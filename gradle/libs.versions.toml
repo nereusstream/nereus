@@ -1,0 +1,18 @@
+[versions]
+# Keep Java aligned with the current Apache Pulsar Gradle build baseline.
+java = "21"
+pulsar = "5.0.0-M1-SNAPSHOT"
+oxia = "0.8.0"
+slf4j = "2.0.18"
+junit-jupiter = "5.13.4"
+
+[libraries]
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
+
+# These are placeholders for the adapter modules once the org forks publish or expose artifacts.
+pulsar-broker = { module = "org.apache.pulsar:pulsar-broker", version.ref = "pulsar" }
+pulsar-managed-ledger = { module = "org.apache.pulsar:managed-ledger", version.ref = "pulsar" }
+oxia-client = { module = "io.streamnative.oxia:oxia-client", version.ref = "oxia" }
+
+[plugins]

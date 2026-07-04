@@ -1,0 +1,9 @@
+Nereus
+Copyright 2026 Nereus contributors
+
+Nereus is a Pulsar-native shared-storage streaming engine designed to integrate
+with Apache Pulsar, KoP, Oxia, and object storage systems.
+
+Apache Pulsar, Apache BookKeeper, and Apache are trademarks of The Apache
+Software Foundation. This repository does not imply endorsement by The Apache
+Software Foundation.

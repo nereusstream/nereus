@@ -1,0 +1,19 @@
+build/
+**/build/
+.gradle/
+.idea/
+*.iml
+.DS_Store
+.classpath
+.project
+.settings/
+
+# Local upstream checkouts kept as sibling repositories, not inside this repo.
+.upstream/
+.worktrees/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+docs/
