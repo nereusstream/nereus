@@ -10,9 +10,6 @@ required=(
   README.md
   LICENSE
   NOTICE
-  docs/design/nereus-design-index.md
-  docs/phase0/repository-plan.md
-  docs/phase0/upstream-forks.md
 )
 
 for path in "${required[@]}"; do
@@ -25,6 +22,13 @@ done
 if [[ -d integrations ]]; then
   echo "integrations/ should not exist in the main repo; use org forks instead" >&2
   exit 1
+fi
+
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if [[ -n "$(git ls-files docs)" ]]; then
+    echo "docs/ should stay out of the pushed code repository for now" >&2
+    exit 1
+  fi
 fi
 
 for module in nereus-api nereus-core nereus-metadata-oxia nereus-object-store \

@@ -12,9 +12,6 @@ not as patch overlays inside this repo.
 
 ```text
 nereus/
-  docs/design/                 Nereus architecture and future design docs
-  docs/phase0/                 engineering bootstrap and repository plan
-  docs/decisions/              architecture decision records
   gradle/                      Gradle wrapper and version catalog
   nereus-api/                  public internal APIs and value types
   nereus-core/                 L0 StreamStorage core
@@ -23,7 +20,6 @@ nereus/
   nereus-managed-ledger/       ManagedLedger facade implementation boundary
   nereus-pulsar-adapter/       Pulsar broker integration boundary
   nereus-kop-adapter/          KoP/Kafka projection boundary
-  distribution/                product distribution assembly
 ```
 
 ## Related Organization Repositories
@@ -35,13 +31,14 @@ github.com/nereusstream/pulsar  -> fork of apache/pulsar
 github.com/nereusstream/kop     -> fork of streamnative/kop
 ```
 
-The main Nereus repository should hold product-owned modules and docs. Forks hold changes that must
-land inside upstream Pulsar or KoP trees.
+The main Nereus repository should hold product-owned modules. Forks hold changes that must
+land inside upstream Pulsar or KoP trees. Design documents are intentionally kept out of the
+pushed code repository for now.
 
 ## Current Phase
 
-Phase 0 creates the standalone Gradle repository scaffold, module boundaries, organization fork workflow,
-and copied design baseline. It does not implement the storage engine yet.
+Phase 0 creates the standalone Gradle repository scaffold, module boundaries, and organization
+fork workflow. It does not implement the storage engine yet.
 
 Recommended implementation sequence:
 
@@ -53,10 +50,6 @@ Recommended implementation sequence:
 6. Future 5: KoP Compatibility
 7. Future 6: Lakehouse SBT / SDT
 8. Future 8: Advanced Pulsar Semantics
-
-## Design Docs
-
-Start with [`docs/design/nereus-design-index.md`](docs/design/nereus-design-index.md).
 
 ## Build
 

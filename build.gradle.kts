@@ -25,10 +25,6 @@ val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::to
 subprojects {
     group = rootProject.group
     version = rootProject.version
-
-    repositories {
-        mavenCentral()
-    }
 }
 
 configure(subprojects.filter { it.name != "nereus-bom" }) {
@@ -81,24 +77,9 @@ tasks.register("quickCheck") {
     dependsOn("checkPhase0")
 }
 
-tasks.register("checkPhase0") {
+tasks.register<Exec>("checkPhase0") {
     group = "verification"
     description = "Verify the Phase 0 repository scaffold."
-    doLast {
-        val required = listOf(
-            "README.md",
-            "LICENSE",
-            "NOTICE",
-            "settings.gradle.kts",
-            "build.gradle.kts",
-            "gradle/libs.versions.toml",
-            "docs/design/nereus-design-index.md",
-            "docs/phase0/repository-plan.md",
-            "docs/phase0/upstream-forks.md"
-        )
-        required.forEach { path ->
-            check(file(path).exists()) { "Missing required file: $path" }
-        }
-        check(!file("integrations").exists()) { "Do not keep integrations/ in the main repo; use org forks." }
-    }
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase0.sh")
 }
