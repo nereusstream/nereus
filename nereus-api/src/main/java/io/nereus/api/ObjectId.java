@@ -12,10 +12,16 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.util.Objects;
+
+/** Durable identifier for an object-store object. */
+public record ObjectId(String value) {
+    public ObjectId {
+        Objects.requireNonNull(value, "value");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("object id cannot be blank");
+        }
+    }
 }

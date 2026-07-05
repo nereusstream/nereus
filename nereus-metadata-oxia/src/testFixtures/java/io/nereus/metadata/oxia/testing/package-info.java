@@ -12,10 +12,5 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
-
-dependencies {
-    api(project(":nereus-api"))
-}
+/** Test-fixture namespace for the future FakeOxiaMetadataStore. */
+package io.nereus.metadata.oxia.testing;

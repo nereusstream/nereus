@@ -12,10 +12,12 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Protocol-neutral label for bytes stored in an append batch. */
+public enum PayloadFormat {
+    OPAQUE_RECORD_BATCH,
+    PULSAR_ENTRY_BATCH,
+    KAFKA_RECORD_BATCH,
+    NORMALIZED_ROW_BATCH
 }

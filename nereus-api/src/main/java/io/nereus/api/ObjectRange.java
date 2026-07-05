@@ -12,10 +12,19 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.util.Objects;
+
+/** Physical byte range inside one object. */
+public record ObjectRange(
+        ObjectKey objectKey,
+        long offset,
+        long length) {
+    public ObjectRange {
+        Objects.requireNonNull(objectKey, "objectKey");
+        if (offset < 0 || length < 0) {
+            throw new IllegalArgumentException("offset and length must be non-negative");
+        }
+    }
 }

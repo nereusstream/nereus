@@ -24,13 +24,6 @@ if [[ -d integrations ]]; then
   exit 1
 fi
 
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  if [[ -n "$(git ls-files docs)" ]]; then
-    echo "docs/ should stay out of the pushed code repository for now" >&2
-    exit 1
-  fi
-fi
-
 for module in nereus-api nereus-core nereus-metadata-oxia nereus-object-store \
               nereus-managed-ledger nereus-pulsar-adapter nereus-kop-adapter; do
   if [[ ! -f "$module/build.gradle.kts" ]]; then

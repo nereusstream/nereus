@@ -14,10 +14,60 @@
 
 package io.nereus.api;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.Objects;
+
 /** Result returned after a batch is durable and visible through Oxia offset index. */
 public record AppendResult(
         StreamId streamId,
         OffsetRange range,
         long committedEndOffset,
+        long generation,
+        ObjectId objectId,
+        ObjectKey objectKey,
+        String sliceId,
+        long objectOffset,
+        long objectLength,
+        PayloadFormat payloadFormat,
+        int recordCount,
+        int entryCount,
+        long logicalBytes,
+        List<SchemaRef> schemaRefs,
+        EntryIndexRef entryIndexRef,
+        Checksum objectChecksum,
+        Checksum sliceChecksum,
+        Optional<ProjectionRef> projectionRef,
         long commitVersion) {
+    public AppendResult {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(range, "range");
+        Objects.requireNonNull(objectId, "objectId");
+        Objects.requireNonNull(objectKey, "objectKey");
+        Objects.requireNonNull(sliceId, "sliceId");
+        Objects.requireNonNull(payloadFormat, "payloadFormat");
+        schemaRefs = List.copyOf(schemaRefs);
+        Objects.requireNonNull(entryIndexRef, "entryIndexRef");
+        Objects.requireNonNull(objectChecksum, "objectChecksum");
+        Objects.requireNonNull(sliceChecksum, "sliceChecksum");
+        projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
+        if (committedEndOffset < range.endOffset()) {
+            throw new IllegalArgumentException("committedEndOffset must be >= range.endOffset");
+        }
+        if (generation < 0) {
+            throw new IllegalArgumentException("generation must be non-negative");
+        }
+        if (sliceId.isBlank()) {
+            throw new IllegalArgumentException("sliceId cannot be blank");
+        }
+        if (objectOffset < 0 || objectLength < 0) {
+            throw new IllegalArgumentException("object offsets and lengths must be non-negative");
+        }
+        if (recordCount < 0 || entryCount < 0 || logicalBytes < 0) {
+            throw new IllegalArgumentException("counts and logicalBytes must be non-negative");
+        }
+        if (commitVersion < 0) {
+            throw new IllegalArgumentException("commitVersion must be non-negative");
+        }
+    }
 }

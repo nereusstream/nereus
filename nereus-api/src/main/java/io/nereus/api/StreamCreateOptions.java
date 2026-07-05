@@ -12,10 +12,17 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.util.Map;
+import java.util.Objects;
+
+/** Options used when creating or looking up a stream. */
+public record StreamCreateOptions(
+        StorageProfile profile,
+        Map<String, String> attributes) {
+    public StreamCreateOptions {
+        Objects.requireNonNull(profile, "profile");
+        attributes = Map.copyOf(attributes);
+    }
 }

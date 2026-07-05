@@ -28,4 +28,16 @@ public record OffsetRange(long startOffset, long endOffset) {
     public long recordCount() {
         return endOffset - startOffset;
     }
+
+    public boolean isEmpty() {
+        return startOffset == endOffset;
+    }
+
+    public boolean contains(long offset) {
+        return offset >= startOffset && offset < endOffset;
+    }
+
+    public boolean overlaps(OffsetRange other) {
+        return startOffset < other.endOffset() && other.startOffset() < endOffset;
+    }
 }

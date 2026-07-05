@@ -83,3 +83,25 @@ tasks.register<Exec>("checkPhase0") {
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-phase0.sh")
 }
+
+val phase1L0Modules = listOf(
+    ":nereus-api",
+    ":nereus-core",
+    ":nereus-metadata-oxia",
+    ":nereus-object-store",
+)
+
+tasks.register<Exec>("checkPhase1L0Dependencies") {
+    group = "verification"
+    description = "Verify Phase 1 L0 modules stay protocol-neutral."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase1-l0-dependencies.sh")
+}
+
+tasks.register("phase1Check") {
+    group = "verification"
+    description = "Verify the Phase 1 Core StreamStorage scaffold."
+    dependsOn("checkPhase0")
+    dependsOn("checkPhase1L0Dependencies")
+    dependsOn(phase1L0Modules.map { "$it:test" })
+}

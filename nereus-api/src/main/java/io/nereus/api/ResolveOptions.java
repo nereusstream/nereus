@@ -12,10 +12,16 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Options for resolving offsets to object ranges. */
+public record ResolveOptions(
+        int maxRanges,
+        boolean allowCache,
+        boolean includeEntryIndex) {
+    public ResolveOptions {
+        if (maxRanges <= 0) {
+            throw new IllegalArgumentException("maxRanges must be positive");
+        }
+    }
 }

@@ -12,10 +12,9 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Physical storage profile for an L0 stream. */
+public enum StorageProfile {
+    OBJECT_WAL
 }

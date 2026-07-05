@@ -12,10 +12,20 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.time.Duration;
+import java.util.Objects;
+
+/** Options for advancing a stream trim low-watermark. */
+public record TrimOptions(
+        Duration timeout,
+        String reason) {
+    public TrimOptions {
+        Objects.requireNonNull(timeout, "timeout");
+        Objects.requireNonNull(reason, "reason");
+        if (timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("timeout must be positive");
+        }
+    }
 }

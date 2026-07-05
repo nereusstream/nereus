@@ -12,10 +12,11 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Future protocol projection reference type. */
+public enum ProjectionType {
+    VIRTUAL_LEDGER,
+    ENTRY_INDEX,
+    PROTOCOL_HINT
 }

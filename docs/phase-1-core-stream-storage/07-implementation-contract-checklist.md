@@ -46,23 +46,21 @@ Before implementing the real `OxiaMetadataStore` adapter:
 
 ## 2.5 Build And Scaffold Gates
 
-Before coding state machines:
+M0 scaffold status before coding state machines:
 
-- migrate the Phase 0 `StreamStorage` byte-array skeleton to the full Phase 1 API, or keep it only as a
-  default wrapper over the full API；
-- expand the existing `AppendResult` record instead of adding a parallel result type；
-- wire `nereus-core` to `nereus-metadata-oxia` and `nereus-object-store` with Gradle `api` only if public
-  core constructors expose those types；
-- expose `FakeOxiaMetadataStore` to core tests through test fixtures, not production packages；
-- keep `checkPhase0` passing while introducing `phase1Check`；
-- scope the dependency guard to Phase 1 L0 modules: `nereus-api`, `nereus-core`, `nereus-metadata-oxia`,
-  and `nereus-object-store`.
+- done: Phase 0 `StreamStorage` byte-array skeleton is removed and the full Phase 1 API surface exists；
+- done: the existing `AppendResult` record is expanded instead of adding a parallel result type；
+- done: `nereus-core` is wired to `nereus-metadata-oxia` and `nereus-object-store` with Gradle `api`；
+- done: `nereus-metadata-oxia` exposes a `java-test-fixtures` boundary for the future fake metadata store；
+- done: `phase1Check` exists and keeps `checkPhase0` passing；
+- done: the dependency guard is scoped to Phase 1 L0 modules: `nereus-api`, `nereus-core`,
+  `nereus-metadata-oxia`, and `nereus-object-store`.
 
 ## 3. Stop-The-Line Conditions
 
 Stop implementation and update design first if any of these are discovered:
 
-- The Phase 0 skeleton API remains as the only `StreamStorage` surface after M1.
+- The Phase 0 skeleton API remains as the only `StreamStorage` surface after M0.
 - Core tests need fake metadata classes from production packages instead of test fixtures.
 - Oxia Java client cannot do the required single-key-group conditional multi-write.
 - M4 core append starts before the Oxia capability spike has real-client evidence for conditional

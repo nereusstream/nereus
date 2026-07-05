@@ -1,46 +1,49 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。当前请求只写设计，不写实现代码；本文件
-用于后续开始编码时逐项推进。
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0 scaffold migration 已开始落代码；后续每个
+里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
 
 ### M0 Phase 0 scaffold migration
 
-Current scaffold state:
+M0 implementation status:
 
-- `nereus-api` has a minimal `StreamStorage.append(StreamId, byte[], int)` and
-  `read(StreamId, long, int)`；
-- `AppendResult` currently has only `streamId`, `range`, `committedEndOffset`, and `commitVersion`；
-- `nereus-core`, `nereus-metadata-oxia`, and `nereus-object-store` currently expose only marker classes；
-- `nereus-core/build.gradle.kts` currently depends only on `nereus-api`。
+- `nereus-api` has the full Phase 1 `StreamStorage` method surface；
+- the old byte-array `append/read` skeleton methods have been removed；
+- `AppendResult` has the Phase 1 fields for object/slice/checksum/schema/index metadata；
+- `nereus-api` contains the M0 value-record shell for identity, append, read, resolve, trim, object refs,
+  checksum, projection, error model, and shared key/hash helpers；
+- `nereus-core/build.gradle.kts` depends on `nereus-api`, `nereus-metadata-oxia`, and
+  `nereus-object-store`；
+- `nereus-metadata-oxia` applies `java-test-fixtures`; the future `FakeOxiaMetadataStore` implementation
+  still belongs to M2；
+- root `phase1Check` runs `checkPhase0`, L0 module tests, and `checkPhase1L0Dependencies`；
+- `checkPhase1L0Dependencies` is a direct-dependency scaffold guard over the L0 module build files。
 
-Migration tasks:
+M0 migration tasks:
 
-- replace the minimal `StreamStorage` interface with the Phase 1 API from
+- done: replace the minimal `StreamStorage` interface with the Phase 1 API from
   `01-api-and-domain-model.md`；
-- keep the old byte-array append/read shape only as a default convenience wrapper after the real API
-  exists, or remove it before M1 exit；
-- expand `AppendResult` in place instead of introducing a second result type；
-- add all missing `nereus-api` value records before implementing core state machines；
-- wire `nereus-core` to `nereus-metadata-oxia` and `nereus-object-store`. If public core constructors keep
-  `OxiaMetadataStore`, `WalObjectWriter`, or `WalObjectReader` in their signatures, those dependencies must
-  be Gradle `api`; if a factory hides them, `implementation` is enough；
-- keep `nereus-managed-ledger`, `nereus-pulsar-adapter`, and `nereus-kop-adapter` compiling but outside
-  the Phase 1 L0 dependency guard；
-- expose `FakeOxiaMetadataStore` to `nereus-core` tests through Gradle `java-test-fixtures` or an explicit
-  test-fixtures artifact, not through production packages；
-- add the root `phase1Check` task only after the module-level gates below exist.
+- done: remove the old byte-array append/read shape instead of keeping it as a parallel API；
+- done: expand `AppendResult` in place instead of introducing a second result type；
+- done: add M0 shells for the missing `nereus-api` value records needed before core state machines；
+- done: wire `nereus-core` to `nereus-metadata-oxia` and `nereus-object-store` using Gradle `api`；
+- done: keep `nereus-managed-ledger`, `nereus-pulsar-adapter`, and `nereus-kop-adapter` outside the
+  Phase 1 L0 dependency guard；
+- done: prepare `nereus-metadata-oxia` test fixtures as the future fake metadata exposure path for
+  `nereus-core` tests；
+- done: add the root `phase1Check` task and a small L0 dependency guard。
 
 Exit:
 
-- `./gradlew checkPhase0` still passes；
+- `./gradlew phase1Check` passes and includes `checkPhase0`；
 - `./gradlew :nereus-api:test :nereus-metadata-oxia:test :nereus-object-store:test :nereus-core:test`
-  can be wired without adapter modules；
-- `dependencyInsight` or a small custom dependency guard can prove Phase 1 modules have no Pulsar, KoP,
-  BookKeeper, or Kafka runtime dependencies。
+  are wired without adapter modules；
+- `checkPhase1L0Dependencies` proves the Phase 1 L0 module build files do not declare Pulsar,
+  BookKeeper, Kafka, or Confluent dependencies。
 
-### M1 API expansion
+### M1 API validation hardening
 
 Module:
 
@@ -50,26 +53,24 @@ nereus-api
 
 Tasks:
 
-- expand `StreamStorage` from Phase 0 skeleton to full Phase 1 API；
-- add identity/value records；
-- add shared key/hash helpers under `nereus-api` for durable path components, deterministic stream ids,
-  fixed-width non-negative long encoding, and writer/run hash components；
-- add append/read/resolve/trim option and result types；
-- add support reference types such as `SchemaRef`, `ProjectionRef`, `EntryIndexRef`, object refs, and
-  `ErrorCode`；
-- add error model；
-- make stream attributes and slice schema refs part of the public result types where needed；
-- add close/backpressure/timeout error codes；
-- expand `AppendResult` with slice id, generation, checksums, payload format, record counts, and
-  logical bytes；
+- review the M0 API shells against `01-api-and-domain-model.md` and tighten validation where M0 stayed
+  intentionally lightweight；
+- add constants for encoded metadata limits such as stream attributes, entry attributes, and schema refs；
+- add deterministic/canonical ordering helpers for schema refs and map encodings where they belong in API
+  helpers；
+- add defaults or factories for common option values only where they do not hide correctness settings；
+- add unit tests for `KeyComponentCodec`, `DeterministicIds`, `OffsetRange`, checksum validation, byte-array
+  defensive copies, and basic value validation；
 - keep all types protocol-neutral；
-- add unit tests for value validation。
+- decide whether a byte-array convenience wrapper is useful; if added, it must be a default wrapper over
+  the full API and preserve Phase 1 opaque-entry rules。
 
 Exit:
 
 - `nereus-api` compiles；
 - no Pulsar/KoP dependencies；
-- API tests cover invalid ranges, blank ids, empty batches。
+- API tests cover invalid ranges, blank ids, empty batches, key encoding edge cases, stream id generation,
+  and checksum formatting。
 
 ### M2 Fake metadata and Oxia key model
 
@@ -542,9 +543,9 @@ forbidden packages:
 
 Phase 1 may mention `PULSAR_ENTRY_BATCH` as an enum value, but must not depend on Pulsar classes.
 
-## 6. Suggested Gradle Tasks
+## 6. Gradle Tasks
 
-Later implementation can add:
+Current M0 verification commands:
 
 ```text
 ./gradlew checkPhase0
@@ -555,14 +556,20 @@ Later implementation can add:
 ./gradlew phase1Check
 ```
 
-`phase1Check` should depend on:
+M0 `phase1Check` currently depends on:
 
-- unit tests；
+- `checkPhase0`；
+- L0 module tests for `nereus-api`, `nereus-core`, `nereus-metadata-oxia`, and `nereus-object-store`；
 - dependency guard scoped to `nereus-api`, `nereus-core`, `nereus-metadata-oxia`, and
-  `nereus-object-store`；
+  `nereus-object-store`。
+
+Future milestones should add these gates to `phase1Check` when the corresponding code exists:
+
 - formatting/checkstyle if introduced；
+- API validation unit tests；
 - object WAL round-trip tests；
-- fake metadata invariant tests。
+- fake metadata invariant tests；
+- real Oxia contract tests when the adapter exists。
 
 `phase1Check` must not require `nereus-managed-ledger`, `nereus-pulsar-adapter`, or `nereus-kop-adapter`
 to implement their future behavior. Those modules may keep marker classes or compile-only boundaries while

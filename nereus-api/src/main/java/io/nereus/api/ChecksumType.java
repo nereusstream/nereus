@@ -12,10 +12,10 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Canonical checksum representation exposed by API values. */
+public enum ChecksumType {
+    CRC32C,
+    SHA256
 }

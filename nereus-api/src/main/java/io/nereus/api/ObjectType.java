@@ -12,10 +12,12 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Durable object format family. */
+public enum ObjectType {
+    MULTI_STREAM_WAL_OBJECT,
+    INDEX_OBJECT,
+    STREAM_COMPACTED_OBJECT,
+    CURSOR_SNAPSHOT_OBJECT
 }

@@ -14,4 +14,7 @@
 
 dependencies {
     api(project(":nereus-api"))
+    api(project(":nereus-metadata-oxia"))
+    api(project(":nereus-object-store"))
+    testImplementation(testFixtures(project(":nereus-metadata-oxia")))
 }

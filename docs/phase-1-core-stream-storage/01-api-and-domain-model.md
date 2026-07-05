@@ -59,11 +59,13 @@ public interface StreamStorage extends AutoCloseable {
 }
 ```
 
-Implementation note:
+Implementation status:
 
-- Existing Phase 0 `StreamStorage.append(StreamId, byte[], int)` can be removed or kept as a default
-  convenience wrapper only after the full API exists.
-- The convenience wrapper must internally build `AppendBatch` and `AppendOptions`, then call the real API.
+- M0 removed the Phase 0 `StreamStorage.append(StreamId, byte[], int)` and
+  `read(StreamId, long, int)` skeleton methods.
+- The full Phase 1 API shape now exists in `nereus-api`.
+- A byte-array convenience wrapper can be reintroduced later only as a default wrapper over this full API,
+  not as a separate durable surface.
 
 Public offset argument validation:
 
@@ -118,7 +120,7 @@ Validation:
 
 ### `StreamId`
 
-Existing record can stay, but Phase 1 should define generation rules:
+M0 keeps the existing record and adds Phase 1 generation rules through shared helpers:
 
 ```java
 public record StreamId(String value) {

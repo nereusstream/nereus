@@ -12,10 +12,11 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Where entry index bytes can be found. */
+public enum EntryIndexLocation {
+    INLINE,
+    OBJECT_FOOTER,
+    INDEX_OBJECT
 }

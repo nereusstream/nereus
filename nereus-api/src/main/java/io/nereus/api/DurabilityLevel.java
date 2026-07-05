@@ -12,10 +12,9 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+/** Durability level requested by append. */
+public enum DurabilityLevel {
+    WAL_DURABLE_AND_INDEX_COMMITTED
 }

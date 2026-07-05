@@ -17,8 +17,37 @@ package io.nereus.api;
 import java.util.concurrent.CompletableFuture;
 
 /** Protocol-neutral L0 storage API. */
-public interface StreamStorage {
-    CompletableFuture<AppendResult> append(StreamId streamId, byte[] payload, int recordCount);
+public interface StreamStorage extends AutoCloseable {
+    CompletableFuture<StreamMetadata> createOrGetStream(
+            StreamName streamName,
+            StreamCreateOptions options);
 
-    CompletableFuture<byte[]> read(StreamId streamId, long offset, int maxRecords);
+    CompletableFuture<AppendSession> acquireAppendSession(
+            StreamId streamId,
+            AppendSessionOptions options);
+
+    CompletableFuture<AppendResult> append(
+            StreamId streamId,
+            AppendBatch batch,
+            AppendOptions options);
+
+    CompletableFuture<ReadResult> read(
+            StreamId streamId,
+            long startOffset,
+            ReadOptions options);
+
+    CompletableFuture<ResolveResult> resolve(
+            StreamId streamId,
+            long startOffset,
+            ResolveOptions options);
+
+    CompletableFuture<Void> trim(
+            StreamId streamId,
+            long beforeOffset,
+            TrimOptions options);
+
+    CompletableFuture<StreamMetadata> getStreamMetadata(StreamId streamId);
+
+    @Override
+    void close();
 }

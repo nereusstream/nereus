@@ -12,10 +12,19 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.util.Objects;
+
+/** Opaque reference to future protocol projection metadata. */
+public record ProjectionRef(
+        ProjectionType type,
+        String value) {
+    public ProjectionRef {
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(value, "value");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("projection value cannot be blank");
+        }
+    }
 }

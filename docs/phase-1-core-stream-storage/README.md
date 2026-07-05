@@ -51,9 +51,19 @@ Phase 1 继承这些不变量：
 | `nereus-pulsar-adapter` | Phase 1 不接入 |
 | `nereus-kop-adapter` | Phase 1 不接入 |
 
-当前代码仍是 Phase 0 skeleton：`nereus-api.StreamStorage` 只有 byte-array append/read，核心模块多为
-marker class。Phase 1 开工第一步必须按 `05-implementation-plan-and-tests.md` 的 M0 迁移骨架，
-再进入状态机实现。
+M0 scaffold migration 已完成。当前代码状态：
+
+- `nereus-api.StreamStorage` 已迁移为 Phase 1 full API surface，旧 byte-array append/read skeleton
+  已移除；
+- `AppendResult` 已原地扩展为 Phase 1 result shape；
+- `nereus-api` 已包含 Phase 1 的 protocol-neutral value records、错误模型和共享 key/hash helpers；
+- `nereus-core` 已通过 Gradle 依赖连接到 `nereus-metadata-oxia` 和 `nereus-object-store`；
+- `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
+  出口；
+- root `phase1Check` 已存在，并包含 `checkPhase0`、L0 module tests 和 Phase 1 L0 dependency guard。
+
+M0 只迁移脚手架和类型边界，不实现 append/read/trim 状态机。后续 M1 继续加固 API validation 和
+单元测试，M2/M3 分别落 metadata 与 object WAL。
 
 Phase 1 允许的依赖方向：
 
@@ -127,11 +137,14 @@ public interface StreamStorage extends AutoCloseable {
             TrimOptions options);
 
     CompletableFuture<StreamMetadata> getStreamMetadata(StreamId streamId);
+
+    @Override
+    void close();
 }
 ```
 
-现有 `nereus-api` 里的 `StreamStorage` 仍是 Phase 0 极简骨架。Phase 1 实现前应按
-`01-api-and-domain-model.md` 演进。
+M0 后，`nereus-api` 里的 `StreamStorage` 已按此 API 形状迁移；append/read/trim 的实际状态机仍在
+后续 M4/M5/M6 实现。
 
 ## 5. Initial Code Package Plan
 

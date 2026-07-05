@@ -12,10 +12,16 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.api;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.util.Objects;
+
+/** Object-store key for immutable object bytes. */
+public record ObjectKey(String value) {
+    public ObjectKey {
+        Objects.requireNonNull(value, "value");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("object key cannot be blank");
+        }
+    }
 }
