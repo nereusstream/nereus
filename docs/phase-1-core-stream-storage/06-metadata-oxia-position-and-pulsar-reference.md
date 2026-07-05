@@ -108,45 +108,67 @@ prove that Pulsar's generic metadata API is sufficient for Nereus stream visibil
 
 ## 6. Oxia Java Client Surface Checked
 
-On 2026-07-05, the public Oxia Java client repository exposes:
+On 2026-07-05, M0.5 added a real-client capability spike using:
 
-- [`AsyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/AsyncOxiaClient.java)
-- [`SyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/SyncOxiaClient.java)
-- [`client.proto`](https://github.com/oxia-db/oxia-client-java/blob/main/client/src/main/proto/io/streamnative/oxia/client.proto)
+- Oxia client: `io.github.oxia-db:oxia-client:0.9.0`；
+- Oxia Testcontainers helper: `io.github.oxia-db:oxia-testcontainers:0.7.4`；
+- Testcontainers JUnit: `org.testcontainers:junit-jupiter:1.20.4`；
+- Oxia image: `oxia/oxia:0.16.3`；
+- Gradle task: `./gradlew :nereus-metadata-oxia:oxiaCapabilitySpike`。
+
+The spike is implemented under the dedicated `oxiaCapabilitySpike` source set in `nereus-metadata-oxia`.
+It writes `build/reports/oxia-capability-spike/summary.md` and `summary.json` when the Docker-backed task
+runs successfully. Root `phase1Check` only compiles the spike source; it does not start Docker.
+
+The public Oxia Java client repository surface checked for this decision is:
+
+- [`AsyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/AsyncOxiaClient.java)；
+- [`SyncOxiaClient.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/SyncOxiaClient.java)；
+- [`PutOption.java`](https://github.com/oxia-db/oxia-client-java/blob/main/client-api/src/main/java/io/oxia/client/api/options/PutOption.java)；
+- [`client.proto`](https://github.com/oxia-db/oxia-client-java/blob/main/client/src/main/proto/io/streamnative/oxia/client.proto)。
 
 Observed surface:
 
 - public sync/async APIs expose single-key `put`, `delete`, `get`, `list`, `rangeScan`, notifications, and
   sequence-update calls；
 - `PutOption`/`DeleteOption` support conditional version checks and partition key options；
-- the proto contains batched write messages, but the public Java API surface above does not by itself prove
-  a supportable multi-key conditional commit API for Nereus。
+- partition-key routing is explicit on get/put/list/rangeScan/sequence APIs；
+- the proto contains batched write messages, but the selected public Java API does not expose a supportable
+  multi-key conditional write/transaction primitive for Nereus。
 
-Therefore the Phase 1 design must keep treating single-key-group conditional multi-write as an unproven
-capability until a real-client spike proves the exact API and failure semantics.
+M0.5 result: `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` for the original single-key-group conditional multi-write
+assumption. This is a valid spike result, not a test failure. It means the original `commitStreamSlice`
+linearization point is blocked until M2 redesigns the commit protocol around an Oxia-supported primitive.
 
-## 7. Required Capability Spike
+## 7. Capability Spike Contract
 
-Before implementing the real `OxiaMetadataStore`, run a small capability spike against the exact Oxia
-Java client dependency planned for Phase 1. This is a stop-the-line gate, not a nice-to-have experiment.
+Before implementing the real `OxiaMetadataStore`, keep the M0.5 spike runnable against the exact Oxia Java
+client dependency planned for Phase 1. This is a stop-the-line gate, not a nice-to-have experiment.
 
-1. Verify how to route every stream-scoped key with the same partition key.
-2. Verify whether the Java client supports conditional multi-write within one key group through a public
-   or supportable API.
-3. Verify version/CAS failure mapping for stale append sessions and offset conflicts.
-4. Verify sequence key behavior if we use server-assigned stream ids, commit versions, or virtual ledger ids.
-5. Verify watch/notification ordering and whether notifications can collapse intermediate updates.
-6. Verify range scan ordering with fixed-width numeric key encoding.
+Already covered by M0.5:
+
+1. stream-scoped keys can be routed with the same partition key；
+2. single-key `IfVersionIdEquals` CAS succeeds and stale versions fail with an Oxia version-conflict
+   exception；
+3. sequence keys require partition-key-aware usage and generate fixed-width suffixes；
+4. range/list ordering works for fixed-width numeric offset-index keys；
+5. the selected public Java API does not expose the multi-key conditional write primitive required by the
+   original design。
+
+Still required before the real adapter:
+
+1. redesign and document the M2 commit protocol around one public Oxia-supported linearization point；
+2. add real/fake contract tests for that redesigned protocol；
+3. verify watch/notification ordering and whether notifications can collapse intermediate updates；
+4. record exception mapping from the redesigned adapter operations into Nereus errors。
 
 Required spike shape:
 
-- create two or more keys routed by the same stream partition key；
-- issue one commit attempt that conditionally updates committed-end, writes one offset-index key, and
-  writes one committed-slice marker；
-- force a condition failure on one participating key and prove no participating write is applied；
-- force concurrent writers racing on the same expected committed end and prove exactly one visible commit；
 - run against the real client, not only `FakeOxiaMetadataStore`；
-- record API calls, observed exception types, and whether partition key is explicit on each operation。
+- record API calls, observed exception types, dependency versions, container image, and whether partition
+  key is explicit on each operation；
+- keep `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` as a passing report status for M0.5, because the spike's job is
+  to discover capability, not to make the unavailable primitive appear。
 
 If conditional multi-write is not available, Phase 1 must not emulate it with unsafe multi-step writes.
 Instead, redesign the append linearization around one authoritative stream-head record CAS plus derived

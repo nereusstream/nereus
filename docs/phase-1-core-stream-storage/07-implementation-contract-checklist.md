@@ -34,14 +34,17 @@
 
 Before implementing the real `OxiaMetadataStore` adapter:
 
-1. Run the Oxia Java client capability spike from `06-metadata-oxia-position-and-pulsar-reference.md`.
-2. Prove same stream key group conditional multi-write is available through the selected Java client API, or
-   redesign `commitStreamSlice`.
-3. Prove every get/put/scan/watch/commit call passes the expected partition key.
-4. Decide and freeze the Phase 1 `MetadataCodecRegistry`.
-5. Add golden-byte codec tests for every Phase 1 metadata record type.
-6. Make `FakeOxiaMetadataStore` and the real adapter share the same metadata codecs.
-7. Freeze `nereus-api` deterministic id/key helpers: exact `StreamName.value()` hashing, full `streamId`
+1. Keep the M0.5 Oxia Java client capability spike from
+   `06-metadata-oxia-position-and-pulsar-reference.md` compiling and runnable.
+2. Treat the current M0.5 result, `NOT_SUPPORTED_BY_PUBLIC_JAVA_API`, as a hard input: same stream key
+   group conditional multi-write is not available through the selected public Java client API.
+3. Redesign `commitStreamSlice` before M2 fake metadata or M4 core append rely on a real adapter contract.
+4. Do not make `FakeOxiaMetadataStore` stronger than the selected public Oxia Java client API.
+5. Prove every get/put/scan/watch/commit call passes the expected partition key.
+6. Decide and freeze the Phase 1 `MetadataCodecRegistry`.
+7. Add golden-byte codec tests for every Phase 1 metadata record type.
+8. Make `FakeOxiaMetadataStore` and the real adapter share the same metadata codecs.
+9. Freeze `nereus-api` deterministic id/key helpers: exact `StreamName.value()` hashing, full `streamId`
    hash, key-safe component escaping, writer/run hash components, and 19-digit offset/generation keys.
 
 ## 2.5 Build And Scaffold Gates
@@ -55,6 +58,11 @@ M0 scaffold status before coding state machines:
 - done: `phase1Check` exists and keeps `checkPhase0` passing；
 - done: the dependency guard is scoped to Phase 1 L0 modules: `nereus-api`, `nereus-core`,
   `nereus-metadata-oxia`, and `nereus-object-store`.
+- done: M0.5 adds `:nereus-metadata-oxia:oxiaCapabilitySpike` as a Docker-backed Testcontainers task；
+- done: `phase1Check` compiles `:nereus-metadata-oxia:compileOxiaCapabilitySpikeJava` but does not run
+  Docker；
+- done: M0.5 records the selected public Oxia Java API result as
+  `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` for multi-key conditional write.
 
 ## 3. Stop-The-Line Conditions
 
@@ -62,12 +70,14 @@ Stop implementation and update design first if any of these are discovered:
 
 - The Phase 0 skeleton API remains as the only `StreamStorage` surface after M0.
 - Core tests need fake metadata classes from production packages instead of test fixtures.
-- Oxia Java client cannot do the required single-key-group conditional multi-write.
-- M4 core append starts before the Oxia capability spike has real-client evidence for conditional
-  multi-write and partition-key routing.
+- A design or fake implementation assumes Oxia public Java client can do single-key-group conditional
+  multi-write without a new passing spike proving that exact API.
+- M4 core append starts before partition-key routing has real-client evidence and the commit protocol has
+  been redesigned to avoid the unavailable multi-key conditional write primitive.
 - The real adapter cannot route all stream-scoped operations with `PartitionKey(streamId)`.
 - Offset index scan cannot preserve 19-digit zero-padded offset/generation ordering.
-- `commitVersion` cannot be computed before encoding the atomic stream commit batch.
+- redesigned commit protocol cannot assign a durable `commitVersion` that can be validated across
+  committed-end, offset-index, and committed-slice state.
 - L0 code needs to parse Pulsar topic syntax or use a human-readable alias as the durable `StreamId`.
 - Metadata and object modules need separate implementations of durable key/hash helpers.
 - Object keys or Oxia paths need raw `cluster`, raw `writerId`, or truncated writer/run hashes.
@@ -93,6 +103,10 @@ Stop implementation and update design first if any of these are discovered:
   uses `forceSingleStreamObject=true`.
 
 ## 4. Commit Contract
+
+M0.5 redesign gate: this section describes the original visibility contract that the redesigned M2
+metadata protocol must preserve, not the current implementation recipe. Do not implement it as a multi-key
+conditional Oxia write unless a future spike proves a supportable public Java API for that primitive.
 
 Producer ack is allowed only after:
 
@@ -154,6 +168,7 @@ payload bytes actually returned after clipping.
 `phase1Check` should not pass without:
 
 - no Pulsar/KoP/BookKeeper dependency guard for Phase 1 modules;
+- compiling the M0.5 Oxia capability spike without starting Docker;
 - fake metadata invariant tests;
 - exact stream-name hash and deterministic stream-id tests;
 - shared key/hash helper parity tests across Oxia keyspace and object key generation;

@@ -16,6 +16,42 @@ plugins {
     `java-test-fixtures`
 }
 
+val oxiaCapabilitySpike by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[oxiaCapabilitySpike.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[oxiaCapabilitySpike.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
 dependencies {
     api(project(":nereus-api"))
+
+    add(oxiaCapabilitySpike.implementationConfigurationName, project())
+    add(oxiaCapabilitySpike.implementationConfigurationName, platform(libs.grpc.bom))
+    add(oxiaCapabilitySpike.implementationConfigurationName, platform(libs.opentelemetry.bom))
+    add(oxiaCapabilitySpike.implementationConfigurationName, platform(libs.opentelemetry.bom.alpha))
+    add(oxiaCapabilitySpike.implementationConfigurationName, libs.oxia.client)
+    add(oxiaCapabilitySpike.implementationConfigurationName, libs.oxia.testcontainers)
+    add(oxiaCapabilitySpike.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(oxiaCapabilitySpike.implementationConfigurationName, libs.junit.jupiter)
+    add(oxiaCapabilitySpike.implementationConfigurationName, libs.assertj)
+    add(oxiaCapabilitySpike.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")
+
+tasks.register<Test>("oxiaCapabilitySpike") {
+    group = "verification"
+    description = "Run the M0.5 Oxia Java client capability spike against a Testcontainers Oxia server."
+    testClassesDirs = oxiaCapabilitySpike.output.classesDirs
+    classpath = oxiaCapabilitySpike.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+    workingDir = projectDir
+    outputs.dir(oxiaCapabilitySpikeReportDir)
 }

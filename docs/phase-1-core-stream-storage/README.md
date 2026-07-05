@@ -295,14 +295,17 @@ committed-end 和 trim 初始记录。后续如果要随机或 sequence stream i
 这些项目不改变 Phase 1 的语义合同，但在实现真实 Oxia adapter 前必须证明或触发
 `07-implementation-contract-checklist.md` 的 stop-the-line 改设计流程：
 
-1. Phase 1 的真实 Oxia 集成是否先做 embedded/fake contract test，再接远端 Oxia。
-2. Oxia Java client 是否支持我们需要的单 stream key group 条件批提交；如果不支持，需要把
-   `commitStreamSlice` 进一步压缩为单 authoritative stream-head record CAS。
+1. Phase 1 的真实 Oxia 集成是否先做 Testcontainers/fake contract test，再接远端 Oxia。
+2. M0.5 已增加 `:nereus-metadata-oxia:oxiaCapabilitySpike`，使用真实 Oxia Testcontainers 验证
+   partition key、单 key CAS、sequence key 和 fixed-width offset key ordering。
+3. M0.5 当前结论是 `NOT_SUPPORTED_BY_PUBLIC_JAVA_API`：选定 public Oxia Java client API 不支持
+   原设计需要的单 stream key group 条件批提交。因此 M2/M4 前必须把 `commitStreamSlice` 重设为
+   Oxia public API 支持的线性化协议，例如单 authoritative stream-head record CAS。
 
 这个 spike 不是优化项，而是 M2/M4 前置门禁。当前公开 Oxia Java client API 只直接暴露了单 key
 conditional put/delete 形态；底层 proto 有 batched write request 并不能自动证明 Java client
-提供了 Nereus 需要的 single-key-group conditional multi-write 语义。没有探针代码和 contract test
-证据之前，`commitStreamSlice` 的线性化点只能被视为高风险假设。
+提供了 Nereus 需要的 single-key-group conditional multi-write 语义。M0.5 把这个风险确认成当前
+设计阻塞：fake metadata 不能模拟比真实 public adapter 更强的原子提交能力。
 
 Already settled for Phase 1:
 

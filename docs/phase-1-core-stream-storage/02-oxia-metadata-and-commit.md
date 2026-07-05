@@ -2,6 +2,12 @@
 
 本文把 Phase 1 需要的 Oxia metadata schema、record 类型和 commit 操作拆到代码级。
 
+M0.5 status: the selected public Oxia Java client API does not expose the multi-key conditional write
+primitive assumed by the original `commitStreamSlice` protocol below. Treat sections that describe one
+atomic stream commit batch as pre-redesign design input, not as implementation-ready contract. M2 must
+replace the append linearization protocol before fake metadata or real adapter work implements
+`commitStreamSlice`.
+
 ## 1. Metadata Responsibility
 
 Oxia metadata layer owns:
@@ -58,10 +64,10 @@ Notes:
   compaction generation.
 - All stream-scoped keys participating in `commitStreamSlice` must use `PartitionKey(streamId)` or an
   equivalent Oxia key-group routing rule so the visible append commit is single-key-group atomic.
-  This is a required client capability assumption until the real Oxia Java client spike proves the exact
-  API and failure semantics. If the selected client cannot express atomic conditional multi-write inside
-  one key group, this keyspace can stay, but the `commitStreamSlice` linearization design must be replaced
-  before M4 core append starts.
+  M0.5 confirmed that the selected public Oxia Java client API does not expose the required atomic
+  conditional multi-write primitive. This keyspace can stay, but the original `commitStreamSlice`
+  linearization design must be replaced before M2 fake metadata semantics are frozen or M4 core append
+  starts.
 - Stream creation also uses `PartitionKey(streamId)`. Phase 1 derives `streamId` deterministically from
   the exact `StreamName.value()`, so the by-name lookup and the initial stream records can be committed
   in the same key group.

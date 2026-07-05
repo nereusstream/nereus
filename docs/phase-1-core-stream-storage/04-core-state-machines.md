@@ -2,6 +2,12 @@
 
 本文定义 `nereus-core` 的 append、resolve/read、trim 和 recovery 状态机。
 
+M0.5 status: the append state machine still shows the original `commitStreamSlice` boundary, but that
+boundary is blocked for implementation because the selected public Oxia Java client API cannot perform the
+assumed multi-key conditional commit. M2 must redesign the metadata linearization point first; until then,
+the append commit details in this file are design input and test requirements to re-evaluate, not a
+ready-to-code adapter contract.
+
 ## 1. Core Components
 
 Package plan:
@@ -155,6 +161,10 @@ Rules:
 - if manifest fails, no offset index commit。
 
 ### `COMMIT_OFFSET_INDEX`
+
+M0.5 redesign gate: this state cannot be implemented as a multi-key conditional Oxia write with the
+current public Java client. Keep the sequencing, timeout, idempotent retry, and visibility requirements,
+but redefine the metadata operation before M2/M4 implementation.
 
 Call:
 

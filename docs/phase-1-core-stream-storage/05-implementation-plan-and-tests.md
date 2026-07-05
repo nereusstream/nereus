@@ -43,6 +43,39 @@ Exit:
 - `checkPhase1L0Dependencies` proves the Phase 1 L0 module build files do not declare Pulsar,
   BookKeeper, Kafka, or Confluent dependencies。
 
+### M0.5 Oxia capability spike
+
+M0.5 implementation status:
+
+- `gradle/libs.versions.toml` uses the official Oxia Java client coordinates
+  `io.github.oxia-db:oxia-client:0.9.0`；
+- `nereus-metadata-oxia` has an independent `oxiaCapabilitySpike` test source set and Gradle task；
+- the spike uses `io.github.oxia-db:oxia-testcontainers:0.7.4`,
+  `org.testcontainers:junit-jupiter:1.20.4`, and Oxia image `oxia/oxia:0.16.3`；
+- root `phase1Check` compiles the spike source through
+  `:nereus-metadata-oxia:compileOxiaCapabilitySpikeJava` but does not run Docker；
+- `:nereus-metadata-oxia:oxiaCapabilitySpike` starts real Oxia through Testcontainers and writes
+  `build/reports/oxia-capability-spike/summary.md` plus `summary.json`；
+- the current public Java API probe result is `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` for the original
+  same-key-group conditional multi-write assumption。
+
+M0.5 spike coverage:
+
+- partition-key routed put/get/list/rangeScan；
+- single-key conditional put with `IfVersionIdEquals` and stale-version conflict mapping；
+- offset-index style fixed-width numeric key ordering；
+- sequence key generation with partition key；
+- reflection over public `AsyncOxiaClient` and `SyncOxiaClient` APIs for transaction/multi-key/batch
+  write primitives。
+
+Exit:
+
+- `./gradlew phase1Check` compiles the spike without requiring Docker；
+- `./gradlew :nereus-metadata-oxia:oxiaCapabilitySpike` passes when Docker/Testcontainers is available；
+- a passing spike with `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` is still a valid M0.5 result, but it blocks the
+  original M2/M4 `commitStreamSlice` design until the append linearization point is redesigned；
+- docs `06`、`07`、`08` record the exact dependency versions, container image, and stop-line result。
+
 ### M1 API validation hardening
 
 Module:
@@ -82,10 +115,13 @@ nereus-metadata-oxia
 
 Tasks:
 
-- run the Oxia Java client capability spike from `06-metadata-oxia-position-and-pulsar-reference.md`；
-- record the spike result in the repository docs before freezing fake metadata semantics；
-- if the spike cannot prove native or equivalent same-key-group conditional multi-write, stop M2 and
-  redesign `commitStreamSlice` before M4 starts；
+- consume the M0.5 Oxia Java client capability result from
+  `:nereus-metadata-oxia:oxiaCapabilitySpike`；
+- treat `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` as the current design input: fake metadata must not implement
+  a stronger multi-key atomic commit than the public real adapter can express；
+- redesign `commitStreamSlice` around an Oxia-supported linearization point before freezing fake metadata
+  semantics；the preferred starting point is one authoritative stream-head record CAS with repairable
+  derived offset-index and committed-slice records；
 - add `OxiaKeyspace` using the shared `nereus-api` key/hash helpers；
 - add key-safe path component encoding for cluster, stream names, object ids, slice ids, offsets, and
   generations；
@@ -114,8 +150,8 @@ Tasks:
 Exit:
 
 - fake store passes linearizable single-process tests；
-- Oxia capability spike result is recorded and either proves required conditional multi-write semantics or
-  points to an updated commit protocol design；
+- M2 records an updated commit protocol design that does not depend on an unavailable public
+  multi-key conditional write API；
 - offset scan ordering is tested with offsets like `9`, `10`, `100`；
 - stale epoch and offset conflict are distinguishable；
 - fake store rejects a commit batch that mixes stream-scoped and object-scoped key groups on the ack path；

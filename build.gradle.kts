@@ -104,4 +104,5 @@ tasks.register("phase1Check") {
     dependsOn("checkPhase0")
     dependsOn("checkPhase1L0Dependencies")
     dependsOn(phase1L0Modules.map { "$it:test" })
+    dependsOn(":nereus-metadata-oxia:compileOxiaCapabilitySpikeJava")
 }
