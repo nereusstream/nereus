@@ -16,4 +16,4 @@ build/
 *.log
 *.tmp
 
-docs/
+*.zip
