@@ -1,0 +1,627 @@
+# 05 Implementation Plan and Tests
+
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。当前请求只写设计，不写实现代码；本文件
+用于后续开始编码时逐项推进。
+
+## 1. Milestones
+
+### M0 Phase 0 scaffold migration
+
+Current scaffold state:
+
+- `nereus-api` has a minimal `StreamStorage.append(StreamId, byte[], int)` and
+  `read(StreamId, long, int)`；
+- `AppendResult` currently has only `streamId`, `range`, `committedEndOffset`, and `commitVersion`；
+- `nereus-core`, `nereus-metadata-oxia`, and `nereus-object-store` currently expose only marker classes；
+- `nereus-core/build.gradle.kts` currently depends only on `nereus-api`。
+
+Migration tasks:
+
+- replace the minimal `StreamStorage` interface with the Phase 1 API from
+  `01-api-and-domain-model.md`；
+- keep the old byte-array append/read shape only as a default convenience wrapper after the real API
+  exists, or remove it before M1 exit；
+- expand `AppendResult` in place instead of introducing a second result type；
+- add all missing `nereus-api` value records before implementing core state machines；
+- wire `nereus-core` to `nereus-metadata-oxia` and `nereus-object-store`. If public core constructors keep
+  `OxiaMetadataStore`, `WalObjectWriter`, or `WalObjectReader` in their signatures, those dependencies must
+  be Gradle `api`; if a factory hides them, `implementation` is enough；
+- keep `nereus-managed-ledger`, `nereus-pulsar-adapter`, and `nereus-kop-adapter` compiling but outside
+  the Phase 1 L0 dependency guard；
+- expose `FakeOxiaMetadataStore` to `nereus-core` tests through Gradle `java-test-fixtures` or an explicit
+  test-fixtures artifact, not through production packages；
+- add the root `phase1Check` task only after the module-level gates below exist.
+
+Exit:
+
+- `./gradlew checkPhase0` still passes；
+- `./gradlew :nereus-api:test :nereus-metadata-oxia:test :nereus-object-store:test :nereus-core:test`
+  can be wired without adapter modules；
+- `dependencyInsight` or a small custom dependency guard can prove Phase 1 modules have no Pulsar, KoP,
+  BookKeeper, or Kafka runtime dependencies。
+
+### M1 API expansion
+
+Module:
+
+```text
+nereus-api
+```
+
+Tasks:
+
+- expand `StreamStorage` from Phase 0 skeleton to full Phase 1 API；
+- add identity/value records；
+- add shared key/hash helpers under `nereus-api` for durable path components, deterministic stream ids,
+  fixed-width non-negative long encoding, and writer/run hash components；
+- add append/read/resolve/trim option and result types；
+- add support reference types such as `SchemaRef`, `ProjectionRef`, `EntryIndexRef`, object refs, and
+  `ErrorCode`；
+- add error model；
+- make stream attributes and slice schema refs part of the public result types where needed；
+- add close/backpressure/timeout error codes；
+- expand `AppendResult` with slice id, generation, checksums, payload format, record counts, and
+  logical bytes；
+- keep all types protocol-neutral；
+- add unit tests for value validation。
+
+Exit:
+
+- `nereus-api` compiles；
+- no Pulsar/KoP dependencies；
+- API tests cover invalid ranges, blank ids, empty batches。
+
+### M2 Fake metadata and Oxia key model
+
+Module:
+
+```text
+nereus-metadata-oxia
+```
+
+Tasks:
+
+- run the Oxia Java client capability spike from `06-metadata-oxia-position-and-pulsar-reference.md`；
+- record the spike result in the repository docs before freezing fake metadata semantics；
+- if the spike cannot prove native or equivalent same-key-group conditional multi-write, stop M2 and
+  redesign `commitStreamSlice` before M4 starts；
+- add `OxiaKeyspace` using the shared `nereus-api` key/hash helpers；
+- add key-safe path component encoding for cluster, stream names, object ids, slice ids, offsets, and
+  generations；
+- add versioned metadata record codec/envelope；
+- add adapter-private Oxia client helpers that require partition key on get/put/scan/watch and commit；
+- add metadata record classes；
+- add `OxiaMetadataStore` interface；
+- add `FakeOxiaMetadataStore` under test fixtures or test package；
+- implement deterministic stream id generation from exact `StreamName.value()`；
+- store `streamNameHash` in both by-name and stream metadata records；
+- store stream attributes in stream metadata；
+- store `logicalBytes` and slice checksum in offset index records；
+- store slice-level schema refs in offset index records；
+- store durable stream `commitVersion` in committed-end, offset-index, and committed-slice records；
+- implement stream create-or-get；
+- implement append session acquire/renew/fence, including `allowStealExpiredSession` semantics；
+- implement object manifest put；
+- implement object manifest/reference read and reference repair operations；
+- implement `commitStreamSlice` CAS semantics；
+- enforce that producer-ack commit batches contain only one stream key group；
+- use overflow-checked offset and cumulative-size arithmetic；
+- implement offset index scan；
+- implement trim update；
+- add `watchStream` boundary, with a no-op implementation allowed when watch is disabled。
+
+Exit:
+
+- fake store passes linearizable single-process tests；
+- Oxia capability spike result is recorded and either proves required conditional multi-write semantics or
+  points to an updated commit protocol design；
+- offset scan ordering is tested with offsets like `9`, `10`, `100`；
+- stale epoch and offset conflict are distinguishable；
+- fake store rejects a commit batch that mixes stream-scoped and object-scoped key groups on the ack path；
+- fake store records and validates partition keys for get/put/scan/watch/commit；
+- fake and real codecs reject wrong record type, unsupported schema version, checksum mismatch, and
+  truncated payloads；
+- codec registry has golden-byte tests for every Phase 1 metadata record type；
+- metadata golden bytes cover absent optional fields encoded as empty string or empty byte array, not null。
+
+### M3 Object WAL local implementation
+
+Module:
+
+```text
+nereus-object-store
+```
+
+Tasks:
+
+- add `ObjectStore` interface；
+- add local filesystem test implementation；
+- add a test-only cleanup helper for the local filesystem implementation or its fixture, scoped strictly
+  to the injected test root；
+- include write timeout in `PutObjectOptions` and propagate WAL upload timeout into concrete object-store
+  calls；
+- add WAL layout encoder/decoder；
+- add WAL header/footer/checksum golden tests and object-bounds validation；
+- use the shared `nereus-api` key/hash helpers for cluster, writer id, writer run id, and object key
+  components；
+- encode variable-length WAL sections with section headers and section checksums；
+- add `WalObjectWriter`；
+- require `WalObjectWriter` to support multi-slice requests even if the first core planner sends one
+  append work item per object；
+- add a WAL writer sizing pass that computes final encoded object length before buffer allocation and
+  before `ObjectStore.putObject`；
+- pass `maxObjectBytes` through `WalWriteOptions` and treat `targetObjectSizeBytes` only as a
+  flush/grouping target；
+- keep WAL canonical object checksum separate from object-store exact-bytes storage checksum；
+- pass `writerRunIdHash` through WAL write request and object header；
+- pass WAL format version and writer version into object header and manifest；
+- add `WalObjectReader` for footer entry index；
+- make `WalObjectReader` accept or use bounded read memory/concurrency guards supplied by core tests；
+- add CRC32C checksum helper；
+- return neutral `WalWriteResult` and `WrittenStreamSlice` descriptors only; do not import Oxia metadata
+  record classes。
+
+Exit:
+
+- write one-slice WAL object and read it back；
+- write multi-slice WAL object and read each slice by range；
+- checksum mismatch test fails before metadata commit；
+- no test uses object list for correctness。
+- local object store cleanup can remove orphan files under the isolated test root without exposing
+  production delete semantics。
+
+### M4 Core append path
+
+Module:
+
+```text
+nereus-core
+```
+
+Tasks:
+
+- add `DefaultStreamStorage`；
+- add `AppendSessionManager`；
+- add `AppendCoordinator`；
+- add per-stream append sequencer；
+- initially allow the core flush planner to send one append work item per WAL object with
+  `forceSingleStreamObject=true`；
+- validate `StreamStorageConfig`；
+- wire WAL writer and metadata commit；
+- map `WalWriteResult` to `ObjectManifestRecord` in `nereus-core` or `nereus-metadata-oxia`；
+- pass canonical schema refs from append batch through WAL write result, commit request, offset index,
+  resolve, and read；
+- implement auto acquire session；
+- implement append result assembly；
+- keep Phase 1 default behavior of failing external offset conflicts instead of rebasing uploaded slices；
+- map metadata/object failures into `NereusException`。
+
+Exit:
+
+- append returns Oxia-assigned offset range；
+- committed end offset advances densely；
+- uploaded but uncommitted object is not readable；
+- stale token append fails and does not advance offset。
+
+### M5 Resolve and read path
+
+Module:
+
+```text
+nereus-core
+```
+
+Tasks:
+
+- add `ReadResolver`；
+- add optional `OffsetIndexCache`；
+- implement generation selection；
+- implement `read` using resolver and WAL reader；
+- implement `maxConcurrentObjectReads` and `maxReadBufferBytes` reservations around full-slice reads；
+- emit read amplification metrics: full-slice bytes downloaded, entry-index bytes downloaded, clipped
+  payload bytes returned, and the difference；
+- implement EOF vs gap distinction；
+- implement trimmed offset check。
+
+Exit:
+
+- read after append returns exact bytes and offset metadata；
+- read at committed end returns `endOfStream=true`；
+- metadata gap below committed end fails as corruption；
+- resolver ignores manifest-only object；
+- read under exhausted read buffer/permit fails before object IO with retriable `BACKPRESSURE_REJECTED`；
+- small clipped reads from large slices emit payload/index download and amplification metrics。
+
+### M6 Trim and recovery boundaries
+
+Module:
+
+```text
+nereus-core
+```
+
+Tasks:
+
+- implement `trim`；
+- add orphan object scanner interface but do not delete by default；
+- add recovery documentation assertions in tests；
+- add metrics hooks。
+
+Exit:
+
+- trim low-watermark advances monotonically；
+- read below trim fails；
+- object bytes remain after trim；
+- manifest with no index is treated as orphan/invisible。
+
+## 2. Core Test Matrix
+
+### API/value tests
+
+| Test | Expected |
+| --- | --- |
+| blank `StreamId` | constructor fails |
+| negative offset range | constructor fails |
+| negative read or resolve start offset | failed future with `INVALID_ARGUMENT` |
+| `endOffset < startOffset` | constructor fails |
+| stream attributes contain null or exceed 16 KiB encoded size | constructor or validation fails |
+| append session option with blank writer or non-positive TTL | constructor or validation fails |
+| append with session for another stream or writer id | append fails before WAL upload |
+| invalid `StreamStorageConfig` duration/count relationship | construction fails with `INVALID_ARGUMENT` |
+| empty append batch | append future fails |
+| record count mismatch | append future fails |
+| append entry with null payload | append future fails before WAL upload |
+| zero-byte append entry | succeeds, consumes one offset, and can be read without infinite loop |
+| append batch event time range invalid | append future fails before WAL upload |
+| append entry event time outside batch range | append future fails before WAL upload |
+| append batch checksum mismatch | append future fails before WAL upload |
+| schema refs contain null, duplicate tuple, or exceed 16 KiB encoded size | append future fails before upload |
+| schema refs supplied in different orders | WAL metadata and offset index use the same canonical order |
+| entry attributes contain null or exceed 16 KiB encoded size | append future fails before upload |
+| non-empty `AppendOptions.tags` | not persisted in WAL or metadata |
+| non-empty `projectionHints` in public append | append future fails before upload |
+| `OPAQUE_RECORD_BATCH` entry with `recordCount > 1` | rejected until a decoder exists |
+| public append with non-`OPAQUE_RECORD_BATCH` payload format | rejected with `UNSUPPORTED_FORMAT` before WAL upload |
+| `EntryIndexRef` with `INDEX_OBJECT` but no object key | constructor or validation fails |
+| `EntryIndexRef` with `INLINE` but no inline bytes | constructor or validation fails |
+| malformed checksum text | constructor or validation fails |
+| `ReadOptions.maxRecords <= 0` or `maxBytes <= 0` | constructor or validation fails |
+| `ResolveOptions.maxRanges <= 0` | constructor or validation fails |
+| object-store operation timeout option is non-positive | constructor or validation fails |
+| `WalWriteOptions.targetObjectSizeBytes <= 0`, `maxObjectBytes <= 0`, or target greater than max | constructor or validation fails |
+| append after `StreamStorage.close()` | failed future with `STORAGE_CLOSED` |
+| first readable entry exceeds `ReadOptions.maxBytes` | `READ_LIMIT_TOO_SMALL` |
+
+### Metadata tests
+
+| Test | Expected |
+| --- | --- |
+| concurrent create same stream name | same `StreamId` |
+| create same stream name after restart | same deterministic `StreamId` |
+| stream names differ only by caller-provided whitespace | different `streamNameHash` and different `StreamId` unless caller normalized before construction |
+| deterministic stream id format | `s-` plus full `base32lower_nopad(sha256(UTF-8 exact StreamName.value()))`; no durable readable alias |
+| shared key/hash helper parity | metadata keyspace and object key generation use the same helper outputs |
+| create stream with attributes | `getStreamMetadata` returns the same attributes |
+| create by-name and initial stream records | one stream key group commit |
+| stream name hash collision | non-retriable invariant/collision error |
+| deterministic stream id collision with different metadata name | non-retriable invariant/collision error |
+| existing sealed stream | create-or-get returns metadata; append/session acquire rejected; read/trim allowed |
+| deleting/deleted stream metadata | append/read/trim rejected according to API state table |
+| slice id contains `/` | committed-slice marker uses encoded component, not nested raw path |
+| dynamic component starts with reserved `b32-` prefix | key encoder escapes it instead of storing raw |
+| dynamic component is `.` or `..` | key encoder escapes it instead of emitting filesystem-special segments |
+| dynamic component looks like a Windows drive designator | key encoder escapes it instead of emitting a platform-special segment |
+| cluster contains `/` or starts with reserved `b32-` prefix | Oxia paths and object keys use `clusterComponent`, not raw cluster |
+| writer id contains path separators | object id uses full key-safe writer/run hashes from shared helpers, not raw writer id |
+| writer hash helper truncation attempt | rejected by tests unless a collision-budget migration document exists |
+| writer run id entropy | generated from at least 128 bits of strong randomness per process incarnation |
+| writer restarts in same timestamp bucket | object id changes because `writerRunIdHash` changes |
+| object upload timeout then new attempt in same process | new attempt uses a fresh object sequence and object id |
+| validation failure before upload | consumed object sequence is not reused by later attempts |
+| acquire when missing | epoch created |
+| acquire by same writer | session reused or renewed |
+| acquire expired different-writer session without allow-steal | `APPEND_SESSION_EXPIRED` |
+| acquire expired different-writer session with allow-steal | higher epoch |
+| two live writers use same `writerId` | documented invalid configuration; test rejects duplicate in local harness when detectable |
+| same writer live renew | epoch and fencing token stay stable |
+| same writer renew after expiry | higher epoch and new fencing token |
+| acquire by different writer before expiry | fenced |
+| acquire by different writer after expiry | requires allow-steal; otherwise `APPEND_SESSION_EXPIRED` |
+| renew after stream becomes non-active | rejected with `STREAM_NOT_ACTIVE` |
+| commit with stale token | `FENCED_APPEND` |
+| same-writer live renew during in-flight append | append can still commit with same epoch/token |
+| append starts with lease below minimum remaining | renews before WAL upload or fails without upload |
+| lease falls below minimum before commit | renews before `commitStreamSlice` or fails without sending commit |
+| commit with wrong expected offset | `OFFSET_CONFLICT` |
+| offsetEnd overflow while committing | rejected before writing offset index |
+| cumulativeSize overflow while committing | rejected before writing offset index |
+| commit valid slice | index entry + committed end updated atomically |
+| committed offset index value | contains logical bytes and slice checksum needed for resolve/read |
+| committed offset index value schema refs | contains canonical schema refs derived from append batch |
+| hydrated offset index record | exposes Oxia `metadataVersion` separately from durable `commitVersion` |
+| valid sequential commits | `commitVersion` increments by one and matches committed-end, offset-index, and committed-slice records |
+| commit same visible slice again after lost response | returns original commit result; no second offset range |
+| concurrent same-slice replay loses marker-missing condition race | re-reads marker and returns original commit result |
+| committed-slice marker exists but offset index missing | `METADATA_INVARIANT_VIOLATION` |
+| committed-slice marker exists but offset index fields differ from request | `METADATA_INVARIANT_VIOLATION` |
+| commit batch includes object reference key | rejected by fake store contract |
+| missing partition key in adapter call | fake contract test fails before write |
+| wrong metadata record type or unsupported schema version | decode fails before state machine uses the value |
+| metadata codec golden bytes | stable for every Phase 1 record type |
+| metadata map encoding | maps are encoded in deterministic UTF-8 key order |
+| schema refs encoding | schema refs are encoded in canonical tuple order |
+| offset/generation key encoding | non-negative long encoded as 19-digit zero-padded decimal |
+| scan offset index for offset inside first range | returns covering entry |
+| scan offset index for offset at range boundary | returns next range |
+| scan offset index for one-record range `[9, 10)` at offset `9` | does not skip `offsetEnd=10` |
+| trim decreases | rejected |
+| trim beyond committed end | rejected |
+| trim negative offset | rejected |
+| trim sealed stream | allowed if within committed bounds |
+| manifest exists but object reference missing | no Phase 1 delete; data visibility follows offset index |
+| repair object references | rebuilds visible slices from manifest + committed-slice marker + offset index |
+| repair object references for missing manifest | fails with metadata invariant error |
+
+### Object WAL tests
+
+| Test | Expected |
+| --- | --- |
+| write/read one-slice object | payload and index match |
+| write/read multi-slice object | each slice has independent range |
+| `forceSingleStreamObject=true` with multiple stream ids | writer rejects before object upload |
+| `forceSingleStreamObject=true` with one stream id | writer may write one or more slices for that stream without changing layout |
+| WAL write request | carries `writerRunIdHash` into object id/key/header |
+| WAL section envelope | each variable-length section has type, version, length, and checksum |
+| WAL binary ids | object/section ids use fixed constants, never Java enum ordinal |
+| object manifest format metadata | stores format major/minor version and writer version |
+| deterministic slice id and order | slices have zero-based ordinals and stable object-local slice ids |
+| Phase 1 entry index location | writer always emits `OBJECT_FOOTER` |
+| read `INLINE` or `INDEX_OBJECT` entry index | fails with `UNSUPPORTED_FORMAT` in Phase 1 |
+| WAL header/footer checksum | decoder rejects wrong header, footer, or object checksum |
+| WAL canonical checksum versus storage checksum | writer computes both domains and manifest stores both without comparing them as equal |
+| WAL descriptor bounds | decoder rejects offsets/lengths outside object bounds |
+| entry payload offset inside non-zero slice offset | reader computes `slicePayloadOffset + entryPayloadOffset` |
+| entry index deterministic encoding | checksum golden test is stable |
+| zero-byte entry index item | payload length zero is valid and still advances relative offset |
+| malformed entry index ordering | reader rejects non-contiguous or overlapping opaque entries |
+| slice checksum domain | checksum covers `slicePayloadBytes || entryIndexBytes` |
+| WAL upload timeout propagation | `WalWriteOptions.uploadTimeout` is copied into `PutObjectOptions.timeout` |
+| final encoded object length exceeds `maxObjectBytes` | writer fails with `INVALID_ARGUMENT` before object upload |
+| object payload fits but footer/index/header push encoded length over max | writer fails before upload |
+| request exceeds `targetObjectSizeBytes` but fits `maxObjectBytes` | writer succeeds because target is advisory |
+| WAL sizing arithmetic overflows | writer fails before allocation and before upload |
+| duplicate object key with `ifAbsent` | fails |
+| manifest retry with same object id but different checksum/length/slices | non-retriable corruption |
+| object id generation after process restart | no collision with previous same-writer sequence |
+| concurrent WAL object id generation | object sequences are unique and monotonic within one writer run |
+| local object store path traversal key | rejected before filesystem write |
+| local object store absolute key, empty segment, or symlink escape | rejected before final object path is visible |
+| local object store failed write | final object path is not visible |
+| local object store test cleanup | removes only files under injected root and is unavailable from production `ObjectStore` |
+| range read past EOF | fails as object read error |
+| `CompressionType.ZSTD` write request | rejected with `UNSUPPORTED_FORMAT` in Phase 1 |
+| corrupted payload checksum | read fails |
+| corrupted entry index checksum | read fails |
+| unsupported major version | reader rejects |
+| unsupported minor version | reader rejects until optional-section compatibility tests exist |
+| committed slice uses non-supported payload format | reader fails with `UNSUPPORTED_FORMAT` in Phase 1 |
+
+### Append path tests
+
+| Test | Expected |
+| --- | --- |
+| append one batch | range starts at previous committed end |
+| append two batches | second starts at first end |
+| concurrent appends through one `DefaultStreamStorage` for same stream | sequenced dense ranges |
+| external writer wins offset race | append fails with retriable `OFFSET_CONFLICT`; uploaded slice is not rebased |
+| append after offset conflict in same instance | sequencer refreshes committed end before next append |
+| backpressure limit reached | append fails before object upload with `BACKPRESSURE_REJECTED` |
+| `maxBufferedBytes` exact-size adjustment would exceed limit | append fails before object upload with `BACKPRESSURE_REJECTED` and releases reservation |
+| accepted append later fails validation or upload | in-flight count and buffered-byte reservations are released |
+| append encoded object exceeds `maxObjectBytes` | append fails before object upload with `INVALID_ARGUMENT` |
+| append caller-cancelled before WAL upload | no object and no offset index; caller future may be cancelled |
+| append service-cancelled before WAL upload | no object and no offset index; `CANCELLED` |
+| append cancelled after commit RPC sent | final state is unknown; same physical slice retry can discover marker |
+| close after commit RPC sent | waits up to shutdown grace for commit result before closing owned clients |
+| object upload fails | no manifest and no offset index |
+| manifest put fails | no offset index |
+| commit fails after manifest | object invisible |
+| commit manifest slice fields mismatch request | no offset index; non-retriable metadata invariant or checksum-style failure |
+| commit manifest slice state already visible but committed-slice marker missing | no offset index; `METADATA_INVARIANT_VIOLATION` |
+| commit manifest writer id/run/epoch mismatch request | no offset index; non-retriable metadata invariant |
+| stream becomes non-active before commit | no offset index; append fails as `STREAM_NOT_ACTIVE` |
+| timeout before commit RPC starts | no offset index is created by that attempt |
+| timeout after commit RPC is sent | final state is unknown; same physical slice retry can discover committed marker |
+| next append after unknown final state | waits for metadata refresh before choosing expected offset |
+| commit succeeds but ack future interrupted in test | read sees data; retry same slice returns original result |
+| process crashes after ack loss and caller resubmits batch | may append duplicate data; producer-level dedup is outside Phase 1 |
+| caller-level retry without same physical slice context | may append duplicate data; no producer identity/sequence dedup in Phase 1 |
+| unknown-final-state timeout mapping | append fails with `TIMEOUT` unknown final state, not `OFFSET_CONFLICT` or generic metadata failure |
+| object reference update fails after stream commit | read sees data and repair can rebuild reference |
+| concurrent post-commit object reference updates | CAS merge does not lose another visible slice; conflict exhaustion leaves repairable stale metadata |
+| stale session after upload | no visible data |
+| manifest object key/type/format mismatch request | no offset index; non-retriable metadata invariant |
+| partial multi-slice commit | committed slice readable, failed slice invisible |
+
+### Read path tests
+
+| Test | Expected |
+| --- | --- |
+| read first offset | returns first batch |
+| read middle offset | clips result to requested offset |
+| read middle offset in a larger resolved slice | `WalObjectReader` uses explicit `startOffset` |
+| resolve committed range | `ResolvedObjectRange` includes slice checksum from offset index |
+| resolve committed range schema refs | `ResolvedObjectRange` includes schema refs from offset index |
+| resolve across two adjacent offset index entries | returns contiguous ranges and advances `resolvedEndOffset` |
+| resolve with `includeEntryIndex=true` | does not read object footer or index object in Phase 1 |
+| read clipped batch | `ReadBatch.sourceObjectOffset/sourceObjectLength` matches returned payload bytes |
+| read 100 bytes from 16 MiB resolved slice | reader downloads/verifies full slice plus entry index, returns clipped bytes, and records amplification metrics |
+| read buffer limit exhausted before range read | fails with retriable `BACKPRESSURE_REJECTED` and does not call `ObjectStore.readRange` |
+| read permit limit exhausted before range read | fails with retriable `BACKPRESSURE_REJECTED` and releases no extra buffer reservation |
+| read adjacent opaque entries | returns one `ReadBatch` per entry and does not concatenate payload bytes |
+| read zero-byte entry | returns one record and advances `nextOffset` even though payload bytes are empty |
+| read positive entry exactly consumes `maxBytes` followed by zero-byte entry | returns both entries if `maxRecords` allows |
+| read positive entry exactly consumes `maxBytes` followed by positive entry | stops before the second positive entry |
+| read batch schema refs | copied from resolved range, not decoded from payload |
+| read clipped batch entry index ref | still references source committed slice index, not a rewritten clipped index |
+| clipped read with corrupted bytes outside returned subrange | fails because full resolved slice checksum is verified |
+| read at committed end | empty EOF result |
+| read below trim | `OFFSET_TRIMMED` |
+| offset index cache stale | refetch and return correct data |
+| offset index cache empty scan | does not cache EOF/negative lookup |
+| watch offset update without follow-up scan | invalidates only and does not populate positive cache data |
+| watch event missed or collapsed | cache still becomes correct through TTL/read-through scan |
+| watch event out of order or duplicate | cache invalidation remains safe |
+| `enableMetadataWatch=false` | no-op registration; cache remains correct through TTL/read-through |
+| index points to missing object | retriable object read failure |
+| gap below committed end | non-retriable metadata invariant failure |
+
+## 3. Failure Injection Points
+
+Test fakes should inject failures at these exact boundaries:
+
+```text
+before object put
+after object put before checksum return
+before manifest put
+after manifest put before return
+before offset index commit
+after offset index commit before return
+before object range read
+after entry index read with corrupted bytes
+```
+
+Each failure test should assert:
+
+- whether offset index exists；
+- whether committed end offset advanced；
+- whether object manifest exists；
+- whether `read` can see the data；
+- whether the append future is retriable。
+
+## 4. Invariant Tests
+
+These should be named and kept stable:
+
+```text
+AppendAckRequiresOffsetIndexCommitTest
+CommittedOffsetsAreDenseTest
+ObjectManifestIsNotVisibilityTest
+StaleAppendSessionIsFencedTest
+PartialWalObjectSliceVisibilityTest
+ReadResolverStartsFromOffsetIndexTest
+TrimDoesNotDeleteObjectTest
+ObjectListNotUsedForCorrectnessTest
+MetadataRecordCodecCompatibilityTest
+AppendConflictDoesNotRebaseUploadedSliceTest
+StreamStorageCloseRejectsNewCallsTest
+```
+
+The names intentionally mirror design invariants.
+
+## 5. No-Pulsar Dependency Guard
+
+Add a test or Gradle check for Phase 1 modules:
+
+```text
+nereus-api
+nereus-core
+nereus-metadata-oxia
+nereus-object-store
+```
+
+Guard:
+
+```text
+forbidden packages:
+  org.apache.pulsar
+  org.apache.bookkeeper
+  org.apache.kafka
+  io.streamnative.pulsar.handlers.kop
+```
+
+Phase 1 may mention `PULSAR_ENTRY_BATCH` as an enum value, but must not depend on Pulsar classes.
+
+## 6. Suggested Gradle Tasks
+
+Later implementation can add:
+
+```text
+./gradlew checkPhase0
+./gradlew :nereus-api:test
+./gradlew :nereus-metadata-oxia:test
+./gradlew :nereus-object-store:test
+./gradlew :nereus-core:test
+./gradlew phase1Check
+```
+
+`phase1Check` should depend on:
+
+- unit tests；
+- dependency guard scoped to `nereus-api`, `nereus-core`, `nereus-metadata-oxia`, and
+  `nereus-object-store`；
+- formatting/checkstyle if introduced；
+- object WAL round-trip tests；
+- fake metadata invariant tests。
+
+`phase1Check` must not require `nereus-managed-ledger`, `nereus-pulsar-adapter`, or `nereus-kop-adapter`
+to implement their future behavior. Those modules may keep marker classes or compile-only boundaries while
+L0 is being built.
+
+## 7. Implementation Order Rationale
+
+Recommended order:
+
+1. API first, because every other module consumes the same value types.
+2. Fake metadata second, because correctness lives in commit semantics.
+3. Object WAL third, because append cannot commit references without durable bytes.
+4. Append coordinator fourth, because it is the first end-to-end write path.
+5. Resolver/read fifth, because it validates offset index shape.
+6. Trim/recovery last, because they depend on committed index and read semantics.
+
+Avoid starting with Pulsar facade. It would force L1 concerns into L0 before the offset truth is stable.
+
+## 8. Phase 1 Done Definition
+
+A Phase 1 implementation is done when this local scenario works without Pulsar:
+
+```text
+create stream "orders-0"
+acquire append session as writer-a
+append batch with 3 records
+append batch with 2 records
+read from offset 0 returns 5 records
+resolve offset 3 returns object range covering [3, 5)
+trim before offset 2
+read offset 1 fails as trimmed
+read offset 2 returns remaining records
+restart DefaultStreamStorage with same fake/local stores
+read offset 2 still returns committed data
+```
+
+And these negative cases hold:
+
+```text
+uploaded object without offset index is invisible
+stale epoch cannot commit
+offset conflict cannot create a gap
+WAL canonical object checksum mismatch cannot commit
+object listing is never used to discover readable data
+```
+
+## 9. Deferred Beyond Phase 1
+
+Do not implement these while completing Phase 1:
+
+- ManagedLedger facade；
+- Pulsar `Position` or `MessageId` mapping beyond opaque `ProjectionRef`；
+- ManagedCursor and individual ack holes；
+- Kafka group offset；
+- transaction markers；
+- compaction worker；
+- lakehouse catalog；
+- routing brown-out；
+- object GC delete policy。
+
+The design keeps references and extension points so these futures can attach later without changing
+`streamId + offset` truth.
