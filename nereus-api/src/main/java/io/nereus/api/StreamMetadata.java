@@ -34,10 +34,16 @@ public record StreamMetadata(
         Objects.requireNonNull(streamName, "streamName");
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(profile, "profile");
-        attributes = Map.copyOf(attributes);
+        attributes = MetadataCanonicalizer.canonicalStringMap(
+                attributes,
+                ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES,
+                "attributes");
         if (createdAtMillis < 0 || metadataVersion < 0 || committedEndOffset < 0
                 || cumulativeSize < 0 || trimOffset < 0) {
             throw new IllegalArgumentException("metadata numeric fields must be non-negative");
+        }
+        if (trimOffset > committedEndOffset) {
+            throw new IllegalArgumentException("trimOffset must be <= committedEndOffset");
         }
     }
 }

@@ -65,8 +65,8 @@ M0 scaffold migration 已完成。当前代码状态：
   出口；
 - root `phase1Check` 已存在，并包含 `checkPhase0`、L0 module tests 和 Phase 1 L0 dependency guard。
 
-M0 只迁移脚手架和类型边界，不实现 append/read/trim 状态机。后续 M1 继续加固 API validation 和
-单元测试，M2/M3 分别落 metadata 与 object WAL。
+M0/M1 已完成脚手架、类型边界、API validation hardening 和 `nereus-api` 单元测试。append/read/trim
+状态机尚未实现；M2/M3 分别落 metadata 与 object WAL。
 
 Phase 1 允许的依赖方向：
 
@@ -356,6 +356,9 @@ Already settled for Phase 1:
   version manifest 字段，避免后续 reader/repair 工具无法按版本解码；
 - stream attributes 和 append schema refs 必须闭环存储：attributes 进入 stream metadata，
   schema refs 进入 WAL slice、commit request、offset index、resolve/read result；
+- M1 已在 `nereus-api` 增加 `ApiLimits` 和 `MetadataCanonicalizer`：stream attributes、entry
+  attributes、schema refs 的 16 KiB public limit、UTF-8 key order、schema-ref canonical tuple order 和
+  defensive copy 规则都从 API 边界统一执行；
 - WAL object id/key 必须包含 writer process incarnation hash，避免进程重启后 sequence 重置造成
   object id 碰撞；
 - append timeout 必须按最后不可逆边界分类；stream-head CAS 发出后的 timeout 是 unknown final

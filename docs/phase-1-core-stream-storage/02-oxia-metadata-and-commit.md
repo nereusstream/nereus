@@ -328,8 +328,10 @@ codec golden bytes are deterministic:
 - absent `objectId` and `objectKey` are encoded as empty strings；
 - absent `inlineData` is encoded as an empty byte array；
 - absent `OffsetIndexRecord.projectionRef` is encoded as an empty string；
-- footer references may omit `objectId/objectKey` when the index is in the same object；
-- index-object references must include both `objectId` and `objectKey`；
+- footer references may omit `objectId/objectKey` when the index is in the same object. If one is
+  present, both must be present. Footer references use empty `inlineData` and positive `length`；
+- index-object references must include both `objectId` and `objectKey`, use empty `inlineData`, and use
+  positive `length`；
 - inline references must include non-empty `inlineData` and use `offset=0,length=0`。
 
 ### `ObjectManifestRecord`

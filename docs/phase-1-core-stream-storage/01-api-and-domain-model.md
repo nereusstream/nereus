@@ -213,6 +213,36 @@ Rules:
 - modules must not duplicate these algorithms in local utility classes. Tests should compare metadata and
   object-store outputs from the same shared helper.
 
+### Shared Metadata Canonicalization Helpers
+
+M1 adds these protocol-neutral helpers in `nereus-api`:
+
+```text
+io.nereus.api.ApiLimits
+io.nereus.api.MetadataCanonicalizer
+```
+
+`ApiLimits` currently defines:
+
+```java
+MAX_STREAM_ATTRIBUTES_ENCODED_BYTES = 16 * 1024
+MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES = 16 * 1024
+MAX_SCHEMA_REFS_ENCODED_BYTES = 16 * 1024
+```
+
+`MetadataCanonicalizer` is the shared API-boundary helper for metadata values that will later be copied
+into WAL and Oxia records:
+
+- maps are defensively copied into unmodifiable insertion-ordered maps sorted by UTF-8 key bytes；
+- map encoded-size guard uses `4-byte key length + key UTF-8 bytes + 4-byte value length + value UTF-8
+  bytes` per entry；
+- `schemaRefs` are defensively copied, sorted by `(namespace UTF-8 bytes, id UTF-8 bytes, version)`,
+  reject duplicate tuples, and use `4-byte namespace length + namespace UTF-8 bytes + 4-byte id length +
+  id UTF-8 bytes + 8-byte version` per item for the API encoded-size guard；
+- this size guard is an API invariant, not a promise that the final metadata codec has no envelope or
+  field-tag overhead. Future codec work may choose Protobuf or another schema-first encoding, but it must
+  preserve the same canonical order and 16 KiB public limits unless this document is changed first.
+
 ### `OffsetRange`
 
 Existing record is correct as the shared half-open range type:
@@ -724,8 +754,10 @@ Validation:
 - `SchemaRef.version >= 0`；
 - `ProjectionRef.value` must be non-blank when present；
 - maps used in API values should be defensively copied. Stored/encoded metadata maps must be sorted by
-  UTF-8 key bytes so golden-byte tests are stable. `schemaRefs` are sorted by their canonical tuple; lists
-  with semantic order, such as append entries and manifest slices, preserve that order.
+  UTF-8 key bytes so golden-byte tests are stable. M1 implements this through
+  `MetadataCanonicalizer.canonicalStringMap`. `schemaRefs` are sorted by their canonical tuple through
+  `MetadataCanonicalizer.canonicalSchemaRefs`; lists with semantic order, such as append entries and
+  manifest slices, preserve that order.
 
 `CURSOR_SNAPSHOT_OBJECT` and `STREAM_COMPACTED_OBJECT` are included as type boundaries. Phase 1 does not
 implement cursor snapshots or compacted object writing.
@@ -733,9 +765,11 @@ implement cursor snapshots or compacted object writing.
 `EntryIndexRef` location rules:
 
 - `OBJECT_FOOTER`: `objectId` and `objectKey` may be empty, meaning the same object as the resolved
-  payload range；
-- `INDEX_OBJECT`: `objectId` and `objectKey` must identify the index object；
-- `INLINE`: `inlineData` must contain the encoded entry index and `offset/length` must be zero。
+  payload range. If one is present, both must be present. `inlineData` must be empty and `length > 0`；
+- `INDEX_OBJECT`: `objectId` and `objectKey` must identify the index object. `inlineData` must be empty
+  and `length > 0`；
+- `INLINE`: `inlineData` must contain the encoded entry index, `objectId/objectKey` must be empty, and
+  `offset/length` must be zero。
 
 Phase 1 writer must emit only `OBJECT_FOOTER`. `INLINE` and `INDEX_OBJECT` are API compatibility values;
 Phase 1 reader must reject them with `UNSUPPORTED_FORMAT`.

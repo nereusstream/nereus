@@ -40,7 +40,7 @@ public record ResolvedObjectRange(
         Objects.requireNonNull(objectType, "objectType");
         Objects.requireNonNull(sliceChecksum, "sliceChecksum");
         Objects.requireNonNull(payloadFormat, "payloadFormat");
-        schemaRefs = List.copyOf(schemaRefs);
+        schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
         if (generation < 0 || objectOffset < 0 || objectLength < 0 || commitVersion < 0) {

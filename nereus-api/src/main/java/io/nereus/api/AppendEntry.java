@@ -25,7 +25,10 @@ public record AppendEntry(
         Map<String, String> attributes) {
     public AppendEntry {
         payload = Objects.requireNonNull(payload, "payload").clone();
-        attributes = Map.copyOf(attributes);
+        attributes = MetadataCanonicalizer.canonicalStringMap(
+                attributes,
+                ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES,
+                "attributes");
         if (recordCount <= 0) {
             throw new IllegalArgumentException("recordCount must be positive");
         }

@@ -15,9 +15,11 @@
 package io.nereus.api;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.zip.CRC32C;
 
 /** A batch of entries submitted through the L0 append API. */
 public record AppendBatch(
@@ -32,10 +34,19 @@ public record AppendBatch(
         Optional<Checksum> checksum) {
     public AppendBatch {
         Objects.requireNonNull(payloadFormat, "payloadFormat");
-        entries = List.copyOf(entries);
-        schemaRefs = List.copyOf(schemaRefs);
-        projectionHints = Map.copyOf(projectionHints);
+        entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
+        schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
+        projectionHints = MetadataCanonicalizer.canonicalStringMap(
+                projectionHints,
+                Integer.MAX_VALUE,
+                "projectionHints");
         checksum = Objects.requireNonNull(checksum, "checksum");
+        if (payloadFormat != PayloadFormat.OPAQUE_RECORD_BATCH) {
+            throw new IllegalArgumentException("Phase 1 append accepts only OPAQUE_RECORD_BATCH");
+        }
+        if (!projectionHints.isEmpty()) {
+            throw new IllegalArgumentException("Phase 1 append does not accept projectionHints");
+        }
         if (entries.isEmpty()) {
             throw new IllegalArgumentException("entries cannot be empty");
         }
@@ -47,6 +58,9 @@ public record AppendBatch(
         }
         long sum = 0;
         for (AppendEntry entry : entries) {
+            if (entry.recordCount() != 1) {
+                throw new IllegalArgumentException("OPAQUE_RECORD_BATCH entries must have recordCount == 1");
+            }
             sum = Math.addExact(sum, entry.recordCount());
             if (entry.eventTimeMillis() < minEventTimeMillis || entry.eventTimeMillis() > maxEventTimeMillis) {
                 throw new IllegalArgumentException("entry event time must be within batch range");
@@ -57,6 +71,26 @@ public record AppendBatch(
         }
         if (minEventTimeMillis < 0 || maxEventTimeMillis < minEventTimeMillis) {
             throw new IllegalArgumentException("invalid event time range");
+        }
+        validatePayloadChecksum(entries, checksum);
+    }
+
+    private static void validatePayloadChecksum(List<AppendEntry> entries, Optional<Checksum> checksum) {
+        if (checksum.isEmpty()) {
+            return;
+        }
+        Checksum expected = checksum.get();
+        if (expected.type() != ChecksumType.CRC32C) {
+            throw new IllegalArgumentException("append payload checksum must be CRC32C");
+        }
+        CRC32C crc32c = new CRC32C();
+        for (AppendEntry entry : entries) {
+            byte[] payload = entry.payload();
+            crc32c.update(payload, 0, payload.length);
+        }
+        String actual = String.format(Locale.ROOT, "%08x", crc32c.getValue());
+        if (!actual.equals(expected.value())) {
+            throw new IllegalArgumentException("append payload checksum mismatch");
         }
     }
 }

@@ -35,6 +35,8 @@ public record EntryIndexRef(
         if (offset < 0 || length < 0) {
             throw new IllegalArgumentException("offset and length must be non-negative");
         }
+        requireNonOverflowingRange(offset, length);
+        validateLocation(location, objectId, objectKey, inlineData, offset, length);
     }
 
     @Override
@@ -45,5 +47,59 @@ public record EntryIndexRef(
     private static Optional<byte[]> copyOptionalBytes(Optional<byte[]> bytes) {
         Objects.requireNonNull(bytes, "inlineData");
         return bytes.map(byte[]::clone);
+    }
+
+    private static void requireNonOverflowingRange(long offset, long length) {
+        try {
+            Math.addExact(offset, length);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("offset + length must not overflow", e);
+        }
+    }
+
+    private static void validateLocation(
+            EntryIndexLocation location,
+            Optional<ObjectId> objectId,
+            Optional<ObjectKey> objectKey,
+            Optional<byte[]> inlineData,
+            long offset,
+            long length) {
+        boolean hasObjectId = objectId.isPresent();
+        boolean hasObjectKey = objectKey.isPresent();
+        switch (location) {
+            case INLINE -> {
+                if (inlineData.isEmpty() || inlineData.get().length == 0) {
+                    throw new IllegalArgumentException("INLINE entry index requires inlineData");
+                }
+                if (hasObjectId || hasObjectKey) {
+                    throw new IllegalArgumentException("INLINE entry index cannot reference an object");
+                }
+                if (offset != 0 || length != 0) {
+                    throw new IllegalArgumentException("INLINE entry index requires zero offset and length");
+                }
+            }
+            case OBJECT_FOOTER -> {
+                if (inlineData.isPresent()) {
+                    throw new IllegalArgumentException("OBJECT_FOOTER entry index cannot contain inlineData");
+                }
+                if (hasObjectId != hasObjectKey) {
+                    throw new IllegalArgumentException("OBJECT_FOOTER entry index objectId/objectKey must both be present or both empty");
+                }
+                if (length <= 0) {
+                    throw new IllegalArgumentException("OBJECT_FOOTER entry index length must be positive");
+                }
+            }
+            case INDEX_OBJECT -> {
+                if (!hasObjectId || !hasObjectKey) {
+                    throw new IllegalArgumentException("INDEX_OBJECT entry index requires objectId and objectKey");
+                }
+                if (inlineData.isPresent()) {
+                    throw new IllegalArgumentException("INDEX_OBJECT entry index cannot contain inlineData");
+                }
+                if (length <= 0) {
+                    throw new IllegalArgumentException("INDEX_OBJECT entry index length must be positive");
+                }
+            }
+        }
     }
 }

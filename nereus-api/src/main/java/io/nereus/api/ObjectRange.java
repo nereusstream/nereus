@@ -26,5 +26,10 @@ public record ObjectRange(
         if (offset < 0 || length < 0) {
             throw new IllegalArgumentException("offset and length must be non-negative");
         }
+        try {
+            Math.addExact(offset, length);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("offset + length must not overflow", e);
+        }
     }
 }

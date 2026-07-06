@@ -30,7 +30,10 @@ public record AppendOptions(
         appendSession = Objects.requireNonNull(appendSession, "appendSession");
         Objects.requireNonNull(durabilityLevel, "durabilityLevel");
         Objects.requireNonNull(timeout, "timeout");
-        tags = Map.copyOf(tags);
+        tags = MetadataCanonicalizer.canonicalStringMap(tags, Integer.MAX_VALUE, "tags");
+        if (durabilityLevel != DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED) {
+            throw new IllegalArgumentException("Phase 1 supports only WAL_DURABLE_AND_INDEX_COMMITTED");
+        }
         if (timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
         }

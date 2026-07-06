@@ -86,6 +86,29 @@ Module:
 nereus-api
 ```
 
+M1 implementation status:
+
+- `nereus-api` now exposes `ApiLimits` for the three Phase 1 16 KiB encoded metadata limits:
+  stream attributes, entry attributes, and schema refs；
+- `MetadataCanonicalizer` provides the shared UTF-8-key map ordering, schema-ref canonical ordering,
+  duplicate rejection, encoded-size guard, and unmodifiable defensive copies；
+- `AppendEntry`, `StreamCreateOptions`, `StreamMetadata`, `AppendOptions`, `AppendBatch`, `AppendResult`,
+  `ReadBatch`, and `ResolvedObjectRange` use the shared canonicalization helper where their API values can
+  be copied into durable metadata；
+- `AppendBatch` now enforces Phase 1 public append constraints at construction time:
+  `OPAQUE_RECORD_BATCH` only, non-empty entries, `entryCount == entries.size()`, one record per opaque
+  entry, empty `projectionHints`, canonical bounded `schemaRefs`, valid event-time bounds, and optional
+  CRC32C payload checksum over concatenated entry payloads；
+- `EntryIndexRef` now validates the `INLINE`, `OBJECT_FOOTER`, and `INDEX_OBJECT` field combinations and
+  keeps byte-array defensive copies for inline index data；
+- no byte-array convenience append/read wrapper was added in M1. The only public durable surface remains
+  the full Phase 1 API；
+- M1 unit tests live under `nereus-api/src/test/java` and cover key encoding edge cases, deterministic
+  stream id generation, offset ranges, checksum formatting, defensive copies, metadata limits, schema-ref
+  canonicalization, append batch validation, and entry-index reference validation；
+- verified commands:
+  `./gradlew :nereus-api:test` and `./gradlew phase1Check`。
+
 Tasks:
 
 - review the M0 API shells against `01-api-and-domain-model.md` and tighten validation where M0 stayed
@@ -102,10 +125,11 @@ Tasks:
 
 Exit:
 
-- `nereus-api` compiles；
-- no Pulsar/KoP dependencies；
-- API tests cover invalid ranges, blank ids, empty batches, key encoding edge cases, stream id generation,
-  and checksum formatting。
+- done: `nereus-api` compiles；
+- done: no Pulsar/KoP dependencies in Phase 1 L0 modules, verified by `checkPhase1L0Dependencies`；
+- done: API tests cover invalid ranges, blank ids, empty batches, key encoding edge cases, stream id
+  generation, checksum formatting, byte-array defensive copies, schema-ref canonicalization, metadata
+  encoded-size rejection, and `EntryIndexRef` shape validation。
 
 ### M2 Fake metadata and Oxia key model
 
@@ -312,20 +336,20 @@ Exit:
 | append session option with blank writer or non-positive TTL | constructor or validation fails |
 | append with session for another stream or writer id | append fails before WAL upload |
 | invalid `StreamStorageConfig` duration/count relationship | construction fails with `INVALID_ARGUMENT` |
-| empty append batch | append future fails |
-| record count mismatch | append future fails |
-| append entry with null payload | append future fails before WAL upload |
+| empty append batch | constructor fails |
+| record count mismatch | constructor fails |
+| append entry with null payload | constructor fails |
 | zero-byte append entry | succeeds, consumes one offset, and can be read without infinite loop |
-| append batch event time range invalid | append future fails before WAL upload |
-| append entry event time outside batch range | append future fails before WAL upload |
-| append batch checksum mismatch | append future fails before WAL upload |
-| schema refs contain null, duplicate tuple, or exceed 16 KiB encoded size | append future fails before upload |
+| append batch event time range invalid | constructor fails |
+| append entry event time outside batch range | constructor fails |
+| append batch checksum mismatch | constructor fails |
+| schema refs contain null, duplicate tuple, or exceed 16 KiB encoded size | constructor fails |
 | schema refs supplied in different orders | WAL metadata and offset index use the same canonical order |
-| entry attributes contain null or exceed 16 KiB encoded size | append future fails before upload |
+| entry attributes contain null or exceed 16 KiB encoded size | constructor fails |
 | non-empty `AppendOptions.tags` | not persisted in WAL or metadata |
-| non-empty `projectionHints` in public append | append future fails before upload |
+| non-empty `projectionHints` in public append | constructor fails |
 | `OPAQUE_RECORD_BATCH` entry with `recordCount > 1` | rejected until a decoder exists |
-| public append with non-`OPAQUE_RECORD_BATCH` payload format | rejected with `UNSUPPORTED_FORMAT` before WAL upload |
+| public append with non-`OPAQUE_RECORD_BATCH` payload format | constructor fails before WAL upload |
 | `EntryIndexRef` with `INDEX_OBJECT` but no object key | constructor or validation fails |
 | `EntryIndexRef` with `INLINE` but no inline bytes | constructor or validation fails |
 | malformed checksum text | constructor or validation fails |

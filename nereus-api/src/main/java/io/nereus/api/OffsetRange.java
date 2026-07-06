@@ -14,6 +14,8 @@
 
 package io.nereus.api;
 
+import java.util.Objects;
+
 /** Half-open stream offset range: [startOffset, endOffset). */
 public record OffsetRange(long startOffset, long endOffset) {
     public OffsetRange {
@@ -38,6 +40,7 @@ public record OffsetRange(long startOffset, long endOffset) {
     }
 
     public boolean overlaps(OffsetRange other) {
+        Objects.requireNonNull(other, "other");
         return startOffset < other.endOffset() && other.startOffset() < endOffset;
     }
 }

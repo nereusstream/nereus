@@ -64,6 +64,14 @@ M0 scaffold status before coding state machines:
   Docker；
 - done: M0.5 records the selected public Oxia Java API result as
   `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` for multi-key conditional write.
+- done: M1 adds `ApiLimits` and `MetadataCanonicalizer` in `nereus-api` so stream attributes, entry
+  attributes, schema refs, and map ordering use one shared API-boundary contract；
+- done: M1 `AppendBatch` rejects non-opaque public appends, opaque entries with `recordCount > 1`,
+  non-empty `projectionHints`, duplicate or oversized schema refs, invalid event-time ranges, empty
+  batches, and mismatched optional CRC32C payload checksums；
+- done: M1 `EntryIndexRef` validates location-specific field combinations instead of allowing ambiguous
+  inline/object index references；
+- done: `./gradlew :nereus-api:test` and `./gradlew phase1Check` pass after M1.
 
 ## 3. Stop-The-Line Conditions
 

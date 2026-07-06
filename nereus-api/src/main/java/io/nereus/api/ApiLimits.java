@@ -12,8 +12,14 @@
  * limitations under the License.
  */
 
-dependencies {
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+package io.nereus.api;
+
+/** Public Phase 1 API value limits shared by metadata and object modules. */
+public final class ApiLimits {
+    public static final int MAX_STREAM_ATTRIBUTES_ENCODED_BYTES = 16 * 1024;
+    public static final int MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES = 16 * 1024;
+    public static final int MAX_SCHEMA_REFS_ENCODED_BYTES = 16 * 1024;
+
+    private ApiLimits() {
+    }
 }

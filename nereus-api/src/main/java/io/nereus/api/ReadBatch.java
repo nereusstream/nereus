@@ -33,7 +33,7 @@ public record ReadBatch(
         Objects.requireNonNull(range, "range");
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         payload = Objects.requireNonNull(payload, "payload").clone();
-        schemaRefs = List.copyOf(schemaRefs);
+        schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
         Objects.requireNonNull(sourceObjectId, "sourceObjectId");

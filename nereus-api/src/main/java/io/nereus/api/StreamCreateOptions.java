@@ -23,6 +23,12 @@ public record StreamCreateOptions(
         Map<String, String> attributes) {
     public StreamCreateOptions {
         Objects.requireNonNull(profile, "profile");
-        attributes = Map.copyOf(attributes);
+        if (profile != StorageProfile.OBJECT_WAL) {
+            throw new IllegalArgumentException("Phase 1 supports only OBJECT_WAL profile");
+        }
+        attributes = MetadataCanonicalizer.canonicalStringMap(
+                attributes,
+                ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES,
+                "attributes");
     }
 }

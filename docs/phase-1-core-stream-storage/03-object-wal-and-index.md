@@ -650,7 +650,8 @@ amplificationBytes = fullSliceAndIndexBytesDownloaded - returnedPayloadBytes
 
 Entry index location handling:
 
-- `OBJECT_FOOTER`: read index bytes from the same object unless `EntryIndexRef.objectKey` is present；
+- `OBJECT_FOOTER`: read index bytes from the same object unless `EntryIndexRef.objectId/objectKey` are
+  both present；
 - `INLINE`: reserved in Phase 1; reader fails with `UNSUPPORTED_FORMAT`；
 - `INDEX_OBJECT`: reserved in Phase 1; reader fails with `UNSUPPORTED_FORMAT`。
 

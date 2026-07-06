@@ -15,8 +15,8 @@
 package io.nereus.api;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Result returned after a batch is durable and visible through Oxia offset index. */
 public record AppendResult(
@@ -46,13 +46,13 @@ public record AppendResult(
         Objects.requireNonNull(objectKey, "objectKey");
         Objects.requireNonNull(sliceId, "sliceId");
         Objects.requireNonNull(payloadFormat, "payloadFormat");
-        schemaRefs = List.copyOf(schemaRefs);
+        schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         Objects.requireNonNull(objectChecksum, "objectChecksum");
         Objects.requireNonNull(sliceChecksum, "sliceChecksum");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
-        if (committedEndOffset < range.endOffset()) {
-            throw new IllegalArgumentException("committedEndOffset must be >= range.endOffset");
+        if (committedEndOffset != range.endOffset()) {
+            throw new IllegalArgumentException("committedEndOffset must equal range.endOffset");
         }
         if (generation < 0) {
             throw new IllegalArgumentException("generation must be non-negative");
@@ -65,6 +65,12 @@ public record AppendResult(
         }
         if (recordCount < 0 || entryCount < 0 || logicalBytes < 0) {
             throw new IllegalArgumentException("counts and logicalBytes must be non-negative");
+        }
+        if (recordCount != range.recordCount()) {
+            throw new IllegalArgumentException("recordCount must equal range.recordCount");
+        }
+        if (payloadFormat == PayloadFormat.OPAQUE_RECORD_BATCH && entryCount != recordCount) {
+            throw new IllegalArgumentException("OPAQUE_RECORD_BATCH entryCount must equal recordCount");
         }
         if (commitVersion < 0) {
             throw new IllegalArgumentException("commitVersion must be non-negative");
