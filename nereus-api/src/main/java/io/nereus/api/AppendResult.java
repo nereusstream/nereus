@@ -60,11 +60,12 @@ public record AppendResult(
         if (sliceId.isBlank()) {
             throw new IllegalArgumentException("sliceId cannot be blank");
         }
-        if (objectOffset < 0 || objectLength < 0) {
-            throw new IllegalArgumentException("object offsets and lengths must be non-negative");
+        ApiRangeValidation.requireNonNegativeNonOverflowingRange(objectOffset, objectLength, "object");
+        if (recordCount <= 0 || entryCount <= 0) {
+            throw new IllegalArgumentException("recordCount and entryCount must be positive");
         }
-        if (recordCount < 0 || entryCount < 0 || logicalBytes < 0) {
-            throw new IllegalArgumentException("counts and logicalBytes must be non-negative");
+        if (logicalBytes < 0) {
+            throw new IllegalArgumentException("logicalBytes must be non-negative");
         }
         if (recordCount != range.recordCount()) {
             throw new IllegalArgumentException("recordCount must equal range.recordCount");

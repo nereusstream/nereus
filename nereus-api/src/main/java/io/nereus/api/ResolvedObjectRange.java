@@ -43,7 +43,8 @@ public record ResolvedObjectRange(
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
-        if (generation < 0 || objectOffset < 0 || objectLength < 0 || commitVersion < 0) {
+        ApiRangeValidation.requireNonNegativeNonOverflowingRange(objectOffset, objectLength, "object");
+        if (generation < 0 || commitVersion < 0) {
             throw new IllegalArgumentException("range numeric fields must be non-negative");
         }
     }

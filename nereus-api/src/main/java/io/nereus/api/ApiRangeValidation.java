@@ -14,15 +14,18 @@
 
 package io.nereus.api;
 
-import java.util.Objects;
+final class ApiRangeValidation {
+    private ApiRangeValidation() {
+    }
 
-/** Physical byte range inside one object. */
-public record ObjectRange(
-        ObjectKey objectKey,
-        long offset,
-        long length) {
-    public ObjectRange {
-        Objects.requireNonNull(objectKey, "objectKey");
-        ApiRangeValidation.requireNonNegativeNonOverflowingRange(offset, length, "object");
+    static void requireNonNegativeNonOverflowingRange(long offset, long length, String fieldName) {
+        if (offset < 0 || length < 0) {
+            throw new IllegalArgumentException(fieldName + " offset and length must be non-negative");
+        }
+        try {
+            Math.addExact(offset, length);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException(fieldName + " offset + length must not overflow", e);
+        }
     }
 }

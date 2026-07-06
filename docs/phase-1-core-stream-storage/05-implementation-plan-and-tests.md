@@ -101,13 +101,18 @@ M1 implementation status:
   CRC32C payload checksum over concatenated entry payloads；
 - `EntryIndexRef` now validates the `INLINE`, `OBJECT_FOOTER`, and `INDEX_OBJECT` field combinations and
   keeps byte-array defensive copies for inline index data；
+- API values that expose physical object ranges now reject negative ranges and `offset + length`
+  overflow, including `ObjectRange`, `EntryIndexRef`, `AppendResult`, `ReadBatch`, and
+  `ResolvedObjectRange`；
+- `AppendResult` now rejects empty success ranges by requiring positive `recordCount` and `entryCount`；
 - no byte-array convenience append/read wrapper was added in M1. The only public durable surface remains
   the full Phase 1 API；
 - M1 unit tests live under `nereus-api/src/test/java` and cover key encoding edge cases, deterministic
   stream id generation, offset ranges, checksum formatting, defensive copies, metadata limits, schema-ref
-  canonicalization, append batch validation, and entry-index reference validation；
+  canonicalization, append batch validation, entry-index reference validation, physical range overflow,
+  and positive append-result semantics；
 - verified commands:
-  `./gradlew :nereus-api:test` and `./gradlew phase1Check`。
+  `./gradlew :nereus-api:test`, `./gradlew phase1Check`, and `./gradlew check`。
 
 Tasks:
 
@@ -129,7 +134,8 @@ Exit:
 - done: no Pulsar/KoP dependencies in Phase 1 L0 modules, verified by `checkPhase1L0Dependencies`；
 - done: API tests cover invalid ranges, blank ids, empty batches, key encoding edge cases, stream id
   generation, checksum formatting, byte-array defensive copies, schema-ref canonicalization, metadata
-  encoded-size rejection, and `EntryIndexRef` shape validation。
+  encoded-size rejection, physical range overflow, positive append-result semantics, and `EntryIndexRef`
+  shape validation。
 
 ### M2 Fake metadata and Oxia key model
 
@@ -352,6 +358,8 @@ Exit:
 | public append with non-`OPAQUE_RECORD_BATCH` payload format | constructor fails before WAL upload |
 | `EntryIndexRef` with `INDEX_OBJECT` but no object key | constructor or validation fails |
 | `EntryIndexRef` with `INLINE` but no inline bytes | constructor or validation fails |
+| physical object range where `offset + length` overflows | constructor or validation fails |
+| append result with empty range or zero counts | constructor or validation fails |
 | malformed checksum text | constructor or validation fails |
 | `ReadOptions.maxRecords <= 0` or `maxBytes <= 0` | constructor or validation fails |
 | `ResolveOptions.maxRanges <= 0` | constructor or validation fails |
@@ -622,7 +630,7 @@ Phase 1 may mention `PULSAR_ENTRY_BATCH` as an enum value, but must not depend o
 
 ## 6. Gradle Tasks
 
-Current M0 verification commands:
+Current M0-M1 verification commands:
 
 ```text
 ./gradlew checkPhase0
@@ -631,14 +639,17 @@ Current M0 verification commands:
 ./gradlew :nereus-object-store:test
 ./gradlew :nereus-core:test
 ./gradlew phase1Check
+./gradlew check
 ```
 
-M0 `phase1Check` currently depends on:
+`phase1Check` currently depends on:
 
 - `checkPhase0`；
 - L0 module tests for `nereus-api`, `nereus-core`, `nereus-metadata-oxia`, and `nereus-object-store`；
 - dependency guard scoped to `nereus-api`, `nereus-core`, `nereus-metadata-oxia`, and
-  `nereus-object-store`。
+  `nereus-object-store`；
+- `:nereus-metadata-oxia:compileOxiaCapabilitySpikeJava`, which compiles the M0.5 Oxia spike without
+  starting Docker。
 
 Future milestones should add these gates to `phase1Check` when the corresponding code exists:
 

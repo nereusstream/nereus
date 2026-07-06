@@ -242,6 +242,58 @@ class ApiValueValidationTest {
     }
 
     @Test
+    void physicalObjectRangesRejectOverflowingOffsetPlusLength() {
+        ObjectId objectId = new ObjectId("object");
+        ObjectKey objectKey = new ObjectKey("object-key");
+
+        assertThatThrownBy(() -> new ObjectRange(objectKey, Long.MAX_VALUE, 1))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new EntryIndexRef(
+                EntryIndexLocation.OBJECT_FOOTER,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Long.MAX_VALUE,
+                1,
+                checksum()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ReadBatch(
+                new OffsetRange(0, 1),
+                PayloadFormat.OPAQUE_RECORD_BATCH,
+                new byte[] {1},
+                List.of(),
+                objectFooterRef(),
+                Optional.empty(),
+                objectId,
+                Long.MAX_VALUE,
+                1))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ResolvedObjectRange(
+                new OffsetRange(0, 1),
+                0,
+                objectId,
+                objectKey,
+                ObjectType.MULTI_STREAM_WAL_OBJECT,
+                Long.MAX_VALUE,
+                1,
+                checksum(),
+                PayloadFormat.OPAQUE_RECORD_BATCH,
+                List.of(),
+                objectFooterRef(),
+                Optional.empty(),
+                1))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> appendResult(new OffsetRange(0, 1), Long.MAX_VALUE, 1, 1, 1))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void appendResultRequiresAVisiblePositiveRange() {
+        assertThatThrownBy(() -> appendResult(new OffsetRange(0, 0), 0, 1, 0, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void basicOptionsAndIdsRejectInvalidValues() {
         assertThatThrownBy(() -> new StreamId(" "))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -260,13 +312,13 @@ class ApiValueValidationTest {
     @Test
     void canonicalStringMapOrdersByUtf8KeyBytes() {
         LinkedHashMap<String, String> values = new LinkedHashMap<>();
-        values.put("z", "last");
         values.put("a", "first");
-        values.put("zhang", "middle");
+        values.put("\uD800\uDC00", "supplementary");
+        values.put("\uE000", "private-use-bmp");
 
         Map<String, String> canonical = MetadataCanonicalizer.canonicalStringMap(values, 1024, "values");
 
-        assertThat(canonical.keySet()).containsExactly("a", "z", "zhang");
+        assertThat(canonical.keySet()).containsExactly("a", "\uE000", "\uD800\uDC00");
     }
 
     private static AppendBatch batch(
@@ -300,5 +352,44 @@ class ApiValueValidationTest {
 
     private static Checksum checksum() {
         return new Checksum(ChecksumType.CRC32C, "00000000");
+    }
+
+    private static EntryIndexRef objectFooterRef() {
+        return new EntryIndexRef(
+                EntryIndexLocation.OBJECT_FOOTER,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                0,
+                1,
+                checksum());
+    }
+
+    private static AppendResult appendResult(
+            OffsetRange range,
+            long objectOffset,
+            long objectLength,
+            int recordCount,
+            int entryCount) {
+        return new AppendResult(
+                new StreamId("stream"),
+                range,
+                range.endOffset(),
+                0,
+                new ObjectId("object"),
+                new ObjectKey("object-key"),
+                "slice",
+                objectOffset,
+                objectLength,
+                PayloadFormat.OPAQUE_RECORD_BATCH,
+                recordCount,
+                entryCount,
+                recordCount,
+                List.of(),
+                objectFooterRef(),
+                checksum(),
+                checksum(),
+                Optional.empty(),
+                1);
     }
 }

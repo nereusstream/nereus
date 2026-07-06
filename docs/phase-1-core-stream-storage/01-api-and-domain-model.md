@@ -491,6 +491,8 @@ Rules:
 - `range.startOffset()` and `range.endOffset()` come from Oxia commit result；
 - `committedEndOffset == range.endOffset()` for simple append；
 - `generation == 0` for Phase 1 WAL appends；
+- `objectOffset/objectLength` must be non-negative and `objectOffset + objectLength` must not overflow；
+- `recordCount > 0`, `entryCount > 0`, and `recordCount == range.recordCount()`；
 - `sliceId`, checksums, and object location come from the durable WAL write result and are useful for
   diagnostics, repair, and idempotent same-slice replay；
 - `logicalBytes` is the caller-visible uncompressed payload bytes represented by this append. For
@@ -573,6 +575,8 @@ Rules:
 - `schemaRefs` are copied from the committed slice metadata and are not decoded from payload bytes；
 - `sourceObjectOffset` and `sourceObjectLength` describe the exact physical bytes returned in `payload`,
   not necessarily the full committed stream slice；
+- `sourceObjectOffset/sourceObjectLength` must be non-negative and `sourceObjectOffset +
+  sourceObjectLength` must not overflow；
 - `sourceObjectLength == payload.length` for uncompressed `OPAQUE_RECORD_BATCH` Phase 1 tests；
 - `entryIndexRef` is the source committed slice's entry-index reference. It is not a newly encoded clipped
   entry index for this `ReadBatch`；
@@ -644,6 +648,7 @@ forcing a payload read.
 
 `ResolvedObjectRange.objectOffset/objectLength` describe the full committed stream slice payload range
 referenced by the offset index. They do not include object header/footer bytes or an external index object.
+The range must be non-negative and `objectOffset + objectLength` must not overflow.
 `sliceChecksum` is required; `WalObjectReader` uses it to verify the full resolved slice before clipping.
 `schemaRefs` are copied from the selected offset index record.
 

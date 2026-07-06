@@ -245,6 +245,10 @@ Build `AppendResult` from:
 - object key and WAL canonical object checksum；
 - generation and commit version。
 
+The constructed `AppendResult` must satisfy the M1 API value contract: positive `recordCount` and
+`entryCount`, `recordCount == range.recordCount()`, and a non-negative non-overflowing physical
+`objectOffset/objectLength` range.
+
 If response is lost after this state, data remains visible.
 
 `CommitSliceRequest.writerRunIdHash` is copied from the `DefaultStreamStorage` process incarnation that

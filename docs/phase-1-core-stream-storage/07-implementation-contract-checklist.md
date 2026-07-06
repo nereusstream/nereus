@@ -71,7 +71,11 @@ M0 scaffold status before coding state machines:
   batches, and mismatched optional CRC32C payload checksums；
 - done: M1 `EntryIndexRef` validates location-specific field combinations instead of allowing ambiguous
   inline/object index references；
-- done: `./gradlew :nereus-api:test` and `./gradlew phase1Check` pass after M1.
+- done: M1 physical object ranges reject negative values and `offset + length` overflow in API values
+  that expose object byte ranges；
+- done: M1 `AppendResult` requires positive visible counts, so an append success result cannot represent
+  an empty range；
+- done: `./gradlew :nereus-api:test`, `./gradlew phase1Check`, and `./gradlew check` pass after M1.
 
 ## 3. Stop-The-Line Conditions
 

@@ -32,10 +32,7 @@ public record EntryIndexRef(
         objectKey = Objects.requireNonNull(objectKey, "objectKey");
         inlineData = copyOptionalBytes(inlineData);
         Objects.requireNonNull(checksum, "checksum");
-        if (offset < 0 || length < 0) {
-            throw new IllegalArgumentException("offset and length must be non-negative");
-        }
-        requireNonOverflowingRange(offset, length);
+        ApiRangeValidation.requireNonNegativeNonOverflowingRange(offset, length, "entry index");
         validateLocation(location, objectId, objectKey, inlineData, offset, length);
     }
 
@@ -47,14 +44,6 @@ public record EntryIndexRef(
     private static Optional<byte[]> copyOptionalBytes(Optional<byte[]> bytes) {
         Objects.requireNonNull(bytes, "inlineData");
         return bytes.map(byte[]::clone);
-    }
-
-    private static void requireNonOverflowingRange(long offset, long length) {
-        try {
-            Math.addExact(offset, length);
-        } catch (ArithmeticException e) {
-            throw new IllegalArgumentException("offset + length must not overflow", e);
-        }
     }
 
     private static void validateLocation(

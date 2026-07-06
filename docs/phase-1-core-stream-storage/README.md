@@ -359,6 +359,8 @@ Already settled for Phase 1:
 - M1 已在 `nereus-api` 增加 `ApiLimits` 和 `MetadataCanonicalizer`：stream attributes、entry
   attributes、schema refs 的 16 KiB public limit、UTF-8 key order、schema-ref canonical tuple order 和
   defensive copy 规则都从 API 边界统一执行；
+- M1 API value objects 已统一拒绝 physical object range 的 `offset + length` overflow，并要求
+  `AppendResult` 代表正数量的已提交 range；
 - WAL object id/key 必须包含 writer process incarnation hash，避免进程重启后 sequence 重置造成
   object id 碰撞；
 - append timeout 必须按最后不可逆边界分类；stream-head CAS 发出后的 timeout 是 unknown final

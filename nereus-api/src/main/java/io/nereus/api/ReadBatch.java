@@ -37,9 +37,10 @@ public record ReadBatch(
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
         Objects.requireNonNull(sourceObjectId, "sourceObjectId");
-        if (sourceObjectOffset < 0 || sourceObjectLength < 0) {
-            throw new IllegalArgumentException("source object offsets and lengths must be non-negative");
-        }
+        ApiRangeValidation.requireNonNegativeNonOverflowingRange(
+                sourceObjectOffset,
+                sourceObjectLength,
+                "source object");
     }
 
     @Override
