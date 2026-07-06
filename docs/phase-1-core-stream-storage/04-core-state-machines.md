@@ -2,11 +2,10 @@
 
 本文定义 `nereus-core` 的 append、resolve/read、trim 和 recovery 状态机。
 
-M0.5 status: the append state machine still shows the original `commitStreamSlice` boundary, but that
-boundary is blocked for implementation because the selected public Oxia Java client API cannot perform the
-assumed multi-key conditional commit. M2 must redesign the metadata linearization point first; until then,
-the append commit details in this file are design input and test requirements to re-evaluate, not a
-ready-to-code adapter contract.
+M0.5 status: the append state machine now uses the redesigned Oxia-compatible commit protocol from
+`02-oxia-metadata-and-commit.md`: one stream-head conditional put is the append linearization point, and
+offset-index plus committed-slice records are materialized indexes that can be repaired from the committed
+head chain.
 
 ## 1. Core Components
 
@@ -77,7 +76,8 @@ IDLE
   -> BUILD_WAL_OBJECT
   -> UPLOAD_WAL_OBJECT
   -> PUT_OBJECT_MANIFEST
-  -> COMMIT_OFFSET_INDEX
+  -> COMMIT_STREAM_HEAD
+  -> MATERIALIZE_OFFSET_INDEX
   -> ACK_RESULT
 ```
 
@@ -142,7 +142,7 @@ WalWriteResult(objectId, objectKey, objectChecksum, storageChecksum, written sli
 Rules:
 
 - no metadata visibility yet；
-- if upload fails, append fails before any offset index commit；
+- if upload fails, append fails before any stream-head commit；
 - object may exist after timeout, but without offset index it is invisible。
 
 ### `PUT_OBJECT_MANIFEST`
@@ -158,13 +158,9 @@ Rules:
 - idempotent for same object id, WAL canonical object checksum, storage checksum, object length, and slice
   manifest；
 - still no producer ack；
-- if manifest fails, no offset index commit。
+- if manifest fails, no stream-head commit。
 
-### `COMMIT_OFFSET_INDEX`
-
-M0.5 redesign gate: this state cannot be implemented as a multi-key conditional Oxia write with the
-current public Java client. Keep the sequencing, timeout, idempotent retry, and visibility requirements,
-but redefine the metadata operation before M2/M4 implementation.
+### `COMMIT_STREAM_HEAD`
 
 Call:
 
@@ -188,7 +184,10 @@ Rules:
   accepting the next append for that stream；
 - if commit is sent and final state is unknown, suspend new appends for that stream until a metadata
   refresh either discovers the same physical slice marker or observes the current committed end；
-- the Oxia condition remains mandatory and rejects stale or competing writers；
+- the Oxia stream-head condition remains mandatory and rejects stale or competing writers；
+- if head CAS loses only because same-writer renew, trim, or another compatible non-append head update
+  changed the Oxia key version, `commitStreamSlice` retries internally with the latest head and preserves
+  the updated session/trim fields；
 - if a competing writer commits first, the sequencer must refresh metadata and either retry the local
   append with a fresh expected offset only when an explicit future retry policy allows it. Phase 1 default
   is to fail with retriable `OFFSET_CONFLICT`。
@@ -203,11 +202,36 @@ commitVersion
 projectionRef
 ```
 
-This is the linearization point.
+The stream-head CAS inside `commitStreamSlice` is the linearization point.
 
-Only stream-scoped keys are part of this linearization point. Object reference and manifest slice-state
-updates run after the stream commit as repairable metadata updates. A failure there cannot make committed
-data invisible and cannot roll back the offset index.
+`commitStreamSlice` must also materialize the offset-index and committed-slice marker before returning a
+successful `CommitSliceResult`. If the head CAS succeeds but this materialization cannot be confirmed
+before timeout/cancellation, the append result is unknown final state and the same physical slice retry
+must finish materialization from the commit-log chain.
+
+Only the stream-head key is part of the append linearization point. Object reference and manifest
+slice-state updates run after the stream commit as repairable metadata updates. A failure there cannot make
+committed data logically uncommitted and cannot roll back the stream head.
+
+### `MATERIALIZE_OFFSET_INDEX`
+
+This is usually completed inside `metadataStore.commitStreamSlice`, before it returns success. It is
+listed as a separate state because failure injection and recovery tests must cover the boundary after head
+CAS and before read-index materialization.
+
+Materialized records:
+
+```text
+/streams/{streamId}/offset-index/{offsetEnd}/0
+/streams/{streamId}/committed-slices/{objectIdComponent}/{sliceIdComponent}
+```
+
+Rules:
+
+- idempotently confirm an existing record has the same bytes as the committed `StreamCommitRecord`；
+- conflicting bytes are `METADATA_INVARIANT_VIOLATION`；
+- timeout here has unknown final state because the stream head may already be committed；
+- read resolver may repair missing materialized records from the head commit chain before declaring a gap。
 
 ### `ACK_RESULT`
 
@@ -269,15 +293,16 @@ Append timeout and cancellation must be classified by the last irreversible boun
 | Boundary | Timeout result | Visibility guarantee |
 | --- | --- | --- |
 | before WAL upload starts | `TIMEOUT` or `CANCELLED` | no object and no offset index |
-| during WAL upload | `TIMEOUT`; upload may later succeed | object may become orphan, but no offset index commit may be started by the timed-out attempt |
+| during WAL upload | `TIMEOUT`; upload may later succeed | object may become orphan, but no stream-head commit may be started by the timed-out attempt |
 | after upload before manifest commit starts | `TIMEOUT` | object may exist, but no visibility |
 | during manifest commit | `TIMEOUT` | manifest may exist, but no visibility unless a later explicit retry commits the slice |
-| after `commitStreamSlice` RPC is sent | `TIMEOUT` with unknown final state | offset index may or may not have committed |
+| after stream-head CAS is sent | `TIMEOUT` with unknown final state | stream head may or may not have committed |
+| after head CAS before index materialization confirms | `TIMEOUT` with unknown final state | stream head committed; offset index may lag until repair |
 
 If timeout or cancellation fires after `commitStreamSlice` has been sent, the implementation must not report
 success without the commit result. A retry that still has the same in-memory `objectId/sliceId` attempt can
-use the committed-slice marker to discover success. A caller-level retry after losing that context may
-append duplicate data because Phase 1 has no producer dedup.
+use the stream-head commit chain or committed-slice marker to discover success. A caller-level retry after
+losing that context may append duplicate data because Phase 1 has no producer dedup.
 
 This boundary must surface as `TIMEOUT` or `CANCELLED` with unknown final state semantics. It must not be
 collapsed into `OFFSET_CONFLICT`, `OBJECT_UPLOAD_FAILED`, `METADATA_CONDITION_FAILED`, or a generic retry
@@ -286,20 +311,21 @@ wrapper, because those errors would incorrectly suggest the append is known not 
 ### Idempotent slice replay
 
 If `commitStreamSlice` finds an existing committed-slice marker for the same stream/object/slice, it should
-return the original commit result instead of creating a second range. This is only idempotency for the same
-physical slice commit; it is not producer-level dedup.
+return the original commit result instead of creating a second range. If the marker is missing, it must
+search the stream-head commit chain for the same `commitId` before treating the attempt as a new commit.
+This is only idempotency for the same physical slice commit; it is not producer-level dedup.
 
-If the first marker read is missing but the atomic commit fails, the metadata layer must re-read the marker
-before surfacing `OFFSET_CONFLICT` or a generic condition failure. A marker that appeared meanwhile and
-validates against the offset index means the same physical slice already committed and should return the
-original result.
+If the first marker read is missing and the head CAS fails or times out, the metadata layer must re-read
+the head and search the committed chain before surfacing `OFFSET_CONFLICT` or a generic condition failure.
+A reachable matching commit means the same physical slice already committed and should return the original
+result after any missing derived records are materialized.
 
 Retry scope:
 
 - retry inside the same append attempt may reuse the same `WalWriteResult`, `sliceId`, and
   `CommitSliceRequest`；
 - retry after the caller loses the append future result but still has the same in-memory attempt context
-  can get the original result through the committed-slice marker；
+  can get the original result through the stream-head commit chain or committed-slice marker；
 - retry after process crash or caller-level resubmission normally creates a new physical slice and may
   append duplicate data because Phase 1 has no producer sequence dedup。
 - a new physical WAL object attempt must allocate a fresh object sequence. It must not reuse a sequence
@@ -407,7 +433,13 @@ If no candidate:
 
 - get `committedEndOffset`；
 - if `startOffset >= committedEndOffset`, return empty resolve result；
-- otherwise fail `READ_RESOLUTION_FAILED` because metadata has a gap。
+- otherwise call `metadataStore.repairDerivedStreamIndexes(streamId, startOffset, maxRanges)` and retry
+  the bounded offset-index scan；
+- if repair returns `repairBudgetExhausted=true` without covering `startOffset`, continue bounded repair
+  attempts only while the read timeout and configured metadata repair budget allow；exhausting that local
+  budget returns retriable `READ_RESOLUTION_FAILED`, not metadata corruption；
+- if repair cannot materialize a covering committed record, fail `METADATA_INVARIANT_VIOLATION` because
+  stream head and commit-log truth cannot be projected into the read index。
 
 ### `SELECT_GENERATION`
 
@@ -457,7 +489,10 @@ while ranges.size < maxRanges and remainingRecords > 0:
   if no selected:
     committedEnd = getCommittedEndOffset(streamId)
     if cursor >= committedEnd: break
-    fail METADATA_INVARIANT_VIOLATION
+    repairDerivedStreamIndexes(streamId, cursor, remainingRepairBudget)
+    retry scan once within the read budget
+    if repair budget is exhausted without covering cursor: fail READ_RESOLUTION_FAILED as retriable
+    if still no selected: fail METADATA_INVARIANT_VIOLATION
   if selected.offsetStart > cursor: fail METADATA_INVARIANT_VIOLATION
   append range clipped to remainingRecords
   cursor = min(selected.offsetEnd, cursor + remainingRecords)
@@ -786,16 +821,18 @@ Session lease rules:
   `appendSessionMinCommitRemaining`；
 - if renewal fails, the append must not send `commitStreamSlice` and should fail with
   `APPEND_SESSION_EXPIRED` or `FENCED_APPEND` depending on the metadata error；
-- if the commit RPC has already been sent, the timeout/unknown-final-state rules still apply.
+- if `commitStreamSlice` has already sent or may send the stream-head CAS, the
+  timeout/unknown-final-state rules still apply.
 
 Lifecycle:
 
 - `close()` transitions the instance to closing and rejects new public calls with `STORAGE_CLOSED`；
 - in-flight appends that have not uploaded bytes may be completed with `STORAGE_CLOSED`；
-- in-flight appends that already uploaded bytes but have not committed offset index should not be acked
-  during close unless their normal commit path succeeds；
-- in-flight appends that have already sent `commitStreamSlice` should be allowed to observe the commit
-  result or timeout according to append timeout rules before owned clients are closed；
+- in-flight appends that already uploaded bytes but have not completed stream-head commit and index
+  materialization should not be acked during close unless their normal commit path succeeds；
+- in-flight appends that have already sent `commitStreamSlice` should be allowed to observe the
+  commit/materialization result or timeout according to append timeout rules before owned clients are
+  closed；
 - in-flight reads may finish or fail with `STORAGE_CLOSED` depending on client shutdown ordering；
 - close should first stop accepting work and stop background renew/watch tasks, then wait up to a
   configured shutdown grace for in-flight irreversible operations, then close owned clients；

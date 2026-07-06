@@ -3,10 +3,10 @@
 本文把 Phase 1 需要的 Oxia metadata schema、record 类型和 commit 操作拆到代码级。
 
 M0.5 status: the selected public Oxia Java client API does not expose the multi-key conditional write
-primitive assumed by the original `commitStreamSlice` protocol below. Treat sections that describe one
-atomic stream commit batch as pre-redesign design input, not as implementation-ready contract. M2 must
-replace the append linearization protocol before fake metadata or real adapter work implements
-`commitStreamSlice`.
+primitive assumed by the first draft of `commitStreamSlice`. This file has been rewritten to match the
+current public Oxia behavior: Phase 1 uses one authoritative stream-head key CAS as the append
+linearization point, and treats offset-index and committed-slice keys as materialized, repairable read
+indexes. M2 fake metadata must implement this single-key-CAS protocol, not the old atomic multi-key batch.
 
 ## 1. Metadata Responsibility
 
@@ -41,13 +41,11 @@ Use one cluster-scoped key prefix:
 Phase 1 keys:
 
 ```text
-/nereus/clusters/{clusterComponent}/streams/by-name/{streamNameHash}
-/nereus/clusters/{clusterComponent}/streams/{streamId}/meta
-/nereus/clusters/{clusterComponent}/streams/{streamId}/append-session
-/nereus/clusters/{clusterComponent}/streams/{streamId}/committed-end-offset
+/nereus/clusters/{clusterComponent}/streams/{streamId}/head
+/nereus/clusters/{clusterComponent}/streams/{streamId}/commit-log/{commitIdComponent}
 /nereus/clusters/{clusterComponent}/streams/{streamId}/offset-index/{offsetEnd}/{generation}
 /nereus/clusters/{clusterComponent}/streams/{streamId}/committed-slices/{objectIdComponent}/{sliceIdComponent}
-/nereus/clusters/{clusterComponent}/streams/{streamId}/trim
+/nereus/clusters/{clusterComponent}/streams/by-name/{streamNameHash}
 
 /nereus/clusters/{clusterComponent}/objects/{objectIdComponent}/manifest
 /nereus/clusters/{clusterComponent}/objects/{objectIdComponent}/references
@@ -56,21 +54,26 @@ Phase 1 keys:
 
 Notes:
 
-- `streamNameHash` is for stable idempotent lookup. The value must contain the original `StreamName`
-  to detect hash collisions.
+- `/streams/{streamId}/head` is the authoritative stream record. It contains stream metadata, stream
+  state, append session snapshot, committed end, trim low-watermark, durable commit version, cumulative
+  logical size, and the latest committed commit id.
+- `streamId` is deterministic: `s-` plus the full `streamNameHash`. Therefore
+  `createOrGetStream(streamName)` can compute the authoritative head key directly. The by-name key is an
+  optional lookup/audit cache, not a correctness dependency.
+- `streamNameHash` is for stable idempotent lookup. The head value and optional by-name value must contain
+  the original `StreamName` to detect hash collisions.
+- `/commit-log/{commitIdComponent}` stores immutable append commit records. A commit-log record is not
+  visible by itself; it becomes committed only when it is reachable from the stream head's
+  `lastCommitId` chain after a successful head CAS.
 - Offset index key includes `{generation}` from Phase 1. Append WAL entries use `generation=0`.
-- `metadataVersion` is the Oxia key version. `commitVersion` is the durable Nereus stream commit
-  sequence stored in `CommittedEndOffsetRecord` and copied into each visible slice commit. Neither is
-  compaction generation.
-- All stream-scoped keys participating in `commitStreamSlice` must use `PartitionKey(streamId)` or an
-  equivalent Oxia key-group routing rule so the visible append commit is single-key-group atomic.
-  M0.5 confirmed that the selected public Oxia Java client API does not expose the required atomic
-  conditional multi-write primitive. This keyspace can stay, but the original `commitStreamSlice`
-  linearization design must be replaced before M2 fake metadata semantics are frozen or M4 core append
-  starts.
-- Stream creation also uses `PartitionKey(streamId)`. Phase 1 derives `streamId` deterministically from
-  the exact `StreamName.value()`, so the by-name lookup and the initial stream records can be committed
-  in the same key group.
+- `metadataVersion` is the Oxia key version for the key that was read or written. `commitVersion` is the
+  durable Nereus stream commit sequence stored in `StreamHeadRecord`, `StreamCommitRecord`, and derived
+  read-index records. Neither is compaction generation.
+- Every stream-scoped operation must use `PartitionKey(streamId)`. The only append linearization write is
+  a conditional put of `/streams/{streamId}/head` with `IfVersionIdEquals(previousHeadVersion)`.
+- Phase 1 must not rely on Oxia multi-key atomicity. The public API shape verified in M0.5 supports
+  single-key conditional put/delete and partition-key-aware get/list/rangeScan/sequence APIs; fake
+  metadata must not expose a stronger commit primitive.
 - Object-scoped keys may use `PartitionKey(objectId)`. They are not part of the producer-ack
   linearization point.
 - Dynamic path components must be key-safe encoded before entering an Oxia path. In particular,
@@ -83,6 +86,8 @@ Path component encoding:
 clusterComponent = keyComponent(cluster)
 streamNameHash = base32lower_nopad(sha256(UTF-8 exact StreamName.value()))
 streamId = "s-" + streamNameHash
+commitId = base32lower_nopad(sha256(canonical CommitSliceRequest identity))
+commitIdComponent = keyComponent(commitId)
 objectIdComponent = keyComponent(objectId)
 sliceIdComponent = base32lower_nopad(sha256(UTF-8 objectId + "\0" + UTF-8 sliceId))
 offsetEnd = offsetEndKey
@@ -137,6 +142,9 @@ public record StreamMetadataRecord(
 }
 ```
 
+`StreamMetadataRecord` is a hydrated view derived from `StreamHeadRecord`. Phase 1 does not require a
+separate authoritative `/meta` key.
+
 ### `StreamNameRecord`
 
 ```java
@@ -148,6 +156,91 @@ public record StreamNameRecord(
         long metadataVersion) {
 }
 ```
+
+`StreamNameRecord` is an optional lookup/audit cache. The authoritative name-to-id mapping is still the
+deterministic `streamId = "s-" + streamNameHash` plus the `streamName` stored in `StreamHeadRecord`.
+
+### `StreamHeadRecord`
+
+```java
+public record StreamHeadRecord(
+        String streamId,
+        String streamName,
+        String streamNameHash,
+        String state,
+        String profile,
+        Map<String, String> attributes,
+        long createdAtMillis,
+        long policyVersion,
+        long committedEndOffset,
+        long cumulativeSize,
+        long commitVersion,
+        long trimOffset,
+        String lastCommitId,
+        AppendSessionSnapshotRecord appendSession,
+        long metadataVersion) {
+}
+
+public record AppendSessionSnapshotRecord(
+        String writerId,
+        long epoch,
+        String fencingToken,
+        long leaseVersion,
+        long expiresAtMillis) {
+}
+```
+
+`StreamHeadRecord` is the only Phase 1 stream key that participates in append, session, state, committed
+end, and trim CAS operations. Empty `lastCommitId` means the stream has no committed append records.
+An empty `appendSession.writerId` means no append session is currently owned.
+
+### `StreamCommitRecord`
+
+```java
+public record StreamCommitRecord(
+        String streamId,
+        String commitId,
+        String previousCommitId,
+        long offsetStart,
+        long offsetEnd,
+        long generation,
+        long cumulativeSize,
+        long commitVersion,
+        String writerId,
+        String writerRunIdHash,
+        long writerEpoch,
+        String fencingTokenHash,
+        String objectId,
+        String objectKey,
+        String sliceId,
+        String objectType,
+        String physicalFormat,
+        String logicalFormat,
+        String payloadFormat,
+        String objectChecksumType,
+        String objectChecksumValue,
+        long objectOffset,
+        long objectLength,
+        int recordCount,
+        int entryCount,
+        long logicalBytes,
+        List<SchemaRef> schemaRefs,
+        EntryIndexReferenceRecord entryIndexRef,
+        String projectionRef,
+        String sliceChecksumType,
+        String sliceChecksumValue,
+        long minEventTimeMillis,
+        long maxEventTimeMillis,
+        long preparedAtMillis,
+        long metadataVersion) {
+}
+```
+
+`StreamCommitRecord` is written before the stream-head CAS and is immutable. It is only committed if the
+current `StreamHeadRecord.lastCommitId` chain reaches `commitId`. Records not reachable from the head are
+orphan commit intents and must be ignored by reads, repair, and object reference rebuilds. Same physical
+retry must reuse an existing record with the same `commitId` after validating its canonical identity
+fields; volatile fields such as `preparedAtMillis` must not make a replay look like a conflicting commit.
 
 ### `AppendSessionRecord`
 
@@ -162,6 +255,10 @@ public record AppendSessionRecord(
 }
 ```
 
+`AppendSessionRecord` is a public/internal view derived from `StreamHeadRecord.appendSession`. The session
+snapshot itself is stored inside the stream head so append commit CAS can validate epoch/token with one
+public Oxia conditional put.
+
 ### `CommittedEndOffsetRecord`
 
 ```java
@@ -173,6 +270,9 @@ public record CommittedEndOffsetRecord(
         long metadataVersion) {
 }
 ```
+
+`CommittedEndOffsetRecord` is a compatibility view derived from `StreamHeadRecord`; Phase 1 does not keep
+an authoritative `/committed-end-offset` key.
 
 ### `OffsetIndexRecord`
 
@@ -307,8 +407,9 @@ public record VisibleSliceReferenceRecord(
 }
 ```
 
-`ObjectReferenceRecord` is an audit and GC input. It is not read visibility truth; visibility still comes
-from `OffsetIndexRecord`. It must be repairable from committed offset index records.
+`ObjectReferenceRecord` is an audit and GC input. It is not read visibility truth; visibility comes from
+`StreamHeadRecord.lastCommitId` reachability. `OffsetIndexRecord` is the normal read-serving materialized
+index and can be rebuilt from the committed head chain when object-reference repair needs it.
 
 ### `CommittedSliceRecord`
 
@@ -324,8 +425,10 @@ public record CommittedSliceRecord(
 }
 ```
 
-`CommittedSliceRecord` is stream-scoped and participates in the same atomic commit as the offset index.
-It prevents accidentally committing the same object slice twice for the same stream.
+`CommittedSliceRecord` is a materialized idempotency/read-repair marker derived from a committed
+`StreamCommitRecord`. It is not the append linearization key. If the marker is missing, the adapter must
+fall back to the stream-head commit chain before deciding whether the same physical slice already
+committed.
 
 Manifest states:
 
@@ -352,6 +455,9 @@ public record TrimRecord(
         long metadataVersion) {
 }
 ```
+
+`TrimRecord` is a hydrated view derived from `StreamHeadRecord.trimOffset`. Phase 1 does not keep an
+authoritative `/trim` key.
 
 ## 4. `OxiaMetadataStore` Interface
 
@@ -407,6 +513,12 @@ public interface OxiaMetadataStore extends AutoCloseable {
             String cluster,
             CommitSliceRequest request);
 
+    CompletableFuture<DerivedIndexRepairResult> repairDerivedStreamIndexes(
+            String cluster,
+            StreamId streamId,
+            long targetOffset,
+            int maxRecordsToRepair);
+
     CompletableFuture<List<OffsetIndexRecord>> scanOffsetIndex(
             String cluster,
             StreamId streamId,
@@ -432,6 +544,16 @@ public interface OxiaMetadataStore extends AutoCloseable {
             StreamId streamId,
             MetadataWatcher watcher);
 }
+
+public record DerivedIndexRepairResult(
+        StreamId streamId,
+        long repairedFromOffset,
+        long repairedToOffset,
+        int repairedRecords,
+        boolean targetCovered,
+        boolean repairBudgetExhausted,
+        long observedCommitVersion) {
+}
 ```
 
 Implementation can wrap native Oxia operations behind smaller internal helpers:
@@ -439,12 +561,19 @@ Implementation can wrap native Oxia operations behind smaller internal helpers:
 ```java
 interface OxiaClient {
     CompletableFuture<OxiaGetResult> get(String key, PartitionKey partitionKey);
-    CompletableFuture<OxiaPutResult> put(
+    CompletableFuture<OxiaPutResult> putIfAbsent(
             String key,
             byte[] value,
-            PutCondition condition,
             PartitionKey partitionKey);
-    CompletableFuture<OxiaCommitResult> commit(OxiaCommitBatch batch);
+    CompletableFuture<OxiaPutResult> putIfVersion(
+            String key,
+            byte[] value,
+            long expectedVersion,
+            PartitionKey partitionKey);
+    CompletableFuture<OxiaDeleteResult> deleteIfVersion(
+            String key,
+            long expectedVersion,
+            PartitionKey partitionKey);
     CompletableFuture<List<OxiaKeyValue>> scan(
             String fromKeyExclusive,
             String toKeyExclusive,
@@ -460,18 +589,23 @@ record PartitionKey(String value) {
 }
 ```
 
-`OxiaGetResult`, `OxiaPutResult`, `OxiaCommitResult`, `OxiaCommitBatch`, `OxiaKeyValue`, and
-`PutCondition` are adapter-private placeholders for the real Oxia client binding. They should not leak
-into `nereus-api`. `OxiaCommitBatch` must support conditional writes for a single stream key group.
-Phase 1 must not require cross-shard or cross-partition atomicity for the producer-ack path.
+`OxiaGetResult`, `OxiaPutResult`, `OxiaDeleteResult`, and `OxiaKeyValue` are adapter-private placeholders
+for the real Oxia client binding. They should not leak into `nereus-api`. The adapter deliberately does
+not define an `OxiaCommitBatch` abstraction in Phase 1 because the selected public Java client API does
+not expose a supportable multi-key conditional write primitive.
 
 Rules:
 
 - every stream-scoped operation must pass `PartitionKey(streamId)`；
 - every object-scoped operation must pass `PartitionKey(objectId)`；
-- `OxiaCommitBatch` must carry one partition key and reject keys routed with a different partition key；
+- append/session/trim linearization is always a `putIfVersion` on `/streams/{streamId}/head`；
+- create stream and immutable commit-log records use `putIfAbsent`；
+- derived offset-index, committed-slice, by-name, object-reference, and manifest-state updates are
+  idempotent single-key puts or CAS merges；
 - the fake store must record supplied partition keys and fail contract tests when production code omits or
-  changes them。
+  changes them；
+- the fake store must be able to inject failure between head CAS and derived-index materialization, because
+  that is the critical recovery path introduced by the Oxia public API constraint。
 
 ## 5. Create-Or-Get Stream
 
@@ -486,27 +620,24 @@ Algorithm:
 1. Compute `streamNameHash = base32lower_nopad(sha256(UTF-8 exact StreamName.value()))`.
 2. Compute deterministic `streamId = "s-" + streamNameHash`.
 3. Use `PartitionKey(streamId)` for all reads/writes in this operation.
-4. Read `/streams/by-name/{streamNameHash}`.
+4. Read `/streams/{streamId}/head`.
 5. If found, validate stored `streamName` and `streamId` match the requested `StreamName`.
-6. Read `/streams/{streamId}/meta`.
-7. If stream metadata exists with a different `streamName`, fail with `METADATA_INVARIANT_VIOLATION`
+6. If stream head exists with a different `streamName`, fail with `METADATA_INVARIANT_VIOLATION`
    because this indicates a deterministic id collision or data corruption.
-8. If not found, create:
-   - deterministic `StreamId`；
-   - `StreamMetadataRecord(streamNameHash, state=ACTIVE, profile=OBJECT_WAL, attributes=options.attributes)`；
-   - `CommittedEndOffsetRecord(committedEndOffset=0, cumulativeSize=0, commitVersion=0)`；
-   - `TrimRecord(trimOffset=0)`；
-   - name lookup record。
-9. Commit all records in one stream key group with conditions:
-   - by-name key missing；
-   - stream meta key missing。
+7. If not found, build `StreamHeadRecord` with deterministic `StreamId`, `state=ACTIVE`,
+   `profile=OBJECT_WAL`, `attributes=options.attributes`, `committedEndOffset=0`, `cumulativeSize=0`,
+   `commitVersion=0`, `trimOffset=0`, empty `lastCommitId`, and empty append session.
+8. `putIfAbsent(/streams/{streamId}/head, StreamHeadRecord)`.
+9. If the conditional put loses a race, re-read the head and validate it as in step 5.
+10. Best-effort write `/streams/by-name/{streamNameHash}` as a derived cache. Failure to write the cache
+    must not make the stream creation fail after the head exists.
 
 Idempotency:
 
 - concurrent create with the same name returns the same stream；
 - hash collision fails with a non-retriable metadata error。
-- if the by-name record exists but stream metadata is missing, fail with `METADATA_INVARIANT_VIOLATION`
-  and leave repair to an explicit metadata repair workflow。
+- if the by-name record exists but stream head is missing, ignore the cache for correctness, re-create or
+  re-read the deterministic head, and leave cache repair to an explicit metadata repair workflow。
 - Phase 1 does not allocate random stream ids. If a future needs random or sequence stream ids, it must
   introduce an allocation protocol that preserves create-or-get atomicity.
 
@@ -526,11 +657,11 @@ allowStealExpiredSession
 Condition:
 
 ```text
-/streams/{streamId}/meta.state == ACTIVE
+head.state == ACTIVE
 AND (
-  append-session missing
-  OR append-session expired AND (append-session.writerId == writerId OR allowStealExpiredSession)
-  OR append-session.writerId == writerId
+  head.appendSession missing
+  OR head.appendSession expired AND (head.appendSession.writerId == writerId OR allowStealExpiredSession)
+  OR head.appendSession.writerId == writerId
 )
 ```
 
@@ -540,13 +671,13 @@ Output:
 epoch = previousEpoch + 1 when ownership changes or the old session is expired
 epoch = currentEpoch when the same writer renews a live session
 fencingToken = current token for same-writer live renew, new opaque token for a new epoch
-leaseVersion = Oxia metadata version
+leaseVersion = head.appendSession.leaseVersion + 1 on acquire/renew
 expiresAtMillis = now + ttl
 ```
 
 Implementation detail:
 
-- `acquire` and `renew` may share one CAS loop.
+- `acquire` and `renew` are CAS loops over `/streams/{streamId}/head`.
 - Use metadata server time if Oxia exposes it. Otherwise use local clock plus conservative TTL.
 - Different-writer takeover of an expired session is allowed only when
   `AppendSessionOptions.allowStealExpiredSession=true`.
@@ -558,11 +689,11 @@ Implementation detail:
 Condition:
 
 ```text
-append-session.writerId == writerId
-AND append-session.epoch == epoch
-AND append-session.fencingToken == fencingToken
-AND append-session.expiresAtMillis > now
-AND /streams/{streamId}/meta.state == ACTIVE
+head.appendSession.writerId == writerId
+AND head.appendSession.epoch == epoch
+AND head.appendSession.fencingToken == fencingToken
+AND head.appendSession.expiresAtMillis > now
+AND head.state == ACTIVE
 ```
 
 Renew only extends expiration and increments `leaseVersion`.
@@ -595,35 +726,27 @@ object.
 
 ## 8. Commit Stream Slice
 
-`commitStreamSlice` is the Phase 1 linearization point for append.
+`commitStreamSlice` uses a single Oxia public API linearization point:
 
-Idempotent replay:
+```text
+putIfVersion(/streams/{streamId}/head, newHead, previousHead.metadataVersion)
+```
 
-1. Before attempting a new atomic commit, read
-   `/streams/{streamId}/committed-slices/{objectIdComponent}/{sliceIdComponent}`.
-2. If it exists, read the matching offset index entry and return the original `CommitSliceResult`.
-3. Do not create a second visible range for the same stream/object/slice.
-4. The offset index entry must match the request's object id, slice id, physical range, record count,
-   entry count, logical bytes, payload format, schema refs, and slice checksum.
-5. If the marker exists but the offset index entry is missing or inconsistent, fail with
-   `METADATA_INVARIANT_VIOLATION`.
+The old design tried to atomically update committed end, offset index, and committed-slice marker in one
+conditional multi-key batch. M0.5 proved the selected public Oxia Java API does not expose that primitive,
+so Phase 1 now separates commit truth from read-serving indexes:
 
-This handles the crash/RPC-loss case after the stream commit succeeds but before the caller receives the
-ack result.
+- `StreamHeadRecord` is the authoritative stream state and commit head；
+- `StreamCommitRecord` is an immutable, pre-written commit intent；
+- `OffsetIndexRecord` and `CommittedSliceRecord` are materialized indexes derived from committed
+  commit-log records；
+- a derived-index write may fail after the head CAS, so read/replay paths must be able to repair it from
+  the head commit chain。
 
-Condition-failure classification:
-
-1. If the atomic commit fails after the initial marker read, re-read the committed-slice marker before
-   returning an error.
-2. If the marker now exists and validates against the matching offset index, return the original
-   `CommitSliceResult`.
-3. If the marker exists but does not validate, fail `METADATA_INVARIANT_VIOLATION`.
-4. If the marker is still missing, classify the failed condition by the stream-scoped state:
-   stream state not `ACTIVE` -> `STREAM_NOT_ACTIVE`; stale epoch/token -> `FENCED_APPEND`; committed end
-   mismatch -> `OFFSET_CONFLICT`; other CAS failures -> `METADATA_CONDITION_FAILED` or
-   `METADATA_UNAVAILABLE` according to the adapter error.
-
-This avoids misclassifying a concurrent same-slice replay as a new offset conflict.
+Producer ack is allowed only after the head CAS has succeeded and the offset-index plus committed-slice
+marker for this slice have been materialized or idempotently confirmed. If the head CAS may have succeeded
+but materialization cannot be confirmed before timeout/cancellation, the append result is unknown final
+state, not a known failure.
 
 Request:
 
@@ -662,25 +785,35 @@ storage checksum over exact uploaded bytes.
 `OPAQUE_RECORD_BATCH` Phase 1 tests it is the sum of entry payload lengths. It is used only for
 `cumulativeSize`; it is not an offset coordinate.
 
-Atomic conditions:
+Commit identity:
 
 ```text
-/streams/{streamId}/meta.state == ACTIVE
-/streams/{streamId}/append-session.epoch == request.epoch
-/streams/{streamId}/append-session.fencingToken == request.fencingToken
-/streams/{streamId}/committed-end-offset.committedEndOffset == request.expectedStartOffset
-/streams/{streamId}/committed-slices/{objectIdComponent}/{sliceIdComponent} is missing
+commitId = sha256(canonical streamId, expectedStartOffset, writerId, writerRunIdHash, epoch,
+                  fencingTokenHash, objectId, objectKey, objectChecksum, sliceId, objectOffset,
+                  objectLength, sliceChecksum, recordCount, entryCount, logicalBytes,
+                  payloadFormat, schemaRefs, entryIndexRef)
 ```
+
+`fencingTokenHash` is `base32lower_nopad(sha256(UTF-8 fencingToken))`. The raw fencing token is used only
+to validate the current append session. `StreamCommitRecord` stores the hash so durable metadata and
+golden bytes do not persist the opaque token itself. The canonical `commitId` input order, text encoding,
+empty optional-field encoding, and schema-ref ordering must be covered by golden tests shared by fake and
+real adapters.
+
+The same physical slice retry uses the same `commitId`. Phase 1 default behavior does not rebase an
+uploaded slice to a different `expectedStartOffset`; an offset conflict returns a retriable error to the
+caller.
 
 `expiresAtMillis` is checked before attempting the commit and during acquire/renew. `DefaultStreamStorage`
 must renew before upload or before `commitStreamSlice` when the remaining lease is below
 `appendSessionMinCommitRemaining`. `expiresAtMillis` is not required as an Oxia value predicate in the
-commit batch. Correct fencing comes from the current session record's epoch/token: once another writer
-acquires the stream, these values change and stale commits fail.
-`leaseVersion` is intentionally not part of `commitStreamSlice` conditions because same-writer live renew
+head CAS payload. Correct fencing comes from the current head's session epoch/token: once another writer
+acquires the stream, these values change and stale commits fail. `leaseVersion` is intentionally not part
+of `commitStreamSlice` conditions because same-writer live renew
 increments it and must not fence that writer's in-flight appends.
 
-Object manifest validation is a required pre-commit read, but not part of the stream atomic commit:
+Object manifest validation is a required pre-head-CAS read, but not part of the stream linearization
+write:
 
 ```text
 /objects/{objectIdComponent}/manifest.state in [UPLOADED, PARTIALLY_VISIBLE, VISIBLE]
@@ -706,27 +839,60 @@ Object manifest validation is a required pre-commit read, but not part of the st
 ```
 
 The requested slice state must be `UPLOADED` for a new commit attempt. A same physical slice replay after a
-successful stream commit is handled by the committed-slice marker before this validation path. If the marker
-is missing but the manifest slice already says `VISIBLE`, object-scoped audit metadata is inconsistent with
-stream-scoped truth and the commit must fail with `METADATA_INVARIANT_VIOLATION` rather than creating a new
-offset range.
+successful stream commit is handled by the committed-slice marker or by the stream-head commit chain before
+this validation path creates any new commit. If the marker is missing but the manifest slice already says
+`VISIBLE`, object-scoped audit metadata is inconsistent with stream-scoped truth; the adapter must search
+the committed head chain for the same `commitId` before deciding whether this is idempotent replay or
+`METADATA_INVARIANT_VIOLATION`.
 
-This split is intentional. Stream visibility must fit in one stream key group; object reference metadata is
-repairable and must not force a cross-shard transaction onto producer ack.
+This split is intentional. Stream commit truth must fit in one single-key Oxia CAS; object reference
+metadata is repairable and must not force cross-shard or multi-key atomicity onto producer ack.
 
-Atomic writes:
+Commit algorithm:
 
 ```text
-offsetStart = expectedStartOffset
-offsetEnd = Math.addExact(expectedStartOffset, recordCount)
-cumulativeSize = Math.addExact(currentCommittedEndOffsetRecord.cumulativeSize, logicalBytes)
-generation = 0
-commitVersion = Math.addExact(currentCommittedEndOffsetRecord.commitVersion, 1)
-
-put /streams/{streamId}/offset-index/{offsetEnd}/0 = OffsetIndexRecord(commitVersion)
-put /streams/{streamId}/committed-end-offset = {offsetEnd, cumulativeSize, commitVersion}
-put /streams/{streamId}/committed-slices/{objectIdComponent}/{sliceIdComponent} = CommittedSliceRecord(generation=0, commitVersion)
-notify stream-data-available
+1. Compute `fencingTokenHash` and `commitId`.
+2. Try replay discovery:
+   a. read materialized committed-slice marker;
+   b. if absent, read stream head and walk the reachable commit chain until commitId is found or the
+      configured replay-search bound is reached.
+3. If replay is found, validate the committed commit record against the request, materialize any missing
+   derived records, and return the original CommitSliceResult.
+4. Start a bounded head-CAS loop. Each iteration reads StreamHeadRecord with PartitionKey(streamId).
+5. Validate the current head:
+   head.state == ACTIVE
+   head.appendSession.epoch == request.epoch
+   head.appendSession.fencingToken == request.fencingToken
+   head.committedEndOffset == request.expectedStartOffset
+6. Validate object manifest and slice fields.
+7. Build immutable StreamCommitRecord:
+   previousCommitId = head.lastCommitId
+   offsetStart = request.expectedStartOffset
+   offsetEnd = Math.addExact(request.expectedStartOffset, recordCount)
+   cumulativeSize = Math.addExact(head.cumulativeSize, logicalBytes)
+   generation = 0
+   commitVersion = Math.addExact(head.commitVersion, 1)
+8. putIfAbsent(/streams/{streamId}/commit-log/{commitIdComponent}, StreamCommitRecord).
+   If the record already exists, validate all canonical commit identity fields against the request and the
+   current head snapshot, including previousCommitId, offsetStart, offsetEnd, cumulativeSize, and
+   commitVersion. If they match, reuse the stored record; if they differ, fail
+   METADATA_INVARIANT_VIOLATION unless the current head already reaches the same commitId.
+9. CAS /streams/{streamId}/head from the version read in step 4 to:
+   committedEndOffset = commitRecord.offsetEnd
+   cumulativeSize = commitRecord.cumulativeSize
+   commitVersion = commitRecord.commitVersion
+   lastCommitId = commitId
+   appendSession = current head.appendSession
+   trimOffset = current head.trimOffset
+   stream metadata/state fields copied from the current head
+10. If head CAS loses, re-read the head:
+    a. if the current head chain reaches commitId, materialize missing derived records and return success;
+    b. if state, epoch/token, or committedEndOffset no longer satisfy step 5, classify the failure;
+    c. if state, epoch/token, committedEndOffset, commitVersion, and lastCommitId are still compatible,
+       retry the CAS with the current head version. This is the expected path when same-writer renew or
+       trim updated the head between read and CAS.
+11. If head CAS succeeds, materialize offset-index and committed-slice marker from the committed record.
+12. Ack only after the derived records required for normal read and same-slice replay are confirmed.
 ```
 
 The `OffsetIndexRecord` value must include `logicalBytes` and the slice checksum from the request. The read
@@ -736,12 +902,35 @@ The offset index value also stores canonical slice-level `schemaRefs` derived fr
 `resolve` and `read` do not need object manifest or footer reads to expose schema metadata.
 
 `commitVersion` must be monotonic for visible commits of one stream and must be computable before the
-atomic write batch is encoded. Phase 1 stores it in `CommittedEndOffsetRecord`; `commitStreamSlice` reads
-the current committed-end record under a version/condition check, computes `current.commitVersion + 1`,
-and writes that same value into the new committed-end record, `OffsetIndexRecord`, and
-`CommittedSliceRecord`. Do not use the Oxia key version returned after commit as this durable value,
-because that version is not available when encoding sibling records in the same atomic batch. Hydrated
-`metadataVersion` remains the Oxia key version for each individual key.
+head CAS is attempted. Phase 1 stores it in `StreamHeadRecord` and `StreamCommitRecord`; materialized
+`OffsetIndexRecord` and `CommittedSliceRecord` copy the value from the committed record. Do not use the
+Oxia key version returned after commit as this durable value. Hydrated `metadataVersion` remains the Oxia
+key version for each individual key.
+
+Head-CAS failure classification:
+
+1. Re-read the head.
+2. If the current head chain reaches `commitId`, treat the attempt as committed, materialize missing
+   derived records, and return the original result.
+3. If head state is not `ACTIVE`, return `STREAM_NOT_ACTIVE`.
+4. If epoch/token no longer match, return `FENCED_APPEND`.
+5. If `head.committedEndOffset != request.expectedStartOffset`, return `OFFSET_CONFLICT`.
+6. If head state, epoch/token, committed end, commitVersion, and lastCommitId are still compatible, retry
+   the CAS loop because another non-append head update such as same-writer renew or trim only changed the
+   Oxia key version.
+7. Otherwise return `METADATA_CONDITION_FAILED` or `METADATA_UNAVAILABLE` according to the adapter error.
+
+Materialization failure after successful head CAS:
+
+- the append is already logically committed because the head points to the commit record；
+- the adapter must retry materializing offset-index and committed-slice marker while the caller's
+  timeout/cancellation budget allows；
+- if materialization cannot be confirmed before the budget expires, surface `TIMEOUT`, `CANCELLED`, or
+  `METADATA_UNAVAILABLE` with unknown-final-state semantics；
+- do not return `OFFSET_CONFLICT` or a known-not-committed error after a successful or possibly successful
+  head CAS；
+- the next same physical slice retry must discover the commit through the head chain and finish
+  materialization instead of creating a second range。
 
 Post-commit repairable writes:
 
@@ -752,8 +941,9 @@ update /objects/{objectIdComponent}/manifest.state = PARTIALLY_VISIBLE or VISIBL
 ```
 
 Failure of post-commit repairable writes must not roll back the append and must not block producer ack after
-the stream commit succeeds. GC must treat offset index as the authoritative reference source when object
-reference metadata is stale or missing.
+the stream commit succeeds. GC/repair must treat the stream-head commit chain as authoritative when object
+reference metadata is stale or missing; offset index is the normal materialized lookup source and can be
+repaired from that chain if needed.
 
 Post-commit object-scoped updates should be best-effort CAS merge operations:
 
@@ -761,11 +951,43 @@ Post-commit object-scoped updates should be best-effort CAS merge operations:
   back with a version condition；
 - manifest update changes only the matching slice state and recomputes aggregate object state；
 - CAS conflict may be retried a bounded number of times；
-- after retries are exhausted, leave the object metadata stale and rely on repair from offset index；
+- after retries are exhausted, leave the object metadata stale and rely on repair from the stream-head
+  commit chain and materialized offset index；
 - do not overwrite another stream slice's already-visible reference or manifest state with an older value。
 
 Phase 1 does not implement object deletion. In particular, a WAL object with a manifest must not be
 deleted solely because its object reference record is missing or stale.
+
+Derived index repair:
+
+```text
+repairDerivedStreamIndexes(streamId, targetOffset)
+```
+
+Algorithm:
+
+1. Read `StreamHeadRecord`.
+2. If `targetOffset >= head.committedEndOffset`, no repair is needed for a normal read.
+3. Walk the commit chain from `head.lastCommitId` through `StreamCommitRecord.previousCommitId`, but
+   materialize at most `maxRecordsToRepair` records in one call.
+4. Stop once the walk has materialized the committed record covering `targetOffset` and all later records
+   needed by the caller's bounded resolve window, once it reaches offset `0`, or once the repair budget is
+   exhausted.
+5. For each reachable commit record, idempotently put:
+   - `/offset-index/{offsetEnd}/{generation}`；
+   - `/committed-slices/{objectIdComponent}/{sliceIdComponent}`。
+6. If `maxRecordsToRepair` is exhausted before the target offset is covered, return
+   `DerivedIndexRepairResult(targetCovered=false, repairBudgetExhausted=true)`. The resolver may issue
+   another bounded repair within the read timeout, but it must not convert budget exhaustion into
+   `METADATA_INVARIANT_VIOLATION`.
+7. If the chain is broken, a commit record is corrupt, or a derived record exists with conflicting bytes,
+   fail with `METADATA_INVARIANT_VIOLATION`.
+
+Reads should normally use offset-index directly. If an offset-index scan shows a gap below
+`head.committedEndOffset`, the resolver must attempt this repair before reporting a metadata invariant
+failure. Budget exhaustion is retriable or may be retried by the resolver; broken chain/corrupt record/
+conflicting materialized bytes are invariant failures. This is the price of replacing unavailable
+multi-key atomic commit with a single-key head CAS.
 
 Object reference repair:
 
@@ -776,13 +998,16 @@ repairObjectReferences(cluster, objectId)
 Algorithm:
 
 1. Read `ObjectManifestRecord`. If missing, fail with `METADATA_INVARIANT_VIOLATION` for repair callers.
-2. For each manifest slice, read the stream-scoped committed-slice marker.
-3. If marker exists, read and validate the matching offset index entry.
-4. Build `VisibleSliceReferenceRecord` only for validated visible slices.
-5. CAS-merge the rebuilt reference list into `/objects/{objectIdComponent}/references`.
+2. For each manifest slice, read the stream head for that slice's stream.
+3. Walk the committed head chain until a record matching the manifest slice's stream id, object id,
+   slice id, writer epoch, checksum, physical range, record count, entry count, logical bytes, payload
+   format, and schema refs is found, or until the chain proves it is not committed.
+4. If committed, materialize and validate the matching offset index and committed-slice marker.
+5. Build `VisibleSliceReferenceRecord` only for validated visible slices.
+6. CAS-merge the rebuilt reference list into `/objects/{objectIdComponent}/references`.
 
 Repair must not use object-store list and must not create visibility. It only rebuilds object-scoped audit
-metadata from stream-scoped truth.
+metadata from stream-head commit truth and derived read indexes.
 
 Result:
 
@@ -850,16 +1075,16 @@ replacement.
 `updateTrim(beforeOffset)` conditions:
 
 ```text
-/streams/{streamId}/meta.state in [ACTIVE, SEALED]
+head.state in [ACTIVE, SEALED]
 beforeOffset >= 0
-beforeOffset >= currentTrimOffset
-beforeOffset <= committedEndOffset
+beforeOffset >= head.trimOffset
+beforeOffset <= head.committedEndOffset
 ```
 
 Writes:
 
 ```text
-/streams/{streamId}/trim = beforeOffset
+putIfVersion(/streams/{streamId}/head, head with trimOffset=beforeOffset, previousHead.metadataVersion)
 ```
 
 No object delete and no offset index delete in Phase 1.
@@ -910,9 +1135,10 @@ Watch rules:
 | Oxia unavailable before object upload | no metadata commit | retry append later |
 | object upload succeeds, manifest put fails | orphan by object store naming; no visibility | retry manifest or GC after TTL |
 | manifest succeeds, slice commit fails due to stale token | manifest remains uploaded; no visibility | reacquire session and retry or abandon |
-| timeout after slice commit RPC is sent | commit may or may not have succeeded | retry same physical slice can use committed-slice marker; caller-level retry may duplicate |
-| slice commit succeeds, ack response lost | data visible; committed-slice marker exists | retry can return idempotent commit result |
-| slice commit succeeds, object reference update fails | data visible; object reference stale | repair object references from offset index |
+| timeout after head CAS is sent | commit may or may not have succeeded; derived indexes may lag | retry same physical slice can use head chain or committed-slice marker; caller-level retry may duplicate |
+| head CAS succeeds but derived index materialization times out | stream head is committed; normal read may need repair | retry same physical slice should finish materialization before ack |
+| slice commit succeeds, ack response lost | data visible after derived index materialization; committed-slice marker or head chain exists | retry can return idempotent commit result |
+| slice commit succeeds, object reference update fails | data visible; object reference stale | repair object references from head chain and materialized offset index |
 | offset conflict | no new index entry | refresh committedEndOffset and retry |
 | checksum mismatch | no index entry | fail non-retriably and quarantine object |
 
@@ -926,14 +1152,15 @@ io.nereus.metadata.oxia.testing.FakeOxiaMetadataStore
 
 It must support:
 
-- linearizable synchronized commit；
+- linearizable synchronized stream-head CAS；
 - CAS condition failures；
 - metadata versions；
 - session expiration through injected clock；
 - required partition key recording and validation；
 - scan ordering identical to production key encoding；
 - watch registration and configurable missed/duplicate/collapsed/out-of-order notifications；
-- failure injection before and after writes。
+- failure injection before commit-log put, after commit-log put, before head CAS, after head CAS before
+  derived-index materialization, and after derived-index materialization before response。
 - no object deletion behavior; fake GC tests must assert deletion is outside Phase 1。
 
 The fake store should not expose test-only shortcuts to `nereus-core` production code.
@@ -943,11 +1170,14 @@ through `OxiaMetadataStore`.
 Fake/real parity requirements:
 
 - every successful write increments the affected key's `metadataVersion` monotonically；
-- every successful `commitStreamSlice` increments the stream `commitVersion` exactly once and stores the
-  same durable value in committed-end, offset-index, and committed-slice records；
-- atomic commit either applies all stream-scoped writes and notifications or applies none；
-- condition failure must not partially apply writes；
-- same physical slice replay must observe the committed-slice marker and return the original result；
+- every successful head CAS increments the stream `commitVersion` exactly once and stores the same durable
+  value in `StreamHeadRecord`, `StreamCommitRecord`, `OffsetIndexRecord`, and `CommittedSliceRecord` when
+  the derived records are materialized；
+- condition failure before head CAS must not advance stream head；
+- failure after head CAS must leave a repairable committed stream head and must not be reported as known
+  uncommitted；
+- same physical slice replay must first use the materialized committed-slice marker when present, then
+  fall back to the stream-head commit chain；
 - scan ordering must match production key bytes, including 19-digit offset/generation encoding；
 - partition key mismatch must fail before applying a write；
 - injected post-write response loss must leave durable metadata visible to later reads；

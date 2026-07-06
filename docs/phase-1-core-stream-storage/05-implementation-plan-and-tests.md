@@ -57,7 +57,9 @@ M0.5 implementation status:
 - `:nereus-metadata-oxia:oxiaCapabilitySpike` starts real Oxia through Testcontainers and writes
   `build/reports/oxia-capability-spike/summary.md` plus `summary.json`；
 - the current public Java API probe result is `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` for the original
-  same-key-group conditional multi-write assumption。
+  same-key-group conditional multi-write assumption；
+- Phase 1 design has been updated to use stream-head single-key CAS plus immutable commit-log records and
+  materialized offset-index/committed-slice indexes.
 
 M0.5 spike coverage:
 
@@ -72,8 +74,8 @@ Exit:
 
 - `./gradlew phase1Check` compiles the spike without requiring Docker；
 - `./gradlew :nereus-metadata-oxia:oxiaCapabilitySpike` passes when Docker/Testcontainers is available；
-- a passing spike with `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` is still a valid M0.5 result, but it blocks the
-  original M2/M4 `commitStreamSlice` design until the append linearization point is redesigned；
+- a passing spike with `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` is still a valid M0.5 result, and M2/M4 must
+  implement the redesigned stream-head CAS protocol rather than the original multi-key commit design；
 - docs `06`、`07`、`08` record the exact dependency versions, container image, and stop-line result。
 
 ### M1 API validation hardening
@@ -119,9 +121,9 @@ Tasks:
   `:nereus-metadata-oxia:oxiaCapabilitySpike`；
 - treat `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` as the current design input: fake metadata must not implement
   a stronger multi-key atomic commit than the public real adapter can express；
-- redesign `commitStreamSlice` around an Oxia-supported linearization point before freezing fake metadata
-  semantics；the preferred starting point is one authoritative stream-head record CAS with repairable
-  derived offset-index and committed-slice records；
+- implement `commitStreamSlice` around the documented Oxia-supported linearization point: one
+  authoritative stream-head record CAS, immutable commit-log intent records, and repairable derived
+  offset-index plus committed-slice records；
 - add `OxiaKeyspace` using the shared `nereus-api` key/hash helpers；
 - add key-safe path component encoding for cluster, stream names, object ids, slice ids, offsets, and
   generations；
@@ -135,13 +137,16 @@ Tasks:
 - store stream attributes in stream metadata；
 - store `logicalBytes` and slice checksum in offset index records；
 - store slice-level schema refs in offset index records；
-- store durable stream `commitVersion` in committed-end, offset-index, and committed-slice records；
+- store durable stream `commitVersion` in stream head, commit-log, offset-index, and committed-slice
+  records；
 - implement stream create-or-get；
 - implement append session acquire/renew/fence, including `allowStealExpiredSession` semantics；
 - implement object manifest put；
 - implement object manifest/reference read and reference repair operations；
-- implement `commitStreamSlice` CAS semantics；
-- enforce that producer-ack commit batches contain only one stream key group；
+- implement `commitStreamSlice` head-CAS semantics；
+- implement commit-log reachability checks for same physical slice replay；
+- implement derived offset-index/committed-slice materialization and `repairDerivedStreamIndexes`；
+- enforce that producer-ack cannot require object-scoped keys or multi-key Oxia batches；
 - use overflow-checked offset and cumulative-size arithmetic；
 - implement offset index scan；
 - implement trim update；
@@ -150,12 +155,14 @@ Tasks:
 Exit:
 
 - fake store passes linearizable single-process tests；
-- M2 records an updated commit protocol design that does not depend on an unavailable public
+- M2 implements the updated commit protocol design that does not depend on an unavailable public
   multi-key conditional write API；
 - offset scan ordering is tested with offsets like `9`, `10`, `100`；
 - stale epoch and offset conflict are distinguishable；
-- fake store rejects a commit batch that mixes stream-scoped and object-scoped key groups on the ack path；
-- fake store records and validates partition keys for get/put/scan/watch/commit；
+- fake store has no multi-key commit primitive and records/validates partition keys for
+  get/put/scan/watch/head-CAS；
+- fake store can inject failure after head CAS and before derived-index materialization, and same-slice
+  retry/read repair can recover；
 - fake and real codecs reject wrong record type, unsupported schema version, checksum mismatch, and
   truncated payloads；
 - codec registry has golden-byte tests for every Phase 1 metadata record type；
@@ -339,7 +346,8 @@ Exit:
 | deterministic stream id format | `s-` plus full `base32lower_nopad(sha256(UTF-8 exact StreamName.value()))`; no durable readable alias |
 | shared key/hash helper parity | metadata keyspace and object key generation use the same helper outputs |
 | create stream with attributes | `getStreamMetadata` returns the same attributes |
-| create by-name and initial stream records | one stream key group commit |
+| create stream head | one `putIfAbsent` creates authoritative `StreamHeadRecord` |
+| by-name cache write fails after head create | create-or-get still returns stream from deterministic head |
 | stream name hash collision | non-retriable invariant/collision error |
 | deterministic stream id collision with different metadata name | non-retriable invariant/collision error |
 | existing sealed stream | create-or-get returns metadata; append/session acquire rejected; read/trim allowed |
@@ -367,21 +375,26 @@ Exit:
 | renew after stream becomes non-active | rejected with `STREAM_NOT_ACTIVE` |
 | commit with stale token | `FENCED_APPEND` |
 | same-writer live renew during in-flight append | append can still commit with same epoch/token |
+| head CAS loses to same-writer live renew | retries with latest head and preserves renewed session fields |
+| head CAS loses to trim-only head update | retries with latest head and preserves updated trim offset |
 | append starts with lease below minimum remaining | renews before WAL upload or fails without upload |
 | lease falls below minimum before commit | renews before `commitStreamSlice` or fails without sending commit |
 | commit with wrong expected offset | `OFFSET_CONFLICT` |
-| offsetEnd overflow while committing | rejected before writing offset index |
-| cumulativeSize overflow while committing | rejected before writing offset index |
-| commit valid slice | index entry + committed end updated atomically |
+| offsetEnd overflow while committing | rejected before commit-log put and head CAS |
+| cumulativeSize overflow while committing | rejected before commit-log put and head CAS |
+| commit valid slice | commit-log record written, stream-head CAS advances, offset-index and marker materialized before ack |
 | committed offset index value | contains logical bytes and slice checksum needed for resolve/read |
 | committed offset index value schema refs | contains canonical schema refs derived from append batch |
 | hydrated offset index record | exposes Oxia `metadataVersion` separately from durable `commitVersion` |
-| valid sequential commits | `commitVersion` increments by one and matches committed-end, offset-index, and committed-slice records |
+| valid sequential commits | `commitVersion` increments by one and matches stream head, commit-log, offset-index, and committed-slice records |
 | commit same visible slice again after lost response | returns original commit result; no second offset range |
-| concurrent same-slice replay loses marker-missing condition race | re-reads marker and returns original commit result |
-| committed-slice marker exists but offset index missing | `METADATA_INVARIANT_VIOLATION` |
+| concurrent same-slice replay loses marker-missing condition race | re-reads marker or head chain and returns original commit result |
+| head CAS succeeds but offset index materialization fails | same physical retry repairs index and returns original result |
+| resolver sees gap below stream head committed end | repairs derived offset index from commit-log before returning data |
+| resolver repair budget exhausted before covering target | retries within read budget or fails retriably, not as metadata corruption |
+| committed-slice marker exists but offset index missing | repair from head chain or `METADATA_INVARIANT_VIOLATION` if bytes conflict |
 | committed-slice marker exists but offset index fields differ from request | `METADATA_INVARIANT_VIOLATION` |
-| commit batch includes object reference key | rejected by fake store contract |
+| commit path tries to use multi-key batch | fake store contract rejects the unsupported primitive |
 | missing partition key in adapter call | fake contract test fails before write |
 | wrong metadata record type or unsupported schema version | decode fails before state machine uses the value |
 | metadata codec golden bytes | stable for every Phase 1 record type |
@@ -396,7 +409,7 @@ Exit:
 | trim negative offset | rejected |
 | trim sealed stream | allowed if within committed bounds |
 | manifest exists but object reference missing | no Phase 1 delete; data visibility follows offset index |
-| repair object references | rebuilds visible slices from manifest + committed-slice marker + offset index |
+| repair object references | rebuilds visible slices from manifest + stream-head commit chain + offset index |
 | repair object references for missing manifest | fails with metadata invariant error |
 
 ### Object WAL tests
@@ -458,17 +471,18 @@ Exit:
 | append encoded object exceeds `maxObjectBytes` | append fails before object upload with `INVALID_ARGUMENT` |
 | append caller-cancelled before WAL upload | no object and no offset index; caller future may be cancelled |
 | append service-cancelled before WAL upload | no object and no offset index; `CANCELLED` |
-| append cancelled after commit RPC sent | final state is unknown; same physical slice retry can discover marker |
-| close after commit RPC sent | waits up to shutdown grace for commit result before closing owned clients |
+| append cancelled after stream-head CAS sent | final state is unknown; same physical slice retry can discover marker or head-chain commit |
+| close after stream-head CAS sent | waits up to shutdown grace for commit/materialization result before closing owned clients |
 | object upload fails | no manifest and no offset index |
 | manifest put fails | no offset index |
-| commit fails after manifest | object invisible |
+| head CAS rejects after manifest | object invisible because no committed head-chain record is reachable |
+| head CAS succeeds but materialization fails | final state unknown; retry/read repair materializes offset index from commit-log |
 | commit manifest slice fields mismatch request | no offset index; non-retriable metadata invariant or checksum-style failure |
-| commit manifest slice state already visible but committed-slice marker missing | no offset index; `METADATA_INVARIANT_VIOLATION` |
+| commit manifest slice state already visible but committed-slice marker missing | search head chain first; if no matching committed record, `METADATA_INVARIANT_VIOLATION` |
 | commit manifest writer id/run/epoch mismatch request | no offset index; non-retriable metadata invariant |
 | stream becomes non-active before commit | no offset index; append fails as `STREAM_NOT_ACTIVE` |
-| timeout before commit RPC starts | no offset index is created by that attempt |
-| timeout after commit RPC is sent | final state is unknown; same physical slice retry can discover committed marker |
+| timeout before stream-head CAS starts | no committed head-chain record is created by that attempt |
+| timeout after stream-head CAS is sent | final state is unknown; same physical slice retry can discover marker or head-chain commit |
 | next append after unknown final state | waits for metadata refresh before choosing expected offset |
 | commit succeeds but ack future interrupted in test | read sees data; retry same slice returns original result |
 | process crashes after ack loss and caller resubmits batch | may append duplicate data; producer-level dedup is outside Phase 1 |
@@ -511,7 +525,7 @@ Exit:
 | watch event out of order or duplicate | cache invalidation remains safe |
 | `enableMetadataWatch=false` | no-op registration; cache remains correct through TTL/read-through |
 | index points to missing object | retriable object read failure |
-| gap below committed end | non-retriable metadata invariant failure |
+| gap below committed end | repair from commit-log first; invariant only if chain/record/materialized bytes are corrupt |
 
 ## 3. Failure Injection Points
 
@@ -522,8 +536,10 @@ before object put
 after object put before checksum return
 before manifest put
 after manifest put before return
-before offset index commit
-after offset index commit before return
+before commit-log put
+after commit-log put before head CAS
+after head CAS before derived-index materialization
+after derived-index materialization before return
 before object range read
 after entry index read with corrupted bytes
 ```
@@ -531,7 +547,8 @@ after entry index read with corrupted bytes
 Each failure test should assert:
 
 - whether offset index exists；
-- whether committed end offset advanced；
+- whether stream head committed end advanced；
+- whether the commit-log record is reachable from stream head；
 - whether object manifest exists；
 - whether `read` can see the data；
 - whether the append future is retriable。

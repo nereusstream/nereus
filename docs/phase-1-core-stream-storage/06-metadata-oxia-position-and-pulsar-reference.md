@@ -98,8 +98,8 @@ Reasons:
 
 - Future 1 needs stream-specific `commitStreamSlice` semantics, not generic key-value operations；
 - producer ack requires a carefully defined linearization point；
-- offset index, committed end offset, append session, and committed-slice marker must be committed in one
-  stream key group；
+- Nereus currently uses one stream-head CAS as the linearization point, then materializes offset-index and
+  committed-slice records from the committed log；
 - object manifest/reference updates are repairable and must not force cross-shard atomicity；
 - Phase 1 modules must not depend on Pulsar classes。
 
@@ -137,8 +137,9 @@ Observed surface:
   multi-key conditional write/transaction primitive for Nereus。
 
 M0.5 result: `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` for the original single-key-group conditional multi-write
-assumption. This is a valid spike result, not a test failure. It means the original `commitStreamSlice`
-linearization point is blocked until M2 redesigns the commit protocol around an Oxia-supported primitive.
+assumption. This is a valid spike result, not a test failure. Phase 1 now treats it as a design input and
+uses a public-API-compatible protocol: immutable commit-log record first, then one conditional put of the
+stream head, then repairable materialization of offset-index and committed-slice records.
 
 ## 7. Capability Spike Contract
 
@@ -157,8 +158,9 @@ Already covered by M0.5:
 
 Still required before the real adapter:
 
-1. redesign and document the M2 commit protocol around one public Oxia-supported linearization point；
-2. add real/fake contract tests for that redesigned protocol；
+1. keep the documented stream-head CAS protocol in `02-oxia-metadata-and-commit.md` as the real/fake
+   adapter contract；
+2. add real/fake contract tests for that protocol；
 3. verify watch/notification ordering and whether notifications can collapse intermediate updates；
 4. record exception mapping from the redesigned adapter operations into Nereus errors。
 
@@ -170,24 +172,33 @@ Required spike shape:
 - keep `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` as a passing report status for M0.5, because the spike's job is
   to discover capability, not to make the unavailable primitive appear。
 
-If conditional multi-write is not available, Phase 1 must not emulate it with unsafe multi-step writes.
-Instead, redesign the append linearization around one authoritative stream-head record CAS plus derived
-index records, or another Oxia-supported atomic primitive.
+Because conditional multi-write is not available through the selected public Java API, Phase 1 must not
+emulate it with unsafe multi-step writes. The supported design is one authoritative stream-head record CAS
+plus immutable commit-log records and derived indexes. If a future Oxia client exposes a supportable
+multi-key transaction API, it needs a new spike and migration note before replacing this protocol.
+The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.md` as reference only.
 
 ## 8. Contract Tests
 
 `nereus-metadata-oxia` needs contract tests that run against both the fake and real Oxia adapter:
 
-- same stream key group commit succeeds atomically；
-- mixed stream/object key group commit is rejected on the ack path；
+- stream-head CAS advances committed end and commitVersion exactly once；
+- commit-log records are invisible until reachable from `StreamHeadRecord.lastCommitId`；
+- compatible head CAS conflicts caused by same-writer renew or trim retry without fencing the append；
+- derived offset-index and committed-slice materialization is idempotent；
+- failure after head CAS but before materialization is recoverable by same-slice retry and read repair；
+- derived-index repair respects `maxRecordsToRepair` and reports budget exhaustion separately from
+  corruption；
+- mixed stream/object key group commit is not expressible on the ack path；
 - missing or wrong partition key is rejected by the fake and detected in real-adapter tests；
 - stale session token maps to `FENCED_APPEND`；
 - committed-end conflict maps to `OFFSET_CONFLICT`；
-- committed-slice marker prevents duplicate slice commit；
+- committed-slice marker or head-chain replay prevents duplicate same physical slice commit；
 - partition key is passed for get/put/scan/watch；
 - metadata versions are monotonic and separated from durable `commitVersion`；
 - fixed-width offset scan returns `[9, 10)` for target offset `9`；
-- object reference repair can rebuild references from offset index；
+- object reference repair can rebuild references from stream-head commit chain and materialized offset
+  index；
 - watch notifications are hints only and cache correctness survives missed, duplicate, collapsed, and
   out-of-order notifications；
 - metadata codec rejects wrong record type, unknown required schema version, checksum mismatch, and

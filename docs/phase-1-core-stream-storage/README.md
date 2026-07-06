@@ -28,13 +28,16 @@ ManagedLedger facade 的前提下，先独立实现 L0 Core StreamStorage：
 Phase 1 继承这些不变量：
 
 1. 内部正确性只以 `streamId + offset` 为准。
-2. Oxia 是 offset、visibility、fencing 的 authority。
+2. Oxia 是 offset、visibility、fencing 的 authority；其中 stream head/commit-log 是 append
+   线性化 truth，offset index 是读路径使用的物化索引。
 3. Object store 只存 bytes，不决定可见性。
-4. Producer ack 只能发生在 WAL bytes durable 且 Oxia offset index commit 成功之后。
+4. Producer ack 只能发生在 WAL bytes durable、stream-head CAS 成功且本 slice 的 offset index
+   物化确认之后。
 5. 每个 stream 的可见 offset range 必须 dense。
 6. Multi-stream WAL object 的可见性按 stream slice 独立提交。
 7. Broker 或调用方本地状态只能是 cache，不能是 durable truth。
-8. Read resolver 必须从 Oxia offset index 或经过校验的 index cache 开始。
+8. Read resolver 正常从 Oxia offset index 或经过校验的 index cache 开始；如果发现 head 已提交但
+   index 缺失，必须先从 commit-log 修复物化索引再返回结果或报告 invariant。
 9. Phase 1 不依赖 Pulsar、KoP、ManagedLedger、cursor、subscription、lakehouse catalog。
 
 ## 2. Repository Boundary
@@ -45,7 +48,7 @@ Phase 1 继承这些不变量：
 | --- | --- |
 | `nereus-api` | 对外暴露 protocol-neutral L0 API、value types、共享 key/hash helpers |
 | `nereus-core` | `StreamStorage` 主实现、append/read/trim 状态机 |
-| `nereus-metadata-oxia` | Oxia keyspace、CAS/commit adapter、metadata records |
+| `nereus-metadata-oxia` | Oxia keyspace、single-key CAS commit adapter、metadata records |
 | `nereus-object-store` | Object WAL layout、object IO、range read abstraction |
 | `nereus-managed-ledger` | Phase 1 不接入 |
 | `nereus-pulsar-adapter` | Phase 1 不接入 |
@@ -94,13 +97,14 @@ Phase 1 不允许：
 | Doc | Purpose |
 | --- | --- |
 | `01-api-and-domain-model.md` | API、value object、错误模型、包结构 |
-| `02-oxia-metadata-and-commit.md` | Oxia keyspace、metadata records、append session、offset index commit |
+| `02-oxia-metadata-and-commit.md` | Oxia keyspace、metadata records、append session、stream-head commit |
 | `03-object-wal-and-index.md` | object WAL 格式、slice、entry index、object store abstraction |
 | `04-core-state-machines.md` | append、read、resolve、trim、recovery 状态机 |
 | `05-implementation-plan-and-tests.md` | 代码落地顺序、测试矩阵、验收条件 |
 | `06-metadata-oxia-position-and-pulsar-reference.md` | `nereus-metadata-oxia` 的横切定位和 Pulsar Oxia 参考边界 |
 | `07-implementation-contract-checklist.md` | 实现前必须遵守的支持范围、stop-the-line 条件和测试 gate |
 | `08-risk-register-and-design-compromises.md` | 当前已知高风险假设、Phase 1 设计妥协和实现门禁 |
+| `09-legacy-oxia-multi-key-commit-design.md` | 已归档的旧 Oxia multi-key atomic commit 方案，供未来 Oxia API 改造后回看 |
 
 ## 4. Phase 1 Public Surface
 
@@ -201,7 +205,9 @@ io.nereus.metadata.oxia
     StreamMetadataRecord
     StreamNameRecord
     AppendSessionRecord
-    CommittedEndOffsetRecord
+    StreamHeadRecord
+    StreamCommitRecord
+    CommittedEndOffsetRecord(view)
     OffsetIndexRecord
     EntryIndexReferenceRecord
     ObjectManifestRecord
@@ -241,8 +247,8 @@ generation = 0
 ```
 
 `metadataVersion` 表示 Oxia key version，用于 cache validation；`commitVersion` 表示 Nereus stream
-commit 的 durable sequence/version，用于 offset index、committed-slice 和诊断。两者都不是
-compaction generation。
+commit 的 durable sequence/version，用于 stream head、commit-log、offset index、committed-slice 和
+诊断。两者都不是 compaction generation。
 
 ### D2. Phase 1 append API is session-aware but can auto-acquire
 
@@ -276,19 +282,25 @@ Phase 1 不解析协议 payload。为了让 `read(startOffset)` 能精确返回 
 `OPAQUE_RECORD_BATCH` 的每个 `AppendEntry` 必须满足 `recordCount=1`。多 record entry 只能用于
 未来有协议 decoder 或 entry-level projection 的 payload format。
 
-### D7. Producer ack atomically commits only stream-scoped metadata
+### D7. Producer ack uses one stream-head CAS plus materialized read indexes
 
-`commitStreamSlice` 的线性化点只更新同一个 stream key group 内的 metadata：append session
-校验、committed end offset、offset index 和 stream-scoped committed-slice marker。Object
-manifest 初始记录需要在 stream commit 前写入并供 commit 校验，但它不是可见性真相。
+`commitStreamSlice` 的线性化点是 `/streams/{streamId}/head` 的单 key conditional put。commit
+truth 由 `StreamHeadRecord.lastCommitId` 指向的 `StreamCommitRecord` 链定义；offset index 和
+stream-scoped committed-slice marker 是从已提交 commit-log 记录物化出来的 read/replay 索引。
+
+Producer ack 必须等到 WAL bytes durable、object manifest 已写入或幂等确认、head CAS 成功，并且
+本 slice 的 offset index 与 committed-slice marker 已物化确认。head CAS 成功但物化索引未确认时，
+结果是 unknown final state，后续同物理 slice retry 或 read repair 必须能从 commit-log 补齐索引。
+
+Object manifest 初始记录需要在 stream commit 前写入并供 commit 校验，但它不是可见性真相。
 producer ack 之后的 object manifest state/reference 更新是可修复审计/GC 状态，不能要求跨
 stream/object key group 的 Oxia 原子事务。
 
 ### D8. Phase 1 stream id is deterministic from stream name
 
 为了让 `createOrGetStream` 不依赖跨 key group 原子事务，Phase 1 从 exact `StreamName.value()`
-确定性生成 `streamId`，并用 `PartitionKey(streamId)` 原子创建 by-name record、stream metadata、
-committed-end 和 trim 初始记录。后续如果要随机或 sequence stream id，必须先设计单独的分配协议。
+确定性生成 `streamId`，并用 `PartitionKey(streamId)` 条件创建 authoritative `StreamHeadRecord`。
+by-name record 只是可修复缓存。后续如果要随机或 sequence stream id，必须先设计单独的分配协议。
 
 ## 7. Required Capability Spikes
 
@@ -299,13 +311,14 @@ committed-end 和 trim 初始记录。后续如果要随机或 sequence stream i
 2. M0.5 已增加 `:nereus-metadata-oxia:oxiaCapabilitySpike`，使用真实 Oxia Testcontainers 验证
    partition key、单 key CAS、sequence key 和 fixed-width offset key ordering。
 3. M0.5 当前结论是 `NOT_SUPPORTED_BY_PUBLIC_JAVA_API`：选定 public Oxia Java client API 不支持
-   原设计需要的单 stream key group 条件批提交。因此 M2/M4 前必须把 `commitStreamSlice` 重设为
-   Oxia public API 支持的线性化协议，例如单 authoritative stream-head record CAS。
+   原设计需要的单 stream key group 条件批提交。因此 Phase 1 当前设计采用单 authoritative
+   stream-head record CAS，加不可见 commit-log intent 和可修复 offset-index/committed-slice 物化索引。
 
 这个 spike 不是优化项，而是 M2/M4 前置门禁。当前公开 Oxia Java client API 只直接暴露了单 key
 conditional put/delete 形态；底层 proto 有 batched write request 并不能自动证明 Java client
-提供了 Nereus 需要的 single-key-group conditional multi-write 语义。M0.5 把这个风险确认成当前
-设计阻塞：fake metadata 不能模拟比真实 public adapter 更强的原子提交能力。
+提供了 Nereus 需要的 single-key-group conditional multi-write 语义。M0.5 把这个风险转化为当前
+设计约束：fake metadata 只能实现 stream-head single-key CAS 协议，不能模拟比真实 public adapter
+更强的原子提交能力。
 
 Already settled for Phase 1:
 
@@ -345,8 +358,8 @@ Already settled for Phase 1:
   schema refs 进入 WAL slice、commit request、offset index、resolve/read result；
 - WAL object id/key 必须包含 writer process incarnation hash，避免进程重启后 sequence 重置造成
   object id 碰撞；
-- append timeout 必须按最后不可逆边界分类；`commitStreamSlice` RPC 发出后的 timeout 是 unknown
-  final state，不得假装未提交；
+- append timeout 必须按最后不可逆边界分类；stream-head CAS 发出后的 timeout 是 unknown final
+  state，不得假装未提交；head CAS 成功但 offset-index/marker 物化未确认也属于 unknown final state；
 - Phase 1 WAL object 只支持 `CompressionType.NONE`；`ZSTD` 枚举保留但实现必须拒绝，直到压缩块
   offset/checksum/read-result 语义单独设计；
 - Phase 1 public append 只接受 `OPAQUE_RECORD_BATCH`；其他 `PayloadFormat` 是未来标签，遇到
@@ -356,23 +369,27 @@ Already settled for Phase 1:
 - Phase 1 `resolve(includeEntryIndex=true)` 不读取 object footer 或 index object，只返回 offset
   index 中已提交的 `EntryIndexRef`；
 - adapter-private Oxia helpers 必须显式携带 partition key；fake/real contract 测试要覆盖
-  get/put/scan/watch/commit 的 partition key 传递；
+  get/put/scan/watch/head-CAS 的 partition key 传递；
 - `OffsetIndexCache` 只能缓存正向命中的 committed records，不能缓存 EOF/negative lookup；watch
   事件只是 invalidation hint，丢失/乱序/合并都不能影响正确性；
 - fake store、real adapter、repair/migration 工具必须共用同一 metadata codec registry，并为每个
   Phase 1 record type 保留 golden-byte 测试；
 - `cluster`、`objectId`、`sliceId` 等所有动态路径组件进入 Oxia path 或 object key 前都必须经过
   统一 key component 编码，不能裸拼字符串；
-- caller cancellation 和 timeout 一样按最后不可逆边界处理；commit RPC 发出后不能保证撤销；
+- caller cancellation 和 timeout 一样按最后不可逆边界处理；stream-head CAS 发出后不能保证撤销；
 - Phase 1 object store 必须固定 ByteBuffer ownership、local-file atomic write、path traversal 拒绝和
   object/metadata exception mapping；
 - `StreamStorageConfig` 必须有明确正值/大小/lease 关系校验；`maxObjectBytes` 是完整编码 WAL object
   的硬上限，`targetObjectSizeBytes` 只是聚合目标；
 - close、timeout、backpressure 和 read-limit-too-small 都是明确 API 错误，不留给实现临时决定；
 - offset 和 `cumulativeSize` 推进必须做 overflow check。
-- same physical slice replay 在 marker-missing 条件竞争失败后必须 re-read committed-slice marker；
+- same physical slice replay 在 marker missing 时必须回查 stream-head commit chain；
   append sequencer 在 `OFFSET_CONFLICT` 或 unknown final state 后必须 refresh，不得继续使用旧的本地
   expected offset；
+- same-writer renew/trim 会改变 stream head 的 Oxia key version；append head CAS 遇到这类 compatible
+  conflict 必须基于最新 head 重试，而不是误报 fencing 或 generic condition failure；
+- derived-index repair 必须受 `maxRecordsToRepair` 和 read timeout 约束；预算耗尽是可重试/背压，不是
+  metadata corruption；
 - `commitStreamSlice` pre-commit validation 必须校验 manifest writer id、writer run id、writer
   epoch、object key/type/format 和 slice 字段，避免 objectId 异常碰撞或错误 manifest 进入可见路径。
 - zero-byte opaque entry 是合法 record：它消耗一个 stream offset，read 必须按 record 推进而不是只按
@@ -392,9 +409,10 @@ Already settled for Phase 1:
 
 设计和实现进入下一阶段前应满足：
 
-- 能创建 stream，并在 Oxia metadata 中恢复 metadata；
+- 能创建 stream，并从 Oxia stream head 中恢复 metadata；
 - 能 acquire/renew/fence append session；
-- append 完成 object upload、manifest 写入、offset index commit、producer ack result；
+- append 完成 object upload、manifest 写入、stream-head CAS、offset-index/marker 物化和 producer
+  ack result；
 - stale session commit 被拒绝；
 - broker/process crash 在 upload 前后、commit 前后都有明确恢复行为；
 - read resolver 只读 offset index 已发布的 range；

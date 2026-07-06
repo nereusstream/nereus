@@ -22,7 +22,7 @@
 | WAL compression | `CompressionType.NONE` | `ZSTD` with `UNSUPPORTED_FORMAT` |
 | Entry index location | writer emits and reader supports `OBJECT_FOOTER` | `INLINE` and `INDEX_OBJECT` with `UNSUPPORTED_FORMAT` |
 | Checksum domains | caller payload checksum, WAL canonical object checksum, storage checksum, slice checksum, entry-index/footer checksums | treating distinct checksum domains as interchangeable |
-| Metadata truth | Oxia offset index, committed end, append session, committed-slice marker | object manifest as read visibility truth |
+| Metadata truth | Oxia stream head, reachable commit-log records, materialized offset index, append session snapshot, committed-slice marker | object manifest as read visibility truth |
 | Object metadata | manifest/reference as repairable audit/GC inputs | cross-stream/object atomic producer ack |
 | Read path | offset-index-driven resolve, full-slice checksum before clipping | object list, manifest-only reads, negative cache |
 | Read amplification | explicit metrics for full-slice bytes, entry-index bytes, returned bytes, amplification, and read backpressure | hiding 16 MiB-to-100 byte reads as ordinary object read volume |
@@ -38,9 +38,10 @@ Before implementing the real `OxiaMetadataStore` adapter:
    `06-metadata-oxia-position-and-pulsar-reference.md` compiling and runnable.
 2. Treat the current M0.5 result, `NOT_SUPPORTED_BY_PUBLIC_JAVA_API`, as a hard input: same stream key
    group conditional multi-write is not available through the selected public Java client API.
-3. Redesign `commitStreamSlice` before M2 fake metadata or M4 core append rely on a real adapter contract.
+3. Use the documented stream-head single-key CAS protocol from `02-oxia-metadata-and-commit.md` for M2
+   fake metadata and M4 core append.
 4. Do not make `FakeOxiaMetadataStore` stronger than the selected public Oxia Java client API.
-5. Prove every get/put/scan/watch/commit call passes the expected partition key.
+5. Prove every get/put/scan/watch/head-CAS call passes the expected partition key.
 6. Decide and freeze the Phase 1 `MetadataCodecRegistry`.
 7. Add golden-byte codec tests for every Phase 1 metadata record type.
 8. Make `FakeOxiaMetadataStore` and the real adapter share the same metadata codecs.
@@ -72,18 +73,18 @@ Stop implementation and update design first if any of these are discovered:
 - Core tests need fake metadata classes from production packages instead of test fixtures.
 - A design or fake implementation assumes Oxia public Java client can do single-key-group conditional
   multi-write without a new passing spike proving that exact API.
-- M4 core append starts before partition-key routing has real-client evidence and the commit protocol has
-  been redesigned to avoid the unavailable multi-key conditional write primitive.
+- M4 core append starts without using the documented stream-head CAS plus commit-log protocol.
 - The real adapter cannot route all stream-scoped operations with `PartitionKey(streamId)`.
 - Offset index scan cannot preserve 19-digit zero-padded offset/generation ordering.
-- redesigned commit protocol cannot assign a durable `commitVersion` that can be validated across
-  committed-end, offset-index, and committed-slice state.
+- commit protocol cannot assign a durable `commitVersion` that can be validated across stream head,
+  commit-log, offset-index, and committed-slice state.
 - L0 code needs to parse Pulsar topic syntax or use a human-readable alias as the durable `StreamId`.
 - Metadata and object modules need separate implementations of durable key/hash helpers.
 - Object keys or Oxia paths need raw `cluster`, raw `writerId`, or truncated writer/run hashes.
 - A new physical WAL object attempt needs to reuse an object sequence from a failed, cancelled, or timed-out
   attempt.
-- `commitStreamSlice` would require object-scoped keys in the producer-ack atomic batch.
+- `commitStreamSlice` would require object-scoped keys or multi-key Oxia atomicity in the producer-ack
+  linearization path.
 - A new `commitStreamSlice` path would accept a manifest slice already marked `VISIBLE` while the
   stream-scoped committed-slice marker is missing.
 - Read path would need object manifest to resolve visibility or checksum.
@@ -104,29 +105,34 @@ Stop implementation and update design first if any of these are discovered:
 
 ## 4. Commit Contract
 
-M0.5 redesign gate: this section describes the original visibility contract that the redesigned M2
-metadata protocol must preserve, not the current implementation recipe. Do not implement it as a multi-key
-conditional Oxia write unless a future spike proves a supportable public Java API for that primitive.
-
 Producer ack is allowed only after:
 
 1. WAL object bytes are durable.
 2. Object manifest is written or idempotently confirmed.
-3. Stream-scoped `commitStreamSlice` succeeds atomically:
+3. `commitStreamSlice` succeeds through the stream-head CAS protocol:
    - stream state is `ACTIVE`;
    - append epoch/token match;
-   - committed end equals `expectedStartOffset`;
-   - for a new physical slice, the committed-slice marker is missing;
-   - for same-slice replay, the existing marker and offset index are validated and the original result is
-     returned;
-   - after marker-missing condition failure, the marker is re-read before classifying the error;
+   - head committed end equals `expectedStartOffset`;
+   - immutable `StreamCommitRecord` is written or idempotently confirmed;
+   - stream head CAS advances committed end, cumulative size, commitVersion, and lastCommitId;
+   - compatible head CAS conflicts caused only by same-writer renew, trim, or other non-append head
+     updates are retried with the latest head instead of fencing or reporting a condition failure;
+   - for same-slice replay, the existing marker or reachable head-chain commit is validated and the
+     original result is returned;
+   - after marker-missing condition failure, the head chain is searched before classifying the error;
    - object manifest writer id, writer run id, writer epoch, object key/type/format, and slice fields match
      the commit request;
-   - offset index, committed end, and committed-slice marker are written in one stream key group;
-   - durable `commitVersion` is the same in committed-end, offset-index, and committed-slice records.
+   - offset index and committed-slice marker for the committed record are materialized or idempotently
+     confirmed before success is returned;
+   - durable `commitVersion` is the same in stream head, commit-log, offset-index, and committed-slice
+     records.
+
+If head CAS succeeds but offset-index/marker materialization cannot be confirmed, the append has unknown
+final state. The implementation must not report a known failure; same physical slice retry and read repair
+must be able to finish materialization from the reachable commit-log record.
 
 Post-commit object reference and manifest state updates are best-effort CAS merges. Failure there does not
-block ack and must be repairable from offset index.
+block ack and must be repairable from the stream-head commit chain and materialized offset index.
 
 ## 5. Read Contract
 
@@ -135,6 +141,8 @@ Read and resolve must follow this chain:
 ```text
 trim/state check
 -> cache positive offset-index records only, or scan Oxia
+-> if scan shows a gap below stream head, repair derived indexes from commit-log and rescan
+-> if repair budget is exhausted before target coverage, retry within read budget or fail retriably
 -> choose highest non-tombstoned generation covering target offset
 -> build ResolvedObjectRange from offset index only
 -> read full slice payload and entry index
@@ -154,10 +162,13 @@ payload bytes actually returned after clipping.
 - Timeout/cancellation before WAL upload starts leaves no object and no offset index.
 - Timeout/cancellation during or after upload may leave an orphan object but must not start a new offset
   commit after the operation has been timed out/cancelled.
-- Timeout/cancellation after `commitStreamSlice` RPC is sent has unknown final state.
+- Timeout/cancellation after stream-head CAS is sent has unknown final state.
+- Timeout/cancellation after head CAS succeeds but before index materialization confirms also has unknown
+  final state.
 - Unknown final state must surface as `TIMEOUT` or `CANCELLED` semantics, not as ordinary offset conflict,
   object upload failure, or generic metadata condition failure.
-- Same physical slice retry can discover a successful commit through the committed-slice marker.
+- Same physical slice retry can discover a successful commit through the committed-slice marker or the
+  stream-head commit chain.
 - Per-stream append sequencer must refresh after `OFFSET_CONFLICT` and must not choose new expected offsets
   while a prior commit final state is unknown.
 - `close()` rejects new work, stops background tasks, waits up to `shutdownGrace` for irreversible in-flight
@@ -170,6 +181,10 @@ payload bytes actually returned after clipping.
 - no Pulsar/KoP/BookKeeper dependency guard for Phase 1 modules;
 - compiling the M0.5 Oxia capability spike without starting Docker;
 - fake metadata invariant tests;
+- stream-head CAS and commit-log reachability tests;
+- compatible head-CAS conflict retry tests for same-writer renew and trim;
+- derived offset-index repair tests for failure after head CAS;
+- derived-index repair budget exhaustion tests;
 - exact stream-name hash and deterministic stream-id tests;
 - shared key/hash helper parity tests across Oxia keyspace and object key generation;
 - non-opaque payload format rejection tests;
