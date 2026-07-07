@@ -76,6 +76,20 @@ M0 scaffold status before coding state machines:
 - done: M1 `AppendResult` requires positive visible counts, so an append success result cannot represent
   an empty range；
 - done: `./gradlew :nereus-api:test`, `./gradlew phase1Check`, and `./gradlew check` pass after M1.
+- in progress: M2 foundation adds `OxiaMetadataStore`, `OxiaKeyspace`, metadata records, codec
+  envelope/registry scaffolding plus `Phase1MetadataCodecs`, and a test-fixture `FakeOxiaMetadataStore` that uses stream-head
+  single-key CAS rather than multi-key atomic commit；
+- in progress: M2 fake store tests cover deterministic create-or-get, append session renew,
+  `commitStreamSlice`, derived-index materialization, failure after head CAS before derived-index
+  materialization, repair recovery, object-reference repair, watch drop/duplicate/stale/collapsed/
+  reconnect events, fixed-width offset scan ordering, offset conflict classification, canonical commit
+  identity/replay hardening, metadata-record range overflow validation, committed-slice-marker-first replay,
+  post-commit object-audit failure injection, and adapter-private partition-key helper enforcement；
+- reviewed 2026-07-07: no P0 was found that invalidates the current stream-head CAS direction；
+- done: M2 codec/validation pass added entry-index decoded shape validation, strict UTF-8 metadata decode,
+  per-record codec round-trip/error-path/golden-byte tests, and deterministic map-order coverage；
+- done: M2 fake store persists stored metadata values as encoded envelopes through `Phase1MetadataCodecs`；
+- not done: M2 full exit still requires broader linearizability tests.
 
 ## 3. Stop-The-Line Conditions
 

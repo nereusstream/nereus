@@ -12,5 +12,10 @@
  * limitations under the License.
  */
 
-/** Test-fixture namespace for the Phase 1 fake Oxia metadata store. */
-package io.nereus.metadata.oxia.testing;
+package io.nereus.metadata.oxia;
+
+/** Best-effort stream metadata watch registration. */
+public interface WatchRegistration extends AutoCloseable {
+    @Override
+    void close();
+}

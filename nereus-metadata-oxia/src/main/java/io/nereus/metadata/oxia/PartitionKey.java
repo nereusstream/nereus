@@ -12,5 +12,16 @@
  * limitations under the License.
  */
 
-/** Test-fixture namespace for the Phase 1 fake Oxia metadata store. */
-package io.nereus.metadata.oxia.testing;
+package io.nereus.metadata.oxia;
+
+import java.util.Objects;
+
+/** Adapter-private routing key that mirrors Oxia partition-key use. */
+public record PartitionKey(String value) {
+    public PartitionKey {
+        Objects.requireNonNull(value, "value");
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("partition key cannot be blank");
+        }
+    }
+}

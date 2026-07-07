@@ -12,5 +12,14 @@
  * limitations under the License.
  */
 
-/** Test-fixture namespace for the Phase 1 fake Oxia metadata store. */
-package io.nereus.metadata.oxia.testing;
+package io.nereus.metadata.oxia.codec;
+
+public class MetadataCodecException extends RuntimeException {
+    public MetadataCodecException(String message) {
+        super(message);
+    }
+
+    public MetadataCodecException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}

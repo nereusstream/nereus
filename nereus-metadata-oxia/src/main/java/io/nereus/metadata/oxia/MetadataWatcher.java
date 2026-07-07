@@ -12,5 +12,18 @@
  * limitations under the License.
  */
 
-/** Test-fixture namespace for the Phase 1 fake Oxia metadata store. */
-package io.nereus.metadata.oxia.testing;
+package io.nereus.metadata.oxia;
+
+import io.nereus.api.StreamId;
+
+/** Invalidation hints emitted by an Oxia metadata watch. */
+public interface MetadataWatcher {
+    void onOffsetIndexUpdated(StreamId streamId, long committedEndOffset, long metadataVersion);
+
+    void onTrimUpdated(StreamId streamId, long trimOffset, long metadataVersion);
+
+    void onAppendSessionChanged(StreamId streamId, long epoch, long leaseVersion);
+
+    default void onWatchReconnected(StreamId streamId, long metadataVersion) {
+    }
+}

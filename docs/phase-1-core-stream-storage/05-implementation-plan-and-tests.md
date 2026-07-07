@@ -145,6 +145,67 @@ Module:
 nereus-metadata-oxia
 ```
 
+M2 foundation implementation status:
+
+- production `nereus-metadata-oxia` now contains:
+  `OxiaMetadataStore`, `OxiaKeyspace`, `PartitionKey`, `MetadataWatcher`, `WatchRegistration`,
+  `CommitSliceRequest`, `CommitSliceResult`, and `DerivedIndexRepairResult`；
+- metadata record classes exist under `io.nereus.metadata.oxia.records` for stream head/name/metadata,
+  append session, commit-log, committed end, offset index, entry-index reference, object manifest,
+  object reference, committed slice, and trim；
+- codec code exists under `io.nereus.metadata.oxia.codec`: `MetadataRecordCodec`,
+  `MetadataCodecRegistry`, `MapMetadataCodecRegistry`, `MetadataRecordEnvelope`,
+  `MetadataCodecException`, and `Phase1MetadataCodecs`；
+- `FakeOxiaMetadataStore` lives in test fixtures and implements the stream-head single-key CAS model. It
+  does not expose a multi-key commit primitive；
+- fake store supports deterministic create-or-get, append session acquire/renew, object manifest put/get,
+  `commitStreamSlice`, derived offset-index/committed-slice materialization, repair after head CAS,
+  offset-index scan, committed-end view, trim view/update, object references produced from successful
+  commits, object-reference repair from stream-head commit reachability, and watch registration；
+- fake watch controls can drop the next event, duplicate the next event, collapse one event into the next,
+  emit reconnect-before-current, or deliver a stale event before the current event；
+- current tests cover key encoding and offset ordering, metadata envelope corruption/truncation,
+  strict metadata UTF-8 decode, per-record codec round-trip/error-path/golden bytes,
+  fake-store codec-backed value persistence,
+  deterministic stream id create-or-get, session renew, commit materialization, partition-key access
+  recording, failure after head CAS before derived index, repair-derived-index recovery, same-slice retry,
+  object-reference repair, manifest-only slices not becoming visible, watch drop/duplicate/stale/collapsed/
+  reconnect events, offset conflict classification, commit identity delimiter/event-time/projection
+  coverage, metadata record range overflow rejection, committed-slice-marker-first replay, post-commit
+  object-audit failure leaving visible data repairable, and adapter-private partition-key helper
+  enforcement；
+- verified earlier in the current M2 sequence:
+  `./gradlew phase1Check` and `./gradlew check`；
+- verified after the latest fake-store codec-backed persistence change:
+  `./gradlew :nereus-metadata-oxia:test`；
+- final Gradle rerun after the documentation sync was environment-blocked by the Codex approval usage limit,
+  not by a project failure；
+- 2026-07-07 review status: no P0 was found that would invalidate the stream-head CAS direction, but the
+  implementation is not M2-complete；
+- not complete yet: the complete M2 linearizable single-process test matrix.
+
+M2 review follow-ups before exit:
+
+- done: replace delimiter-concatenated `EntryIndexRef` commit identity with nested length-prefix canonical
+  fields, because API string values can legally contain delimiter characters；
+- done: include event-time range and projection identity consistently in the documented `commitId` inputs
+  and same-slice replay validation；
+- done: validate every canonical persisted identity field when an existing commit-log record or reachable
+  head commit is reused；
+- done: apply `offset + length` overflow checks to decoded metadata records, not only to public API request
+  values；
+- done: add a fake-store path that checks committed-slice marker replay before walking the head chain；
+- done: add failure injection and tests for object manifest/reference audit update failure after the
+  stream-head commit has succeeded；
+- done: add adapter-private helper tests that can fail when a real Oxia get/put/scan/watch/head-CAS call
+  omits or misroutes the required partition key。
+- done: make metadata `EntryIndexReferenceRecord` enforce the same location-specific shape rules as
+  API `EntryIndexRef`；
+- done: freeze current `Phase1MetadataCodecs` with round-trip, wrong-type, unsupported-version,
+  malformed-UTF-8, absent-field, deterministic-map-order, and per-record golden-byte tests；
+- done: make fake metadata value persistence codec-backed instead of relying only on in-memory records；
+- review-open: future real adapter must use the same `MetadataCodecRegistry` as the fake store。
+
 Tasks:
 
 - consume the M0.5 Oxia Java client capability result from

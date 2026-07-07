@@ -105,6 +105,7 @@ Phase 1 不允许：
 | `07-implementation-contract-checklist.md` | 实现前必须遵守的支持范围、stop-the-line 条件和测试 gate |
 | `08-risk-register-and-design-compromises.md` | 当前已知高风险假设、Phase 1 设计妥协和实现门禁 |
 | `09-legacy-oxia-multi-key-commit-design.md` | 已归档的旧 Oxia multi-key atomic commit 方案，供未来 Oxia API 改造后回看 |
+| `10-current-progress-review-2026-07-07.md` | 当前 M0/M1/M2 代码与文档 review 记录、剩余 M2 风险和修正门禁 |
 
 ## 4. Phase 1 Public Surface
 
@@ -361,6 +362,21 @@ Already settled for Phase 1:
   defensive copy 规则都从 API 边界统一执行；
 - M1 API value objects 已统一拒绝 physical object range 的 `offset + length` overflow，并要求
   `AppendResult` 代表正数量的已提交 range；
+- M2 foundation 已开始：`nereus-metadata-oxia` 现在有生产接口/keyspace/record/codec envelope、
+  `Phase1MetadataCodecs` 实现候选，以及 test fixtures 中的 `FakeOxiaMetadataStore`。fake store 使用 stream-head
+  single-key CAS、commit-log reachability 和 repairable offset-index/committed-slice 派生索引，不提供
+  multi-key atomic commit primitive；
+- fake store 已支持 object-reference repair，并能模拟 watch drop/duplicate/stale-before-current/
+  collapsed/reconnect invalidation hints；
+- 2026-07-06 M2 hardening pass 已补齐 commit identity/replay canonical field 覆盖、metadata decoded
+  record 的 range overflow 防御、committed-slice marker replay，以及 post-commit object-audit failure
+  injection；
+- 2026-07-07 helper pass 已增加 package-private `PartitionedOxiaClient`，后续真实 Oxia adapter 的
+  get/put/list/rangeScan/watch/head-CAS 边界必须携带 `PartitionKey`；
+- 2026-07-07 review 记录在 `10-current-progress-review-2026-07-07.md`：未发现需要推翻
+  stream-head CAS 方向的 P0；随后 M2 codec/validation pass 已补齐 entry-index metadata record shape
+  validation、codec strict UTF-8、per-record codec golden bytes，并让 fake store stored values 经过共享
+  codec envelope，剩余 M2 工作是更广的 linearizability tests；
 - WAL object id/key 必须包含 writer process incarnation hash，避免进程重启后 sequence 重置造成
   object id 碰撞；
 - append timeout 必须按最后不可逆边界分类；stream-head CAS 发出后的 timeout 是 unknown final

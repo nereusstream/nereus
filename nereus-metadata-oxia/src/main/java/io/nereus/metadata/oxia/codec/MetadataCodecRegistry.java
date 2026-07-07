@@ -12,5 +12,10 @@
  * limitations under the License.
  */
 
-/** Test-fixture namespace for the Phase 1 fake Oxia metadata store. */
-package io.nereus.metadata.oxia.testing;
+package io.nereus.metadata.oxia.codec;
+
+public interface MetadataCodecRegistry {
+    <T> MetadataRecordCodec<T> codecForType(String recordType);
+
+    <T> MetadataRecordCodec<T> codecForClass(Class<T> recordClass);
+}

@@ -8,6 +8,38 @@ current public Oxia behavior: Phase 1 uses one authoritative stream-head key CAS
 linearization point, and treats offset-index and committed-slice keys as materialized, repairable read
 indexes. M2 fake metadata must implement this single-key-CAS protocol, not the old atomic multi-key batch.
 
+M2 foundation implementation status:
+
+- production code now has `OxiaMetadataStore`, `OxiaKeyspace`, `PartitionKey`, watch interfaces, commit
+  request/result records, metadata record classes, metadata codec envelope/registry scaffolding, and a
+  `Phase1MetadataCodecs` binary-v1 implementation；
+- `io.nereus.metadata.oxia.testing.FakeOxiaMetadataStore` exists under test fixtures and implements the
+  stream-head single-key CAS protocol for create/get, append session acquire/renew, object manifest
+  put/get, `commitStreamSlice`, derived-index repair, offset-index scan, object-reference repair, trim,
+  and watch registration；
+- fake commit truth is stream-head reachability through immutable `StreamCommitRecord`; offset-index and
+  committed-slice records are repairable derived state；
+- fake failure injection currently covers the critical head-CAS-success-before-derived-index point,
+  post-derived-index object-audit/reference update failure, plus earlier commit phases used by future
+  tests；
+- fake watch simulation can drop, duplicate, collapse, emit reconnect-before-current, or deliver
+  stale-before-current invalidation hints so cache tests do not treat watch as correctness truth；
+- metadata envelope and codec tests cover magic/payload/checksum/truncation behavior, strict UTF-8 decode,
+  wrong record type, unsupported schema/encoding, invalid payload tags, deterministic map order,
+  round-trip for every Phase 1 metadata record, and golden envelope hex for every Phase 1 record type；
+- 2026-07-06 hardening pass closed the first review gaps for nested length-prefixed `commitId` identity,
+  event-time/projection identity coverage, full canonical replay validation, record-level
+  `offset + length` overflow checks on decoded metadata, committed-slice-marker-first replay, and
+  post-commit object-audit failure injection；
+- 2026-07-07 helper pass added package-private `PartitionedOxiaClient` so future real adapter get/put/list/
+  rangeScan/watch/head-CAS calls cannot be built without a `PartitionKey`；
+- 2026-07-07 watch pass added collapsed and reconnect-before-current watch simulation；
+- 2026-07-07 codec/validation pass closed decoded `EntryIndexReferenceRecord` location-shape validation,
+  strict UTF-8 decode, and per-record codec round-trip/golden/error-path tests；
+- 2026-07-07 fake-store codec pass changed fake stored metadata maps to keep encoded envelope bytes and
+  decode through `Phase1MetadataCodecs` on read；
+- still not complete for full M2 exit: broader linearizability tests remain.
+
 ## 1. Metadata Responsibility
 
 Oxia metadata layer owns:
@@ -322,17 +354,23 @@ public record EntryIndexReferenceRecord(
 }
 ```
 
-Location rules mirror `EntryIndexRef` in `nereus-api`. Stored records should avoid nullable fields so
+Location rules must mirror `EntryIndexRef` in `nereus-api`. Stored records should avoid nullable fields so
 codec golden bytes are deterministic:
 
 - absent `objectId` and `objectKey` are encoded as empty strings；
 - absent `inlineData` is encoded as an empty byte array；
-- absent `OffsetIndexRecord.projectionRef` is encoded as an empty string；
+- `OffsetIndexRecord.projectionRef` and `StreamCommitRecord.projectionRef` store the canonical projection
+  identity string. An absent public `ProjectionRef` is encoded as the canonical absent identity, not as a
+  null field. The exact absent/present bytes are covered by codec golden tests；
 - footer references may omit `objectId/objectKey` when the index is in the same object. If one is
   present, both must be present. Footer references use empty `inlineData` and positive `length`；
 - index-object references must include both `objectId` and `objectKey`, use empty `inlineData`, and use
   positive `length`；
 - inline references must include non-empty `inlineData` and use `offset=0,length=0`。
+
+2026-07-07 codec/validation pass: the Java record constructor now also enforces the same
+`INLINE`/`OBJECT_FOOTER`/`INDEX_OBJECT` location-specific shape rules as the public `EntryIndexRef` API
+contract.
 
 ### `ObjectManifestRecord`
 
@@ -423,7 +461,8 @@ public record CommittedSliceRecord(
         long offsetStart,
         long offsetEnd,
         long generation,
-        long commitVersion) {
+        long commitVersion,
+        long metadataVersion) {
 }
 ```
 
@@ -793,14 +832,16 @@ Commit identity:
 commitId = sha256(canonical streamId, expectedStartOffset, writerId, writerRunIdHash, epoch,
                   fencingTokenHash, objectId, objectKey, objectChecksum, sliceId, objectOffset,
                   objectLength, sliceChecksum, recordCount, entryCount, logicalBytes,
-                  payloadFormat, schemaRefs, entryIndexRef)
+                  payloadFormat, schemaRefs, entryIndexRef, minEventTimeMillis,
+                  maxEventTimeMillis, projectionRef)
 ```
 
 `fencingTokenHash` is `base32lower_nopad(sha256(UTF-8 fencingToken))`. The raw fencing token is used only
 to validate the current append session. `StreamCommitRecord` stores the hash so durable metadata and
-golden bytes do not persist the opaque token itself. The canonical `commitId` input order, text encoding,
-empty optional-field encoding, and schema-ref ordering must be covered by golden tests shared by fake and
-real adapters.
+golden bytes do not persist the opaque token itself. The canonical `commitId` input order uses
+length-prefixed UTF-8 fields at every nested level, including `EntryIndexRef` and `projectionRef`, so
+legal delimiter characters in API values cannot collide. Text encoding, empty optional-field encoding, and
+schema-ref ordering must be covered by golden tests shared by fake and real adapters.
 
 The same physical slice retry uses the same `commitId`. Phase 1 default behavior does not rebase an
 uploaded slice to a different `expectedStartOffset`; an offset conflict returns a retriable error to the
@@ -1128,7 +1169,7 @@ Watch rules:
 - `onAppendSessionChanged` invalidates local append-session cache only, not committed read data；
 - reconnect should invalidate affected local caches or force short-TTL read-through until a fresh scan
   succeeds；
-- fake watch tests should simulate missed, duplicate, collapsed, and out-of-order events。
+- fake watch tests should simulate missed, duplicate, collapsed, reconnect, and out-of-order events。
 
 ## 12. Failure Semantics
 
@@ -1160,7 +1201,7 @@ It must support:
 - session expiration through injected clock；
 - required partition key recording and validation；
 - scan ordering identical to production key encoding；
-- watch registration and configurable missed/duplicate/collapsed/out-of-order notifications；
+- watch registration and configurable missed/duplicate/collapsed/reconnect/out-of-order notifications；
 - failure injection before commit-log put, after commit-log put, before head CAS, after head CAS before
   derived-index materialization, and after derived-index materialization before response。
 - no object deletion behavior; fake GC tests must assert deletion is outside Phase 1。
@@ -1222,13 +1263,23 @@ payloadChecksum
 payload
 ```
 
+Current implementation:
+
+- `Phase1MetadataCodecs` registers every Phase 1 metadata record type and wraps record payloads in
+  `MetadataRecordEnvelope` with `payloadEncoding=binary-v1`；
+- payload encoding is deterministic for currently supported field kinds: strings, longs, ints, booleans,
+  byte arrays, lists, `Map<String,String>`, and nested Java records；
+- map entries are encoded sorted by UTF-8 key bytes；
+- decode rejects malformed UTF-8 for envelope strings and payload string fields；
+- Java record simple names and component names are part of the encoded bytes. The current golden-byte
+  tests treat those names as schema for the Phase 1 record set.
+
 Rules:
 
-- Phase 1 should use one schema-first encoding for production records, preferably Protobuf once the build
-  adds the dependency. A deterministic JSON codec may be used only before the codec freeze, for early
-  fake-store spikes hidden behind the same `MetadataRecordCodec` contract. It must not be accepted as the
-  final `phase1Check` codec unless the real adapter, fake store, repair tools, and golden bytes all use
-  that exact deterministic JSON codec；
+- Phase 1 must use one shared metadata value encoding for production records. `Phase1MetadataCodecs`
+  is now the current M2 binary-v1 codec for the Phase 1 record set, but the metadata layer is not M2-exit
+  complete until the fake store, future real adapter, and repair tools all use the same
+  `MetadataCodecRegistry`；
 - map fields such as stream attributes and entry attributes must encode entries sorted by UTF-8 key bytes；
 - repeated fields preserve the order specified by their owning contract. `schemaRefs` use canonical
   `(namespace,id,version)` order; manifest slice lists preserve encoded object slice order；
@@ -1240,6 +1291,7 @@ Rules:
 - decode must reject wrong `recordType`, unknown newer required schema versions, checksum mismatch, and
   truncated payloads with `METADATA_INVARIANT_VIOLATION` or `METADATA_UNAVAILABLE` depending on whether
   bytes are corrupt or the store is unavailable；
+- decode must reject malformed UTF-8 instead of relying on Java replacement-character decoding；
 - adding optional fields requires defaults and a schema-version test；
 - changing field meaning requires a new record type or an explicit migration plan；
 - codec tests must include golden bytes for each Phase 1 record type before the implementation is treated

@@ -190,7 +190,8 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
 - derived-index repair respects `maxRecordsToRepair` and reports budget exhaustion separately from
   corruption；
 - mixed stream/object key group commit is not expressible on the ack path；
-- missing or wrong partition key is rejected by the fake and detected in real-adapter tests；
+- partition key is recorded by the fake store, and the package-private `PartitionedOxiaClient` helper
+  rejects missing partition keys before reaching the future real adapter backend；
 - stale session token maps to `FENCED_APPEND`；
 - committed-end conflict maps to `OFFSET_CONFLICT`；
 - committed-slice marker or head-chain replay prevents duplicate same physical slice commit；
@@ -199,7 +200,10 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
 - fixed-width offset scan returns `[9, 10)` for target offset `9`；
 - object reference repair can rebuild references from stream-head commit chain and materialized offset
   index；
-- watch notifications are hints only and cache correctness survives missed, duplicate, collapsed, and
-  out-of-order notifications；
-- metadata codec rejects wrong record type, unknown required schema version, checksum mismatch, and
-  truncated payload using the same codec in fake and real adapters。
+- watch notifications are hints only and cache correctness survives missed, duplicate, collapsed,
+  reconnect, and out-of-order notifications；
+- metadata envelope and `Phase1MetadataCodecs` currently reject checksum mismatch, truncated payload,
+  malformed UTF-8, wrong record type, unsupported schema version, unsupported payload encoding, and
+  invalid payload type tags. Per-record round-trip and golden envelope hex tests cover every Phase 1
+  metadata record type. Fake stored metadata values now persist encoded envelopes through the same codec
+  registry. Future real adapter work must continue using that registry.

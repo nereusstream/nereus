@@ -50,7 +50,11 @@ Residual risks introduced by this mitigation:
 - derived-index repair must remain bounded; repair budget exhaustion is operational backpressure, not
   metadata corruption；
 - fake metadata must model failure between head CAS and materialization, otherwise tests will miss the
-  most important new recovery boundary。
+  most important new recovery boundary；
+- 2026-07-06 M2 hardening pass added tests and implementation for canonical `commitId` event-time/projection
+  coverage without delimiter collisions, full canonical replay validation, decoded metadata
+  `offset + length` overflow rejection, committed-slice-marker-first replay, and a fake-store
+  object-audit/reference failure injection point。
 
 实现门禁：
 
@@ -169,6 +173,17 @@ WAL 机制层，再继续 core append。
 - M2/M4 没有继续依赖原始 multi-key conditional write 假设；
 - stream-head CAS、commit-log reachability、derived-index repair 已在 fake metadata 语义中覆盖；
 - `FakeOxiaMetadataStore` 没有比真实 Oxia adapter 更强的 commit 语义；
+- done: `commitId` 和 same-physical-slice replay validation 覆盖所有 canonical identity fields，且不使用可
+  被合法 value 撞开的 delimiter-only 子编码；
+- done: decoded metadata records 与 public API request values 一样拒绝 byte range `offset + length`
+  overflow；
+- done: fake metadata 能分别注入 head-CAS 后 derived-index 失败和 post-commit object-audit/reference
+  失败；
+- done: `EntryIndexReferenceRecord` decoded metadata validation enforces the same
+  `INLINE`/`OBJECT_FOOTER`/`INDEX_OBJECT` shape rules as public `EntryIndexRef`；
+- done: `Phase1MetadataCodecs` has strict UTF-8 decode plus per-record round-trip/golden/error-path tests；
+- done: fake metadata stored values are codec-backed and use `Phase1MetadataCodecs` envelopes；
+- review-open: future real adapter must use the same metadata codec registry as the fake store；
 - `StreamStorageConfig` 包含 read memory/concurrency 限流项；
 - `WalObjectReader` full-slice read 先预留内存，后读取对象；
 - read amplification metrics 已在 `StreamStorageMetrics` 命名；

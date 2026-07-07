@@ -31,6 +31,10 @@ configurations[oxiaCapabilitySpike.runtimeOnlyConfigurationName].extendsFrom(
 dependencies {
     api(project(":nereus-api"))
 
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj)
+    testRuntimeOnly(libs.junit.platform.launcher)
+
     add(oxiaCapabilitySpike.implementationConfigurationName, project())
     add(oxiaCapabilitySpike.implementationConfigurationName, platform(libs.grpc.bom))
     add(oxiaCapabilitySpike.implementationConfigurationName, platform(libs.opentelemetry.bom))
