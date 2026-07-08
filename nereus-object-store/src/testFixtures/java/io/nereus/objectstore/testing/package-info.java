@@ -12,14 +12,5 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
-
-dependencies {
-    api(project(":nereus-api"))
-
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
-}
+/** Test fixtures for object-store backed Phase 1 tests. */
+package io.nereus.objectstore.testing;

@@ -12,14 +12,17 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore.wal;
 
-dependencies {
-    api(project(":nereus-api"))
+import io.nereus.api.AppendBatch;
+import io.nereus.api.StreamId;
+import java.util.Objects;
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+public record WalStreamSliceInput(
+        StreamId streamId,
+        AppendBatch batch) {
+    public WalStreamSliceInput {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(batch, "batch");
+    }
 }

@@ -64,9 +64,13 @@ M0 scaffold migration 已完成。当前代码状态：
 - `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
   出口；
 - root `phase1Check` 已存在，并包含 `checkPhase0`、L0 module tests 和 Phase 1 L0 dependency guard。
+- `nereus-object-store` 已落地 M3 主体实现：production object-store API、WAL writer/reader、CRC32C
+  helper、WAL binary layout、local test fixture、read-resource guard hook、read amplification observer 和
+  WAL round-trip/local-store tests 已存在。2026-07-08 M3 review 发现的 reader multi-range byte-budget 和
+  local symlink escape blockers 已修复并补测试；最终 Gradle gate 仍需重跑确认。
 
-M0/M1 已完成脚手架、类型边界、API validation hardening 和 `nereus-api` 单元测试。append/read/trim
-状态机尚未实现；M2/M3 分别落 metadata 与 object WAL。
+M0/M1/M2 已完成。M3 object WAL implementation 已落地并完成 blocker fix pass；重跑
+`11-m3-object-wal-review-2026-07-08.md` 中列出的 final gate 后即可进入 M4 core append path。
 
 Phase 1 允许的依赖方向：
 
@@ -105,7 +109,8 @@ Phase 1 不允许：
 | `07-implementation-contract-checklist.md` | 实现前必须遵守的支持范围、stop-the-line 条件和测试 gate |
 | `08-risk-register-and-design-compromises.md` | 当前已知高风险假设、Phase 1 设计妥协和实现门禁 |
 | `09-legacy-oxia-multi-key-commit-design.md` | 已归档的旧 Oxia multi-key atomic commit 方案，供未来 Oxia API 改造后回看 |
-| `10-current-progress-review-2026-07-07.md` | 当前 M0/M1/M2 代码与文档 review 记录、剩余 M2 风险和修正门禁 |
+| `10-current-progress-review-2026-07-07.md` | 当前 M0/M1/M2 review 记录，以及 2026-07-08 M2 completion 追加说明 |
+| `11-m3-object-wal-review-2026-07-08.md` | M3 object WAL review 记录、completion blockers 和重新验收 gate |
 
 ## 4. Phase 1 Public Surface
 
@@ -362,7 +367,7 @@ Already settled for Phase 1:
   defensive copy 规则都从 API 边界统一执行；
 - M1 API value objects 已统一拒绝 physical object range 的 `offset + length` overflow，并要求
   `AppendResult` 代表正数量的已提交 range；
-- M2 foundation 已开始：`nereus-metadata-oxia` 现在有生产接口/keyspace/record/codec envelope、
+- M2 已完成：`nereus-metadata-oxia` 现在有生产接口/keyspace/record/codec envelope、
   `Phase1MetadataCodecs` 实现候选，以及 test fixtures 中的 `FakeOxiaMetadataStore`。fake store 使用 stream-head
   single-key CAS、commit-log reachability 和 repairable offset-index/committed-slice 派生索引，不提供
   multi-key atomic commit primitive；
@@ -374,9 +379,14 @@ Already settled for Phase 1:
 - 2026-07-07 helper pass 已增加 package-private `PartitionedOxiaClient`，后续真实 Oxia adapter 的
   get/put/list/rangeScan/watch/head-CAS 边界必须携带 `PartitionKey`；
 - 2026-07-07 review 记录在 `10-current-progress-review-2026-07-07.md`：未发现需要推翻
-  stream-head CAS 方向的 P0；随后 M2 codec/validation pass 已补齐 entry-index metadata record shape
-  validation、codec strict UTF-8、per-record codec golden bytes，并让 fake store stored values 经过共享
-  codec envelope，剩余 M2 工作是更广的 linearizability tests；
+  stream-head CAS 方向的 P0；2026-07-08 M2 completion pass 已补齐完整 M2 测试矩阵（deterministic
+  before-head-CAS renew/trim interleavings, bounded repair retry progress, commitVersion cross-record
+  equality, stale-epoch fencing priority, commit-log retry），M2 已完成；
+- 2026-07-08 M3 object WAL 主体实现已落地：`DefaultWalObjectWriter`/`DefaultWalObjectReader`、
+  `LocalFileObjectStore` test fixture、WAL section/checksum layout、entry-index golden tests、multi-slice
+  round trip、read-resource guard 和 local cleanup 均已存在；M3 review 发现的 reader multi-range
+  byte-budget classification 和 local symlink escape blockers 已修复并补测试；最终 gate 仍需在本地
+  重跑后再把 M3 标记为 complete；
 - WAL object id/key 必须包含 writer process incarnation hash，避免进程重启后 sequence 重置造成
   object id 碰撞；
 - append timeout 必须按最后不可逆边界分类；stream-head CAS 发出后的 timeout 是 unknown final

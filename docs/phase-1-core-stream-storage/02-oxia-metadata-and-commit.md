@@ -38,7 +38,12 @@ M2 foundation implementation status:
   strict UTF-8 decode, and per-record codec round-trip/golden/error-path tests；
 - 2026-07-07 fake-store codec pass changed fake stored metadata maps to keep encoded envelope bytes and
   decode through `Phase1MetadataCodecs` on read；
-- still not complete for full M2 exit: broader linearizability tests remain.
+- 2026-07-08 M2 completion pass tightened the linearizability matrix with deterministic
+  before-head-CAS interleavings for same-writer renew and trim, bounded repair progress across repeated
+  calls, cross-record `commitVersion` equality, stale epoch fenced before an also-present offset conflict,
+  and commit-log reuse after first-attempt head CAS failure；
+- M2 is now complete. Remaining metadata work (real Oxia adapter, codec freeze for future schema
+  evolution) belongs to M7 and later phases.
 
 ## 1. Metadata Responsibility
 
@@ -1277,9 +1282,8 @@ Current implementation:
 Rules:
 
 - Phase 1 must use one shared metadata value encoding for production records. `Phase1MetadataCodecs`
-  is now the current M2 binary-v1 codec for the Phase 1 record set, but the metadata layer is not M2-exit
-  complete until the fake store, future real adapter, and repair tools all use the same
-  `MetadataCodecRegistry`；
+  is the frozen M2 binary-v1 codec for the Phase 1 record set. Fake store stored values already use this
+  codec；real adapter and repair tools must use the same `MetadataCodecRegistry` in later phases；
 - map fields such as stream attributes and entry attributes must encode entries sorted by UTF-8 key bytes；
 - repeated fields preserve the order specified by their owning contract. `schemaRefs` use canonical
   `(namespace,id,version)` order; manifest slice lists preserve encoded object slice order；

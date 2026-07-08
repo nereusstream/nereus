@@ -81,6 +81,11 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
         RECONNECT_THEN_CURRENT_NEXT
     }
 
+    public enum HeadCasInterleaving {
+        SAME_WRITER_RENEW,
+        TRIM
+    }
+
     public record PartitionedAccess(String key, String partitionKey, String operation) {
     }
 
@@ -123,6 +128,9 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
             MetadataWatcher watcher) {
     }
 
+    private record RepairMaterialization(boolean repaired) {
+    }
+
     private static final int REPLAY_SEARCH_LIMIT = 10_000;
 
     private final LongSupplier clock;
@@ -148,6 +156,9 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
     private long nextMetadataVersion = 1;
     private long nextTokenId = 1;
     private FailurePoint failNext;
+    private HeadCasInterleaving interleaveBeforeHeadCas;
+    private Duration interleaveRenewTtl;
+    private long interleaveTrimOffset;
     private WatchDelivery nextWatchDelivery = WatchDelivery.NORMAL;
     private boolean collapsedWatchEventPending;
     private boolean closed;
@@ -162,6 +173,17 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
 
     public synchronized void failNext(FailurePoint failurePoint) {
         failNext = Objects.requireNonNull(failurePoint, "failurePoint");
+    }
+
+    public synchronized void interleaveBeforeNextHeadCasWithSameWriterRenew(Duration ttl) {
+        interleaveBeforeHeadCas = HeadCasInterleaving.SAME_WRITER_RENEW;
+        interleaveRenewTtl = Objects.requireNonNull(ttl, "ttl");
+    }
+
+    public synchronized void interleaveBeforeNextHeadCasWithTrim(long beforeOffset, String reason) {
+        interleaveBeforeHeadCas = HeadCasInterleaving.TRIM;
+        interleaveTrimOffset = beforeOffset;
+        Objects.requireNonNull(reason, "reason");
     }
 
     public synchronized List<PartitionedAccess> accessLog() {
@@ -415,6 +437,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
             maybeFail(FailurePoint.AFTER_COMMIT_LOG_PUT);
             maybeFail(FailurePoint.BEFORE_HEAD_CAS);
 
+            applyBeforeHeadCasInterleaving(cluster, request.streamId());
             StreamHeadRecord currentHead = headOrThrow(cluster, request.streamId());
             if (currentHead.metadataVersion() != head.metadataVersion()) {
                 if (headReaches(cluster, currentHead, commitId)) {
@@ -459,24 +482,30 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
             long repairedFrom = Long.MAX_VALUE;
             long repairedTo = 0;
             String commitId = head.lastCommitId();
-            while (!commitId.isEmpty() && repaired < maxRecordsToRepair) {
+            while (!commitId.isEmpty()) {
                 StreamCommitRecord commit = commitById.get(commitIdentityMapKey(cluster, streamId, commitId));
                 if (commit == null) {
                     throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false, "broken commit chain");
                 }
-                materializeDerivedRecords(cluster, commit);
-                repaired++;
-                repairedFrom = Math.min(repairedFrom, commit.offsetStart());
-                repairedTo = Math.max(repairedTo, commit.offsetEnd());
+                RepairMaterialization materialization = materializeDerivedRecords(cluster, commit);
+                if (materialization.repaired()) {
+                    repaired++;
+                    repairedFrom = Math.min(repairedFrom, commit.offsetStart());
+                    repairedTo = Math.max(repairedTo, commit.offsetEnd());
+                }
                 if (commit.offsetStart() <= targetOffset && targetOffset < commit.offsetEnd()) {
                     targetCovered = true;
                     break;
                 }
                 commitId = commit.previousCommitId();
+                if (materialization.repaired() && repaired >= maxRecordsToRepair) {
+                    break;
+                }
             }
-            boolean exhausted = !targetCovered && !commitId.isEmpty() && repaired >= maxRecordsToRepair;
+            boolean exhausted = !targetCovered && !commitId.isEmpty();
             long from = repairedFrom == Long.MAX_VALUE ? targetOffset : repairedFrom;
-            return new DerivedIndexRepairResult(streamId, from, repairedTo, repaired, targetCovered, exhausted, head.commitVersion());
+            long to = repairedFrom == Long.MAX_VALUE ? targetOffset : repairedTo;
+            return new DerivedIndexRepairResult(streamId, from, to, repaired, targetCovered, exhausted, head.commitVersion());
         });
     }
 
@@ -691,7 +720,8 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
                 metadataVersion);
     }
 
-    private void materializeDerivedRecords(String cluster, StreamCommitRecord commit) {
+    private RepairMaterialization materializeDerivedRecords(String cluster, StreamCommitRecord commit) {
+        boolean repaired = false;
         StreamId streamId = new StreamId(commit.streamId());
         ObjectId objectId = new ObjectId(commit.objectId());
         OxiaKeyspace keyspace = new OxiaKeyspace(cluster);
@@ -731,6 +761,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
             recordStreamAccess(keyspace.offsetIndexKey(streamId, commit.offsetEnd(), commit.generation()), keyspace, streamId, "putDerived");
             offsetIndexes.put(offsetKey, offsetIndexRecord);
             notifyOffsetIndexUpdated(cluster, streamId, commit.offsetEnd(), offsetIndexRecord.metadataVersion());
+            repaired = true;
         }
 
         CommittedSliceRecord committedSliceRecord = new CommittedSliceRecord(
@@ -750,6 +781,60 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
         if (existingMarker == null) {
             recordStreamAccess(keyspace.committedSliceKey(streamId, objectId, commit.sliceId()), keyspace, streamId, "putDerived");
             committedSlices.put(markerKey, committedSliceRecord);
+            repaired = true;
+        }
+        return new RepairMaterialization(repaired);
+    }
+
+    private void applyBeforeHeadCasInterleaving(String cluster, StreamId streamId) {
+        HeadCasInterleaving interleaving = interleaveBeforeHeadCas;
+        if (interleaving == null) {
+            return;
+        }
+        interleaveBeforeHeadCas = null;
+        StreamHeadRecord head = headOrThrow(cluster, streamId);
+        if (interleaving == HeadCasInterleaving.SAME_WRITER_RENEW) {
+            AppendSessionSnapshotRecord current = head.appendSession();
+            long now = clock.getAsLong();
+            if (current.isEmpty() || current.expiresAtMillis() <= now) {
+                throw failure(ErrorCode.APPEND_SESSION_EXPIRED, true, "append session expired during interleaved renew");
+            }
+            AppendSessionSnapshotRecord updatedSession = new AppendSessionSnapshotRecord(
+                    current.writerId(),
+                    current.epoch(),
+                    current.fencingToken(),
+                    current.leaseVersion() + 1,
+                    now + interleaveRenewTtl.toMillis());
+            StreamHeadRecord updated = withSession(head, updatedSession, nextVersion());
+            recordHeadCas(cluster, streamId);
+            streamHeads.put(headMapKey(cluster, streamId), updated);
+            notifyAppendSessionChanged(cluster, streamId, updatedSession.epoch(), updatedSession.leaseVersion());
+            interleaveRenewTtl = null;
+            return;
+        }
+        if (interleaving == HeadCasInterleaving.TRIM) {
+            if (interleaveTrimOffset < head.trimOffset() || interleaveTrimOffset > head.committedEndOffset()) {
+                throw failure(ErrorCode.INVALID_ARGUMENT, false, "interleaved trim offset is outside committed range");
+            }
+            StreamHeadRecord updated = new StreamHeadRecord(
+                    head.streamId(),
+                    head.streamName(),
+                    head.streamNameHash(),
+                    head.state(),
+                    head.profile(),
+                    head.attributes(),
+                    head.createdAtMillis(),
+                    head.policyVersion(),
+                    head.committedEndOffset(),
+                    head.cumulativeSize(),
+                    head.commitVersion(),
+                    interleaveTrimOffset,
+                    head.lastCommitId(),
+                    head.appendSession(),
+                    nextVersion());
+            recordHeadCas(cluster, streamId);
+            streamHeads.put(headMapKey(cluster, streamId), updated);
+            notifyTrimUpdated(cluster, streamId, interleaveTrimOffset, updated.metadataVersion());
         }
     }
 
@@ -1137,10 +1222,27 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
                 && left.offsetStart() == right.offsetStart()
                 && left.offsetEnd() == right.offsetEnd()
                 && left.generation() == right.generation()
+                && left.cumulativeSize() == right.cumulativeSize()
                 && left.objectId().equals(right.objectId())
                 && left.objectKey().equals(right.objectKey())
                 && left.sliceId().equals(right.sliceId())
-                && left.commitVersion() == right.commitVersion();
+                && left.objectType().equals(right.objectType())
+                && left.physicalFormat().equals(right.physicalFormat())
+                && left.logicalFormat().equals(right.logicalFormat())
+                && left.objectOffset() == right.objectOffset()
+                && left.objectLength() == right.objectLength()
+                && left.recordCount() == right.recordCount()
+                && left.entryCount() == right.entryCount()
+                && left.logicalBytes() == right.logicalBytes()
+                && left.schemaRefs().equals(right.schemaRefs())
+                && left.entryIndexRef().equals(right.entryIndexRef())
+                && left.projectionRef().equals(right.projectionRef())
+                && left.sliceChecksumType().equals(right.sliceChecksumType())
+                && left.sliceChecksumValue().equals(right.sliceChecksumValue())
+                && left.minEventTimeMillis() == right.minEventTimeMillis()
+                && left.maxEventTimeMillis() == right.maxEventTimeMillis()
+                && left.commitVersion() == right.commitVersion()
+                && left.tombstoned() == right.tombstoned();
     }
 
     private boolean committedSliceMatches(CommittedSliceRecord left, CommittedSliceRecord right) {

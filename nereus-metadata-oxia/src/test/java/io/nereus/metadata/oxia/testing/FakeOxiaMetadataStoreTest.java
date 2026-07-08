@@ -42,6 +42,7 @@ import io.nereus.metadata.oxia.codec.MetadataRecordCodec;
 import io.nereus.metadata.oxia.codec.MetadataRecordEnvelope;
 import io.nereus.metadata.oxia.codec.Phase1MetadataCodecs;
 import io.nereus.metadata.oxia.records.AppendSessionRecord;
+import io.nereus.metadata.oxia.records.CommittedEndOffsetRecord;
 import io.nereus.metadata.oxia.records.CommittedSliceRecord;
 import io.nereus.metadata.oxia.records.EntryIndexReferenceRecord;
 import io.nereus.metadata.oxia.records.ObjectManifestRecord;
@@ -297,6 +298,220 @@ class FakeOxiaMetadataStoreTest {
         }
     }
 
+    @Test
+    void sameWriterRenewIsCompatibleHeadVersionChange() {
+        StreamId streamId = new StreamId(createStream(new StreamName("renew-head-conflict")).streamId());
+        AppendSessionRecord session = acquireSession(streamId);
+        CommitSliceRequest request = request(streamId, session, "object-renew", "slice-1", 0, 1);
+        store.putObjectManifest(CLUSTER, manifest(request)).join();
+
+        store.interleaveBeforeNextHeadCasWithSameWriterRenew(Duration.ofMillis(2_000));
+
+        CommitSliceResult result = store.commitStreamSlice(CLUSTER, request).join();
+        StreamHeadRecord head = storedHead(streamId);
+
+        assertThat(result.commitVersion()).isEqualTo(1);
+        assertThat(result.range().startOffset()).isEqualTo(0);
+        assertThat(result.range().endOffset()).isEqualTo(1);
+        assertThat(head.committedEndOffset()).isEqualTo(1);
+        assertThat(head.commitVersion()).isEqualTo(1);
+        assertThat(head.appendSession().leaseVersion()).isEqualTo(session.leaseVersion() + 1);
+        assertThat(head.appendSession().expiresAtMillis()).isEqualTo(clock.get() + 2_000);
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(1);
+    }
+
+    @Test
+    void sameWriterTrimIsCompatibleHeadVersionChange() {
+        StreamId streamId = new StreamId(createStream(new StreamName("trim-head-conflict")).streamId());
+        AppendSessionRecord session = acquireSession(streamId);
+        CommitSliceRequest first = request(streamId, session, "object-trim-1", "slice-1", 0, 1);
+        CommitSliceRequest second = request(streamId, session, "object-trim-2", "slice-2", 1, 1);
+        store.putObjectManifest(CLUSTER, manifest(first)).join();
+        store.putObjectManifest(CLUSTER, manifest(second)).join();
+        store.commitStreamSlice(CLUSTER, first).join();
+
+        store.interleaveBeforeNextHeadCasWithTrim(1, "test trim");
+
+        CommitSliceResult result = store.commitStreamSlice(CLUSTER, second).join();
+        StreamHeadRecord head = storedHead(streamId);
+
+        assertThat(result.commitVersion()).isEqualTo(2);
+        assertThat(head.committedEndOffset()).isEqualTo(2);
+        assertThat(head.commitVersion()).isEqualTo(2);
+        assertThat(head.trimOffset()).isEqualTo(1);
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(2);
+    }
+
+    @Test
+    void repairBudgetExhaustionStopsAtMaxRecords() {
+        StreamId streamId = new StreamId(createStream(new StreamName("repair-budget-exhaustion")).streamId());
+        AppendSessionRecord session = acquireSession(streamId);
+
+        CommitSliceRequest req1 = request(streamId, session, "object-repair-1", "slice-1", 0, 1);
+        store.putObjectManifest(CLUSTER, manifest(req1)).join();
+        store.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+        assertNereusCode(
+                () -> store.commitStreamSlice(CLUSTER, req1).join(),
+                ErrorCode.METADATA_UNAVAILABLE);
+
+        CommitSliceRequest req2 = request(streamId, session, "object-repair-2", "slice-2", 1, 1);
+        store.putObjectManifest(CLUSTER, manifest(req2)).join();
+        store.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+        assertNereusCode(
+                () -> store.commitStreamSlice(CLUSTER, req2).join(),
+                ErrorCode.METADATA_UNAVAILABLE);
+
+        CommitSliceRequest req3 = request(streamId, session, "object-repair-3", "slice-3", 2, 1);
+        store.putObjectManifest(CLUSTER, manifest(req3)).join();
+        store.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+        assertNereusCode(
+                () -> store.commitStreamSlice(CLUSTER, req3).join(),
+                ErrorCode.METADATA_UNAVAILABLE);
+
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
+
+        DerivedIndexRepairResult repair = store.repairDerivedStreamIndexes(CLUSTER, streamId, 0, 1).join();
+
+        assertThat(repair.repairedRecords()).isEqualTo(1);
+        assertThat(repair.targetCovered()).isFalse();
+        assertThat(repair.repairBudgetExhausted()).isTrue();
+        assertThat(repair.repairedFromOffset()).isEqualTo(2);
+        assertThat(repair.repairedToOffset()).isEqualTo(3);
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join())
+                .extracting(OffsetIndexRecord::offsetStart)
+                .containsExactly(2L);
+
+        DerivedIndexRepairResult secondRepair = store.repairDerivedStreamIndexes(CLUSTER, streamId, 0, 1).join();
+        assertThat(secondRepair.repairedRecords()).isEqualTo(1);
+        assertThat(secondRepair.targetCovered()).isFalse();
+        assertThat(secondRepair.repairBudgetExhausted()).isTrue();
+        assertThat(secondRepair.repairedFromOffset()).isEqualTo(1);
+        assertThat(secondRepair.repairedToOffset()).isEqualTo(2);
+
+        DerivedIndexRepairResult thirdRepair = store.repairDerivedStreamIndexes(CLUSTER, streamId, 0, 1).join();
+        assertThat(thirdRepair.repairedRecords()).isEqualTo(1);
+        assertThat(thirdRepair.targetCovered()).isTrue();
+        assertThat(thirdRepair.repairBudgetExhausted()).isFalse();
+        assertThat(thirdRepair.repairedFromOffset()).isEqualTo(0);
+        assertThat(thirdRepair.repairedToOffset()).isEqualTo(1);
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join())
+                .extracting(OffsetIndexRecord::offsetStart)
+                .containsExactly(0L, 1L, 2L);
+    }
+
+    @Test
+    void commitVersionIsMonotonicAcrossSequentialCommits() {
+        StreamId streamId = new StreamId(createStream(new StreamName("monotonic-version")).streamId());
+        AppendSessionRecord session = acquireSession(streamId);
+
+        CommitSliceRequest req1 = request(streamId, session, "object-mono-1", "slice-1", 0, 1);
+        CommitSliceRequest req2 = request(streamId, session, "object-mono-2", "slice-2", 1, 1);
+        CommitSliceRequest req3 = request(streamId, session, "object-mono-3", "slice-3", 2, 1);
+        store.putObjectManifest(CLUSTER, manifest(req1)).join();
+        store.putObjectManifest(CLUSTER, manifest(req2)).join();
+        store.putObjectManifest(CLUSTER, manifest(req3)).join();
+
+        CommitSliceResult first = store.commitStreamSlice(CLUSTER, req1).join();
+        CommitSliceResult second = store.commitStreamSlice(CLUSTER, req2).join();
+        CommitSliceResult third = store.commitStreamSlice(CLUSTER, req3).join();
+
+        assertThat(first.commitVersion()).isEqualTo(1);
+        assertThat(second.commitVersion()).isEqualTo(2);
+        assertThat(third.commitVersion()).isEqualTo(3);
+
+        CommittedEndOffsetRecord committedEnd = store.getCommittedEndOffset(CLUSTER, streamId).join();
+        assertThat(committedEnd.committedEndOffset()).isEqualTo(3);
+        assertThat(committedEnd.commitVersion()).isEqualTo(3);
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join())
+                .extracting(OffsetIndexRecord::commitVersion)
+                .containsExactly(1L, 2L, 3L);
+        assertThat(storedRecords(StreamCommitRecord.class).stream()
+                .map(StreamCommitRecord::commitVersion)
+                .distinct()
+                .sorted()
+                .toList())
+                .containsExactly(1L, 2L, 3L);
+        assertThat(storedRecords(CommittedSliceRecord.class).stream()
+                .map(CommittedSliceRecord::commitVersion)
+                .sorted()
+                .toList())
+                .containsExactly(1L, 2L, 3L);
+    }
+
+    @Test
+    void staleEpochIsFencedBeforeOffsetConflict() {
+        String writerA = "writerA";
+        String writerB = "writerB";
+        StreamId streamId = new StreamId(createStream(new StreamName("fenced-before-conflict")).streamId());
+        AppendSessionRecord sessionA = store.acquireAppendSession(
+                CLUSTER, streamId,
+                new AppendSessionOptions(writerA, Duration.ofMillis(10), false))
+                .join();
+        clock.set(clock.get() + 11);
+
+        AppendSessionRecord sessionB = store.acquireAppendSession(
+                CLUSTER, streamId,
+                new AppendSessionOptions(writerB, Duration.ofMillis(1), true))
+                .join();
+        CommitSliceRequest winner = request(
+                streamId, sessionB, writerB, "object-winner", "slice-winner", 0, 1);
+        store.putObjectManifest(CLUSTER, manifest(winner)).join();
+        store.commitStreamSlice(CLUSTER, winner).join();
+
+        CommitSliceRequest staleRequest = new CommitSliceRequest(
+                streamId,
+                writerA,
+                WRITER_RUN_ID_HASH,
+                sessionA.epoch(),
+                sessionA.fencingToken(),
+                0,
+                "stale-slice",
+                1,
+                1,
+                7,
+                List.of(),
+                new ObjectId("object-stale"),
+                new ObjectKey("object-stale-key"),
+                checksum("aaaaaaaa"),
+                10,
+                20,
+                entryIndexRef(),
+                checksum("bbbbbbbb"),
+                PayloadFormat.OPAQUE_RECORD_BATCH,
+                1,
+                1,
+                Optional.empty());
+        store.putObjectManifest(CLUSTER, manifest(staleRequest)).join();
+
+        assertNereusCode(
+                () -> store.commitStreamSlice(CLUSTER, staleRequest).join(),
+                ErrorCode.FENCED_APPEND);
+    }
+
+    @Test
+    void retryReusesStoredCommitLogAfterFirstAttemptFailedHeadCas() {
+        StreamId streamId = new StreamId(createStream(new StreamName("retry-commit-log")).streamId());
+        AppendSessionRecord session = acquireSession(streamId);
+        CommitSliceRequest request = request(streamId, session, "object-retry-cl", "slice-1", 0, 1);
+        store.putObjectManifest(CLUSTER, manifest(request)).join();
+        store.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_COMMIT_LOG_PUT);
+
+        assertNereusCode(
+                () -> store.commitStreamSlice(CLUSTER, request).join(),
+                ErrorCode.METADATA_UNAVAILABLE);
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).isEmpty();
+
+        CommitSliceResult result = store.commitStreamSlice(CLUSTER, request).join();
+
+        assertThat(result.commitVersion()).isEqualTo(1);
+        assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join()).hasSize(1);
+        assertThat(storedRecords(StreamCommitRecord.class).stream()
+                .map(StreamCommitRecord::commitId)
+                .distinct()
+                .toList())
+                .containsExactly(request.commitId());
+    }
+
     private StreamMetadataRecord createStream(StreamName streamName) {
         return store.createOrGetStream(
                 CLUSTER,
@@ -320,9 +535,20 @@ class FakeOxiaMetadataStoreTest {
             String sliceId,
             long expectedStartOffset,
             int recordCount) {
+        return request(streamId, session, WRITER_ID, objectId, sliceId, expectedStartOffset, recordCount);
+    }
+
+    private CommitSliceRequest request(
+            StreamId streamId,
+            AppendSessionRecord session,
+            String writerId,
+            String objectId,
+            String sliceId,
+            long expectedStartOffset,
+            int recordCount) {
         return new CommitSliceRequest(
                 streamId,
-                WRITER_ID,
+                writerId,
                 WRITER_RUN_ID_HASH,
                 session.epoch(),
                 session.fencingToken(),
@@ -343,6 +569,22 @@ class FakeOxiaMetadataStoreTest {
                 1,
                 1,
                 Optional.empty());
+    }
+
+    private StreamHeadRecord storedHead(StreamId streamId) {
+        return store.storedMetadataValuesForTesting().stream()
+                .filter(value -> value.recordType().equals(StreamHeadRecord.class.getSimpleName()))
+                .filter(value -> value.key().contains("|head|" + streamId.value()))
+                .findFirst()
+                .map(value -> Phase1MetadataCodecs.decodeEnvelope(value.envelope(), StreamHeadRecord.class))
+                .orElseThrow();
+    }
+
+    private <T> List<T> storedRecords(Class<T> recordClass) {
+        return store.storedMetadataValuesForTesting().stream()
+                .filter(value -> value.recordType().equals(recordClass.getSimpleName()))
+                .map(value -> Phase1MetadataCodecs.decodeEnvelope(value.envelope(), recordClass))
+                .toList();
     }
 
     private ObjectManifestRecord manifest(CommitSliceRequest request) {

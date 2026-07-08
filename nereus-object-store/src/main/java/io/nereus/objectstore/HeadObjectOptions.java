@@ -12,14 +12,16 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.time.Duration;
+import java.util.Objects;
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+public record HeadObjectOptions(Duration timeout) {
+    public HeadObjectOptions {
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("timeout must be positive");
+        }
+    }
 }

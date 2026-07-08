@@ -12,14 +12,17 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore.wal;
 
-dependencies {
-    api(project(":nereus-api"))
+import io.nereus.api.ReadBatch;
+import io.nereus.api.ReadOptions;
+import io.nereus.api.ResolvedObjectRange;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+public interface WalObjectReader {
+    CompletableFuture<List<ReadBatch>> read(
+            long startOffset,
+            List<ResolvedObjectRange> ranges,
+            ReadOptions options);
 }

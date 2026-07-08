@@ -12,14 +12,13 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore.wal;
 
-dependencies {
-    api(project(":nereus-api"))
+public interface WalReadObserver {
+    void onSliceRead(long fullSlicePayloadBytes, long entryIndexBytes, long returnedPayloadBytes);
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+    static WalReadObserver noop() {
+        return (fullSlicePayloadBytes, entryIndexBytes, returnedPayloadBytes) -> {
+        };
+    }
 }

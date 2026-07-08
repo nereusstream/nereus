@@ -12,14 +12,18 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore.wal;
 
-dependencies {
-    api(project(":nereus-api"))
+public interface ReadResourceGuard {
+    Reservation reserve(long bytes);
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+    static ReadResourceGuard unbounded() {
+        return ignored -> () -> {
+        };
+    }
+
+    interface Reservation extends AutoCloseable {
+        @Override
+        void close();
+    }
 }

@@ -174,15 +174,17 @@ M2 foundation implementation status:
   coverage, metadata record range overflow rejection, committed-slice-marker-first replay, post-commit
   object-audit failure leaving visible data repairable, and adapter-private partition-key helper
   enforcement；
-- verified earlier in the current M2 sequence:
-  `./gradlew phase1Check` and `./gradlew check`；
-- verified after the latest fake-store codec-backed persistence change:
-  `./gradlew :nereus-metadata-oxia:test`；
-- final Gradle rerun after the documentation sync was environment-blocked by the Codex approval usage limit,
-  not by a project failure；
-- 2026-07-07 review status: no P0 was found that would invalidate the stream-head CAS direction, but the
-  implementation is not M2-complete；
-- not complete yet: the complete M2 linearizable single-process test matrix.
+- 2026-07-07 review status: no P0 was found that would invalidate the stream-head CAS direction；
+- 2026-07-08 M2 completion pass completed the remaining M2 test matrix:
+  `sameWriterRenewIsCompatibleHeadVersionChange`, `sameWriterTrimIsCompatibleHeadVersionChange`,
+  `repairBudgetExhaustionStopsAtMaxRecords`, `commitVersionIsMonotonicAcrossSequentialCommits`,
+  `staleEpochIsFencedBeforeOffsetConflict`, and `retryReusesStoredCommitLogAfterFirstAttemptFailedHeadCas`；
+- these tests now use deterministic before-head-CAS interleavings for renew/trim, prove repeated bounded
+  repair calls continue toward the target offset, and check `commitVersion` equality across stream head,
+  commit-log, offset-index, and committed-slice records；
+- verified in the final M2 gate run:
+  `./gradlew :nereus-metadata-oxia:test`, `./gradlew phase1Check`, and `./gradlew check`；
+- M2 is done.
 
 M2 review follow-ups before exit:
 
@@ -204,6 +206,10 @@ M2 review follow-ups before exit:
 - done: freeze current `Phase1MetadataCodecs` with round-trip, wrong-type, unsupported-version,
   malformed-UTF-8, absent-field, deterministic-map-order, and per-record golden-byte tests；
 - done: make fake metadata value persistence codec-backed instead of relying only on in-memory records；
+- done: add the complete M2 linearizable single-process test matrix covering deterministic compatible
+  head-version interleavings from same-writer renew and trim, bounded repair retry progress,
+  commitVersion cross-record equality, stale epoch fenced before an also-present offset conflict, and
+  commit-log retry after first-attempt head CAS failure；
 - review-open: future real adapter must use the same `MetadataCodecRegistry` as the fake store。
 
 Tasks:
@@ -267,43 +273,88 @@ Module:
 nereus-object-store
 ```
 
+M3 implementation status:
+
+- production `nereus-object-store` now contains `ObjectStore`, operation options/results,
+  `Crc32cChecksums`, and `RangeChecks`；
+- `LocalFileObjectStore` is a `java-test-fixtures` test implementation with immutable put, head, exact
+  range read, expected checksum validation, path traversal rejection, duplicate `ifAbsent` behavior, and
+  `deleteAllForTesting()` under the injected temp root only；
+- `DefaultWalObjectWriter` builds the full Phase 1 WAL object in memory, computes final encoded length
+  before upload, rejects `maxObjectBytes` violations before `putObject`, copies `uploadTimeout` into
+  `PutObjectOptions.timeout`, and verifies returned length/storage checksum before exposing a
+  `WalWriteResult`；
+- WAL binary encoding now uses fixed durable ids, common header, variable-length section envelopes,
+  footer checksum, header checksum, canonical object checksum, exact-bytes storage checksum, deterministic
+  slice descriptors, and `OBJECT_FOOTER` entry indexes；
+- `DefaultWalObjectReader` supports `MULTI_STREAM_WAL_OBJECT`, `OPAQUE_RECORD_BATCH`, and
+  `OBJECT_FOOTER`; it reserves full checksum-domain bytes through `ReadResourceGuard` before object IO,
+  verifies slice and entry-index CRC32C, clips entries by requested offset/record/byte limits, and reports
+  read amplification inputs through `WalReadObserver`；
+- writer mechanism supports multi-slice and multi-stream objects. `forceSingleStreamObject=true` remains
+  only a validation guard for the future core planner；
+- object-store production code still has no delete/list correctness path, and `nereus-object-store` does
+  not import Oxia metadata record classes.
+- 2026-07-08 M3 review status: implementation is present and the review-found blockers have been fixed
+  with tests. Final M3 acceptance still requires rerunning the local Gradle gate after the current
+  execution-environment approval limit is cleared. See `11-m3-object-wal-review-2026-07-08.md`.
+
 Tasks:
 
-- add `ObjectStore` interface；
-- add local filesystem test implementation；
-- add a test-only cleanup helper for the local filesystem implementation or its fixture, scoped strictly
+- done: add `ObjectStore` interface；
+- done: add local filesystem test implementation；
+- done: add a test-only cleanup helper for the local filesystem implementation or its fixture, scoped strictly
   to the injected test root；
-- include write timeout in `PutObjectOptions` and propagate WAL upload timeout into concrete object-store
+- done: include write timeout in `PutObjectOptions` and propagate WAL upload timeout into concrete object-store
   calls；
-- add WAL layout encoder/decoder；
-- add WAL header/footer/checksum golden tests and object-bounds validation；
-- use the shared `nereus-api` key/hash helpers for cluster, writer id, writer run id, and object key
+- done: add WAL layout encoder/decoder；
+- done: add WAL header/footer/checksum golden tests and object-bounds validation；
+- done: use the shared `nereus-api` key/hash helpers for cluster, writer id, writer run id, and object key
   components；
-- encode variable-length WAL sections with section headers and section checksums；
-- add `WalObjectWriter`；
-- require `WalObjectWriter` to support multi-slice requests even if the first core planner sends one
+- done: encode variable-length WAL sections with section headers and section checksums；
+- done: add `WalObjectWriter`；
+- done: require `WalObjectWriter` to support multi-slice requests even if the first core planner sends one
   append work item per object；
-- add a WAL writer sizing pass that computes final encoded object length before buffer allocation and
+- done: add a WAL writer sizing pass that computes final encoded object length before buffer allocation and
   before `ObjectStore.putObject`；
-- pass `maxObjectBytes` through `WalWriteOptions` and treat `targetObjectSizeBytes` only as a
+- done: pass `maxObjectBytes` through `WalWriteOptions` and treat `targetObjectSizeBytes` only as a
   flush/grouping target；
-- keep WAL canonical object checksum separate from object-store exact-bytes storage checksum；
-- pass `writerRunIdHash` through WAL write request and object header；
-- pass WAL format version and writer version into object header and manifest；
-- add `WalObjectReader` for footer entry index；
-- make `WalObjectReader` accept or use bounded read memory/concurrency guards supplied by core tests；
-- add CRC32C checksum helper；
-- return neutral `WalWriteResult` and `WrittenStreamSlice` descriptors only; do not import Oxia metadata
+- done: keep WAL canonical object checksum separate from object-store exact-bytes storage checksum；
+- done: pass `writerRunIdHash` through WAL write request and object header；
+- done: pass WAL format version and writer version into object header and manifest；
+- done: add `WalObjectReader` for footer entry index；
+- done: make `WalObjectReader` accept or use bounded read memory/concurrency guards supplied by core tests；
+- done: add CRC32C checksum helper；
+- done: return neutral `WalWriteResult` and `WrittenStreamSlice` descriptors only; do not import Oxia metadata
   record classes。
 
 Exit:
 
-- write one-slice WAL object and read it back；
-- write multi-slice WAL object and read each slice by range；
-- checksum mismatch test fails before metadata commit；
-- no test uses object list for correctness。
-- local object store cleanup can remove orphan files under the isolated test root without exposing
+- done: write one-slice WAL object and read it back；
+- done: write multi-slice WAL object and read each slice by range；
+- done: checksum mismatch test fails before metadata commit；
+- done: no test uses object list for correctness。
+- done: local object store cleanup can remove orphan files under the isolated test root without exposing
   production delete semantics。
+
+M3 blocker fix pass is ready for final verification. The previous baseline implementation passed
+`./gradlew :nereus-object-store:test`, `./gradlew phase1Check`, and `./gradlew check`; after the fix pass,
+rerunning Gradle was blocked by the current execution-environment approval limit rather than by a project
+failure.
+
+Before M3 completion is claimed:
+
+- done: fix `DefaultWalObjectReader` so a positive entry after previously returned data exceeds remaining
+  `maxBytes` by stopping, not by returning `READ_LIMIT_TOO_SMALL`；
+- done: fix `LocalFileObjectStore` so final symlink and symlink-parent escapes are rejected before
+  put/read/head；
+- done: add tests for those two blockers；
+- done: add tests for upload-timeout propagation, target-size advisory behavior,
+  zero-byte entry reads, unsupported entry-index locations, non-zero source object offsets, descriptor
+  bounds, range-read-past-EOF, and failed-write invisibility；
+- done: wrap checksum-consistent invalid WAL object and entry-index metadata as `UNSUPPORTED_FORMAT`,
+  with focused decoder tests；
+- pending: rerun `./gradlew :nereus-object-store:test`, `./gradlew phase1Check`, and `./gradlew check`.
 
 ### M4 Core append path
 
@@ -691,7 +742,7 @@ Phase 1 may mention `PULSAR_ENTRY_BATCH` as an enum value, but must not depend o
 
 ## 6. Gradle Tasks
 
-Current M0-M1 verification commands:
+Current M0-M3 verification commands:
 
 ```text
 ./gradlew checkPhase0
@@ -716,8 +767,8 @@ Future milestones should add these gates to `phase1Check` when the corresponding
 
 - formatting/checkstyle if introduced；
 - API validation unit tests；
-- object WAL round-trip tests；
-- fake metadata invariant tests；
+- done: object WAL round-trip tests；
+- done: fake metadata invariant tests；
 - real Oxia contract tests when the adapter exists。
 
 `phase1Check` must not require `nereus-managed-ledger`, `nereus-pulsar-adapter`, or `nereus-kop-adapter`

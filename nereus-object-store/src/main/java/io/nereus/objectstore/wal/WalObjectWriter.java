@@ -12,14 +12,10 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore.wal;
 
-dependencies {
-    api(project(":nereus-api"))
+import java.util.concurrent.CompletableFuture;
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+public interface WalObjectWriter {
+    CompletableFuture<WalWriteResult> write(WalWriteRequest request);
 }

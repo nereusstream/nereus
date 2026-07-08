@@ -3,6 +3,33 @@
 本文定义 Phase 1 的 object store abstraction、object WAL writer/reader、stream slice 和 entry
 index 设计。Phase 1 只实现 WAL object，不实现 compacted object writer。
 
+M3 implementation status, 2026-07-08:
+
+- `nereus-object-store` now exposes the production `ObjectStore` API, object options/results, CRC32C
+  helper, and shared range validation；
+- `DefaultWalObjectWriter` implements the Phase 1 in-memory WAL encoder with common header, section
+  envelopes, footer, deterministic slice descriptors, `OBJECT_FOOTER` entry indexes, storage checksum,
+  and WAL canonical object checksum；
+- `DefaultWalObjectReader` reads the full resolved slice payload plus footer entry index, verifies
+  `slicePayloadBytes || entryIndexBytes`, clips by offset/record/byte limits, and uses an injected
+  `ReadResourceGuard` plus `WalReadObserver` for M5 core integration；
+- `LocalFileObjectStore` lives under `src/testFixtures` only. It gives tests immutable put, head, range
+  read, path traversal rejection, duplicate `ifAbsent` handling, checksum validation, and
+  `deleteAllForTesting()` scoped to the injected temp root；
+- M3 tests currently cover one-slice round trip, multi-slice round trip, pre-upload
+  sizing/force-single-stream/ZSTD validation, upload-timeout propagation, advisory target size behavior,
+  storage checksum mismatch, corrupt slice/index/object checksums, descriptor bounds, unsupported entry
+  index locations, checksum-consistent invalid entry-index/descriptor metadata, entry-index golden bytes,
+  read-budget rejection before object IO, multi-range read byte-budget clipping, zero-byte entry reads,
+  unsafe local keys, symlink escape, duplicate `ifAbsent`, range-read-past-EOF, failed-write invisibility,
+  and test-only cleanup.
+
+Review correction: `11-m3-object-wal-review-2026-07-08.md` found two completion blockers: multi-range
+read byte-budget classification could incorrectly return `READ_LIMIT_TOO_SMALL`, and
+`LocalFileObjectStore` did not reject final symlink escape. Both have now been fixed with focused tests;
+the same fix pass also wraps checksum-consistent invalid WAL/index metadata as `UNSUPPORTED_FORMAT`.
+Final M3 acceptance still requires rerunning the Gradle gate.
+
 ## 1. Object Store Responsibility
 
 Object store layer owns:
@@ -28,25 +55,43 @@ Object store layer does not own:
 ```text
 io.nereus.objectstore
   ObjectStore
+  PutObjectOptions
   PutObjectResult
+  RangeReadOptions
   RangeReadResult
+  HeadObjectOptions
   HeadObjectResult
+  Crc32cChecksums
+  RangeChecks
 
 io.nereus.objectstore.wal
+  CompressionType
+  WalWriteRequest
+  WalWriteOptions
+  WalStreamSliceInput
+  WalWriteResult
+  WrittenStreamSlice
   WalObjectWriter
   WalObjectReader
   WalObjectLayout
-  WalObjectHeader
-  WalObjectFooter
   StreamSliceDescriptor
-  PayloadBlockDescriptor
   EntryIndex
+  EntryIndexItem
   EntryIndexEncoder
   EntryIndexDecoder
+  ReadResourceGuard
+  WalReadObserver
+
+io.nereus.objectstore.testing (test fixtures)
+  LocalFileObjectStore
 ```
 
 `ObjectId`, `ObjectKey`, `ObjectRange`, `Checksum`, `PayloadFormat`, `ReadBatch`, and
 `ResolvedObjectRange` are imported from `nereus-api`; `nereus-object-store` must not redefine them.
+
+The current implementation keeps `WalObjectHeader`, footer payload, and section headers as internal
+binary encoders rather than public Java records. The stable public contract is the object-store API plus
+neutral WAL result/descriptors above.
 
 ## 3. `ObjectStore` Interface
 
@@ -304,7 +349,8 @@ Header/footer encoding rules:
 - API-level `Checksum.value` for CRC32C uses lowercase 8-character hexadecimal text；
 - every variable-length section is encoded as `SectionHeader + payload`, and `sectionChecksum` covers only
   that section payload with canonical deterministic bytes；
-- `headerChecksum` is CRC32C over the encoded common header with `headerChecksum` bytes set to zero；
+- `headerChecksum` is CRC32C over the encoded common header with both `headerChecksum` and
+  `objectChecksum` bytes set to zero；
 - `objectChecksum` is CRC32C over the entire encoded object with the `objectChecksum` bytes in the common
   header set to zero；
 - `storageChecksum` is a separate CRC32C over the exact bytes passed to `putObject`, including the
@@ -486,7 +532,8 @@ public record WalWriteOptions(
 
 `WalWriteOptions` validation:
 
-- `compression == CompressionType.NONE` in Phase 1；
+- `compression` is non-null. Phase 1 writer accepts only `CompressionType.NONE` and rejects
+  `CompressionType.ZSTD` with `UNSUPPORTED_FORMAT` before object upload；
 - `targetObjectSizeBytes > 0`；
 - `maxObjectBytes > 0`；
 - `targetObjectSizeBytes <= maxObjectBytes`；
@@ -624,10 +671,12 @@ checksums can reduce read amplification without weakening corruption detection.
 Phase 1 can perform one range read per resolved object range. Coalescing adjacent ranges is an optimization.
 
 Full-slice read amplification is an accepted Phase 1 compromise, not a license for unbounded allocation.
-`WalObjectReader` must be called through a core read path that reserves memory for the full checksum domain:
+`WalObjectReader` must reserve memory for the full checksum domain:
 `ResolvedObjectRange.objectLength` plus the referenced entry-index byte length, using checked addition,
-before the first `ObjectStore.readRange` starts. The object-store module should keep the reader API
-neutral, but the default reader implementation must:
+before the first `ObjectStore.readRange` starts. In M3, `DefaultWalObjectReader` accepts an injected
+`ReadResourceGuard`; M5 core will bind that guard to `StreamStorageConfig.maxConcurrentObjectReads` and
+`maxReadBufferBytes`. The object-store module keeps the reader API neutral, but the default reader
+implementation must:
 
 - reject negative or overflowing resolved range lengths before allocation；
 - rely on the core read resource guard, or an equivalent injected guard, to fail with
@@ -639,8 +688,9 @@ neutral, but the default reader implementation must:
 - never claim a clipped subrange is independently checksum-verified unless a future block-level checksum
   format exists。
 
-Read amplification metrics are owned by `nereus-core` metrics, but the reader must surface enough byte
-counts to emit:
+Read amplification metrics are owned by `nereus-core` metrics, but the M3 reader already exposes
+`WalReadObserver.onSliceRead(fullSlicePayloadBytes, entryIndexBytes, returnedPayloadBytes)` so core can
+emit:
 
 ```text
 fullSliceAndIndexBytesDownloaded

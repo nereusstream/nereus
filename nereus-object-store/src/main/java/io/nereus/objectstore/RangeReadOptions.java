@@ -12,14 +12,21 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore;
 
-dependencies {
-    api(project(":nereus-api"))
+import io.nereus.api.Checksum;
+import java.time.Duration;
+import java.util.Objects;
+import java.util.Optional;
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+public record RangeReadOptions(
+        Optional<Checksum> expectedChecksum,
+        Duration timeout) {
+    public RangeReadOptions {
+        expectedChecksum = Objects.requireNonNull(expectedChecksum, "expectedChecksum");
+        Objects.requireNonNull(timeout, "timeout");
+        if (timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException("timeout must be positive");
+        }
+    }
 }

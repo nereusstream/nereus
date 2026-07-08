@@ -76,10 +76,10 @@ M0 scaffold status before coding state machines:
 - done: M1 `AppendResult` requires positive visible counts, so an append success result cannot represent
   an empty range；
 - done: `./gradlew :nereus-api:test`, `./gradlew phase1Check`, and `./gradlew check` pass after M1.
-- in progress: M2 foundation adds `OxiaMetadataStore`, `OxiaKeyspace`, metadata records, codec
-  envelope/registry scaffolding plus `Phase1MetadataCodecs`, and a test-fixture `FakeOxiaMetadataStore` that uses stream-head
-  single-key CAS rather than multi-key atomic commit；
-- in progress: M2 fake store tests cover deterministic create-or-get, append session renew,
+- done: M2 foundation adds `OxiaMetadataStore`, `OxiaKeyspace`, metadata records, codec
+  envelope/registry scaffolding plus `Phase1MetadataCodecs`, and a test-fixture `FakeOxiaMetadataStore`
+  that uses stream-head single-key CAS rather than multi-key atomic commit；
+- done: M2 fake store tests cover deterministic create-or-get, append session renew,
   `commitStreamSlice`, derived-index materialization, failure after head CAS before derived-index
   materialization, repair recovery, object-reference repair, watch drop/duplicate/stale/collapsed/
   reconnect events, fixed-width offset scan ordering, offset conflict classification, canonical commit
@@ -89,7 +89,30 @@ M0 scaffold status before coding state machines:
 - done: M2 codec/validation pass added entry-index decoded shape validation, strict UTF-8 metadata decode,
   per-record codec round-trip/error-path/golden-byte tests, and deterministic map-order coverage；
 - done: M2 fake store persists stored metadata values as encoded envelopes through `Phase1MetadataCodecs`；
-- not done: M2 full exit still requires broader linearizability tests.
+- done: M2 linearizability test matrix covers deterministic compatible head-version interleavings
+  (renew/trim), bounded repair retry progress after budget exhaustion, commitVersion cross-record
+  equality, stale-epoch fencing priority over an also-present offset conflict, and commit-log retry；
+- M2 is complete; the final M2 gate run passed `./gradlew :nereus-metadata-oxia:test`,
+  `./gradlew phase1Check`, and `./gradlew check`.
+- done: M3 adds the production `ObjectStore` API, local test-fixture object store, WAL write/read records,
+  CRC32C helper, WAL binary layout encoder/decoder, `DefaultWalObjectWriter`, and
+  `DefaultWalObjectReader`；
+- done: M3 WAL writer computes final encoded object length before upload, treats `maxObjectBytes` as the
+  hard bound, propagates `uploadTimeout`, separates WAL canonical checksum from storage checksum, and
+  returns neutral descriptors without importing Oxia metadata records；
+- done: M3 WAL reader supports only `MULTI_STREAM_WAL_OBJECT` + `OPAQUE_RECORD_BATCH` +
+  `OBJECT_FOOTER`, reserves full slice-plus-index bytes before object IO, verifies slice/index checksums,
+  clips after verification, and reports amplification byte counts through `WalReadObserver`；
+- done: M3 tests cover one-slice and multi-slice round trips, force-single-stream validation before
+  upload, sizing failure before upload, checksum corruption, entry-index golden bytes, read-resource
+  rejection before object IO, checksum-consistent invalid WAL/index metadata, basic local path traversal
+  rejection, duplicate `ifAbsent`, and test-only cleanup.
+- done: M3 review-found blockers were fixed: multi-range read byte-budget classification now stops after
+  previously returned data instead of returning `READ_LIMIT_TOO_SMALL`, and local-store final/parent
+  symlink escape is rejected before put/read/head.
+- pending final gate rerun: M3 baseline gates passed `./gradlew :nereus-object-store:test`,
+  `./gradlew phase1Check`, and `./gradlew check`; after the blocker fix pass, Gradle rerun is still
+  required before M4 starts.
 
 ## 3. Stop-The-Line Conditions
 
@@ -121,9 +144,13 @@ Stop implementation and update design first if any of these are discovered:
 - Backpressure cannot release in-flight count or buffered-byte reservations on every terminal path.
 - Full-slice read cannot be guarded by read permits and byte reservations before object IO starts.
 - Read amplification cannot be measured as full-slice bytes versus returned payload bytes.
+- `WalObjectReader` would return `READ_LIMIT_TOO_SMALL` after at least one prior batch was already selected
+  in the same read call. That error is reserved for the first readable positive entry when no record has
+  been returned.
 - WAL binary object/section encoding would use Java enum ordinal instead of fixed durable ids.
 - Writer needs a non-`OPAQUE_RECORD_BATCH` payload format, `CompressionType.ZSTD`, `INLINE`, or
   `INDEX_OBJECT` before their contracts are designed.
+- Local object-store fixture can read, head, or write through a symlink that escapes the injected root.
 - A Phase 1 module needs Pulsar, BookKeeper, Kafka, or KoP classes.
 - Object deletion appears necessary for a Phase 1 correctness test.
 - `WalObjectWriter`, reader, or manifest code becomes single-stream-only because the initial core planner

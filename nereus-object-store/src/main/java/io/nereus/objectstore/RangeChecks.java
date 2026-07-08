@@ -12,14 +12,20 @@
  * limitations under the License.
  */
 
-plugins {
-    `java-test-fixtures`
-}
+package io.nereus.objectstore;
 
-dependencies {
-    api(project(":nereus-api"))
+public final class RangeChecks {
+    private RangeChecks() {
+    }
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+    public static void requireNonNegativeNonOverflowingRange(long offset, long length, String label) {
+        if (offset < 0 || length < 0) {
+            throw new IllegalArgumentException(label + " offset and length must be non-negative");
+        }
+        try {
+            Math.addExact(offset, length);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException(label + " offset + length must not overflow", e);
+        }
+    }
 }

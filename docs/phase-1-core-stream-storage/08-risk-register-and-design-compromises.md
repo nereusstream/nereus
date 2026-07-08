@@ -69,7 +69,8 @@ Residual risks introduced by this mitigation:
 
 ## 2. Read Amplification From Full-Slice Verification
 
-Status: accepted Phase 1 compromise with hard resource guards.
+Status: accepted Phase 1 compromise with hard resource guards; M3 object reader has the guard hook, and
+the review-found byte-budget clipping bug has been fixed pending final gate rerun.
 
 Phase 1 read 为了校验 slice checksum，必须读取完整 resolved slice payload 和 entry index 后再按
 `startOffset`、`maxRecords`、`maxBytes` clip。这样能保证返回的 clipped bytes 来自一个完整校验过
@@ -77,14 +78,18 @@ Phase 1 read 为了校验 slice checksum，必须读取完整 resolved slice pay
 
 实现契约：
 
-- `WalObjectReader` 不允许无界分配完整 slice buffer；
+- M3 `DefaultWalObjectReader` 不允许无界分配完整 slice buffer；它在读取 payload/index 前调用
+  injected `ReadResourceGuard.reserve(objectLength + entryIndexLength)`；
+- done: reader now treats a later positive entry that exceeds remaining `maxBytes` after earlier records
+  were returned as a normal stop, not `READ_LIMIT_TOO_SMALL`；
 - `DefaultStreamStorage` 必须配置 `maxConcurrentObjectReads` 和 `maxReadBufferBytes`；
 - 每个 resolved range read 前按 `ResolvedObjectRange.objectLength + entryIndexLength` 的 checked sum
   预留 read buffer bytes；
 - 预留失败时返回 retriable `BACKPRESSURE_REJECTED`，不启动 object range read；
 - `maxObjectBytes <= maxReadBufferBytes` 是 Phase 1 full-slice reader 的启动校验；
 - reader 必须在 success、decode failure、checksum failure、cancel、timeout、close 所有终态释放预留；
-- read amplification metrics 必须区分 slice payload/index bytes downloaded 和 payload bytes returned。
+- M3 `WalReadObserver` 已暴露 slice payload bytes、entry-index bytes 和 returned payload bytes；
+- M5 core read metrics 必须把这些 byte counts 接到正式指标，并保留 backpressure rejection 计数。
 
 观测指标：
 
@@ -126,7 +131,8 @@ after stream-head CAS sent、after head CAS before materialization confirmed、a
 
 ## 4. No GC And Object Deletion In Phase 1
 
-Status: accepted correctness boundary, local test cleanup required.
+Status: accepted correctness boundary; M3 local test cleanup exists, and symlink escape handling has been
+fixed pending final gate rerun.
 
 Phase 1 `trim` 只推进 low-watermark，不删除 offset index，也不删除 object bytes。Upload 后 manifest
 失败、commit 失败、process crash、caller timeout 都可能留下 orphan WAL objects。
@@ -137,8 +143,10 @@ Phase 1 `trim` 只推进 low-watermark，不删除 offset index，也不删除 o
 - read/recovery correctness 不依赖 object list；
 - `ObjectReferenceRecord` 和 manifest state 只是审计/未来 GC 输入；
 - orphan scanner 可以用于诊断或测试断言，但不能让 committed read 依赖 list 结果；
-- `LocalFileObjectStore` 测试实现必须支持隔离 root 下的 test-only cleanup helper，例如
-  `deleteAllForTesting()` 或 fixture-level `cleanupRoot()`；
+- M3 `LocalFileObjectStore` 测试实现支持隔离 root 下的 test-only cleanup helper:
+  `deleteAllForTesting()`；
+- done: final symlink targets and symlink parents are rejected before `putObject`/`readRange`/`headObject`
+  can follow them outside the injected root；
 - cleanup helper 必须只在 testing package 暴露，并且拒绝清理注入 root 之外的路径。
 
 本地/CI 风险：长时间跑 append/timeout/orphan 测试会快速堆积 WAL files。测试必须为每个 test class
@@ -146,7 +154,8 @@ Phase 1 `trim` 只推进 low-watermark，不删除 offset index，也不删除 o
 
 ## 5. Strategy Versus Mechanism For Single-Stream Objects
 
-Status: accepted implementation simplification, not a WAL format limitation.
+Status: accepted implementation simplification, not a WAL format limitation; M3 writer mechanism supports
+multi-slice/multi-stream.
 
 Phase 1 core planner 可以先设置 `forceSingleStreamObject=true`，即一个 WAL object 只承载一个 stream
 的 append work item。这能降低 append coordinator、manifest commit loop 和 failure classification
@@ -154,10 +163,13 @@ Phase 1 core planner 可以先设置 `forceSingleStreamObject=true`，即一个 
 
 机制层契约：
 
-- `WalObjectWriter` 必须从第一版支持多个 `WalStreamSliceInput`；
+- M3 `DefaultWalObjectWriter` 已从第一版支持多个 `WalStreamSliceInput`，并按
+  `streamId.value()` 确定性排序编码；
 - WAL header、slice directory、entry index、manifest slice list 都必须按 multi-slice 编码；
-- `forceSingleStreamObject=true` 只能做 validation，不能让 writer split/rewrite request；
-- `forceSingleStreamObject=false` 的 direct writer tests 必须覆盖 multi-stream/multi-slice object；
+- `forceSingleStreamObject=true` 只能做 validation，不能让 writer split/rewrite request；M3 已在
+  pre-upload guard 中覆盖；
+- `forceSingleStreamObject=false` 的 direct writer tests 必须覆盖 multi-stream/multi-slice object；M3
+  已覆盖 direct writer multi-slice round trip；
 - `DefaultStreamStorage` 初期使用单 stream object 是 planner 策略，后续可在不改 WAL format 的前提下
   改成 cross-stream batching。
 
