@@ -86,13 +86,17 @@ public record StreamCreateOptions(
 }
 ```
 
-Phase 1 accepts only `StorageProfile.OBJECT_WAL`.
+Phase 1 implementation starts from the legacy `StorageProfile.OBJECT_WAL` / `OBJECT_WAL_SYNC_OBJECT`
+path, but the public enum reserves BookKeeper/Object WAL and sync/async object materialization profiles so
+topic-level policy can be added without renaming the API.
 `attributes` are opaque stream-level metadata stored in `StreamMetadataRecord` and returned by
 `getStreamMetadata`. They are not used for partitioning, visibility, or object keys.
 
 Validation:
 
-- `profile == StorageProfile.OBJECT_WAL` in Phase 1；
+- `StorageProfile.OBJECT_WAL` is a compatibility alias for `OBJECT_WAL_SYNC_OBJECT`；
+- M4 core append may initially reject profiles whose primary WAL reader/writer is not implemented, but
+  API value construction must not bake in a single profile；
 - attribute keys and values must be non-null UTF-8 strings；
 - Phase 1 enforces `MAX_STREAM_ATTRIBUTES_ENCODED_BYTES = 16 KiB` for the total encoded map size because
   attributes live in metadata values；
@@ -301,12 +305,33 @@ public enum StreamState {
 }
 
 public enum StorageProfile {
-    OBJECT_WAL
+    OBJECT_WAL,
+    BOOKKEEPER_WAL_ONLY,
+    BOOKKEEPER_WAL_SYNC_OBJECT,
+    BOOKKEEPER_WAL_ASYNC_OBJECT,
+    OBJECT_WAL_SYNC_OBJECT,
+    OBJECT_WAL_ASYNC_OBJECT
 }
 ```
 
-Phase 1 only implements `OBJECT_WAL`. BookKeeper WAL is a boundary in the design docs, not part of this
-implementation slice.
+`OBJECT_WAL` is the legacy Phase 1 name and should canonicalize to `OBJECT_WAL_SYNC_OBJECT`.
+BookKeeper WAL and AutoMQ-like async object materialization are design/API boundaries until their
+concrete writers, readers, and materializers are implemented.
+
+Helper methods in `StorageProfile` define the shared branch point for later core implementations:
+
+```java
+StorageProfile canonical();
+boolean usesBookKeeperWal();
+boolean usesObjectWal();
+boolean objectMaterializationEnabled();
+boolean syncObjectMaterialization();
+boolean asyncObjectMaterialization();
+DurabilityLevel defaultDurabilityLevel();
+```
+
+`defaultDurabilityLevel()` returns `WAL_DURABLE_AND_INDEX_COMMITTED` for sync object materialization
+profiles and `WAL_DURABLE` for async or WAL-only profiles.
 
 Phase 1 state behavior:
 
@@ -432,9 +457,14 @@ have non-null UTF-8 keys/values and should stay small enough for in-memory loggi
 
 ```java
 public enum DurabilityLevel {
+    WAL_DURABLE,
     WAL_DURABLE_AND_INDEX_COMMITTED
 }
 ```
+
+`WAL_DURABLE_AND_INDEX_COMMITTED` is the Ursa-like Phase 1 default. `WAL_DURABLE` is reserved for
+AutoMQ-like fast-ack profiles and still requires a stable stream offset/protocol projection before
+returning success.
 
 ### `AppendSession`
 

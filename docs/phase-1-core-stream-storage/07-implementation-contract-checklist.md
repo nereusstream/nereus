@@ -9,7 +9,7 @@
 | --- | --- | --- |
 | Stream lifecycle | exact opaque `StreamName`, deterministic full-hash `StreamId`, create-or-get as `ACTIVE`, read/trim `SEALED` | public seal/delete API, parsing Pulsar topic syntax in L0 |
 | Durable key helpers | `nereus-api` shared key/hash helpers used by metadata and object modules; `.`/`..` are encoded; writer run id has at least 128 bits entropy | duplicate local key encoders, raw cluster in paths, truncated hashes without migration plan |
-| Storage profile | `OBJECT_WAL` | BookKeeper/local WAL profiles |
+| Storage profile | API names and helpers for BK/Object WAL and sync/async object materialization; Phase 1 core starts with `OBJECT_WAL` / `OBJECT_WAL_SYNC_OBJECT`; metadata stores canonical profile names | BookKeeper/local WAL execution before concrete writer/reader support |
 | Payload | `OPAQUE_RECORD_BATCH`, one record per entry, one read batch per opaque entry | non-opaque public append, opaque entry with `recordCount > 1`, concatenating opaque entries |
 | Zero-byte records | empty payload consumes one offset and can be returned after byte budget is exactly consumed | read loops that advance only by payload bytes or stop solely on `remainingBytes == 0` |
 | Projection | public append returns empty `ProjectionRef` | non-empty public `projectionHints` without a durable mapping |

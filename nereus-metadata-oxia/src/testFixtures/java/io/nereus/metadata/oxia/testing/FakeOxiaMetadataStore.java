@@ -228,7 +228,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
                     streamName.value(),
                     DeterministicIds.streamNameHash(streamName),
                     StreamState.ACTIVE.name(),
-                    options.profile().name(),
+                    options.profile().canonical().name(),
                     options.attributes(),
                     now,
                     0,

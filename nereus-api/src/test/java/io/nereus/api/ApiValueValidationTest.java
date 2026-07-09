@@ -74,6 +74,7 @@ class ApiValueValidationTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     void metadataMapsRejectNullsAndEncodedSizeOverflow() {
         HashMap<String, String> nullKey = new HashMap<>();
@@ -307,6 +308,32 @@ class ApiValueValidationTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new TrimOptions(Duration.ZERO, "test"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void storageProfileHelpersDescribeWalAndObjectMaterializationMode() {
+        assertThat(StorageProfile.OBJECT_WAL.canonical()).isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.usesBookKeeperWal()).isTrue();
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.objectMaterializationEnabled()).isFalse();
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ONLY.defaultDurabilityLevel())
+                .isEqualTo(DurabilityLevel.WAL_DURABLE);
+        assertThat(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT.syncObjectMaterialization()).isTrue();
+        assertThat(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT.defaultDurabilityLevel())
+                .isEqualTo(DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED);
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.asyncObjectMaterialization()).isTrue();
+        assertThat(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.defaultDurabilityLevel())
+                .isEqualTo(DurabilityLevel.WAL_DURABLE);
+        assertThat(StorageProfile.OBJECT_WAL_ASYNC_OBJECT.usesObjectWal()).isTrue();
+
+        AppendOptions fastAck = new AppendOptions(
+                Optional.empty(),
+                DurabilityLevel.WAL_DURABLE,
+                Duration.ofSeconds(1),
+                true,
+                Map.of());
+
+        assertThat(fastAck.durabilityLevel()).isEqualTo(DurabilityLevel.WAL_DURABLE);
     }
 
     @Test

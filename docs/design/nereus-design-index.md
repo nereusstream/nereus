@@ -5,7 +5,9 @@
 
 ## 1. Product Definition
 
-Nereus 是一个对标 Ursa 架构范式的 Pulsar-native shared-storage streaming engine：
+Nereus 是一个 Pulsar-native shared-storage streaming engine。当前主线以 Ursa-like
+强一致元数据提交为基础，同时保留 AutoMQ-like 异步对象化 profile，让用户按 topic/partition
+选择延迟、成本和对象存储语义：
 
 ```text
 Pulsar native protocol
@@ -34,6 +36,8 @@ transaction visibility、retention、compaction 和 lakehouse snapshot 都必须
 
 - north-star architecture；
 - Ursa parity matrix；
+- AutoMQ-like async object materialization matrix；
+- topic-level storage profile matrix；
 - Pulsar-native enhancement matrix；
 - L0-L4 layer boundary；
 - metadata ownership；
@@ -59,9 +63,10 @@ transaction visibility、retention、compaction 和 lakehouse snapshot 都必须
 
 | Doc | Role | Stage |
 | --- | --- | --- |
-| `nereus-overall-architecture.md` | Nereus north-star architecture and Ursa parity | current |
-| `nereus-futures.md` | Future split and module boundaries | current |
+| `nereus-overall-architecture.md` | Nereus north-star architecture, Ursa-like / AutoMQ-like profiles | current |
+| `nereus-futures.md` | Future split, module boundaries, and profile-aware gates | current |
 | `nereus-terminology.md` | Shared vocabulary and banned ambiguity | current |
+| `../automq-like-stream-storage/README.md` | AutoMQ-like async object materialization profile and implementation split | current design draft |
 | `nereus-future1-core-stream-storage.md` | Future 1 L0 Core StreamStorage + Object WAL design | current future design |
 | `nereus-future2-managed-ledger-facade.md` | Future 2 Pulsar ManagedLedger facade design | current future design |
 | `nereus-future3-cursor-subscription.md` | Future 3 cursor/subscription durable progress design | current future design |
@@ -96,14 +101,15 @@ They should be reintroduced after the relevant future design has been reviewed a
 2. Read `nereus-terminology.md` before writing or reviewing future docs.
 3. Read `nereus-futures.md` to understand module boundaries.
 4. Read `nereus-future1-core-stream-storage.md` for Future 1 L0 details.
-5. Read `nereus-future2-managed-ledger-facade.md` for Future 2 Pulsar facade details.
-6. Read `nereus-future3-cursor-subscription.md` for Future 3 cursor/subscription details.
-7. Read `nereus-future4-compaction-generation.md` for Future 4 compaction details.
-8. Read `nereus-future5-kop-compatibility.md` for Future 5 Kafka compatibility details.
-9. Read `nereus-future6-lakehouse-sbt-sdt.md` for Future 6 lakehouse details.
-10. Read `nereus-future7-routing-brownout-elasticity.md` for Future 7 elasticity details.
-11. Read `nereus-future8-advanced-pulsar-semantics.md` for Future 8 Pulsar-native details.
-12. Defer validation and benchmark docs until a future explicitly enters verification.
+5. Read `../automq-like-stream-storage/README.md` for async object materialization details.
+6. Read `nereus-future2-managed-ledger-facade.md` for Future 2 Pulsar facade details.
+7. Read `nereus-future3-cursor-subscription.md` for Future 3 cursor/subscription details.
+8. Read `nereus-future4-compaction-generation.md` for Future 4 compaction details.
+9. Read `nereus-future5-kop-compatibility.md` for Future 5 Kafka compatibility details.
+10. Read `nereus-future6-lakehouse-sbt-sdt.md` for Future 6 lakehouse details.
+11. Read `nereus-future7-routing-brownout-elasticity.md` for Future 7 elasticity details.
+12. Read `nereus-future8-advanced-pulsar-semantics.md` for Future 8 Pulsar-native details.
+13. Defer validation and benchmark docs until a future explicitly enters verification.
 
 ## 6. Future Doc Rule
 

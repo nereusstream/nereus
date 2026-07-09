@@ -31,6 +31,8 @@ Future 1 覆盖：
 - fencing token；
 - object WAL writer；
 - BookKeeper WAL profile boundary；
+- topic/stream-level storage profile boundary；
+- AutoMQ-like async object materialization boundary；
 - object manifest；
 - Oxia commit-time offset assignment；
 - Oxia offset index；
@@ -205,7 +207,7 @@ final visible offset。
   "streamId": "s-123",
   "topic": "persistent://tenant/ns/topic-partition-0",
   "state": "ACTIVE",
-  "profile": "OBJECT_WAL",
+  "profile": "OBJECT_WAL_SYNC_OBJECT",
   "createdAt": 1783036800000,
   "policyVersion": 9,
   "schemaNamespaceRef": "schema://tenant/ns/topic",
@@ -449,13 +451,15 @@ commit lakehouse catalog metadata and does not put catalog operations on the pro
 1. `streamId + offset` is the only internal ordering coordinate.
 2. Oxia is the offset and visibility authority.
 3. Object store stores bytes, not truth.
-4. Producer ack happens only after WAL durable and Oxia offset index commit.
-5. Offset ranges must be dense per stream.
-6. Multi-stream object visibility is per stream slice.
-7. Broker local state is cache only.
-8. Object list is never used for correctness.
-9. Read resolver always starts from Oxia offset index or a validated cache of it.
-10. L0 does not depend on Pulsar subscription or Kafka group semantics.
+4. Ursa-like producer ack happens only after WAL durable and Oxia offset index commit.
+5. AutoMQ-like producer ack may complete at `WAL_DURABLE`, but only after stable offset/projection is
+   recoverable; read-optimized object materialization is background work.
+6. Offset ranges must be dense per stream.
+7. Multi-stream object visibility is per stream slice.
+8. Broker local state is cache only.
+9. Object list is never used for correctness.
+10. Read resolver always starts from Oxia offset index or a validated cache of it.
+11. L0 does not depend on Pulsar subscription or Kafka group semantics.
 
 ## 14. Future Gate
 

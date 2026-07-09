@@ -9,7 +9,8 @@
 
 Nereus 的目标架构一步到位，对标 Ursa 的 Oxia 控制面、共享对象数据面、
 stateless/leaderless broker、offset index、multi-stream WAL object、compaction 和
-lakehouse-native stream-table duality。
+lakehouse-native stream-table duality，同时保留 AutoMQ-like async object materialization
+profile。
 
 Future 拆分不是产品阶段缩水，而是把完整目标架构切成可设计、可评审、可实现的模块：
 
@@ -28,14 +29,23 @@ streamId + offset
 Pulsar `MessageId`、ManagedLedger `Position`、Kafka offset、cursor progress、lakehouse
 snapshot 都是这个内部坐标的外部投影或衍生状态。
 
+每个 future 都必须把 storage profile 当成横切维度处理：
+
+- Ursa-like sync profile：append 等待 primary WAL durable + visible/read index commit；
+- AutoMQ-like async profile：append 不等待读优化对象发布，但必须返回稳定 offset/projection；
+- BK-only profile：Nereus 不接管对象化，但仍必须保持同一 facade、cursor、routing 和 protocol
+  projection；
+- future 文档不能默认只有 `OBJECT_WAL_SYNC_OBJECT`，除非该 future 明确说明其他 profile 的
+  fallback、defer 或 rejection 行为。
+
 ## 2. Future 1：Core StreamStorage + Object WAL
 
 Detailed design: `pip/Nereus/nereus-future1-core-stream-storage.md`.
 
 ### Motivation
 
-建立 Nereus 的 Ursa-parity 核心：stream offset、object WAL、Oxia offset index、
-commit-time offset assignment 和 read resolver。
+建立 Nereus 的共享 L0 核心：stream offset、primary WAL、Oxia offset/read index、
+commit-time offset assignment、read resolver，以及 Ursa-like / AutoMQ-like profile branch。
 
 ### Scope
 
@@ -43,6 +53,8 @@ commit-time offset assignment 和 read resolver。
 - stream metadata；
 - append session；
 - object WAL writer；
+- BookKeeper WAL boundary；
+- storage profile metadata；
 - object manifest；
 - Oxia offset index；
 - commit-time offset assignment；
@@ -62,6 +74,7 @@ commit-time offset assignment 和 read resolver。
 Future 1 的设计必须能完整解释：
 
 - producer ack 线性化点；
+- `StorageProfile.defaultDurabilityLevel()` 如何映射 Ursa-like、AutoMQ-like 和 BK-only；
 - object upload 与 Oxia offset index commit 的顺序；
 - multi-stream WAL object 的 partial slice visibility；
 - stale epoch fencing；
@@ -102,6 +115,7 @@ Future 2 的设计必须能完整解释：
 - MessageId 如何稳定映射回 `streamId + offset`；
 - topic unload/reload 后如何恢复读写；
 - BookKeeper WAL profile 和 Object WAL profile 如何共用同一 facade。
+- sync profile 和 async profile 下 MessageId/Position 何时稳定返回。
 
 ## 4. Future 3：Cursor / Subscription State
 
@@ -149,8 +163,9 @@ Related design basis: `pip/Nereus/nereus-storage-object-format.md` and
 
 ### Motivation
 
-让 multi-stream WAL object 转换为 per-stream read-optimized object，并通过 Oxia
-generation replacement 原子切换读路径。
+让 primary WAL ranges 转换为 per-stream read-optimized object，并通过 Oxia generation
+replacement 原子切换读路径。对 AutoMQ-like profile，这也是 append ack 之后的核心
+object materialization worker。
 
 ### Scope
 
@@ -161,6 +176,7 @@ generation replacement 原子切换读路径。
 - highest-generation read resolver；
 - old generation fallback；
 - compaction checkpoint；
+- async materialization task/checkpoint boundary；
 - GC protection。
 
 ### Non-scope
@@ -178,6 +194,7 @@ Future 4 的设计必须能完整解释：
 - 新 generation 损坏时如何 fallback；
 - active reader/cursor 如何保护旧 objects；
 - topic compaction 如何复用 generation replacement。
+- AutoMQ-like materialization lag 如何保护 primary WAL retention。
 
 ## 6. Future 5：KoP Compatibility
 
@@ -209,7 +226,7 @@ Detailed design: `pip/Nereus/nereus-future5-kop-compatibility.md`.
 
 Future 5 的设计必须能完整解释：
 
-- KoP produce ack 如何使用 Oxia commit result；
+- KoP produce ack 如何使用 selected storage profile 的 append result；
 - record batch base offset 如何在 object WAL 模式下生成或重写；
 - group coordinator failover 后 offset 如何恢复；
 - Kafka transaction visibility 如何映射到 Nereus transaction state；
@@ -252,6 +269,7 @@ Future 6 的设计必须能完整解释：
 - Oxia visible offset 为什么始终是 stream truth；
 - SDT 失败为什么不影响 stream read；
 - Iceberg first、Delta/Hudi optional 的 adapter 边界。
+- AutoMQ-like materialization lag 为什么不能让 lakehouse catalog 领先 stream truth。
 
 ## 8. Future 7：Routing / Brown-out / Elasticity
 
@@ -291,6 +309,7 @@ Future 7 的设计必须能完整解释：
 - routing remap 为什么不需要数据搬迁；
 - client retry 如何与 preferred broker/readmission 配合；
 - Pulsar lookup 和 Kafka MetadataResponse 如何投影同一 routing state。
+- profile-aware routing 如何区分 BK-heavy、object-WAL-heavy 和 materializer-heavy load。
 
 ## 9. Future 8：Advanced Pulsar Semantics
 

@@ -3,6 +3,8 @@
 > 本文定义 Nereus L3 compaction 和 generation replacement 设计。Future 4 的核心目标是
 > 把 multi-stream WAL object 转换为 per-stream read-optimized object，并通过 Oxia offset
 > index 的 generation overlay 原子切换读路径。Compaction 不改变 `streamId + offset`。
+> 对 AutoMQ-like profile，Future 4 的 worker 也是 append ack 之后的 async object
+> materialization 路径。
 
 ## 1. Motivation
 
@@ -16,6 +18,7 @@ Future 4 引入 compaction service：
 - 将多个小 offset index entries 合并为更大的 read-optimized range；
 - 对同一个 offset range 发布更高 generation；
 - 让 reader 在不中断、不改变 offset 的情况下切换到新 object；
+- 为 AutoMQ-like profile 消费 primary WAL ranges 并后台发布 read-optimized object；
 - 为 Future 6 的 SBT/SDT 和 Future 8 的 topic compaction 提供底层 primitive。
 
 ## 2. Scope
@@ -31,6 +34,7 @@ Future 4 覆盖：
 - old generation fallback；
 - topic compaction primitive；
 - compaction checkpoint；
+- materialization lag checkpoint；
 - GC protection and object reference rules。
 
 ## 3. Non-scope
@@ -75,6 +79,7 @@ Future 4 不能做：
 
 - 改变 stream offset；
 - 改变 `committedEndOffset`；
+- 改变 producer ack 已经返回的 protocol projection；
 - 让 object list 决定可见性；
 - 删除仍被 cursor、reader、catalog 或 task 引用的 object；
 - 让 lakehouse catalog commit 进入 producer ack path。
@@ -338,6 +343,7 @@ Future 4 design is ready to move into implementation planning when the following
 - fallback and checksum behavior；
 - topic compaction primitive；
 - old generation reference and GC protection；
+- AutoMQ-like materialization lag and primary WAL retention protection；
 - interactions with Future 3 cursor low-watermark and Future 6 catalog snapshots。
 
 This is a design gate. It does not require benchmark, chaos, compatibility certification, CI, or

@@ -61,6 +61,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 class FakeOxiaMetadataStoreTest {
     private static final String CLUSTER = "cluster";
     private static final String WRITER_ID = "writer";
@@ -84,6 +85,21 @@ class FakeOxiaMetadataStoreTest {
         assertThat(loaded.streamId()).isEqualTo(created.streamId());
         assertThat(loaded.streamName()).isEqualTo(streamName.value());
         assertThat(loaded.streamNameHash()).isEqualTo(DeterministicIds.streamNameHash(streamName));
+        assertThat(created.profile()).isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT.name());
+        assertThat(loaded.profile()).isEqualTo(StorageProfile.OBJECT_WAL_SYNC_OBJECT.name());
+    }
+
+    @Test
+    void createOrGetStreamPersistsProfileSelectionForNewProfiles() {
+        StreamName streamName = new StreamName("tenant/ns/async-topic");
+
+        StreamMetadataRecord created = store.createOrGetStream(
+                CLUSTER,
+                streamName,
+                new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Map.of("alias", "topic")))
+                .join();
+
+        assertThat(created.profile()).isEqualTo(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.name());
     }
 
     @Test

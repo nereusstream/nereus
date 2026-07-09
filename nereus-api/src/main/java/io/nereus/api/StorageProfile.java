@@ -14,7 +14,60 @@
 
 package io.nereus.api;
 
-/** Physical storage profile for an L0 stream. */
+/** Physical storage and object-materialization profile for an L0 stream. */
 public enum StorageProfile {
-    OBJECT_WAL
+    /**
+     * Legacy Phase 1 object-WAL profile name.
+     *
+     * <p>New code should prefer {@link #OBJECT_WAL_SYNC_OBJECT}.
+     */
+    @Deprecated
+    OBJECT_WAL,
+
+    /** BookKeeper is the only durable WAL; remote object materialization is disabled. */
+    BOOKKEEPER_WAL_ONLY,
+
+    /** BookKeeper is the WAL and object-backed visibility/materialization is completed on the append path. */
+    BOOKKEEPER_WAL_SYNC_OBJECT,
+
+    /** BookKeeper is the WAL and object-backed materialization is completed by background workers. */
+    BOOKKEEPER_WAL_ASYNC_OBJECT,
+
+    /** Object storage is the WAL and object-backed visibility/materialization is completed on the append path. */
+    OBJECT_WAL_SYNC_OBJECT,
+
+    /** Object storage is the WAL and read-optimized object materialization is completed by background workers. */
+    OBJECT_WAL_ASYNC_OBJECT;
+
+    public StorageProfile canonical() {
+        return this == OBJECT_WAL ? OBJECT_WAL_SYNC_OBJECT : this;
+    }
+
+    public boolean usesBookKeeperWal() {
+        return canonical() == BOOKKEEPER_WAL_ONLY
+                || canonical() == BOOKKEEPER_WAL_SYNC_OBJECT
+                || canonical() == BOOKKEEPER_WAL_ASYNC_OBJECT;
+    }
+
+    public boolean usesObjectWal() {
+        return canonical() == OBJECT_WAL_SYNC_OBJECT || canonical() == OBJECT_WAL_ASYNC_OBJECT;
+    }
+
+    public boolean objectMaterializationEnabled() {
+        return canonical() != BOOKKEEPER_WAL_ONLY;
+    }
+
+    public boolean syncObjectMaterialization() {
+        return objectMaterializationEnabled() && !asyncObjectMaterialization();
+    }
+
+    public boolean asyncObjectMaterialization() {
+        return canonical() == BOOKKEEPER_WAL_ASYNC_OBJECT || canonical() == OBJECT_WAL_ASYNC_OBJECT;
+    }
+
+    public DurabilityLevel defaultDurabilityLevel() {
+        return syncObjectMaterialization()
+                ? DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED
+                : DurabilityLevel.WAL_DURABLE;
+    }
 }

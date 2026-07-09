@@ -23,6 +23,7 @@ ManagedLedger facade 的前提下，先独立实现 L0 Core StreamStorage：
 - `docs/design/nereus-overall-architecture.md`
 - `docs/design/nereus-commit-protocol.md`
 - `docs/design/nereus-storage-object-format.md`
+- `docs/automq-like-stream-storage/README.md`
 - `docs/phase0/repository-plan.md`
 
 Phase 1 继承这些不变量：
@@ -31,8 +32,9 @@ Phase 1 继承这些不变量：
 2. Oxia 是 offset、visibility、fencing 的 authority；其中 stream head/commit-log 是 append
    线性化 truth，offset index 是读路径使用的物化索引。
 3. Object store 只存 bytes，不决定可见性。
-4. Producer ack 只能发生在 WAL bytes durable、stream-head CAS 成功且本 slice 的 offset index
-   物化确认之后。
+4. Phase 1 默认 producer ack 发生在 WAL bytes durable、stream-head CAS 成功且本 slice 的 offset
+   index 物化确认之后；AutoMQ-like profile 会把 read-optimized object materialization 移到后台，
+   但不能返回不稳定的 broker-local offset。
 5. 每个 stream 的可见 offset range 必须 dense。
 6. Multi-stream WAL object 的可见性按 stream slice 独立提交。
 7. Broker 或调用方本地状态只能是 cache，不能是 durable truth。
@@ -60,6 +62,10 @@ M0 scaffold migration 已完成。当前代码状态：
   已移除；
 - `AppendResult` 已原地扩展为 Phase 1 result shape；
 - `nereus-api` 已包含 Phase 1 的 protocol-neutral value records、错误模型和共享 key/hash helpers；
+- `StorageProfile` 已预留 BookKeeper/Object WAL 与 sync/async object materialization profiles；
+  `OBJECT_WAL` 是旧 Phase 1 兼容名，等价于 `OBJECT_WAL_SYNC_OBJECT`；
+- `FakeOxiaMetadataStore.createOrGetStream` 已保存 `options.profile().canonical().name()`，后续
+  core implementation 可以从 stream metadata 区分 Ursa-like sync、AutoMQ-like async 和 BK-only profile；
 - `nereus-core` 已通过 Gradle 依赖连接到 `nereus-metadata-oxia` 和 `nereus-object-store`；
 - `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
   出口；

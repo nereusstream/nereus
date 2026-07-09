@@ -671,8 +671,9 @@ Algorithm:
 6. If stream head exists with a different `streamName`, fail with `METADATA_INVARIANT_VIOLATION`
    because this indicates a deterministic id collision or data corruption.
 7. If not found, build `StreamHeadRecord` with deterministic `StreamId`, `state=ACTIVE`,
-   `profile=OBJECT_WAL`, `attributes=options.attributes`, `committedEndOffset=0`, `cumulativeSize=0`,
-   `commitVersion=0`, `trimOffset=0`, empty `lastCommitId`, and empty append session.
+   `profile=options.profile.canonical().name()`, `attributes=options.attributes`,
+   `committedEndOffset=0`, `cumulativeSize=0`, `commitVersion=0`, `trimOffset=0`, empty
+   `lastCommitId`, and empty append session.
 8. `putIfAbsent(/streams/{streamId}/head, StreamHeadRecord)`.
 9. If the conditional put loses a race, re-read the head and validate it as in step 5.
 10. Best-effort write `/streams/by-name/{streamNameHash}` as a derived cache. Failure to write the cache

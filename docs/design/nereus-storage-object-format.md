@@ -19,6 +19,8 @@
 设计目标是对齐 Ursa 的关键能力：一个 WAL object 聚合多个 streams，metadata service
 维护 offset index，compaction 把 row-based WAL objects 转为 per-stream columnar
 objects，并让同一份 object 同时服务 streaming read 和 lakehouse query。
+同一套格式也服务 AutoMQ-like profile：append ack 可以早于 read-optimized object publish，
+但后台 materializer 发布的对象、index generation、SBT/SDT metadata 仍使用本文定义的格式。
 
 ## 2. 不变量
 
@@ -32,6 +34,8 @@ objects，并让同一份 object 同时服务 streaming read 和 lakehouse query
 8. 每个 stream slice 的可见性由自己的 offset index entry 决定。
 9. Pulsar `MessageId` 是 virtual ledger projection，不是内部排序依据。
 10. Compacted object 替换的是 offset index 指向，不改变 stream offset。
+11. AutoMQ-like async materialization 不能引入第二套对象格式或第二套 offset truth；它只改变
+    这些对象何时被后台发布。
 
 ## 3. 编码约定
 
@@ -424,15 +428,22 @@ GC 只能删除满足全部条件的 object：
 5. orphan TTL 到期；
 6. checksum/audit 状态明确。
 
-## 13. 与 Ursa 的对齐状态
+## 13. Ursa-like 与 AutoMQ-like 对齐状态
 
-已对齐：
+Ursa-like sync profile 已对齐：
 
 - multi-stream WAL object；
 - metadata/offset index 驱动读路径；
 - row-based WAL 到 per-stream columnar compacted object；
 - stream-table duality；
 - compaction 替换 index 而不是改写 stream offset。
+
+AutoMQ-like async profile 复用：
+
+- primary WAL object / BK range 到 read-optimized object 的后台 materialization；
+- generation replacement 作为后台发布点；
+- SBT/SDT metadata 作为已 materialized ranges 的 lakehouse 投影；
+- GC 以 published generation、cursor、reader 和 task 引用为准。
 
 增强点：
 

@@ -13,7 +13,12 @@
 | Stream offset | Dense, monotonically increasing record offset assigned at Oxia commit time | L0 |
 | Append session | Oxia-fenced write session for a stream | L0/L4 |
 | Fencing token | Monotonic token checked on visible commit | L0/L4 |
+| BookKeeper WAL | BookKeeper-backed primary WAL used by latency-oriented profiles | L0 |
 | Object WAL | Write-ahead log stored in object storage | L0 |
+| Storage profile | Topic/stream-level choice of primary WAL and object materialization mode | L0/L1/L2 |
+| Ursa-like profile | Append profile that waits for WAL durability plus synchronous Oxia-visible commit before ack | L0 |
+| AutoMQ-like profile | Append profile that acks after primary WAL durability and lets background workers materialize read-optimized object ranges | L0/L3 |
+| Object materialization | Copying or transforming WAL ranges into object-backed read/retention/lakehouse ranges | L0/L3 |
 | Multi-stream WAL object | One physical object containing slices for multiple streams | L0 |
 | Stream slice | The part of a WAL object belonging to one stream | L0 |
 | Offset index | Oxia index mapping stream offset ranges to physical object ranges | L0 |
@@ -63,7 +68,9 @@ Avoid these phrases in Nereus design docs:
 - "local broker RocksDB stores durable cursor truth";
 - "Nereus is only tiered storage";
 - "Nereus is only a BookKeeper replacement";
-- "Nereus is AutoMQ for Pulsar".
+- "Nereus is AutoMQ for Pulsar";
+- "AutoMQ-like means object storage decides visibility";
+- "WAL durable alone is enough to invent protocol offsets".
 
 Preferred language:
 
@@ -73,6 +80,7 @@ Preferred language:
 - "KoP is a protocol projection";
 - "SBT/SDT are lakehouse projections over committed stream offsets";
 - "object store stores bytes, not truth".
+- "AutoMQ-like is an async object-materialization profile over the same stream truth".
 
 ## 5. Naming
 
@@ -110,6 +118,8 @@ When reviewing `pip/Nereus/nereus-future1-core-stream-storage.md`, keep these bo
 - Object WAL durability is necessary but not sufficient for visibility.
 - Read resolver must start from Oxia offset index or a validated cache.
 - Cursor, KoP group, transaction pending ack, and lakehouse catalog are future projections over L0.
+- `StorageProfile` selects the primary WAL and object materialization mode; it must not create a second
+  offset truth.
 
 ## 7. Future 2 Reading Notes
 

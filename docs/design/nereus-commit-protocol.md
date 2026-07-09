@@ -16,17 +16,34 @@
 
 ## 2. 核心不变量
 
-1. Producer ack 之前，WAL bytes 必须 durable，且对应 stream slice 的 Oxia offset index
+1. Producer ack 之前，primary WAL bytes 必须 durable。
+2. Producer ack 返回给 Pulsar/Kafka 客户端时，必须有稳定的 stream offset / MessageId
+   投影；不能只凭 broker 本地临时 offset 返回成功。
+3. Ursa-like sync profile 下，producer ack 之前，对应 stream slice 的 Oxia offset index
    entry 必须 committed。
-2. `committedEndOffset` 对每个 stream 单调递增。
-3. Append path 生成的 offset range 必须 dense，不允许可见 gap。
-4. Multi-stream WAL object 的物理 durable 不代表所有 slices 可见。
-5. 每个 stream slice 独立提交 offset index entry。
-6. Compaction 不改变 offset，只改变 offset range 指向的 physical object。
-7. Compaction 发布新 generation 后，旧 generation 保持可读直到 GC 安全。
-8. SBT/SDT 不能影响 producer ack。
-9. 所有 fencing 都以 Oxia epoch/token 为准。
-10. Object list 不能参与 recovery 正确性判断。
+4. AutoMQ-like async profile 下，producer ack 不等待读优化对象、remote segment、compacted object
+   或 lakehouse file 发布；这些由后台 materializer 完成。
+5. `committedEndOffset` 对每个 stream 单调递增。
+6. Append path 生成的 offset range 必须 dense，不允许可见 gap。
+7. Multi-stream WAL object 的物理 durable 不代表所有 slices 可见。
+8. 每个 stream slice 独立提交 offset index entry 或 fast-ack WAL visibility marker。
+9. Compaction 不改变 offset，只改变 offset range 指向的 physical object。
+10. Compaction 发布新 generation 后，旧 generation 保持可读直到 GC 安全。
+11. SBT/SDT 不能影响 producer ack。
+12. 所有 fencing 都以 Oxia epoch/token 为准。
+13. Object list 不能参与 recovery 正确性判断。
+
+Profile-specific ack boundary:
+
+| Profile family | `DurabilityLevel` | Producer ack boundary | 后台工作 |
+| --- | --- | --- | --- |
+| Ursa-like sync object | `WAL_DURABLE_AND_INDEX_COMMITTED` | primary WAL durable + Oxia visible/read index committed | compaction、SBT/SDT、GC |
+| AutoMQ-like async object | `WAL_DURABLE` | primary WAL durable + stable offset/projection returned | object materialization、read-optimized generation publish、remote retention |
+| BK-only | `WAL_DURABLE` or stricter | BookKeeper WAL durable + stable offset/projection returned | no Nereus object materialization |
+
+Nereus-compatible AutoMQ-like 不等于“完全跳过 Oxia”。如果实现要在没有 Oxia head/index 的情况下
+返回成功，必须先设计 WAL-resident offset reservation、session recovery、duplicate suppression 和
+read-after-ack 语义；这不属于当前 Phase 1/AutoMQ-like 目录的默认方案。
 
 ## 3. 参与者
 
@@ -35,6 +52,7 @@
 | Broker | 协议处理、batching、WAL object 写入、append session、producer ack |
 | Oxia | offset authority、append fencing、offset index、cursor/txn/routing metadata |
 | Object store | WAL/compacted/index/snapshot bytes durability |
+| Object materializer | AutoMQ-like profile 下把 WAL ranges 异步发布为 object-backed read/retention ranges |
 | Compaction planner | 生成 compaction tasks，维护 checkpoint |
 | Compaction worker | 读取 WAL/old compacted objects，生成 compacted object |
 | Committer | 提交 offset index replacement、SBT/SDT metadata |
@@ -127,9 +145,11 @@ sliceCount = N
 ttl = orphanTtl
 ```
 
-此时 object 仍不可见。可见性只由 per-stream offset index entry 决定。
+Ursa-like sync profile 下，此时 object 仍不可见。可见性只由 per-stream offset index entry 决定。
+AutoMQ-like async profile 下，WAL object 可以作为 primary WAL durable proof，但 producer ack 仍需要
+稳定 offset/projection；read-optimized object visibility 由后台 materializer 后续发布。
 
-### 5.3 Commit Stream Slice
+### 5.3 Commit Stream Slice For Ursa-like Sync Profile
 
 每个 stream slice 独立提交：
 
@@ -181,7 +201,33 @@ Producer ack 使用 commit result 生成：
 - Pulsar `MessageId(virtualLedgerId, entryId, batchIndex)`；
 - Kafka offset = stream record offset。
 
-### 5.4 Partial Slice Commit
+### 5.4 Fast Ack For AutoMQ-like Async Profile
+
+AutoMQ-like profile 的目标是让 producer ack 不等待对象化完成。推荐状态机：
+
+```text
+WAL_DURABLE
+  -> reserve/commit stable stream offset and projection
+  -> PRODUCER_ACK
+  -> enqueue object materialization task
+  -> publish object-backed offset index generation
+  -> mark WAL range object-materialized
+```
+
+实现约束：
+
+- fast ack 不能返回 broker-local 临时 offset；
+- fast ack 的恢复真相必须能从 primary WAL + Oxia stream head/commit-log 解释；
+- read-after-ack 必须能从 primary WAL location 读到数据，或明确等待 materialization policy；
+- materializer 发布的新 generation 不能改变 offset，只能改变 object location；
+- materializer lag 必须进入 backpressure/retention 决策，避免 WAL 无限增长；
+- 如果后台对象化失败，数据仍以 primary WAL 为 truth，但 topic profile 应暴露 degraded/lag 状态。
+
+对于当前 Phase 1 的 Oxia public Java API 约束，fast ack 的 Nereus-compatible 版本仍建议使用
+stream-head single-key CAS 分配稳定 offset，只是不等待 read-optimized object generation 发布。
+更激进的“WAL durable 后完全不等 Oxia”需要单独设计。
+
+### 5.5 Partial Slice Commit
 
 同一个 WAL object 中，slice A commit 成功、slice B commit 失败是合法状态。
 
@@ -195,15 +241,23 @@ Producer ack 使用 commit result 生成：
 
 ## 6. BookKeeper WAL Commit
 
-Latency profile 下，BK 作为 WAL durable layer：
+BookKeeper profile 下，BK 作为 primary WAL durable layer：
 
 1. Broker 写 BK ledger entry。
 2. BK quorum ack 后 bytes durable。
-3. Broker 对 stream 提交 Oxia offset index entry，`objectType=BK_WAL_RANGE`。
-4. Producer ack 来自 Oxia offset index commit result。
-5. Compaction service 可以把 BK range 读出并写成 compacted object，然后替换 offset index。
+3. Broker 对 stream 提交稳定 offset/projection；sync profile 物化 `objectType=BK_WAL_RANGE`
+   offset index 后 ack，async profile 可在 fast-ack 边界返回。
+4. Object materializer 可以把 BK range 读出并写成 object-backed range，然后发布更高 generation
+   或远端对象状态。
+5. BK-only profile 禁用第 4 步；retention/trim 需要按 BK ledger 生命周期处理。
 
 BK ledger id 不是内部 truth，只是 WAL object location 的一种。
+
+| Profile | Ack boundary | Object materialization |
+| --- | --- | --- |
+| `BOOKKEEPER_WAL_ONLY` | BK durable + stable projection | disabled |
+| `BOOKKEEPER_WAL_SYNC_OBJECT` | BK durable + Oxia visible/index commit | sync on append path or before visible publish |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BK durable fast ack + stable projection | background materializer |
 
 ## 7. Offset Index Read Resolution
 
@@ -450,8 +504,9 @@ Oxia shard leader failover 后：
 
 | 操作 | 线性化点 |
 | --- | --- |
-| Produce append | Oxia offset index entry commit |
-| Producer ack | append 线性化点之后 |
+| Produce append, Ursa-like sync | Oxia offset index entry commit |
+| Produce append, AutoMQ-like async | primary WAL durable + stable offset/projection commit |
+| Producer ack | selected profile 的 append 线性化点之后 |
 | Cursor update | Oxia cursor CAS success |
 | Transaction commit | transaction state `COMMITTED` CAS success after stream markers |
 | Transaction abort | transaction state `ABORTED` CAS success after abort ranges |
@@ -460,9 +515,9 @@ Oxia shard leader failover 后：
 | SDT delivery visibility | target catalog commit |
 | GC delete | object reference check + delete marker commit |
 
-## 15. 与 Ursa 的对齐状态
+## 15. Ursa-like 与 AutoMQ-like 对齐状态
 
-已对齐：
+Ursa-like sync profile 已对齐：
 
 - Oxia/metadata service 作为 offset authority；
 - broker stateless/leaderless；
@@ -471,6 +526,13 @@ Oxia shard leader failover 后：
 - offset index 驱动读路径；
 - distributed compaction 替换 offset index；
 - lakehouse catalog 与 stream storage 共享 compacted objects。
+
+AutoMQ-like async profile 新增：
+
+- producer ack 不等待 object materialization；
+- BK WAL 和 Object WAL 都可以作为 primary WAL；
+- 后台 materializer 负责 remote object、compacted object、lakehouse-ready object 发布；
+- materialization lag 成为独立背压和运维指标。
 
 增强点：
 

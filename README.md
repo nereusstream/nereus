@@ -1,8 +1,9 @@
 # Nereus
 
 Nereus is a Pulsar-native shared-storage streaming engine built around an Oxia
-metadata/coordination plane, shared object data plane, stateless broker serving,
-and a single internal `streamId + offset` truth.
+metadata/coordination plane, selectable Ursa-like / AutoMQ-like storage profiles,
+shared object data plane, stateless broker serving, and a single internal
+`streamId + offset` truth.
 
 This is the standalone product repository for `github.com/nereusstream/nereus`.
 Pulsar and KoP changes are developed in organization-owned fork repositories,
@@ -12,14 +13,15 @@ not as patch overlays inside this repo.
 
 ```text
 nereus/
-  gradle/                      Gradle wrapper and version catalog
-  nereus-api/                  public internal APIs and value types
-  nereus-core/                 L0 StreamStorage core
-  nereus-metadata-oxia/        Oxia metadata and coordination adapter
-  nereus-object-store/         object WAL / object IO boundary
-  nereus-managed-ledger/       ManagedLedger facade implementation boundary
-  nereus-pulsar-adapter/       Pulsar broker integration boundary
-  nereus-kop-adapter/          KoP/Kafka projection boundary
+  gradle/                               Gradle wrapper and version catalog
+  nereus-api/                           public internal APIs and value types
+  nereus-core/                          L0 StreamStorage core
+  nereus-metadata-oxia/                 Oxia metadata and coordination adapter
+  nereus-object-store/                  object WAL / object IO boundary
+  nereus-managed-ledger/                ManagedLedger facade implementation boundary
+  nereus-pulsar-adapter/                Pulsar broker integration boundary
+  nereus-kop-adapter/                   KoP/Kafka projection boundary
+  docs/automq-like-stream-storage/      AutoMQ-like async object materialization design
 ```
 
 ## Related Organization Repositories

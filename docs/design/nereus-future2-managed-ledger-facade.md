@@ -307,7 +307,7 @@ Future 2 adds projection and facade metadata on top of Future 1:
   "topic": "persistent://tenant/ns/topic-partition-0",
   "streamId": "s-123",
   "storageClass": "nereus",
-  "profile": "OBJECT_WAL",
+  "profile": "OBJECT_WAL_SYNC_OBJECT",
   "createdAt": 1783036800000,
   "version": 12
 }
@@ -337,7 +337,7 @@ Future 2 adds projection and facade metadata on top of Future 1:
   "managedLedgerName": "persistent://tenant/ns/topic-partition-0",
   "state": "OPEN",
   "storageClass": "nereus",
-  "profile": "OBJECT_WAL",
+  "profile": "OBJECT_WAL_SYNC_OBJECT",
   "lastProjectionLedgerId": 9007199254740993,
   "metadataVersion": 31
 }

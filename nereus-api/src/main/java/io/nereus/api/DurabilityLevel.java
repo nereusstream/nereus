@@ -14,7 +14,17 @@
 
 package io.nereus.api;
 
-/** Durability level requested by append. */
+/** Durability/visibility boundary requested by append. */
 public enum DurabilityLevel {
+    /**
+     * The primary WAL append is durable before the append future succeeds.
+     *
+     * <p>This is the fast-ack boundary used by AutoMQ-like profiles. Implementations still have to return
+     * stable stream offsets and protocol projection references; they just must not wait for read-optimized
+     * object materialization before acknowledging the caller.
+     */
+    WAL_DURABLE,
+
+    /** The primary WAL append is durable and the Oxia read index is committed before the append succeeds. */
     WAL_DURABLE_AND_INDEX_COMMITTED
 }
