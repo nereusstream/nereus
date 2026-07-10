@@ -69,8 +69,8 @@ Residual risks introduced by this mitigation:
 
 ## 2. Read Amplification From Full-Slice Verification
 
-Status: accepted Phase 1 compromise with hard resource guards; M3 object reader has the guard hook, and
-the review-found byte-budget clipping bug has been fixed pending final gate rerun.
+Status: accepted Phase 1 compromise with hard resource guards; M3 object reader has the guard hook, the
+review-found byte-budget clipping bug is fixed, and the 2026-07-10 final local gate passed.
 
 Phase 1 read 为了校验 slice checksum，必须读取完整 resolved slice payload 和 entry index 后再按
 `startOffset`、`maxRecords`、`maxBytes` clip。这样能保证返回的 clipped bytes 来自一个完整校验过
@@ -131,8 +131,8 @@ after stream-head CAS sent、after head CAS before materialization confirmed、a
 
 ## 4. No GC And Object Deletion In Phase 1
 
-Status: accepted correctness boundary; M3 local test cleanup exists, and symlink escape handling has been
-fixed pending final gate rerun.
+Status: accepted correctness boundary; M3 local test cleanup and symlink-escape fixes passed the
+2026-07-10 final local gate.
 
 Phase 1 `trim` 只推进 low-watermark，不删除 offset index，也不删除 object bytes。Upload 后 manifest
 失败、commit 失败、process crash、caller timeout 都可能留下 orphan WAL objects。
@@ -176,7 +176,31 @@ Phase 1 core planner 可以先设置 `forceSingleStreamObject=true`，即一个 
 停线条件：如果实现过程中发现 writer/reader/manifest 只能处理一个 slice 或一个 stream，必须先补齐
 WAL 机制层，再继续 core append。
 
-## 6. Review Checklist Before Coding
+## 6. Reserved Profiles And Object-Shaped Result API
+
+Status: accepted Phase 1 limitation；must be resolved before BookKeeper or async execution。
+
+`StorageProfile` and `DurabilityLevel` expose target names，but current `AppendResult` and
+`ResolvedObjectRange` require object id/key/range。Phase 1 therefore supports only
+`OBJECT_WAL_SYNC_OBJECT + WAL_DURABLE_AND_INDEX_COMMITTED`。
+
+Risks：
+
+- metadata can contain a reserved profile even though core cannot execute it；
+- treating `WAL_DURABLE` as WAL-only ack would violate stable offset/read-after-ack semantics；
+- representing BK ranges with synthetic object ids would leak an invalid durable identity；
+- silent fallback to Object WAL sync would violate topic policy。
+
+Controls：
+
+- M4 rejects unsupported profile/durability before reservation/WAL IO with
+  `UNSUPPORTED_STORAGE_PROFILE` / `UNSUPPORTED_DURABILITY_LEVEL`；
+- profile metadata persistence is documented as reservation only；
+- future `WAL_DURABLE` still requires intent + stream-head CAS + recoverable primary target；
+- BookKeeper implementation is blocked on a generic primary read-target/result abstraction；
+- no compatibility alias exists except deprecated `OBJECT_WAL -> OBJECT_WAL_SYNC_OBJECT`。
+
+## 7. Review Checklist Before Coding
 
 开始实现前逐项确认：
 
@@ -200,5 +224,7 @@ WAL 机制层，再继续 core append。
 - `WalObjectReader` full-slice read 先预留内存，后读取对象；
 - read amplification metrics 已在 `StreamStorageMetrics` 命名；
 - timeout/unknown-final-state 错误不会被映射成普通 retriable conflict；
+- M4 validates canonical profile and strict durability before WAL IO；
+- no reserved profile uses sentinel object identity or silent fallback；
 - LocalFileObjectStore cleanup helper 只在 test package 可见；
 - multi-slice writer tests 在 core planner 仍为 single-stream 策略时也必须存在。

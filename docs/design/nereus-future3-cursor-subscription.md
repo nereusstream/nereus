@@ -1,8 +1,11 @@
 # Nereus Future 3：Cursor / Subscription State
 
-> 本文是 Nereus L1 cursor/subscription 设计文档。它定义 Pulsar durable cursor progress
-> 如何从 BookKeeper cursor ledger 迁移到 Oxia + object snapshot，同时保持
-> `streamId + offset` 是内部 truth。当前阶段只冻结设计边界，不要求实现或验证。
+> 状态：Designed；当前仓库没有 cursor implementation
+> 前置：Future 2 Position projection、Future 1 read/trim semantics
+
+本文定义 Pulsar durable cursor progress 如何从 BookKeeper cursor ledger 迁移到 Oxia + immutable
+object snapshot，同时保持 `streamId + offset` 是逻辑坐标。Cursor state 是独立 commit domain，不能
+改变 stream-head append truth。
 
 ## 1. Motivation
 
@@ -59,6 +62,10 @@ Future 3 不解决：
 - dispatcher fairness and consumer flow-control policy。
 
 这些能力依赖 Future 3 的 durable cursor state，但在 Future 8 或 Future 5 中设计。
+
+当前实现边界：`StreamStorage` 还没有 cursor methods，`CURSOR_SNAPSHOT_OBJECT` 只有 object-type
+reservation。实现 F3 前必须先冻结 projection-to-record-range API、snapshot bytes 和 cursor CAS record；
+不能把本设计中的 pseudo-code 当成已存在 Java surface。
 
 ## 4. Layer Boundary
 
@@ -474,10 +481,12 @@ durable progress; broker still owns dispatch policy and flow control.
 8. Cursor low-watermark protects stream data from unsafe trim/GC.
 9. Redelivery after failover is allowed; losing acked progress after successful CAS is not.
 10. Cursor state cannot change stream offset ordering or visibility.
+11. Backlog/high-watermark comes from stream-head committed end；offset index只用于 size/range resolution，
+    不是 cursor 可自行推进的 append truth。
 
 ## 16. Future Gate
 
-Future 3 design is ready to move into implementation planning when the following are reviewed:
+Future 3 may enter implementation planning only after the following are reviewed:
 
 - cursor offset conventions；
 - ManagedCursor method mapping；

@@ -1,8 +1,11 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
-> 本文定义 Nereus L3 compaction 和 generation replacement 设计。Future 4 的核心目标是
+> 状态：Designed；worker/task/higher-generation publish 尚未实现
+> 前置：Future 1 generation-0 contract、generic read target、cursor/reader reference hooks
+
+本文定义 Nereus L3 compaction 和 generation replacement 设计。Future 4 的核心目标是
 > 把 multi-stream WAL object 转换为 per-stream read-optimized object，并通过 Oxia offset
-> index 的 generation overlay 原子切换读路径。Compaction 不改变 `streamId + offset`。
+> index 的 generation overlay 条件发布并切换读路径。Compaction 不改变 `streamId + offset`。
 > 对 AutoMQ-like profile，Future 4 的 worker 也是 append ack 之后的 async object
 > materialization 路径。
 
@@ -50,6 +53,10 @@ Future 4 不解决：
 
 这些能力依赖 Future 4 的 generation replacement，但分别在 Future 5、Future 6、Future 8
 和后续验证阶段处理。
+
+当前实现边界：Phase 1 只有 generation 0 的 Object WAL records，且其 offset index 可从
+stream-head reachable commit repair。F4 实现前必须冻结 higher-generation conditional
+publish/overlap schema；compaction 不能改写 `StreamHeadRecord.committedEndOffset` 或 commit chain。
 
 ## 4. Layer Boundary
 
@@ -156,8 +163,9 @@ RUNNING -> FAILED -> PLANNED
 OUTPUT_UPLOADED -> FAILED -> PLANNED
 ```
 
-Task state 只是 compaction workflow state，不决定 stream read visibility。Stream read
-visibility 只由 offset index generation 决定。
+Task state 只是 compaction workflow state，不决定 logical append visibility。Offset index
+generation 决定已提交 range 的 physical read target；stream head + reachable commit log 仍决定该
+range 是否逻辑提交。
 
 ## 7. Compacted Object Format
 
@@ -264,7 +272,7 @@ PLANNED
   -> OUTPUT_UPLOADED
 ```
 
-Worker 输出 object 后，object 仍不可见。可见性必须等到 generation replacement commit。
+Worker 输出 object 后，它还不是 active read target。必须等到 generation replacement publish。
 
 ### 9.3 Publish
 
@@ -275,7 +283,8 @@ OUTPUT_UPLOADED
   -> mark task PUBLISHED
 ```
 
-发布线性化点是更高 generation offset index entry 可见。
+发布线性化点是更高 generation offset index entry 可见；这是 physical-target switch，不是新的
+logical append commit。
 
 ### 9.4 GC readiness
 
@@ -334,7 +343,7 @@ offset gap。
 
 ## 13. Future Gate
 
-Future 4 design is ready to move into implementation planning when the following are reviewed:
+Future 4 may enter implementation planning only after the following are reviewed:
 
 - compaction task schema；
 - generation replacement CAS conditions；

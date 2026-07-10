@@ -1,7 +1,7 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0 scaffold migration 已开始落代码；后续每个
-里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M3 已完成，M4 Core Append 是当前入口；
+后续每个里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
 
@@ -295,9 +295,9 @@ M3 implementation status:
   only a validation guard for the future core planner；
 - object-store production code still has no delete/list correctness path, and `nereus-object-store` does
   not import Oxia metadata record classes.
-- 2026-07-08 M3 review status: implementation is present and the review-found blockers have been fixed
-  with tests. Final M3 acceptance still requires rerunning the local Gradle gate after the current
-  execution-environment approval limit is cleared. See `11-m3-object-wal-review-2026-07-08.md`.
+- 2026-07-08 M3 review found blockers that were fixed with tests；2026-07-10 reran
+  `./gradlew :nereus-object-store:test phase1Check check` successfully. M3 is complete. The dated review
+  remains historical context in `11-m3-object-wal-review-2026-07-08.md`.
 
 Tasks:
 
@@ -337,12 +337,7 @@ Exit:
 - done: local object store cleanup can remove orphan files under the isolated test root without exposing
   production delete semantics。
 
-M3 blocker fix pass is ready for final verification. The previous baseline implementation passed
-`./gradlew :nereus-object-store:test`, `./gradlew phase1Check`, and `./gradlew check`; after the fix pass,
-rerunning Gradle was blocked by the current execution-environment approval limit rather than by a project
-failure.
-
-Before M3 completion is claimed:
+M3 completion checklist:
 
 - done: fix `DefaultWalObjectReader` so a positive entry after previously returned data exceeds remaining
   `maxBytes` by stopping, not by returning `READ_LIMIT_TOO_SMALL`；
@@ -354,7 +349,7 @@ Before M3 completion is claimed:
   bounds, range-read-past-EOF, and failed-write invisibility；
 - done: wrap checksum-consistent invalid WAL object and entry-index metadata as `UNSUPPORTED_FORMAT`,
   with focused decoder tests；
-- pending: rerun `./gradlew :nereus-object-store:test`, `./gradlew phase1Check`, and `./gradlew check`.
+- done on 2026-07-10: rerun `./gradlew :nereus-object-store:test phase1Check check`.
 
 ### M4 Core append path
 
@@ -370,6 +365,8 @@ Tasks:
 - add `AppendSessionManager`；
 - add `AppendCoordinator`；
 - add per-stream append sequencer；
+- accept only canonical `OBJECT_WAL_SYNC_OBJECT` and
+  `WAL_DURABLE_AND_INDEX_COMMITTED` in Phase 1；reject BK/async profiles and `WAL_DURABLE` before WAL IO；
 - initially allow the core flush planner to send one append work item per WAL object with
   `forceSingleStreamObject=true`；
 - validate `StreamStorageConfig`；
@@ -388,6 +385,8 @@ Exit:
 - committed end offset advances densely；
 - uploaded but uncommitted object is not readable；
 - stale token append fails and does not advance offset。
+- a reserved profile/durability combination fails explicitly and cannot create an acknowledged append；
+- producer success waits for reachable head commit and generation-0 offset-index/marker confirmation。
 
 ### M5 Resolve and read path
 
@@ -578,7 +577,7 @@ Exit:
 | entry index deterministic encoding | checksum golden test is stable |
 | zero-byte entry index item | payload length zero is valid and still advances relative offset |
 | malformed entry index ordering | reader rejects non-contiguous or overlapping opaque entries |
-| slice checksum domain | checksum covers `slicePayloadBytes || entryIndexBytes` |
+| slice checksum domain | checksum covers `concat(slicePayloadBytes, entryIndexBytes)` |
 | WAL upload timeout propagation | `WalWriteOptions.uploadTimeout` is copied into `PutObjectOptions.timeout` |
 | final encoded object length exceeds `maxObjectBytes` | writer fails with `INVALID_ARGUMENT` before object upload |
 | object payload fits but footer/index/header push encoded length over max | writer fails before upload |
@@ -604,6 +603,10 @@ Exit:
 
 | Test | Expected |
 | --- | --- |
+| stream uses canonical `OBJECT_WAL_SYNC_OBJECT` + strict durability | append enters WAL path |
+| stream uses deprecated `OBJECT_WAL` alias | metadata canonicalization yields sync object behavior |
+| stream uses BK or async profile | append fails before WAL IO with `UNSUPPORTED_STORAGE_PROFILE` |
+| options request `WAL_DURABLE` | Phase 1 fails before WAL IO with `UNSUPPORTED_DURABILITY_LEVEL`；future support cannot return before head commit |
 | append one batch | range starts at previous committed end |
 | append two batches | second starts at first end |
 | concurrent appends through one `DefaultStreamStorage` for same stream | sequenced dense ranges |

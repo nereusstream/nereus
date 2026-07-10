@@ -18,7 +18,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Result returned after a batch is durable and visible through Oxia offset index. */
+/**
+ * Result returned after a batch is durable and has a stable logical commit.
+ *
+ * <p>The requested {@link DurabilityLevel} determines whether generation-zero read-index confirmation is also
+ * required. Phase 1 executes only {@link DurabilityLevel#WAL_DURABLE_AND_INDEX_COMMITTED} on the Object WAL
+ * profile; this record remains object-shaped until a generic primary-read-target API is introduced.
+ */
 public record AppendResult(
         StreamId streamId,
         OffsetRange range,

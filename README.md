@@ -1,9 +1,9 @@
 # Nereus
 
 Nereus is a Pulsar-native shared-storage streaming engine built around an Oxia
-metadata/coordination plane, selectable Ursa-like / AutoMQ-like storage profiles,
-shared object data plane, stateless broker serving, and a single internal
-`streamId + offset` truth.
+metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
+a shared object data plane, broker-locality without durable broker ownership, and a
+single logical `streamId + offset` coordinate.
 
 This is the standalone product repository for `github.com/nereusstream/nereus`.
 Pulsar and KoP changes are developed in organization-owned fork repositories,
@@ -21,7 +21,9 @@ nereus/
   nereus-managed-ledger/                ManagedLedger facade implementation boundary
   nereus-pulsar-adapter/                Pulsar broker integration boundary
   nereus-kop-adapter/                   KoP/Kafka projection boundary
-  docs/automq-like-stream-storage/      AutoMQ-like async object materialization design
+  docs/design/                          north-star and capability-track designs
+  docs/phase-1-core-stream-storage/     current code-level contracts and milestones
+  docs/automq-like-stream-storage/      reserved async materialization profile design
 ```
 
 ## Related Organization Repositories
@@ -33,29 +35,28 @@ github.com/nereusstream/pulsar  -> fork of apache/pulsar
 github.com/nereusstream/kop     -> fork of streamnative/kop
 ```
 
-The main Nereus repository should hold product-owned modules. Forks hold changes that must
-land inside upstream Pulsar or KoP trees. Design documents are intentionally kept out of the
-pushed code repository for now.
+The main Nereus repository holds product-owned modules and authoritative design documents.
+Forks hold changes that must land inside upstream Pulsar or KoP trees.
 
 ## Current Phase
 
-Phase 0 creates the standalone Gradle repository scaffold, module boundaries, and organization
-fork workflow. It does not implement the storage engine yet.
+Future 1 / Phase 1 Core StreamStorage is in progress. M0-M3 are complete:
 
-Recommended implementation sequence:
+- protocol-neutral API/value/error contracts；
+- Oxia key/record/codec and stream-head CAS fake metadata path；
+- Object WAL v1 writer/reader, entry index, checksums, and tests。
 
-1. Future 1: Core StreamStorage + Object WAL
-2. Future 2: ManagedLedger Facade
-3. Future 3: Cursor / Subscription State
-4. Future 4: Compaction + Generation Replacement
-5. Future 7: Routing / Brown-out / Elasticity
-6. Future 5: KoP Compatibility
-7. Future 6: Lakehouse SBT / SDT
-8. Future 8: Advanced Pulsar Semantics
+M4 Core Append is the next milestone, followed by M5 resolve/read and M6 trim/recovery.
+Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
+materialization profiles are reserved design/API boundaries, not implemented support.
+
+Start with `docs/design/nereus-design-index.md` for document authority and current status, then
+`docs/phase-1-core-stream-storage/README.md` for the active code-level design.
 
 ## Build
 
 ```bash
 ./gradlew checkPhase0
+./gradlew phase1Check
 ./gradlew build
 ```

@@ -14,17 +14,22 @@
 
 package io.nereus.api;
 
-/** Durability/visibility boundary requested by append. */
+/** Durability and derived-read-index boundary requested by append. */
 public enum DurabilityLevel {
     /**
-     * The primary WAL append is durable before the append future succeeds.
+     * The primary WAL append is durable and the logical append has a stable Oxia commit before the append future
+     * succeeds. The generation-zero read index may still require repair from the reachable commit record.
      *
-     * <p>This is the fast-ack boundary used by AutoMQ-like profiles. Implementations still have to return
-     * stable stream offsets and protocol projection references; they just must not wait for read-optimized
-     * object materialization before acknowledging the caller.
+     * <p>This is the target fast-publication boundary for AutoMQ-like and WAL-only profiles. It never permits a
+     * WAL-only acknowledgment with broker-local offsets. Implementations still have to return stable stream
+     * offsets, a recoverable primary read target, and protocol projection references; they just need not wait for
+     * derived-index confirmation or read-optimized object materialization.
      */
     WAL_DURABLE,
 
-    /** The primary WAL append is durable and the Oxia read index is committed before the append succeeds. */
+    /**
+     * The primary WAL append and stable logical commit are durable, and the generation-zero Oxia read/replay
+     * indexes are confirmed before the append succeeds.
+     */
     WAL_DURABLE_AND_INDEX_COMMITTED
 }

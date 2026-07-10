@@ -2,6 +2,9 @@
 
 本文定义 `nereus-core` 的 append、resolve/read、trim 和 recovery 状态机。
 
+Status: M4-M6 target。`nereus-core` 当前仍是 marker/orchestration scaffold；M4 implementation must
+match this document and the strict Object WAL profile boundary。
+
 M0.5 status: the append state machine now uses the redesigned Oxia-compatible commit protocol from
 `02-oxia-metadata-and-commit.md`: one stream-head conditional put is the append linearization point, and
 offset-index plus committed-slice records are materialized indexes that can be repaired from the committed
@@ -72,6 +75,7 @@ High-level state:
 
 ```text
 IDLE
+  -> VALIDATE_PROFILE
   -> ENSURE_SESSION
   -> BUILD_WAL_OBJECT
   -> UPLOAD_WAL_OBJECT
@@ -80,6 +84,20 @@ IDLE
   -> MATERIALIZE_OFFSET_INDEX
   -> ACK_RESULT
 ```
+
+### `VALIDATE_PROFILE`
+
+Before session acquisition、buffer reservation or WAL IO：
+
+- canonicalize stream profile；
+- accept only `OBJECT_WAL_SYNC_OBJECT` (`OBJECT_WAL` is its create-time alias)；
+- accept only `WAL_DURABLE_AND_INDEX_COMMITTED`；
+- reject BookKeeper/async profiles with `UNSUPPORTED_STORAGE_PROFILE` and reject `WAL_DURABLE` with
+  `UNSUPPORTED_DURABILITY_LEVEL`；
+- do not fall back to another profile or silently strengthen/weaken the caller request。
+
+Future `WAL_DURABLE` support still requires WAL durability + commit intent + stable stream-head CAS；it is
+deferred because Phase 1 has no non-strict result/read-repair coordinator。
 
 ### `ENSURE_SESSION`
 

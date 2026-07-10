@@ -14,7 +14,12 @@
 
 package io.nereus.api;
 
-/** Physical storage and object-materialization profile for an L0 stream. */
+/**
+ * Physical storage and object-materialization profile for an L0 stream.
+ *
+ * <p>An enum value reserves a durable metadata name; it does not by itself imply that the current core has an
+ * end-to-end writer, reader, and coordinator for that profile.
+ */
 public enum StorageProfile {
     /**
      * Legacy Phase 1 object-WAL profile name.

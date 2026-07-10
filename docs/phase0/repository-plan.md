@@ -1,13 +1,16 @@
 # Phase 0 Repository Plan
 
-Phase 0 establishes the standalone `nereusstream/nereus` repository.
+> Status: Historical / completed. Current implementation status is maintained in
+> `../design/nereus-design-index.md`.
+
+Phase 0 established the standalone `nereusstream/nereus` repository.
 
 ## Goals
 
 - Keep Nereus product code in a standalone repository, not a Pulsar fork.
 - Use Gradle Kotlin DSL, aligned with Apache Pulsar's current build style.
 - Keep Pulsar and KoP source-tree changes in organization-owned fork repositories.
-- Keep all design docs in `docs/design`.
+- Keep authoritative design and code-level documents in the repository under `docs/`.
 - Build a Java 21 Gradle monorepo that can grow into the Future 1-8 plan.
 
 ## Non-goals
@@ -41,7 +44,7 @@ Use separate repositories under the `nereusstream` organization:
 The Nereus repo can depend on fork artifacts, local composite builds, or published snapshots later, but it
 should not own the full upstream source trees.
 
-## First Implementation Gate
+## First Implementation Gate (completed)
 
 Before Future 1 starts:
 
@@ -50,3 +53,5 @@ Before Future 1 starts:
 - local `main` branch has this scaffold committed.
 - `./gradlew checkPhase0` passes.
 - target Pulsar and KoP upstream commits are recorded in `docs/phase0/upstream-forks.md`.
+
+The scaffold gate now passes. Future 1 / Phase 1 is the active implementation track.

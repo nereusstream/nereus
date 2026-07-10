@@ -1,7 +1,11 @@
 # 技术细节：Nereus Zone-aware Routing and Brown-out Handling
 
-> 这是 `pip/Nereus/nereus-overall-architecture.md` 的配套技术细节文档。
-> 本文定义 leaderless broker 下的 zone-aware routing、preferred broker、brown-out 摘除和恢复。
+> 状态：Designed；routing/broker-session implementation 尚未存在
+> 前置：Future 1 append-session/head-CAS semantics；Future 2/5 lookup projections
+
+本文定义 ownership-decoupled broker serving 下的 zone-aware routing、preferred broker、brown-out
+摘除和恢复。`leaderless` 指 broker 不持有 durable partition data，不表示同一 stream 可以绕过
+append session/CAS 无序提交。
 
 ## 1. 目标
 
@@ -13,7 +17,10 @@ Ursa 的公开设计强调 stateless/leaderless broker、zone-aware routing 和 
 - client 尽量连接同 AZ broker，降低 cross-AZ traffic；
 - broker crash/brown-out 不触发数据搬迁；
 - routing 变化通过 Oxia notification 和 client retry 收敛；
-- append correctness 仍由 Oxia fencing 和 offset index commit 保证。
+- append correctness 仍由 Oxia session fencing、commit intent 和 stream-head CAS 保证。
+
+当前实现边界：Phase 1 只有 stream-scoped append-session snapshot 和 fake metadata semantics；broker
+membership、routing ring、health model、Pulsar lookup/Kafka metadata projection 都是 target design。
 
 ## 2. 核心概念
 
@@ -100,7 +107,7 @@ Preferred broker 不等于 append owner。
 | preferred broker 有 append session | 正常写入，batch/cache locality 最佳 |
 | non-preferred broker 收到 produce | 可以转发，也可以获取 append session 后直接写 |
 | preferred broker brown-out | routing ring 摘除，client retry 到新 preferred broker |
-| append session stale | Oxia fencing 拒绝 commit |
+| append session stale | stream-head commit validation rejects the writer |
 
 实现策略：
 
@@ -166,7 +173,7 @@ reAdmissionWindow = 60s
 - degraded broker 不删除 durable data，因为 broker 无 durable data；
 - no partition rebalance copy；
 - stale append commit 由 Oxia fencing 拒绝；
-- acked records 仍从 Oxia offset index 可读。
+- acked records 仍由 stream head/reachable commits 解释，并通过 generation index 或 repair 读取。
 
 ## 8. Re-admission
 
@@ -247,7 +254,7 @@ pulsar_nereus_cross_zone_lookup_total
 
 | Design question | Required answer |
 | --- | --- |
-| Broker crash remap | 无数据搬迁，新 broker 从 Oxia offset index 继续 |
+| Broker crash remap | 无数据搬迁，新 broker 从 stream head/session 和 read index 继续 |
 | Brown-out evict | degraded broker 从 active ring 移除，ring version 单调递增 |
 | Re-admission warmup | 恢复 broker 渐进承接流量，不立即接管 hot stream |
 | Same-zone routing | client 优先连本 zone broker |
@@ -257,9 +264,9 @@ pulsar_nereus_cross_zone_lookup_total
 | Pulsar lookup refresh | Pulsar lookup 从同一 routing state 派生 |
 | Group coordinator remap | coordinator 是 locality role，group state 从 Oxia 恢复 |
 
-## 13. 与 Ursa 的对齐状态
+## 13. 与 Ursa 的目标设计对齐
 
-已对齐：
+目标设计已覆盖：
 
 - broker stateless/leaderless；
 - preferred broker 只做 locality；
@@ -282,9 +289,9 @@ pulsar_nereus_cross_zone_lookup_total
 
 ## 14. 参考
 
-- 总体架构：`pip/Nereus/nereus-overall-architecture.md`
-- Commit protocol：`pip/Nereus/nereus-commit-protocol.md`
-- KoP compatibility：`pip/Nereus/nereus-future5-kop-compatibility.md`
+- 总体架构：`nereus-overall-architecture.md`
+- Commit protocol：`nereus-commit-protocol.md`
+- KoP compatibility：`nereus-future5-kop-compatibility.md`
 - Ursa VLDB paper: <https://www.vldb.org/pvldb/vol18/p5184-guo.pdf>
 - StreamNative Lakestream architecture:
   <https://docs.streamnative.io/cloud/overview/lakestream-overview>

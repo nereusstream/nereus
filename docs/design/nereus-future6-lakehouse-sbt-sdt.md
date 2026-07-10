@@ -1,8 +1,12 @@
 # Nereus Future 6：Lakehouse SBT / SDT
 
-> 本文定义 Nereus L3 lakehouse 设计。Future 6 把 lakehouse 作为 Nereus 的一等能力：
+> 状态：Designed；当前仓库没有 catalog/table implementation
+> 前置：Future 4 compacted generation、schema/projection preservation、GC references
+
+本文定义 Nereus L3 lakehouse 设计。Future 6 把 lakehouse 作为 Nereus 的一等能力：
 > SBT 是 Nereus-managed table view，SDT 是 external table delivery。Lakehouse catalog
-> 不参与 producer ack，Oxia offset index 始终是 stream truth。
+> 不参与 producer ack。Stream head + reachable commit log 决定 logical append truth；generation-aware
+> offset index决定 table file 所引用的 physical source。
 
 ## 1. Motivation
 
@@ -41,6 +45,9 @@ Future 6 不解决：
 - 完整 SQL engine；
 - 用户自定义 ETL runtime；
 - benchmark、real table workload、catalog compatibility certification。
+
+当前实现边界：`STREAM_COMPACTED_OBJECT` 只是 enum/format reservation，higher generation、Parquet
+writer 和 catalog adapter 都不存在。本文件中的 API/key/schema 均是 target pseudo-code。
 
 ## 4. Layer Boundary
 
@@ -244,10 +251,14 @@ Repair must handle partial commit:
 | SDT Oxia state missing after external success | Insert delivery state with same delivery id |
 | Catalog references object no longer active in highest generation | Keep reference until catalog snapshot expires or is superseded |
 
-Repair source of truth order：
+Repair source order：
 
 ```text
-Oxia offset index > object manifest > catalog snapshot > object list
+stream head + reachable commit log
+  > generation-aware offset index
+  > object manifest
+  > catalog snapshot/delivery lineage
+  > object list
 ```
 
 Object list is never a correctness source.
@@ -289,7 +300,7 @@ Suggested metrics:
 | Duplicate SDT retry | Same delivery id must be idempotent |
 | Schema evolves during range selection | Snapshot records schema version; next range may use new schema |
 | Object referenced by catalog is superseded | Catalog reference protects object until snapshot expiry |
-| External query engine reads stale snapshot | Allowed; stream truth remains newer Oxia offset index |
+| External query engine reads stale snapshot | Allowed; stream-head committed end may be newer and catalog lag remains observable |
 
 ## 13. Compatibility Impact
 
@@ -313,7 +324,7 @@ Suggested metrics:
 
 ## 14. Future Gate
 
-Future 6 design is ready to move into implementation planning when the following are reviewed:
+Future 6 may enter implementation planning only after the following are reviewed:
 
 - SBT/SDT metadata schema；
 - Iceberg-first catalog commit order；

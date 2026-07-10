@@ -683,6 +683,10 @@ Idempotency:
 
 - concurrent create with the same name returns the same stream；
 - hash collision fails with a non-retriable metadata error。
+- `StreamCreateOptions` are creation inputs only。When the head already exists，stored canonical profile and
+  attributes win；`createOrGetStream` does not mutate policy or treat differing options as a profile migration。
+- Persisting a reserved BK/async profile proves metadata compatibility only。Phase 1 core append must reject
+  unsupported execution before WAL IO；metadata store does not silently rewrite it to Object WAL sync。
 - if the by-name record exists but stream head is missing, ignore the cache for correctness, re-create or
   re-read the deterministic head, and leave cache repair to an explicit metadata repair workflow。
 - Phase 1 does not allocate random stream ids. If a future needs random or sequence stream ids, it must

@@ -1,5 +1,7 @@
 # Upstream Forks
 
+> Status: Active integration register. Exact pins must be refreshed before the corresponding adapter track starts.
+
 Nereus keeps source-tree modifications for Pulsar and KoP in organization-owned fork repositories.
 
 ## Forks

@@ -9,7 +9,8 @@
 | --- | --- | --- |
 | Stream lifecycle | exact opaque `StreamName`, deterministic full-hash `StreamId`, create-or-get as `ACTIVE`, read/trim `SEALED` | public seal/delete API, parsing Pulsar topic syntax in L0 |
 | Durable key helpers | `nereus-api` shared key/hash helpers used by metadata and object modules; `.`/`..` are encoded; writer run id has at least 128 bits entropy | duplicate local key encoders, raw cluster in paths, truncated hashes without migration plan |
-| Storage profile | API names and helpers for BK/Object WAL and sync/async object materialization; Phase 1 core starts with `OBJECT_WAL` / `OBJECT_WAL_SYNC_OBJECT`; metadata stores canonical profile names | BookKeeper/local WAL execution before concrete writer/reader support |
+| Storage profile | metadata/API reserve all names；execution accepts only canonical `OBJECT_WAL_SYNC_OBJECT` (`OBJECT_WAL` alias) | BK/async/local execution；fail with `UNSUPPORTED_STORAGE_PROFILE` before WAL IO |
+| Durability | `WAL_DURABLE_AND_INDEX_COMMITTED` only；success includes WAL durable、head commit、generation-0 index/marker confirmation | `WAL_DURABLE` execution；fail with `UNSUPPORTED_DURABILITY_LEVEL` before WAL IO |
 | Payload | `OPAQUE_RECORD_BATCH`, one record per entry, one read batch per opaque entry | non-opaque public append, opaque entry with `recordCount > 1`, concatenating opaque entries |
 | Zero-byte records | empty payload consumes one offset and can be returned after byte budget is exactly consumed | read loops that advance only by payload bytes or stop solely on `remainingBytes == 0` |
 | Projection | public append returns empty `ProjectionRef` | non-empty public `projectionHints` without a durable mapping |
@@ -22,7 +23,7 @@
 | WAL compression | `CompressionType.NONE` | `ZSTD` with `UNSUPPORTED_FORMAT` |
 | Entry index location | writer emits and reader supports `OBJECT_FOOTER` | `INLINE` and `INDEX_OBJECT` with `UNSUPPORTED_FORMAT` |
 | Checksum domains | caller payload checksum, WAL canonical object checksum, storage checksum, slice checksum, entry-index/footer checksums | treating distinct checksum domains as interchangeable |
-| Metadata truth | Oxia stream head, reachable commit-log records, materialized offset index, append session snapshot, committed-slice marker | object manifest as read visibility truth |
+| Metadata truth | stream head + reachable commit log are append truth；offset index/marker are repairable read/replay materializations | treating derived index, manifest, watch, or list as the append linearization truth |
 | Object metadata | manifest/reference as repairable audit/GC inputs | cross-stream/object atomic producer ack |
 | Read path | offset-index-driven resolve, full-slice checksum before clipping | object list, manifest-only reads, negative cache |
 | Read amplification | explicit metrics for full-slice bytes, entry-index bytes, returned bytes, amplification, and read backpressure | hiding 16 MiB-to-100 byte reads as ordinary object read volume |
@@ -110,9 +111,8 @@ M0 scaffold status before coding state machines:
 - done: M3 review-found blockers were fixed: multi-range read byte-budget classification now stops after
   previously returned data instead of returning `READ_LIMIT_TOO_SMALL`, and local-store final/parent
   symlink escape is rejected before put/read/head.
-- pending final gate rerun: M3 baseline gates passed `./gradlew :nereus-object-store:test`,
-  `./gradlew phase1Check`, and `./gradlew check`; after the blocker fix pass, Gradle rerun is still
-  required before M4 starts.
+- done on 2026-07-10: `./gradlew :nereus-object-store:test phase1Check check` passed after the blocker
+  fix pass；M3 is complete and M4 may start.
 
 ## 3. Stop-The-Line Conditions
 
@@ -123,6 +123,9 @@ Stop implementation and update design first if any of these are discovered:
 - A design or fake implementation assumes Oxia public Java client can do single-key-group conditional
   multi-write without a new passing spike proving that exact API.
 - M4 core append starts without using the documented stream-head CAS plus commit-log protocol.
+- M4 acknowledges a BK/async profile or `WAL_DURABLE` request instead of rejecting it before WAL IO.
+- Any future `WAL_DURABLE` design attempts to return before a stable stream-head commit or without a
+  recoverable primary read target.
 - The real adapter cannot route all stream-scoped operations with `PartitionKey(streamId)`.
 - Offset index scan cannot preserve 19-digit zero-padded offset/generation ordering.
 - commit protocol cannot assign a durable `commitVersion` that can be validated across stream head,

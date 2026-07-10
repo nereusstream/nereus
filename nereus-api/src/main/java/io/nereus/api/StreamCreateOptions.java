@@ -17,7 +17,12 @@ package io.nereus.api;
 import java.util.Map;
 import java.util.Objects;
 
-/** Options used when creating or looking up a stream. */
+/**
+ * Options used when creating or looking up a stream.
+ *
+ * <p>For an existing stream these values do not mutate its stored profile or attributes; profile migration is a
+ * separate protocol.
+ */
 public record StreamCreateOptions(
         StorageProfile profile,
         Map<String, String> attributes) {

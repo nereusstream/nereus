@@ -1,468 +1,353 @@
-# 技术细节：Nereus Storage Object Format
+# Nereus Storage Object Format
 
-> 这是 `pip/Nereus/nereus-overall-architecture.md` 的配套技术细节文档。
-> 总体架构一步到位；本文只拆解 object/index/table 文件格式，便于后续按模块实施。
+> 状态：Object WAL v1 `Implemented`；其他 object families `Designed/Reserved`
+> Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
-## 1. 目标
+## 1. Format families
 
-本文定义共享存储数据面的格式：
+Nereus shared data plane 需要多类 immutable objects：
 
-- multi-stream WAL object；
-- stream slice index；
-- Pulsar entry index；
-- Oxia offset index entry；
-- per-stream compacted object；
-- Stream-Backed Table (SBT) metadata；
-- Stream-Delivered-to-Table (SDT) metadata；
-- cursor/transaction snapshot object。
+| Family | Purpose | Visibility/reference authority | Status |
+| --- | --- | --- | --- |
+| Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
+| Index object | large entry/projection index | offset-index reference | Reserved |
+| Stream compacted object | per-stream higher-generation read target | generation publish | Designed |
+| Cursor snapshot | large ack state | cursor-state CAS ref | Designed |
+| Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |
+| SBT/SDT table file | analytical/table projection | catalog snapshot/delivery lineage | Designed |
 
-设计目标是对齐 Ursa 的关键能力：一个 WAL object 聚合多个 streams，metadata service
-维护 offset index，compaction 把 row-based WAL objects 转为 per-stream columnar
-objects，并让同一份 object 同时服务 streaming read 和 lakehouse query。
-同一套格式也服务 AutoMQ-like profile：append ack 可以早于 read-optimized object publish，
-但后台 materializer 发布的对象、index generation、SBT/SDT metadata 仍使用本文定义的格式。
+Object existence never makes a logical range visible。Object keys are placement identities，not ownership or
+ordering truth。
 
-## 2. 不变量
+## 2. Common invariants
 
-1. `streamId + offset` 是唯一内部坐标。
-2. Oxia offset index 决定数据是否可见。
-3. Object store 只存 bytes，不决定可见性。
-4. Object 一旦 commit 即不可变。
-5. Object list 不能参与正确性判断。
-6. Oxia 不存 per-message metadata。
-7. 一个物理 WAL object 可以包含多个 stream slices。
-8. 每个 stream slice 的可见性由自己的 offset index entry 决定。
-9. Pulsar `MessageId` 是 virtual ledger projection，不是内部排序依据。
-10. Compacted object 替换的是 offset index 指向，不改变 stream offset。
-11. AutoMQ-like async materialization 不能引入第二套对象格式或第二套 offset truth；它只改变
-    这些对象何时被后台发布。
+1. Objects are immutable after successful put。
+2. Logical offsets are assigned by stream-head commit，not encoded object order。
+3. Multi-stream slices commit independently。
+4. Every referenced byte range has explicit bounds、format version and checksums。
+5. Fixed-width numeric fields use a declared byte order；enum ordinal is never durable encoding。
+6. Unknown/unsupported major version、type、compression or required section fails closed。
+7. Object list is audit/GC input only。
+8. Generation replacement preserves offset/projection semantics。
+9. Stored bytes checksum and canonical format checksum can be different domains。
 
-## 3. 编码约定
+## 3. Implemented Object WAL v1
 
-控制元数据使用 Protobuf 或等价 schema-first 编码。下面的 JSON 只是字段说明，不是磁盘
-格式要求。
-
-二进制 object 使用小端编码，所有可变长 section 都带：
-
-```text
-sectionType: uint16
-sectionVersion: uint16
-sectionLength: uint32
-sectionChecksum: uint32  // CRC32C
-payload: bytes
-```
-
-公共 header：
-
-```text
-magic: bytes[4]          // "NRS1"
-formatVersion: uint16
-objectType: uint16       // WAL, COMPACTED, INDEX, CURSOR_SNAPSHOT, TXN_SNAPSHOT
-flags: uint32
-headerLength: uint32
-headerChecksum: uint32
-footerOffset: uint64
-footerLength: uint32
-objectChecksum: bytes    // CRC32C required, SHA-256 optional
-encryptionInfoRef: bytes // optional
-```
-
-兼容规则：
-
-- reader 必须拒绝未知 major version；
-- reader 可以跳过未知 optional section；
-- writer 只能 append 新 section，不能改变已有 section 语义；
-- object metadata 中必须记录 writer version 和 format version；
-- checksum 覆盖 header、payload blocks、footer 和 index sections。
-
-## 4. Multi-stream WAL Object
-
-WAL object 是 row-based durable log。它面向写入效率，一个 object 可以包含多个
-stream 的 slices。
-
-### 4.1 Layout
+The executable v1 layout is：
 
 ```text
 WALObject
-  CommonHeader
-  WALObjectHeader
-  StreamSliceDirectory
-  PayloadBlock[0..N]
-  EntryIndexSection[0..N]
-  Footer
+  CommonHeader                         48 bytes
+  Section(WAL_OBJECT_HEADER)
+  Section(STREAM_SLICE_DIRECTORY)
+  Section(PAYLOAD_BLOCK)               one per slice in current writer
+  Section(ENTRY_INDEX)                 one per slice
+  Section(FOOTER)
 ```
 
-### 4.2 WALObjectHeader
+### 3.1 Constants
 
-```json
-{
-  "objectId": "wo-20260703-000001",
-  "clusterId": "prod-a",
-  "writerBrokerId": "broker-7",
-  "writerEpoch": 42,
-  "createdAtMillis": 1783036800000,
-  "walProfile": "OBJECT",
-  "compression": "ZSTD",
-  "encryption": "AES_GCM_256",
-  "streamSliceCount": 128,
-  "payloadBlockCount": 64,
-  "minPublishTime": 1783036800000,
-  "maxPublishTime": 1783036810000
-}
-```
-
-### 4.3 StreamSliceDirectory
-
-Stream slices 按 `streamId` 排序。排序不是正确性要求，但能改善 footer/index 查询和
-compaction 顺序读。
-
-```json
-{
-  "slices": [
-    {
-      "streamId": "s-123",
-      "sliceId": "wo-20260703-000001/s-123/0",
-      "relativeBaseOffset": 0,
-      "entryCount": 4096,
-      "recordCount": 65536,
-      "payloadOffset": 8388608,
-      "payloadLength": 67108864,
-      "entryIndexOffset": 259522560,
-      "entryIndexLength": 8192,
-      "checksum": "crc32c:...",
-      "schemaIds": ["schema-1", "schema-2"],
-      "minEventTime": 1783036800000,
-      "maxEventTime": 1783036810000
-    }
-  ]
-}
-```
-
-字段语义：
-
-| 字段 | 含义 |
+| Field | v1 value |
 | --- | --- |
-| `relativeBaseOffset` | slice 内第一条 record 的相对 offset，最终 base offset 由 Oxia commit 返回 |
-| `entryCount` | Pulsar entry 数量 |
-| `recordCount` | 展开 batch 后的 record 数量 |
-| `payloadOffset/Length` | 该 slice 在 object 内的物理范围 |
-| `entryIndexOffset/Length` | entry index 在 object 内的位置 |
-| `schemaIds` | slice 中出现的 schema id 集合，用于 compaction 转列式 |
+| magic | ASCII `NRS1` |
+| format major/minor | `1 / 0` |
+| object type id | `1` (`MULTI_STREAM_WAL_OBJECT`) |
+| fixed-width byte order | little endian |
+| common header length | 48 bytes |
+| section header length | 16 bytes |
+| checksum | CRC32C |
+| compression | `NONE` only |
+| encryption info | empty only |
+| payload format | `OPAQUE_RECORD_BATCH` only |
+| entry-index location | `OBJECT_FOOTER` only |
 
-### 4.4 PayloadBlock
+Durable section ids：
 
-PayloadBlock 保存 Pulsar entry 或 Kafka record batch 的原始行式数据。
+| Section | Id |
+| --- | --- |
+| `WAL_OBJECT_HEADER` | 1 |
+| `STREAM_SLICE_DIRECTORY` | 2 |
+| `PAYLOAD_BLOCK` | 3 |
+| `ENTRY_INDEX` | 4 |
+| `FOOTER` | 5 |
 
-```json
-{
-  "blockId": 12,
-  "streamId": "s-123",
-  "compression": "ZSTD",
-  "uncompressedLength": 33554432,
-  "compressedLength": 8388608,
-  "checksum": "crc32c:...",
-  "payloadFormat": "PULSAR_ENTRY_BATCH"
-}
-```
+### 3.2 Common header
 
-`payloadFormat` 可选：
-
-- `PULSAR_ENTRY_BATCH`
-- `KAFKA_RECORD_BATCH`
-- `NORMALIZED_ROW_BATCH`
-
-目标格式是 `PULSAR_ENTRY_BATCH`，KoP 在协议层做 Kafka projection。若后续为了
-Kafka 性能引入 `KAFKA_RECORD_BATCH`，也必须映射回同一个 stream offset truth。
-
-## 5. Pulsar Entry Index
-
-Entry index 负责把 Pulsar `entryId + batchIndex` 映射到 stream record offset。
-
-```json
-{
-  "virtualLedgerId": 9007199254740993,
-  "entryBaseId": 0,
-  "segmentStartOffset": 1048576,
-  "segmentEndOffset": 1114112,
-  "entries": [
-    {
-      "entryId": 10,
-      "relativeBaseOffset": 34,
-      "recordCount": 20,
-      "payloadOffset": 8192,
-      "payloadLength": 16384,
-      "batchMetadataOffset": 1024,
-      "publishTime": 1783036800010,
-      "eventTime": 1783036800000,
-      "schemaId": "schema-1",
-      "txnId": "optional",
-      "flags": ["BATCHED"]
-    }
-  ]
-}
-```
-
-映射规则：
+Encoded fields in order：
 
 ```text
-entryBaseOffset = offsetIndex.offsetStart + entry.relativeBaseOffset
-recordOffset = entryBaseOffset + batchIndex
+magic[4]
+formatMajor: int32
+formatMinor: int32
+objectType: int32
+flags: int32
+headerLength: int32
+footerOffset: int64
+footerLength: int32
+headerChecksum: uint32
+objectChecksum: uint32
+encryptionInfoLength: int32
 ```
 
-非 batch entry 的 `recordCount = 1`，`batchIndex` 为空或 0。Batch entry 的
-`recordCount > 1`，`batchIndex` 必须落在 `[0, recordCount)`。
+Checksum rules：
 
-Entry index 存放策略：
+- `headerChecksum` covers the 48-byte header with both checksum fields zeroed；
+- `objectChecksum` covers the full object with only its own field zeroed；
+- API CRC32C value uses lowercase 8-character hex；
+- `storageChecksum` covers exact uploaded bytes including populated `objectChecksum`，and is passed to
+  `ObjectStore.putObject`；
+- every section checksum covers its payload only。
 
-| 大小 | 存放位置 |
-| --- | --- |
-| 小于 16 KiB | 内联在 Oxia offset index value |
-| 16 KiB 到 4 MiB | WAL object footer |
-| 大于 4 MiB | 独立 index object，Oxia 只存引用 |
-
-## 6. Oxia Offset Index Entry
-
-Offset index entry 是读路径、cursor、retention、compaction、SBT/SDT 的共同索引。
-
-Key：
+### 3.3 Section envelope
 
 ```text
-/streams/{streamId}/offset-index/{offsetEnd}/{generation}
+sectionType: int32
+sectionVersion: int32             // v1 requires 1
+sectionLength: int32
+sectionChecksum: uint32
+payload[sectionLength]
 ```
 
-Value：
+The decoder verifies section bounds/checksum before interpreting payload。Current decoder rejects newer
+minor versions instead of silently skipping unknown sections；future compatibility needs explicit tests before
+loosening this rule。
 
-```json
-{
-  "streamId": "s-123",
-  "generation": 17,
-  "offsetStart": 1048576,
-  "offsetEnd": 1114112,
-  "cumulativeSize": 9876543210,
-  "objectId": "wo-20260703-000001",
-  "objectKey": "prod-a/wal/2026/07/03/wo-20260703-000001",
-  "objectType": "MULTI_STREAM_WAL_OBJECT",
-  "physicalFormat": "ROW_WAL",
-  "logicalFormat": "PULSAR_ENTRY_BATCH",
-  "objectOffset": 8388608,
-  "objectLength": 67108864,
-  "entryIndexRef": {
-    "location": "OBJECT_FOOTER",
-    "offset": 259522560,
-    "length": 8192,
-    "checksum": "crc32c:..."
-  },
-  "virtualLedgerId": 9007199254740993,
-  "entryBaseId": 0,
-  "recordCount": 65536,
-  "entryCount": 4096,
-  "minEventTime": 1783036800000,
-  "maxEventTime": 1783036810000,
-  "supersedes": [],
-  "commitVersion": 88
-}
+## 4. WAL object header
+
+Current logical fields：
+
+```text
+objectId
+cluster
+writerId
+writerRunIdHash
+writerEpoch
+writerVersion
+createdAtMillis
+compression
+streamSliceCount
+payloadBlockCount
+minEventTimeMillis
+maxEventTimeMillis
 ```
 
-读路径：
+`writerRunIdHash` prevents object id/key collisions after process restart when local sequence restarts。
+`cluster`、writer/object/slice dynamic path components are encoded before entering keys。
 
-1. 找到第一个 `offsetEnd > targetOffset` 的候选 entry。
-2. 如果存在多个 generation，选择可见 generation 最大且覆盖目标 offset 的 entry。
-3. 根据 `objectType` 选择 WAL reader 或 compacted object reader。
-4. 根据 `entryIndexRef` 定位 Pulsar entry 或 Kafka record。
+## 5. Stream slice descriptor
 
-`cumulativeSize` 是该 stream 到 `offsetEnd` 为止的累计 logical bytes，用于 backlog、
-quota、retention、compaction window 和 billing。
+Current descriptor：
 
-## 7. Per-stream Compacted Object
-
-Compacted object 是 per-stream、read-optimized、columnar 的物理对象。默认格式是
-Parquet，表格式由 Iceberg/Delta/Hudi catalog 管理。
-
-```json
-{
-  "objectId": "co-s-123-1048576-1114112-g18",
-  "streamId": "s-123",
-  "generation": 18,
-  "offsetStart": 1048576,
-  "offsetEnd": 1114112,
-  "recordCount": 65536,
-  "entryCount": 4096,
-  "physicalFormat": "PARQUET",
-  "compression": "ZSTD",
-  "schemaId": "schema-1",
-  "rowGroupIndex": [
-    {
-      "rowGroupId": 0,
-      "offsetStart": 1048576,
-      "offsetEnd": 1064960,
-      "fileOffset": 4096,
-      "length": 8388608,
-      "minEventTime": 1783036800000,
-      "maxEventTime": 1783036805000
-    }
-  ],
-  "checksum": "crc32c:..."
-}
+```text
+sliceOrdinal
+streamId
+sliceId
+writerEpoch
+relativeBaseOffset
+entryCount / recordCount
+logicalBytes
+payloadOffset / payloadLength
+entryIndexOffset / entryIndexLength
+sliceChecksum
+payloadFormat
+min/max event time
+canonical schema refs
 ```
 
-Compacted object 必须保留 offset、publish time、event time、key、producer metadata、
-schema id、transaction marker、batch 信息等字段，以便投影回 Pulsar/Kafka 语义。
+Rules：
 
-## 8. SBT Metadata
+- encoded slices are deterministic by stream id then request order；
+- `sliceOrdinal` is assigned after final ordering；
+- `sliceId = objectId + "/" + zero-padded ordinal` and never contains final stream offset；
+- `relativeBaseOffset` is normally zero in Phase 1；final base offset comes from head commit；
+- `logicalBytes` is uncompressed caller-visible payload size；
+- `sliceChecksum = CRC32C(slicePayloadBytes || encodedEntryIndexBytes)`；
+- descriptor and entry-index ranges stay within object bounds and cannot overflow。
 
-SBT 是内建 lakehouse 表。每个 stream 至少对应一个系统管理表：
+## 6. Entry index v1
 
-```json
-{
-  "tableType": "STREAM_BACKED_TABLE",
-  "streamId": "s-123",
-  "tableName": "tenant.namespace.topic.partition0",
-  "catalog": "iceberg",
-  "snapshotId": 202607030001,
-  "offsetStart": 1048576,
-  "offsetEnd": 1114112,
-  "indexGeneration": 18,
-  "dataFiles": [
-    {
-      "objectId": "co-s-123-1048576-1114112-g18",
-      "path": "prod-a/compacted/s-123/1048576-1114112.parquet",
-      "format": "PARQUET",
-      "recordCount": 65536,
-      "fileSizeBytes": 67108864
-    }
-  ],
-  "commitState": "COMMITTED"
-}
+```text
+EntryIndex
+  entryCount
+  recordCount
+  EntryIndexItem[]
+
+EntryIndexItem
+  entryOrdinal
+  relativeBaseOffset
+  recordCount
+  payloadOffset / payloadLength
+  eventTimeMillis
+  canonical attributes
 ```
 
-SBT 规则：
+Validation：
 
-- stream 写入只通过 append path；
-- external engine 对 SBT read-only；
-- SBT snapshot 必须包含 `indexGeneration`；
-- catalog snapshot 落后于 stream offset index 是允许的，但不能领先到引用未提交 object；
-- repair worker 可以根据 Oxia offset index 重建 SBT metadata。
+- ordinals are zero-based and contiguous；
+- first relative offset is zero；following offsets equal previous offset + record count；
+- total record count matches header/slice；
+- payload ranges are non-negative/in-bounds；zero-length payload is legal；
+- Phase 1 opaque entries have `recordCount == 1`；
+- attributes use deterministic UTF-8 key order。
 
-## 9. SDT Metadata
+Mapping after logical commit：
 
-SDT 是外部交付模式。它可以把同一 stream range 交付到用户指定 catalog/table。
-
-```json
-{
-  "tableType": "STREAM_DELIVERED_TO_TABLE",
-  "streamId": "s-123",
-  "targetCatalog": "customer-iceberg",
-  "targetTable": "analytics.events",
-  "deliveryId": "sdt-20260703-000001",
-  "offsetStart": 1048576,
-  "offsetEnd": 1114112,
-  "sourceIndexGeneration": 18,
-  "state": "COMMITTED",
-  "retryCount": 0
-}
+```text
+recordOffset = committedRange.start + item.relativeBaseOffset
+objectByteOffset = slice.payloadOffset + item.payloadOffset
 ```
 
-SDT 失败不影响 stream visibility。SDT 使用至少一次提交 + 幂等 delivery id，外部表必须
-能通过 `(streamId, offsetStart, offsetEnd, deliveryId)` 去重。
+Future storage policy may choose inline/footer/index object by size，but current writer and reader support
+only footer。`INLINE` and `INDEX_OBJECT` are API/metadata reservations，not implemented format support。
 
-## 10. Cursor Snapshot Object
+## 7. Footer and decode rules
 
-大的 individual ack holes 不进入 Oxia value。
+Footer contains：
 
-```json
-{
-  "objectType": "CURSOR_SNAPSHOT",
-  "streamId": "s-123",
-  "subscription": "sub-a",
-  "snapshotVersion": 42,
-  "markDeleteOffset": 1048576,
-  "ranges": [
-    {"start": 1048610, "end": 1048620}
-  ],
-  "checksum": "crc32c:..."
-}
+```text
+footerChecksum
+objectId
+sliceCount
+reserved entry-index-directory offset/length
+full slice descriptors
 ```
 
-Oxia cursor state 只存 snapshot ref、version 和小 range cache。
+Decoder order：
 
-## 11. Transaction Snapshot Object
+1. verify minimum length、magic、version、object type and supported header shape；
+2. verify header checksum；
+3. verify object checksum；
+4. scan and verify every section；
+5. verify footer offset/length and footer checksum；
+6. decode descriptors and validate all referenced bounds；
+7. reject trailing/corrupt payloads with `UNSUPPORTED_FORMAT`。
 
-Transaction buffer、abort range 或 pending ack 过大时写入 snapshot object。
+Checksum-valid but structurally invalid bytes remain invalid；CRC is not a schema validator。
 
-```json
-{
-  "objectType": "TXN_SNAPSHOT",
-  "coordinatorId": "tc-1",
-  "txnId": "txn-123",
-  "state": "ABORTED",
-  "affectedRanges": [
-    {
-      "streamId": "s-123",
-      "offsetStart": 1048576,
-      "offsetEnd": 1048600
-    }
-  ],
-  "checksum": "crc32c:..."
-}
+## 8. Object identity and lifecycle
+
+Current Object WAL key is deterministic from cluster、writer identity/run and object sequence。The exact
+builder lives in `DefaultWalObjectWriter` and shared key helpers。
+
+Lifecycle domains：
+
+```text
+bytes uploaded
+  -> manifest validated
+  -> zero or more stream slices logically committed
+  -> references repaired/audited
+  -> eligible for GC only when all slice/task/reader/catalog references are gone
 ```
 
-Reader 必须在 dispatch 前加载可见 transaction/abort metadata，避免暴露 aborted records。
+An object with no reachable committed slice is orphan。An object with one committed slice and one orphan slice
+is not deletable as a whole。
 
-## 12. GC 引用模型
+## 9. Offset-index record boundary
 
-一个 object 可被多类引用持有：
+Offset index is Oxia metadata，not an object section。For a generation it includes at least：
 
-- Oxia offset index entry；
-- SBT catalog snapshot；
-- SDT delivery metadata；
-- active cursor/read handle；
-- compaction task；
-- recovery task。
+```text
+streamId / offset range / generation
+physical target identity and byte range
+payload format / schema refs
+entry-index reference
+slice checksum
+projection identity
+commitVersion
+```
 
-GC 只能删除满足全部条件的 object：
+Generation 0 is repairable from reachable append commit。Higher generations are conditionally published by
+F4。The current Java type is object-specific；BookKeeper support requires a proper physical-target union。
 
-1. 不再被任何 active offset index entry 引用；
-2. 不再被 SBT/SDT active snapshot 引用；
-3. 不再被 cursor low-watermark 保护；
-4. 不再被 compaction/recovery task 引用；
-5. orphan TTL 到期；
-6. checksum/audit 状态明确。
+## 10. Designed compacted object
 
-## 13. Ursa-like 与 AutoMQ-like 对齐状态
+> Status: Designed
 
-Ursa-like sync profile 已对齐：
+A compacted object is per-stream and covers a declared half-open offset range。Required logical columns/fields：
 
-- multi-stream WAL object；
-- metadata/offset index 驱动读路径；
-- row-based WAL 到 per-stream columnar compacted object；
-- stream-table duality；
-- compaction 替换 index 而不是改写 stream offset。
+- stream offset and record identity；
+- publish/event time、key、payload/normalized fields；
+- schema reference；
+- producer/sequence and transaction visibility metadata；
+- Pulsar entry/batch projection information；
+- source generation/checksum lineage。
 
-AutoMQ-like async profile 复用：
+Default target is Parquet with row-group offset bounds。Before implementation F4 must freeze：
 
-- primary WAL object / BK range 到 read-optimized object 的后台 materialization；
-- generation replacement 作为后台发布点；
-- SBT/SDT metadata 作为已 materialized ranges 的 lakehouse 投影；
-- GC 以 published generation、cursor、reader 和 task 引用为准。
+- projection-preserving schema；
+- row-group index/checksum semantics；
+- topic-compaction tombstone/coverage behavior；
+- higher-generation publish and fallback validation。
 
-增强点：
+## 11. Designed snapshot objects
 
-- 支持 Pulsar virtual ledger projection；
-- 支持 Pulsar entry/batch index；
-- 支持 cursor snapshot 和 pending ack snapshot；
-- 支持 SBT/SDT 两种 lakehouse 暴露。
+> Status: Designed
 
-当前设计关注点：
+Common snapshot rules：
 
-- multi-stream WAL object 必须允许每个 stream slice 独立可见；
-- entry index 必须能在 Oxia inline、object footer、独立 index object 之间平滑切换；
-- compacted object 必须保留足够字段以投影回 Pulsar/Kafka 语义；
-- SBT catalog snapshot 不能领先 Oxia offset index；
-- SDT metadata 必须支持幂等 delivery；
-- GC 必须以 Oxia offset index、cursor low-watermark、catalog snapshot 和 active task 引用为准。
+- immutable bytes with version、owner identity、base state and checksum；
+- authoritative only when an Oxia CAS record references the exact object/version/checksum；
+- upload-before-CAS failure creates orphan；
+- replacement keeps old snapshot protected until the new reference is durable and readers release it。
 
-## 14. 参考
+### Cursor snapshot
 
-- 总体架构：`pip/Nereus/nereus-overall-architecture.md`
-- Ursa VLDB paper: <https://www.vldb.org/pvldb/vol18/p5184-guo.pdf>
-- Oxia documentation: <https://oxia-db.github.io/docs/what-is-oxia>
+Contains normalized half-open ack ranges、base mark-delete、cursor/snapshot version and optional partial-batch
+projection data。
+
+### Transaction snapshot
+
+Contains affected stream ranges、pending-ack/abort state and transaction identity。Transaction terminal state，
+not snapshot existence，controls visibility。
+
+## 12. Designed table files
+
+> Status: Designed
+
+SBT/SDT files carry lineage：
+
+```text
+streamId
+offsetStart / offsetEnd
+source generation and commit lineage
+object ids/checksums
+schema snapshot
+catalog snapshot or delivery id
+```
+
+SBT may reuse compacted objects。SDT can create target-specific files。Catalog commits never change stream
+offsets or producer acknowledgement。
+
+## 13. Format evolution
+
+- Major version changes incompatible required semantics。
+- Minor version may add optional sections only after reader skip/compatibility rules are implemented and tested。
+- Durable numeric ids are registry values，not Java enum ordinals。
+- New compression must define compressed/uncompressed offsets、checksums and `ReadBatch` source ranges。
+- New encryption must define header visibility、nonce/key ref、range-read and checksum order。
+- New entry-index location needs writer、metadata codec、resolver、reader and migration tests together。
+- Golden bytes are required for every durable encoder change。
+
+## 14. GC reference model
+
+An object can be protected by：
+
+- reachable primary append；
+- visible offset-index generation；
+- reader lease/cache pin；
+- cursor/transaction snapshot ref；
+- materialization/compaction/repair task；
+- SBT/SDT catalog snapshot/delivery；
+- retention/orphan grace policy。
+
+GC may use object listing to find candidates，but all deletion decisions are validated against authoritative
+metadata and ownership。
+
+## 15. Implementation sources
+
+- Object WAL code：`../../nereus-object-store/src/main/java/io/nereus/objectstore/wal/`
+- Exact Phase 1 design：`../phase-1-core-stream-storage/03-object-wal-and-index.md`
+- Object WAL review：`../phase-1-core-stream-storage/11-m3-object-wal-review-2026-07-08.md`
+- Commit semantics：`nereus-commit-protocol.md`
+- F4 target：`nereus-future4-compaction-generation.md`
+- F6 target：`nereus-future6-lakehouse-sbt-sdt.md`

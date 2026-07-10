@@ -3,7 +3,7 @@
 本文定义 Phase 1 的 object store abstraction、object WAL writer/reader、stream slice 和 entry
 index 设计。Phase 1 只实现 WAL object，不实现 compacted object writer。
 
-M3 implementation status, 2026-07-08:
+M3 implementation status, verified 2026-07-10:
 
 - `nereus-object-store` now exposes the production `ObjectStore` API, object options/results, CRC32C
   helper, and shared range validation；
@@ -11,7 +11,7 @@ M3 implementation status, 2026-07-08:
   envelopes, footer, deterministic slice descriptors, `OBJECT_FOOTER` entry indexes, storage checksum,
   and WAL canonical object checksum；
 - `DefaultWalObjectReader` reads the full resolved slice payload plus footer entry index, verifies
-  `slicePayloadBytes || entryIndexBytes`, clips by offset/record/byte limits, and uses an injected
+  `concat(slicePayloadBytes, entryIndexBytes)`, clips by offset/record/byte limits, and uses an injected
   `ReadResourceGuard` plus `WalReadObserver` for M5 core integration；
 - `LocalFileObjectStore` lives under `src/testFixtures` only. It gives tests immutable put, head, range
   read, path traversal rejection, duplicate `ifAbsent` handling, checksum validation, and
@@ -28,7 +28,7 @@ Review correction: `11-m3-object-wal-review-2026-07-08.md` found two completion 
 read byte-budget classification could incorrectly return `READ_LIMIT_TOO_SMALL`, and
 `LocalFileObjectStore` did not reject final symlink escape. Both have now been fixed with focused tests;
 the same fix pass also wraps checksum-consistent invalid WAL/index metadata as `UNSUPPORTED_FORMAT`.
-Final M3 acceptance still requires rerunning the Gradle gate.
+`./gradlew :nereus-object-store:test phase1Check check` passed on 2026-07-10；M3 is complete.
 
 ## 1. Object Store Responsibility
 

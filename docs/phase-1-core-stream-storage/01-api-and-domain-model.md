@@ -1,7 +1,7 @@
 # 01 API and Domain Model
 
-本文定义 Phase 1 需要演进的 Java API、value object、错误语义和包边界。目标是让后续实现
-可以直接按这里拆类，而不是在写代码时重新发明 API。
+本文定义 Phase 1 已落地的 Java API、value object、错误语义和包边界，以及 M4-M6 必须遵守的
+execution contract。Target profile reservations 与当前 executable support 会明确区分。
 
 ## 1. API Principles
 
@@ -86,17 +86,18 @@ public record StreamCreateOptions(
 }
 ```
 
-Phase 1 implementation starts from the legacy `StorageProfile.OBJECT_WAL` / `OBJECT_WAL_SYNC_OBJECT`
-path, but the public enum reserves BookKeeper/Object WAL and sync/async object materialization profiles so
-topic-level policy can be added without renaming the API.
+Phase 1 execution supports the legacy `StorageProfile.OBJECT_WAL` /
+`OBJECT_WAL_SYNC_OBJECT` path。The enum reserves BookKeeper/Object WAL and sync/async object
+materialization names so future policy does not require renaming the API，but those names are not current
+execution support。
 `attributes` are opaque stream-level metadata stored in `StreamMetadataRecord` and returned by
 `getStreamMetadata`. They are not used for partitioning, visibility, or object keys.
 
 Validation:
 
 - `StorageProfile.OBJECT_WAL` is a compatibility alias for `OBJECT_WAL_SYNC_OBJECT`；
-- M4 core append may initially reject profiles whose primary WAL reader/writer is not implemented, but
-  API value construction must not bake in a single profile；
+- M4 core append must reject every non-object-sync profile before WAL IO；API value construction and
+  metadata codecs still accept/canonicalize reserved names；
 - attribute keys and values must be non-null UTF-8 strings；
 - Phase 1 enforces `MAX_STREAM_ATTRIBUTES_ENCODED_BYTES = 16 KiB` for the total encoded map size because
   attributes live in metadata values；
@@ -331,7 +332,8 @@ DurabilityLevel defaultDurabilityLevel();
 ```
 
 `defaultDurabilityLevel()` returns `WAL_DURABLE_AND_INDEX_COMMITTED` for sync object materialization
-profiles and `WAL_DURABLE` for async or WAL-only profiles.
+profiles and `WAL_DURABLE` for async or WAL-only profiles。This helper describes target defaults；it does
+not make a reserved profile executable。
 
 Phase 1 state behavior:
 
@@ -462,9 +464,12 @@ public enum DurabilityLevel {
 }
 ```
 
-`WAL_DURABLE_AND_INDEX_COMMITTED` is the Ursa-like Phase 1 default. `WAL_DURABLE` is reserved for
-AutoMQ-like fast-ack profiles and still requires a stable stream offset/protocol projection before
-returning success.
+`WAL_DURABLE_AND_INDEX_COMMITTED` is the only Phase 1 execution boundary。M4 must reject
+`WAL_DURABLE` before WAL IO。
+
+Target semantics for future `WAL_DURABLE` are nevertheless fixed now：primary WAL durable + immutable
+commit intent + successful/replayed stream-head CAS + recoverable primary read target。It can defer
+generation-0 index confirmation and secondary materialization；it cannot return before stable offset commit。
 
 ### `AppendSession`
 
@@ -490,7 +495,7 @@ Rules:
 
 ### `AppendResult`
 
-Existing `AppendResult` should expand:
+The implemented `AppendResult` is:
 
 ```java
 public record AppendResult(
@@ -533,6 +538,11 @@ Rules:
   store checksum over exact uploaded bytes；
 - Future compaction must not change prior append result offsets；
 - Phase 1 public append returns `projectionRef=Optional.empty()`；`projectionRef` is not ordering truth。
+- the record is object-shaped and is sufficient only for the Phase 1 Object WAL path；BookKeeper support
+  must introduce a real generic primary read-target/result abstraction before execution，not sentinel
+  `ObjectId`/`ObjectKey` values；
+- success means the requested `AppendOptions.durabilityLevel` was achieved。Phase 1 accepts only strict
+  index-committed success；the result does not independently downgrade that contract。
 
 ## 6. Read and Resolve Domain
 
@@ -841,6 +851,8 @@ public enum ErrorCode {
     METADATA_CONDITION_FAILED,
     METADATA_INVARIANT_VIOLATION,
     READ_RESOLUTION_FAILED,
+    UNSUPPORTED_STORAGE_PROFILE,
+    UNSUPPORTED_DURABILITY_LEVEL,
     UNSUPPORTED_FORMAT
 }
 ```
@@ -870,6 +882,8 @@ Error codes:
 | `METADATA_CONDITION_FAILED` | yes | CAS conflict not classified above |
 | `METADATA_INVARIANT_VIOLATION` | no | committed metadata is internally inconsistent |
 | `READ_RESOLUTION_FAILED` | depends | resolver could not map offset to object range |
+| `UNSUPPORTED_STORAGE_PROFILE` | no | stream uses a valid reserved profile for which the current core has no end-to-end writer/reader/coordinator |
+| `UNSUPPORTED_DURABILITY_LEVEL` | no | append requests a valid durability boundary not implemented by the selected profile/current core |
 | `UNSUPPORTED_FORMAT` | no | payload format, compression, or entry-index location is not implemented in Phase 1 |
 
 Async rule:
@@ -911,6 +925,8 @@ Exception mapping:
 | Metadata codec | corrupt bytes, wrong record type, checksum mismatch | `METADATA_INVARIANT_VIOLATION` |
 | Metadata state machine | stale append epoch/token | `FENCED_APPEND` |
 | Metadata state machine | committed end changed | `OFFSET_CONFLICT` |
+| Core preflight | stream profile is not canonical Object WAL sync in Phase 1 | `UNSUPPORTED_STORAGE_PROFILE` |
+| Core preflight | durability is not `WAL_DURABLE_AND_INDEX_COMMITTED` in Phase 1 | `UNSUPPORTED_DURABILITY_LEVEL` |
 | Resolver | no covering index below committed end | `METADATA_INVARIANT_VIOLATION` |
 
 ## 10. Immutability and Validation

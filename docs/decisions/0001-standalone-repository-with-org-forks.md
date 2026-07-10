@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted for Phase 0.
+Accepted. The repository scaffold and product-owned modules are implemented；future Pulsar/KoP source-tree
+integration continues through organization forks.
 
 ## Context
 

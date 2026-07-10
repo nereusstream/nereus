@@ -1,6 +1,9 @@
 # Nereus Future 8：Advanced Pulsar Semantics
 
-> 本文定义 Nereus L1/L4 Pulsar 高级语义设计边界。Future 8 的目标是让 Nereus 不只是
+> 状态：Designed；当前仓库没有 advanced-semantics implementation
+> 前置：Future 2/3/4/7 的 projection、cursor、generation、routing contracts
+
+本文定义 Nereus L1/L4 Pulsar 高级语义设计边界。Future 8 的目标是让 Nereus 不只是
 > basic topic storage，而是完整面向 Pulsar-native 商业产品：Key_Shared、delayed delivery、
 > pending ack transaction、replicated subscription、schema/system topic bootstrap、topic
 > compaction、geo-replication 和 policy interaction 都必须投影到 `streamId + offset`。
@@ -21,6 +24,9 @@ Pulsar 产品真正难的部分：
 - namespace/topic policy interaction。
 
 这些能力不能回退到 BookKeeper ledger truth，也不能为每个高级语义引入独立 durable log。
+
+当前实现边界：schema/system-topic、transaction、delayed、replication 和 Key_Shared records/API 都
+尚未存在。下面的 keys、JSON 和 state machines 是 target design，不能作为当前 Phase 1 行为声明。
 
 ## 2. Scope
 
@@ -186,18 +192,22 @@ Pending ack transaction state:
 State machine:
 
 ```text
-OPEN -> COMMITTING -> COMMITTED
+OPEN -> COMMITTING(decision durable) -> COMMITTED
 OPEN -> ABORTING -> ABORTED
 ```
 
 Commit rules:
 
-1. Validate transaction state.
-2. Apply pending ack ranges to Future 3 cursor state with CAS.
-3. Publish transaction state `COMMITTED`.
-4. Release pending ack snapshot references.
+1. CAS `OPEN -> COMMITTING` and persist an immutable commit decision/apply id；after this point abort is not
+   allowed.
+2. Apply pending ack ranges to Future 3 cursor state with CAS，recording the apply id so retry is idempotent.
+3. CAS transaction state `COMMITTING -> COMMITTED` after cursor state proves the apply id.
+4. Release pending-ack snapshot references only after terminal state and reader leases are safe.
 
-Abort rules:
+Recovery of `COMMITTING` always completes steps 2-3。A crash after cursor CAS but before terminal transaction
+CAS therefore cannot later choose abort or silently roll back acknowledged progress。
+
+Abort rules（only before a commit decision）：
 
 1. Mark transaction `ABORTED`.
 2. Do not advance cursor ack truth.
@@ -355,7 +365,7 @@ discardable and must be invalidated through notifications.
 | --- | --- |
 | Broker crashes during Key_Shared rebalance | New broker recovers assignment epoch and cursor state |
 | Broker crashes with delayed timers in memory | Timers rebuild from delayed index |
-| Pending ack txn commit CAS loses | Transaction retries or aborts without advancing cursor incorrectly |
+| Pending ack txn CAS loses before commit decision | Refresh and retry or abort from `OPEN`；after `COMMITTING`, recovery must finish the idempotent cursor apply and terminal commit |
 | Transaction buffer marker missing | Reader keeps records hidden until transaction state resolves |
 | Replicated subscription update duplicated | Target applies idempotently by source offset/version |
 | System topic bootstrap interrupted | Bootstrap state resumes from Oxia stage marker |
@@ -390,7 +400,7 @@ No advanced feature may introduce a second durable log or use broker local disk 
 
 ## 17. Future Gate
 
-Future 8 design is ready to move into implementation planning when the following are reviewed:
+Future 8 may enter implementation planning only after the following are reviewed:
 
 - Key_Shared assignment and drain boundary；
 - delayed delivery durable index and recovery；

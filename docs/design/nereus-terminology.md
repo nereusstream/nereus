@@ -1,195 +1,152 @@
 # Nereus Terminology
 
-> Nereus uses stream terminology for internal correctness. Pulsar ledger terms and Kafka log terms
-> are protocol projections, not storage truth.
+> 状态：Current
+> 适用范围：总体设计、Future 1-8、Phase 1 代码级设计和实现注释
 
-## 1. Core Terms
+Nereus 以 stream 术语描述内部正确性。Pulsar ledger、Kafka log、对象和表都是投影或物理
+承载，不能取代逻辑 truth。
 
-| Term | Meaning | Layer |
+## 1. Truth hierarchy
+
+| Term | 精确定义 | 当前 owner |
 | --- | --- | --- |
-| Nereus | Pulsar-native shared-storage streaming engine built on Oxia and shared object storage | product |
-| Stream | Internal durable ordered record sequence for a topic partition | L0 |
-| `streamId + offset` | The only internal truth for ordering, visibility, cursor progress, trim, compaction, and lakehouse | L0 |
-| Stream offset | Dense, monotonically increasing record offset assigned at Oxia commit time | L0 |
-| Append session | Oxia-fenced write session for a stream | L0/L4 |
-| Fencing token | Monotonic token checked on visible commit | L0/L4 |
-| BookKeeper WAL | BookKeeper-backed primary WAL used by latency-oriented profiles | L0 |
-| Object WAL | Write-ahead log stored in object storage | L0 |
-| Storage profile | Topic/stream-level choice of primary WAL and object materialization mode | L0/L1/L2 |
-| Ursa-like profile | Append profile that waits for WAL durability plus synchronous Oxia-visible commit before ack | L0 |
-| AutoMQ-like profile | Append profile that acks after primary WAL durability and lets background workers materialize read-optimized object ranges | L0/L3 |
-| Object materialization | Copying or transforming WAL ranges into object-backed read/retention/lakehouse ranges | L0/L3 |
-| Multi-stream WAL object | One physical object containing slices for multiple streams | L0 |
-| Stream slice | The part of a WAL object belonging to one stream | L0 |
-| Offset index | Oxia index mapping stream offset ranges to physical object ranges | L0 |
-| Object manifest | Oxia metadata describing object identity, checksum, format, references, and visibility | L0 |
-| Read resolver | Component that maps `streamId + offset` to WAL/compacted object range and entry index | L0 |
-| Compacted object | Read-optimized per-stream object that preserves offsets | L3 |
-| Generation replacement | Compaction mechanism that changes offset index targets without changing offsets | L3 |
-| SBT | Stream-Backed Table: built-in table view backed by committed stream objects | L3 |
-| SDT | Stream-Delivered-to-Table: delivery into external table/catalog targets | L3 |
-| Preferred broker | Routing/locality hint for cache and batching, not durable ownership | L4 |
-| Brown-out | State where a broker is degraded and removed from preferred routing before hard failure | L4 |
+| Logical coordinate | `streamId + offset`；排序、trim、cursor、replication 的统一坐标 | L0 API |
+| Stream head | 单 stream authoritative record；保存 committed end、commit version、last commit id、trim 和 session snapshot | Oxia |
+| Reachable commit | 从 stream head 的 `lastCommitId` 可达的 immutable commit-log record | Oxia |
+| Append truth | stream head + reachable commit-log chain；决定某个 offset range 是否逻辑提交 | Oxia |
+| Primary WAL bytes | append payload 的第一份 durable bytes；可以在 BookKeeper 或 object store | WAL layer |
+| Generation-0 read index | 从 reachable commit 物化的 primary read target；丢失时可 repair | Oxia derived index |
+| Higher generation | compaction/materialization 发布的替代物理读目标；不改变 offset | Oxia generation index |
+| Object manifest | object identity、format、checksums、slices 和引用审计状态；不是 append truth | Oxia + object store |
+| Object bytes | immutable WAL/compacted/index/snapshot/table bytes | object store |
+| Watch notification | cache invalidation/refresh hint；允许丢失、重复、乱序、合并 | Oxia watch |
 
-## 2. Pulsar Projection Terms
+“Oxia is the authority”应具体说明是哪一种状态。不要笼统地把 offset index 写成 append truth：
+Phase 1 中 append 线性化 truth 是 stream head，offset index 是读路径物化索引。
 
-| Term | Nereus Meaning |
+## 2. Append and durability terms
+
+| Term | Meaning |
 | --- | --- |
-| ManagedLedger facade | Compatibility layer that lets Pulsar broker runtime use Nereus storage |
-| Ledger | Virtual ledger projection over committed stream ranges |
-| Entry | Pulsar entry projection over one or more stream offsets |
-| `Position(ledgerId, entryId)` | External Pulsar coordinate mapped to an entry offset range |
-| `MessageId(ledgerId, entryId, batchIndex)` | Stable Pulsar protocol coordinate projected from `streamId + offset` |
-| ManagedCursor | Cursor facade backed by Oxia cursor state and optional object snapshots |
-| Mark-delete | Cursor committed offset, expressed internally as stream offset |
-| Individual ack holes | Stream offset ranges or snapshots, not BookKeeper cursor ledger truth |
+| Append session | stream-scoped writer session；epoch/token 被 stream-head CAS 校验，不等于 durable ownership |
+| Fencing token | 拒绝 stale writer 的单调 session identity |
+| Commit intent | head CAS 前写入的 immutable commit-log record；单独存在时不可见 |
+| Append linearization point | stream-head `putIfVersion` 成功 |
+| Stable offset | 已由 successful head CAS 固化、可从 reachable commit 恢复的 offset |
+| Index materialization | 把 reachable commit 写成 generation-0 offset index 和 committed-slice marker |
+| Unknown final state | head CAS 已发出但 caller 无法确认结果；必须以同 commit identity replay/repair |
+| `WAL_DURABLE` | primary WAL durable + stable logical commit；不保证 derived read index 已物化 |
+| `WAL_DURABLE_AND_INDEX_COMMITTED` | 上述条件 + generation-0 read/replay indexes 已确认 |
 
-## 3. Kafka Projection Terms
+`WAL_DURABLE` 的名字描述额外等待边界，不允许解释为“WAL quorum/object put 完成就直接返回
+broker-local offset”。任何成功 append 都必须返回 stable offset/projection。
 
-| Term | Nereus Meaning |
+## 3. Storage profile terms
+
+| Term | Primary WAL | Object publication | Default durability | Status |
+| --- | --- | --- | --- | --- |
+| `OBJECT_WAL` | Object store | compatibility alias | strict | deprecated alias |
+| `OBJECT_WAL_SYNC_OBJECT` | Object store | generation-0 object target before ack | `WAL_DURABLE_AND_INDEX_COMMITTED` | Phase 1 target |
+| `OBJECT_WAL_ASYNC_OBJECT` | Object store | primary WAL committed first；read-optimized generation later | `WAL_DURABLE` | reserved |
+| `BOOKKEEPER_WAL_ONLY` | BookKeeper | disabled | `WAL_DURABLE` | reserved |
+| `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | object-backed target published synchronously | `WAL_DURABLE_AND_INDEX_COMMITTED` | reserved |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | object-backed target published by worker | `WAL_DURABLE` | reserved |
+
+Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套 engine：
+
+- **Ursa-like sync**：producer ack 等待 primary WAL、stable head commit 和要求的 read-index publish；
+- **AutoMQ-like async**：producer ack 仍等待 stable head commit，但不等待 secondary/read-optimized
+  object generation；
+- **BK-only**：没有 Nereus secondary object generation，仍使用同一 offset/session/projection truth。
+
+## 4. Object and read terms
+
+| Term | Meaning |
 | --- | --- |
-| Kafka offset | Equal to stream record offset |
-| Log end offset | Stream `committedEndOffset` |
-| Fetch offset | `streamId + offset` resolved through offset index |
-| Group offset | Oxia group offset state |
-| Leader epoch | Projection of stream epoch / routing generation, not broker durable leadership |
-| Transaction marker | Stream-visible marker plus Oxia transaction state |
+| Multi-stream WAL object | 一个 physical object 包含多个 stream slices |
+| Stream slice | 一个 WAL object 中属于一个 stream 的 immutable payload/index range |
+| Entry index | slice 内 entry boundaries 到 relative record offsets/physical bytes 的映射 |
+| Offset index | stream offset range 到 physical read target 的 generation-aware mapping |
+| Read resolver | 从 head/offset index/validated cache 解析 physical target，并在缺失 generation-0 index 时 repair |
+| Read target | BookKeeper range、object WAL slice 或 compacted object range；target abstraction 尚未在当前 API 泛化 |
+| Materialization | 从 primary WAL 复制/转换并发布 object-backed generation |
+| Compaction | 生成更适合读取或表查询的 per-stream object；可以是 materialization 的一种 |
+| Generation replacement | 发布更高 generation 以切换 physical target，不改变 logical offsets |
+| Orphan | bytes 或 metadata intent 存在，但没有被当前 authoritative state 引用 |
 
-## 4. Terms To Avoid
+## 5. Protocol projection terms
 
-Avoid these phrases in Nereus design docs:
+### Pulsar
 
-- "object storage decides visibility";
-- "broker owns partition";
-- "ledger is the storage truth";
-- "Kafka log and Pulsar log are separate durable logs";
-- "lakehouse commit is on the producer ack path";
-- "object list is used for correctness";
-- "local broker RocksDB stores durable cursor truth";
-- "Nereus is only tiered storage";
-- "Nereus is only a BookKeeper replacement";
-- "Nereus is AutoMQ for Pulsar";
-- "AutoMQ-like means object storage decides visibility";
-- "WAL durable alone is enough to invent protocol offsets".
+| Term | Nereus meaning |
+| --- | --- |
+| ManagedLedger facade | 让 Pulsar broker runtime 使用 `StreamStorage` 的兼容层 |
+| Virtual ledger | committed stream ranges 的稳定 Pulsar coordinate projection |
+| `Position(ledgerId, entryId)` | 通过 projection/entry index 映射到 stream entry range |
+| `MessageId(..., batchIndex)` | 映射到 entry 内具体 record offset |
+| ManagedCursor | Oxia cursor state + optional immutable snapshot object 的 facade |
+| Mark-delete | first not cumulatively acknowledged stream offset |
 
-Preferred language:
+### Kafka / KoP
 
-- "Oxia is the offset and visibility authority";
-- "broker is stateless for correctness";
-- "ManagedLedger is a compatibility facade";
-- "KoP is a protocol projection";
-- "SBT/SDT are lakehouse projections over committed stream offsets";
-- "object store stores bytes, not truth".
-- "AutoMQ-like is an async object-materialization profile over the same stream truth".
+| Term | Nereus meaning |
+| --- | --- |
+| Kafka offset | 等于 Nereus record offset |
+| Log end/high watermark | 由 stream head 的 `committedEndOffset` 派生 |
+| Fetch target | offset resolver 选择的 current physical generation |
+| Group offset | Kafka group 独有的 Oxia state；不等于 Pulsar cursor |
+| Leader | preferred broker projection；不是 durable partition owner |
 
-## 5. Naming
+## 6. Layer terms
 
-Product name:
+| Layer | Responsibility |
+| --- | --- |
+| L0 Core Stream Storage | offsets、sessions、WAL、head/commit-log、read index、resolve、trim |
+| L1 Pulsar Projection | ManagedLedger、Position/MessageId、cursor/subscription、Pulsar semantics |
+| L2 Kafka Projection | KoP produce/fetch/group/txn/leader projection |
+| L3 Materialization and Lakehouse | higher generations、compaction、SBT/SDT |
+| L4 Routing and Operations | membership、preferred routing、brown-out、cache/ops |
+
+## 7. Delivery terms
+
+- **Future 1-8**：稳定的 capability-track 编号，不代表统一处于未来。
+- **Phase 1**：当前 Future 1 的代码级交付阶段。
+- **M0-M6**：Phase 1 内部里程碑。
+- **Design gate**：进入实现规划前必须回答的问题。
+- **Implementation gate**：代码和测试必须通过的验收条件。
+
+## 8. Terms to avoid
+
+不要使用：
+
+- “offset index CAS 是 Phase 1 append 线性化点”；
+- “object manifest/object list 决定可见性”；
+- “`WAL_DURABLE` 可以返回临时 offset”；
+- “async profile 跳过 Oxia”；
+- “preferred broker owns the partition”；
+- “ledger/Kafka log 是 storage truth”；
+- “compaction 重新分配 offset”；
+- “lakehouse catalog 在 producer ack path”；
+- “Nereus is AutoMQ for Pulsar”；
+- “reserved profile 已经支持”。
+
+建议使用：
+
+- “stream-head CAS linearizes the append”；
+- “reachable commit-log records explain the committed range”；
+- “offset index materializes the read path”；
+- “higher generation changes location, not offset”；
+- “preferred broker is a locality hint”；
+- “object store stores bytes, not truth”。
+
+## 9. Naming
 
 ```text
-Nereus
+Product: Nereus
+Storage class: nereus
+Configuration prefix: nereus.*
+Repository modules: nereus-*
 ```
 
-Storage class:
-
-```properties
-managedLedgerStorageClassName=nereus
-```
-
-Configuration prefix:
-
-```properties
-nereus.*
-```
-
-Internal module prefix:
-
-```text
-pulsar-nereus-*
-```
-
-## 6. Future 1 Reading Notes
-
-When reviewing `pip/Nereus/nereus-future1-core-stream-storage.md`, keep these boundaries:
-
-- `StreamStorage` is L0 and must stay protocol-neutral.
-- `AppendResult` may include projection references, but projection references are not ordering truth.
-- `OffsetIndexEntry` is the read and visibility truth for committed ranges.
-- Object WAL durability is necessary but not sufficient for visibility.
-- Read resolver must start from Oxia offset index or a validated cache.
-- Cursor, KoP group, transaction pending ack, and lakehouse catalog are future projections over L0.
-- `StorageProfile` selects the primary WAL and object materialization mode; it must not create a second
-  offset truth.
-
-## 7. Future 2 Reading Notes
-
-When reviewing `pip/Nereus/nereus-future2-managed-ledger-facade.md`, keep these boundaries:
-
-- Broker-level `managedLedgerStorageClassName` is the `ManagedLedgerStorage` implementation class.
-- Policy-level `PersistencePolicies.managedLedgerStorageClassName` is the selected storage class name, such as `nereus`.
-- `ManagedLedgerFactory` and `ManagedLedger` are compatibility facades.
-- `ledgerId` in Nereus is a virtual projection id, not a BookKeeper ledger id.
-- `Position` is stable only through virtual ledger projection.
-- Full cursor semantics belong to Future 3, even if Future 2 exposes a basic cursor boundary.
-
-## 8. Future 3 Reading Notes
-
-When reviewing `pip/Nereus/nereus-future3-cursor-subscription.md`, keep these boundaries:
-
-- `markDeleteOffset` is the first not cumulatively acknowledged stream offset.
-- `readPositionOffset` is a dispatch/recovery hint, not ack truth.
-- Individual acknowledgments are half-open stream offset ranges above mark-delete.
-- Cursor snapshot objects are immutable; Oxia cursor state decides which snapshot is visible.
-- Cursor low-watermark protects stream data from trim and GC.
-- Key_Shared ordering, delayed delivery, pending ack transaction, and replicated subscription are Future 8 topics.
-
-## 9. Future 4 Reading Notes
-
-When reviewing compaction and generation replacement, keep these boundaries:
-
-- Compaction never changes stream offsets.
-- Generation replacement changes the object/index target for an offset range, not the logical range.
-- Readers choose the highest visible generation that covers the requested offset.
-- Old generations remain readable until cursor, reader, catalog, and task references are safe for GC.
-- Pulsar topic compaction and Kafka topic compaction share the same generation replacement primitive.
-
-## 10. Future 5 Reading Notes
-
-When reviewing KoP/Kafka compatibility, keep these boundaries:
-
-- Kafka offset is exactly the stream record offset.
-- KoP must not introduce a second durable log.
-- Kafka group offsets are not Pulsar subscription cursors, even though both use stream offsets.
-- Kafka leader and leader epoch are protocol projections over routing/stream epoch state.
-- Kafka transaction visibility must be derived from Nereus transaction state and stream markers.
-
-## 11. Future 6 Reading Notes
-
-When reviewing SBT/SDT lakehouse design, keep these boundaries:
-
-- Lakehouse catalog commits are not on the producer ack path.
-- Oxia offset index remains stream truth even when catalog snapshots lag.
-- SBT is a Nereus-managed table view over committed stream offsets.
-- SDT is external delivery and must be idempotent by stream range and delivery id.
-- Catalog repair can reconstruct table metadata from Oxia offset index and committed objects.
-
-## 12. Future 7 Reading Notes
-
-When reviewing routing and elasticity, keep these boundaries:
-
-- Preferred broker is a locality/cache/batching hint, not durable ownership.
-- Broker session and routing ring live in Oxia metadata.
-- Append session fencing, not routing preference, rejects stale commits.
-- Brown-out changes routing state; it does not move durable data.
-- Pulsar lookup and Kafka MetadataResponse must project the same routing truth.
-
-## 13. Future 8 Reading Notes
-
-When reviewing advanced Pulsar semantics, keep these boundaries:
-
-- Key_Shared, delayed delivery, pending ack transaction, replicated subscription, schema/system topics,
-  and geo-replication are Pulsar-native projections over L0/L1 state.
-- None of these features may create a second durable log.
-- Broker runtime state can optimize dispatch, but durable recovery state must live in Oxia or referenced
-  snapshot objects.
-- Geo-replication must make source/target stream offset translation explicit.
+Durable key components必须通过 `KeyComponentCodec`；offset/generation key 使用固定宽度编码。
+人类可读 alias 可以放 attributes，但不能替代 durable identity。

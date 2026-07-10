@@ -1,370 +1,278 @@
-# Nereus Future 拆分设计
+# Nereus Capability Tracks and Delivery Plan
 
-> 本文是 `pip/Nereus/nereus-overall-architecture.md` 的配套 future 拆分文档。
-> 当前阶段只定义模块边界、设计范围和后续技术文档结构；验证、benchmark、chaos 和
-> compatibility suite 在各 future 设计冻结后推进。
-> 写 future 文档前先阅读 `pip/Nereus/nereus-terminology.md`。
+> 状态：Current roadmap
+> `Future 1-8` 是稳定的能力轨道编号，不是“全部尚未开始”的阶段标签。
 
-## 1. 总体原则
+## 1. 交付原则
 
-Nereus 的目标架构一步到位，对标 Ursa 的 Oxia 控制面、共享对象数据面、
-stateless/leaderless broker、offset index、multi-stream WAL object、compaction 和
-lakehouse-native stream-table duality，同时保留 AutoMQ-like async object materialization
-profile。
-
-Future 拆分不是产品阶段缩水，而是把完整目标架构切成可设计、可评审、可实现的模块：
-
-- L0: Core Stream Storage
-- L1: Pulsar Compatibility Projection
-- L2: KoP / Kafka Compatibility Projection
-- L3: Compaction + Lakehouse
-- L4: Routing / Elasticity / Operations
-
-每个 future 都必须保持同一个内部真相：
+Nereus 的 north-star architecture 一次定义，工程按能力依赖增量交付。每个轨道必须保持：
 
 ```text
-streamId + offset
+logical truth = stream head + reachable commit log
+logical coordinate = streamId + offset
+physical selection = generation-aware read index
+protocol/table state = projection
 ```
 
-Pulsar `MessageId`、ManagedLedger `Position`、Kafka offset、cursor progress、lakehouse
-snapshot 都是这个内部坐标的外部投影或衍生状态。
+跨轨道规则：
+
+- 下层 API 不引入 Pulsar/Kafka 类型；
+- 所有成功 append 都有 stable offset，不允许 profile 跳过 Oxia head commit；
+- async 只延后 object/read-optimized generation，不延后逻辑提交；
+- higher generation 不改变 offsets/projections；
+- routing 不成为 durable ownership；
+- catalog 不进入 producer ack；
+- `Designed/Reserved` 不得写成 `Implemented`。
+
+## 2. 当前交付状态
+
+| Track | Delivery mapping | Status | Next gate |
+| --- | --- | --- | --- |
+| F1 Core Stream Storage | Phase 1 M0-M6 | In progress；M0-M3 complete | M4 append coordinator |
+| F2 ManagedLedger Facade | later phase | Designed | F1 append/read API stable |
+| F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
+| F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
+| F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
+| F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
+| F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
+| F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
+
+Current Phase 1 deliberately implements only `OBJECT_WAL_SYNC_OBJECT` execution。BookKeeper and async
+profiles are enum/metadata reservations until their target abstraction and state machines are implemented。
+
+## 3. Dependency graph
 
-每个 future 都必须把 storage profile 当成横切维度处理：
+```mermaid
+flowchart LR
+    F1["F1 Core Stream Storage"] --> F2["F2 ManagedLedger Facade"]
+    F1 --> F4["F4 Materialization / Compaction"]
+    F1 --> F7["F7 Routing / Elasticity"]
+    F2 --> F3["F3 Cursor / Subscription"]
+    F2 --> F5["F5 KoP / Kafka"]
+    F4 --> F5
+    F4 --> F6["F6 Lakehouse"]
+    F2 --> F8["F8 Advanced Pulsar"]
+    F3 --> F8
+    F4 --> F8
+    F7 --> F8
+    F5 -. shared retention/txn contracts .-> F8
+```
 
-- Ursa-like sync profile：append 等待 primary WAL durable + visible/read index commit；
-- AutoMQ-like async profile：append 不等待读优化对象发布，但必须返回稳定 offset/projection；
-- BK-only profile：Nereus 不接管对象化，但仍必须保持同一 facade、cursor、routing 和 protocol
-  projection；
-- future 文档不能默认只有 `OBJECT_WAL_SYNC_OBJECT`，除非该 future 明确说明其他 profile 的
-  fallback、defer 或 rejection 行为。
+这不是严格串行计划。F4 的 schema/worker、F7 的 routing metadata 可以在 F2 之前并行设计，
+但不能越过依赖它们的 correctness contracts。
 
-## 2. Future 1：Core StreamStorage + Object WAL
+## 4. F1 — Core Stream Storage
 
-Detailed design: `pip/Nereus/nereus-future1-core-stream-storage.md`.
+Detailed design: `nereus-future1-core-stream-storage.md`
+Code-level design: `../phase-1-core-stream-storage/README.md`
 
-### Motivation
+### Owns
 
-建立 Nereus 的共享 L0 核心：stream offset、primary WAL、Oxia offset/read index、
-commit-time offset assignment、read resolver，以及 Ursa-like / AutoMQ-like profile branch。
+- protocol-neutral `StreamStorage`；
+- stream identity/lifecycle；
+- append session and fencing；
+- primary WAL boundary and Object WAL v1；
+- stream head / commit log / generation-0 read index；
+- resolve/read/trim/recovery；
+- checksum、format、timeout、close contracts。
 
-### Scope
+### Does not own
 
-- `StreamStorage` API；
-- stream metadata；
-- append session；
-- object WAL writer；
-- BookKeeper WAL boundary；
-- storage profile metadata；
-- object manifest；
-- Oxia offset index；
-- commit-time offset assignment；
-- read resolver；
-- basic MessageId projection。
+- ManagedLedger/MessageId semantics；
+- durable cursor/group/transaction semantics；
+- higher-generation compaction workers；
+- routing and catalog operations。
 
-### Non-scope
+### Current implementation gate
 
-- 完整 ManagedLedger facade；
-- Shared/Key_Shared cursor 复杂语义；
-- KoP group/transaction；
-- lakehouse catalog；
-- routing brown-out。
+Phase 1 done requires M4-M6 and the full definition in
+`../phase-1-core-stream-storage/05-implementation-plan-and-tests.md`。BookKeeper/async profiles are not
+part of that done definition。
 
-### Design Gate
+## 5. F2 — ManagedLedger Facade
 
-Future 1 的设计必须能完整解释：
+Detailed design: `nereus-future2-managed-ledger-facade.md`
 
-- producer ack 线性化点；
-- `StorageProfile.defaultDurabilityLevel()` 如何映射 Ursa-like、AutoMQ-like 和 BK-only；
-- object upload 与 Oxia offset index commit 的顺序；
-- multi-stream WAL object 的 partial slice visibility；
-- stale epoch fencing；
-- `streamId + offset` 到 object range 的读路径。
+### Owns
 
-## 3. Future 2：ManagedLedger Facade
+- storage class `nereus`；
+- `ManagedLedgerFactory` and ManagedLedger facade；
+- Pulsar entry encoding；
+- virtual ledger / Position / MessageId projection；
+- topic open/load/unload and compatibility stats。
 
-Detailed design: `pip/Nereus/nereus-future2-managed-ledger-facade.md`.
+### Entry gate
 
-### Motivation
+- F1 append/read/trim error semantics stable；
+- projection reference contract stable；
+- generic physical target does not leak into broker API；
+- current object-shaped `AppendResult` is either intentionally retained for object-only rollout or
+  generalized before BookKeeper facade support。
 
-让 Pulsar broker 通过现有 ManagedLedger 形态接入 Nereus，同时不让旧 ledger 模型成为
-底层 truth。
+### Exit gate
 
-### Scope
+- Position remains stable across restart and future generation replacement；
+- append ack maps selected durability boundary to Pulsar callback once；
+- no broker path assumes virtual ledger id is a BookKeeper ledger id；
+- storage class coexistence/offload behavior is explicit。
 
-- `ManagedLedgerFactory`；
-- ManagedLedger-compatible runtime；
-- virtual ledger projection；
-- `Position(ledgerId, entryId)` 映射；
-- entry projection；
-- topic open/load/unload；
-- basic cursor 接入；
-- storage class `nereus`。
+## 6. F3 — Cursor and Subscription State
 
-### Non-scope
+Detailed design: `nereus-future3-cursor-subscription.md`
 
-- 改写 `PersistentTopic` 主流程；
-- 完整 Shared/Key_Shared ack hole 处理；
-- geo-replication；
-- delayed delivery。
+### Owns
 
-### Design Gate
+- mark-delete/read-position offsets；
+- individual ack ranges and snapshot objects；
+- cursor CAS and failover recovery；
+- Exclusive/Failover/Shared durable progress；
+- retention low-watermark contribution。
 
-Future 2 的设计必须能完整解释：
+### Entry/exit gates
 
-- 一个 committed stream range 如何形成 virtual ledger；
-- MessageId 如何稳定映射回 `streamId + offset`；
-- topic unload/reload 后如何恢复读写；
-- BookKeeper WAL profile 和 Object WAL profile 如何共用同一 facade。
-- sync profile 和 async profile 下 MessageId/Position 何时稳定返回。
+- F2 can map Position/MessageId to record ranges；
+- F1 resolver and trim contract is stable；
+- cursor snapshot ref is authoritative only through Oxia state；
+- ack/trim races and failover redelivery have deterministic tests；
+- Key_Shared/delayed/pending-ack remain F8。
 
-## 4. Future 3：Cursor / Subscription State
+## 7. F4 — Materialization, Compaction and Generation Replacement
 
-Detailed design: `pip/Nereus/nereus-future3-cursor-subscription.md`.
+Detailed design: `nereus-future4-compaction-generation.md`
 
-### Motivation
+### Owns
 
-把 Pulsar subscription 的 durable progress 从 BookKeeper cursor ledger 迁移到
-Oxia + object snapshot。
+- async materialization task/checkpoint/lag；
+- primary-WAL retention gate；
+- compaction planner/worker；
+- higher-generation publish and reader selection；
+- fallback and GC references；
+- topic-compaction primitive。
 
-### Scope
+### Entry gate
 
-- mark-delete offset；
-- read-position offset；
-- individual ack ranges；
-- cursor CAS；
-- cursor snapshot object；
-- Exclusive/Failover cursor；
-- Shared cursor；
-- cursor recovery；
-- retention low-watermark。
+- F1 generation-0 index and commitVersion contracts stable；
+- read target can represent every supported primary WAL；
+- conditional higher-generation publish schema is frozen；
+- source ranges and checksums form deterministic task identity。
 
-### Non-scope
+### Exit gate
 
-- Key_Shared 全量顺序优化；
-- pending ack transaction；
-- delayed delivery timer；
-- replicated subscription。
+- publish changes physical target only；
+- repair handles upload/publish/checkpoint partial states；
+- lag blocks unsafe primary-WAL GC；
+- old generations are retained until all reader/cursor/task/catalog references are safe。
 
-### Design Gate
+## 8. F5 — KoP / Kafka Projection
 
-Future 3 的设计必须能完整解释：
+Detailed design: `nereus-future5-kop-compatibility.md`
 
-- mark-delete 和 individual ack holes 如何并存；
-- cursor snapshot 与 Oxia small state 如何保持版本一致；
-- cursor update 与 trim/retention/GC 的安全关系；
-- broker failover 后 subscription 如何恢复。
+### Owns
 
-## 5. Future 4：Compaction + Generation Replacement
+- Kafka offset/base-offset projection；
+- Produce/Fetch and high-watermark mapping；
+- group coordinator state/offsets；
+- idempotent producer and Kafka transaction projection；
+- Kafka compaction and leader projection。
 
-Detailed design: `pip/Nereus/nereus-future4-compaction-generation.md`.
+### Entry/exit gates
 
-Related design basis: `pip/Nereus/nereus-storage-object-format.md` and
-`pip/Nereus/nereus-commit-protocol.md`.
+- Kafka offset is exactly Nereus record offset；
+- ProduceResponse only follows stable append result；
+- record-batch offset rewrite has layered checksum semantics；
+- group offsets remain separate from Pulsar cursors but participate in retention；
+- no second Kafka durable log or remote-log truth。
 
-### Motivation
+## 9. F6 — Lakehouse SBT / SDT
 
-让 primary WAL ranges 转换为 per-stream read-optimized object，并通过 Oxia generation
-replacement 原子切换读路径。对 AutoMQ-like profile，这也是 append ack 之后的核心
-object materialization worker。
+Detailed design: `nereus-future6-lakehouse-sbt-sdt.md`
 
-### Scope
+### Owns
 
-- compaction planner；
-- WAL object reader；
-- compacted object writer；
-- generation overlay；
-- highest-generation read resolver；
-- old generation fallback；
-- compaction checkpoint；
-- async materialization task/checkpoint boundary；
-- GC protection。
+- Stream-Backed Table and Stream-Delivered-to-Table；
+- Iceberg-first catalog adapter boundary；
+- lineage、snapshot、delivery idempotence、repair；
+- catalog object references and lag metrics。
 
-### Non-scope
+### Entry/exit gates
 
-- 外部 lakehouse catalog 完整提交；
-- SDT delivery；
-- topic compaction 的全部协议细节。
+- F4 higher generations and compacted object schema stable；
+- table snapshot references only logically committed ranges；
+- catalog lag/failure does not affect stream visibility；
+- repair order begins with stream head/reachable commits and derived index, never object list；
+- catalog reference prevents unsafe object GC。
 
-### Design Gate
+## 10. F7 — Routing, Brown-out and Elasticity
 
-Future 4 的设计必须能完整解释：
+Detailed design: `nereus-future7-routing-brownout-elasticity.md`
 
-- compaction 为什么不改变 offset；
-- replacement 前后 reader 如何不中断；
-- 新 generation 损坏时如何 fallback；
-- active reader/cursor 如何保护旧 objects；
-- topic compaction 如何复用 generation replacement。
-- AutoMQ-like materialization lag 如何保护 primary WAL retention。
+### Owns
 
-## 6. Future 5：KoP Compatibility
+- broker membership/capabilities/load；
+- zone-aware preferred routing；
+- degraded/brown-out/readmission；
+- Pulsar lookup and Kafka leader projection；
+- cache warmup and cross-zone policy。
 
-Detailed design: `pip/Nereus/nereus-future5-kop-compatibility.md`.
+### Entry/exit gates
 
-### Motivation
+- append session and routing role remain separate；
+- stale writers are fenced by head commit, not routing cache；
+- broker remap does not move durable data；
+- Pulsar/Kafka projections derive from one routing state；
+- health thresholds are policy, not correctness constants。
 
-让 Kafka 客户端通过 KoP 访问同一套 Nereus stream storage，不引入第二套 durable log。
+## 11. F8 — Advanced Pulsar Semantics
 
-### Scope
+Detailed design: `nereus-future8-advanced-pulsar-semantics.md`
 
-- Kafka offset 等于 stream record offset；
-- ProduceResponse base offset；
-- Fetch offset index lookup；
-- group offset state in Oxia；
-- idempotent producer sequence；
-- transaction marker projection；
-- read_committed/read_uncommitted；
-- Kafka topic compaction projection；
-- leader epoch projection。
+### Owns
 
-### Non-scope
+- Key_Shared ordering/drain boundary；
+- delayed delivery durable recovery；
+- pending ack and transaction buffer semantics；
+- replicated subscriptions；
+- schema/system-topic bootstrap；
+- Pulsar topic compaction and geo-replication；
+- policy interactions。
 
-- 新 Kafka broker 实现；
-- Kafka protocol handler 重写；
-- 与 Pulsar 分离的 Kafka storage。
+### Entry/exit gates
 
-### Design Gate
+- F2 projection、F3 cursor、F4 generation and F7 routing contracts stable；
+- no feature creates a separate durable log；
+- transaction/cursor changes use explicit state machines, not assumed cross-shard transaction；
+- system topic bootstrap has a resumable order；
+- geo-replication stores explicit source/target offset translation。
 
-Future 5 的设计必须能完整解释：
+## 12. Cross-track verification waves
 
-- KoP produce ack 如何使用 selected storage profile 的 append result；
-- record batch base offset 如何在 object WAL 模式下生成或重写；
-- group coordinator failover 后 offset 如何恢复；
-- Kafka transaction visibility 如何映射到 Nereus transaction state；
-- Kafka compaction 与 Pulsar topic compaction 如何共享底层 compaction service。
+Verification follows architecture dependencies rather than waiting for all tracks：
 
-## 7. Future 6：Lakehouse SBT / SDT
+| Wave | Scope |
+| --- | --- |
+| V1 | F1 deterministic unit/contract/failure-injection tests |
+| V2 | F2/F3 Pulsar facade and cursor compatibility suites |
+| V3 | F4 materialization lag、generation、GC and corruption tests |
+| V4 | F5/F7 protocol routing/failover compatibility |
+| V5 | F6/F8 catalog、advanced semantics、geo/txn integration |
 
-Detailed design: `pip/Nereus/nereus-future6-lakehouse-sbt-sdt.md`.
+Benchmark、chaos、model checking 和 production profile claims 只能在对应 implementation gate
+之后使用；不能用 future design 文本代替证据。
 
-Related design basis: `pip/Nereus/nereus-storage-object-format.md` and
-`pip/Nereus/nereus-commit-protocol.md`.
+## 13. Document template
 
-### Motivation
-
-把 lakehouse 作为 Nereus 的一等能力，而不是 BookKeeper/offload 之后的外部复制。
-
-### Scope
-
-- Stream-Backed Table (SBT)；
-- Stream-Delivered-to-Table (SDT)；
-- Iceberg catalog commit；
-- Delta/Hudi adapter boundary；
-- catalog snapshot；
-- catalog repair；
-- delivery idempotence；
-- lag metrics。
-
-### Non-scope
-
-- producer ack 依赖 lakehouse catalog；
-- 外部查询引擎写回 stream object；
-- 每个 catalog 的深度优化。
-
-### Design Gate
-
-Future 6 的设计必须能完整解释：
-
-- SBT snapshot 如何追溯到 offset index generation；
-- catalog commit 成功但 Oxia commit 失败如何 repair；
-- Oxia visible offset 为什么始终是 stream truth；
-- SDT 失败为什么不影响 stream read；
-- Iceberg first、Delta/Hudi optional 的 adapter 边界。
-- AutoMQ-like materialization lag 为什么不能让 lakehouse catalog 领先 stream truth。
-
-## 8. Future 7：Routing / Brown-out / Elasticity
-
-Detailed design: `pip/Nereus/nereus-future7-routing-brownout-elasticity.md`.
-
-### Motivation
-
-实现 stateless/leaderless serving 的产品体验：broker 可弹性伸缩，故障时不搬数据，
-preferred broker 只做 locality 和 cache。
-
-### Scope
-
-- broker session；
-- zone-aware routing ring；
-- preferred broker；
-- append session transfer；
-- fencing token；
-- degraded broker detection；
-- brown-out eviction；
-- readmission warmup；
-- cross-zone fallback；
-- lookup / KoP metadata projection；
-- cache invalidation。
-
-### Non-scope
-
-- broker durable ownership；
-- partition 数据搬迁；
-- 依赖 broker 本地磁盘恢复 correctness。
-
-### Design Gate
-
-Future 7 的设计必须能完整解释：
-
-- 任意 broker 为什么可以服务任意 stream；
-- stale broker commit 为什么会被 Oxia fencing 拒绝；
-- routing remap 为什么不需要数据搬迁；
-- client retry 如何与 preferred broker/readmission 配合；
-- Pulsar lookup 和 Kafka MetadataResponse 如何投影同一 routing state。
-- profile-aware routing 如何区分 BK-heavy、object-WAL-heavy 和 materializer-heavy load。
-
-## 9. Future 8：Advanced Pulsar Semantics
-
-Initial design boundary: `pip/Nereus/nereus-overall-architecture.md`.
-Dedicated detailed design doc: `pip/Nereus/nereus-future8-advanced-pulsar-semantics.md`.
-
-### Motivation
-
-把 Nereus 从“能跑 Pulsar basic topic”提升为 Pulsar-native 商业产品能力。
-
-### Scope
-
-- Key_Shared ordering；
-- delayed delivery；
-- pending ack transaction；
-- transaction buffer；
-- replicated subscription；
-- schema/system topic bootstrap；
-- topic compaction compatibility；
-- geo-replication；
-- namespace/topic policy interaction。
-
-### Non-scope
-
-- 改变 L0 stream offset truth；
-- 为某个 Pulsar 特性引入独立 durable log；
-- 让 broker local state 成为 correctness source。
-
-### Design Gate
-
-Future 8 的设计必须能完整解释：
-
-- Key_Shared rebalance 后的顺序边界；
-- delayed delivery timer 如何从 durable state 恢复；
-- pending ack transaction 如何与 cursor state 对齐；
-- schema/system topic 如何在 `nereus` storage class 下 bootstrap；
-- geo-replication 如何处理 source/target stream offset translation。
-
-## 10. 后续文档模板
-
-每个 future 的技术细节文档使用同一个结构：
+每个 capability document 至少包含：
 
 ```text
-1. Motivation
-2. Scope
-3. Non-scope
-4. Layer boundary
-5. API
-6. Oxia metadata schema
-7. Object or snapshot format
-8. State transition
-9. Failure model
-10. Compatibility impact
-11. Future gate
+status and prerequisites
+motivation
+scope / non-scope
+layer boundary
+API and durable schema
+state transitions and linearization points
+failure/repair model
+compatibility impact
+implementation gate
 ```
 
-验证、benchmark、chaos、compatibility suite 和 model checking 是 future 设计冻结后的
-验收工作，不进入当前总体设计的主线。
+状态改变时先更新 `nereus-design-index.md` 和当前代码级 README，再更新本 roadmap。

@@ -1,7 +1,9 @@
 # 技术细节：KoP/Kafka Compatibility on Nereus Storage
 
-> 这是 `pip/Nereus/nereus-overall-architecture.md` 的配套技术细节文档。
-> 本文定义 KoP/Kafka 协议在 Nereus shared storage 上的映射、风险和兼容性边界。
+> 状态：Designed；`nereus-kop-adapter` 当前只有 marker class
+> 前置：Future 1 stable append/read、Future 2 projection boundary、Future 4 generation reader
+
+本文定义 KoP/Kafka 协议在 Nereus shared storage 上的映射、风险和兼容性边界。
 
 ## 1. 目标
 
@@ -13,6 +15,10 @@
 - Kafka transactions 映射到 Pulsar/Oxia transaction state；
 - Kafka topic compaction 复用 shared compaction service；
 - KoP 不引入第二套 durable log。
+
+当前 Phase 1 只接受 one-record-per-entry `OPAQUE_RECORD_BATCH`，没有 Kafka producer sequence、
+transaction marker 或 record-batch decoder。Future 5 实现必须增加明确的 payload/projection contract，
+不能假设当前 L0 已能直接持久化任意 Kafka record batch。
 
 ## 2. 坐标映射
 
@@ -35,15 +41,16 @@ KoP produce path：
 
 1. KoP 接收 Kafka ProduceRequest。
 2. Broker 把 Kafka records 归一化为 stream append batch。
-3. Object WAL 写入时可先使用 relative offsets。
-4. Oxia offset index commit 返回 `[baseOffset, endOffset)`。
+3. Primary WAL 写入时可先使用 relative offsets。
+4. Stream commit intent + head CAS 固化 `[baseOffset, endOffset)`；generation-0 offset index 可在 strict
+   boundary 前物化，或由 resolver 从 reachable commit repair。
 5. KoP 生成 ProduceResponse，返回 base offset。
 6. 如果需要保留 Kafka record batch header 的 base offset，reader 在 fetch 时基于
    offset index result 重写或补齐。
 
 不变量：
 
-- ProduceResponse 的 base offset 必须来自 Oxia commit result；
+- ProduceResponse 的 base offset 必须来自 stable stream-head commit result；
 - broker 不能提前返回本地 offset；
 - failed slice 不返回成功 ProduceResponse；
 - retry 通过 Kafka producer id / sequence 去重。
@@ -53,7 +60,7 @@ KoP produce path：
 Fetch path：
 
 1. Kafka fetch offset -> `streamId + offset`。
-2. 查询 Oxia offset index。
+2. 查询/修复 Oxia generation-aware offset index。
 3. 若 index 指向 WAL object，读取 row-based payload 并生成 Kafka record batch。
 4. 若 index 指向 compacted Parquet object，读取 row group 并投影成 Kafka record batch。
 5. 应用 transaction visibility 和 topic compaction visibility。
@@ -65,7 +72,8 @@ High watermark：
 highWatermark = stream.committedEndOffset
 ```
 
-如果需要模拟 Kafka leader epoch，使用 Oxia stream epoch / index generation projection。
+Kafka leader epoch 必须由 routing/stream epoch 的显式 projection 定义；不能直接把 compaction
+generation 当成 leader epoch。
 
 ## 5. Consumer Group
 
@@ -178,7 +186,7 @@ base offset。
 
 | Design question | Required answer |
 | --- | --- |
-| Produce offset | ProduceResponse base offset 必须来自 Oxia commit result |
+| Produce offset | ProduceResponse base offset 必须来自 stable stream-head commit result |
 | Fetch from WAL object | read-time offset rewrite 必须有 checksum 分层策略 |
 | Fetch from compacted object | finalized offset 必须与 stream offset 一致 |
 | Consumer group failover | group coordinator 是 locality role，group state 从 Oxia 恢复 |
@@ -189,15 +197,16 @@ base offset。
 | Topic compaction | latest value by key，offset coverage 不出现 gap |
 | Mixed Pulsar/Kafka access | MessageId 与 Kafka offset 指向同一 stream truth |
 
-## 11. 与 Ursa 的对齐状态
+## 11. 与 Ursa 的目标设计对齐
 
-已对齐：
+目标设计已覆盖：
 
 - Kafka offset 使用 stream offset；
 - broker 不维护 Kafka local log；
 - consumer group metadata 可放 Oxia；
 - topic compaction 可由 compaction service 实现；
-- object WAL + metadata commit 才返回 produce ack。
+- primary WAL durable + stable head commit 才能返回 produce ack；strict profile 还等待 generation-0
+  index confirmation。
 
 本设计增强点：
 
@@ -214,6 +223,6 @@ base offset。
 
 ## 12. 参考
 
-- 总体架构：`pip/Nereus/nereus-overall-architecture.md`
-- Commit protocol：`pip/Nereus/nereus-commit-protocol.md`
+- 总体架构：`nereus-overall-architecture.md`
+- Commit protocol：`nereus-commit-protocol.md`
 - Ursa VLDB paper: <https://www.vldb.org/pvldb/vol18/p5184-guo.pdf>

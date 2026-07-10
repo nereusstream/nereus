@@ -1,8 +1,11 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 本文是 Nereus L1 设计文档。它定义 Nereus 如何通过 Pulsar 的 ManagedLedger API
-> 暴露给 `PersistentTopic`、dispatcher、subscription 和 admin runtime，同时保持
-> `streamId + offset` 是内部 truth。当前阶段只冻结设计边界，不要求实现或验证。
+> 状态：Designed；当前模块只有 marker class，尚未实现 facade
+> 前置：Future 1 append/read/trim contract 和 projection reference 稳定
+
+本文定义 Nereus 如何通过 Pulsar ManagedLedger API 暴露给 `PersistentTopic`、dispatcher、
+subscription 和 admin runtime，同时保持 `streamId + offset` 是逻辑坐标、stream head + reachable
+commit log 是 append truth。
 
 ## 1. Motivation
 
@@ -61,6 +64,10 @@ Future 2 不解决：
 - compaction worker。
 
 这些能力在 Future 3、Future 5、Future 6、Future 8 中作为 projection 或上层状态处理。
+
+当前实现约束：`nereus-managed-ledger` 还没有真实 facade；Phase 1 payload 是 one-record-per-entry
+opaque batch，`AppendResult`/`ResolvedObjectRange` 仍是 object-shaped。BookKeeper profile 进入 facade
+前必须先完成 generic primary read-target 设计，不能用伪造 object identity 兼容。
 
 ## 4. Layer Boundary
 
@@ -257,7 +264,8 @@ BrokerService
 ```
 
 Open must be idempotent. Multiple brokers may open the same topic facade, but correctness still relies on
-Future 1 append session fencing and offset index commit.
+Future 1 append session fencing and stream-head commit。Generation-0 offset index 可以从 reachable commit
+repair，不能被 facade 当成唯一 append truth。
 
 ### 8.2 Load
 
@@ -425,10 +433,12 @@ Migration from existing BookKeeper topics is a separate future. Future 2 only en
 8. Broker local cache is discardable.
 9. Admin stats must distinguish virtual ledgers from BookKeeper ledgers.
 10. Hybrid storage class selection must be explicit through policy.
+11. Facade callback follows the requested L0 durability boundary exactly once；`WAL_DURABLE` still implies a
+    stable head commit and never exposes a broker-local temporary position。
 
 ## 14. Future Gate
 
-Future 2 design is ready to move into implementation planning when the following are reviewed:
+Future 2 may enter implementation planning only after the following are reviewed:
 
 - broker-level `ManagedLedgerStorage` provider shape；
 - storage class name `nereus` and coexistence with BookKeeper；
@@ -440,5 +450,7 @@ Future 2 design is ready to move into implementation planning when the following
 - cache and invalidation boundaries；
 - compatibility behavior for stats/admin/offload APIs；
 - explicit boundary with Future 3 cursor semantics。
+- current object-shaped L0 result is generalized or an object-only rollout boundary is explicitly accepted；
+- profile/offload policy rejects every execution path whose primary reader/writer is not implemented。
 
 This is a design gate. It does not require benchmark, compatibility certification, CI, or real evidence.

@@ -10,8 +10,8 @@ ManagedLedger facade 的前提下，先独立实现 L0 Core StreamStorage：
 - read resolver；
 - trim 与 GC 引用模型的 Phase 1 边界。
 
-当前目录是持续迭代的 working design。后续代码实现与设计出现偏差时，应优先更新这里，
-再修改实现。
+当前目录是持续迭代的 active code-level design。代码、测试和本文档必须在同一变更中保持一致；
+已实现行为发生冲突时，以代码和可执行测试识别事实，再同步修正文档或实现，不能长期保留偏差。
 
 ## 1. Design Inputs
 
@@ -23,6 +23,7 @@ ManagedLedger facade 的前提下，先独立实现 L0 Core StreamStorage：
 - `docs/design/nereus-overall-architecture.md`
 - `docs/design/nereus-commit-protocol.md`
 - `docs/design/nereus-storage-object-format.md`
+- `docs/decisions/0002-separate-append-commit-index-and-materialization.md`
 - `docs/automq-like-stream-storage/README.md`
 - `docs/phase0/repository-plan.md`
 
@@ -32,9 +33,9 @@ Phase 1 继承这些不变量：
 2. Oxia 是 offset、visibility、fencing 的 authority；其中 stream head/commit-log 是 append
    线性化 truth，offset index 是读路径使用的物化索引。
 3. Object store 只存 bytes，不决定可见性。
-4. Phase 1 默认 producer ack 发生在 WAL bytes durable、stream-head CAS 成功且本 slice 的 offset
-   index 物化确认之后；AutoMQ-like profile 会把 read-optimized object materialization 移到后台，
-   但不能返回不稳定的 broker-local offset。
+4. Phase 1 只实现 strict Object WAL boundary：producer success 发生在 WAL bytes durable、stream-head
+   CAS 成功且本 slice 的 generation-0 offset index/marker 物化确认之后。AutoMQ-like profiles are
+   reserved beyond Phase 1；即使未来实现，也必须完成 stable head commit，不能返回 broker-local offset。
 5. 每个 stream 的可见 offset range 必须 dense。
 6. Multi-stream WAL object 的可见性按 stream slice 独立提交。
 7. Broker 或调用方本地状态只能是 cache，不能是 durable truth。
@@ -64,8 +65,10 @@ M0 scaffold migration 已完成。当前代码状态：
 - `nereus-api` 已包含 Phase 1 的 protocol-neutral value records、错误模型和共享 key/hash helpers；
 - `StorageProfile` 已预留 BookKeeper/Object WAL 与 sync/async object materialization profiles；
   `OBJECT_WAL` 是旧 Phase 1 兼容名，等价于 `OBJECT_WAL_SYNC_OBJECT`；
-- `FakeOxiaMetadataStore.createOrGetStream` 已保存 `options.profile().canonical().name()`，后续
-  core implementation 可以从 stream metadata 区分 Ursa-like sync、AutoMQ-like async 和 BK-only profile；
+- `ErrorCode` 已预留 `UNSUPPORTED_STORAGE_PROFILE` / `UNSUPPORTED_DURABILITY_LEVEL`，供 M4 在
+  任何 WAL IO 前拒绝非 Phase 1 execution boundary；
+- `FakeOxiaMetadataStore.createOrGetStream` 已保存 `options.profile().canonical().name()`；这只证明
+  profile metadata persistence。M4 必须显式拒绝 Phase 1 不支持的 BK/async execution profiles；
 - `nereus-core` 已通过 Gradle 依赖连接到 `nereus-metadata-oxia` 和 `nereus-object-store`；
 - `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
   出口；
@@ -73,10 +76,9 @@ M0 scaffold migration 已完成。当前代码状态：
 - `nereus-object-store` 已落地 M3 主体实现：production object-store API、WAL writer/reader、CRC32C
   helper、WAL binary layout、local test fixture、read-resource guard hook、read amplification observer 和
   WAL round-trip/local-store tests 已存在。2026-07-08 M3 review 发现的 reader multi-range byte-budget 和
-  local symlink escape blockers 已修复并补测试；最终 Gradle gate 仍需重跑确认。
+  local symlink escape blockers 已修复并补测试；2026-07-10 final Gradle gate 已通过。
 
-M0/M1/M2 已完成。M3 object WAL implementation 已落地并完成 blocker fix pass；重跑
-`11-m3-object-wal-review-2026-07-08.md` 中列出的 final gate 后即可进入 M4 core append path。
+M0/M1/M2/M3 已完成。当前进入 M4 core append path。
 
 Phase 1 允许的依赖方向：
 
@@ -117,6 +119,9 @@ Phase 1 不允许：
 | `09-legacy-oxia-multi-key-commit-design.md` | 已归档的旧 Oxia multi-key atomic commit 方案，供未来 Oxia API 改造后回看 |
 | `10-current-progress-review-2026-07-07.md` | 当前 M0/M1/M2 review 记录，以及 2026-07-08 M2 completion 追加说明 |
 | `11-m3-object-wal-review-2026-07-08.md` | M3 object WAL review 记录、completion blockers 和重新验收 gate |
+| `12-architecture-realignment-2026-07-10.md` | 多 profile 总体架构与 Phase 1 strict execution boundary 的对齐记录 |
+
+`10`/`11` 是 dated historical reviews；当前里程碑状态以本 README 和 `05` 为准。
 
 ## 4. Phase 1 Public Surface
 
@@ -391,8 +396,8 @@ Already settled for Phase 1:
 - 2026-07-08 M3 object WAL 主体实现已落地：`DefaultWalObjectWriter`/`DefaultWalObjectReader`、
   `LocalFileObjectStore` test fixture、WAL section/checksum layout、entry-index golden tests、multi-slice
   round trip、read-resource guard 和 local cleanup 均已存在；M3 review 发现的 reader multi-range
-  byte-budget classification 和 local symlink escape blockers 已修复并补测试；最终 gate 仍需在本地
-  重跑后再把 M3 标记为 complete；
+  byte-budget classification 和 local symlink escape blockers 已修复并补测试；2026-07-10 已运行
+  `./gradlew :nereus-object-store:test phase1Check check` 并通过，M3 complete；
 - WAL object id/key 必须包含 writer process incarnation hash，避免进程重启后 sequence 重置造成
   object id 碰撞；
 - append timeout 必须按最后不可逆边界分类；stream-head CAS 发出后的 timeout 是 unknown final
