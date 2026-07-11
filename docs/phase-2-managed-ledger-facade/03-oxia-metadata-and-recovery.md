@@ -358,10 +358,10 @@ F2 records use the same envelope/version/CRC conventions as Phase 1. Each record
 - metadata version hydrated from Oxia, not trusted from encoded bytes;
 - durable golden bytes in tests.
 
-The current `Phase1MetadataCodecs` registry and generic record codec are private/static, so F2 cannot literally append
-types without a small codec refactor. M2 introduces a package-level `MetadataRecordCodecFactory` and an
-`F2MetadataCodecs` registry for F2 records. `Phase1MetadataCodecs` keeps its exact public methods, registered type list,
-schema version and golden bytes. No existing type ID or byte changes.
+The Phase 1 `Phase1MetadataCodecs` registry and generic record codec are private/static。Phase 1.5 P15-M2 introduces
+the package-level `MetadataRecordCodecFactory` while preserving every Phase 1 method/type/schema/golden byte。F2-M2
+consumes that implemented factory and adds only the `F2MetadataCodecs` registry/records；it must not perform a second
+codec refactor or change an L0 type ID。
 
 The current Phase 1 `OxiaJavaClientMetadataStore` owns its `SyncOxiaClient`, `PartitionedOxiaClient` and executors, so
 M2 must perform an explicit ownership-preserving refactor:

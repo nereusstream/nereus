@@ -257,7 +257,9 @@ commitVersion
 ```
 
 Generation 0 is repairable from reachable append commit。Higher generations are conditionally published by
-F4。The current Java type is object-specific；BookKeeper support requires a proper physical-target union。
+F4。The production Phase 1 Java type is object-specific；Phase 1.5 has designed the proper tagged target union and
+dual-read/new-write generic metadata, with implementation gated by P15-M1-M5。This does not alter Object WAL bytes or
+implement BookKeeper IO。
 
 ## 10. Designed compacted object
 
@@ -347,6 +349,7 @@ metadata and ownership。
 
 - Object WAL code：`../../nereus-object-store/src/main/java/com/nereusstream/objectstore/wal/`
 - Exact Phase 1 design：`../phase-1-core-stream-storage/03-object-wal-and-index.md`
+- Phase 1.5 generic target metadata：`../phase-1.5-core-storage-foundation/02-metadata-schema-and-compatibility.md`
 - Object WAL review：`../phase-1-core-stream-storage/11-m3-object-wal-review-2026-07-08.md`
 - Commit semantics：`nereus-commit-protocol.md`
 - F4 target：`nereus-future4-compaction-generation.md`

@@ -1,7 +1,7 @@
 # AutoMQ-like Async Materialization Profile
 
 > 状态：Designed / API-reserved，尚未实现端到端执行路径
-> 前置：Future 1 stable append、generic primary read target、Future 4 generation publish
+> 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Future 4 generation publish
 
 本文定义 Nereus 中的 AutoMQ-like 边界。它不是独立 engine，也不是“WAL 成功后跳过 Oxia”：
 
@@ -26,6 +26,7 @@ Already present：
 - `DurabilityLevel.WAL_DURABLE` contract name；
 - canonical profile persistence in stream metadata；
 - Object WAL v1 bytes and Phase 1 head-CAS/commit-log primitives。
+- Phase 1.5 code-level design for generic target/adapter and stable-commit/materialization separation（design only）。
 
 Not present：
 
@@ -113,9 +114,9 @@ interface Materializer {
 }
 ```
 
-The target `PrimaryReadTarget` must be a real tagged/typed union for Object and BookKeeper ranges。Current
-`AppendResult`/`ResolvedObjectRange` are object-shaped，so this abstraction is an entry gate rather than an
-implemented interface。
+Phase 1.5 freezes the concrete `ReadTarget` union, generic metadata and adapter seam in
+`../phase-1.5-core-storage-foundation/`。They remain design until P15-M1-M5 are implemented；even after P15-M5,
+`WAL_DURABLE` and the async coordinator remain separate gates rather than implied support。
 
 ## 6. State machine
 

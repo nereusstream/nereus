@@ -96,7 +96,8 @@ OPEN/TERMINATED -> DELETING -> DELETED
 - terminate/delete do not bypass `WRITE_FENCED`: they wait for exact append recovery or fail without starting a
   lifecycle CAS. Local close is still allowed because it does not mutate durable stream state.
 
-F2 requires the protocol-neutral L0 methods defined in `06` before terminate/delete can be implemented:
+F2 consumes the protocol-neutral L0 methods defined in `06` and implemented by Phase 1.5 P15-M4 before
+terminate/delete can be implemented:
 
 ```java
 CompletableFuture<StreamMetadata> seal(
@@ -272,6 +273,8 @@ durable Consumer subscription recovery.
 | `OFFSET_NOT_AVAILABLE` | `NoMoreEntriesToReadException` for terminal reads; an ordinary tail cursor returns empty/waits by method contract |
 | metadata unavailable/condition failed | `MetaStoreException` / `BadVersionException` |
 | metadata invariant/checksum/corruption | `NonRecoverableLedgerException` |
+| primary-WAL write/read availability failure | generic managed-ledger storage exception preserving retriable/cause |
+| primary-WAL target not found/checksum mismatch | `NonRecoverableLedgerException` |
 | unsupported profile/format/operation | explicit `ManagedLedgerException` with stable Nereus error code in message/cause |
 | timeout/cancel | managed-ledger timeout/cancel wrapper preserving cause |
 

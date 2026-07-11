@@ -2,8 +2,8 @@
 
 本文档目录是 Future 2 的 active code-level design。F2-M0 在 2026-07-11 完成第一轮 API spike；
 同日的代码级复审（F2-M0R）补齐了 append recovery、topic incarnation、role-aware Position、
-exhaustive interface matrix 和 broker runtime bootstrap。生产 facade 仍未实现，当前实现里程碑是
-F2-M1。
+exhaustive interface matrix 和 broker runtime bootstrap。生产 facade 仍未实现。Phase 1.5 P15-M0 已把
+这些结论要求的 L0 evolution 冻结成代码级设计；当前实现里程碑是 P15-M1，F2-M1 在 P15-M5 后恢复。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -69,12 +69,28 @@ audit must pass again before implementation continues.
     metadata path. Unsupported offload/BookKeeper-shaped operations fail explicitly.
 12. `ManagedLedger.getFirstPosition()` returns the position immediately before the first retained entry. Direct
     entries, next-read positions, mark-delete positions and inclusive max positions use separate conversion methods.
+13. F2 consumes the Phase 1.5 generic append/read result only through logical range/payload fields；it never derives
+    Position from an object or BookKeeper target。
 
-## 3. Repository Boundary
+## 3. Phase 1.5 Production Prerequisite
+
+F2-M0R was completed against the exact Phase 1 implementation baseline and remains the facade authority。Before any
+F2-M1 production artifact is exposed, `../phase-1.5-core-storage-foundation/` P15-M1-M5 must implement and prove：
+
+- generic `ReadTarget`/`AppendResult`/`ResolvedRange` with Object WAL strict parity；
+- legacy/new L0 metadata compatibility；
+- `AppendAttemptId` and exact `recoverAppend`；
+- stream `seal` and logical `delete`；
+- protocol-neutral F2 prerequisite fixtures and unchanged Phase 1 gates。
+
+F2 must consume those APIs rather than reintroducing temporary L0 types in `nereus-managed-ledger` or implementing
+head/replay/lifecycle truth in projection metadata。
+
+## 4. Repository Boundary
 
 | Repository/module | Ownership |
 | --- | --- |
-| `nereus-api` | Minimal protocol-neutral lifecycle additions required by facade; no Pulsar types |
+| `nereus-api` | Consume Phase 1.5 generic result/recovery/lifecycle API; F2 adds no Pulsar or duplicate L0 type |
 | `nereus-metadata-oxia` | F2 keyspace, records, codecs, fake/real projection metadata contract |
 | `nereus-managed-ledger` | Projection model, entry codec, factory, ledger, entry/read-only/non-durable cursor facade |
 | `nereus-pulsar-adapter` | Product-owned configuration/bootstrap helpers that do not depend on Pulsar private internals |
@@ -84,7 +100,7 @@ audit must pass again before implementation continues.
 The class that composes stock `ManagedLedgerClientFactory` with the Nereus factory therefore belongs in
 the Pulsar fork. Stable product logic stays in Nereus.
 
-## 4. Document Map
+## 5. Document Map
 
 | Document | Purpose |
 | --- | --- |
@@ -98,7 +114,7 @@ the Pulsar fork. Stable product logic stays in Nereus.
 | `spikes/PulsarManagedLedgerApiProbe.java` | Compile-only exact-signature probe |
 | `spikes/pulsar-api-probe.init.gradle` | Temporary Pulsar source-set injection; does not edit the Pulsar checkout |
 
-## 5. F2-M0 Evidence
+## 6. F2-M0 Evidence
 
 From the locked-compatible Pulsar checkout:
 
@@ -125,13 +141,14 @@ blobs in `01`. It
 does not prove implementation behavior, callback ordering, resource ownership or broker integration.
 Those are later milestone gates.
 
-## 6. Milestone State
+## 7. Milestone State
 
 | Milestone | State | Exit |
 | --- | --- | --- |
 | F2-M0 design/API spike | Complete | Locked target and successful compile probe |
 | F2-M0R code-level review | Complete | Documents 02-07; L0 prerequisites and exhaustive target behavior frozen |
-| F2-M1 projection model | Next | Pure model/codec implementation and restart-stable mapping tests |
+| Phase 1.5 P15-M1-M5 | Next prerequisite | Implement generic L0/recovery/lifecycle and final gate |
+| F2-M1 projection model | Gated | Starts after P15-M5；pure model/codec and restart-stable mapping tests |
 | F2-M2 projection metadata | Not started | Fake/real Oxia contract and crash-repair tests |
 | F2-M3 ManagedLedger facade | Not started | Factory/ledger append/read/lifecycle and exactly-once callback tests |
 | F2-M4 cursor boundary | Not started | Read-only/non-durable cursor; explicit durable mutation rejection |

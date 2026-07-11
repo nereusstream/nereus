@@ -1,7 +1,7 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
 > 状态：Designed；worker/task/higher-generation publish 尚未实现
-> 前置：Future 1 generation-0 contract、generic read target、cursor/reader reference hooks
+> 前置：Future 1 generation-0 contract、Phase 1.5 P15-M5 generic target/stable-commit split、cursor/reader reference hooks
 
 本文定义 Nereus L3 compaction 和 generation replacement 设计。Future 4 的核心目标是
 > 把 multi-stream WAL object 转换为 per-stream read-optimized object，并通过 Oxia offset
@@ -57,6 +57,10 @@ Future 4 不解决：
 当前实现边界：Phase 1 只有 generation 0 的 Object WAL records，且其 offset index 可从
 stream-head reachable commit repair。F4 实现前必须冻结 higher-generation conditional
 publish/overlap schema；compaction 不能改写 `StreamHeadRecord.committedEndOffset` 或 commit chain。
+
+Phase 1.5 code-level design freezes only the tagged target/adapter、generic generation-zero record compatibility and
+stable-commit/materializer seam。It does not freeze this document's task/checkpoint/source-generation CAS schema and
+does not implement a worker。F4 production starts only after P15-M5 and the remaining reference/publish entry gates。
 
 ## 4. Layer Boundary
 

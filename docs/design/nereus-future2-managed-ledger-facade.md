@@ -1,7 +1,7 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 状态：In progress；F2-M0 API spike + F2-M0R code-level review complete，F2-M1 implementation next
-> 前置：Future 1 append/read/trim contract 和 projection reference 稳定
+> 状态：In progress；F2-M0 API spike + F2-M0R code-level review complete，F2-M1 waits for P15-M5
+> 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle/generic-result final gate
 > Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 
 本文定义 Nereus 如何通过 Pulsar ManagedLedger API 暴露给 `PersistentTopic`、dispatcher、
@@ -70,10 +70,10 @@ Future 2 不解决：
 这些能力在 Future 3、Future 5、Future 6、Future 8 中作为 projection 或上层状态处理。
 
 当前实现约束：`nereus-managed-ledger` 还没有真实 facade；Phase 1 payload 是 one-record-per-entry
-opaque batch，`AppendResult`/`ResolvedObjectRange` 仍是 object-shaped。F2 首版显式只接受
-`OBJECT_WAL_SYNC_OBJECT`。Broker hybrid mode 中的 `bookkeeper` 继续走 stock BookKeeper factory，
-不等于 Nereus BookKeeper profile 已实现；后者进入 facade 前必须先完成 generic primary read-target
-设计，不能用伪造 object identity 兼容。
+opaque batch，production `AppendResult`/resolve 仍是 object-shaped。Phase 1.5 已冻结 generic target/result、
+exact recovery 和 lifecycle 设计，但 P15-M1-M5 尚未实现。F2 首版在 P15-M5 后仍只接受
+`OBJECT_WAL_SYNC_OBJECT`，并只从 generic result 的 logical range 构造 Position。Broker hybrid mode 中的
+`bookkeeper` 继续走 stock BookKeeper factory，不等于 Nereus BookKeeper profile 已实现。
 
 ## 4. Layer Boundary
 
@@ -426,6 +426,7 @@ Migration from existing BookKeeper topics is a separate future. Future 2 only en
     stable head commit and never exposes a broker-local temporary position。
 13. One broker-metadata binding generation selects BookKeeper or Nereus for a topic lifetime; class migration is not
     inferred from policy and cannot create two live durable views。
+14. F2 never branches on `ReadTarget` to allocate Position；physical target selection/reading stays in L0。
 
 ## 14. Future Gate
 
@@ -445,7 +446,15 @@ F2-M0 API spike and F2-M0R code-level review are complete. The review locked:
 - hybrid runtime construction, S3-compatible ObjectStore provider and broker-side unsupported-feature admission。
 - single-key cross-storage binding and explicit rejection of live BookKeeper/Nereus policy switching。
 
+Production implementation is gated by Phase 1.5 P15-M5 proving：
+
+- generic logical append/resolve results and Object WAL parity；
+- exact retained attempt ID/recovery with multi-page progress；
+- authoritative L0 seal and logical delete；
+- legacy/new metadata restart compatibility and unchanged strict durability；
+- no new BookKeeper/async profile claim。
+
 The executable API probe passed against interface blobs identical to the locked fork。Code-level
 contracts and F2-M1 through F2-M6 gates are in
 `../phase-2-managed-ledger-facade/README.md`。This closes the design gate only；Future 2 remains
-in progress until all implementation/final-acceptance gates pass。
+in progress but implementation-gated until P15-M5, then until all F2 implementation/final-acceptance gates pass。

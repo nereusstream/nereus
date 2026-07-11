@@ -97,10 +97,16 @@ nereus-managed-ledger/com.nereusstream.managedledger/
 `nereus-managed-ledger` may import Pulsar managed-ledger/common types. No class added to `nereus-api`,
 `nereus-core`, `nereus-metadata-oxia` or `nereus-object-store` imports a Pulsar type.
 
-## 3. Required L0 Additions
+The L0 API/core classes and append-replay types in this inventory are implemented by Phase 1.5 P15-M1-M4。F2 owns
+only projection metadata and managed-ledger classes after P15-M5；the combined inventory is retained here because
+these are the exact types the facade consumes。
 
-The current public `StreamStorage` surface cannot fulfill the F2 append and lifecycle promises. F2-M1/M2
-therefore require the following protocol-neutral additions before `NereusManagedLedger` is exposed.
+## 3. Required Phase 1.5 L0 Contract
+
+The Phase 1 public `StreamStorage` surface cannot fulfill the F2 append and lifecycle promises。Phase 1.5
+`../phase-1.5-core-storage-foundation/` is the implementation authority for the protocol-neutral additions below；
+P15-M5 must pass before F2-M1 starts or `NereusManagedLedger` is exposed。This section remains the F2 consumer
+contract and cannot be implemented independently in the facade。
 
 ### 3.1 Recoverable append attempt
 
@@ -128,8 +134,9 @@ public interface StreamStorage extends AutoCloseable {
   bounded, never reused in one runtime and never accepted from a protocol client；
 - a failure before the stream-head request is `KNOWN_NOT_COMMITTED` and has no attempt ID；
 - every `MAY_HAVE_COMMITTED` or `KNOWN_COMMITTED` failure after the head request has an attempt ID；
-- the core append lane retains the exact `CommitSliceRequest`, `WalWriteResult` and slice needed to replay that ID；
-- `recoverAppend` replays that same physical attempt; it never prepares or uploads a new object；
+- the core append lane retains the exact generic `CommitAppendRequest`, durable provider result and `ReadTarget`
+  needed to replay that ID；
+- `recoverAppend` replays that same physical attempt; it never prepares or persists a new primary target；
 - successful recovery returns the same `AppendResult` that the original call would have returned and releases the
   suspended lane；
 - recovery may instead fail with `KNOWN_NOT_COMMITTED` only after bounded complete commit-identity inspection proves
@@ -138,7 +145,7 @@ public interface StreamStorage extends AutoCloseable {
 - an unknown/expired attempt ID is `METADATA_INVARIANT_VIOLATION`, not permission to submit new bytes。
 
 The current Phase 1 replay search restarts at the latest head after each bounded-scan exhaustion. That is insufficient
-for an F2 suspended callback because an attempt older than `maxCommitChainScan` would never make progress. M2 adds a
+for an F2 suspended callback because an attempt older than `maxCommitChainScan` would never make progress. P15-M2/M4 add a
 protocol-neutral, metadata-internal paged search:
 
 ```java
@@ -164,7 +171,7 @@ public enum AppendReplayStatus {
 
 public record AppendReplaySearchResult(
         AppendReplayStatus status,
-        Optional<CommitSliceResult> committedResult,
+        Optional<ReachableCommittedAppend> committedResult,
         Optional<AppendReplayCursor> continuation,
         int scannedRecords) {
 }
@@ -172,7 +179,7 @@ public record AppendReplaySearchResult(
 public interface OxiaMetadataStore extends AutoCloseable {
     CompletableFuture<AppendReplaySearchResult> searchAppendReplay(
             String cluster,
-            CommitSliceRequest request,
+            CommitAppendRequest request,
             Optional<AppendReplayCursor> continuation,
             int maxCommitsToScan);
 }
@@ -184,7 +191,7 @@ request identity plus the original observed-head anchor and the exact dense `(of
 tuple expected at `nextCommitId`; it is opaque to facade callers.
 
 Recovery first joins the retained original mutation runner until no old task can still submit the head CAS. The
-single-flight recovery runner is then the only code allowed to resubmit that exact `CommitSliceRequest`. When the
+single-flight recovery runner is then the only code allowed to resubmit that exact `CommitAppendRequest`. When the
 observed head equals `expectedStartOffset`, it retries that request directly. When the head is later, it freezes the
 immutable head anchor and pages backward; later remote appends do not invalidate that anchor because the old physical
 attempt can no longer be submitted concurrently. `FOUND` requires full request-identity validation and derived-index
@@ -879,6 +886,10 @@ void invokeFailureCallback(...);
 ```
 
 The pipeline recursively unwraps `CompletionException`/`ExecutionException` but retains the original Nereus cause.
+Phase 1.5 provider-neutral primary-WAL availability errors preserve their retriable flag in a generic
+`ManagedLedgerException`；target-not-found/checksum mismatch maps non-recoverably, and
+`UNSUPPORTED_READ_TARGET` follows the explicit unsupported path。The current Object-WAL-specific mappings remain
+unchanged。
 When `STREAM_NOT_ACTIVE` arrives without a trustworthy state snapshot, the async operation refreshes
 `StreamStorage.getStreamMetadata` before calling the mapper: `SEALED` maps to
 `ManagedLedgerTerminatedException`, `DELETING/DELETED` to closed/not-found by operation, and `CREATING` to a

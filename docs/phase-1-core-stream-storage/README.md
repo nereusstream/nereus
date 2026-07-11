@@ -10,7 +10,9 @@ ManagedLedger facade 的前提下，先独立实现 L0 Core StreamStorage：
 - read resolver；
 - trim 与 GC 引用模型的 Phase 1 边界。
 
-当前目录是持续迭代的 active code-level design。代码、测试和本文档必须在同一变更中保持一致；
+当前目录是已实现 Phase 1 的 frozen-compatible code-level contract。后续通用 read-target、append
+recovery 和 lifecycle 演进进入 `../phase-1.5-core-storage-foundation/`。Phase 1 缺陷修复仍必须让
+代码、测试和本文档在同一变更中保持一致；
 已实现行为发生冲突时，以代码和可执行测试识别事实，再同步修正文档或实现，不能长期保留偏差。
 
 ## 1. Design Inputs
@@ -25,8 +27,10 @@ ManagedLedger facade 的前提下，先独立实现 L0 Core StreamStorage：
 - `docs/design/nereus-storage-object-format.md`
 - `docs/decisions/0002-separate-append-commit-index-and-materialization.md`
 - `docs/decisions/0003-domain-derived-java-and-maven-namespace.md`
+- `docs/decisions/0004-insert-phase-1-5-generic-storage-foundation.md`（successor delivery decision）
 - `docs/automq-like-stream-storage/README.md`
 - `docs/phase0/repository-plan.md`
+- `docs/phase-1.5-core-storage-foundation/README.md`（Phase 1 后继设计，不改变本目录已实现状态）
 
 Phase 1 继承这些不变量：
 
@@ -100,6 +104,9 @@ Phase 1 M0-M8 已完成。Post-review final verification passes 45 core、63 met
 object-store ordinary tests，
 5 real-adapter、5 capability-spike and 2 final core/Oxia/Object-WAL Docker tests. The release command is
 `./gradlew phase1FinalCheck --rerun-tasks`；M8 没有扩展功能面，只完成端到端/restart/failure 验收和冻结。
+
+Phase 1.5 P15-M0 只完成设计，尚未改变这里描述的生产代码。直到对应 implementation milestone
+落地并同步本文档前，当前 object-shaped API/metadata 和 strict Object WAL runtime facts 仍以本目录为准。
 
 Phase 1 允许的依赖方向：
 

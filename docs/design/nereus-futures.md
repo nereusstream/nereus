@@ -28,8 +28,8 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 | Implemented | Future-specific extensions |
-| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R complete） | F2-M1 projection model |
+| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 | Phase 1 implemented；P15-M0 design complete | P15-M1 target API |
+| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R complete；implementation gated） | F2-M1 after P15-M5 |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
@@ -37,16 +37,18 @@ protocol/table state = projection
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
 
-Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Future 2 keeps the same executable-profile
-boundary；BookKeeper and async Nereus profiles remain reservations until their target abstraction and
-state machines are implemented。
+Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
+foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
+profile after P15-M5；BookKeeper and async profiles remain reservations until their adapters/state machines pass their
+own gates。
 
 ## 3. Dependency graph
 
 ```mermaid
 flowchart LR
-    F1["F1 Core Stream Storage"] --> F2["F2 ManagedLedger Facade"]
-    F1 --> F4["F4 Materialization / Compaction"]
+    F1["F1 Phase 1 Core Storage"] --> P15["Phase 1.5 L0 Foundation"]
+    P15 --> F2["F2 ManagedLedger Facade"]
+    P15 --> F4["F4 Materialization / Compaction"]
     F1 --> F7["F7 Routing / Elasticity"]
     F2 --> F3["F3 Cursor / Subscription"]
     F2 --> F5["F5 KoP / Kafka"]
@@ -59,13 +61,16 @@ flowchart LR
     F5 -. shared retention/txn contracts .-> F8
 ```
 
-这不是严格串行计划。F4 的 schema/worker、F7 的 routing metadata 可以在 F2 之前并行设计，
-但不能越过依赖它们的 correctness contracts。
+这不是所有设计工作的严格串行计划。F4 schema、F7 routing metadata 可以并行 review，但 F2 production
+implementation 不能越过 P15-M5；F4 production 不能越过 generic target/stable-commit foundation 和它依赖
+的 cursor/reader/reference correctness contracts。
 
 ## 4. F1 — Core Stream Storage
 
 Detailed design: `nereus-future1-core-stream-storage.md`
-Code-level design: `../phase-1-core-stream-storage/README.md`
+Implemented Phase 1 contract: `../phase-1-core-stream-storage/README.md`
+Active Phase 1.5 contract: `../phase-1.5-core-storage-foundation/README.md`
+Delivery decision: `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md`
 
 ### Owns
 
@@ -90,11 +95,25 @@ Phase 1 done requires M0-M8 and the full definition in
 `../phase-1-core-stream-storage/05-implementation-plan-and-tests.md`。BookKeeper/async profiles are not
 part of that done definition。
 
+### Phase 1.5 delivery extension
+
+F2-M0R exposed shared L0 prerequisites, so the roadmap inserts P15-M0-M5 before F2-M1：
+
+- tagged Object/BookKeeper `ReadTarget` values and generic result/resolve contracts；
+- primary-WAL adapter registry with Object WAL v1 parity；
+- stable head commit separated from generation-zero materialization；
+- legacy-record dual-read and generic-target new-write；
+- exact retained append attempt recovery；
+- authoritative seal/logical-delete lifecycle。
+
+P15-M5 still supports only strict Object WAL。BookKeeper IO、`WAL_DURABLE` success、async workers and higher
+generations remain outside this delivery。
+
 ## 5. F2 — ManagedLedger Facade
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0 API spike + F2-M0R code-level review complete；F2-M1 next；production facade not implemented
+Current milestone: F2-M0 API spike + F2-M0R code-level review complete；F2-M1 waits for P15-M5；production facade not implemented
 
 ### Owns
 
@@ -106,14 +125,15 @@ Current milestone: F2-M0 API spike + F2-M0R code-level review complete；F2-M1 n
 
 ### Entry gate
 
-F2-M0/M0R closed the design entry gate:
+F2-M0/M0R closed the facade design gate。Production entry additionally requires P15-M5：
 
 - F1 append/read/trim error semantics are stable；
 - Pulsar fork/API blobs and repository boundary are locked；
 - mapping v1 is one stream/one virtual ledger with `entryId == stream offset`；
 - same-name delete/recreate uses a new projection incarnation/stream/virtual ledger；
 - non-known append outcomes carry and recover the exact retained attempt before writes resume；
-- current object-shaped `AppendResult` is intentionally retained for the object-only F2 rollout；
+- generic `AppendResult` exposes logical range independently from physical target；F2 does not inspect object fields；
+- L0 seal/logical-delete are authoritative and implemented；
 - every other Nereus profile is rejected before IO。
 
 ### Exit gate
@@ -161,7 +181,7 @@ Detailed design: `nereus-future4-compaction-generation.md`
 ### Entry gate
 
 - F1 generation-0 index and commitVersion contracts stable；
-- read target can represent every supported primary WAL；
+- Phase 1.5 generic read target/dispatcher and stable-commit split implemented；
 - conditional higher-generation publish schema is frozen；
 - source ranges and checksums form deterministic task identity。
 
@@ -262,6 +282,7 @@ Verification follows architecture dependencies rather than waiting for all track
 | Wave | Scope |
 | --- | --- |
 | V1 | F1 deterministic unit/contract/failure-injection tests |
+| V1.5 | Phase 1.5 mixed-metadata、generic target、exact recovery and lifecycle tests |
 | V2 | F2/F3 Pulsar facade and cursor compatibility suites |
 | V3 | F4 materialization lag、generation、GC and corruption tests |
 | V4 | F5/F7 protocol routing/failover compatibility |

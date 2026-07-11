@@ -249,7 +249,8 @@ The upgrade gate also regenerates a `javap -public` signature snapshot and verif
 - Pulsar Entry byte codec and `Entry` implementation.
 - `ManagedLedgerFactory`, `ManagedLedger`, read-only and non-durable cursor facades.
 - Projection metadata records/codecs/fake/real Oxia adapter.
-- L0 stream lifecycle and append-recovery extensions.
+- Consume Phase 1.5 L0 stream lifecycle and append-recovery extensions；their implementation/metadata truth remains
+  in protocol-neutral modules, not in the facade.
 - Product configuration values that do not import broker-private classes.
 
 It is acceptable for `nereus-managed-ledger` to depend on the locked managed-ledger artifact. It must

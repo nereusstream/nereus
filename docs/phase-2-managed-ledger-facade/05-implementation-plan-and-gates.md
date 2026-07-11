@@ -1,23 +1,25 @@
 # Future 2 Implementation Plan and Gates
 
-This plan starts after F2-M0/M0R. A milestone is complete only when its code, focused tests and listed
+This plan starts after F2-M0/M0R design and the Phase 1.5 P15-M5 final gate. A milestone is complete only when its code, focused tests and listed
 gate exist; documentation alone is not implementation evidence.
 
 ## 1. Build and Version Gate
 
 Before F2-M1 production code:
 
-1. add a pinned Pulsar managed-ledger compile dependency for the locked fork commit;
-2. support a side-by-side Gradle composite build for development/CI, with the Pulsar checkout commit
+1. pass `phase15FinalCheck` and the protocol-neutral F2 prerequisite fixture from
+   `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md`；
+2. add a pinned Pulsar managed-ledger compile dependency for the locked fork commit;
+3. support a side-by-side Gradle composite build for development/CI, with the Pulsar checkout commit
    verified as `100d3ef0...`;
-3. choose an organization-owned published artifact/version for release builds before publishing any
+4. choose an organization-owned published artifact/version for release builds before publishing any
    Nereus facade artifact;
-4. keep `pulsar-broker` off the Nereus L0 modules' compile/runtime classpaths;
-5. run the API compile probe in CI.
-6. lock and diff the additional read-only/Entry/Position/callback/exception/config/scan/admin/cache/MXBean blobs in
+5. keep `pulsar-broker` off the Nereus L0 modules' compile/runtime classpaths;
+6. run the API compile probe in CI.
+7. lock and diff the additional read-only/Entry/Position/callback/exception/config/scan/admin/cache/MXBean blobs in
    document 06;
-7. generate a `javap -public` inventory and fail if a locked method has no `I/L/N/U/D` assignment.
-8. verify the broker-private call-site blobs in document 01 and require a source/admission-order re-review on drift.
+8. generate a `javap -public` inventory and fail if a locked method has no `I/L/N/U/D` assignment.
+9. verify the broker-private call-site blobs in document 01 and require a source/admission-order re-review on drift.
 
 A floating `master`, unverified `mavenLocal()` or an Apache snapshot that does not contain the locked
 fork commit is not an acceptable dependency lock.
@@ -57,8 +59,8 @@ nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/entry/
   NereusEntry.java
 ```
 
-Also add the protocol-neutral L0 lifecycle request types plus `AppendAttemptId`/recovery API surface, but do not
-expose facade terminate/delete/append recovery until the core state machines exist.
+Consume the implemented Phase 1.5 lifecycle/recovery/generic-result surface。F2-M1 adds no protocol-neutral L0 type
+and does not duplicate a target, attempt or lifecycle value in `nereus-managed-ledger`。
 
 Tests:
 
@@ -92,9 +94,6 @@ nereus-metadata-oxia/.../
   FakeManagedLedgerProjectionMetadataStore.java (test fixture)
   OxiaJavaManagedLedgerProjectionMetadataStore.java
   SharedOxiaClientRuntime.java
-  AppendReplayCursor.java
-  AppendReplayStatus.java
-  AppendReplaySearchResult.java
   records/LedgerIdAllocatorRecord.java
   records/TopicProjectionRecord.java
   records/ProjectionIdentity.java
@@ -102,16 +101,11 @@ nereus-metadata-oxia/.../
   records/PositionIndexRecord.java
   ProjectionIdentityMismatchException.java
   codec/F2MetadataCodecs.java
-  codec/MetadataRecordCodecFactory.java
-
-nereus-core/.../
-  append/AppendRecoveryCoordinator.java
-  lifecycle/StreamLifecycleCoordinator.java
 ```
 
-Implement L0 seal/logical-delete stream-head CAS state machines and retained-attempt append recovery here and in
-core. Logical delete does not add ObjectStore deletion. The projection adapter and L0 adapter share one Oxia client
-runtime and close it once.
+Phase 1.5 already owns `MetadataRecordCodecFactory`、append replay/recovery and L0 lifecycle。F2-M2 implements only
+projection metadata/open/recreate/mirror repair and consumes the implemented L0 operations。The projection adapter
+and L0 adapter share one Oxia client runtime and close it once.
 
 Tests:
 
@@ -121,15 +115,9 @@ Tests:
 - concurrent deleted-topic recreation publishes one next incarnation；
 - golden bytes and registry backward compatibility;
 - single-key CAS assertions and fault injection after every write;
-- existing Phase 1 gates remain green;
-- `KNOWN_COMMITTED`/`MAY_HAVE_COMMITTED` expose an attempt ID, replay the same physical request and unsuspend only
-  after committed success or a complete identity check proves `KNOWN_NOT_COMMITTED`; permanent invariants keep the
-  facade fenced.
-- retained-attempt capacity is reserved before WAL IO; exhaustion is `KNOWN_NOT_COMMITTED` and never evicts an
-  uncertain attempt.
-- recovery waits for the original mutation runner to quiesce, then advances an observed-head-anchored replay cursor
-  across more than `maxCommitChainScan` historical commits; every page validates dense chain tuples and a later remote
-  append cannot cause a false `KNOWN_NOT_COMMITTED` result.
+- existing Phase 1/1.5 gates remain green;
+- projection open/reconciliation exercises Phase 1.5 seal/delete/recovery as a black-box contract without
+  reimplementing its replay cursor, retained registry or lifecycle CAS。
 
 Exit:
 
@@ -138,7 +126,7 @@ One authoritative topic projection survives restart and concurrent creation.
 Derived projection records repair without a multi-key transaction.
 Seal/delete state is reconciled from L0 truth.
 Same-name recreation publishes a new stream/virtual ledger without resurrecting the old stream.
-Uncertain append recovery never prepares a second WAL object.
+Projection repair never substitutes for Phase 1.5 exact append recovery or lifecycle truth.
 ```
 
 ## 4. F2-M3 — ManagedLedger Facade
@@ -189,7 +177,7 @@ Focused tests:
   limits reject before byte/WAL allocation；
 - append success callback bytes parse identically to input;
 - `KNOWN_COMMITTED` recovery returns the committed Position;
-- `MAY_HAVE_COMMITTED` recovery uses the same object/commit identity or write-fences the facade；
+- `MAY_HAVE_COMMITTED` recovery uses the same physical target/commit identity or write-fences the facade；
 - background recovery that later proves `KNOWN_NOT_COMMITTED` releases the lane/capacity without a second callback,
   while permanent invariant/corruption remains fenced；
 - uncertain append fences the local writer rather than inventing a result;
@@ -397,6 +385,8 @@ evidence for the end-to-end milestone.
 
 Stop implementation and update design if:
 
+- Phase 1.5 P15-M5 API/behavior differs from the locked F2 prerequisite and cannot be reconciled without changing
+  Position/callback/lifecycle semantics；
 - Pulsar target interface blobs differ from the lock;
 - one Pulsar Entry cannot remain one L0 offset;
 - a required broker path needs durable ack semantics from Future 3;

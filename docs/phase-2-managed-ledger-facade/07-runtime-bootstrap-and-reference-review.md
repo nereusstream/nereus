@@ -159,8 +159,9 @@ No broker-private class enters L0 modules.
 `DefaultNereusRuntimeProvider` is the production implementation. The F2 writer ID is
 `brokerId + "/" + processRunId`; `processRunId` contains at least 128 bits from `SecureRandom` and is regenerated at
 every broker process start. `NereusRuntimeConfiguration.streamStorage().writerId()` must equal that value and its
-cluster must equal the frozen broker cluster identity. Durable append authority is still the Oxia epoch/token, not
-this human-readable ID.
+`processRunId()` must equal the context value；its cluster must equal the frozen broker cluster identity。Phase 1.5
+derives the durable writer-run hash and process-local `AppendAttemptId` namespace from that explicit process ID。
+Durable append authority is still the Oxia epoch/token, not this human-readable ID.
 
 Configured runtime/ObjectStore provider classes are loaded once with `pluginClassLoader`, require a public no-arg
 constructor and are type-checked before any client is created. Constructor/type failure is a startup failure; there is
@@ -292,13 +293,14 @@ The conversion is constructor-by-constructor, with no untyped property bag:
 | --- | --- |
 | `OxiaClientConfiguration` | service address, namespace, metadata request timeout, Oxia session timeout, `maxCommitChainScan`, max Oxia pending operations |
 | `ObjectStoreConfiguration` | provider, parsed absolute endpoint URI, region/bucket/prefix, path-style flag, object request timeout, connection limit and secret references |
-| `StreamStorageConfig` identity/session | cluster name, `brokerId/processRunId`, TTL, renew-before, minimum commit remaining |
-| `StreamStorageConfig` deadlines | append/read from the matching Nereus fields; shutdown grace equals close timeout |
-| `StreamStorageConfig` resource limits | resolve ranges, commit scan, derived repair page, cached streams, in-flight appends, buffered bytes, concurrent object reads, read buffer and object bytes |
+| `StreamStorageConfig` identity/session | cluster name, writer ID=`brokerId/processRunId`, explicit `processRunId`, TTL, renew-before, minimum commit remaining |
+| `StreamStorageConfig` deadlines | append/read/recovery attempt/backoff/terminal TTL from matching Nereus fields; shutdown grace equals close timeout |
+| `StreamStorageConfig` resource limits | resolve ranges, commit scan, derived repair page, cached streams, in-flight appends, retained attempts/terminals, buffered/primary-append bytes, concurrent primary reads, primary-read buffer and object bytes |
 | `StreamStorageConfig` fixed F2 fields | `maxAppendBatchRecords=1`, `autoAcquireAppendSession=true`; metadata watch and offset cache use their explicit booleans/TTL |
 | `NereusManagedLedgerFactoryConfig` | metadata/append/recovery/read/close/poll deadlines and entry/read/open/callback/retained-attempt/scan limits |
 
 The two `maxCommitChainScan` constructor arguments must be identical. `maxCachedStreams >= maxOpenLedgers`；
+the core/facade `maxRetainedAppendAttempts` values must be identical；core terminal capacity is at least that value；
 `maxInFlightAppends <= maxPendingCallbacks`；the WAL-v1 checked single-entry upper-bound function, including frame,
 index and fixed F2 entry attributes, must fit `maxObjectBytes <= maxBufferedBytes` and
 `maxObjectBytes <= maxReadBufferBytes`。Renew-before and minimum-commit-remaining are each positive and less than the

@@ -1,8 +1,8 @@
 # Nereus Commit Protocol
 
 > 状态：Current cross-track protocol
-> Append 部分已与 Phase 1 stream-head CAS 实现合同对齐；generation、cursor、txn、catalog 部分为
-> target design。
+> Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已完成
+> code-level design 但未实现；generation、cursor、txn、catalog 部分仍为 target design。
 
 ## 1. Purpose
 
@@ -10,6 +10,7 @@
 
 - primary WAL durability；
 - stable append/producer result；
+- exact in-process append recovery and stream lifecycle；
 - generation-0 read-index materialization；
 - async object materialization and compaction generation publish；
 - cursor、transaction、SBT/SDT and GC commits。
@@ -17,6 +18,7 @@
 精确 Phase 1 records/keys/algorithms 见
 `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md` 和
 `../phase-1-core-stream-storage/04-core-state-machines.md`。
+Phase 1.5 target records/state machines见 `../phase-1.5-core-storage-foundation/README.md`。
 
 ## 2. Commit domains
 
@@ -27,6 +29,8 @@ Nereus 不把所有状态塞进一个“commit”概念：
 | Logical append | Oxia stream head | successful head `putIfVersion` |
 | Commit identity | reachable immutable commit log | head links the record |
 | Generation-0 read/replay index | Oxia derived records | records materialized and validated |
+| Stream seal | Oxia stream head | `ACTIVE -> SEALED` head CAS |
+| Logical stream delete | Oxia stream head | first `ACTIVE/SEALED -> DELETING` head CAS |
 | Higher-generation target | Oxia generation index | conditional generation entry publish |
 | Cursor progress | Oxia cursor state | cursor CAS |
 | Transaction result | transaction state + required stream markers | explicit state-machine terminal CAS |
@@ -67,6 +71,11 @@ Readable form：
 `OxiaKeyspace` applies canonical component encoding。Same-stream operations carry
 `PartitionKey(streamId)`；object records carry `PartitionKey(objectId)`。Cross-partition atomicity is not
 assumed。
+
+The Phase 1.5 target keeps these head/commit/index keys and adds
+`/streams/{streamId}/committed-appends/{commitId}`。The existing commit-log/offset-index key may contain a frozen
+legacy object record or a new generic-target record；envelope record type selects the decoder and one head may link a
+dense mixed-version chain。This is designed in P15-M0 and becomes production behavior only after P15-M3/M5。
 
 ## 5. Append session protocol
 
@@ -131,16 +140,16 @@ Each slice commits independently。If A commits、B is fenced and C remains pend
 
 ### 7.1 Deterministic commit identity
 
-The coordinator builds a canonical identity over every durable replay field，including：
+Phase 1 builds a canonical object identity over every durable replay field。Phase 1.5 uses a domain-separated v2
+identity containing the same logical fields plus a canonical tagged read-target identity：
 
 ```text
-stream / object / slice identity
+stream / physical read-target identity
 writer epoch and fencing-token hash
 expected offset and counts
 logical bytes and event-time bounds
 payload format / schema refs / projection identity
-object and slice checksums
-entry-index identity
+target-specific checksums and read framing/index identity
 ```
 
 `commitId` is a deterministic hash of that identity。The same physical slice replay must compute the same
@@ -153,7 +162,7 @@ must match when an existing intent is reused，but they are deliberately not has
 ### 7.2 Intent write
 
 ```text
-putIfAbsent(commit-log/{commitId}, StreamCommitRecord)
+putIfAbsent(commit-log/{commitId}, legacy StreamCommitRecord or generic StreamCommitTargetRecord)
 ```
 
 If an existing record is found，all canonical request fields and the current head-derived
@@ -168,8 +177,8 @@ The coordinator reads the latest head and validates：
 - current session matches epoch/token；the adapter performs an expiry preflight，while the single-key CAS
   atomically fences through the current epoch/token snapshot rather than an unavailable server-time predicate；
 - `expectedStartOffset == committedEndOffset`；
-- object manifest/slice identity is valid；
-- stored manifest `objectId` and aggregate/per-slice visibility states are consistent；
+- provider-specific durable target identity is valid before CAS；Object WAL requires the exact manifest/slice，a
+  future BookKeeper adapter validates its ledger/entry range without fake object records；
 - offset/cumulative size arithmetic is safe；
 - replay is not already reachable under another incompatible identity。
 
@@ -195,8 +204,8 @@ multi-key offset-index batch in the active design。
 
 After head success，materialize idempotently from the committed record：
 
-1. generation-0 `OffsetIndexRecord`；
-2. `CommittedSliceRecord` replay marker；
+1. generation-0 legacy `OffsetIndexRecord` or generic `OffsetIndexTargetRecord`；
+2. matching legacy `CommittedSliceRecord` or generic `CommittedAppendRecord` replay marker；
 3. object reference/audit state。
 
 Every record validates the same `commitVersion` and durable identity。Object reference failure after head
@@ -211,6 +220,10 @@ commit is repairable audit/GC state，not logical rollback。
 
 Current Phase 1 implements only strict success。The name `WAL_DURABLE` never authorizes success before the
 head CAS or with a temporary local offset。
+
+Phase 1.5 P15-M2/M3 will separate `commitStableAppend` from `materializeGenerationZero` internally while still executing only the
+strict second row。The split is a prerequisite for later completion policies, not implementation of
+`WAL_DURABLE` success。
 
 ## 8. Retry and failure classification
 
@@ -228,7 +241,7 @@ Timeout and caller cancellation follow the same table。Cancellation cannot undo
 Replay lookup order：
 
 ```text
-committed-slice marker
+version-matched committed-slice/committed-append marker
   -> latest head offset relation
   -> reachable commit chain only for an older expectedStartOffset
   -> orphan intent check
@@ -247,13 +260,15 @@ anchor plus the exact expected tuple for the next commit。
 
 ### 8.1 In-process append recovery handle
 
-Future 2 exposes a callback API that must choose one terminal `addComplete` or `addFailed`. `AppendOutcome` alone says
+Future 2 exposes a callback API that must choose one terminal `addComplete` or `addFailed`. Phase 1.5 therefore owns
+the protocol-neutral prerequisite。`AppendOutcome` alone says
 how certain the result is but does not identify which physical attempt to replay. Therefore every public append failure
 after the head request is sent also carries an opaque `AppendAttemptId`。
 
-The core retains the exact `CommitSliceRequest`、WAL result and slice behind that ID. `recoverAppend` replays only that
-identity and either returns the original `AppendResult` or preserves/increases certainty. It cannot prepare a new WAL
-object. A stream lane with a non-known attempt remains suspended until recovery returns committed, proves
+The core retains the exact generic `CommitAppendRequest`、durable provider result and read target behind that ID。
+`recoverAppend` replays only that identity and either returns the original `AppendResult` or preserves/increases
+certainty. It cannot prepare a new target or persist new primary bytes. A stream lane with a non-known attempt remains
+suspended until recovery returns committed, proves
 `KNOWN_NOT_COMMITTED` by complete commit-identity inspection, or reaches a permanent invariant failure; observing only
 that the head advanced is insufficient because another writer may own the new range。Historical inspection is paged
 from an immutable observed-head anchor and retains its continuation across recovery calls；retrying the newest bounded
@@ -261,6 +276,20 @@ page is not progress。The original mutation runner must quiesce before that anc
 proven-uncommitted terminal releases retained attempt capacity；a permanent invariant leaves the facade write-fenced。
 
 This is an in-process callback-recovery contract, not producer-sequence deduplication across broker crashes。
+
+### 8.2 Seal and logical delete
+
+Phase 1.5 P15-M4 will add head-only lifecycle transitions：
+
+```text
+ACTIVE -> SEALED
+ACTIVE/SEALED -> DELETING -> DELETED
+```
+
+Seal linearizes at the first edge and keeps committed reads/trim available。Logical delete linearizes on entry to
+`DELETING`; append/session/read/resolve/trim are then rejected。`DELETED` is terminal completion。Neither transition
+deletes offset indexes or object bytes；physical deletion still requires the GC protocol in section 15。A local
+lifecycle barrier waits for older exact append recovery, while remote races are ordered only by the same head CAS。
 
 ## 9. AutoMQ-like async materialization
 
@@ -304,8 +333,8 @@ offsets。The commit record/read target must eventually represent a real BK ledg
 | `BOOKKEEPER_WAL_SYNC_OBJECT` | object-backed target is published before strict success |
 | `BOOKKEEPER_WAL_ASYNC_OBJECT` | BK range serves reads until background generation publish |
 
-Current object-shaped API cannot safely encode this range；generic target design is a pre-implementation
-gate。
+Phase 1.5 design has frozen a generic BookKeeper entry-range target value/codec and adapter registry, but P15-M5 will register
+only Object WAL IO。A real BookKeeper adapter/client/retention implementation remains a separate profile gate。
 
 ## 11. Generation publish protocol
 
@@ -459,9 +488,17 @@ M7 production Oxia adapter now passes the same manifest validation、single-key 
 replay/repair continuation and watch/partition contract as the fake，plus its independent Docker/Testcontainers
 gate. M8 must compose that adapter with core and Object WAL for final Phase 1 exit。
 
-Before extending beyond Phase 1 strict Object WAL：
+Phase 1.5 P15-M1-M5 must first implement and verify：
 
-- implement and test a generic primary read target；
+- generic target API/codec and legacy/new metadata compatibility；
+- Object WAL adapter parity through split stable commit/materialization；
+- exact retained-attempt recovery with anchored multi-page progress；
+- authoritative seal/logical-delete state machines；
+- unchanged Phase 1 ordinary/Docker gates and one-way rollout boundary。
+
+Before enabling async/BookKeeper/higher-generation execution after Phase 1.5：
+
+- implement the real primary adapter required by the profile；
 - define `WAL_DURABLE` read-after-success SLA and repair error mapping；
 - freeze async task/checkpoint/idempotence schema；
 - freeze higher-generation publish CAS and overlap rules；
@@ -476,4 +513,5 @@ Before extending beyond Phase 1 strict Object WAL：
 - `nereus-future1-core-stream-storage.md`
 - `../automq-like-stream-storage/README.md`
 - `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`
+- `../phase-1.5-core-storage-foundation/README.md`
 - `../phase-1-core-stream-storage/09-legacy-oxia-multi-key-commit-design.md`（Historical）

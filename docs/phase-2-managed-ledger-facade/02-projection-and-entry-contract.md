@@ -253,6 +253,10 @@ Before invoking `addComplete`, validate:
 - result committed end equals range end;
 - the facade is still open on the same projection incarnation.
 
+The Phase 1.5 `ReadTarget` carried by the result is validated/owned by L0。F2 neither requires an object target nor
+reads physical fields to construct the Position；its separate open-time profile admission still limits the first
+runtime to `OBJECT_WAL_SYNC_OBJECT`。
+
 The last check is local plus lifecycle fencing; it does not add a projection metadata read to every append. A current
 topic incarnation cannot be replaced until its L0 stream has reached logical delete and the old facade has stopped
 admission.

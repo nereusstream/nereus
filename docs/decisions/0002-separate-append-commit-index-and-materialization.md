@@ -24,7 +24,8 @@ Nereus uses three distinct domains：
    - stream-head `putIfVersion` links the intent and advances stable offsets；
    - the head CAS is the append linearization point。
 2. **Generation-0 read-index materialization**
-   - offset-index and committed-slice records are derived from a reachable commit；
+   - offset-index and version-matched legacy committed-slice/generic committed-append records are derived from a
+     reachable commit；
    - they can be repaired idempotently；
    - strict durability waits for their confirmation。
 3. **Secondary object materialization / higher generation**
@@ -46,6 +47,9 @@ ack after WAL durability while returning only a broker-local temporary offset.
 - Documentation must distinguish logical visibility from physical read-target selection。
 - BookKeeper profiles require a generic physical read-target model before implementation；fake object keys are
   not an acceptable adapter。
+- Phase 1.5 code-level design maps this separation to explicit `commitStableAppend` /
+  `materializeGenerationZero` operations and a tagged target model；P15-M1-M5 must implement it while retaining
+  strict Object-WAL-only public execution at that delivery's exit。
 
 ## Rejected alternatives
 
@@ -61,4 +65,4 @@ ack after WAL durability while returning only a broker-local temporary offset.
 - `../design/nereus-overall-architecture.md`
 - `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`
 - `../phase-1-core-stream-storage/09-legacy-oxia-multi-key-commit-design.md`
-
+- `../phase-1.5-core-storage-foundation/README.md`

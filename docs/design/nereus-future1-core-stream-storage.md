@@ -2,7 +2,8 @@
 
 > 状态：Implemented；Phase 1 M0-M8 complete
 > 交付映射：`docs/phase-1-core-stream-storage/`
-> 当前里程碑：Phase 1 complete；后续扩展进入对应 Future
+> 后继交付：Phase 1.5 P15-M0 design complete；`docs/phase-1.5-core-storage-foundation/`
+> 当前里程碑：P15-M1 target API；Phase 1 production behavior remains unchanged
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
 Oxia keys、failure injection 和测试 gate 以代码级文档为准；本文不复制那些合同。
@@ -73,6 +74,16 @@ OBJECT_WAL / OBJECT_WAL_SYNC_OBJECT
 Other enum values can be canonicalized and persisted as metadata today, but core must reject their execution
 until the corresponding writer/reader/coordinator exists。This is `Reserved`, not partial support。
 
+### 3.4 Phase 1.5 designed extension
+
+Phase 1.5 is an F1 delivery extension inserted before F2 production implementation。It will add generic read-target
+and primary-WAL adapter boundaries、split stable head commit from generation-zero materialization、dual-read/new-write
+metadata、exact in-process append recovery and seal/logical delete。P15-M0 is design only；until P15-M1-M5 code/gates
+land, none of those additions is an implemented runtime claim。
+
+P15-M5 deliberately keeps the same supported profile/durability as Phase 1。BookKeeper adapters、non-strict success
+and Future 4 workers remain deferred beyond it。
+
 ## 4. Layer and module boundary
 
 ```text
@@ -131,11 +142,12 @@ API rules：
 - trim advances metadata only；
 - after close, new work fails with `STORAGE_CLOSED`。
 
-### 5.1 Known target API gap
+### 5.1 Phase 1.5 target API evolution
 
 Current `AppendResult` and `ResolvedObjectRange` are object-shaped。Before BookKeeper profiles are
-implemented, L0 must introduce a real primary read-target abstraction or deliberately separate BK adapter
-results。Using fake object ids/keys for BK ranges is forbidden。
+implemented, the Phase 1.5 target introduces a tagged `ReadTarget`、generic `ResolvedRange` and target-aware durable metadata。
+Its code-level contract is `../phase-1.5-core-storage-foundation/01-api-and-read-target-contract.md`。Using fake
+object ids/keys for BK ranges remains forbidden；the BookKeeper target value/codec does not itself register IO support。
 
 ## 6. Durable metadata model
 
@@ -212,6 +224,9 @@ All successful levels include `HEAD_COMMITTED`。
 
 Phase 1 M4 implements only the second row。The first row is a target contract for async/BK-only profiles，
 not “WAL put/quorum only”。
+
+Phase 1.5 will split the internal stable commit/materializer operations but continues rejecting the first row before
+IO。That refactor is a prerequisite, not implementation of the non-strict public boundary。
 
 ### 7.4 Replay and append outcome certainty
 
@@ -368,10 +383,13 @@ facade-level release scenario。
 
 Explicitly deferred：
 
-- BookKeeper location/result/read adapter；
-- `WAL_DURABLE` non-strict return implementation；
+- Phase 1.5 P15-M1-M5 will implement generic target/result/adapter seams but still defer BookKeeper writer/reader registration；
+- `WAL_DURABLE` non-strict return implementation remains after the Phase 1.5 internal split；
 - async materialization tasks and retention gate；
 - higher generations/compacted readers；
 - protocol projections and durable cursors。
 
 These deferrals must remain visible in docs and runtime errors；they cannot be hidden behind reserved enums。
+
+The exact Phase 1.5 scope、metadata migration、state machines and P15-M1-M5 gates are authoritative in
+`../phase-1.5-core-storage-foundation/README.md`。

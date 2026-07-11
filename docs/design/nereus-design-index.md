@@ -2,8 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-11
-> 当前实现阶段：Future 2，F2-M0 API spike + F2-M0R code-level review complete；下一里程碑为 F2-M1
-> projection model
+> 当前交付阶段：Phase 1.5，P15-M0 code-level design complete；下一实现里程碑为 P15-M1 target API
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -37,8 +36,9 @@ streamId + offset
 发生冲突时按下列顺序处理：
 
 1. **已实现行为**：生产代码、可执行测试和 durable golden bytes；
-2. **当前代码级合同**：`docs/phase-1-core-stream-storage/` 的已实现 L0 合同，以及
-   `docs/phase-2-managed-ledger-facade/` 的 active F2 design；
+2. **当前代码级合同**：`docs/phase-1-core-stream-storage/` 的已实现 L0 合同、
+   `docs/phase-1.5-core-storage-foundation/` 的 active L0 evolution design，以及
+   `docs/phase-2-managed-ledger-facade/` 的 reviewed F2 design；
 3. **已接受决策**：`docs/decisions/`；
 4. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
 5. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
@@ -67,10 +67,11 @@ streamId + offset
 | `nereus-metadata-oxia` | `Implemented`（M7） | fake + production Oxia adapter、shared codecs/contract、single-key CAS、repair/watch、Docker gates |
 | `nereus-object-store` | `Implemented`（M3） | object-store API、WAL v1 writer/reader、entry index、local test fixture、checksums/tests |
 | `nereus-core` | `Implemented`（Phase 1） | append、read/resolve、trim/recovery、deadline/resource/close and M8 real-Oxia restart/failure gate |
+| Phase 1.5 foundation | `Designed`（P15-M0） | generic target/adapter、metadata dual-read/new-write、append recovery、seal/delete contract；no production code |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `In progress`（F2-M0R） | API spike、code-level method/runtime review complete；production module still marker-only |
-| `nereus-pulsar-adapter` | `In progress`（F2-M0R） | runtime/bootstrap contract complete；module still marker-only |
+| `nereus-managed-ledger` | `In progress`（F2-M0R complete；gated） | API spike、code-level method/runtime review complete；implementation waits for P15-M5；module marker-only |
+| `nereus-pulsar-adapter` | `In progress`（F2-M0R complete；gated） | runtime/bootstrap contract complete；implementation waits for F2 milestones；module marker-only |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
@@ -92,7 +93,8 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 1. 任意成功 append 都必须先完成 primary WAL durability，再通过 stream-head single-key CAS
    获得稳定 offset；`WAL_DURABLE` 不是“只写 WAL、跳过 Oxia”。
 2. Stream-head CAS 是逻辑 append 线性化点；reachable commit log 记录完整提交身份。
-3. Generation-0 offset index 和 committed-slice marker 是可修复读/replay 索引。
+3. Generation-0 offset index 和版本匹配的 legacy committed-slice / generic committed-append marker 是可修复
+   读/replay 索引。
 4. `WAL_DURABLE_AND_INDEX_COMMITTED` 额外等待 generation-0 读索引物化确认。
 5. Async profile 延后的是 object-backed/read-optimized generation 发布，不是 offset 稳定性。
 6. Compaction/materialization 发布 higher generation 只切换物理读目标，不改变已提交 offset。
@@ -111,6 +113,15 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
     that exact retained physical attempt or write-fences，and does not claim producer dedup across broker crashes。
 14. Hybrid first-create/delete/new-lifetime selection is serialized by one broker-metadata storage-class binding；an
     existing live topic cannot switch between BookKeeper and Nereus without a future migration protocol。
+15. Phase 1.5 design replaces mandatory object-shaped common results/metadata with a tagged `ReadTarget` and uses
+    dual-read/new-write metadata；legacy Phase 1 golden bytes remain frozen and one unchanged head may link a mixed
+    commit chain。
+16. Stable head commit and generation-zero index materialization become separate idempotent L0 operations, while
+    Phase 1.5 public success remains strict and continues rejecting `WAL_DURABLE` before IO。
+17. F2-required append recovery、seal and logical delete must be implemented in L0 before F2 production code；logical
+    delete never implies physical object deletion。
+
+ADR 0004 owns the delivery-order、generic-target compatibility and support-boundary decision behind items 15-17。
 
 详细协议见 `nereus-commit-protocol.md`，当前 Phase 1 精确合同见
 `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`。
@@ -124,8 +135,10 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 | `nereus-commit-protocol.md` | append/head CAS、index repair、generation、cursor/txn/catalog commit | current |
 | `nereus-storage-object-format.md` | 已实现 WAL v1 与未来 object families 的版本边界 | current |
 | `nereus-futures.md` | 能力轨道、依赖 DAG、交付状态 | current |
+| `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | designed / current delivery |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
+| `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
 
 ## 7. 能力轨道文档
 
@@ -133,8 +146,8 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
-| `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R complete；M1 next） |
+| `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1）；Phase 1.5 designed extension active |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R complete；M1 after P15-M5） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
@@ -154,12 +167,21 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 
 ### 实现 Future 2
 
-1. `nereus-future2-managed-ledger-facade.md`；
-2. `../phase-2-managed-ledger-facade/README.md`；
-3. 该目录的 `01` 到 `07` active code-level documents；
-4. `../phase-2-managed-ledger-facade/spikes/PulsarManagedLedgerApiProbe.java` 与锁定的
+1. first complete `../phase-1.5-core-storage-foundation/README.md` P15-M1-M5；
+2. `nereus-future2-managed-ledger-facade.md`；
+3. `../phase-2-managed-ledger-facade/README.md`；
+4. 该目录的 `01` 到 `07` reviewed code-level documents；
+5. `../phase-2-managed-ledger-facade/spikes/PulsarManagedLedgerApiProbe.java` 与锁定的
    Pulsar fork commit；
-5. 当前里程碑对应的代码和可执行 gate。
+6. 当前里程碑对应的代码和可执行 gate。
+
+### 实现 Phase 1.5
+
+1. `nereus-future1-core-stream-storage.md`；
+2. `../phase-1.5-core-storage-foundation/README.md`；
+3. 该目录的 `01` 到 `05` code-level documents；
+4. 对照 `../phase-1-core-stream-storage/` 的 frozen legacy contract/goldens；
+5. P15-M1-M5 当前里程碑代码与 gate。
 
 ### 评审目标架构
 
@@ -177,3 +199,5 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 - 不把 review 日期结论当作永久状态；当前状态只在本索引和当前 phase README 维护。
 - 架构决策改变时，同时检查 overall、commit protocol、对应 future，以及 active phase 的
   README/编号合同。
+- Phase 1.5 implementation touching an existing Phase 1 behavior must update both the successor contract and the
+  exact affected Phase 1 document；design-only future types must not be written as current code。
