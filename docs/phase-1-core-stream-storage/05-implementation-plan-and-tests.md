@@ -651,6 +651,9 @@ Status: implemented and final-gated on 2026-07-11.
 - done: release terminal append lanes while retaining uncertain suspended lanes；
 - done: migrate Java packages/Maven group to owned-domain namespace `com.nereusstream` without changing
   metadata/WAL golden bytes；
+- done: make the append upload-timeout regression synchronize on the observed upload boundary before
+  waiting for expiry；this preserves the during-upload assertion without depending on a 40 ms CI scheduling
+  window；
 - done: document findings and residual compromises in `13-phase-1-final-review-2026-07-11.md`。
 
 Ordinary gate after these changes: 45 core、63 metadata、23 object-store and 23 API tests pass via

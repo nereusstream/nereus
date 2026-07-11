@@ -99,3 +99,12 @@ Result：all 29 tasks passed. Ordinary suites contain 23 API、45 core、63 meta
 Docker-backed suites contain 5 production-adapter、5 capability-spike and 2 final
 core/Oxia/Object-WAL end-to-end tests. API and BOM generated POMs were also checked for
 `com.nereusstream`、`https://nereusstream.com`、Apache-2.0 and the GitHub SCM coordinates。
+
+### CI timing follow-up
+
+The append upload-timeout regression originally used a 40 ms end-to-end deadline and then dereferenced the
+prepared object unconditionally. On a loaded GitHub Actions runner the deadline could expire before the
+asynchronous prepare stage ran, so the test failed with its own `NullPointerException` rather than testing
+the intended during-upload boundary. The test now waits for the writer's `uploadStarted` latch, uses a
+two-second deadline, and only then asserts `TIMEOUT + KNOWN_NOT_COMMITTED` plus absence of an object
+manifest. Production deadline and commit behavior are unchanged.

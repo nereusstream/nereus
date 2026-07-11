@@ -151,12 +151,17 @@ class DefaultStreamStorageAppendTest {
         try (TestContext context = context(
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT, Runnable::run, timeoutWriter)) {
             StreamId streamId = context.createStream("timeout").streamId();
-            NereusException failure = appendFailure(context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofMillis(40))));
+            CompletableFuture<AppendResult> append = context.storage.append(
+                    streamId, batch("a"), appendOptions(Duration.ofSeconds(2)));
+            assertThat(timeoutWriter.uploadStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+            NereusException failure = appendFailure(append);
             assertThat(failure.code()).isEqualTo(ErrorCode.TIMEOUT);
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
+            PreparedWalObject prepared = timeoutWriter.prepared;
+            assertThat(prepared).isNotNull();
             assertThat(context.metadata.getObjectManifest(
-                    "cluster/a", timeoutWriter.prepared.result().objectId()).join()).isEmpty();
+                    "cluster/a", prepared.result().objectId()).join()).isEmpty();
         }
 
         BlockingUploadWriter cancelledWriter = new BlockingUploadWriter(
