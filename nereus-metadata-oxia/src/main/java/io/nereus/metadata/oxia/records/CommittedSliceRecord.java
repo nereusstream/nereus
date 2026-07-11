@@ -29,7 +29,7 @@ public record CommittedSliceRecord(
         requireNonBlank(streamId, "streamId");
         requireNonBlank(objectId, "objectId");
         requireNonBlank(sliceId, "sliceId");
-        if (offsetStart < 0 || offsetEnd <= offsetStart || generation < 0 || commitVersion < 0
+        if (offsetStart < 0 || offsetEnd <= offsetStart || generation < 0 || commitVersion <= 0
                 || metadataVersion < 0) {
             throw new IllegalArgumentException("committed slice numeric fields are invalid");
         }

@@ -302,6 +302,10 @@ class ApiValueValidationTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendSessionOptions(" ", Duration.ofSeconds(1), false))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new AppendSessionOptions("writer", Duration.ofNanos(1), false))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new AppendSessionOptions("writer", Duration.ofSeconds(Long.MAX_VALUE), false))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ReadOptions(0, 1, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ResolveOptions(0, true, true))

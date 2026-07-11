@@ -33,6 +33,9 @@ public record AppendSessionSnapshotRecord(
         if (writerId.isEmpty() != fencingToken.isEmpty()) {
             throw new IllegalArgumentException("writerId and fencingToken must both be empty or both be set");
         }
+        if (!writerId.isEmpty() && (epoch == 0 || leaseVersion == 0 || expiresAtMillis == 0)) {
+            throw new IllegalArgumentException("non-empty append session fields must be positive");
+        }
     }
 
     public boolean isEmpty() {

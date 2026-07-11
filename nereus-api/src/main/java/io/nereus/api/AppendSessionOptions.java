@@ -28,8 +28,14 @@ public record AppendSessionOptions(
         if (writerId.isBlank()) {
             throw new IllegalArgumentException("writerId cannot be blank");
         }
-        if (ttl.isZero() || ttl.isNegative()) {
-            throw new IllegalArgumentException("ttl must be positive");
+        long ttlMillis;
+        try {
+            ttlMillis = ttl.toMillis();
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("ttl must fit millisecond lease representation", e);
+        }
+        if (ttlMillis <= 0) {
+            throw new IllegalArgumentException("ttl must be at least one millisecond");
         }
     }
 }

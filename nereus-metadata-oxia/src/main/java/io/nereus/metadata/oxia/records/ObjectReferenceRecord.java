@@ -14,8 +14,11 @@
 
 package io.nereus.metadata.oxia.records;
 
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public record ObjectReferenceRecord(
         String objectId,
@@ -24,9 +27,19 @@ public record ObjectReferenceRecord(
         long metadataVersion) {
     public ObjectReferenceRecord {
         objectId = requireNonBlank(objectId, "objectId");
-        visibleSlices = List.copyOf(Objects.requireNonNull(visibleSlices, "visibleSlices"));
+        visibleSlices = Objects.requireNonNull(visibleSlices, "visibleSlices").stream()
+                .sorted(Comparator.comparing(VisibleSliceReferenceRecord::streamId)
+                        .thenComparingLong(VisibleSliceReferenceRecord::offsetStart)
+                        .thenComparing(VisibleSliceReferenceRecord::sliceId))
+                .toList();
         if (updatedAtMillis < 0 || metadataVersion < 0) {
             throw new IllegalArgumentException("object reference numeric fields must be non-negative");
+        }
+        Set<SliceIdentity> identities = new HashSet<>();
+        for (VisibleSliceReferenceRecord slice : visibleSlices) {
+            if (!identities.add(new SliceIdentity(slice.streamId(), slice.sliceId()))) {
+                throw new IllegalArgumentException("object reference visible slice identities must be unique");
+            }
         }
     }
 
@@ -36,5 +49,8 @@ public record ObjectReferenceRecord(
             throw new IllegalArgumentException(fieldName + " cannot be blank");
         }
         return value;
+    }
+
+    private record SliceIdentity(String streamId, String sliceId) {
     }
 }

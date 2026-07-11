@@ -64,7 +64,40 @@ M4 adds a pre-IO profile gate before session acquisition/buffering/upload：
 
 Required tests were added to the M4 matrix in `05-implementation-plan-and-tests.md`。
 
-## 6. Documentation authority
+## 6. Pre-M4 review closure
+
+The 2026-07-10 pre-M4 review found and closed these design/code gaps in source：
+
+- `NereusException` now carries optional structured `AppendOutcome`；
+- fake metadata and the future real adapter share `Phase1ObjectManifestValidator`；
+- replay scan exhaustion is an explicit `MAY_HAVE_COMMITTED` result，not offset conflict/not-found；
+- normal new appends at current committed end and compatible metadata-only head updates do not walk old
+  history，so bounded replay cannot cap the lifetime number of commits；
+- existing orphan intents are reusable only when predecessor/range/cumulative-size/commitVersion fields
+  match the current head snapshot；
+- derived-index repair counts every scanned record，validates dense chain progression，and returns a
+  target-bound cursor carrying the original head anchor plus exact next-commit tuple；
+- object-reference repair rejects manifest/reachable-commit conflicts and cannot silently remove an
+  existing visible reference；manifest slice order/ranges and object-reference identities/order are canonical；
+- post-head object audit runtime/injected failures are uniformly best-effort and observable，not append
+  failures with false certainty；
+- decoded commit/index/marker records reject zero versions，non-dense logical progress，invalid cumulative
+  size，and zero-length WAL slices before state-machine use；
+- append-session tests now cover live-owner fencing，stale renew，expiry/steal policy，and post-expiry
+  epoch/token rollover with public retriable classification；
+- append-session TTL is millisecond-representable、at least 1 ms，and overflow checked through expiration；
+- decoded non-empty append-session identity/lease/expiry fields are positive before fencing use；
+- trim reason/range/state is validated before head mutation；
+- watcher callback failures are isolated/observable and cannot alter session/trim/append outcomes；closed
+  stores reject new registrations；
+- active docs distinguish manifest-only invisibility from head-committed/index-missing repair；
+- M7 production Oxia adapter/shared-contract integration is part of final Phase 1 exit。
+
+On 2026-07-11 the final cursor-tuple/chain-validation/object-rebuild follow-up passed
+`:nereus-api:test`、`:nereus-metadata-oxia:test`、`phase1Check` and `check`。The temporary environment
+verification blocker is closed and the M4 entry gate is open。
+
+## 7. Documentation authority
 
 - current implementation status：`README.md` and `05-implementation-plan-and-tests.md`；
 - precise API：`01-api-and-domain-model.md`；

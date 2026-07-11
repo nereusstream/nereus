@@ -46,7 +46,10 @@ Future 1 / Phase 1 Core StreamStorage is in progress. M0-M3 are complete:
 - Oxia key/record/codec and stream-head CAS fake metadata path；
 - Object WAL v1 writer/reader, entry index, checksums, and tests。
 
-M4 Core Append is the next milestone, followed by M5 resolve/read and M6 trim/recovery.
+M4 Core Append is the next milestone, followed by M5 resolve/read, M6 trim/recovery, and M7 production
+Oxia adapter/shared-contract integration. The M6 fake/local scenario is not the final Oxia-backed Phase 1
+exit. Pre-M4 metadata/outcome/replay/repair hardening and its repository-level Gradle gates passed on
+2026-07-11, so M4 implementation may begin.
 Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
 materialization profiles are reserved design/API boundaries, not implemented support.
 

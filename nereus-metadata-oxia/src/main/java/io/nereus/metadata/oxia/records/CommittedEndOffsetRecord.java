@@ -27,6 +27,10 @@ public record CommittedEndOffsetRecord(
         if (committedEndOffset < 0 || cumulativeSize < 0 || commitVersion < 0 || metadataVersion < 0) {
             throw new IllegalArgumentException("committed-end numeric fields must be non-negative");
         }
+        if ((committedEndOffset == 0) != (commitVersion == 0)
+                || (committedEndOffset == 0 && cumulativeSize != 0)) {
+            throw new IllegalArgumentException("committed-end state is inconsistent");
+        }
     }
 
     private static void requireNonBlank(String value, String fieldName) {

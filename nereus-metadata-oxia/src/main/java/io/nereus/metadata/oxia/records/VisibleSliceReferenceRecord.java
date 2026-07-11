@@ -26,7 +26,7 @@ public record VisibleSliceReferenceRecord(
     public VisibleSliceReferenceRecord {
         requireNonBlank(streamId, "streamId");
         requireNonBlank(sliceId, "sliceId");
-        if (offsetStart < 0 || offsetEnd <= offsetStart || generation < 0 || commitVersion < 0) {
+        if (offsetStart < 0 || offsetEnd <= offsetStart || generation < 0 || commitVersion <= 0) {
             throw new IllegalArgumentException("visible slice reference numeric fields are invalid");
         }
     }

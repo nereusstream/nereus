@@ -2,7 +2,7 @@
 
 > 状态：In progress
 > 交付映射：`docs/phase-1-core-stream-storage/`
-> 当前里程碑：M0-M3 complete，M4 append coordinator next
+> 当前里程碑：M0-M3 与 pre-M4 hardening gate complete，M4 append coordinator next
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
 Oxia keys、failure injection 和测试 gate 以代码级文档为准；本文不复制那些合同。
@@ -52,12 +52,13 @@ F1 does not own：
 | Object WAL | v1 writer/reader、multi-slice object、footer entry index、CRC32C、local fixture |
 | Build | protocol-neutral dependency guard、Phase 1 tasks |
 
-### 3.2 Pending M4-M6
+### 3.2 Pending M4-M7
 
 - `DefaultStreamStorage` append coordinator and per-stream sequencer；
 - strict append result/replay/timeout behavior；
 - resolve/read cache and repair path；
-- trim/recovery/close/backpressure integration。
+- trim/recovery/close/backpressure integration；
+- production Oxia adapter、shared fake/real contract suite and Testcontainers restart/failure gate。
 
 ### 3.3 Supported profile
 
@@ -153,7 +154,7 @@ selected Oxia Java client's lack of required conditional multi-key writes。
 - reconstruct generation-0 offset index；
 - reconstruct committed-slice marker；
 - validate checksums、schema refs、projection identity and commitVersion；
-- diagnose unknown-final state。
+- diagnose exact `AppendOutcome` certainty。
 
 An intent is committed only if reachable from `StreamHeadRecord.lastCommitId`。
 
@@ -166,7 +167,8 @@ An intent is committed only if reachable from `StreamHeadRecord.lastCommitId`。
 | object references | audit/GC references | committed slice/index + manifest |
 
 Derived record failure after head CAS cannot roll back the append。Strict append waits for them or returns
-unknown final state；read/replay can repair under bounded budget。
+`AppendOutcome.KNOWN_COMMITTED`；an unconfirmed head response returns `MAY_HAVE_COMMITTED`。Read/replay uses
+scan-bounded continuation repair。
 
 ## 7. Append protocol
 
@@ -193,7 +195,7 @@ putIfVersion(/streams/{streamId}/head, nextHead)
 The CAS validates：
 
 - stream active；
-- session epoch/token and expiry；
+- session epoch/token；expiry is checked before CAS，while atomic fencing relies on the current head snapshot；
 - expected offset equals head committed end；
 - next offsets/cumulative size/commitVersion do not overflow；
 - `lastCommitId` points to the deterministic intent。
@@ -210,14 +212,19 @@ All successful levels include `HEAD_COMMITTED`。
 Phase 1 M4 implements only the second row。The first row is a target contract for async/BK-only profiles，
 not “WAL put/quorum only”。
 
-### 7.4 Replay and unknown final state
+### 7.4 Replay and append outcome certainty
 
-- before head CAS is sent：known not committed；
-- after it is sent：outcome may be unknown；
+- before head CAS is sent：`KNOWN_NOT_COMMITTED`；
+- after it is sent but the response is unavailable：`MAY_HAVE_COMMITTED`；
+- after head success is confirmed：`KNOWN_COMMITTED` even when index confirmation/result delivery fails；
 - retry of the same physical slice recomputes the same commit id；
 - replay checks marker, then head/reachable chain；
 - if committed, it repairs derived records and returns the existing result；
-- a different durable identity cannot reuse the same committed range。
+- a different durable identity cannot reuse the same committed range；
+- bounded chain-search exhaustion remains `MAY_HAVE_COMMITTED`，and repair pages use explicit continuation
+  cursors rather than restarting from head；
+- every chain page validates dense offset/cumulative-size/commitVersion progression，and the continuation
+  retains the original observed head plus the exact expected tuple for its next commit。
 
 ### 7.5 Multi-stream objects
 
@@ -292,10 +299,10 @@ Actual safe deletion requires F3 cursor low-watermarks and F4 generation/catalog
 | intent write succeeds, head CAS loses | orphan intent；no visibility unless reachable |
 | stale epoch/token | `FENCED_APPEND` before offset conflict takes precedence |
 | compatible renew/trim changes head version | refresh and retry CAS against semantically compatible head |
-| head commits, index write fails | committed; strict result unknown until replay/repair confirms |
-| read sees index gap below head | bounded repair；budget exhaustion is retriable, not corruption |
+| head commits, index write fails | `KNOWN_COMMITTED`; strict index boundary requires replay/repair |
+| read sees index gap below head | bounded continuation repair；budget exhaustion is retriable, not corruption |
 | object/index bytes corrupt | fail closed; never synthesize from list |
-| cancellation/timeout after irreversible boundary | same unknown-final rules as failure |
+| cancellation/timeout after irreversible boundary | same structured `AppendOutcome` rules as failure |
 
 ## 12. Compatibility outputs
 
@@ -333,12 +340,20 @@ F2 and F5 own parsing/projection。They cannot reinterpret F1 offset allocation 
 - close and in-flight completion semantics；
 - final Phase 1 failure-injection matrix。
 
+### M7 real Oxia adapter
+
+- selected public Java client only，with `PartitionKey` on every scoped operation；
+- shared codecs、manifest validator、append outcomes and bounded replay/repair contract tests；
+- Docker/Testcontainers persistence、restart、failure and exception-mapping gate。
+
 The full test matrix and done definition remain authoritative in
 `../phase-1-core-stream-storage/05-implementation-plan-and-tests.md`。
 
 ## 14. F1 exit and deferred work
 
-F1 Phase 1 exits when Object WAL sync append/read/trim works end to end without protocol dependencies。
+F1 Phase 1 exits when Object WAL sync append/read/trim works end to end without protocol dependencies and
+the M7 production Oxia adapter passes its shared contract and independent integration gates。M6's fake/local
+scenario is a semantic reference milestone，not the final Oxia-backed exit。
 
 Explicitly deferred：
 

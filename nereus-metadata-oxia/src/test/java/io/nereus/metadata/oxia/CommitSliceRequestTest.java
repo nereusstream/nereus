@@ -15,6 +15,7 @@
 package io.nereus.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.nereus.api.Checksum;
 import io.nereus.api.ChecksumType;
@@ -56,20 +57,66 @@ class CommitSliceRequestTest {
         assertThat(base.commitId()).isNotEqualTo(projected.commitId());
     }
 
+    @Test
+    void rejectsLogicalOffsetRangeOverflowAtConstruction() {
+        EntryIndexRef ref = indexObjectRef("index-object", "index-key");
+
+        assertThatThrownBy(() -> request(ref, 1, 2, Optional.empty(), Long.MAX_VALUE, 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("logical offset");
+    }
+
+    @Test
+    void rejectsZeroLengthWalSliceAtConstruction() {
+        EntryIndexRef ref = indexObjectRef("index-object", "index-key");
+
+        assertThatThrownBy(() -> request(ref, 1, 2, Optional.empty(), 0, 1, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("object length must be positive");
+    }
+
     private CommitSliceRequest request(
             EntryIndexRef entryIndexRef,
             long minEventTimeMillis,
             long maxEventTimeMillis,
             Optional<ProjectionRef> projectionRef) {
+        return request(entryIndexRef, minEventTimeMillis, maxEventTimeMillis, projectionRef, 0, 1);
+    }
+
+    private CommitSliceRequest request(
+            EntryIndexRef entryIndexRef,
+            long minEventTimeMillis,
+            long maxEventTimeMillis,
+            Optional<ProjectionRef> projectionRef,
+            long expectedStartOffset,
+            int recordCount) {
+        return request(
+                entryIndexRef,
+                minEventTimeMillis,
+                maxEventTimeMillis,
+                projectionRef,
+                expectedStartOffset,
+                recordCount,
+                16);
+    }
+
+    private CommitSliceRequest request(
+            EntryIndexRef entryIndexRef,
+            long minEventTimeMillis,
+            long maxEventTimeMillis,
+            Optional<ProjectionRef> projectionRef,
+            long expectedStartOffset,
+            int recordCount,
+            long objectLength) {
         return new CommitSliceRequest(
                 new StreamId("stream"),
                 "writer",
                 "run-hash",
                 1,
                 "fencing-token",
-                0,
+                expectedStartOffset,
                 "slice",
-                1,
+                recordCount,
                 1,
                 7,
                 List.of(new SchemaRef("namespace", "schema", 1)),
@@ -77,7 +124,7 @@ class CommitSliceRequestTest {
                 new ObjectKey("object-key"),
                 checksum("11111111"),
                 0,
-                16,
+                objectLength,
                 entryIndexRef,
                 checksum("22222222"),
                 PayloadFormat.OPAQUE_RECORD_BATCH,

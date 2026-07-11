@@ -629,8 +629,8 @@ Failure handling:
 | State | Failure | Result |
 | --- | --- | --- |
 | `BUILD_LAYOUT` | invalid batch | append future fails, no object |
-| `PUT_OBJECT` | store timeout | retriable failure, no offset commit |
-| `VERIFY_CHECKSUM` | mismatch | non-retriable failure, no offset commit |
+| `PUT_OBJECT` | store timeout | retriable failure, no stream-head commit |
+| `VERIFY_CHECKSUM` | mismatch | non-retriable failure, no stream-head commit |
 | `WRITTEN` before manifest | object may exist but is not visible | metadata layer may write manifest or orphan scanner handles TTL |
 
 ## 10. WAL Reader API
@@ -789,7 +789,7 @@ Commit rules:
 
 Corruption behavior:
 
-- checksum mismatch before offset commit: no index entry, fail append；
+- checksum mismatch before stream-head commit: no reachable commit/index entry, fail append；
 - checksum mismatch during read: fail read with non-retriable data integrity error and emit metric；
 - future repair may mark object suspect, but Phase 1 only reports。
 

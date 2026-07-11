@@ -27,8 +27,8 @@ public record AppendSessionRecord(
         requireNonBlank(streamId, "streamId");
         requireNonBlank(writerId, "writerId");
         requireNonBlank(fencingToken, "fencingToken");
-        if (epoch < 0 || leaseVersion < 0 || expiresAtMillis < 0) {
-            throw new IllegalArgumentException("append session numeric fields must be non-negative");
+        if (epoch <= 0 || leaseVersion <= 0 || expiresAtMillis <= 0) {
+            throw new IllegalArgumentException("append session numeric fields must be positive");
         }
     }
 

@@ -141,11 +141,14 @@ logical bytes and event-time bounds
 payload format / schema refs / projection identity
 object and slice checksums
 entry-index identity
-previous commit id and next commitVersion
 ```
 
 `commitId` is a deterministic hash of that identity。The same physical slice replay must compute the same
 id；different identity must not alias。
+
+`previousCommitId`、next `commitVersion` and cumulative size are CAS-snapshot-derived record fields。They
+must match when an existing intent is reused，but they are deliberately not hashed into the physical-attempt
+`commitId`；otherwise compatible renew/trim retries could not compute one stable id before head CAS。
 
 ### 7.2 Intent write
 
@@ -153,17 +156,20 @@ id；different identity must not alias。
 putIfAbsent(commit-log/{commitId}, StreamCommitRecord)
 ```
 
-If an existing record is found，all canonical fields must match。A commit-log record alone is an invisible
-intent and can be orphaned when head CAS loses。
+If an existing record is found，all canonical request fields and the current head-derived
+`previousCommitId/offsetEnd/cumulativeSize/commitVersion` fields must match before reuse。A commit-log record
+alone is an invisible intent and can be orphaned when head CAS loses。
 
 ### 7.3 Stream-head CAS
 
 The coordinator reads the latest head and validates：
 
 - stream exists/ACTIVE；
-- current session matches epoch/token and has not expired；
+- current session matches epoch/token；the adapter performs an expiry preflight，while the single-key CAS
+  atomically fences through the current epoch/token snapshot rather than an unavailable server-time predicate；
 - `expectedStartOffset == committedEndOffset`；
 - object manifest/slice identity is valid；
+- stored manifest `objectId` and aggregate/per-slice visibility states are consistent；
 - offset/cumulative size arithmetic is safe；
 - replay is not already reachable under another incompatible identity。
 
@@ -208,14 +214,14 @@ head CAS or with a temporary local offset。
 
 ## 8. Retry and failure classification
 
-| Last boundary | Classification | Required action |
+| Last boundary | `AppendOutcome` | Required action |
 | --- | --- | --- |
-| before WAL durable | known not committed | normal retry |
-| after WAL durable, before intent | known not committed；orphan bytes possible | reuse deterministic bytes or GC |
-| after intent, before head CAS is sent | known not committed | retry same id or abandon intent |
-| after head CAS is sent | unknown final state | re-read head/chain；never assume rollback |
-| head reachable, indexes missing | committed | repair indexes then satisfy requested boundary |
-| result constructed, response lost | committed | replay returns same range/version |
+| before WAL durable | `KNOWN_NOT_COMMITTED` | normal retry |
+| after WAL durable, before intent | `KNOWN_NOT_COMMITTED`；orphan bytes possible | reuse deterministic bytes or GC |
+| after intent, before head CAS is sent | `KNOWN_NOT_COMMITTED` | retry same id or abandon intent |
+| after head CAS is sent, response unavailable | `MAY_HAVE_COMMITTED` | re-read head/chain；never assume rollback |
+| head reachable, indexes missing | `KNOWN_COMMITTED` | repair indexes then satisfy requested boundary |
+| result constructed, response lost | `KNOWN_COMMITTED` | replay returns same range/version |
 
 Timeout and caller cancellation follow the same table。Cancellation cannot undo an already-sent CAS。
 
@@ -223,11 +229,21 @@ Replay lookup order：
 
 ```text
 committed-slice marker
-  -> latest head / reachable commit chain
+  -> latest head offset relation
+  -> reachable commit chain only for an older expectedStartOffset
   -> orphan intent check
 ```
 
 Marker absence is not proof of non-commit。
+When `head.committedEndOffset == expectedStartOffset`，dense positive-record offsets prove a normal new append
+cannot already be deeper in history，so it must not consume replay scan budget。Only an older expected start
+requires the bounded walk。Within that walk，the first different reachable record whose range starts at or
+before `expectedStartOffset` proves not-found；the adapter does not continue toward genesis after crossing
+the only possible commit position。
+Bounded chain-search exhaustion is also not proof of non-commit；it returns retriable metadata failure with
+`MAY_HAVE_COMMITTED`。Reachable-chain reads validate dense `(offsetEnd, cumulativeSize, commitVersion)`
+progression。Derived-index repair pages count every scanned commit and carry the original observed-head
+anchor plus the exact expected tuple for the next commit。
 
 ## 9. AutoMQ-like async materialization
 
@@ -421,6 +437,10 @@ stream head + reachable commit log
 For cursor/transaction domains，their own authoritative CAS state joins the first tier for that domain。
 
 ## 18. Implementation gates
+
+Before final Phase 1 exit，the M7 production Oxia adapter must pass the same manifest validation、single-key
+CAS、`AppendOutcome`、bounded replay/repair continuation and watch/partition contract suite as the fake，plus
+its independent Docker/Testcontainers integration gate。
 
 Before extending beyond Phase 1 strict Object WAL：
 

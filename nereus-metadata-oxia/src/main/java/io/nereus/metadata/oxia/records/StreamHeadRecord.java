@@ -54,6 +54,12 @@ public record StreamHeadRecord(
         if (trimOffset > committedEndOffset) {
             throw new IllegalArgumentException("trimOffset must be <= committedEndOffset");
         }
+        boolean emptyCommitChain = lastCommitId.isEmpty();
+        if (emptyCommitChain != (commitVersion == 0)
+                || emptyCommitChain != (committedEndOffset == 0)
+                || (emptyCommitChain && cumulativeSize != 0)) {
+            throw new IllegalArgumentException("stream head commit anchor is inconsistent");
+        }
     }
 
     public StreamMetadataRecord toMetadataRecord() {

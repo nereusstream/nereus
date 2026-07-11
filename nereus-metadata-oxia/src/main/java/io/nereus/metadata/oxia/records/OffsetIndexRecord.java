@@ -61,10 +61,16 @@ public record OffsetIndexRecord(
         sliceChecksumValue = requireNonBlank(sliceChecksumValue, "sliceChecksumValue");
         if (offsetStart < 0 || offsetEnd <= offsetStart || generation < 0 || cumulativeSize < 0
                 || recordCount <= 0 || entryCount <= 0 || logicalBytes < 0 || minEventTimeMillis < 0
-                || maxEventTimeMillis < minEventTimeMillis || commitVersion < 0 || metadataVersion < 0) {
+                || maxEventTimeMillis < minEventTimeMillis || commitVersion <= 0 || metadataVersion < 0
+                || cumulativeSize < logicalBytes) {
             throw new IllegalArgumentException("offset index numeric fields are invalid");
         }
-        MetadataRecordValidation.requireNonNegativeNonOverflowingRange(
+        MetadataRecordValidation.requireDenseLogicalRange(
+                offsetStart,
+                offsetEnd,
+                recordCount,
+                "offset index logical range");
+        MetadataRecordValidation.requirePositiveNonOverflowingRange(
                 objectOffset,
                 objectLength,
                 "offset index object");

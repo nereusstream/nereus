@@ -78,7 +78,21 @@ public interface OxiaMetadataStore extends AutoCloseable {
             String cluster,
             StreamId streamId,
             long targetOffset,
-            int maxRecordsToRepair);
+            Optional<DerivedIndexRepairCursor> continuation,
+            int maxCommitsToScan);
+
+    default CompletableFuture<DerivedIndexRepairResult> repairDerivedStreamIndexes(
+            String cluster,
+            StreamId streamId,
+            long targetOffset,
+            int maxCommitsToScan) {
+        return repairDerivedStreamIndexes(
+                cluster,
+                streamId,
+                targetOffset,
+                Optional.empty(),
+                maxCommitsToScan);
+    }
 
     CompletableFuture<List<OffsetIndexRecord>> scanOffsetIndex(
             String cluster,

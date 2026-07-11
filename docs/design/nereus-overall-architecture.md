@@ -32,14 +32,16 @@ Pulsar and Kafka protocol projections
 
 ### 2.1 已实现
 
-截至 2026-07-10：
+截至 2026-07-11：
 
-- protocol-neutral `nereus-api` values、validation、errors、key/hash helpers；
+- protocol-neutral `nereus-api` values、validation、structured `AppendOutcome` errors、key/hash helpers；
 - `StorageProfile` / `DurabilityLevel` names and helpers；
-- Oxia keyspace、metadata records、binary-v1 codec、partition-aware client boundary；
-- stream-head CAS + reachable commit-log 的 fake metadata implementation 和 repair tests；
+- Oxia keyspace、metadata records、binary-v1 codec、partition-aware client boundary、shared Phase 1
+  manifest validator；
+- stream-head CAS + reachable commit-log 的 fake metadata implementation，bounded replay classification，
+  head-derived orphan-intent validation，dense chain validation，tuple-bound continuation repair and tests；
 - Object WAL v1 writer/reader、multi-slice layout、entry index、checksums、local test object store；
-- M0-M3 tests and dependency gates。
+- M0-M3 tests、pre-M4 metadata hardening and repository dependency/test gates。
 
 ### 2.2 正在实现
 
@@ -49,6 +51,7 @@ Future 1 / Phase 1 的剩余顺序：
 M4 DefaultStreamStorage append
   -> M5 resolve/read
   -> M6 trim/recovery/close boundaries
+  -> M7 production Oxia adapter and integration gate
 ```
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
@@ -106,7 +109,8 @@ reachable immutable StreamCommitRecord chain
 - head 中的 `lastCommitId` 把新 record 接入 committed chain；
 - `commitVersion` 在 head、commit record、derived index 和 marker 中保持一致；
 - stale epoch/token 在 CAS 前被拒绝；
-- timeout/cancellation 在 head CAS 发出后可能是 unknown final state。
+- exceptional append carries machine-readable certainty：CAS 前 `KNOWN_NOT_COMMITTED`，未确认的 CAS
+  response `MAY_HAVE_COMMITTED`，确认 head 后的 index/result failure `KNOWN_COMMITTED`。
 
 ### 4.2 Read-resolution truth
 
@@ -244,7 +248,7 @@ flowchart TB
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Implemented for Phase 1 |
 | `nereus-core` | coordinators and state machines | M4-M6 pending |
-| `nereus-metadata-oxia` | durable key/record/codec and Oxia client | Phase 1 fake/contract implemented；real adapter pending |
+| `nereus-metadata-oxia` | durable key/record/codec and Oxia client | fake/contract implemented；M7 real adapter pending |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
 | `nereus-managed-ledger` | ManagedLedger facade | marker only |
 | `nereus-pulsar-adapter` | broker integration/config/policy | marker only |
@@ -412,8 +416,8 @@ operations are resolved by replay/refresh; routing changes never move durable da
 | before WAL durable | not committed | caller retry |
 | WAL durable, before intent | not committed；possible orphan bytes | deterministic reuse or GC |
 | intent written, before head CAS | intent invisible | replay same commit id or GC intent |
-| head CAS sent, response unknown | unknown final state | read head/reachable chain, replay same identity |
-| head committed, generation-0 index missing | committed | bounded repair from commit log |
+| head CAS sent, response unknown | `MAY_HAVE_COMMITTED` | read head/reachable chain, replay same identity |
+| head committed, generation-0 index missing | `KNOWN_COMMITTED` | bounded continuation repair from commit log |
 | higher-generation upload before publish | old generation stays active | retry/reuse or orphan GC |
 | higher-generation publish before checkpoint | new target active | repair task/checkpoint |
 | catalog commit partial | stream unaffected | idempotent catalog/Oxia repair |
@@ -424,8 +428,8 @@ operations are resolved by replay/refresh; routing changes never move durable da
 Minimum signal families：
 
 - append latency split by WAL、head CAS、index materialization；
-- fenced sessions、head CAS conflicts、unknown-final retries；
-- derived-index repair attempts/records/budget exhaustion；
+- fenced sessions、head CAS conflicts、append outcomes by certainty；
+- derived-index repair attempts/scanned/repaired records/continuation/budget exhaustion；
 - object WAL size、slice count、upload/checksum failures；
 - read amplification、read buffer/concurrency rejection、cache hit ratio；
 - materialization lag records/bytes/age and WAL retention blocked；

@@ -74,6 +74,10 @@ public record CommitSliceRequest(
         if (recordCount <= 0 || entryCount <= 0) {
             throw new IllegalArgumentException("recordCount and entryCount must be positive");
         }
+        if (objectLength == 0) {
+            throw new IllegalArgumentException("object length must be positive");
+        }
+        requireNonNegativeNonOverflowingRange(expectedStartOffset, recordCount, "logical offset");
         requireNonNegativeNonOverflowingRange(objectOffset, objectLength, "object");
     }
 

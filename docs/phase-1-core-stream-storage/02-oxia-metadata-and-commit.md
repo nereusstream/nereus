@@ -42,8 +42,11 @@ M2 foundation implementation status:
   before-head-CAS interleavings for same-writer renew and trim, bounded repair progress across repeated
   calls, cross-record `commitVersion` equality, stale epoch fenced before an also-present offset conflict,
   and commit-log reuse after first-attempt head CAS failure；
-- M2 is now complete. Remaining metadata work (real Oxia adapter, codec freeze for future schema
-  evolution) belongs to M7 and later phases.
+- 2026-07-10 pre-M4 hardening added structured `AppendOutcome`，shared manifest validation，bounded replay
+  classification，and target-bound continuation repair with focused M2 tests；
+- M2 source work and the latest post-hardening gates are complete。On 2026-07-11,
+  `:nereus-api:test`、`:nereus-metadata-oxia:test`、`phase1Check` and `check` passed。Remaining production
+  metadata work belongs to M7。
 
 ## 1. Metadata Responsibility
 
@@ -563,7 +566,8 @@ public interface OxiaMetadataStore extends AutoCloseable {
             String cluster,
             StreamId streamId,
             long targetOffset,
-            int maxRecordsToRepair);
+            Optional<DerivedIndexRepairCursor> continuation,
+            int maxCommitsToScan);
 
     CompletableFuture<List<OffsetIndexRecord>> scanOffsetIndex(
             String cluster,
@@ -595,12 +599,34 @@ public record DerivedIndexRepairResult(
         StreamId streamId,
         long repairedFromOffset,
         long repairedToOffset,
+        int scannedRecords,
         int repairedRecords,
         boolean targetCovered,
         boolean repairBudgetExhausted,
+        Optional<DerivedIndexRepairCursor> continuation,
         long observedCommitVersion) {
 }
+
+public record DerivedIndexRepairCursor(
+        StreamId streamId,
+        long targetOffset,
+        String observedHeadCommitId,
+        long observedCommitVersion,
+        String nextCommitId,
+        long nextOffsetEnd,
+        long nextCumulativeSize,
+        long nextCommitVersion) {
+}
 ```
+
+The cursor is opaque to the resolver and must be echoed unchanged. The observed-head fields keep every
+page on one committed-chain anchor; the three `next*` fields are the expected chain state for
+`nextCommitId`, so a resumed page cannot silently materialize an orphan or a commit from a different
+branch. A newer current head is allowed because Phase 1 heads are append-only, but the original anchor is
+retained in every continuation page.
+`DerivedIndexRepairResult` is total：it must either set `targetCovered=true` or return
+`repairBudgetExhausted=true` with a continuation；`false/false` is rejected rather than leaving the resolver
+without a next action。
 
 Implementation can wrap native Oxia operations behind smaller internal helpers:
 
@@ -723,13 +749,19 @@ epoch = previousEpoch + 1 when ownership changes or the old session is expired
 epoch = currentEpoch when the same writer renews a live session
 fencingToken = current token for same-writer live renew, new opaque token for a new epoch
 leaseVersion = head.appendSession.leaseVersion + 1 on acquire/renew
-expiresAtMillis = now + ttl
+expiresAtMillis = Math.addExact(now, ttl.toMillis())
 ```
+
+A non-empty persisted/hydrated append session has positive epoch、leaseVersion and expiresAtMillis。
+The all-empty snapshot is reserved for no current owner；an empty snapshot may retain historical epoch in a
+future explicit release protocol，but it cannot contain only one of writerId/fencingToken。
 
 Implementation detail:
 
 - `acquire` and `renew` are CAS loops over `/streams/{streamId}/head`.
 - Use metadata server time if Oxia exposes it. Otherwise use local clock plus conservative TTL.
+- TTL is at least one millisecond and both conversion/addition are overflow checked；invalid values return
+  non-retriable `INVALID_ARGUMENT` before a head write.
 - Different-writer takeover of an expired session is allowed only when
   `AppendSessionOptions.allowStealExpiredSession=true`.
 - Failed acquire should complete with `FENCED_APPEND` for a live conflicting owner or
@@ -759,15 +791,22 @@ putObjectManifest(manifest.state=UPLOADED)
 
 Conditions:
 
-- manifest key missing, or same writer retry with identical WAL canonical object checksum,
-  storage checksum, object length, and slice manifest；
+- new manifests and all their slices are `UPLOADED`；object type is `MULTI_STREAM_WAL_OBJECT`，format is
+  `1.0`，slice ids are unique，slice ordinal equals its zero-based encoded list position，and positive slice
+  byte ranges are ordered、non-overlapping and inside `objectLength`；
+- the aggregate state must match per-slice states：`UPLOADED` has no visible slice，`VISIBLE` has only
+  visible slices，and `PARTIALLY_VISIBLE` has at least one slice in each state；
+- manifest key missing, or same writer retry with identical immutable identity：writer/version/epoch，format，
+  WAL canonical checksum，storage checksum，object length，and every immutable slice field；
+- mutable audit state (`UPLOADED` / `PARTIALLY_VISIBLE` / `VISIBLE` and per-slice state) is excluded from
+  immutable retry equality，so retrying the original uploaded manifest after audit repair remains idempotent；
 - object state is not `DELETED`。
 
 The manifest write is not the producer ack point.
 
 Retry:
 
-- same `objectId` plus same object checksum, storage checksum, object length, and slice manifest is
+- same `objectId` plus the same immutable manifest identity is
   idempotent；
 - same `objectId` plus different checksum, length, or slice manifest is non-retriable corruption。
 
@@ -795,9 +834,9 @@ so Phase 1 now separates commit truth from read-serving indexes:
   the head commit chain。
 
 Producer ack is allowed only after the head CAS has succeeded and the offset-index plus committed-slice
-marker for this slice have been materialized or idempotently confirmed. If the head CAS may have succeeded
-but materialization cannot be confirmed before timeout/cancellation, the append result is unknown final
-state, not a known failure.
+marker for this slice have been materialized or idempotently confirmed. Exceptional completion carries a
+machine-readable `AppendOutcome`：before head CAS is `KNOWN_NOT_COMMITTED`；an unconfirmed CAS response is
+`MAY_HAVE_COMMITTED`；a confirmed head commit followed by index/response failure is `KNOWN_COMMITTED`。
 
 Request:
 
@@ -870,6 +909,7 @@ write:
 
 ```text
 /objects/{objectIdComponent}/manifest.state in [UPLOADED, PARTIALLY_VISIBLE, VISIBLE]
+/objects/{objectIdComponent}/manifest.objectId == request.objectId
 /objects/{objectIdComponent}/manifest.objectKey == request.objectKey
 /objects/{objectIdComponent}/manifest.objectType == MULTI_STREAM_WAL_OBJECT
 /objects/{objectIdComponent}/manifest.formatMajorVersion == 1
@@ -889,7 +929,14 @@ write:
 /objects/{objectIdComponent}/manifest.slices[request.sliceId].logicalBytes == request.logicalBytes
 /objects/{objectIdComponent}/manifest.slices[request.sliceId].payloadFormat == request.payloadFormat
 /objects/{objectIdComponent}/manifest.slices[request.sliceId].schemaRefs == request.schemaRefs
+/objects/{objectIdComponent}/manifest.slices[request.sliceId].streamId == request.streamId
+/objects/{objectIdComponent}/manifest.slices have unique sliceId and contiguous zero-based sliceOrdinal
+/objects/{objectIdComponent}/manifest.slices byte ranges are positive, ordered, non-overlapping, and within manifest.objectLength
+/objects/{objectIdComponent}/manifest aggregate state matches per-slice visibility states
 ```
+
+`Phase1ObjectManifestValidator` is the shared production helper for these checks。The fake store and future
+real Oxia adapter must call the same helper rather than maintain parallel validation lists。
 
 The requested slice state must be `UPLOADED` for a new commit attempt. A same physical slice replay after a
 successful stream commit is handled by the committed-slice marker or by the stream-head commit chain before
@@ -906,9 +953,18 @@ Commit algorithm:
 ```text
 1. Compute `fencingTokenHash` and `commitId`.
 2. Try replay discovery:
-   a. read materialized committed-slice marker;
-   b. if absent, read stream head and walk the reachable commit chain until commitId is found or the
-      configured replay-search bound is reached.
+   a. read materialized committed-slice marker；when present，validate its direct deterministic commit record
+      and monotonic head end/commitVersion proof without an unbounded chain walk;
+   b. if absent, read stream head；only when `head.committedEndOffset > request.expectedStartOffset` can this
+      be an older already-committed attempt, so only that case walks the reachable chain。After testing the
+      commitId at each record, a record with `offsetStart <= request.expectedStartOffset` proves the request
+      is not reachable and terminates the walk as not-found;
+   c. when `head.committedEndOffset == request.expectedStartOffset`, the positive-record dense-offset
+      invariant proves this is not an older reachable commit, so a normal new append must not spend replay
+      scan budget；when head is behind the requested start, no historical scan is needed either;
+   d. if a required historical walk reaches the configured `maxCommitChainScan` bound, return
+      `METADATA_UNAVAILABLE` with
+      `AppendOutcome.MAY_HAVE_COMMITTED`；never downgrade it to `OFFSET_CONFLICT` or not-found.
 3. If replay is found, validate the committed commit record against the request, materialize any missing
    derived records, and return the original CommitSliceResult.
 4. Start a bounded head-CAS loop. Each iteration reads StreamHeadRecord with PartitionKey(streamId).
@@ -942,11 +998,21 @@ Commit algorithm:
     a. if the current head chain reaches commitId, materialize missing derived records and return success;
     b. if state, epoch/token, or committedEndOffset no longer satisfy step 5, classify the failure;
     c. if state, epoch/token, committedEndOffset, commitVersion, and lastCommitId are still compatible,
-       retry the CAS with the current head version. This is the expected path when same-writer renew or
-       trim updated the head between read and CAS.
+       retry the CAS with the current head version without walking history. This is the expected path when
+       same-writer renew or trim updated only the metadata version between read and CAS.
 11. If head CAS succeeds, materialize offset-index and committed-slice marker from the committed record.
 12. Ack only after the derived records required for normal read and same-slice replay are confirmed.
 ```
+
+Manifest validation includes equality between the lookup request and stored `objectId`; matching only the
+object key/checksum is insufficient. `CommitSliceRequest` rejects
+`expectedStartOffset + recordCount` overflow at construction. Replay and reachable-chain validation check
+the exact logical range, generation `0`, fixed Phase 1 object/physical/logical format values, and the
+head-derived `(offsetEnd, cumulativeSize, commitVersion)` tuple. Every exceptional fake-adapter append,
+including missing-stream and closed-store rejection before head CAS, carries `KNOWN_NOT_COMMITTED` unless
+the state machine has stronger committed or unknown evidence。An internal append-stage guard starts at
+`KNOWN_NOT_COMMITTED` and becomes `KNOWN_COMMITTED` immediately after replay/head proof；it also structures
+unexpected runtime/validation failures and prevents any post-proof error from being downgraded。
 
 The `OffsetIndexRecord` value must include `logicalBytes` and the slice checksum from the request. The read
 resolver must copy that checksum into `ResolvedObjectRange.sliceChecksum`; otherwise the WAL reader cannot
@@ -963,15 +1029,17 @@ key version for each individual key.
 Head-CAS failure classification:
 
 1. Re-read the head.
-2. If the current head chain reaches `commitId`, treat the attempt as committed, materialize missing
-   derived records, and return the original result.
-3. If head state is not `ACTIVE`, return `STREAM_NOT_ACTIVE`.
-4. If epoch/token no longer match, return `FENCED_APPEND`.
-5. If `head.committedEndOffset != request.expectedStartOffset`, return `OFFSET_CONFLICT`.
-6. If head state, epoch/token, committed end, commitVersion, and lastCommitId are still compatible, retry
+2. If committed end/cumulative size/commitVersion/lastCommitId are unchanged, no append won the race；skip
+   replay scan and evaluate the compatible metadata-only update directly.
+3. Otherwise, if the current head chain reaches `commitId`, treat the attempt as committed, materialize
+   missing derived records, and return the original result.
+4. If head state is not `ACTIVE`, return `STREAM_NOT_ACTIVE`.
+5. If epoch/token no longer match, return `FENCED_APPEND`.
+6. If `head.committedEndOffset != request.expectedStartOffset`, return `OFFSET_CONFLICT`.
+7. If head state, epoch/token, committed end, commitVersion, and lastCommitId are still compatible, retry
    the CAS loop because another non-append head update such as same-writer renew or trim only changed the
    Oxia key version.
-7. Otherwise return `METADATA_CONDITION_FAILED` or `METADATA_UNAVAILABLE` according to the adapter error.
+8. Otherwise return `METADATA_CONDITION_FAILED` or `METADATA_UNAVAILABLE` according to the adapter error.
 
 Materialization failure after successful head CAS:
 
@@ -979,7 +1047,8 @@ Materialization failure after successful head CAS:
 - the adapter must retry materializing offset-index and committed-slice marker while the caller's
   timeout/cancellation budget allows；
 - if materialization cannot be confirmed before the budget expires, surface `TIMEOUT`, `CANCELLED`, or
-  `METADATA_UNAVAILABLE` with unknown-final-state semantics；
+  `METADATA_UNAVAILABLE` with `AppendOutcome.KNOWN_COMMITTED` when head success was observed；if the head
+  response itself is unknown，use `MAY_HAVE_COMMITTED`；
 - do not return `OFFSET_CONFLICT` or a known-not-committed error after a successful or possibly successful
   head CAS；
 - the next same physical slice retry must discover the commit through the head chain and finish
@@ -998,6 +1067,11 @@ the stream commit succeeds. GC/repair must treat the stream-head commit chain as
 reference metadata is stale or missing; offset index is the normal materialized lookup source and can be
 repaired from that chain if needed.
 
+The fake adapter routes both injected and actual runtime/validation failures from object audit updates
+through the same best-effort boundary and increments `objectAuditFailureCount`；such a failure cannot escape
+as a known-not-committed append exception after head success。The real adapter must expose the equivalent
+metric/log signal rather than weakening append certainty。
+
 Post-commit object-scoped updates should be best-effort CAS merge operations:
 
 - object reference update reads the current reference list, adds the committed slice if absent, and writes
@@ -1006,7 +1080,10 @@ Post-commit object-scoped updates should be best-effort CAS merge operations:
 - CAS conflict may be retried a bounded number of times；
 - after retries are exhausted, leave the object metadata stale and rely on repair from the stream-head
   commit chain and materialized offset index；
-- do not overwrite another stream slice's already-visible reference or manifest state with an older value。
+- do not overwrite another stream slice's already-visible reference or manifest state with an older value；
+- object-reference rebuild validates the stored manifest, matches writer/object checksum/slice identity
+  against the reachable commit, and fails invariant rather than deleting an existing visible reference
+  from the rebuilt result。
 
 Phase 1 does not implement object deletion. In particular, a WAL object with a manifest must not be
 deleted solely because its object reference record is missing or stale.
@@ -1021,19 +1098,28 @@ Algorithm:
 
 1. Read `StreamHeadRecord`.
 2. If `targetOffset >= head.committedEndOffset`, no repair is needed for a normal read.
-3. Walk the commit chain from `head.lastCommitId` through `StreamCommitRecord.previousCommitId`, but
-   materialize at most `maxRecordsToRepair` records in one call.
-4. Stop once the walk has materialized the committed record covering `targetOffset` and all later records
+3. Start from `head.lastCommitId` or the supplied `DerivedIndexRepairCursor.nextCommitId` and walk backward
+   through `StreamCommitRecord.previousCommitId`。The initial page is anchored by head
+   `(committedEndOffset, cumulativeSize, commitVersion)`；a continuation page uses its immutable `next*`
+   tuple and retains the original observed-head identity/version。
+4. Count every commit-log record read in `scannedRecords`，including records whose derived indexes already
+   exist。One call scans at most `maxCommitsToScan`；`repairedRecords` counts only records whose missing derived
+   state was created。
+5. Stop once the walk has materialized the committed record covering `targetOffset` and all later records
    needed by the caller's bounded resolve window, once it reaches offset `0`, or once the repair budget is
    exhausted.
-5. For each reachable commit record, idempotently put:
+6. For each reachable commit record, idempotently put:
    - `/offset-index/{offsetEnd}/{generation}`；
    - `/committed-slices/{objectIdComponent}/{sliceIdComponent}`。
-6. If `maxRecordsToRepair` is exhausted before the target offset is covered, return
-   `DerivedIndexRepairResult(targetCovered=false, repairBudgetExhausted=true)`. The resolver may issue
-   another bounded repair within the read timeout, but it must not convert budget exhaustion into
-   `METADATA_INVARIANT_VIOLATION`.
-7. If the chain is broken, a commit record is corrupt, or a derived record exists with conflicting bytes,
+7. If `maxCommitsToScan` is exhausted before the target offset is covered, return
+   `targetCovered=false`、`repairBudgetExhausted=true` and a non-empty continuation cursor。The resolver may
+   pass that cursor to the next bounded call within the same read timeout；restarting from head is not
+   considered progress。
+8. Validate every scanned record's stream/commit identity, generation, fixed format fields, dense offset
+   range, cumulative size, and commitVersion against the current expected tuple, then derive the predecessor
+   tuple from that record.
+9. If the chain is broken, ends before covering a below-head target, a commit record is corrupt, a
+   continuation is invalid, or a derived record exists with conflicting bytes,
    fail with `METADATA_INVARIANT_VIOLATION`.
 
 Reads should normally use offset-index directly. If an offset-index scan shows a gap below
@@ -1050,14 +1136,19 @@ repairObjectReferences(cluster, objectId)
 
 Algorithm:
 
-1. Read `ObjectManifestRecord`. If missing, fail with `METADATA_INVARIANT_VIOLATION` for repair callers.
+1. Read and validate `ObjectManifestRecord`. If missing or malformed, fail with
+   `METADATA_INVARIANT_VIOLATION` for repair callers.
 2. For each manifest slice, read the stream head for that slice's stream.
-3. Walk the committed head chain until a record matching the manifest slice's stream id, object id,
-   slice id, writer epoch, checksum, physical range, record count, entry count, logical bytes, payload
-   format, and schema refs is found, or until the chain proves it is not committed.
+3. Walk the committed head chain until the object id/slice id is found, then require its stream id,
+   writer identity/epoch, object key/type/checksum, physical range, record count, entry count, logical
+   bytes, payload format, schema refs, entry-index ref, and slice checksum to match the manifest.
 4. If committed, materialize and validate the matching offset index and committed-slice marker.
-5. Build `VisibleSliceReferenceRecord` only for validated visible slices.
-6. CAS-merge the rebuilt reference list into `/objects/{objectIdComponent}/references`.
+5. Build `VisibleSliceReferenceRecord` only for validated reachable slices. A manifest slice already marked
+   visible but lacking a matching reachable commit is an invariant failure.
+6. Before write, require the rebuilt list to contain every existing visible reference；repair cannot
+   silently remove one. `ObjectReferenceRecord` also rejects duplicate/conflicting streamId+sliceId
+   identities and canonicalizes list order by streamId/offsetStart/sliceId. Then CAS-merge it into
+   `/objects/{objectIdComponent}/references`.
 
 Repair must not use object-store list and must not create visibility. It only rebuilds object-scoped audit
 metadata from stream-head commit truth and derived read indexes.
@@ -1080,6 +1171,18 @@ Dense offset rule:
 - `offsetStart` must equal current `committedEndOffset`；
 - `offsetEnd = offsetStart + recordCount`；
 - no visible gap can be created。
+
+The same rules are enforced when persisted records are constructed/decoded，not only during commit。
+`StreamCommitRecord` and `OffsetIndexRecord` require exact dense logical range、positive `commitVersion`、
+`cumulativeSize >= logicalBytes` and a positive non-overflowing physical slice length；
+`StreamCommitRecord` additionally requires an empty predecessor only for the first
+`offsetStart=0/commitVersion=1/cumulativeSize=logicalBytes` record，while non-first records have a non-empty
+predecessor、positive start and version greater than one；
+`StreamSliceManifestRecord` also requires a positive physical slice length，and
+`CommittedSliceRecord` / `VisibleSliceReferenceRecord` commit versions are positive。`StreamHeadRecord` and
+`CommittedEndOffsetRecord` also enforce that an empty chain is exactly end/version/cumulative zero，while a
+non-empty head has a positive end/version and non-empty lastCommitId。This prevents corrupt materialized or
+head state from bypassing the commit-chain validator and reaching append/resolve/read directly。
 
 ## 9. Offset Index Scan
 
@@ -1132,7 +1235,11 @@ head.state in [ACTIVE, SEALED]
 beforeOffset >= 0
 beforeOffset >= head.trimOffset
 beforeOffset <= head.committedEndOffset
+reason != null
 ```
+
+All conditions are validated before head mutation；an invalid reason/range/state cannot advance the
+low-watermark and then fail while constructing the response。
 
 Writes:
 
@@ -1179,7 +1286,10 @@ Watch rules:
 - `onAppendSessionChanged` invalidates local append-session cache only, not committed read data；
 - reconnect should invalidate affected local caches or force short-TTL read-through until a fresh scan
   succeeds；
-- fake watch tests should simulate missed, duplicate, collapsed, reconnect, and out-of-order events。
+- fake watch tests should simulate missed, duplicate, collapsed, reconnect, and out-of-order events；
+- callback exceptions are isolated per delivery，increment an observable failure counter/metric，and never
+  change the outcome of an already-applied session/trim/index mutation；
+- a closed metadata store rejects new watch registration with `STORAGE_CLOSED`。
 
 ## 12. Failure Semantics
 
@@ -1191,7 +1301,7 @@ Watch rules:
 | timeout after head CAS is sent | commit may or may not have succeeded; derived indexes may lag | retry same physical slice can use head chain or committed-slice marker; caller-level retry may duplicate |
 | head CAS succeeds but derived index materialization times out | stream head is committed; normal read may need repair | retry same physical slice should finish materialization before ack |
 | slice commit succeeds, ack response lost | data visible after derived index materialization; committed-slice marker or head chain exists | retry can return idempotent commit result |
-| slice commit succeeds, object reference update fails | data visible; object reference stale | repair object references from head chain and materialized offset index |
+| slice commit succeeds, object reference update fails | data visible; object reference stale | rebuild from head chain and idempotently materialize/validate derived indexes |
 | offset conflict | no new index entry | refresh committedEndOffset and retry |
 | checksum mismatch | no index entry | fail non-retriably and quarantine object |
 

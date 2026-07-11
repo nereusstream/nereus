@@ -187,8 +187,15 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
 - compatible head CAS conflicts caused by same-writer renew or trim retry without fencing the append；
 - derived offset-index and committed-slice materialization is idempotent；
 - failure after head CAS but before materialization is recoverable by same-slice retry and read repair；
-- derived-index repair respects `maxRecordsToRepair` and reports budget exhaustion separately from
-  corruption；
+- derived-index repair limits every commit record read with `maxCommitsToScan`，returns separate
+  `scannedRecords` / `repairedRecords` counts，and supplies a continuation cursor retaining the original
+  observed head plus exact next `(offsetEnd, cumulativeSize, commitVersion)` on budget exhaustion；
+- existing orphan intent reuse validates predecessor/range/cumulative-size/commitVersion against the
+  current head snapshot；reachable-chain scans validate the same dense progression on every record；
+- append replay scan exhaustion maps to retriable `METADATA_UNAVAILABLE + MAY_HAVE_COMMITTED`，never to
+  `OFFSET_CONFLICT` or proven not-found；
+- fake and real adapters use `Phase1ObjectManifestValidator` for the same format/state/stream/slice/bounds
+  checks；
 - mixed stream/object key group commit is not expressible on the ack path；
 - partition key is recorded by the fake store, and the package-private `PartitionedOxiaClient` helper
   rejects missing partition keys before reaching the future real adapter backend；
@@ -198,8 +205,8 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
 - partition key is passed for get/put/scan/watch；
 - metadata versions are monotonic and separated from durable `commitVersion`；
 - fixed-width offset scan returns `[9, 10)` for target offset `9`；
-- object reference repair can rebuild references from stream-head commit chain and materialized offset
-  index；
+- object reference repair can rebuild references from stream-head commit chain，but rejects manifest/commit
+  identity conflicts and cannot remove an existing visible reference；
 - watch notifications are hints only and cache correctness survives missed, duplicate, collapsed,
   reconnect, and out-of-order notifications；
 - metadata envelope and `Phase1MetadataCodecs` currently reject checksum mismatch, truncated payload,
@@ -207,3 +214,7 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
   invalid payload type tags. Per-record round-trip and golden envelope hex tests cover every Phase 1
   metadata record type. Fake stored metadata values now persist encoded envelopes through the same codec
   registry. Future real adapter work must continue using that registry.
+
+The production adapter is now the explicit M7 Phase 1 gate。M4-M6 may use the fake to implement and test core
+state machines，but Phase 1 is not complete until the real adapter passes this shared contract suite and the
+independent Docker/Testcontainers integration task。

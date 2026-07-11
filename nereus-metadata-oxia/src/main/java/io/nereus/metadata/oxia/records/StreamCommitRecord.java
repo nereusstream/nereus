@@ -77,15 +77,27 @@ public record StreamCommitRecord(
         sliceChecksumType = requireNonBlank(sliceChecksumType, "sliceChecksumType");
         sliceChecksumValue = requireNonBlank(sliceChecksumValue, "sliceChecksumValue");
         if (offsetStart < 0 || offsetEnd <= offsetStart || generation < 0 || cumulativeSize < 0
-                || commitVersion < 0 || writerEpoch < 0 || recordCount <= 0 || entryCount <= 0
+                || commitVersion <= 0 || writerEpoch < 0 || recordCount <= 0 || entryCount <= 0
                 || logicalBytes < 0 || minEventTimeMillis < 0 || maxEventTimeMillis < minEventTimeMillis
-                || preparedAtMillis < 0 || metadataVersion < 0) {
+                || preparedAtMillis < 0 || metadataVersion < 0 || cumulativeSize < logicalBytes) {
             throw new IllegalArgumentException("stream commit numeric fields are invalid");
         }
-        MetadataRecordValidation.requireNonNegativeNonOverflowingRange(
+        MetadataRecordValidation.requireDenseLogicalRange(
+                offsetStart,
+                offsetEnd,
+                recordCount,
+                "stream commit logical range");
+        MetadataRecordValidation.requirePositiveNonOverflowingRange(
                 objectOffset,
                 objectLength,
                 "stream commit object");
+        if (previousCommitId.isEmpty()) {
+            if (offsetStart != 0 || cumulativeSize != logicalBytes || commitVersion != 1) {
+                throw new IllegalArgumentException("first stream commit predecessor state is inconsistent");
+            }
+        } else if (offsetStart == 0 || commitVersion <= 1) {
+            throw new IllegalArgumentException("non-first stream commit predecessor state is inconsistent");
+        }
     }
 
     private static String requireNonBlank(String value, String fieldName) {

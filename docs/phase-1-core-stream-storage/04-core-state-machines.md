@@ -2,7 +2,7 @@
 
 本文定义 `nereus-core` 的 append、resolve/read、trim 和 recovery 状态机。
 
-Status: M4-M6 target。`nereus-core` 当前仍是 marker/orchestration scaffold；M4 implementation must
+Status: M4-M6 core target。`nereus-core` 当前仍是 marker/orchestration scaffold；M4 implementation must
 match this document and the strict Object WAL profile boundary。
 
 M0.5 status: the append state machine now uses the redesigned Oxia-compatible commit protocol from
@@ -161,7 +161,7 @@ Rules:
 
 - no metadata visibility yet；
 - if upload fails, append fails before any stream-head commit；
-- object may exist after timeout, but without offset index it is invisible。
+- object may exist after timeout, but without a reachable stream-head commit it is invisible。
 
 ### `PUT_OBJECT_MANIFEST`
 
@@ -200,8 +200,9 @@ Rules:
 - if commit is not sent, no local expected offset may be consumed；
 - if commit is sent and returns `OFFSET_CONFLICT`, refresh from `getCommittedEndOffset(streamId)` before
   accepting the next append for that stream；
-- if commit is sent and final state is unknown, suspend new appends for that stream until a metadata
-  refresh either discovers the same physical slice marker or observes the current committed end；
+- if commit fails with `AppendOutcome.MAY_HAVE_COMMITTED` or `KNOWN_COMMITTED`，suspend new appends for that
+  stream until the original physical attempt is resolved/repaired；observing only a later committed end is
+  not proof that this particular commit id won；
 - the Oxia stream-head condition remains mandatory and rejects stale or competing writers；
 - if head CAS loses only because same-writer renew, trim, or another compatible non-append head update
   changed the Oxia key version, `commitStreamSlice` retries internally with the latest head and preserves
@@ -223,9 +224,9 @@ projectionRef
 The stream-head CAS inside `commitStreamSlice` is the linearization point.
 
 `commitStreamSlice` must also materialize the offset-index and committed-slice marker before returning a
-successful `CommitSliceResult`. If the head CAS succeeds but this materialization cannot be confirmed
-before timeout/cancellation, the append result is unknown final state and the same physical slice retry
-must finish materialization from the commit-log chain.
+successful `CommitSliceResult`. Failure before sending head CAS carries `KNOWN_NOT_COMMITTED`；an unconfirmed
+head-CAS response carries `MAY_HAVE_COMMITTED`；a confirmed head commit followed by materialization failure
+carries `KNOWN_COMMITTED`。The same physical slice must be resolved/repaired before any new append retry。
 
 Only the stream-head key is part of the append linearization point. Object reference and manifest
 slice-state updates run after the stream commit as repairable metadata updates. A failure there cannot make
@@ -248,7 +249,8 @@ Rules:
 
 - idempotently confirm an existing record has the same bytes as the committed `StreamCommitRecord`；
 - conflicting bytes are `METADATA_INVARIANT_VIOLATION`；
-- timeout here has unknown final state because the stream head may already be committed；
+- timeout here carries `AppendOutcome.KNOWN_COMMITTED` when head success is known，or
+  `MAY_HAVE_COMMITTED` when the head result itself was not confirmed；
 - read resolver may repair missing materialized records from the head commit chain before declaring a gap。
 
 ### `ACK_RESULT`
@@ -312,35 +314,43 @@ Phase 1 behavior:
 
 Append timeout and cancellation must be classified by the last irreversible boundary reached:
 
-| Boundary | Timeout result | Visibility guarantee |
+| Boundary | Error + append outcome | Visibility guarantee |
 | --- | --- | --- |
-| before WAL upload starts | `TIMEOUT` or `CANCELLED` | no object and no offset index |
-| during WAL upload | `TIMEOUT`; upload may later succeed | object may become orphan, but no stream-head commit may be started by the timed-out attempt |
-| after upload before manifest commit starts | `TIMEOUT` | object may exist, but no visibility |
-| during manifest commit | `TIMEOUT` | manifest may exist, but no visibility unless a later explicit retry commits the slice |
-| after stream-head CAS is sent | `TIMEOUT` with unknown final state | stream head may or may not have committed |
-| after head CAS before index materialization confirms | `TIMEOUT` with unknown final state | stream head committed; offset index may lag until repair |
+| before WAL upload starts | `TIMEOUT/CANCELLED + KNOWN_NOT_COMMITTED` | no object and no head commit |
+| during WAL upload | `TIMEOUT + KNOWN_NOT_COMMITTED` | object may become orphan；the timed-out attempt must not start head commit |
+| after upload before manifest commit starts | `TIMEOUT + KNOWN_NOT_COMMITTED` | object may exist，but no head commit |
+| during manifest commit | `TIMEOUT + KNOWN_NOT_COMMITTED` | manifest may exist，but no head commit may be started by that timed-out attempt |
+| after stream-head CAS is sent, response unavailable | `TIMEOUT/CANCELLED + MAY_HAVE_COMMITTED` | stream head may or may not have committed |
+| head success known, index confirmation unavailable | `TIMEOUT/CANCELLED/METADATA_UNAVAILABLE + KNOWN_COMMITTED` | logical append committed；derived index may lag until repair |
 
 If timeout or cancellation fires after `commitStreamSlice` has been sent, the implementation must not report
 success without the commit result. A retry that still has the same in-memory `objectId/sliceId` attempt can
 use the stream-head commit chain or committed-slice marker to discover success. A caller-level retry after
 losing that context may append duplicate data because Phase 1 has no producer dedup.
 
-This boundary must surface as `TIMEOUT` or `CANCELLED` with unknown final state semantics. It must not be
-collapsed into `OFFSET_CONFLICT`, `OBJECT_UPLOAD_FAILED`, `METADATA_CONDITION_FAILED`, or a generic retry
-wrapper, because those errors would incorrectly suggest the append is known not to be visible.
+`NereusException.appendOutcome` is mandatory on every exceptional append completion。M4 must not encode
+commit certainty in message text or collapse `MAY_HAVE_COMMITTED/KNOWN_COMMITTED` into `OFFSET_CONFLICT`，
+`OBJECT_UPLOAD_FAILED`，`METADATA_CONDITION_FAILED`，or a generic retry wrapper。
 
 ### Idempotent slice replay
 
 If `commitStreamSlice` finds an existing committed-slice marker for the same stream/object/slice, it should
 return the original commit result instead of creating a second range. If the marker is missing, it must
-search the stream-head commit chain for the same `commitId` before treating the attempt as a new commit.
+read the stream head。It searches the stream-head commit chain for the same `commitId` only when
+`committedEndOffset > expectedStartOffset`；equality proves a normal new positive-record append is not in
+history and must not consume replay budget.
 This is only idempotency for the same physical slice commit; it is not producer-level dedup.
 
 If the first marker read is missing and the head CAS fails or times out, the metadata layer must re-read
 the head and search the committed chain before surfacing `OFFSET_CONFLICT` or a generic condition failure.
 A reachable matching commit means the same physical slice already committed and should return the original
 result after any missing derived records are materialized.
+
+Commit-chain replay search is bounded。Budget exhaustion returns retriable `METADATA_UNAVAILABLE` with
+`MAY_HAVE_COMMITTED`；it is not proof of non-commit。M4 must keep the physical attempt suspended and may use
+bounded `repairDerivedStreamIndexes` continuation calls to materialize its marker before replaying。The
+resolver echoes the opaque cursor unchanged；metadata validates the original observed-head anchor and exact
+next `(offsetEnd, cumulativeSize, commitVersion)` tuple on every page。
 
 Retry scope:
 
@@ -460,6 +470,7 @@ If no candidate:
 - if repair returns `repairBudgetExhausted=true` without covering `startOffset`, continue bounded repair
   attempts only while the read timeout and configured metadata repair budget allow；exhausting that local
   budget returns retriable `READ_RESOLUTION_FAILED`, not metadata corruption；
+- each continuation page must reuse the returned cursor rather than construct or alter its fields；
 - if repair cannot materialize a covering committed record, fail `METADATA_INVARIANT_VIOLATION` because
   stream head and commit-log truth cannot be projected into the read index。
 
@@ -713,13 +724,13 @@ Object may exist, but:
 
 GC/orphan scanner can later remove by object-store operational scan, but correctness does not rely on it.
 
-### Crash after manifest before offset commit
+### Crash after manifest before stream-head commit
 
 Object manifest exists:
 
 ```text
 state = UPLOADED
-no offset index reference
+no reachable stream-head commit
 ```
 
 Recovery options:
@@ -729,9 +740,11 @@ Recovery options:
 
 Phase 1 default: no autonomous recommit. Avoid acking data whose client result is unknown.
 
-### Crash after offset commit before ack
+### Crash after stream-head commit before derived index or ack
 
-Offset index exists and committed end offset advanced. Data is visible.
+The append is logically committed whenever the stream head reaches its commit record，even if offset index
+or committed-slice marker is still missing。Recovery materializes those derived records from the commit
+chain；it must not classify the object as orphan or invisible solely because index materialization lagged。
 
 Phase 1 does not solve producer dedup. Future protocol layers will use producer sequence or idempotency.
 
@@ -763,6 +776,8 @@ public record StreamStorageConfig(
         Duration readTimeout,
         Duration shutdownGrace,
         int maxResolveRanges,
+        int maxCommitChainScan,
+        int maxDerivedIndexRepairCommitsPerCall,
         int maxInFlightAppends,
         long maxBufferedBytes,
         int maxConcurrentObjectReads,
@@ -800,6 +815,8 @@ Suggested initial defaults:
 | `readTimeout` | 30 seconds |
 | `shutdownGrace` | 30 seconds |
 | `maxResolveRanges` | 64 |
+| `maxCommitChainScan` | 10000 |
+| `maxDerivedIndexRepairCommitsPerCall` | 256 |
 | `maxInFlightAppends` | 1024 |
 | `maxBufferedBytes` | 64 MiB |
 | `maxConcurrentObjectReads` | 64 |
@@ -822,6 +839,8 @@ Config validation:
 - `appendSessionRenewBefore < appendSessionTtl`；
 - `appendSessionMinCommitRemaining < appendSessionTtl`；
 - `maxResolveRanges > 0`；
+- `maxCommitChainScan > 0`；
+- `maxDerivedIndexRepairCommitsPerCall > 0`；
 - `maxInFlightAppends > 0`；
 - `maxBufferedBytes > 0`；
 - `maxConcurrentObjectReads > 0`；
@@ -834,6 +853,16 @@ Config validation:
 - `appendSessionRenewBefore + appendSessionMinCommitRemaining <= appendSessionTtl` is recommended so a
   late renewal still leaves enough commit window for normal cases。
 
+Timeout rule:
+
+- `AppendOptions.timeout` is the caller's end-to-end budget；`StreamStorageConfig.appendTimeout` is the
+  instance maximum。The effective append deadline is `now + min(options.timeout, config.appendTimeout)`；
+- WAL upload、manifest put、commit-log/head CAS、derived-index confirmation and internal retries all consume
+  the same remaining deadline；a sub-operation must never receive the original full timeout again；
+- once the deadline expires，no new irreversible stage may start。An already-sent head CAS follows the
+  `AppendOutcome` rules above；
+- object and metadata client timeouts are capped by the effective remaining deadline。
+
 Session lease rules:
 
 - background renewal should renew when remaining lease is at or below `appendSessionRenewBefore`；
@@ -844,7 +873,7 @@ Session lease rules:
 - if renewal fails, the append must not send `commitStreamSlice` and should fail with
   `APPEND_SESSION_EXPIRED` or `FENCED_APPEND` depending on the metadata error；
 - if `commitStreamSlice` has already sent or may send the stream-head CAS, the
-  timeout/unknown-final-state rules still apply.
+  timeout/`AppendOutcome` rules still apply.
 
 Lifecycle:
 

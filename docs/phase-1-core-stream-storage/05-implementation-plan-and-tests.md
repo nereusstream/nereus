@@ -1,6 +1,7 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M3 已完成，M4 Core Append 是当前入口；
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M3 已完成，M4 Core Append 是下一入口；
+pre-M4 P1 source closure 已实现，最终 Gradle rerun 通过前不开始 M4；
 后续每个里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
@@ -149,7 +150,8 @@ M2 foundation implementation status:
 
 - production `nereus-metadata-oxia` now contains:
   `OxiaMetadataStore`, `OxiaKeyspace`, `PartitionKey`, `MetadataWatcher`, `WatchRegistration`,
-  `CommitSliceRequest`, `CommitSliceResult`, and `DerivedIndexRepairResult`；
+  `CommitSliceRequest`, `CommitSliceResult`, `DerivedIndexRepairCursor`, `DerivedIndexRepairResult`, and
+  shared `Phase1ObjectManifestValidator`；
 - metadata record classes exist under `io.nereus.metadata.oxia.records` for stream head/name/metadata,
   append session, commit-log, committed end, offset index, entry-index reference, object manifest,
   object reference, committed slice, and trim；
@@ -167,24 +169,36 @@ M2 foundation implementation status:
 - current tests cover key encoding and offset ordering, metadata envelope corruption/truncation,
   strict metadata UTF-8 decode, per-record codec round-trip/error-path/golden bytes,
   fake-store codec-backed value persistence,
-  deterministic stream id create-or-get, session renew, commit materialization, partition-key access
+  deterministic stream id create-or-get, session renew/fencing/expiry/steal/reacquire, commit materialization, partition-key access
   recording, failure after head CAS before derived index, repair-derived-index recovery, same-slice retry,
   object-reference repair, manifest-only slices not becoming visible, watch drop/duplicate/stale/collapsed/
-  reconnect events, offset conflict classification, commit identity delimiter/event-time/projection
+  reconnect events，watch-callback failure isolation/closed-store rejection，offset conflict classification, commit identity delimiter/event-time/projection
   coverage, metadata record range overflow rejection, committed-slice-marker-first replay, post-commit
   object-audit failure leaving visible data repairable, and adapter-private partition-key helper
   enforcement；
 - 2026-07-07 review status: no P0 was found that would invalidate the stream-head CAS direction；
 - 2026-07-08 M2 completion pass completed the remaining M2 test matrix:
   `sameWriterRenewIsCompatibleHeadVersionChange`, `sameWriterTrimIsCompatibleHeadVersionChange`,
-  `repairBudgetExhaustionStopsAtMaxRecords`, `commitVersionIsMonotonicAcrossSequentialCommits`,
-  `staleEpochIsFencedBeforeOffsetConflict`, and `retryReusesStoredCommitLogAfterFirstAttemptFailedHeadCas`；
+  `repairBudgetExhaustionStopsAtMaxScannedCommitsAndContinues`, `commitVersionIsMonotonicAcrossSequentialCommits`,
+  `staleEpochIsFencedBeforeOffsetConflict`, and
+  `retryReusesStoredCommitLogAfterFirstAttemptFailedHeadCasAndSessionRenew`；
 - these tests now use deterministic before-head-CAS interleavings for renew/trim, prove repeated bounded
   repair calls continue toward the target offset, and check `commitVersion` equality across stream head,
   commit-log, offset-index, and committed-slice records；
-- verified in the final M2 gate run:
+- 2026-07-10 pre-M4 hardening closed the latest review P1s：append failures now carry machine-readable
+  `AppendOutcome`；manifest validation checks commit-eligible state、format、stream identity、unique
+  slice id/ordinal and object bounds；replay budget exhaustion is `MAY_HAVE_COMMITTED` rather than
+  `OFFSET_CONFLICT`；derived repair limits every scanned commit and returns a continuation cursor so bounded
+  calls make progress even when newer indexes already exist；the follow-up review added stored object-id
+  and aggregate/slice-state checks, head-derived orphan-intent validation, dense reachable-chain tuple
+  validation, continuation `nextOffsetEnd/nextCumulativeSize/nextCommitVersion` checks, logical-offset
+  overflow rejection, and monotonic object-reference rebuild protection；
+- 2026-07-11 final pre-M4 verification passed after the cursor-tuple/chain-validation/object-rebuild
+  follow-up：`./gradlew :nereus-api:test :nereus-metadata-oxia:test` and
+  `./gradlew phase1Check check`；
+- verified in the baseline M2 gate run before the latest pre-M4 hardening:
   `./gradlew :nereus-metadata-oxia:test`, `./gradlew phase1Check`, and `./gradlew check`；
-- M2 is done.
+- M2 foundation and pre-M4 hardening are done；the M4 entry gate is open.
 
 M2 review follow-ups before exit:
 
@@ -196,9 +210,19 @@ M2 review follow-ups before exit:
   head commit is reused；
 - done: apply `offset + length` overflow checks to decoded metadata records, not only to public API request
   values；
+- done: reject zero-length persisted WAL slices，non-dense `offsetEnd/recordCount` pairs，cumulative size
+  below logical bytes，zero commitVersion in committed/index/marker/reference records，and impossible empty/
+  non-empty stream-head anchors；
+- done: correct offset-index codec golden sample from `0..10 + recordCount=2` to dense `recordCount=10`；
+  correct commit golden sample to a valid non-first `previous-commit / 1..10 / recordCount=9` record；
+  refresh only the affected envelope checksums/payload goldens；
 - done: add a fake-store path that checks committed-slice marker replay before walking the head chain；
 - done: add failure injection and tests for object manifest/reference audit update failure after the
   stream-head commit has succeeded；
+- done: route actual runtime/validation audit-update failures through the same best-effort boundary and
+  expose fake `objectAuditFailureCount`，so no post-head audit error escapes with false append certainty；
+- done: add an internal monotonic append-stage guard so unexpected exceptions always carry structured
+  certainty and no error after replay/head proof can be downgraded below `KNOWN_COMMITTED`；
 - done: add adapter-private helper tests that can fail when a real Oxia get/put/scan/watch/head-CAS call
   omits or misroutes the required partition key。
 - done: make metadata `EntryIndexReferenceRecord` enforce the same location-specific shape rules as
@@ -210,6 +234,21 @@ M2 review follow-ups before exit:
   head-version interleavings from same-writer renew and trim, bounded repair retry progress,
   commitVersion cross-record equality, stale epoch fenced before an also-present offset conflict, and
   commit-log retry after first-attempt head CAS failure；
+- done: complete append-session negative coverage for live different-writer fencing，stale renew token，
+  expired renew，expired different-writer steal policy，and same-writer post-expiry epoch/token rollover；
+- done: add pre-M4 tests for append outcome certainty，cross-stream/invalid manifest rejection，manifest
+  retry after audit-state changes，bounded replay exhaustion，and continuation-based repair progress；
+- done: validate an existing orphan commit against the current head-derived predecessor/range/cumulative
+  size/commitVersion tuple before reuse, including reuse after a same-writer session renew；
+- done: bind repair pages to the original observed head and the exact next chain tuple, validate every
+  scanned reachable record, and reject a tampered cursor or a chain that ends before the target；
+- done: avoid historical replay walks for a normal new append at current committed end and for compatible
+  renew/trim-only head updates，so `maxCommitChainScan` does not become a stream lifetime write limit；
+- done: make object-reference rebuild reject manifest/commit identity conflicts and any result that would
+  remove an existing visible reference；
+- done: require manifest ordinal/list-order agreement and ordered non-overlapping positive slice ranges，
+  reject duplicate stream/slice identities in object-reference records，and canonicalize reference-list
+  order independent of commit arrival order；
 - review-open: future real adapter must use the same `MetadataCodecRegistry` as the fake store。
 
 Tasks:
@@ -239,10 +278,13 @@ Tasks:
 - implement stream create-or-get；
 - implement append session acquire/renew/fence, including `allowStealExpiredSession` semantics；
 - implement object manifest put；
+- use `Phase1ObjectManifestValidator` for both fake and future real-adapter manifest checks；
 - implement object manifest/reference read and reference repair operations；
 - implement `commitStreamSlice` head-CAS semantics；
 - implement commit-log reachability checks for same physical slice replay；
 - implement derived offset-index/committed-slice materialization and `repairDerivedStreamIndexes`；
+- bound replay/repair by scanned commit-log records，and return explicit continuation rather than restarting
+  every repair page from head；
 - enforce that producer-ack cannot require object-scoped keys or multi-key Oxia batches；
 - use overflow-checked offset and cumulative-size arithmetic；
 - implement offset index scan；
@@ -377,7 +419,9 @@ Tasks:
 - implement auto acquire session；
 - implement append result assembly；
 - keep Phase 1 default behavior of failing external offset conflicts instead of rebasing uploaded slices；
-- map metadata/object failures into `NereusException`。
+- map metadata/object failures into `NereusException`；
+- preserve or assign `AppendOutcome` on every exceptional append completion；never infer commit certainty
+  from `ErrorCode` or message text。
 
 Exit:
 
@@ -437,7 +481,34 @@ Exit:
 - trim low-watermark advances monotonically；
 - read below trim fails；
 - object bytes remain after trim；
-- manifest with no index is treated as orphan/invisible。
+- manifest/object bytes without a reachable head commit are orphan/invisible；a reachable head commit with a
+  missing index is committed and repairable。
+
+### M7 Real Oxia adapter and integration gate
+
+Module:
+
+```text
+nereus-metadata-oxia
+```
+
+Tasks:
+
+- implement the production Oxia Java client binding using the selected public single-key APIs；
+- reuse `Phase1MetadataCodecs` and `Phase1ObjectManifestValidator`，with no fake-only commit capability；
+- run the same stream/session/manifest/head-CAS/replay/repair/watch contract suite against fake and real
+  adapters；
+- add Docker/Testcontainers tests for restart persistence，CAS conflict mapping，partition-key routing，
+  replay scan exhaustion，repair continuation and post-head failure recovery；
+- define production client lifecycle/configuration and exception-to-`NereusException`/`AppendOutcome` mapping。
+
+Exit:
+
+- real adapter passes the shared fake/real contract suite；
+- a fresh adapter process recovers stream head、commit log and derived indexes from the Oxia container；
+- no operation assumes multi-key conditional atomicity；
+- `phase1Check` keeps Docker optional，while a separate real-adapter integration task is mandatory for the
+  final Phase 1 release gate。
 
 ## 2. Core Test Matrix
 
@@ -450,7 +521,8 @@ Exit:
 | negative read or resolve start offset | failed future with `INVALID_ARGUMENT` |
 | `endOffset < startOffset` | constructor fails |
 | stream attributes contain null or exceed 16 KiB encoded size | constructor or validation fails |
-| append session option with blank writer or non-positive TTL | constructor or validation fails |
+| append session option with blank writer, sub-millisecond/non-positive TTL, or millisecond overflow | constructor or validation fails before metadata write |
+| decoded non-empty append session has zero epoch, leaseVersion, or expiry | record validation fails before fencing use |
 | append with session for another stream or writer id | append fails before WAL upload |
 | invalid `StreamStorageConfig` duration/count relationship | construction fails with `INVALID_ARGUMENT` |
 | empty append batch | constructor fails |
@@ -525,21 +597,30 @@ Exit:
 | commit with wrong expected offset | `OFFSET_CONFLICT` |
 | offsetEnd overflow while committing | rejected before commit-log put and head CAS |
 | cumulativeSize overflow while committing | rejected before commit-log put and head CAS |
+| `CommitSliceRequest.expectedStartOffset + recordCount` overflow | constructor rejects it before metadata access |
 | commit valid slice | commit-log record written, stream-head CAS advances, offset-index and marker materialized before ack |
 | committed offset index value | contains logical bytes and slice checksum needed for resolve/read |
 | committed offset index value schema refs | contains canonical schema refs derived from append batch |
 | hydrated offset index record | exposes Oxia `metadataVersion` separately from durable `commitVersion` |
 | valid sequential commits | `commitVersion` increments by one and matches stream head, commit-log, offset-index, and committed-slice records |
 | commit same visible slice again after lost response | returns original commit result; no second offset range |
+| new append at current committed end after history exceeds replay budget | commits normally without historical replay scan |
+| compatible renew/trim changes only head metadata version on a long stream | retries CAS without historical replay scan |
+| historical replay reaches a different commit occupying/crossing expected start at the scan boundary | proves not committed and returns classified conflict, not `MAY_HAVE_COMMITTED` |
 | concurrent same-slice replay loses marker-missing condition race | re-reads marker or head chain and returns original commit result |
 | head CAS succeeds but offset index materialization fails | same physical retry repairs index and returns original result |
 | resolver sees gap below stream head committed end | repairs derived offset index from commit-log before returning data |
-| resolver repair budget exhausted before covering target | retries within read budget or fails retriably, not as metadata corruption |
+| resolver repair scan budget exhausted before covering target | continues from returned cursor within read budget or fails retriably, not as metadata corruption |
+| repair continuation tuple is altered or points at an inconsistent record | `METADATA_INVARIANT_VIOLATION`; no derived record is materialized |
+| reachable commit chain ends before a below-head repair target | `METADATA_INVARIANT_VIOLATION` |
 | committed-slice marker exists but offset index missing | repair from head chain or `METADATA_INVARIANT_VIOLATION` if bytes conflict |
 | committed-slice marker exists but offset index fields differ from request | `METADATA_INVARIANT_VIOLATION` |
+| object-reference rebuild conflicts with manifest identity or would drop an existing visible slice | `METADATA_INVARIANT_VIOLATION` |
+| manifest ordinal/order differs, slice ranges overlap, or object references duplicate one stream/slice identity | record/manifest validation fails before commit or repair write |
 | commit path tries to use multi-key batch | fake store contract rejects the unsupported primitive |
 | missing partition key in adapter call | fake contract test fails before write |
 | wrong metadata record type or unsupported schema version | decode fails before state machine uses the value |
+| decoded head/commit/index/marker/reference has impossible anchor, zero commitVersion, non-dense logical range, or zero physical slice length | record decode/validation fails before append, replay, or read |
 | metadata codec golden bytes | stable for every Phase 1 record type |
 | metadata map encoding | maps are encoded in deterministic UTF-8 key order |
 | schema refs encoding | schema refs are encoded in canonical tuple order |
@@ -550,9 +631,10 @@ Exit:
 | trim decreases | rejected |
 | trim beyond committed end | rejected |
 | trim negative offset | rejected |
+| null trim reason or invalid trim range | `INVALID_ARGUMENT` before head mutation |
 | trim sealed stream | allowed if within committed bounds |
 | manifest exists but object reference missing | no Phase 1 delete; data visibility follows offset index |
-| repair object references | rebuilds visible slices from manifest + stream-head commit chain + offset index |
+| repair object references | rebuilds from validated manifest + stream-head chain, materializes derived indexes, and never drops an existing visible reference |
 | repair object references for missing manifest | fails with metadata invariant error |
 
 ### Object WAL tests
@@ -610,7 +692,8 @@ Exit:
 | append one batch | range starts at previous committed end |
 | append two batches | second starts at first end |
 | concurrent appends through one `DefaultStreamStorage` for same stream | sequenced dense ranges |
-| external writer wins offset race | append fails with retriable `OFFSET_CONFLICT`; uploaded slice is not rebased |
+| different writer takes over session before commit | stale attempt fails with retriable `FENCED_APPEND + KNOWN_NOT_COMMITTED` before offset conflict |
+| same-session concurrent commit wins offset race | losing attempt fails with retriable `OFFSET_CONFLICT + KNOWN_NOT_COMMITTED`; uploaded slice is not rebased |
 | append after offset conflict in same instance | sequencer refreshes committed end before next append |
 | backpressure limit reached | append fails before object upload with `BACKPRESSURE_REJECTED` |
 | `maxBufferedBytes` exact-size adjustment would exceed limit | append fails before object upload with `BACKPRESSURE_REJECTED` and releases reservation |
@@ -623,18 +706,19 @@ Exit:
 | object upload fails | no manifest and no offset index |
 | manifest put fails | no offset index |
 | head CAS rejects after manifest | object invisible because no committed head-chain record is reachable |
-| head CAS succeeds but materialization fails | final state unknown; retry/read repair materializes offset index from commit-log |
+| head CAS succeeds but materialization fails | `KNOWN_COMMITTED`; retry/read repair materializes offset index from commit-log |
 | commit manifest slice fields mismatch request | no offset index; non-retriable metadata invariant or checksum-style failure |
 | commit manifest slice state already visible but committed-slice marker missing | search head chain first; if no matching committed record, `METADATA_INVARIANT_VIOLATION` |
 | commit manifest writer id/run/epoch mismatch request | no offset index; non-retriable metadata invariant |
 | stream becomes non-active before commit | no offset index; append fails as `STREAM_NOT_ACTIVE` |
 | timeout before stream-head CAS starts | no committed head-chain record is created by that attempt |
-| timeout after stream-head CAS is sent | final state is unknown; same physical slice retry can discover marker or head-chain commit |
-| next append after unknown final state | waits for metadata refresh before choosing expected offset |
+| timeout after stream-head CAS is sent | `MAY_HAVE_COMMITTED`; same physical slice replay/repair resolves the result |
+| next append after `MAY_HAVE_COMMITTED/KNOWN_COMMITTED` | remains suspended until the original physical attempt is resolved |
 | commit succeeds but ack future interrupted in test | read sees data; retry same slice returns original result |
 | process crashes after ack loss and caller resubmits batch | may append duplicate data; producer-level dedup is outside Phase 1 |
 | caller-level retry without same physical slice context | may append duplicate data; no producer identity/sequence dedup in Phase 1 |
-| unknown-final-state timeout mapping | append fails with `TIMEOUT` unknown final state, not `OFFSET_CONFLICT` or generic metadata failure |
+| CAS response timeout mapping | append fails with `TIMEOUT + MAY_HAVE_COMMITTED`, not `OFFSET_CONFLICT` or generic metadata failure |
+| head known committed, index confirmation fails | append fails with `KNOWN_COMMITTED`; a new physical append is forbidden |
 | object reference update fails after stream commit | read sees data and repair can rebuild reference |
 | concurrent post-commit object reference updates | CAS merge does not lose another visible slice; conflict exhaustion leaves repairable stale metadata |
 | stale session after upload | no visible data |
@@ -670,6 +754,8 @@ Exit:
 | watch offset update without follow-up scan | invalidates only and does not populate positive cache data |
 | watch event missed or collapsed | cache still becomes correct through TTL/read-through scan |
 | watch event out of order or duplicate | cache invalidation remains safe |
+| watcher callback throws during session/trim/index notification | mutation result is unchanged; failure metric increments; other deliveries continue |
+| register watch after metadata store close | synchronous `STORAGE_CLOSED` rejection |
 | `enableMetadataWatch=false` | no-op registration; cache remains correct through TTL/read-through |
 | index points to missing object | retriable object read failure |
 | gap below committed end | repair from commit-log first; invariant only if chain/record/materialized bytes are corrupt |
@@ -772,7 +858,8 @@ Future milestones should add these gates to `phase1Check` when the corresponding
 - API validation unit tests；
 - done: object WAL round-trip tests；
 - done: fake metadata invariant tests；
-- real Oxia contract tests when the adapter exists。
+- M7 real Oxia shared-contract tests and an independent Docker/Testcontainers integration task；the latter
+  stays outside ordinary `phase1Check` but is mandatory for final Phase 1 release。
 
 `phase1Check` must not require `nereus-managed-ledger`, `nereus-pulsar-adapter`, or `nereus-kop-adapter`
 to implement their future behavior. Those modules may keep marker classes or compile-only boundaries while
@@ -787,7 +874,9 @@ Recommended order:
 3. Object WAL third, because append cannot commit references without durable bytes.
 4. Append coordinator fourth, because it is the first end-to-end write path.
 5. Resolver/read fifth, because it validates offset index shape.
-6. Trim/recovery last, because they depend on committed index and read semantics.
+6. Trim/recovery next, because they depend on committed index and read semantics.
+7. Real Oxia adapter last, after the state-machine contract is executable against the fake and can be reused
+   as a production-adapter contract suite.
 
 Avoid starting with Pulsar facade. It would force L1 concerns into L0 before the offset truth is stable.
 
@@ -812,12 +901,17 @@ read offset 2 still returns committed data
 And these negative cases hold:
 
 ```text
-uploaded object without offset index is invisible
+uploaded object without a reachable head commit is invisible
+head-reachable commit without an offset index is repaired and remains logically committed
 stale epoch cannot commit
 offset conflict cannot create a gap
 WAL canonical object checksum mismatch cannot commit
 object listing is never used to discover readable data
 ```
+
+The local fake/local-store scenario closes M6 but does not by itself close Phase 1。Final Phase 1 completion
+also requires M7：the production Oxia adapter passes the shared contract suite and its independent
+Docker/Testcontainers integration gate，including process restart and post-head recovery。
 
 ## 9. Deferred Beyond Phase 1
 

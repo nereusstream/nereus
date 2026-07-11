@@ -48,7 +48,7 @@ public record StreamSliceManifestRecord(
                 || logicalBytes < 0) {
             throw new IllegalArgumentException("slice manifest numeric fields are invalid");
         }
-        MetadataRecordValidation.requireNonNegativeNonOverflowingRange(
+        MetadataRecordValidation.requirePositiveNonOverflowingRange(
                 objectOffset,
                 objectLength,
                 "slice manifest object");

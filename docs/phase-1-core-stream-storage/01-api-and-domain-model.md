@@ -1,6 +1,6 @@
 # 01 API and Domain Model
 
-本文定义 Phase 1 已落地的 Java API、value object、错误语义和包边界，以及 M4-M6 必须遵守的
+本文定义 Phase 1 已落地的 Java API、value object、错误语义和包边界，以及 M4-M7 必须遵守的
 execution contract。Target profile reservations 与当前 executable support 会明确区分。
 
 ## 1. API Principles
@@ -119,7 +119,8 @@ explicit when the metadata record is already expired.
 Validation:
 
 - `writerId` must be non-blank；
-- `ttl` must be positive；
+- `ttl` must be representable in milliseconds and at least `1 ms`；sub-millisecond values and
+  `Duration.toMillis()` overflow are rejected；
 - implementation may enforce configured min/max TTL bounds and fail with `INVALID_ARGUMENT` when the
   requested value is outside those bounds.
 
@@ -827,6 +828,13 @@ Base type:
 public class NereusException extends RuntimeException {
     private final ErrorCode code;
     private final boolean retriable;
+    private final Optional<AppendOutcome> appendOutcome;
+}
+
+public enum AppendOutcome {
+    KNOWN_NOT_COMMITTED,
+    MAY_HAVE_COMMITTED,
+    KNOWN_COMMITTED
 }
 
 public enum ErrorCode {
@@ -862,14 +870,14 @@ Error codes:
 | Code | Retriable | Meaning |
 | --- | --- | --- |
 | `INVALID_ARGUMENT` | no | caller supplied invalid options, offsets, batch shape, or unsupported value combination |
-| `CANCELLED` | yes | operation was cancelled before reaching a known final state |
+| `CANCELLED` | yes | operation was cancelled；append commit certainty is carried separately by `appendOutcome` |
 | `STREAM_NOT_FOUND` | no | stream metadata missing |
 | `STREAM_NOT_ACTIVE` | depends | stream state does not allow the requested operation |
 | `APPEND_SESSION_EXPIRED` | yes | caller must reacquire |
 | `FENCED_APPEND` | yes | stale epoch/token rejected |
 | `OFFSET_CONFLICT` | yes | committed end offset changed before commit |
 | `BACKPRESSURE_REJECTED` | yes | append or read rejected before irreversible object IO because local resource limits are full |
-| `TIMEOUT` | yes | configured operation timeout elapsed; append final state may be unknown if stream-head CAS was already sent |
+| `TIMEOUT` | yes | configured operation timeout elapsed；append commit certainty is carried separately by `appendOutcome` |
 | `STORAGE_CLOSED` | no | `StreamStorage` or one of its required clients is closing or closed |
 | `OBJECT_UPLOAD_FAILED` | yes | object store write failed |
 | `OBJECT_READ_FAILED` | yes | object range read failed for a transient or unknown reason |
@@ -899,6 +907,17 @@ irreversible boundary, the internal operation may still complete and the durable
 same boundary rules as timeout. Service-side cancellation before an irreversible boundary should use
 `NereusException(CANCELLED)`.
 
+Every exceptional append completion must carry `NereusException.appendOutcome()`:
+
+- `KNOWN_NOT_COMMITTED`：the attempt is proven not to have advanced stream head；
+- `MAY_HAVE_COMMITTED`：head CAS was sent or bounded replay proof was exhausted；the caller must not create
+  a new physical append as an automatic retry；
+- `KNOWN_COMMITTED`：the head is known to contain the append, although strict index confirmation or response
+  delivery failed；the caller must repair/recover the original result, not append the payload again。
+
+Non-append failures keep `appendOutcome=Optional.empty()`。`code` describes the immediate failure category；
+`appendOutcome` independently describes durable append certainty。Message text is never a commit-state API。
+
 Normal `read` and `resolve` calls at or beyond the current committed end do not fail with
 `OFFSET_NOT_AVAILABLE`; they return an empty result (`ReadResult.endOfStream=true` for `read`). The error
 code is reserved for future strict APIs or internal helpers that cannot represent EOF as a normal result.
@@ -908,6 +927,12 @@ Implementation helper:
 
 ```java
 static <T> CompletableFuture<T> failedFuture(ErrorCode code, String message, Throwable cause);
+static <T> CompletableFuture<T> failedAppendFuture(
+        ErrorCode code,
+        boolean retriable,
+        AppendOutcome appendOutcome,
+        String message,
+        Throwable cause);
 ```
 
 Exception mapping:
@@ -925,6 +950,9 @@ Exception mapping:
 | Metadata codec | corrupt bytes, wrong record type, checksum mismatch | `METADATA_INVARIANT_VIOLATION` |
 | Metadata state machine | stale append epoch/token | `FENCED_APPEND` |
 | Metadata state machine | committed end changed | `OFFSET_CONFLICT` |
+| Append before head CAS is sent | any terminal failure | `appendOutcome=KNOWN_NOT_COMMITTED` |
+| Append after head CAS is sent, response unavailable | timeout/cancel/transport failure | `appendOutcome=MAY_HAVE_COMMITTED` |
+| Append head known committed, result/index confirmation unavailable | post-head failure | `appendOutcome=KNOWN_COMMITTED` |
 | Core preflight | stream profile is not canonical Object WAL sync in Phase 1 | `UNSUPPORTED_STORAGE_PROFILE` |
 | Core preflight | durability is not `WAL_DURABLE_AND_INDEX_COMMITTED` in Phase 1 | `UNSUPPORTED_DURABILITY_LEVEL` |
 | Resolver | no covering index below committed end | `METADATA_INVARIANT_VIOLATION` |

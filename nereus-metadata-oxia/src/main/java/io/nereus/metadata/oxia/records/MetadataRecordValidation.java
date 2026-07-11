@@ -28,4 +28,23 @@ final class MetadataRecordValidation {
             throw new IllegalArgumentException(fieldName + " offset + length must not overflow", e);
         }
     }
+
+    static void requirePositiveNonOverflowingRange(long offset, long length, String fieldName) {
+        requireNonNegativeNonOverflowingRange(offset, length, fieldName);
+        if (length == 0) {
+            throw new IllegalArgumentException(fieldName + " length must be positive");
+        }
+    }
+
+    static void requireDenseLogicalRange(long offsetStart, long offsetEnd, int recordCount, String fieldName) {
+        long expectedEnd;
+        try {
+            expectedEnd = Math.addExact(offsetStart, recordCount);
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException(fieldName + " start + recordCount must not overflow", e);
+        }
+        if (offsetEnd != expectedEnd) {
+            throw new IllegalArgumentException(fieldName + " end must equal start + recordCount");
+        }
+    }
 }

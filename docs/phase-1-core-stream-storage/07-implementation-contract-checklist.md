@@ -81,6 +81,7 @@ M0 scaffold status before coding state machines:
   envelope/registry scaffolding plus `Phase1MetadataCodecs`, and a test-fixture `FakeOxiaMetadataStore`
   that uses stream-head single-key CAS rather than multi-key atomic commit；
 - done: M2 fake store tests cover deterministic create-or-get, append session renew,
+  live-owner fencing/expiry/steal/reacquire,
   `commitStreamSlice`, derived-index materialization, failure after head CAS before derived-index
   materialization, repair recovery, object-reference repair, watch drop/duplicate/stale/collapsed/
   reconnect events, fixed-width offset scan ordering, offset conflict classification, canonical commit
@@ -93,8 +94,13 @@ M0 scaffold status before coding state machines:
 - done: M2 linearizability test matrix covers deterministic compatible head-version interleavings
   (renew/trim), bounded repair retry progress after budget exhaustion, commitVersion cross-record
   equality, stale-epoch fencing priority over an also-present offset conflict, and commit-log retry；
-- M2 is complete; the final M2 gate run passed `./gradlew :nereus-metadata-oxia:test`,
+- M2 baseline is complete; its pre-hardening gate run passed `./gradlew :nereus-metadata-oxia:test`,
   `./gradlew phase1Check`, and `./gradlew check`.
+- done in pre-M4 source hardening: structured `AppendOutcome`, shared manifest validation, bounded replay
+  exhaustion classification, head-derived orphan-intent reuse validation, dense chain tuple validation,
+  target-bound repair continuation tuple tests, logical-offset overflow rejection, and monotonic
+  object-reference rebuild checks were added；the complete post-hardening Gradle gates passed on
+  2026-07-11.
 - done: M3 adds the production `ObjectStore` API, local test-fixture object store, WAL write/read records,
   CRC32C helper, WAL binary layout encoder/decoder, `DefaultWalObjectWriter`, and
   `DefaultWalObjectReader`；
@@ -112,7 +118,9 @@ M0 scaffold status before coding state machines:
   previously returned data instead of returning `READ_LIMIT_TOO_SMALL`, and local-store final/parent
   symlink escape is rejected before put/read/head.
 - done on 2026-07-10: `./gradlew :nereus-object-store:test phase1Check check` passed after the blocker
-  fix pass；M3 is complete and M4 may start.
+  fix pass；M3 is complete。
+- done on 2026-07-11: `./gradlew :nereus-api:test :nereus-metadata-oxia:test` and
+  `./gradlew phase1Check check` passed after the final pre-M4 hardening；the M4 entry gate is open.
 
 ## 3. Stop-The-Line Conditions
 
@@ -123,6 +131,8 @@ Stop implementation and update design first if any of these are discovered:
 - A design or fake implementation assumes Oxia public Java client can do single-key-group conditional
   multi-write without a new passing spike proving that exact API.
 - M4 core append starts without using the documented stream-head CAS plus commit-log protocol.
+- M4 can complete an exceptional append without a machine-readable `AppendOutcome`, or derives commit
+  certainty from `ErrorCode`/message text alone.
 - M4 acknowledges a BK/async profile or `WAL_DURABLE` request instead of rejecting it before WAL IO.
 - Any future `WAL_DURABLE` design attempts to return before a stable stream-head commit or without a
   recoverable primary read target.
@@ -130,6 +140,9 @@ Stop implementation and update design first if any of these are discovered:
 - Offset index scan cannot preserve 19-digit zero-padded offset/generation ordering.
 - commit protocol cannot assign a durable `commitVersion` that can be validated across stream head,
   commit-log, offset-index, and committed-slice state.
+- Decoded head/commit/index/marker/reference records can carry an impossible head anchor，zero
+  commitVersion，a non-dense logical range，cumulative size below logical bytes，or a zero-length WAL slice
+  into append/replay/read state machines.
 - L0 code needs to parse Pulsar topic syntax or use a human-readable alias as the durable `StreamId`.
 - Metadata and object modules need separate implementations of durable key/hash helpers.
 - Object keys or Oxia paths need raw `cluster`, raw `writerId`, or truncated writer/run hashes.
@@ -138,8 +151,26 @@ Stop implementation and update design first if any of these are discovered:
 - `commitStreamSlice` would require object-scoped keys or multi-key Oxia atomicity in the producer-ack
   linearization path.
 - A new `commitStreamSlice` path would accept a manifest slice already marked `VISIBLE` while the
-  stream-scoped committed-slice marker is missing.
+  stream-scoped committed-slice marker is missing without first proving replay through the committed chain.
+- Fake or real metadata bypasses `Phase1ObjectManifestValidator`，or accepts duplicate slice ids/ordinals，
+  non-contiguous ordinal/list order，cross-stream slices，overlapping/out-of-object slice ranges，or
+  unsupported Phase 1 format/state.
+- Replay/repair limits only newly written records rather than every commit-log record scanned，or a bounded
+  repair retry restarts from head instead of using its continuation cursor.
+- Marker-missing replay walks history for a normal new append whose `expectedStartOffset` equals current
+  committed end，turning `maxCommitChainScan` into a stream lifetime write limit.
+- Historical replay keeps scanning after a different reachable range reaches/crosses the request's
+  expected start，and reports budget exhaustion after the chain already proved the request absent.
+- An existing orphan commit can be reused without matching the current head's predecessor, offset range,
+  cumulative size, and next commitVersion.
+- A repair continuation does not retain the original observed head and exact expected next
+  `(offsetEnd, cumulativeSize, commitVersion)` tuple, or a broken chain can end below the target without an
+  invariant failure.
+- Object-reference repair can silently omit an existing visible reference or accept a reachable commit
+  whose object/writer/checksum/slice identity conflicts with the manifest.
 - Read path would need object manifest to resolve visibility or checksum.
+- A watcher callback exception can fail or reclassify an already-applied metadata mutation，or new watch
+  registration succeeds after metadata store close.
 - WAL canonical object checksum and object-store storage checksum have to be collapsed into one field.
 - WAL object sections cannot carry type/version/length/checksum from the first encoder.
 - WAL writer cannot know or enforce final encoded object length before `putObject`.
@@ -176,19 +207,26 @@ Producer ack is allowed only after:
    - for same-slice replay, the existing marker or reachable head-chain commit is validated and the
      original result is returned;
    - after marker-missing condition failure, the head chain is searched before classifying the error;
-   - object manifest writer id, writer run id, writer epoch, object key/type/format, and slice fields match
-     the commit request;
+   - object manifest object id, writer id, writer run id, writer epoch, object key/type/format, aggregate
+     visibility state, and slice fields match the commit request;
+   - an existing commit intent matches both the canonical request and the current head-derived predecessor,
+     offset range, cumulative size, and next commitVersion before CAS reuse;
+   - every reachable-chain scan validates dense offset, cumulative-size, and commitVersion progression;
    - offset index and committed-slice marker for the committed record are materialized or idempotently
      confirmed before success is returned;
    - durable `commitVersion` is the same in stream head, commit-log, offset-index, and committed-slice
      records.
 
-If head CAS succeeds but offset-index/marker materialization cannot be confirmed, the append has unknown
-final state. The implementation must not report a known failure; same physical slice retry and read repair
-must be able to finish materialization from the reachable commit-log record.
+Every exceptional append carries `AppendOutcome`，including missing-stream/closed-store rejection。Before head send is `KNOWN_NOT_COMMITTED`；unconfirmed head
+response or replay-proof budget exhaustion is `MAY_HAVE_COMMITTED`；confirmed head success followed by
+index/result failure is `KNOWN_COMMITTED`。The implementation must not report either latter state as an
+ordinary retryable conflict；same physical slice replay/repair must finish from the reachable commit record。
+Unexpected runtime/validation failures are also structured，and certainty is monotonic after replay/head
+proof。
 
 Post-commit object reference and manifest state updates are best-effort CAS merges. Failure there does not
-block ack and must be repairable from the stream-head commit chain and materialized offset index.
+block ack，must be observable，and must be repairable from the stream-head commit chain and materialized
+offset index。Runtime/validation failures at this boundary cannot escape as a known-not-committed append。
 
 ## 5. Read Contract
 
@@ -198,7 +236,8 @@ Read and resolve must follow this chain:
 trim/state check
 -> cache positive offset-index records only, or scan Oxia
 -> if scan shows a gap below stream head, repair derived indexes from commit-log and rescan
--> if repair budget is exhausted before target coverage, retry within read budget or fail retriably
+-> if repair scan budget is exhausted before target coverage, continue from returned cursor within read
+   budget or fail retriably
 -> choose highest non-tombstoned generation covering target offset
 -> build ResolvedObjectRange from offset index only
 -> read full slice payload and entry index
@@ -218,11 +257,11 @@ payload bytes actually returned after clipping.
 - Timeout/cancellation before WAL upload starts leaves no object and no offset index.
 - Timeout/cancellation during or after upload may leave an orphan object but must not start a new offset
   commit after the operation has been timed out/cancelled.
-- Timeout/cancellation after stream-head CAS is sent has unknown final state.
-- Timeout/cancellation after head CAS succeeds but before index materialization confirms also has unknown
-  final state.
-- Unknown final state must surface as `TIMEOUT` or `CANCELLED` semantics, not as ordinary offset conflict,
-  object upload failure, or generic metadata condition failure.
+- Timeout/cancellation after stream-head CAS is sent but not confirmed carries `MAY_HAVE_COMMITTED`.
+- Timeout/cancellation after head CAS is known successful but before index materialization confirms carries
+  `KNOWN_COMMITTED`.
+- Both states must remain distinct from `KNOWN_NOT_COMMITTED` and must not surface as ordinary offset
+  conflict, object upload failure, or generic metadata condition failure.
 - Same physical slice retry can discover a successful commit through the committed-slice marker or the
   stream-head commit chain.
 - Per-stream append sequencer must refresh after `OFFSET_CONFLICT` and must not choose new expected offsets
@@ -240,11 +279,13 @@ payload bytes actually returned after clipping.
 - stream-head CAS and commit-log reachability tests;
 - compatible head-CAS conflict retry tests for same-writer renew and trim;
 - derived offset-index repair tests for failure after head CAS;
-- derived-index repair budget exhaustion tests;
+- derived-index scan-budget exhaustion and continuation-progress tests;
+- append outcome certainty tests for pre-head、unconfirmed-head and known-head failures;
+- shared manifest-validator tests for state/format/stream/id/ordinal/bounds and audit-state idempotency;
 - exact stream-name hash and deterministic stream-id tests;
 - shared key/hash helper parity tests across Oxia keyspace and object key generation;
 - non-opaque payload format rejection tests;
-- real Oxia contract tests, once the adapter exists;
+- M7 real Oxia shared-contract and independent Testcontainers integration tests before final Phase 1 exit;
 - WAL object golden encode/decode tests;
 - WAL section envelope and format-version manifest tests;
 - checksum-domain tests for WAL canonical checksum versus storage checksum;
@@ -261,7 +302,7 @@ payload bytes actually returned after clipping.
 - checksum corruption tests for payload, entry index, footer, header, and whole object;
 - stream `commitVersion` monotonicity and cross-record equality tests;
 - concurrent same-slice replay condition-race tests;
-- append timeout/cancellation unknown-final-state tests;
+- append timeout/cancellation `AppendOutcome` tests;
 - object reference repair tests;
 - offset index cache missed/duplicate/collapsed/out-of-order watch tests;
 - local object store path traversal, atomic-write, and test-only cleanup tests.

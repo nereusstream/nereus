@@ -37,18 +37,26 @@ Current design:
 - `/offset-index/{offsetEnd}/{generation}` and `/committed-slices/{objectId}/{sliceId}` are materialized
   derived records copied from a reachable commit-log record；
 - producer ack waits for both head CAS and materialization of this slice's offset-index/marker；
-- if head CAS succeeds but materialization cannot be confirmed, the append returns unknown final state and
-  same-slice retry/read repair must finish materialization。
+- exceptional append outcomes are explicit：pre-head `KNOWN_NOT_COMMITTED`，unconfirmed head response
+  `MAY_HAVE_COMMITTED`，and confirmed head with incomplete index/result `KNOWN_COMMITTED`；same-slice
+  retry/read repair must finish materialization before any new physical append。
 
 Residual risks introduced by this mitigation:
 
 - read/resolve has a new repair path when stream head is ahead of offset-index；
 - commit-log chain walking can be more expensive than a pure offset-index lookup after failures；
+- normal new append at current committed end and compatible metadata-only head updates skip historical
+  replay walking；the bound applies only when resolving an older possibly committed attempt；
 - orphan commit intents can exist when a commit-log put succeeds but head CAS loses；
+- orphan intents are never visible by existence alone and can be reused only when their predecessor,
+  offset range, cumulative size, and commitVersion match the current head snapshot；
 - same-writer renew and trim now contend on the same head key as append; append must retry compatible
   head-version conflicts instead of treating them as fencing or generic condition failure；
 - derived-index repair must remain bounded; repair budget exhaustion is operational backpressure, not
   metadata corruption；
+- the bound counts every scanned commit record，not only missing records written；budget exhaustion returns a
+  continuation cursor with the original observed-head anchor and exact next chain tuple so retries progress
+  without rescanning the newest chain segment or accepting a different/orphan commit；
 - fake metadata must model failure between head CAS and materialization, otherwise tests will miss the
   most important new recovery boundary；
 - 2026-07-06 M2 hardening pass added tests and implementation for canonical `commitId` event-time/projection
@@ -66,6 +74,9 @@ Residual risks introduced by this mitigation:
 - read resolver 必须能在 offset-index gap below head 时触发 derived-index repair。
 - head CAS 失败分类必须区分 compatible head-version conflict、stale epoch/token、offset conflict 和
   metadata corruption。
+- M4 exceptional completion 必须携带 `AppendOutcome`；message text 不能充当 commit certainty contract。
+- fake 与 M7 real adapter 必须共用 `Phase1ObjectManifestValidator`、dense reachable-chain validation、
+  monotonic object-reference repair 和 tuple-bound continuation contract。
 
 ## 2. Read Amplification From Full-Slice Verification
 
@@ -117,9 +128,9 @@ sequence、broker message id、Kafka producer epoch，因而不实现 producer-l
 
 实现契约：
 
-- `TIMEOUT` after `commitStreamSlice` sends or may send stream-head CAS 必须明确表示 unknown final
-  state；
-- `CANCELLED` after irreversible boundary 也不能伪装成未提交；
+- `TIMEOUT/CANCELLED` after an unconfirmed head send 必须携带 `MAY_HAVE_COMMITTED`；confirmed head
+  success 后的 materialization/result failure 必须携带 `KNOWN_COMMITTED`；
+- irreversible boundary 后不能伪装成 `KNOWN_NOT_COMMITTED`；
 - metadata layer 必须先通过 committed-slice marker 或 stream-head commit chain 尝试恢复同一物理
   slice 的原始结果；
 - 丢失同一物理 attempt 上下文后的重复提交风险必须保留给上层协议 projection 解决；
@@ -223,7 +234,7 @@ Controls：
 - `StreamStorageConfig` 包含 read memory/concurrency 限流项；
 - `WalObjectReader` full-slice read 先预留内存，后读取对象；
 - read amplification metrics 已在 `StreamStorageMetrics` 命名；
-- timeout/unknown-final-state 错误不会被映射成普通 retriable conflict；
+- timeout/cancellation 的 `AppendOutcome` 不会被映射丢失或折叠成普通 retriable conflict；
 - M4 validates canonical profile and strict durability before WAL IO；
 - no reserved profile uses sentinel object identity or silent fallback；
 - LocalFileObjectStore cleanup helper 只在 test package 可见；
