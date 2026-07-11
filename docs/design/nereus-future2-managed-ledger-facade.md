@@ -1,7 +1,8 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 状态：Designed；当前模块只有 marker class，尚未实现 facade
+> 状态：In progress；F2-M0 design/API spike complete，F2-M1 implementation next
 > 前置：Future 1 append/read/trim contract 和 projection reference 稳定
+> Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 
 本文定义 Nereus 如何通过 Pulsar ManagedLedger API 暴露给 `PersistentTopic`、dispatcher、
 subscription 和 admin runtime，同时保持 `streamId + offset` 是逻辑坐标、stream head + reachable
@@ -48,7 +49,8 @@ Future 2 覆盖：
 - topic open/load/unload；
 - read-only cursor boundary；
 - basic cursor open boundary；
-- BookKeeper WAL profile 与 Object WAL profile 共用 facade 的方式。
+- broker 内 stock BookKeeper storage class 与 Nereus storage class 的 hybrid selection；
+- 首版 `OBJECT_WAL_SYNC_OBJECT` facade，以及未来 profile 共用 projection contract 的版本边界。
 
 ## 3. Non-scope
 
@@ -62,12 +64,15 @@ Future 2 不解决：
 - KoP group coordinator；
 - lakehouse catalog；
 - compaction worker。
+- Nereus BookKeeper primary WAL profile 和 async object materialization profile。
 
 这些能力在 Future 3、Future 5、Future 6、Future 8 中作为 projection 或上层状态处理。
 
 当前实现约束：`nereus-managed-ledger` 还没有真实 facade；Phase 1 payload 是 one-record-per-entry
-opaque batch，`AppendResult`/`ResolvedObjectRange` 仍是 object-shaped。BookKeeper profile 进入 facade
-前必须先完成 generic primary read-target 设计，不能用伪造 object identity 兼容。
+opaque batch，`AppendResult`/`ResolvedObjectRange` 仍是 object-shaped。F2 首版显式只接受
+`OBJECT_WAL_SYNC_OBJECT`。Broker hybrid mode 中的 `bookkeeper` 继续走 stock BookKeeper factory，
+不等于 Nereus BookKeeper profile 已实现；后者进入 facade 前必须先完成 generic primary read-target
+设计，不能用伪造 object identity 兼容。
 
 ## 4. Layer Boundary
 
@@ -152,12 +157,12 @@ NereusManagedLedgerStorageClass implements ManagedLedgerStorageClass
 | `openCursor` | create/open `NereusManagedCursor` boundary; full cursor semantics in Future 3 |
 | read by position | map `Position` to stream offset using virtual ledger projection, call resolver |
 | `getLastConfirmedEntry` | synthesize from `committedEndOffset` and latest virtual ledger projection |
-| `getNumberOfEntries` | derive from offset index summary, approximate if exact count requires scan |
-| `getTotalSize` | use `cumulativeSize` from offset index |
+| `getNumberOfEntries` | exact `committedEndOffset - trimOffset` under F2 one-entry/one-offset contract |
+| `getTotalSize` | derive exact retained logical bytes from L0 index summary; no correctness-path approximation |
 | `terminate` | set stream state to sealed/terminated in Oxia |
 | `close` | close facade, release local cache/session, not stream data |
 | `deleteCursor` | delete cursor state in Future 3 schema |
-| offload APIs | no-op, unsupported, or remapped to native compaction depending on compatibility mode |
+| offload APIs | fail explicitly in F2；never route virtual ledger IDs to BookKeeper/offloader code |
 
 Synchronous methods can be implemented as compatibility wrappers over async operations, but they must not block
 event-loop threads. The broker-facing hot path should use async methods.
@@ -193,60 +198,44 @@ Future 3 owns:
 
 ## 7. Virtual Ledger Projection
 
-### 7.1 Projection model
-
-Every committed stream range visible to Pulsar must be addressable through a stable virtual ledger projection:
+F2-M0 locks projection mapping version 1:
 
 ```text
-VirtualLedger
-  streamId
-  virtualLedgerId
-  startOffset
-  endOffset
-  entryBaseId
-  entryCount
-  entryIndexRef
-  commitVersion
+one stream                  <-> one stable virtual ledger
+one persisted Pulsar Entry  <-> one stream offset
+Position.ledgerId           == projection.virtualLedgerId
+Position.entryId            == stream offset
 ```
 
-Projection options:
+`virtualLedgerId` is allocated once from an Oxia single-key CAS allocator in the positive high range.
+Future 2 does not roll the virtual ledger at physical object, append-session, broker or compaction
+boundaries. L0 `committedEndOffset` and `trimOffset` supply mutable range state；projection metadata
+must not copy them into a second visibility truth。
 
-| Option | Pros | Cons |
-| --- | --- | --- |
-| Oxia allocated `virtualLedgerId` | simple uniqueness, flexible rollover | requires one metadata write/reference |
-| deterministic from `streamId + startOffset` | easy recovery, fewer sequence dependencies | encoding must fit Pulsar expectations |
-| epoch-based | aligns with append session/rollover | session churn can create many ledgers |
-
-Future 2 does not need to choose the final encoding if it defines the projection contract:
-
-- `virtualLedgerId` is stable after published；
-- `entryId` is ordinal within the virtual ledger；
-- each entry maps to `[entryBaseOffset, entryBaseOffset + recordCount)`；
-- batch index maps within the entry；
-- projection can be rebuilt from offset index + entry index。
-
-### 7.2 Position mapping
-
-```text
-Position(ledgerId, entryId)
-  -> virtualLedger(ledgerId)
-  -> entryIndex[entryId]
-  -> streamId + entryBaseOffset
-```
-
-For batched messages:
+For a batched Pulsar Entry, `MessageId.batchIndex` remains a sub-index inside the same persisted Entry:
 
 ```text
 MessageId(ledgerId, entryId, batchIndex)
-  -> streamId + entryBaseOffset + batchIndex
+  -> Position(ledgerId, entryId)
+  -> streamId + offset(entryId)
+  -> decode batchIndex inside the returned Entry bytes
 ```
+
+`batchIndex` never adds to the stream offset。This follows the implemented Phase 1
+`OPAQUE_RECORD_BATCH` constraint where every `AppendEntry` has `recordCount == 1`。
 
 Rules:
 
-- `entryId` is not equal to record offset when batching is used.
-- `ledgerId` is not a BookKeeper ledger id in Nereus; it is a virtual projection id.
-- A `Position` returned to Pulsar must remain resolvable until retention/trim legally removes it.
-- Compaction must preserve projection or provide a projection-preserving replacement.
+- empty LAC is `Position(virtualLedgerId, -1)`；
+- non-empty LAC is `Position(virtualLedgerId, committedEndOffset - 1)`；
+- trim never renumbers an entry or changes the ledger id；
+- position mapping is formula-based and does not add one Oxia record/write per entry；
+- a returned `Position` remains resolvable until retention/trim legally removes its offset；
+- virtual ledger IDs are never passed to BookKeeper clients, handles, offloaders or metadata paths；
+- a later rollover scheme requires a new mapping version and mixed-version compatibility design。
+
+The complete model, sentinel behavior and entry byte contract are defined by
+`../phase-2-managed-ledger-facade/02-projection-and-entry-contract.md`。
 
 ## 8. Topic Open / Load / Unload
 
@@ -301,55 +290,25 @@ Unload must not:
 Future 2 adds projection and facade metadata on top of Future 1:
 
 ```text
-/nereus/clusters/{cluster}/topics/{tenant}/{namespace}/{topic}/partitions/{partition}/stream
-/nereus/clusters/{cluster}/streams/{streamId}/virtual-ledgers/{virtualLedgerId}
-/nereus/clusters/{cluster}/streams/{streamId}/position-index/{virtualLedgerId}/{entryId}
-/nereus/clusters/{cluster}/streams/{streamId}/facade/managed-ledger
-/nereus/clusters/{cluster}/streams/{streamId}/facade/cursors/{cursorName}
+/nereus/clusters/{cluster}/facade/managed-ledger/ledger-id-allocator
+/nereus/clusters/{cluster}/facade/managed-ledger/topics/{managedLedgerNameHash}
+/nereus/clusters/{cluster}/streams/{streamId}/facade/managed-ledger/virtual-ledger
+/nereus/clusters/{cluster}/streams/{streamId}/facade/managed-ledger/position-index
 ```
 
-### 9.1 Topic-to-stream mapping
+The topic projection record is authoritative and contains the exact broker-supplied managed-ledger
+name、deterministic stream ID、storage class/profile、one virtual ledger ID、mapping version、facade
+state and properties。The virtual-ledger and position-index records are repairable derived records。
 
-```json
-{
-  "topic": "persistent://tenant/ns/topic-partition-0",
-  "streamId": "s-123",
-  "storageClass": "nereus",
-  "profile": "OBJECT_WAL_SYNC_OBJECT",
-  "createdAt": 1783036800000,
-  "version": 12
-}
-```
+Create/open uses a recoverable sequence: create/get deterministic L0 stream、allocate ledger ID with
+allocator-key CAS、put-if-absent authoritative topic record、then idempotently repair the two derived
+records。A crash can leak an unused ledger ID but cannot replace a published projection。No step assumes
+multi-key atomic commit，and append does not write projection metadata。
 
-### 9.2 VirtualLedgerProjection
-
-```json
-{
-  "virtualLedgerId": 9007199254740993,
-  "streamId": "s-123",
-  "startOffset": 1048576,
-  "endOffset": 1114112,
-  "entryBaseId": 0,
-  "entryCount": 4096,
-  "entryIndexRef": "object-footer:offset=67000000,length=8192,checksum=crc32c:...",
-  "sourceOffsetIndexEnd": 1114112,
-  "commitVersion": 17
-}
-```
-
-### 9.3 ManagedLedger facade state
-
-```json
-{
-  "streamId": "s-123",
-  "managedLedgerName": "persistent://tenant/ns/topic-partition-0",
-  "state": "OPEN",
-  "storageClass": "nereus",
-  "profile": "OBJECT_WAL_SYNC_OBJECT",
-  "lastProjectionLedgerId": 9007199254740993,
-  "metadataVersion": 31
-}
-```
+The position-index is one formula record per stream (`ENTRY_ID_EQUALS_STREAM_OFFSET`)，not one Oxia
+record per entry。Mutable committed/trim offsets remain in the L0 stream head。Detailed records、codecs、
+CAS state machine and failure tests are defined in
+`../phase-2-managed-ledger-facade/03-oxia-metadata-and-recovery.md`。
 
 ## 10. Entry Cache and Read Cache
 
@@ -357,7 +316,7 @@ Nereus should not depend on BookKeeper ledger cache semantics. It needs a compat
 
 | Cache | Key | Value | Truth |
 | --- | --- | --- | --- |
-| Projection cache | `ledgerId` | virtual ledger metadata | Oxia / offset index |
+| Projection cache | `ledgerId` | virtual ledger metadata | authoritative topic projection + repairable derived records |
 | Entry cache | `Position` | decoded Pulsar entry | object bytes + entry index |
 | Resolver cache | `streamId + offset range` | offset index entries | Oxia offset index |
 | Block cache | object key + range | object bytes | object store |
@@ -424,12 +383,12 @@ Migration from existing BookKeeper topics is a separate future. Future 2 only en
 ## 13. Design Invariants
 
 1. ManagedLedger facade never owns storage truth.
-2. `ledgerId + entryId` is a stable external coordinate, not internal ordering.
+2. `ledgerId + entryId` is a stable, order-preserving external coordinate；L0 truth remains `streamId + offset`.
 3. `Position` maps to `streamId + offset` through virtual ledger projection.
 4. `addEntry` ack maps to Future 1 `AppendResult`.
 5. `readEntries` resolves through Future 1 read resolver.
 6. Cursor state exposed by Future 2 is a boundary; durable cursor semantics belong to Future 3.
-7. BookKeeper WAL and Object WAL profiles share the same projection contract.
+7. F2 execution accepts only `OBJECT_WAL_SYNC_OBJECT`；future Nereus primary profiles may reuse the versioned projection contract only after their L0 readers/writers exist.
 8. Broker local cache is discardable.
 9. Admin stats must distinguish virtual ledgers from BookKeeper ledgers.
 10. Hybrid storage class selection must be explicit through policy.
@@ -438,19 +397,19 @@ Migration from existing BookKeeper topics is a separate future. Future 2 only en
 
 ## 14. Future Gate
 
-Future 2 may enter implementation planning only after the following are reviewed:
+F2-M0 is complete. The review locked:
 
-- broker-level `ManagedLedgerStorage` provider shape；
-- storage class name `nereus` and coexistence with BookKeeper；
-- `ManagedLedgerFactory` method mapping；
-- `ManagedLedger` append/read/terminate/delete mapping；
-- virtual ledger projection contract；
-- `Position` and `MessageId` mapping；
-- topic open/load/unload lifecycle；
-- cache and invalidation boundaries；
-- compatibility behavior for stats/admin/offload APIs；
-- explicit boundary with Future 3 cursor semantics。
-- current object-shaped L0 result is generalized or an object-only rollout boundary is explicitly accepted；
-- profile/offload policy rejects every execution path whose primary reader/writer is not implemented。
+- `nereusstream/pulsar@100d3ef0...` / `5.0.0-M1-SNAPSHOT` and exact interface blobs；
+- fork-owned hybrid `ManagedLedgerStorage` with stock BookKeeper as default；
+- Nereus-owned factory/ledger/projection metadata implementation boundary；
+- one stream/one virtual ledger and `entryId == stream offset` mapping v1；
+- batch index as an in-entry sub-index；
+- authoritative topic record plus repairable derived records under single-key CAS rules；
+- exact callback、buffer、open/close/terminate/delete and unsupported-method behavior；
+- read-only/non-durable cursor delivery boundary and Future 3 durable-ack boundary；
+- object-only rollout and explicit rejection of every unimplemented profile/offload path。
 
-This is a design gate. It does not require benchmark, compatibility certification, CI, or real evidence.
+The executable API probe passed against interface blobs identical to the locked fork。Code-level
+contracts and F2-M1 through F2-M6 gates are in
+`../phase-2-managed-ledger-facade/README.md`。This closes the design gate only；Future 2 remains
+in progress until all implementation/final-acceptance gates pass。

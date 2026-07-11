@@ -1,7 +1,8 @@
 # Nereus 总体设计文档
 
 本目录描述 Nereus 的目标架构和能力轨道。它不再是从规划工作区复制来的 Phase 0 快照；
-自 2026-07-10 起，这里与 `docs/phase-1-core-stream-storage/` 共同构成仓库内设计基线。
+自 2026-07-10 起，这里与 `docs/phase-1-core-stream-storage/`、
+`docs/phase-2-managed-ledger-facade/` 共同构成仓库内设计基线。
 
 建议阅读顺序：
 
@@ -12,5 +13,7 @@
 5. `nereus-futures.md`：能力轨道、依赖关系和交付顺序；
 6. 文件名以 `nereus-futureN-` 开头的文档：各能力轨道详细设计。
 
-当前代码正在实现 Future 1 / Phase 1。代码级合同、里程碑和测试以
-`../phase-1-core-stream-storage/README.md` 及该目录下的编号文档为准。
+Future 1 / Phase 1 已完成。当前轨道是 Future 2：F2-M0 design/API spike 已完成，F2-M1
+projection model 是下一实现里程碑。L0 已实现合同以
+`../phase-1-core-stream-storage/README.md` 为准；active F2 合同、里程碑和 gate 以
+`../phase-2-managed-ledger-facade/README.md` 及该目录下的编号文档为准。

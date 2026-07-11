@@ -24,6 +24,7 @@ nereus/
   nereus-kop-adapter/                   KoP/Kafka projection boundary
   docs/design/                          north-star and capability-track designs
   docs/phase-1-core-stream-storage/     current code-level contracts and milestones
+  docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/automq-like-stream-storage/      reserved async materialization profile design
 ```
 
@@ -52,8 +53,13 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
 materialization profiles are reserved design/API boundaries, not implemented support.
 
-Start with `docs/design/nereus-design-index.md` for document authority and current status, then
-`docs/phase-1-core-stream-storage/README.md` for the active code-level design.
+Future 2 F2-M0 design convergence and the locked Pulsar API spike are complete. The active
+implementation milestone is F2-M1 (projection model); `nereus-managed-ledger` still has no production
+facade, so Future 2 itself is not implemented.
+
+Start with `docs/design/nereus-design-index.md` for document authority and current status. Use
+`docs/phase-1-core-stream-storage/README.md` for the implemented L0 contract and
+`docs/phase-2-managed-ledger-facade/README.md` for the active F2 code-level design.
 
 ## Build
 

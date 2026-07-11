@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-11
-> 当前实现阶段：Future 1 / Phase 1，M0-M8 implemented；下一阶段为 Future 2
+> 当前实现阶段：Future 2，F2-M0 design/API spike complete；下一里程碑为 F2-M1 projection model
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -36,7 +36,8 @@ streamId + offset
 发生冲突时按下列顺序处理：
 
 1. **已实现行为**：生产代码、可执行测试和 durable golden bytes；
-2. **当前代码级合同**：`docs/phase-1-core-stream-storage/` 中的 active design；
+2. **当前代码级合同**：`docs/phase-1-core-stream-storage/` 的已实现 L0 合同，以及
+   `docs/phase-2-managed-ledger-facade/` 的 active F2 design；
 3. **已接受决策**：`docs/decisions/`；
 4. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
 5. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
@@ -67,7 +68,7 @@ streamId + offset
 | `nereus-core` | `Implemented`（Phase 1） | append、read/resolve、trim/recovery、deadline/resource/close and M8 real-Oxia restart/failure gate |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `Designed` | marker module only |
+| `nereus-managed-ledger` | `In progress`（F2-M0） | code-level design/API spike complete；production module still marker-only |
 | Pulsar / KoP adapters | `Designed` | marker modules only |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
@@ -123,7 +124,7 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Designed` |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0 complete；M1 next） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
@@ -141,6 +142,15 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 4. 该目录下 `01` 到 `08` 的 active code-level documents；
 5. `09` 及 dated reviews 只作为历史/审计材料。
 
+### 实现 Future 2
+
+1. `nereus-future2-managed-ledger-facade.md`；
+2. `../phase-2-managed-ledger-facade/README.md`；
+3. 该目录的 `01` 到 `05` active code-level documents；
+4. `../phase-2-managed-ledger-facade/spikes/PulsarManagedLedgerApiProbe.java` 与锁定的
+   Pulsar fork commit；
+5. 当前里程碑对应的代码和可执行 gate。
+
 ### 评审目标架构
 
 1. `nereus-overall-architecture.md`；
@@ -154,5 +164,6 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 - 代码示例如果不是当前 Java surface，必须标记 `target` 或 `pseudo-code`。
 - durable key、record、binary field 以代码级文档和 golden tests 为准。
 - 不复制大段 Phase 1 record 定义到总体文档；总体文档链接到代码级合同。
-- 不把 review 日期结论当作永久状态；当前状态只在本索引和 Phase 1 README 维护。
-- 架构决策改变时，同时检查 overall、commit protocol、F1、Phase 1 README/01/02/04/05/07。
+- 不把 review 日期结论当作永久状态；当前状态只在本索引和当前 phase README 维护。
+- 架构决策改变时，同时检查 overall、commit protocol、对应 future，以及 active phase 的
+  README/编号合同。

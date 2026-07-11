@@ -1,0 +1,12 @@
+allprojects {
+    plugins.withId('java') {
+        if (path == ':pulsar-broker') {
+            sourceSets {
+                f2ApiProbe {
+                    java.srcDir(System.getenv('NEREUS_F2_PROBE_DIR'))
+                    compileClasspath += sourceSets.main.output + configurations.testCompileClasspath
+                }
+            }
+        }
+    }
+}

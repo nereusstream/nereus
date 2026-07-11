@@ -29,7 +29,7 @@ protocol/table state = projection
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
 | F1 Core Stream Storage | Phase 1 M0-M8 | Implemented | Future-specific extensions |
-| F2 ManagedLedger Facade | later phase | Designed | F1 append/read API stable |
+| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0 complete） | F2-M1 projection model |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
@@ -37,8 +37,9 @@ protocol/table state = projection
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
 
-Current Phase 1 deliberately implements only `OBJECT_WAL_SYNC_OBJECT` execution。BookKeeper and async
-profiles are enum/metadata reservations until their target abstraction and state machines are implemented。
+Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Future 2 keeps the same executable-profile
+boundary；BookKeeper and async Nereus profiles remain reservations until their target abstraction and
+state machines are implemented。
 
 ## 3. Dependency graph
 
@@ -92,6 +93,8 @@ part of that done definition。
 ## 5. F2 — ManagedLedger Facade
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
+Code-level design: `../phase-2-managed-ledger-facade/README.md`
+Current milestone: F2-M0 complete；F2-M1 next；production facade not implemented
 
 ### Owns
 
@@ -103,11 +106,13 @@ Detailed design: `nereus-future2-managed-ledger-facade.md`
 
 ### Entry gate
 
-- F1 append/read/trim error semantics stable；
-- projection reference contract stable；
-- generic physical target does not leak into broker API；
-- current object-shaped `AppendResult` is either intentionally retained for object-only rollout or
-  generalized before BookKeeper facade support。
+F2-M0 closed the entry gate:
+
+- F1 append/read/trim error semantics are stable；
+- Pulsar fork/API blobs and repository boundary are locked；
+- mapping v1 is one stream/one virtual ledger with `entryId == stream offset`；
+- current object-shaped `AppendResult` is intentionally retained for the object-only F2 rollout；
+- every other Nereus profile is rejected before IO。
 
 ### Exit gate
 
