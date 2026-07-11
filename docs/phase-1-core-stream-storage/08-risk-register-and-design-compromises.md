@@ -1,7 +1,7 @@
 # 08 Risk Register And Design Compromises
 
 本文集中记录 Phase 1 当前最容易误伤实现的风险假设和设计妥协。它不是替代前面文档的总纲，
-而是进入 M2/M3/M4/M5 编码前必须复读的风险清单。
+而是每个里程碑编码和 review 前必须复读的风险清单。M0-M4 已实现，当前重点是 M5 及后续。
 
 ## 1. Oxia Conditional Multi-Write Capability
 
@@ -165,8 +165,8 @@ Phase 1 `trim` 只推进 low-watermark，不删除 offset index，也不删除 o
 
 ## 5. Strategy Versus Mechanism For Single-Stream Objects
 
-Status: accepted implementation simplification, not a WAL format limitation; M3 writer mechanism supports
-multi-slice/multi-stream.
+Status: implemented M4 planner simplification, not a WAL format limitation; M3/M4 writer mechanism supports
+multi-slice/multi-stream while core submits one stream slice per object.
 
 Phase 1 core planner 可以先设置 `forceSingleStreamObject=true`，即一个 WAL object 只承载一个 stream
 的 append work item。这能降低 append coordinator、manifest commit loop 和 failure classification
@@ -182,7 +182,8 @@ Phase 1 core planner 可以先设置 `forceSingleStreamObject=true`，即一个 
 - `forceSingleStreamObject=false` 的 direct writer tests 必须覆盖 multi-stream/multi-slice object；M3
   已覆盖 direct writer multi-slice round trip；
 - `DefaultStreamStorage` 初期使用单 stream object 是 planner 策略，后续可在不改 WAL format 的前提下
-  改成 cross-stream batching。
+  改成 cross-stream batching；M4 currently sets `forceSingleStreamObject=true` and validates the returned
+  prepared result contains exactly one slice for the requested stream。
 
 停线条件：如果实现过程中发现 writer/reader/manifest 只能处理一个 slice 或一个 stream，必须先补齐
 WAL 机制层，再继续 core append。
@@ -204,7 +205,7 @@ Risks：
 
 Controls：
 
-- M4 rejects unsupported profile/durability before reservation/WAL IO with
+- done: M4 rejects unsupported profile/durability before reservation/WAL prepare/upload with
   `UNSUPPORTED_STORAGE_PROFILE` / `UNSUPPORTED_DURABILITY_LEVEL`；
 - profile metadata persistence is documented as reservation only；
 - future `WAL_DURABLE` still requires intent + stream-head CAS + recoverable primary target；

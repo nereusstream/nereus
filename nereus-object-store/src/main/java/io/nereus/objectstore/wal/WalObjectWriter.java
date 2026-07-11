@@ -17,5 +17,15 @@ package io.nereus.objectstore.wal;
 import java.util.concurrent.CompletableFuture;
 
 public interface WalObjectWriter {
-    CompletableFuture<WalWriteResult> write(WalWriteRequest request);
+    PreparedWalObject prepare(WalWriteRequest request);
+
+    CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject);
+
+    default CompletableFuture<WalWriteResult> write(WalWriteRequest request) {
+        try {
+            return upload(prepare(request));
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
 }

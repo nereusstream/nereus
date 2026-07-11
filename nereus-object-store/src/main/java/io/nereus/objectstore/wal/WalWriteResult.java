@@ -26,15 +26,26 @@ public record WalWriteResult(
         long objectLength,
         Checksum objectChecksum,
         Checksum storageChecksum,
+        int formatMajorVersion,
+        int formatMinorVersion,
+        String writerVersion,
+        long createdAtMillis,
         List<WrittenStreamSlice> slices) {
     public WalWriteResult {
         Objects.requireNonNull(objectId, "objectId");
         Objects.requireNonNull(objectKey, "objectKey");
         Objects.requireNonNull(objectChecksum, "objectChecksum");
         Objects.requireNonNull(storageChecksum, "storageChecksum");
+        Objects.requireNonNull(writerVersion, "writerVersion");
         slices = List.copyOf(Objects.requireNonNull(slices, "slices"));
         if (objectLength <= 0) {
             throw new IllegalArgumentException("objectLength must be positive");
+        }
+        if (formatMajorVersion < 0 || formatMinorVersion < 0 || createdAtMillis < 0) {
+            throw new IllegalArgumentException("WAL format versions and createdAtMillis must be non-negative");
+        }
+        if (writerVersion.isBlank()) {
+            throw new IllegalArgumentException("writerVersion cannot be blank");
         }
         if (slices.isEmpty()) {
             throw new IllegalArgumentException("slices cannot be empty");

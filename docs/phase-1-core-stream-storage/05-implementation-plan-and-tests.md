@@ -1,7 +1,7 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M3 已完成，M4 Core Append 是下一入口；
-pre-M4 P1 source closure 已实现，最终 Gradle rerun 通过前不开始 M4；
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M4 已完成，M5 Resolve/Read 是下一入口；
+2026-07-11 M4 完成后的 `./gradlew phase1Check check --rerun-tasks` 运行 28 个执行任务并全部通过；
 后续每个里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
@@ -198,7 +198,7 @@ M2 foundation implementation status:
   `./gradlew phase1Check check`；
 - verified in the baseline M2 gate run before the latest pre-M4 hardening:
   `./gradlew :nereus-metadata-oxia:test`, `./gradlew phase1Check`, and `./gradlew check`；
-- M2 foundation and pre-M4 hardening are done；the M4 entry gate is open.
+- M2 foundation and pre-M4 hardening are done；this gate opened M4, which is now implemented.
 
 M2 review follow-ups before exit:
 
@@ -395,6 +395,8 @@ M3 completion checklist:
 
 ### M4 Core append path
 
+Status: implemented on 2026-07-11 with fake Oxia metadata and local Object WAL fixtures.
+
 Module:
 
 ```text
@@ -403,25 +405,40 @@ nereus-core
 
 Tasks:
 
-- add `DefaultStreamStorage`；
-- add `AppendSessionManager`；
-- add `AppendCoordinator`；
-- add per-stream append sequencer；
-- accept only canonical `OBJECT_WAL_SYNC_OBJECT` and
+- done: add `DefaultStreamStorage`；
+- done: add `AppendSessionManager` with supplied-session validation, cache, auto-acquire and pre-upload /
+  pre-commit minimum-lease renewal；
+- done: add `AppendCoordinator`；
+- done: add per-stream append sequencer with local expected-offset initialization/advance, conflict
+  invalidation, and uncertain/known-committed lane suspension；
+- done: accept only canonical `OBJECT_WAL_SYNC_OBJECT` and
   `WAL_DURABLE_AND_INDEX_COMMITTED` in Phase 1；reject BK/async profiles and `WAL_DURABLE` before WAL IO；
-- initially allow the core flush planner to send one append work item per WAL object with
+- done: initially allow the core flush planner to send one append work item per WAL object with
   `forceSingleStreamObject=true`；
-- validate `StreamStorageConfig`；
-- wire WAL writer and metadata commit；
-- map `WalWriteResult` to `ObjectManifestRecord` in `nereus-core` or `nereus-metadata-oxia`；
-- pass canonical schema refs from append batch through WAL write result, commit request, offset index,
+- done: validate `StreamStorageConfig` positive durations/limits, millisecond lease representation and
+  object/read/append memory relationships；
+- done: split WAL writer into exact `prepare` and `upload` boundaries while preserving `write` convenience；
+- done: wire WAL writer, manifest put and metadata commit；
+- done: map `WalWriteResult` to `ObjectManifestRecord` in `nereus-core`；
+- done: pass canonical schema refs from append batch through WAL write result, commit request, offset index,
   resolve, and read；
-- implement auto acquire session；
-- implement append result assembly；
-- keep Phase 1 default behavior of failing external offset conflicts instead of rebasing uploaded slices；
-- map metadata/object failures into `NereusException`；
-- preserve or assign `AppendOutcome` on every exceptional append completion；never infer commit certainty
+- done: implement auto acquire session；
+- done: implement append result assembly；
+- done: keep Phase 1 default behavior of failing external offset conflicts instead of rebasing uploaded slices；
+- done: map metadata/object failures into `NereusException`；
+- done: preserve or assign `AppendOutcome` on every exceptional append completion；never infer commit certainty
   from `ErrorCode` or message text。
+- done: count accepted/queued work separately from active prepared-object bytes；reserve the object hard cap
+  before prepare and shrink to exact encoded length before upload；release both counters on every terminal path；
+- done: revalidate the prepared hard cap and append-batch/slice identity at the core module boundary before
+  upload instead of trusting an injected writer blindly；
+- done: implement one end-to-end append deadline, advisory cancellation, pre/post-head certainty mapping,
+  close rejection and `shutdownGrace` wait for accepted work；
+- done: add focused tests for dense sequential/concurrent offsets, manifest/index/result mapping, profile and
+  durability pre-IO rejection, upload timeout/cancellation, unconfirmed commit response, known-committed
+  materialization failure, lane suspension, close rejection, config memory relationships, max-in-flight
+  release, pre-upload lease renewal, explicit-session mode, prepared-slice validation and external offset
+  conflict refresh without slice rebasing。
 
 Exit:
 
@@ -431,6 +448,22 @@ Exit:
 - stale token append fails and does not advance offset。
 - a reserved profile/durability combination fails explicitly and cannot create an acknowledged append；
 - producer success waits for reachable head commit and generation-0 offset-index/marker confirmation。
+
+Implementation boundary after M4：`DefaultStreamStorage.read/resolve/trim` return explicit asynchronous
+milestone errors until M5/M6. Constructor-injected clients are externally owned; owned-client factory and
+watch/background-renew lifecycle wiring remain M6. The production Oxia adapter remains M7.
+
+Verification completed on 2026-07-11:
+
+```text
+./gradlew :nereus-core:test --rerun-tasks
+./gradlew :nereus-core:test :nereus-object-store:test --rerun-tasks
+./gradlew phase1Check check --rerun-tasks
+```
+
+The final combined gate executed 28 tasks successfully, including all L0 tests, the dependency guard and
+`compileOxiaCapabilitySpikeJava`. It did not launch the Docker-backed `oxiaCapabilitySpike` task, which
+remains an independent environment check by design.
 
 ### M5 Resolve and read path
 

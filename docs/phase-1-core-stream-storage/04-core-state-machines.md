@@ -2,8 +2,8 @@
 
 本文定义 `nereus-core` 的 append、resolve/read、trim 和 recovery 状态机。
 
-Status: M4-M6 core target。`nereus-core` 当前仍是 marker/orchestration scaffold；M4 implementation must
-match this document and the strict Object WAL profile boundary。
+Status: M4 append implemented on 2026-07-11；M5 resolve/read and M6 trim/recovery remain. The implemented
+append path matches the strict Object WAL profile boundary and the stream-head single-key CAS protocol。
 
 M0.5 status: the append state machine now uses the redesigned Oxia-compatible commit protocol from
 `02-oxia-metadata-and-commit.md`: one stream-head conditional put is the append linearization point, and
@@ -21,7 +21,9 @@ io.nereus.core
 io.nereus.core.append
   AppendCoordinator
   AppendSessionManager
-  WalFlushPlanner
+  AppendDeadline
+  AppendResourceLimiter
+  WalFlushPlanner (future cross-stream batching)
 
 io.nereus.core.read
   ReadResolver
@@ -114,6 +116,7 @@ Rules:
   `session.writerId == config.writerId`；
 - if missing and `autoAcquireSession=true`, acquire or reuse cached session；
 - if missing and auto-acquire disabled, fail with `APPEND_SESSION_EXPIRED`；
+- a warm internal cache does not override an explicit `autoAcquireSession=false` when no session was supplied；
 - before starting WAL upload, ensure the session has at least
   `StreamStorageConfig.appendSessionMinCommitRemaining` remaining, otherwise renew first；
 - session cache is an optimization only。
@@ -145,21 +148,29 @@ Rules:
 
 ### `UPLOAD_WAL_OBJECT`
 
-Call:
+Calls:
 
 ```text
-WalObjectWriter.write(WalWriteRequest)
+PreparedWalObject prepared = WalObjectWriter.prepare(WalWriteRequest)
+WalObjectWriter.upload(prepared)
 ```
 
 Output:
 
 ```text
-WalWriteResult(objectId, objectKey, objectChecksum, storageChecksum, written slices)
+WalWriteResult(objectId, objectKey, objectChecksum, storageChecksum,
+               format version, writer version, created time, written slices)
 ```
 
 Rules:
 
 - no metadata visibility yet；
+- `prepare` completes the exact sizing pass and allocates the physical object identity before upload；
+- core adjusts its conservative buffer reservation to the exact prepared object length before IO；
+- core independently verifies the prepared hard cap and that the single returned slice preserves the
+  request's stream id, record/entry counts, logical bytes, payload format, schema refs and event-time range；
+- after upload, core verifies the returned `WalWriteResult` is the same immutable result carried by the
+  prepared object before it constructs a manifest；
 - if upload fails, append fails before any stream-head commit；
 - object may exist after timeout, but without a reachable stream-head commit it is invisible。
 
@@ -328,7 +339,7 @@ success without the commit result. A retry that still has the same in-memory `ob
 use the stream-head commit chain or committed-slice marker to discover success. A caller-level retry after
 losing that context may append duplicate data because Phase 1 has no producer dedup.
 
-`NereusException.appendOutcome` is mandatory on every exceptional append completion。M4 must not encode
+`NereusException.appendOutcome` is mandatory on every exceptional append completion。M4 does not encode
 commit certainty in message text or collapse `MAY_HAVE_COMMITTED/KNOWN_COMMITTED` into `OFFSET_CONFLICT`，
 `OBJECT_UPLOAD_FAILED`，`METADATA_CONDITION_FAILED`，or a generic retry wrapper。
 
@@ -347,7 +358,7 @@ A reachable matching commit means the same physical slice already committed and 
 result after any missing derived records are materialized.
 
 Commit-chain replay search is bounded。Budget exhaustion returns retriable `METADATA_UNAVAILABLE` with
-`MAY_HAVE_COMMITTED`；it is not proof of non-commit。M4 must keep the physical attempt suspended and may use
+`MAY_HAVE_COMMITTED`；it is not proof of non-commit。M4 keeps the physical attempt suspended and may use
 bounded `repairDerivedStreamIndexes` continuation calls to materialize its marker before replaying。The
 resolver echoes the opaque cursor unchanged；metadata validates the original observed-head anchor and exact
 next `(offsetEnd, cumulativeSize, commitVersion)` tuple on every page。
@@ -890,6 +901,16 @@ Lifecycle:
 - `close()` must close or release owned metadata/object clients only when `DefaultStreamStorage` created
   them. Injected clients owned by tests or embedding code should have explicit ownership flags。
 
+M4 lifecycle implementation treats every constructor-injected metadata/WAL client as externally owned：
+`close()` stops acceptance, queued/pre-upload appends fail as `STORAGE_CLOSED + KNOWN_NOT_COMMITTED`, and
+the coordinator waits up to `shutdownGrace` for accepted work. It does not close the injected clients.
+Owned-client factories/flags and background watch/renew task shutdown remain M6 construction work.
+
+M4 caller cancellation is advisory: `AppendFuture.cancel` signals the shared append deadline instead of
+blindly cancelling the underlying metadata/object future. The public future therefore completes with a
+structured `NereusException(CANCELLED, appendOutcome)` and is not required to report
+`CompletableFuture.isCancelled()==true`。
+
 ## 9. Backpressure Boundary
 
 Phase 1 can start simple, but append coordinator should have clear rejection points:
@@ -905,12 +926,13 @@ maxReadBufferBytes
 
 Accounting rules:
 
-- `maxInFlightAppends` counts append work items accepted by `AppendCoordinator` and releases on every
-  terminal future path；
+- `maxInFlightAppends` counts append work items accepted by `AppendCoordinator`, including work waiting in
+  a per-stream lane, and releases on every terminal future path；
 - `maxAppendBatchRecords` is checked against `AppendBatch.recordCount()` before WAL layout；
-- `maxBufferedBytes` accounts in-flight encoded WAL-object bytes, not committed stream size. The
-  coordinator should reserve a conservative estimate before async WAL work starts and release it when the
-  append reaches any terminal state；
+- `maxBufferedBytes` accounts active encoded WAL-object bytes, not queued work or committed stream size.
+  M4 reserves `maxObjectBytes` immediately before `prepare`, then atomically shrinks the reservation to the
+  exact `PreparedWalObject.objectLength()` and releases it on every terminal path. This is deliberately
+  conservative but cannot under-reserve the in-memory encoder；
 - the estimate must include payload bytes plus deterministic metadata/index overhead. After the WAL writer
   sizing pass computes the exact encoded object length, the coordinator either adjusts the reservation
   atomically or fails before upload if the adjusted size would exceed `maxBufferedBytes`；

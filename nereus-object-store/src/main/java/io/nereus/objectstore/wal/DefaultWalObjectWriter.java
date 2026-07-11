@@ -70,31 +70,48 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
     }
 
     @Override
-    public CompletableFuture<WalWriteResult> write(WalWriteRequest request) {
+    public PreparedWalObject prepare(WalWriteRequest request) {
         Objects.requireNonNull(request, "request");
-        LayoutPlan plan;
         try {
-            plan = plan(request);
+            LayoutPlan plan = plan(request);
+            WalObjectLayout.EncodedObject encoded = WalObjectLayout.encodeObject(
+                    plan.sections(),
+                    plan.footerOffset(),
+                    plan.footerLength());
+            WalWriteResult result = new WalWriteResult(
+                    plan.objectId(),
+                    plan.objectKey(),
+                    plan.objectLength(),
+                    encoded.objectChecksum(),
+                    encoded.storageChecksum(),
+                    WalObjectLayout.FORMAT_MAJOR,
+                    WalObjectLayout.FORMAT_MINOR,
+                    writerVersion,
+                    plan.createdAtMillis(),
+                    plan.writtenSlices());
+            return new PreparedWalObject(result, encoded.bytes(), request.options().uploadTimeout());
         } catch (NereusException e) {
-            return CompletableFuture.failedFuture(e);
+            throw e;
         } catch (RuntimeException e) {
-            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, e.getMessage(), e);
+            throw failure(ErrorCode.INVALID_ARGUMENT, false, e.getMessage(), e);
         }
-        WalObjectLayout.EncodedObject encoded = WalObjectLayout.encodeObject(
-                plan.sections(),
-                plan.footerOffset(),
-                plan.footerLength());
+    }
+
+    @Override
+    public CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject) {
+        Objects.requireNonNull(preparedObject, "preparedObject");
+        WalWriteResult result = preparedObject.result();
         PutObjectOptions options = new PutObjectOptions(
                 CONTENT_TYPE,
-                encoded.storageChecksum(),
+                result.storageChecksum(),
                 true,
-                Map.of("objectChecksum", encoded.objectChecksum().value()),
-                request.options().uploadTimeout());
+                Map.of("objectChecksum", result.objectChecksum().value()),
+                preparedObject.uploadTimeout());
         return objectStore.putObject(
-                        plan.objectKey(),
-                        ByteBuffer.wrap(encoded.bytes()).asReadOnlyBuffer(),
+                        result.objectKey(),
+                        preparedObject.payload(),
                         options)
-                .thenApply(result -> verifyPutResult(plan, encoded, result))
+                .thenApply(putResult -> verifyPutResult(result, putResult))
                 .exceptionally(DefaultWalObjectWriter::unwrapCompletionException);
     }
 
@@ -212,6 +229,7 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
                 objectId,
                 objectKey,
                 finalObjectLength,
+                now.toEpochMilli(),
                 footerOffset,
                 footerLength,
                 sections,
@@ -261,23 +279,14 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
                 sliceChecksum);
     }
 
-    private WalWriteResult verifyPutResult(
-            LayoutPlan plan,
-            WalObjectLayout.EncodedObject encoded,
-            PutObjectResult putResult) {
-        if (!putResult.checksum().equals(encoded.storageChecksum())) {
+    private WalWriteResult verifyPutResult(WalWriteResult result, PutObjectResult putResult) {
+        if (!putResult.checksum().equals(result.storageChecksum())) {
             throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "object store returned mismatched storage checksum");
         }
-        if (putResult.objectLength() != plan.objectLength()) {
+        if (putResult.objectLength() != result.objectLength()) {
             throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "object store returned mismatched object length");
         }
-        return new WalWriteResult(
-                plan.objectId(),
-                plan.objectKey(),
-                plan.objectLength(),
-                encoded.objectChecksum(),
-                encoded.storageChecksum(),
-                plan.writtenSlices());
+        return result;
     }
 
     private ObjectKey objectKey(
@@ -367,6 +376,7 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
             ObjectId objectId,
             ObjectKey objectKey,
             long objectLength,
+            long createdAtMillis,
             long footerOffset,
             int footerLength,
             List<WalObjectLayout.Section> sections,

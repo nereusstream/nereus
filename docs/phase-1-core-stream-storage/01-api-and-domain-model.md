@@ -96,7 +96,7 @@ execution support。
 Validation:
 
 - `StorageProfile.OBJECT_WAL` is a compatibility alias for `OBJECT_WAL_SYNC_OBJECT`；
-- M4 core append must reject every non-object-sync profile before WAL IO；API value construction and
+- M4 core append rejects every non-object-sync profile before WAL IO；API value construction and
   metadata codecs still accept/canonicalize reserved names；
 - attribute keys and values must be non-null UTF-8 strings；
 - Phase 1 enforces `MAX_STREAM_ATTRIBUTES_ENCODED_BYTES = 16 KiB` for the total encoded map size because
@@ -465,7 +465,7 @@ public enum DurabilityLevel {
 }
 ```
 
-`WAL_DURABLE_AND_INDEX_COMMITTED` is the only Phase 1 execution boundary。M4 must reject
+`WAL_DURABLE_AND_INDEX_COMMITTED` is the only Phase 1 execution boundary。M4 rejects
 `WAL_DURABLE` before WAL IO。
 
 Target semantics for future `WAL_DURABLE` are nevertheless fixed now：primary WAL durable + immutable

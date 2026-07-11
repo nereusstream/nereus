@@ -3,13 +3,15 @@
 本文定义 Phase 1 的 object store abstraction、object WAL writer/reader、stream slice 和 entry
 index 设计。Phase 1 只实现 WAL object，不实现 compacted object writer。
 
-M3 implementation status, verified 2026-07-10:
+M3 implementation status, verified 2026-07-10 and integrated by M4 on 2026-07-11:
 
 - `nereus-object-store` now exposes the production `ObjectStore` API, object options/results, CRC32C
   helper, and shared range validation；
 - `DefaultWalObjectWriter` implements the Phase 1 in-memory WAL encoder with common header, section
   envelopes, footer, deterministic slice descriptors, `OBJECT_FOOTER` entry indexes, storage checksum,
   and WAL canonical object checksum；
+- M4 adds the exact `prepare`/`upload` boundary and manifest-source fields to `WalWriteResult` while
+  retaining the original one-shot `write` convenience API；
 - `DefaultWalObjectReader` reads the full resolved slice payload plus footer entry index, verifies
   `concat(slicePayloadBytes, entryIndexBytes)`, clips by offset/record/byte limits, and uses an injected
   `ReadResourceGuard` plus `WalReadObserver` for M5 core integration；
@@ -502,10 +504,22 @@ Phase 1 supported storage policy:
 
 ```java
 public interface WalObjectWriter {
-    CompletableFuture<WalWriteResult> write(
-            WalWriteRequest request);
+    PreparedWalObject prepare(WalWriteRequest request);
+
+    CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject);
+
+    default CompletableFuture<WalWriteResult> write(WalWriteRequest request) {
+        return upload(prepare(request));
+    }
 }
 ```
+
+M4 split the original one-shot writer boundary into `prepare` and `upload` while retaining `write` as the
+convenience path used by direct M3 callers. `prepare` allocates the object id once, performs the complete
+sizing/layout/checksum pass, and returns an immutable `PreparedWalObject` with exact encoded bytes and a
+pre-upload `WalWriteResult`. Core adjusts its buffer reservation from the conservative hard cap to
+`PreparedWalObject.objectLength()` before calling `upload`. A retry of the same physical attempt reuses the
+same prepared object rather than allocating a second object id or object sequence.
 
 Request:
 
@@ -576,9 +590,16 @@ public record WalWriteResult(
         long objectLength,
         Checksum objectChecksum,
         Checksum storageChecksum,
+        int formatMajorVersion,
+        int formatMinorVersion,
+        String writerVersion,
+        long createdAtMillis,
         List<WrittenStreamSlice> slices) {
 }
 ```
+
+The format/writer/time fields were added in M4 because `nereus-core` must build the immutable object manifest
+without depending on package-private WAL layout constants or inventing a second writer version/time source.
 
 `objectChecksum` is the WAL canonical checksum stored in the object header. `storageChecksum` is the exact
 uploaded-bytes checksum returned by the object store. They usually differ because the WAL canonical checksum
@@ -619,6 +640,7 @@ NEW
   -> ADD_SLICE
   -> BUILD_LAYOUT
   -> ENCODE_BYTES
+  -> PREPARED
   -> PUT_OBJECT
   -> VERIFY_CHECKSUM
   -> WRITTEN

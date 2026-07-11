@@ -120,7 +120,13 @@ M0 scaffold status before coding state machines:
 - done on 2026-07-10: `./gradlew :nereus-object-store:test phase1Check check` passed after the blocker
   fix pass；M3 is complete。
 - done on 2026-07-11: `./gradlew :nereus-api:test :nereus-metadata-oxia:test` and
-  `./gradlew phase1Check check` passed after the final pre-M4 hardening；the M4 entry gate is open.
+  `./gradlew phase1Check check` passed after the final pre-M4 hardening；the M4 entry gate opened.
+- done on 2026-07-11: M4 adds exact WAL `prepare/upload`, `StreamStorageConfig`, session manager,
+  per-stream append lanes, resource/deadline/cancellation guards, WAL -> manifest -> stream-head commit ->
+  result orchestration, and structured lane suspension；focused `:nereus-core:test` and
+  `:nereus-object-store:test` pass.
+- done on 2026-07-11: final `./gradlew phase1Check check --rerun-tasks` executed 28 tasks successfully；
+  the L0 dependency guard passed and Oxia capability-spike sources compiled without starting Docker.
 
 ## 3. Stop-The-Line Conditions
 

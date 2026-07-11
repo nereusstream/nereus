@@ -65,11 +65,14 @@ M0 scaffold migration 已完成。当前代码状态：
 - `nereus-api` 已包含 Phase 1 的 protocol-neutral value records、错误模型和共享 key/hash helpers；
 - `StorageProfile` 已预留 BookKeeper/Object WAL 与 sync/async object materialization profiles；
   `OBJECT_WAL` 是旧 Phase 1 兼容名，等价于 `OBJECT_WAL_SYNC_OBJECT`；
-- `ErrorCode` 已预留 `UNSUPPORTED_STORAGE_PROFILE` / `UNSUPPORTED_DURABILITY_LEVEL`，供 M4 在
-  任何 WAL IO 前拒绝非 Phase 1 execution boundary；
-- `FakeOxiaMetadataStore.createOrGetStream` 已保存 `options.profile().canonical().name()`；这只证明
-  profile metadata persistence。M4 必须显式拒绝 Phase 1 不支持的 BK/async execution profiles；
-- `nereus-core` 已通过 Gradle 依赖连接到 `nereus-metadata-oxia` 和 `nereus-object-store`；
+- `DefaultStreamStorage`、`AppendCoordinator`、`AppendSessionManager`、per-stream append lane、
+  `StreamStorageConfig` 和 append resource/deadline guards 已在 M4 落地；
+- `UNSUPPORTED_STORAGE_PROFILE` / `UNSUPPORTED_DURABILITY_LEVEL` 已由 M4 在任何 WAL prepare/upload
+  前拒绝非 Phase 1 execution boundary；
+- `FakeOxiaMetadataStore.createOrGetStream` 已保存 `options.profile().canonical().name()`；M4 在执行
+  层显式拒绝 Phase 1 不支持的 BK/async profiles，未把 metadata persistence 当作执行支持；
+- `nereus-core` 已连接 fake Oxia metadata 与 Object WAL，完成 WAL prepare/upload、manifest put、
+  stream-head commit、derived-index confirmation 和 `AppendResult` 组装；
 - `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
   出口；
 - root `phase1Check` 已存在，并包含 `checkPhase0`、L0 module tests 和 Phase 1 L0 dependency guard。
@@ -78,8 +81,10 @@ M0 scaffold migration 已完成。当前代码状态：
   WAL round-trip/local-store tests 已存在。2026-07-08 M3 review 发现的 reader multi-range byte-budget 和
   local symlink escape blockers 已修复并补测试；2026-07-10 final Gradle gate 已通过。
 
-M0/M1/M2/M3 已完成。M4 core append 是下一实现项；pre-M4 outcome/manifest/replay/repair closure
-及最新 API/metadata/phase1/full Gradle gates 已于 2026-07-11 通过，因此 M4 entry gate 已打开。
+M0/M1/M2/M3/M4 已完成。2026-07-11 的最终
+`./gradlew phase1Check check --rerun-tasks` 运行 28 个执行任务并全部通过；M5 resolve/read 是下一
+实现项。M4 证明的是 fake metadata + local Object WAL reference path，production Oxia adapter 仍由
+M7 gate 负责。
 
 Phase 1 允许的依赖方向：
 
@@ -166,8 +171,8 @@ public interface StreamStorage extends AutoCloseable {
 }
 ```
 
-M0 后，`nereus-api` 里的 `StreamStorage` 已按此 API 形状迁移；append/read/trim 的实际状态机仍在
-后续 M4/M5/M6 实现。
+M0 后，`nereus-api` 里的 `StreamStorage` 已按此 API 形状迁移；append 状态机已在 M4 实现，
+read/resolve 与 trim 状态机仍分别由 M5/M6 实现。
 
 ## 5. Initial Code Package Plan
 
