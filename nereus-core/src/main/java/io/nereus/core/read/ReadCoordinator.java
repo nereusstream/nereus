@@ -130,6 +130,11 @@ public final class ReadCoordinator implements AutoCloseable {
         return result;
     }
 
+    /** Invalidates every cached offset-index range for one stream. */
+    public void invalidate(StreamId streamId) {
+        resolver.invalidate(Objects.requireNonNull(streamId, "streamId"));
+    }
+
     private CompletableFuture<ReadResult> readResolution(
             StreamId streamId,
             long startOffset,

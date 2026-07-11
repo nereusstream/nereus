@@ -1,8 +1,8 @@
 # 12 Architecture Realignment 2026-07-10
 
 本文记录总体架构扩展到多 storage profiles 后，Phase 1 code-level contract 的收敛结果。它不是新的
-里程碑；当前仍是 Future 1 / Phase 1。M4 Core Append 和 M5 Resolve/Read 已于 2026-07-11 实现，
-M6 Trim/Recovery next。
+里程碑；当前仍是 Future 1 / Phase 1。M4 Core Append、M5 Resolve/Read 和 M6 Trim/Recovery 已于
+2026-07-11 实现；本文其余内容保留当时的架构收敛记录。
 
 ## 1. Verified progress
 

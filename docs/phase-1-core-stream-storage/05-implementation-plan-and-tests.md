@@ -1,7 +1,7 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M5 已完成，M6 Trim/Recovery 是下一入口；
-M5 focused verification currently passes 32 core tests and 23 object-store tests；
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M6 已完成，M7 production Oxia adapter and
+integration gate remain；M6 focused verification passes 42 core tests；
 后续每个里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
@@ -450,9 +450,9 @@ Exit:
 - producer success waits for reachable head commit and generation-0 offset-index/marker confirmation。
 
 Implementation boundary immediately after M4：`DefaultStreamStorage.read/resolve/trim` returned explicit
-milestone errors. M5 has now replaced read/resolve with the implemented state machines；trim remains M6.
-Constructor-injected clients are externally owned; owned-client factory and background-renew lifecycle
-wiring remain M6. The production Oxia adapter remains M7.
+milestone errors. M5 replaced read/resolve and M6 replaced trim with implemented state machines.
+Constructor-injected clients remain externally owned；owned-client factory and production background-renew
+wiring belong with M7 adapter construction. The production Oxia adapter remains M7.
 
 Verification completed on 2026-07-11:
 
@@ -521,6 +521,8 @@ gate。
 
 ### M6 Trim and recovery boundaries
 
+Status: implemented on 2026-07-11 with fake Oxia metadata and local Object WAL fixtures.
+
 Module:
 
 ```text
@@ -529,10 +531,20 @@ nereus-core
 
 Tasks:
 
-- implement `trim`；
-- add orphan object scanner interface but do not delete by default；
-- add recovery documentation assertions in tests；
-- add metrics hooks。
+- done: implement `TrimCoordinator` with API validation，one caller deadline，advisory cancellation and
+  explicit positive offset-index cache invalidation；
+- done: retain accepted source metadata futures across caller timeout/cancellation so `close()` waits up to
+  `shutdownGrace` for a possibly irreversible head CAS；late success still invalidates cache；
+- done: use two-phase close to stop append/trim/read admission before waiting，and share one global
+  `shutdownGrace` budget across trim and append coordinators；
+- done: add `OrphanObjectScanner` plus `MetadataOrphanObjectScanner` without object list/delete APIs；
+- done: repair object references from reachable head truth before classifying `MISSING_MANIFEST`、
+  `UNREFERENCED_MANIFEST`、`PARTIALLY_REFERENCED` or `FULLY_REFERENCED`；
+- done: make `OrphanObjectAssessment.deletionAllowed()` unconditionally false in Phase 1；
+- done: add isolated `TrimMetricsObserver` and `RecoveryMetricsObserver` hooks；
+- done: add focused trim/recovery tests for bounds，cache/read behavior，physical retention，timeout/cancel，
+  close wait/admission rejection，manifest-only orphan candidate，post-head index repair，closed scanner and
+  metrics failure isolation。
 
 Exit:
 
@@ -541,6 +553,17 @@ Exit:
 - object bytes remain after trim；
 - manifest/object bytes without a reachable head commit are orphan/invisible；a reachable head commit with a
   missing index is committed and repairable。
+
+M6 focused verification completed on 2026-07-11:
+
+```text
+./gradlew :nereus-core:test --rerun-tasks
+./gradlew phase1Check check --rerun-tasks
+```
+
+Result: 42 core tests passed（32 existing + 10 M6 trim/recovery tests）。The final repository-wide gate
+executed 28 tasks successfully，including all L0 tests，the dependency guard and
+`compileOxiaCapabilitySpikeJava`；the independent Docker-backed spike was not launched.
 
 ### M7 Real Oxia adapter and integration gate
 
@@ -932,7 +955,7 @@ Recommended order:
 3. Object WAL third, because append cannot commit references without durable bytes.
 4. Append coordinator fourth, because it is the first end-to-end write path.
 5. Resolver/read fifth, because it validates offset index shape.
-6. Trim/recovery next, because they depend on committed index and read semantics.
+6. Trim/recovery sixth, because they depend on committed index and read semantics.
 7. Real Oxia adapter last, after the state-machine contract is executable against the fake and can be reused
    as a production-adapter contract suite.
 
@@ -967,7 +990,7 @@ WAL canonical object checksum mismatch cannot commit
 object listing is never used to discover readable data
 ```
 
-The local fake/local-store scenario closes M6 but does not by itself close Phase 1。Final Phase 1 completion
+The local fake/local-store scenario has closed M6 but does not by itself close Phase 1。Final Phase 1 completion
 also requires M7：the production Oxia adapter passes the shared contract suite and its independent
 Docker/Testcontainers integration gate，including process restart and post-head recovery。
 

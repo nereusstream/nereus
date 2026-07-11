@@ -215,6 +215,6 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
   metadata record type. Fake stored metadata values now persist encoded envelopes through the same codec
   registry. Future real adapter work must continue using that registry.
 
-The production adapter is now the explicit M7 Phase 1 gate。M4-M6 may use the fake to implement and test core
+The production adapter is now the explicit M7 Phase 1 gate。M4-M6 used the fake to implement and test core
 state machines，but Phase 1 is not complete until the real adapter passes this shared contract suite and the
 independent Docker/Testcontainers integration task。

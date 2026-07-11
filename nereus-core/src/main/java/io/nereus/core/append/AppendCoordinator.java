@@ -534,12 +534,21 @@ public final class AppendCoordinator implements AutoCloseable {
 
     @Override
     public void close() {
-        if (!closed.compareAndSet(false, true)) {
-            return;
-        }
+        beginClose();
+        awaitClose(config.shutdownGrace());
+    }
+
+    /** Stops admission without waiting for already accepted appends. */
+    public void beginClose() {
+        closed.set(true);
+    }
+
+    /** Waits for accepted appends using the caller's remaining global shutdown budget. */
+    public void awaitClose(Duration grace) {
+        Objects.requireNonNull(grace, "grace");
         long graceNanos;
         try {
-            graceNanos = config.shutdownGrace().toNanos();
+            graceNanos = grace.toNanos();
         } catch (ArithmeticException e) {
             graceNanos = Long.MAX_VALUE;
         }

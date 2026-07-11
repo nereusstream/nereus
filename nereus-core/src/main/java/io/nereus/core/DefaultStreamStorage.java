@@ -38,6 +38,8 @@ import io.nereus.core.append.AppendSessionManager;
 import io.nereus.core.read.ReadCoordinator;
 import io.nereus.core.read.ReadMetricsObserver;
 import io.nereus.core.read.ReadResolver;
+import io.nereus.core.trim.TrimCoordinator;
+import io.nereus.core.trim.TrimMetricsObserver;
 import io.nereus.metadata.oxia.OxiaMetadataStore;
 import io.nereus.metadata.oxia.records.CommittedEndOffsetRecord;
 import io.nereus.metadata.oxia.records.StreamMetadataRecord;
@@ -45,6 +47,7 @@ import io.nereus.metadata.oxia.records.TrimRecord;
 import io.nereus.objectstore.wal.WalObjectReader;
 import io.nereus.objectstore.wal.WalObjectWriter;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -57,6 +60,7 @@ public final class DefaultStreamStorage implements StreamStorage {
     private final AppendSessionManager appendSessionManager;
     private final AppendCoordinator appendCoordinator;
     private final ReadCoordinator readCoordinator;
+    private final TrimCoordinator trimCoordinator;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public DefaultStreamStorage(
@@ -73,7 +77,8 @@ public final class DefaultStreamStorage implements StreamStorage {
                 walObjectReader,
                 clock,
                 callbackExecutor,
-                ReadMetricsObserver.noop());
+                ReadMetricsObserver.noop(),
+                TrimMetricsObserver.noop());
     }
 
     public DefaultStreamStorage(
@@ -84,6 +89,26 @@ public final class DefaultStreamStorage implements StreamStorage {
             Clock clock,
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                TrimMetricsObserver.noop());
+    }
+
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
@@ -91,6 +116,7 @@ public final class DefaultStreamStorage implements StreamStorage {
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
+        Objects.requireNonNull(trimMetricsObserver, "trimMetricsObserver");
         this.appendSessionManager = new AppendSessionManager(config, metadataStore, clock);
         this.appendCoordinator = new AppendCoordinator(
                 config,
@@ -110,6 +136,12 @@ public final class DefaultStreamStorage implements StreamStorage {
                 readResolver,
                 walObjectReader,
                 readMetricsObserver,
+                callbackExecutor);
+        this.trimCoordinator = new TrimCoordinator(
+                config,
+                metadataStore,
+                readCoordinator::invalidate,
+                trimMetricsObserver,
                 callbackExecutor);
     }
 
@@ -166,7 +198,7 @@ public final class DefaultStreamStorage implements StreamStorage {
             StreamId streamId,
             long beforeOffset,
             TrimOptions options) {
-        return milestoneFailure("trim", "M6");
+        return trimCoordinator.trim(streamId, beforeOffset, options);
     }
 
     @Override
@@ -220,22 +252,30 @@ public final class DefaultStreamStorage implements StreamStorage {
                 : null;
     }
 
-    private <T> CompletableFuture<T> milestoneFailure(String operation, String milestone) {
-        CompletableFuture<T> rejection = rejectIfClosed();
-        if (rejection != null) {
-            return rejection;
-        }
-        return NereusException.failedFuture(
-                ErrorCode.UNSUPPORTED_FORMAT,
-                false,
-                operation + " is not implemented until " + milestone);
-    }
-
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            long deadlineNanos = shutdownDeadline(config.shutdownGrace());
+            appendCoordinator.beginClose();
+            trimCoordinator.beginClose();
             readCoordinator.close();
-            appendCoordinator.close();
+            trimCoordinator.awaitClose(remainingShutdownGrace(deadlineNanos));
+            appendCoordinator.awaitClose(remainingShutdownGrace(deadlineNanos));
         }
+    }
+
+    private static long shutdownDeadline(Duration grace) {
+        long graceNanos;
+        try {
+            graceNanos = grace.toNanos();
+        } catch (ArithmeticException e) {
+            graceNanos = Long.MAX_VALUE;
+        }
+        long now = System.nanoTime();
+        return graceNanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + graceNanos;
+    }
+
+    private static Duration remainingShutdownGrace(long deadlineNanos) {
+        return Duration.ofNanos(Math.max(0, deadlineNanos - System.nanoTime()));
     }
 }

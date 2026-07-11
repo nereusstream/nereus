@@ -1,6 +1,6 @@
 # 01 API and Domain Model
 
-本文定义 Phase 1 已落地的 Java API、value object、错误语义和包边界，以及 M6-M7 必须遵守的
+本文定义 Phase 1 已落地的 Java API、value object、错误语义和包边界，以及 M7 必须遵守的
 execution contract。Target profile reservations 与当前 executable support 会明确区分。
 
 ## 1. API Principles
@@ -710,6 +710,13 @@ public record TrimOptions(
 
 Phase 1 `trim` never deletes object bytes. It only changes metadata used by read and future GC.
 
+M6 implementation uses `TrimCoordinator` and the caller's `TrimOptions.timeout` as one decreasing deadline
+around `OxiaMetadataStore.updateTrim`. The adapter performs the authoritative state/bounds check and
+single-key stream-head CAS. A known successful response invalidates all positive offset-index cache entries
+for the stream. Timeout/cancellation is advisory：an already-issued head CAS may still complete later，so
+`close()` tracks the source metadata future rather than only the caller-facing deadline future. A late
+successful source response still invalidates the cache.
+
 Read behavior:
 
 - `startOffset < trimOffset` completes exceptionally with `NereusException` code `OFFSET_TRIMMED`；
@@ -995,6 +1002,9 @@ nereus_stream_fenced_appends_total
 nereus_stream_offset_conflicts_total
 nereus_stream_append_unknown_final_state_total
 nereus_stream_object_reference_repair_total
+nereus_stream_orphan_object_assessments_total
+nereus_stream_trim_success_total
+nereus_stream_trim_failures_total
 nereus_stream_offset_index_cache_hits_total
 nereus_stream_offset_index_cache_misses_total
 nereus_stream_checksum_mismatch_total

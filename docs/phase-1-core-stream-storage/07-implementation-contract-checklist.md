@@ -28,6 +28,8 @@
 | Read path | offset-index-driven resolve, full-slice checksum before clipping | object list, manifest-only reads, negative cache |
 | Read amplification | explicit metrics for full-slice bytes, entry-index bytes, returned bytes, amplification, and read backpressure | hiding 16 MiB-to-100 byte reads as ordinary object read volume |
 | Offset-index cache | positive scan results only; watch events invalidate but never populate cache | EOF caching, watch-created positive records |
+| Trim | monotonic stream-head low-watermark CAS，deadline/cancel response，explicit cache invalidation | offset-index/object deletion，treating timeout as rollback proof |
+| Orphan diagnostics | caller-supplied object id，manifest + repaired reachable references，diagnostic-only classification | object listing in correctness path，any Phase 1 deletion authorization |
 | Local object cleanup | test-only cleanup under injected `LocalFileObjectStore` root | production object delete in Phase 1 |
 | Protocol integration | protocol-neutral API and metadata labels | Pulsar, KoP, ManagedLedger classes |
 
@@ -280,6 +282,10 @@ payload bytes actually returned after clipping.
   while a prior commit final state is unknown.
 - `close()` rejects new work, stops background tasks, waits up to `shutdownGrace` for irreversible in-flight
   work, then closes owned clients.
+- Close is two-phase：all public coordinator admission closes first，then append/trim share one global grace
+  budget rather than waiting one full grace period per coordinator.
+- Trim timeout/cancellation has no `AppendOutcome` and is advisory：an already-issued head CAS can still
+  succeed. Coordinator lifecycle follows the source metadata future；late success invalidates read cache.
 
 ## 7. Required Test Gates
 
@@ -316,5 +322,8 @@ payload bytes actually returned after clipping.
 - concurrent same-slice replay condition-race tests;
 - append timeout/cancellation `AppendOutcome` tests;
 - object reference repair tests;
+- trim monotonic/bounds，read-cache invalidation，physical-retention，timeout/cancel and close-wait tests;
+- orphan diagnostic tests proving manifest-only candidates remain invisible/no-delete and reachable
+  post-head commits repair missing indexes before classification;
 - offset index cache missed/duplicate/collapsed/out-of-order watch tests;
 - local object store path traversal, atomic-write, and test-only cleanup tests.

@@ -1,7 +1,7 @@
 # 08 Risk Register And Design Compromises
 
 本文集中记录 Phase 1 当前最容易误伤实现的风险假设和设计妥协。它不是替代前面文档的总纲，
-而是每个里程碑编码和 review 前必须复读的风险清单。M0-M5 已实现，当前重点是 M6 及后续。
+而是每个里程碑编码和 review 前必须复读的风险清单。M0-M6 已实现，当前重点是 M7 及后续。
 
 ## 1. Oxia Conditional Multi-Write Capability
 
@@ -143,8 +143,8 @@ after stream-head CAS sent、after head CAS before materialization confirmed、a
 
 ## 4. No GC And Object Deletion In Phase 1
 
-Status: accepted correctness boundary; M3 local test cleanup and symlink-escape fixes passed the
-2026-07-10 final local gate.
+Status: accepted correctness boundary；M3 local cleanup and M6 metadata-driven diagnostics are implemented，
+with no production delete API.
 
 Phase 1 `trim` 只推进 low-watermark，不删除 offset index，也不删除 object bytes。Upload 后 manifest
 失败、commit 失败、process crash、caller timeout 都可能留下 orphan WAL objects。
@@ -154,7 +154,10 @@ Phase 1 `trim` 只推进 low-watermark，不删除 offset index，也不删除 o
 - production `ObjectStore` Phase 1 不暴露 delete；
 - read/recovery correctness 不依赖 object list；
 - `ObjectReferenceRecord` 和 manifest state 只是审计/未来 GC 输入；
-- orphan scanner 可以用于诊断或测试断言，但不能让 committed read 依赖 list 结果；
+- M6 `MetadataOrphanObjectScanner` 只接受外部提供的 object id，先用 reachable head chain repair
+  references，再产生 diagnostic classification；它不 list object store；
+- `MISSING_MANIFEST` / `UNREFERENCED_MANIFEST` 也不构成 delete proof；
+- `OrphanObjectAssessment.deletionAllowed()` 在 Phase 1 永远返回 false；
 - M3 `LocalFileObjectStore` 测试实现支持隔离 root 下的 test-only cleanup helper:
   `deleteAllForTesting()`；
 - done: final symlink targets and symlink parents are rejected before `putObject`/`readRange`/`headObject`

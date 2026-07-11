@@ -2,7 +2,7 @@
 
 本文定义 `nereus-core` 的 append、resolve/read、trim 和 recovery 状态机。
 
-Status: M4 append and M5 resolve/read implemented on 2026-07-11；M6 trim/recovery remains. The implemented
+Status: M4 append、M5 resolve/read and M6 trim/recovery implemented on 2026-07-11. The implemented
 paths match the strict Object WAL profile boundary and the stream-head single-key CAS protocol。
 
 M0.5 status: the append state machine now uses the redesigned Oxia-compatible commit protocol from
@@ -35,9 +35,15 @@ io.nereus.core.read
 
 io.nereus.core.trim
   TrimCoordinator
+  TrimOperationDeadline
+  TrimMetricsObserver
 
 io.nereus.core.recovery
   OrphanObjectScanner
+  MetadataOrphanObjectScanner
+  OrphanObjectAssessment
+  OrphanObjectStatus
+  RecoveryMetricsObserver
 ```
 
 `DefaultStreamStorage` should be thin orchestration:
@@ -731,6 +737,11 @@ READ_STREAM_METADATA
   -> INVALIDATE_CACHE
 ```
 
+The first two logical states run inside `OxiaMetadataStore.updateTrim` against one current stream-head
+snapshot；the core coordinator validates API-local null/negative input before invoking it. This avoids a
+second non-atomic core snapshot while preserving the adapter's authoritative checks. `UPDATE_TRIM` is the
+single-key `putIfVersion` on stream head described in document 02.
+
 Rules:
 
 - `beforeOffset` must not decrease current trim offset；
@@ -738,6 +749,11 @@ Rules:
 - offset index entries remain in Oxia；
 - object bytes remain in object store；
 - future GC uses trim plus cursor/reader references。
+- `TrimOptions.timeout` bounds the caller result；cancellation is advisory and neither outcome proves that an
+  already-issued head CAS was rolled back；
+- `TrimCoordinator.close()` rejects new work and waits up to `shutdownGrace` for accepted source metadata
+  futures，including a source still in flight after its caller-facing timeout；
+- a late successful source response still invalidates the read cache；metrics callback failures are isolated。
 
 Read after trim:
 
@@ -787,6 +803,23 @@ chain；it must not classify the object as orphan or invisible solely because in
 
 Phase 1 does not solve producer dedup. Future protocol layers will use producer sequence or idempotency.
 
+### M6 orphan diagnostic boundary
+
+`OrphanObjectScanner` accepts an object id supplied by an operational scan or test. It does not list the
+object store and does not expose delete. `MetadataOrphanObjectScanner` reads the manifest and, when present,
+calls `repairObjectReferences` before classification，so reachable stream-head commits remain authoritative
+and missing derived indexes are materialized before an orphan decision.
+
+| Status | Meaning |
+| --- | --- |
+| `MISSING_MANIFEST` | caller supplied an object id with no manifest；bytes may or may not exist |
+| `UNREFERENCED_MANIFEST` | manifest exists but no slice has a reachable head commit；orphan candidate only |
+| `PARTIALLY_REFERENCED` | at least one but not all manifest slices are reachable |
+| `FULLY_REFERENCED` | every manifest slice is reachable |
+
+`OrphanObjectAssessment.deletionAllowed()` is always `false` in Phase 1. TTL、manifest state and an empty
+reference list are diagnostic inputs only；none proves that physical deletion is safe.
+
 ## 8. `DefaultStreamStorage` Construction
 
 ```java
@@ -802,7 +835,8 @@ public final class DefaultStreamStorage implements StreamStorage {
 
     public DefaultStreamStorage(
             ...,
-            ReadMetricsObserver readMetricsObserver) {
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
     }
 }
 ```
@@ -934,10 +968,11 @@ Lifecycle:
 - `close()` must close or release owned metadata/object clients only when `DefaultStreamStorage` created
   them. Injected clients owned by tests or embedding code should have explicit ownership flags。
 
-M4 lifecycle implementation treats every constructor-injected metadata/WAL client as externally owned：
-`close()` stops acceptance, queued/pre-upload appends fail as `STORAGE_CLOSED + KNOWN_NOT_COMMITTED`, and
-the coordinator waits up to `shutdownGrace` for accepted work. It does not close the injected clients.
-Owned-client factories/flags and background watch/renew task shutdown remain M6 construction work.
+M4-M6 lifecycle implementation treats every constructor-injected metadata/WAL client as externally owned：
+`close()` first stops append/trim/read acceptance and closes resolver watch registrations，then shares one
+global `shutdownGrace` budget while waiting for accepted trim and append work. Queued/pre-upload appends fail
+as `STORAGE_CLOSED + KNOWN_NOT_COMMITTED`. It does not close injected clients. Owned-client factories/flags
+and production background-renew wiring remain an M7 adapter/construction concern.
 
 M4 caller cancellation is advisory: `AppendFuture.cancel` signals the shared append deadline instead of
 blindly cancelling the underlying metadata/object future. The public future therefore completes with a
