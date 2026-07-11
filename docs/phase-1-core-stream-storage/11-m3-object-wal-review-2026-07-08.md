@@ -36,7 +36,7 @@ M3 status: ready for final gate rerun.
 ### P1: multi-range read can incorrectly fail with `READ_LIMIT_TOO_SMALL`
 
 Code reference:
-`nereus-object-store/src/main/java/io/nereus/objectstore/wal/DefaultWalObjectReader.java`
+`nereus-object-store/src/main/java/com/nereusstream/objectstore/wal/DefaultWalObjectReader.java`
 
 `DefaultWalObjectReader.read()` keeps global `remainingBytes`, but `clip()` decides whether to throw
 `READ_LIMIT_TOO_SMALL` by checking only the per-range local `batches.isEmpty()`. If an earlier resolved
@@ -62,7 +62,7 @@ Required fix:
 ### P1: `LocalFileObjectStore` can follow final symlinks outside the injected root
 
 Code reference:
-`nereus-object-store/src/testFixtures/java/io/nereus/objectstore/testing/LocalFileObjectStore.java`
+`nereus-object-store/src/testFixtures/java/com/nereusstream/objectstore/testing/LocalFileObjectStore.java`
 
 `resolveKey()` checks existing parent directories but does not reject a final path that already exists as
 a symlink. `readRange()` calls `Files.exists`, `Files.size`, and `FileChannel.open` on the resolved target

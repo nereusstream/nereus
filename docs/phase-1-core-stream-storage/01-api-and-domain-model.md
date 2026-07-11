@@ -19,8 +19,11 @@ Target profile reservations 与当前 executable support 会明确区分。
 Package:
 
 ```text
-io.nereus.api
+com.nereusstream.api
 ```
+
+`com.nereusstream` is derived from the owned `nereusstream.com` domain and is also the Maven group. The
+pre-release placeholder packages `io.nereus.*` are not compatibility aliases；see ADR 0003。
 
 Target interface:
 
@@ -181,7 +184,7 @@ Path and identity helpers used by more than one Phase 1 module must live below `
 `nereus-metadata-oxia` and `nereus-object-store` cannot drift:
 
 ```text
-io.nereus.api.keys
+com.nereusstream.api.keys
   KeyComponentCodec
   DeterministicIds
 ```
@@ -224,8 +227,8 @@ Rules:
 M1 adds these protocol-neutral helpers in `nereus-api`:
 
 ```text
-io.nereus.api.ApiLimits
-io.nereus.api.MetadataCanonicalizer
+com.nereusstream.api.ApiLimits
+com.nereusstream.api.MetadataCanonicalizer
 ```
 
 `ApiLimits` currently defines:

@@ -13,7 +13,7 @@ M2 foundation implementation status:
 - production code now has `OxiaMetadataStore`, `OxiaKeyspace`, `PartitionKey`, watch interfaces, commit
   request/result records, metadata record classes, metadata codec envelope/registry scaffolding, and a
   `Phase1MetadataCodecs` binary-v1 implementation；
-- `io.nereus.metadata.oxia.testing.FakeOxiaMetadataStore` exists under test fixtures and implements the
+- `com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore` exists under test fixtures and implements the
   stream-head single-key CAS protocol for create/get, append session acquire/renew, object manifest
   put/get, `commitStreamSlice`, derived-index repair, offset-index scan, object-reference repair, trim,
   and watch registration；
@@ -158,7 +158,7 @@ different numeric key encoding requires an explicit keyspace migration plan.
 Package:
 
 ```text
-io.nereus.metadata.oxia.records
+com.nereusstream.metadata.oxia.records
 ```
 
 The records below are hydrated Java/domain records returned by the adapter. Fields named
@@ -514,12 +514,17 @@ public record TrimRecord(
 `TrimRecord` is a hydrated view derived from `StreamHeadRecord.trimOffset`. Phase 1 does not keep an
 authoritative `/trim` key.
 
+`StreamMetadataSnapshot` is the read-side aggregate hydrated from one `StreamHeadRecord` get. Its
+`StreamMetadataRecord`、`CommittedEndOffsetRecord` and `TrimRecord` must carry the same stream id and Oxia
+metadata version, and trim cannot exceed committed end. Core read/metadata APIs use this operation instead
+of independently reading three views and constructing a torn snapshot across concurrent head CAS updates.
+
 ## 4. `OxiaMetadataStore` Interface
 
 Package:
 
 ```text
-io.nereus.metadata.oxia
+com.nereusstream.metadata.oxia
 ```
 
 Target interface:
@@ -532,6 +537,10 @@ public interface OxiaMetadataStore extends AutoCloseable {
             StreamCreateOptions options);
 
     CompletableFuture<StreamMetadataRecord> getStream(
+            String cluster,
+            StreamId streamId);
+
+    CompletableFuture<StreamMetadataSnapshot> getStreamSnapshot(
             String cluster,
             StreamId streamId);
 
@@ -599,6 +608,12 @@ public interface OxiaMetadataStore extends AutoCloseable {
             String cluster,
             StreamId streamId,
             MetadataWatcher watcher);
+}
+
+public record StreamMetadataSnapshot(
+        StreamMetadataRecord metadata,
+        CommittedEndOffsetRecord committedEnd,
+        TrimRecord trim) {
 }
 
 public record DerivedIndexRepairResult(
@@ -1198,14 +1213,24 @@ index entries whose `offsetEnd > targetOffset`.
 Implementation with lexicographic keys:
 
 ```text
-fromExclusive = /streams/{streamId}/offset-index/{padded(targetOffset)}/~
-to   = /streams/{streamId}/offset-index/~/
+fromInclusive = /streams/{streamId}/offset-index/{padded(targetOffset)}/~
+toExclusive   = /streams/{streamId}/offset-index/{padded(Long.MAX_VALUE)}/~
 scan limit = small page size
 ```
 
 This avoids skipping `offsetEnd == targetOffset + 1` and avoids overflow at very large offsets. The `~`
 suffix sorts after all generations for exactly `targetOffset`, so the next key has
 `offsetEnd > targetOffset`.
+
+The production adapter enforces `limit` while consuming the public Oxia `rangeScan` iterator and closes
+the iterator immediately at the limit. Calling unbounded `list` followed by one `get` per key and applying
+`limit` only in memory does not satisfy this contract.
+
+Every decoded result is checked against its durable key identity before it leaves the adapter：stream head
+must match the requested deterministic stream id/name hash，commit id and stream id must match the commit
+key，object manifest/reference ids must match the object key，and offset-index stream/end/generation must
+reconstruct exactly the returned key. Key/value mismatch is `METADATA_INVARIANT_VIOLATION`，not an empty
+scan or a repairable gap。
 
 Encoding requirement:
 
@@ -1295,6 +1320,9 @@ Watch rules:
 - fake watch tests should simulate missed, duplicate, collapsed, reconnect, and out-of-order events；
 - callback exceptions are isolated per delivery，increment an observable failure counter/metric，and never
   change the outcome of an already-applied session/trim/index mutation；
+- watch callbacks run on an executor distinct from both blocking Oxia request workers and normal metadata
+  operation workers. A callback may read the head for invalidation data without waiting for work queued
+  behind itself；
 - a closed metadata store rejects new watch registration with `STORAGE_CLOSED`。
 
 ## 12. Failure Semantics
@@ -1316,7 +1344,7 @@ Watch rules:
 Before real Oxia integration, implement an in-memory store with the same operation-level semantics:
 
 ```text
-io.nereus.metadata.oxia.testing.FakeOxiaMetadataStore
+com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore
 ```
 
 It must support:

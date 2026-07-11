@@ -345,7 +345,7 @@ metadata and ownership。
 
 ## 15. Implementation sources
 
-- Object WAL code：`../../nereus-object-store/src/main/java/io/nereus/objectstore/wal/`
+- Object WAL code：`../../nereus-object-store/src/main/java/com/nereusstream/objectstore/wal/`
 - Exact Phase 1 design：`../phase-1-core-stream-storage/03-object-wal-and-index.md`
 - Object WAL review：`../phase-1-core-stream-storage/11-m3-object-wal-review-2026-07-08.md`
 - Commit semantics：`nereus-commit-protocol.md`

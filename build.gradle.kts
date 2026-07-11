@@ -17,7 +17,7 @@ plugins {
     `maven-publish`
 }
 
-group = "io.nereusstream"
+group = providers.gradleProperty("nereusGroup").get()
 version = providers.gradleProperty("nereusVersion").getOrElse("0.1.0-SNAPSHOT")
 
 val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::toInt).getOrElse(21)
@@ -54,7 +54,7 @@ configure(subprojects.filter { it.name != "nereus-bom" }) {
                 pom {
                     name.set(project.name)
                     description.set("Nereus module ${project.name}")
-                    url.set("https://github.com/nereusstream/nereus")
+                    url.set("https://nereusstream.com")
                     licenses {
                         license {
                             name.set("Apache License, Version 2.0")
@@ -98,11 +98,19 @@ tasks.register<Exec>("checkPhase1L0Dependencies") {
     commandLine("bash", "scripts/check-phase1-l0-dependencies.sh")
 }
 
+tasks.register<Exec>("checkPhase1Namespace") {
+    group = "verification"
+    description = "Verify Java packages and Maven coordinates use the owned nereusstream.com namespace."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase1-namespace.sh")
+}
+
 tasks.register("phase1Check") {
     group = "verification"
     description = "Verify the Phase 1 Core StreamStorage scaffold."
     dependsOn("checkPhase0")
     dependsOn("checkPhase1L0Dependencies")
+    dependsOn("checkPhase1Namespace")
     dependsOn(phase1L0Modules.map { "$it:test" })
     dependsOn(":nereus-metadata-oxia:compileOxiaCapabilitySpikeJava")
 }

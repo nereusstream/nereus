@@ -135,6 +135,12 @@ M0 scaffold status before coding state machines:
   object-store suites pass 32 and 23 tests respectively.
 - done on 2026-07-11: the post-M5 `./gradlew phase1Check check --rerun-tasks` gate executed 28 tasks
   successfully；the L0 dependency guard passed and capability-spike sources compiled without Docker.
+- done on 2026-07-11 after M8 review: core read/metadata views use one-head `StreamMetadataSnapshot`；real
+  offset-index range scans stop at the requested limit；Oxia request/watch executors are isolated；cache、
+  session、watch and terminal append-lane state are bounded/released；ordinary gate passes 45 core、63
+  metadata、23 object-store and 23 API tests。
+- done before first tagged release: package and Maven namespace is `com.nereusstream` from owned
+  `nereusstream.com`; ADR 0003 records the breaking pre-release migration and durable bytes remain stable。
 
 ## 3. Stop-The-Line Conditions
 
@@ -152,6 +158,12 @@ Stop implementation and update design first if any of these are discovered:
   recoverable primary read target.
 - The real adapter cannot route all stream-scoped operations with `PartitionKey(streamId)`.
 - Offset index scan cannot preserve 19-digit zero-padded offset/generation ordering.
+- A metadata scan accepts a limit but first lists or buffers the complete Oxia range，or performs one get per
+  listed key before applying that limit.
+- Core constructs metadata/trim/committed-end state from independent stream-head reads without proving one
+  shared Oxia version.
+- A decoded head/commit/index/manifest/reference can disagree with the durable key identity and still enter
+  a core or repair state machine.
 - commit protocol cannot assign a durable `commitVersion` that can be validated across stream head,
   commit-log, offset-index, and committed-slice state.
 - Decoded head/commit/index/marker/reference records can carry an impossible head anchor，zero
@@ -185,6 +197,9 @@ Stop implementation and update design first if any of these are discovered:
 - Read path would need object manifest to resolve visibility or checksum.
 - A watcher callback exception can fail or reclassify an already-applied metadata mutation，or new watch
   registration succeeds after metadata store close.
+- Watch callbacks can occupy the same bounded executor whose request tasks they synchronously wait for.
+- Metadata operation/watch executors use unbounded pending queues，or queue saturation is mislabeled as a
+  closed store instead of retriable backpressure.
 - WAL canonical object checksum and object-store storage checksum have to be collapsed into one field.
 - WAL object sections cannot carry type/version/length/checksum from the first encoder.
 - WAL writer cannot know or enforce final encoded object length before `putObject`.
@@ -327,4 +342,11 @@ payload bytes actually returned after clipping.
 - orphan diagnostic tests proving manifest-only candidates remain invisible/no-delete and reachable
   post-head commits repair missing indexes before classification;
 - offset index cache missed/duplicate/collapsed/out-of-order watch tests;
+- one-head stream metadata snapshot identity/version tests;
+- real Oxia iterator close-at-limit and callback/request executor isolation tests;
+- bounded metadata operation-queue saturation and error-classification tests;
+- durable metadata key/value identity mismatch tests;
+- cache stream/record cardinality bounds;
+- append lane release for terminal known outcomes and retention for suspended committed/unknown outcomes;
+- repository namespace gate for `com.nereusstream` Java packages and Maven group;
 - local object store path traversal, atomic-write, and test-only cleanup tests.

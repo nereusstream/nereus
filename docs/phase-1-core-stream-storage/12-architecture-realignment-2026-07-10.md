@@ -1,8 +1,8 @@
 # 12 Architecture Realignment 2026-07-10
 
 本文记录总体架构扩展到多 storage profiles 后，Phase 1 code-level contract 的收敛结果。它不是新的
-里程碑；当前仍是 Future 1 / Phase 1。M4 Core Append、M5 Resolve/Read 和 M6 Trim/Recovery 已于
-2026-07-11 实现；本文其余内容保留当时的架构收敛记录。
+里程碑。Phase 1 M0-M8 已于 2026-07-11 完成；本文其余内容保留当时的架构收敛记录，post-M8
+实现审计见 `13-phase-1-final-review-2026-07-11.md`。
 
 ## 1. Verified progress
 
@@ -110,4 +110,6 @@ verification blocker closed the M4 entry prerequisite；M4 itself was subsequent
 - precise metadata/commit：`02-oxia-metadata-and-commit.md`；
 - precise state machine：`04-core-state-machines.md`；
 - stop-line contract：`07-implementation-contract-checklist.md`；
-- cross-track decision：`../decisions/0002-separate-append-commit-index-and-materialization.md`。
+- post-M8 review：`13-phase-1-final-review-2026-07-11.md`；
+- cross-track decisions：`../decisions/0002-separate-append-commit-index-and-materialization.md` and
+  `../decisions/0003-domain-derived-java-and-maven-namespace.md`。

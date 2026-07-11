@@ -245,3 +245,35 @@ Controls：
 - no reserved profile uses sentinel object identity or silent fallback；
 - LocalFileObjectStore cleanup helper 只在 test package 可见；
 - multi-slice writer tests 在 core planner 仍为 single-stream 策略时也必须存在。
+
+## 8. Post-M8 Metadata And Resident-Memory Risks
+
+Status: review findings fixed on 2026-07-11，with focused ordinary tests and the Docker-backed final gate
+required before release。
+
+The first M7 adapter and M5 cache implementation had four operational risks that did not change the
+stream-head linearization protocol but could fail under production scale or concurrency:
+
+- watch callbacks and blocking Oxia requests shared an executor，creating a pool-saturation deadlock when
+  callbacks synchronously reloaded head state；
+- fixed operation/watch executors used unbounded queues，so overload could move the memory risk from caches
+  into pending tasks；
+- `scanOffsetIndex(limit)` listed the complete key range and fetched every value before applying `limit`；
+- core independently loaded stream metadata、trim and committed-end views and could assemble a torn head
+  snapshot；
+- cache/session/watch/lane maps retained stream state without a cardinality bound。
+
+Current contract:
+
+- request、operation and watch executors are isolated；
+- `OxiaClientConfiguration.maxPendingOperations` bounds operation/watch queues；saturation returns retriable
+  `BACKPRESSURE_REJECTED` and dropped watch hints do not affect correctness；
+- Oxia range iteration stops and closes at `limit`；
+- `StreamMetadataSnapshot` is hydrated from one head value and all views share one metadata version；
+- `maxCachedStreams` bounds stream-level cache/session/watch state，per-stream index records are capped by
+  `maxCommitChainScan`，and terminal append lanes are released；
+- suspended append lanes remain resident on purpose because evicting an unresolved physical attempt would
+  permit an unsafe new append；an operational reconciliation API is still a post-Phase-1 requirement。
+
+The remaining full-slice payload allocation risk is still governed by Section 2; these metadata/cache fixes
+do not introduce block-level checksums or production GC。

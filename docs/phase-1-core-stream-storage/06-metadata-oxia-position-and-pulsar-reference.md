@@ -221,3 +221,11 @@ and uses immutable commit intent plus one conditional stream-head put as the app
 The independent `oxiaIntegrationTest` task passes shared fake/real contract、restart、CAS conflict、watch and
 repair-continuation scenarios against `oxia/oxia:0.16.3`. M8 final end-to-end gate also passes；Phase 1 is
 complete without changing the M0.5 `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` conclusion.
+
+The post-M8 review tightened the binding without changing that protocol：request、operation and watch
+executors are isolated；offset-index reads stop the public `rangeScan` iterator at the caller limit；and
+`getStreamSnapshot` hydrates metadata/committed-end/trim from one stream-head value. Backend tests cover the
+single-thread callback/read deadlock case and close-at-limit iterator behavior，and the shared fake/real
+contract covers equal-version snapshots。`OxiaClientConfiguration.maxPendingOperations` also bounds
+operation/watch queues；operation saturation is `BACKPRESSURE_REJECTED` while shutdown rejection remains
+`STORAGE_CLOSED`。

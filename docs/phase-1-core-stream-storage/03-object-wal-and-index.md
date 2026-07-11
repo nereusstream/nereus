@@ -55,7 +55,7 @@ Object store layer does not own:
 ## 2. Package Plan
 
 ```text
-io.nereus.objectstore
+com.nereusstream.objectstore
   ObjectStore
   PutObjectOptions
   PutObjectResult
@@ -66,7 +66,7 @@ io.nereus.objectstore
   Crc32cChecksums
   RangeChecks
 
-io.nereus.objectstore.wal
+com.nereusstream.objectstore.wal
   CompressionType
   WalWriteRequest
   WalWriteOptions
@@ -84,7 +84,7 @@ io.nereus.objectstore.wal
   ReadResourceGuard
   WalReadObserver
 
-io.nereus.objectstore.testing (test fixtures)
+com.nereusstream.objectstore.testing (test fixtures)
   LocalFileObjectStore
 ```
 
@@ -833,7 +833,7 @@ Corruption behavior:
 Add a test/local implementation:
 
 ```text
-io.nereus.objectstore.testing.LocalFileObjectStore
+com.nereusstream.objectstore.testing.LocalFileObjectStore
 ```
 
 Requirements:

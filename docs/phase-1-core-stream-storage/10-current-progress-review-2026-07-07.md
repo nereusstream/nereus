@@ -55,7 +55,7 @@ Follow-up implementation status from the next M2 pass:
 Status: resolved by the follow-up M2 codec/validation pass.
 
 Code reference:
-`nereus-metadata-oxia/src/main/java/io/nereus/metadata/oxia/records/EntryIndexReferenceRecord.java`
+`nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/records/EntryIndexReferenceRecord.java`
 
 The public API `EntryIndexRef` validates `INLINE`, `OBJECT_FOOTER`, and `INDEX_OBJECT` field combinations.
 At review time, the metadata record checked only non-null fields, non-blank checksum/location strings, and
@@ -82,8 +82,8 @@ Required before M2 exit:
 Status: resolved for the current M2 record set by the follow-up codec/golden test pass.
 
 Code references:
-`nereus-metadata-oxia/src/main/java/io/nereus/metadata/oxia/codec/Phase1MetadataCodecs.java`
-and `nereus-metadata-oxia/src/test/java/io/nereus/metadata/oxia/codec/MetadataCodecSamples.java`
+`nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/codec/Phase1MetadataCodecs.java`
+and `nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/codec/MetadataCodecSamples.java`
 
 At review time, the code contained a reflection-based `binary-v1` codec registry for all Phase 1 metadata
 records, plus a sample catalog, while tests still covered only `MetadataRecordEnvelope` and registry
@@ -129,7 +129,7 @@ Required before codec freeze:
 Status: resolved by the follow-up fake-store codec-backed persistence pass.
 
 Code reference:
-`nereus-metadata-oxia/src/testFixtures/java/io/nereus/metadata/oxia/testing/FakeOxiaMetadataStore.java`
+`nereus-metadata-oxia/src/testFixtures/java/com/nereusstream/metadata/oxia/testing/FakeOxiaMetadataStore.java`
 
 At review time, the fake store stored hydrated Java records directly in maps. That was acceptable for
 early M2 state-machine work, but it did not prove fake/real codec parity.

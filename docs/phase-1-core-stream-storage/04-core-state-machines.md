@@ -15,17 +15,17 @@ head chain.
 Package plan:
 
 ```text
-io.nereus.core
+com.nereusstream.core
   DefaultStreamStorage
 
-io.nereus.core.append
+com.nereusstream.core.append
   AppendCoordinator
   AppendSessionManager
   AppendDeadline
   AppendResourceLimiter
   WalFlushPlanner (future cross-stream batching)
 
-io.nereus.core.read
+com.nereusstream.core.read
   ReadCoordinator
   ReadResolver
   OffsetIndexCache
@@ -33,12 +33,12 @@ io.nereus.core.read
   ReadResourceLimiter
   ReadMetricsObserver
 
-io.nereus.core.trim
+com.nereusstream.core.trim
   TrimCoordinator
   TrimOperationDeadline
   TrimMetricsObserver
 
-io.nereus.core.recovery
+com.nereusstream.core.recovery
   OrphanObjectScanner
   MetadataOrphanObjectScanner
   OrphanObjectAssessment
@@ -856,6 +856,7 @@ public record StreamStorageConfig(
         int maxResolveRanges,
         int maxCommitChainScan,
         int maxDerivedIndexRepairCommitsPerCall,
+        int maxCachedStreams,
         int maxInFlightAppends,
         long maxBufferedBytes,
         int maxConcurrentObjectReads,
@@ -880,7 +881,9 @@ Threading:
 
 - public methods should return quickly；
 - blocking object store or metadata calls must run on dedicated clients/executors；
-- completion callbacks should not run expensive decode on metadata IO thread。
+- completion callbacks should not run expensive decode on metadata IO thread；
+- production Oxia request、metadata operation and watch callback executors are separate so a watch callback
+  that reloads stream head cannot starve the request workers it is waiting for。
 
 Suggested initial defaults:
 
@@ -895,6 +898,7 @@ Suggested initial defaults:
 | `maxResolveRanges` | 64 |
 | `maxCommitChainScan` | 10000 |
 | `maxDerivedIndexRepairCommitsPerCall` | 256 |
+| `maxCachedStreams` | 10000 |
 | `maxInFlightAppends` | 1024 |
 | `maxBufferedBytes` | 64 MiB |
 | `maxConcurrentObjectReads` | 64 |
@@ -919,6 +923,7 @@ Config validation:
 - `maxResolveRanges > 0`；
 - `maxCommitChainScan > 0`；
 - `maxDerivedIndexRepairCommitsPerCall > 0`；
+- `maxCachedStreams > 0`；
 - `maxInFlightAppends > 0`；
 - `maxBufferedBytes > 0`；
 - `maxConcurrentObjectReads > 0`；
@@ -1046,6 +1051,11 @@ Cache stale behavior:
   stream read-through-only until a scan refreshes it；
 - an out-of-order watch notification whose `metadataVersion` is lower than the cached range's observed
   version may be ignored as stale.
+- resident cache/session/watch state is bounded by `maxCachedStreams`; offset-index records retained for one
+  stream are bounded by `maxCommitChainScan` and prioritize the latest scan result；
+- successful and known-not-committed append lanes are removed when their retained operation count reaches
+  zero. A lane suspended for an unknown/known committed physical attempt remains resident intentionally and
+  must be resolved before that stream can accept another physical append。
 
 ## 11. Sequence Diagrams
 
@@ -1083,6 +1093,8 @@ sequenceDiagram
 
     C->>S: read(streamId, startOffset)
     S->>R: resolve
+    R->>M: get one-head stream metadata snapshot
+    M-->>R: metadata + trim + committed end at one version
     R->>M: scan offset index
     M-->>R: index records
     R-->>S: object ranges

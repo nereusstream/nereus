@@ -37,6 +37,21 @@ publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["javaPlatform"])
+            pom {
+                name.set(project.name)
+                description.set("Nereus module ${project.name}")
+                url.set("https://nereusstream.com")
+                licenses {
+                    license {
+                        name.set("Apache License, Version 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/nereusstream/nereus")
+                    connection.set("scm:git:https://github.com/nereusstream/nereus.git")
+                }
+            }
         }
     }
 }

@@ -151,10 +151,10 @@ M2 foundation implementation status:
   `OxiaMetadataStore`, `OxiaKeyspace`, `PartitionKey`, `MetadataWatcher`, `WatchRegistration`,
   `CommitSliceRequest`, `CommitSliceResult`, `DerivedIndexRepairCursor`, `DerivedIndexRepairResult`, and
   shared `Phase1ObjectManifestValidator`；
-- metadata record classes exist under `io.nereus.metadata.oxia.records` for stream head/name/metadata,
+- metadata record classes exist under `com.nereusstream.metadata.oxia.records` for stream head/name/metadata,
   append session, commit-log, committed end, offset index, entry-index reference, object manifest,
   object reference, committed slice, and trim；
-- codec code exists under `io.nereus.metadata.oxia.codec`: `MetadataRecordCodec`,
+- codec code exists under `com.nereusstream.metadata.oxia.codec`: `MetadataRecordCodec`,
   `MetadataCodecRegistry`, `MapMetadataCodecRegistry`, `MetadataRecordEnvelope`,
   `MetadataCodecException`, and `Phase1MetadataCodecs`；
 - `FakeOxiaMetadataStore` lives in test fixtures and implements the stream-head single-key CAS model. It
@@ -584,10 +584,12 @@ Tasks:
   adapters；
 - done: add Docker/Testcontainers tests for adapter restart persistence，same-offset CAS conflict mapping，
   watch delivery，repair continuation and post-head derived-index recovery；
-- done: define `OxiaClientConfiguration`，dedicated operation/client executors，single notification stream
-  fan-out and exception-to-`NereusException`/`AppendOutcome` mapping；
-- done: fix real Oxia offset-index list upper bound to a fixed-width `Long.MAX_VALUE` endpoint rather than
-  the invalid `/~` shortcut。
+- done: define `OxiaClientConfiguration`，separate request/operation/watch executors，single notification
+  stream fan-out，bounded `maxPendingOperations` queues and exception-to-`NereusException`/`AppendOutcome`
+  mapping；queue saturation is retriable `BACKPRESSURE_REJECTED`，not a false close signal；
+- done: fix real Oxia offset-index range upper bound to a fixed-width `Long.MAX_VALUE` endpoint rather than
+  the invalid `/~` shortcut，and stop the public `rangeScan` iterator at the requested limit instead of
+  listing every key and issuing N+1 gets。
 
 Exit:
 
@@ -636,6 +638,27 @@ Final verification:
 
 Result: all 28 aggregate tasks passed，including 42 core、59 metadata、23 object-store ordinary tests，
 5 production-adapter、5 capability-spike and 2 final end-to-end Docker tests.
+
+### Post-M8 final review hardening
+
+Status: implemented and final-gated on 2026-07-11.
+
+- done: add one-head `StreamMetadataSnapshot` and route core metadata/read snapshots through it；
+- done: isolate Oxia watch callbacks from request workers and test synchronous callback reads without pool
+  starvation；
+- done: make the real offset-index scan enforce its bound while consuming Oxia results；
+- done: add `maxCachedStreams` and bound offset-index records、append-session cache and watch registrations；
+- done: release terminal append lanes while retaining uncertain suspended lanes；
+- done: migrate Java packages/Maven group to owned-domain namespace `com.nereusstream` without changing
+  metadata/WAL golden bytes；
+- done: document findings and residual compromises in `13-phase-1-final-review-2026-07-11.md`。
+
+Ordinary gate after these changes: 45 core、63 metadata、23 object-store and 23 API tests pass via
+`./gradlew phase1Check --rerun-tasks`。
+
+Post-review final gate：`./gradlew phase1FinalCheck --rerun-tasks` executed all 29 tasks successfully，
+including the same ordinary suites、5 production-adapter Docker tests、5 capability-spike Docker tests and
+2 final core/Oxia/Object-WAL end-to-end Docker tests。
 
 ## 2. Core Test Matrix
 
@@ -958,7 +981,7 @@ Phase 1 may mention `PULSAR_ENTRY_BATCH` as an enum value, but must not depend o
 
 ## 6. Gradle Tasks
 
-Current M0-M3 verification commands:
+Current ordinary Phase 1 verification commands:
 
 ```text
 ./gradlew checkPhase0

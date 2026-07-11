@@ -71,22 +71,16 @@ streamId + offset
 | Pulsar / KoP adapters | `Designed` | marker modules only |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
-2026-07-10 M3 baseline 已通过：
+Phase 1 ordinary and final gates are：
 
 ```text
-./gradlew :nereus-object-store:test phase1Check check
+./gradlew phase1Check
+./gradlew phase1FinalCheck --rerun-tasks
 ```
 
-Docker-backed `oxiaCapabilitySpike` 是独立环境测试，不包含在上述本地 gate 中。
-2026-07-11 latest pre-M4 append-outcome/manifest/replay/repair hardening passed：
-
-```text
-./gradlew :nereus-api:test :nereus-metadata-oxia:test
-./gradlew phase1Check check
-```
-
-M7 now passes both Docker-backed production integration and capability-spike gates. M8 owns the final
-end-to-end acceptance/freeze only。
+`phase1Check` keeps Docker optional；`phase1FinalCheck` includes the production adapter、capability spike and
+full core/Oxia/Object-WAL Testcontainers suites. The post-M8 review also gates one-head snapshots、bounded
+range iteration、executor isolation、cache/lane lifecycle and the `com.nereusstream` namespace。
 
 ## 5. 当前一致性决策
 
@@ -104,6 +98,8 @@ end-to-end acceptance/freeze only。
    `MAY_HAVE_COMMITTED` and `KNOWN_COMMITTED`；`ErrorCode`/message alone is insufficient。
 9. Final Phase 1 exit includes completed M7 production Oxia adapter gates plus the M8 full core/Oxia/Object
    WAL restart and failure scenario。
+10. Java packages and Maven coordinates use the owned-domain namespace `com.nereusstream`；ADR 0003 owns
+    this compatibility decision。
 
 详细协议见 `nereus-commit-protocol.md`，当前 Phase 1 精确合同见
 `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`。

@@ -43,21 +43,23 @@ F1 does not own：
 
 ## 3. Current Phase 1 boundary
 
-### 3.1 Implemented through M7
+### 3.1 Implemented through M8
 
 | Area | Implemented |
 | --- | --- |
 | API | values、validation、canonicalization、errors、profile/durability enums |
-| Metadata | fake + production Oxia adapter、binary-v1 codec、partition wrapper、head-CAS、repair/watch tests |
+| Metadata | fake + production Oxia adapter、binary-v1 codec、partition wrapper、one-head snapshot、bounded scan、head-CAS、repair/watch tests |
 | Object WAL | v1 writer/reader、multi-slice object、footer entry index、CRC32C、local fixture |
 | Core | append、resolve/read、trim/recovery、resource/deadline/close state machines |
 | Build | protocol-neutral dependency guard、ordinary/Docker Phase 1 tasks |
 
-### 3.2 Pending M8
+### 3.2 M8 final acceptance
 
-- full `DefaultStreamStorage` + production Oxia + local Object WAL end-to-end scenario；
-- facade/client restart、orphan invisibility、post-head repair and trim-retention acceptance；
-- final support-matrix/document freeze and `phase1FinalCheck` aggregate gate。
+- done: full `DefaultStreamStorage` + production Oxia + local Object WAL end-to-end scenario；
+- done: facade/client restart、orphan invisibility、post-head repair and trim-retention acceptance；
+- done: final support-matrix/document freeze and `phase1FinalCheck` aggregate gate；
+- done after M8: package/Maven namespace migration to `com.nereusstream` plus metadata concurrency、bounded
+  scan and resident-memory hardening recorded in the Phase 1 final review。
 
 ### 3.3 Supported profile
 

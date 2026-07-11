@@ -41,18 +41,16 @@ Pulsar and Kafka protocol projections
 - stream-head CAS + reachable commit-log 的 fake metadata implementation，bounded replay classification，
   head-derived orphan-intent validation，dense chain validation，tuple-bound continuation repair and tests；
 - Object WAL v1 writer/reader、multi-slice layout、entry index、checksums、local test object store；
-- M0-M3 tests、pre-M4 metadata hardening and repository dependency/test gates。
+- M4 append、M5 resolve/read、M6 trim/recovery/close、M7 production Oxia adapter and M8 final
+  Oxia/Object-WAL restart/failure acceptance；
+- one-head metadata snapshots、bounded Oxia range scan、separate request/watch executors and bounded resident
+  cache/session/watch state from the post-M8 review；
+- repository namespace `com.nereusstream` and ordinary/Docker-backed Phase 1 gates。
 
-### 2.2 正在实现
+### 2.2 当前交付边界
 
-Future 1 / Phase 1 的剩余顺序：
-
-```text
-M4 DefaultStreamStorage append
-  -> M5 resolve/read
-  -> M6 trim/recovery/close boundaries
-  -> M7 production Oxia adapter and integration gate
-```
+Future 1 / Phase 1 M0-M8 已完成。下一实现轨道按 design index 进入 Future 2；Future 1 后续只接受
+缺陷修复和不改变已冻结 durable contract 的维护。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。

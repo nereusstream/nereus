@@ -5,7 +5,8 @@ metadata/coordination plane, selectable primary-WAL/object-materialization profi
 a shared object data plane, broker-locality without durable broker ownership, and a
 single logical `streamId + offset` coordinate.
 
-This is the standalone product repository for `github.com/nereusstream/nereus`.
+The project website and namespace authority is `nereusstream.com`; Java packages and Maven coordinates use
+`com.nereusstream`. This is the standalone product repository for `github.com/nereusstream/nereus`.
 Pulsar and KoP changes are developed in organization-owned fork repositories,
 not as patch overlays inside this repo.
 
@@ -40,16 +41,14 @@ Forks hold changes that must land inside upstream Pulsar or KoP trees.
 
 ## Current Phase
 
-Future 1 / Phase 1 Core StreamStorage is in progress. M0-M3 are complete:
+Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 
 - protocol-neutral API/value/error contracts；
-- Oxia key/record/codec and stream-head CAS fake metadata path；
-- Object WAL v1 writer/reader, entry index, checksums, and tests。
+- Oxia key/record/codec, fake metadata, and production Oxia Java adapter；
+- Object WAL v1 writer/reader, entry index, checksums, and resource guards；
+- append, resolve/read, trim/recovery, restart, and post-head repair state machines；
+- ordinary and Docker-backed final acceptance gates。
 
-M4 Core Append is the next milestone, followed by M5 resolve/read, M6 trim/recovery, and M7 production
-Oxia adapter/shared-contract integration. The M6 fake/local scenario is not the final Oxia-backed Phase 1
-exit. Pre-M4 metadata/outcome/replay/repair hardening and its repository-level Gradle gates passed on
-2026-07-11, so M4 implementation may begin.
 Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
 materialization profiles are reserved design/API boundaries, not implemented support.
 
@@ -61,5 +60,6 @@ Start with `docs/design/nereus-design-index.md` for document authority and curre
 ```bash
 ./gradlew checkPhase0
 ./gradlew phase1Check
+./gradlew phase1FinalCheck --rerun-tasks
 ./gradlew build
 ```

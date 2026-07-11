@@ -24,6 +24,7 @@ ManagedLedger facade 的前提下，先独立实现 L0 Core StreamStorage：
 - `docs/design/nereus-commit-protocol.md`
 - `docs/design/nereus-storage-object-format.md`
 - `docs/decisions/0002-separate-append-commit-index-and-materialization.md`
+- `docs/decisions/0003-domain-derived-java-and-maven-namespace.md`
 - `docs/automq-like-stream-storage/README.md`
 - `docs/phase0/repository-plan.md`
 
@@ -79,8 +80,12 @@ M0 scaffold migration 已完成。当前代码状态：
   以及 metadata-driven `OrphanObjectScanner` 诊断边界；scanner 会先 repair object references，再按
   reachable head chain 分类，且所有分类都不授权物理删除；
 - M7 已落地 `OxiaJavaClientMetadataStore`、`OxiaClientConfiguration` 和 public Oxia 0.9.0 client
-  binding；真实 adapter 使用 dedicated executors、显式 `PartitionKey`、shared metadata codecs、
-  immutable commit intent + stream-head CAS，以及可恢复 derived indexes；
+  binding；真实 adapter 使用分离的 request/operation/watch executors、显式 `PartitionKey`、bounded
+  range iterator、shared metadata codecs、immutable commit intent + stream-head CAS，以及可恢复
+  derived indexes；
+- post-M8 review 已增加 one-head `StreamMetadataSnapshot`、`maxCachedStreams`、bounded index cache/session/
+  watch state 和 terminal append-lane release；详细 findings 见 `13-phase-1-final-review-2026-07-11.md`；
+- Java package 与 Maven group 已在首个 tag 前统一为 owned-domain namespace `com.nereusstream`；
 - `OffsetIndexRecord` 已补齐 `payloadFormat`，因此 resolver 可以只依赖 committed offset index 构造
   `ResolvedObjectRange`，不读取 manifest、不猜测 payload format；
 - `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
@@ -91,7 +96,8 @@ M0 scaffold migration 已完成。当前代码状态：
   WAL round-trip/local-store tests 已存在。2026-07-08 M3 review 发现的 reader multi-range byte-budget 和
   local symlink escape blockers 已修复并补测试；2026-07-10 final Gradle gate 已通过。
 
-Phase 1 M0-M8 已完成。Final verification passes 42 core、59 metadata、23 object-store ordinary tests，
+Phase 1 M0-M8 已完成。Post-review final verification passes 45 core、63 metadata、23 API and 23
+object-store ordinary tests，
 5 real-adapter、5 capability-spike and 2 final core/Oxia/Object-WAL Docker tests. The release command is
 `./gradlew phase1FinalCheck --rerun-tasks`；M8 没有扩展功能面，只完成端到端/restart/failure 验收和冻结。
 
@@ -136,8 +142,9 @@ Phase 1 不允许：
 | `10-current-progress-review-2026-07-07.md` | 当前 M0/M1/M2 review 记录，以及 2026-07-08 M2 completion 追加说明 |
 | `11-m3-object-wal-review-2026-07-08.md` | M3 object WAL review 记录、completion blockers 和重新验收 gate |
 | `12-architecture-realignment-2026-07-10.md` | 多 profile 总体架构、Phase 1 strict boundary 与 pre-M4 review closure 记录 |
+| `13-phase-1-final-review-2026-07-11.md` | M8 后代码/设计深审、修复项、命名空间决策和最终复验记录 |
 
-`10`/`11` 是 dated historical reviews；当前里程碑状态以本 README 和 `05` 为准。
+`10`/`11`/`12` 是 dated historical reviews；当前实现状态以本 README、`05` 和 `13` 为准。
 
 ## 4. Phase 1 Public Surface
 
@@ -188,7 +195,7 @@ read/resolve 已在 M5 实现，trim 状态机已在 M6 实现。
 建议包结构：
 
 ```text
-io.nereus.api
+com.nereusstream.api
   StreamStorage
   StreamId
   StreamName
@@ -216,7 +223,7 @@ io.nereus.api
     KeyComponentCodec
     DeterministicIds
 
-io.nereus.core
+com.nereusstream.core
   DefaultStreamStorage
   append/
     AppendCoordinator
@@ -239,7 +246,7 @@ io.nereus.core
     OrphanObjectAssessment / OrphanObjectStatus
     RecoveryMetricsObserver
 
-io.nereus.metadata.oxia
+com.nereusstream.metadata.oxia
   OxiaMetadataStore
   OxiaKeyspace
   CommitSliceRequest / CommitSliceResult
@@ -260,7 +267,7 @@ io.nereus.metadata.oxia
     CommittedSliceRecord
     TrimRecord
 
-io.nereus.objectstore
+com.nereusstream.objectstore
   ObjectStore
   PutObjectOptions
   PutObjectResult
@@ -449,7 +456,8 @@ Already settled for Phase 1:
 - adapter-private Oxia helpers 必须显式携带 partition key；fake/real contract 测试要覆盖
   get/put/scan/watch/head-CAS 的 partition key 传递；
 - `OffsetIndexCache` 只能缓存正向命中的 committed records，不能缓存 EOF/negative lookup；watch
-  事件只是 invalidation hint，丢失/乱序/合并都不能影响正确性；
+  事件只是 invalidation hint，丢失/乱序/合并都不能影响正确性；stream/record cardinality 必须受
+  `maxCachedStreams` / `maxCommitChainScan` 约束；
 - fake store、real adapter、repair/migration 工具必须共用同一 metadata codec registry，并为每个
   Phase 1 record type 保留 golden-byte 测试；
 - `cluster`、`objectId`、`sliceId` 等所有动态路径组件进入 Oxia path 或 object key 前都必须经过
