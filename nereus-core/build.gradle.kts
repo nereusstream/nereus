@@ -22,3 +22,36 @@ dependencies {
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+val phase1IntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[phase1IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[phase1IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(phase1IntegrationTest.implementationConfigurationName, platform(libs.grpc.bom))
+    add(phase1IntegrationTest.implementationConfigurationName, platform(libs.opentelemetry.bom))
+    add(phase1IntegrationTest.implementationConfigurationName, platform(libs.opentelemetry.bom.alpha))
+    add(phase1IntegrationTest.implementationConfigurationName, libs.oxia.client)
+    add(phase1IntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(phase1IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(phase1IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(phase1IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(phase1IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+tasks.register<Test>("phase1IntegrationTest") {
+    group = "verification"
+    description = "Run the M8 final Core StreamStorage integration gate."
+    testClassesDirs = phase1IntegrationTest.output.classesDirs
+    classpath = phase1IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}

@@ -91,9 +91,9 @@ M0 scaffold migration 已完成。当前代码状态：
   WAL round-trip/local-store tests 已存在。2026-07-08 M3 review 发现的 reader multi-range byte-budget 和
   local symlink escape blockers 已修复并补测试；2026-07-10 final Gradle gate 已通过。
 
-M0-M7 已完成。M7 verification passes 59 ordinary metadata tests、5 real-adapter Docker tests and 5
-capability-spike Docker tests；`./gradlew phase1Check check --rerun-tasks` executes 28 tasks successfully.
-M8 final acceptance 是 Phase 1 最后一项，只补端到端/restart/failure 验收和文档冻结，不扩展功能面。
+Phase 1 M0-M8 已完成。Final verification passes 42 core、59 metadata、23 object-store ordinary tests，
+5 real-adapter、5 capability-spike and 2 final core/Oxia/Object-WAL Docker tests. The release command is
+`./gradlew phase1FinalCheck --rerun-tasks`；M8 没有扩展功能面，只完成端到端/restart/failure 验收和冻结。
 
 Phase 1 允许的依赖方向：
 
@@ -500,5 +500,5 @@ Already settled for Phase 1:
 - trim 只推进 low-watermark，不删除 object；
 - 单元测试覆盖 offset dense、partial slice visibility、orphan object、cache stale、checksum mismatch；
 - 代码不依赖 Pulsar/KoP/ManagedLedger。
-- M7 真实 Oxia adapter 通过与 fake 共用的 contract suite 和 Docker/Testcontainers integration gate；
-  M8 还必须通过完整 core + real Oxia + local Object WAL restart/failure scenario，才宣称 Phase 1 完成。
+- done: M7 真实 Oxia adapter 通过与 fake 共用的 contract suite 和 Docker/Testcontainers gate；
+- done: M8 完整 core + real Oxia + local Object WAL restart/failure scenario 和 `phase1FinalCheck` 通过。

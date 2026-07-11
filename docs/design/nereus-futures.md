@@ -28,7 +28,7 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 | In progress；M0-M7 complete | M8 final acceptance |
+| F1 Core Stream Storage | Phase 1 M0-M8 | Implemented | Future-specific extensions |
 | F2 ManagedLedger Facade | later phase | Designed | F1 append/read API stable |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |

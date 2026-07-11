@@ -1,7 +1,8 @@
 # 08 Risk Register And Design Compromises
 
 本文集中记录 Phase 1 当前最容易误伤实现的风险假设和设计妥协。它不是替代前面文档的总纲，
-而是每个里程碑编码和 review 前必须复读的风险清单。M0-M7 已实现，当前重点是 M8 final acceptance。
+而是后续 Future 编码和 review 前必须复读的风险清单。Phase 1 M0-M8 已实现并通过 final gate；
+本文件中的 accepted compromises 仍然有效。
 
 ## 1. Oxia Conditional Multi-Write Capability
 

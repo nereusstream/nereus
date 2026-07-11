@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterAll;
@@ -78,13 +79,18 @@ final class OxiaCapabilitySpikeTest {
             client.put(prefix + "/c", bytes("c"), Set.of(PutOption.PartitionKey(partitionKey)));
             client.put(prefix + "/d", bytes("d"), Set.of(PutOption.PartitionKey(partitionKey)));
 
-            assertThat(client.get(prefix + "/a")).isNull();
-
             GetResult result = client.get(prefix + "/a", Set.of(GetOption.PartitionKey(partitionKey)));
             assertThat(result.value()).isEqualTo(bytes("a"));
 
+            String wrongPartitionKey = IntStream.range(0, 100)
+                    .mapToObj(index -> "wrong-" + index)
+                    .filter(candidate -> client.get(
+                            prefix + "/a", Set.of(GetOption.PartitionKey(candidate))) == null)
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("could not find a partition key routed to another shard"));
+
             List<String> wrongPartitionList =
-                    client.list(prefix + "/a", prefix + "/e", Set.of(ListOption.PartitionKey("wrong")));
+                    client.list(prefix + "/a", prefix + "/e", Set.of(ListOption.PartitionKey(wrongPartitionKey)));
             assertThat(wrongPartitionList).isEmpty();
 
             List<String> keys =

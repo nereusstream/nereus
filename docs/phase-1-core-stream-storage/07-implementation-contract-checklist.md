@@ -303,7 +303,8 @@ payload bytes actually returned after clipping.
 - exact stream-name hash and deterministic stream-id tests;
 - shared key/hash helper parity tests across Oxia keyspace and object key generation;
 - non-opaque payload format rejection tests;
-- M7 real Oxia shared-contract and independent Testcontainers integration tests before final Phase 1 exit;
+- M7 real Oxia shared-contract and independent Testcontainers integration tests;
+- M8 `phase1FinalCheck` production-Oxia/Object-WAL restart、orphan and post-head repair scenarios;
 - WAL object golden encode/decode tests;
 - WAL section envelope and format-version manifest tests;
 - checksum-domain tests for WAL canonical checksum versus storage checksum;

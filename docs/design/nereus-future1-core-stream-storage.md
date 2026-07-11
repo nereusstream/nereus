@@ -1,8 +1,8 @@
 # Nereus Future 1：Core Stream Storage
 
-> 状态：In progress；M0-M7 implemented，M8 final acceptance pending
+> 状态：Implemented；Phase 1 M0-M8 complete
 > 交付映射：`docs/phase-1-core-stream-storage/`
-> 当前里程碑：M8 final Phase 1 acceptance and freeze
+> 当前里程碑：Phase 1 complete；后续扩展进入对应 Future
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
 Oxia keys、failure injection 和测试 gate 以代码级文档为准；本文不复制那些合同。
@@ -352,6 +352,8 @@ Status: implemented and verified on 2026-07-11.
 - aggregate core + production Oxia + Object WAL restart/failure scenario；
 - no new feature or support-surface expansion；
 - final docs/status freeze and one explicit release gate。
+
+Status: implemented and verified on 2026-07-11 through `./gradlew phase1FinalCheck --rerun-tasks`.
 
 The full test matrix and done definition remain authoritative in
 `../phase-1-core-stream-storage/05-implementation-plan-and-tests.md`。

@@ -219,4 +219,5 @@ M7 is complete：`OxiaJavaClientMetadataStore` uses `io.github.oxia-db:oxia-clie
 record `metadataVersion` from Oxia `versionId`，passes `PartitionKey` on scoped get/put/list/range operations，
 and uses immutable commit intent plus one conditional stream-head put as the append linearization protocol.
 The independent `oxiaIntegrationTest` task passes shared fake/real contract、restart、CAS conflict、watch and
-repair-continuation scenarios against `oxia/oxia:0.16.3`. M8 remains the final end-to-end Phase 1 gate.
+repair-continuation scenarios against `oxia/oxia:0.16.3`. M8 final end-to-end gate also passes；Phase 1 is
+complete without changing the M0.5 `NOT_SUPPORTED_BY_PUBLIC_JAVA_API` conclusion.

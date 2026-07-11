@@ -106,3 +106,12 @@ tasks.register("phase1Check") {
     dependsOn(phase1L0Modules.map { "$it:test" })
     dependsOn(":nereus-metadata-oxia:compileOxiaCapabilitySpikeJava")
 }
+
+tasks.register("phase1FinalCheck") {
+    group = "verification"
+    description = "Run every ordinary and Docker-backed Phase 1 release gate."
+    dependsOn("phase1Check")
+    dependsOn(":nereus-metadata-oxia:oxiaCapabilitySpike")
+    dependsOn(":nereus-metadata-oxia:oxiaIntegrationTest")
+    dependsOn(":nereus-core:phase1IntegrationTest")
+}

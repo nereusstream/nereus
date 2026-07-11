@@ -247,7 +247,7 @@ flowchart TB
 | Module | Target responsibility | 2026-07-10 status |
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Implemented for Phase 1 |
-| `nereus-core` | coordinators and state machines | M4-M6 implemented；M8 final scenario pending |
+| `nereus-core` | coordinators and state machines | Phase 1 M4-M8 implemented and final-gated |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | M7 fake/real shared contract and Docker gates implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
 | `nereus-managed-ledger` | ManagedLedger facade | marker only |
@@ -453,7 +453,7 @@ and secondary materialization lag；这些故障的 correctness 和恢复路径�
 
 | Track | Scope | Status |
 | --- | --- | --- |
-| F1 | L0 API、Object WAL、Oxia commit、resolve/read/trim | In progress；M8 final acceptance |
+| F1 | L0 API、Object WAL、Oxia commit、resolve/read/trim | Implemented / Phase 1 |
 | F2 | ManagedLedger facade and virtual positions | Designed |
 | F3 | Cursor/subscription durable state | Designed |
 | F4 | Materialization/compaction/generation/GC | Designed |

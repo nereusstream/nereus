@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-11
-> 当前实现阶段：Future 1 / Phase 1，M0-M7 已完成；M8 final acceptance 待完成
+> 当前实现阶段：Future 1 / Phase 1，M0-M8 implemented；下一阶段为 Future 2
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -64,7 +64,7 @@ streamId + offset
 | `nereus-api` | `Implemented` | protocol-neutral values、validation、`StorageProfile`、`DurabilityLevel`、key/hash helpers |
 | `nereus-metadata-oxia` | `Implemented`（M7） | fake + production Oxia adapter、shared codecs/contract、single-key CAS、repair/watch、Docker gates |
 | `nereus-object-store` | `Implemented`（M3） | object-store API、WAL v1 writer/reader、entry index、local test fixture、checksums/tests |
-| `nereus-core` | `Implemented`（M4-M6） | append、read/resolve、trim/recovery、deadline/resource/close contracts；M8 final scenario pending |
+| `nereus-core` | `Implemented`（Phase 1） | append、read/resolve、trim/recovery、deadline/resource/close and M8 real-Oxia restart/failure gate |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
 | `nereus-managed-ledger` | `Designed` | marker module only |
@@ -126,7 +126,7 @@ end-to-end acceptance/freeze only。
 
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
-| `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `In progress`，对应 Phase 1 |
+| `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Designed` |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |

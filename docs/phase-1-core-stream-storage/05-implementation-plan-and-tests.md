@@ -1,6 +1,6 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M7 已完成，M8 final acceptance remains；
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M8 已完成；
 后续每个里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
@@ -612,10 +612,30 @@ and 28 repository-wide tasks passed. The capability result remains
 
 ### M8 Final Phase 1 acceptance and freeze
 
-M8 is an acceptance milestone added after M7；it does not add a new storage feature. It must run the complete
-`DefaultStreamStorage` flow with production Oxia plus local Object WAL，restart both storage facade and
-metadata client，exercise orphan invisibility/post-head repair/trim retention，freeze the final support matrix，
-and make one explicit `phase1FinalCheck` task include both ordinary and Docker-backed gates.
+Status: complete on 2026-07-11. M8 is an acceptance milestone added after M7；it does not add a new storage
+feature.
+
+- done: run create/session、two append、five-entry read、resolve、trim and post-trim read with production
+  Oxia plus local Object WAL；
+- done: restart `DefaultStreamStorage`、Oxia client and local object-store fixture，then read retained data and
+  append densely from offset 5 to 6 with a new writer-run identity；
+- done: inject failure after manifest/before head and prove object bytes persist while committed end stays 0，
+  read is empty and orphan assessment never authorizes delete；
+- done: delete generation-0 offset index and committed marker after a real head commit，restart clients，and
+  prove core repairs both from the reachable commit chain before reading；
+- done: add root `phase1FinalCheck` aggregating ordinary checks、M7 capability/adapter Docker gates and M8
+  end-to-end Docker gate；
+- done: remove a probabilistic M0.5 shard-routing assertion by discovering an actually different partition
+  route before testing wrong-route emptiness。
+
+Final verification:
+
+```text
+./gradlew phase1FinalCheck --rerun-tasks
+```
+
+Result: all 28 aggregate tasks passed，including 42 core、59 metadata、23 object-store ordinary tests，
+5 production-adapter、5 capability-spike and 2 final end-to-end Docker tests.
 
 ## 2. Core Test Matrix
 
