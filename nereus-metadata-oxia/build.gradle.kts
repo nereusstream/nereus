@@ -30,6 +30,10 @@ configurations[oxiaCapabilitySpike.runtimeOnlyConfigurationName].extendsFrom(
 
 dependencies {
     api(project(":nereus-api"))
+    implementation(platform(libs.grpc.bom))
+    implementation(platform(libs.opentelemetry.bom))
+    implementation(platform(libs.opentelemetry.bom.alpha))
+    implementation(libs.oxia.client)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
@@ -45,6 +49,36 @@ dependencies {
     add(oxiaCapabilitySpike.implementationConfigurationName, libs.junit.jupiter)
     add(oxiaCapabilitySpike.implementationConfigurationName, libs.assertj)
     add(oxiaCapabilitySpike.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+val oxiaIntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[oxiaIntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[oxiaIntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(oxiaIntegrationTest.implementationConfigurationName, project())
+    add(oxiaIntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(oxiaIntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(oxiaIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(oxiaIntegrationTest.implementationConfigurationName, libs.assertj)
+    add(oxiaIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+tasks.register<Test>("oxiaIntegrationTest") {
+    group = "verification"
+    description = "Run the M7 production Oxia adapter integration gate."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
 }
 
 val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")

@@ -198,7 +198,7 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
   checks；
 - mixed stream/object key group commit is not expressible on the ack path；
 - partition key is recorded by the fake store, and the package-private `PartitionedOxiaClient` helper
-  rejects missing partition keys before reaching the future real adapter backend；
+  rejects missing partition keys before reaching the M7 real adapter backend；
 - stale session token maps to `FENCED_APPEND`；
 - committed-end conflict maps to `OFFSET_CONFLICT`；
 - committed-slice marker or head-chain replay prevents duplicate same physical slice commit；
@@ -215,6 +215,8 @@ The archived pre-M0.5 design is kept in `09-legacy-oxia-multi-key-commit-design.
   metadata record type. Fake stored metadata values now persist encoded envelopes through the same codec
   registry. Future real adapter work must continue using that registry.
 
-The production adapter is now the explicit M7 Phase 1 gate。M4-M6 used the fake to implement and test core
-state machines，but Phase 1 is not complete until the real adapter passes this shared contract suite and the
-independent Docker/Testcontainers integration task。
+M7 is complete：`OxiaJavaClientMetadataStore` uses `io.github.oxia-db:oxia-client:0.9.0` public APIs，hydrates
+record `metadataVersion` from Oxia `versionId`，passes `PartitionKey` on scoped get/put/list/range operations，
+and uses immutable commit intent plus one conditional stream-head put as the append linearization protocol.
+The independent `oxiaIntegrationTest` task passes shared fake/real contract、restart、CAS conflict、watch and
+repair-continuation scenarios against `oxia/oxia:0.16.3`. M8 remains the final end-to-end Phase 1 gate.

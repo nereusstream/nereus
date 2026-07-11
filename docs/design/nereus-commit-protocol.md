@@ -438,9 +438,9 @@ For cursor/transaction domains，their own authoritative CAS state joins the fir
 
 ## 18. Implementation gates
 
-Before final Phase 1 exit，the M7 production Oxia adapter must pass the same manifest validation、single-key
-CAS、`AppendOutcome`、bounded replay/repair continuation and watch/partition contract suite as the fake，plus
-its independent Docker/Testcontainers integration gate。
+M7 production Oxia adapter now passes the same manifest validation、single-key CAS、`AppendOutcome`、bounded
+replay/repair continuation and watch/partition contract as the fake，plus its independent Docker/Testcontainers
+gate. M8 must compose that adapter with core and Object WAL for final Phase 1 exit。
 
 Before extending beyond Phase 1 strict Object WAL：
 

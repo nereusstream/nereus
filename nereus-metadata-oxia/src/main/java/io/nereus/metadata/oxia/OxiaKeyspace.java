@@ -74,8 +74,15 @@ public final class OxiaKeyspace {
                 + "/~";
     }
 
+    public String offsetIndexScanFromBeginning(StreamId streamId) {
+        return offsetIndexKey(streamId, 0, 0);
+    }
+
     public String offsetIndexScanToExclusive(StreamId streamId) {
-        return offsetIndexPrefix(streamId) + "/~";
+        return offsetIndexPrefix(streamId)
+                + "/"
+                + KeyComponentCodec.encodeNonNegativeLong(Long.MAX_VALUE)
+                + "/~";
     }
 
     public String committedSliceKey(StreamId streamId, ObjectId objectId, String sliceId) {

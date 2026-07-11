@@ -74,7 +74,7 @@ recorded in `05-implementation-plan-and-tests.md`。The final 2026-07-11
 The 2026-07-10 pre-M4 review found and closed these design/code gaps in source：
 
 - `NereusException` now carries optional structured `AppendOutcome`；
-- fake metadata and the future real adapter share `Phase1ObjectManifestValidator`；
+- fake metadata and the M7 real adapter share `Phase1ObjectManifestValidator`；
 - replay scan exhaustion is an explicit `MAY_HAVE_COMMITTED` result，not offset conflict/not-found；
 - normal new appends at current committed end and compatible metadata-only head updates do not walk old
   history，so bounded replay cannot cap the lifetime number of commits；

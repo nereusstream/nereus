@@ -31,7 +31,7 @@ M2 foundation implementation status:
   event-time/projection identity coverage, full canonical replay validation, record-level
   `offset + length` overflow checks on decoded metadata, committed-slice-marker-first replay, and
   post-commit object-audit failure injection；
-- 2026-07-07 helper pass added package-private `PartitionedOxiaClient` so future real adapter get/put/list/
+- 2026-07-07 helper pass added package-private `PartitionedOxiaClient` so production adapter get/put/list/
   rangeScan/watch/head-CAS calls cannot be built without a `PartitionKey`；
 - 2026-07-07 watch pass added collapsed and reconnect-before-current watch simulation；
 - 2026-07-07 codec/validation pass closed decoded `EntryIndexReferenceRecord` location-shape validation,
@@ -44,9 +44,9 @@ M2 foundation implementation status:
   and commit-log reuse after first-attempt head CAS failure；
 - 2026-07-10 pre-M4 hardening added structured `AppendOutcome`，shared manifest validation，bounded replay
   classification，and target-bound continuation repair with focused M2 tests；
-- M2 source work and the latest post-hardening gates are complete。On 2026-07-11,
-  `:nereus-api:test`、`:nereus-metadata-oxia:test`、`phase1Check` and `check` passed。Remaining production
-  metadata work belongs to M7。
+- M7 production work is complete。`OxiaJavaClientMetadataStore` uses the same codecs、manifest validator、
+  single-key head CAS and bounded repair contracts as the fake，and passes its independent Oxia 0.16.3
+  Testcontainers gate。
 
 ## 1. Metadata Responsibility
 

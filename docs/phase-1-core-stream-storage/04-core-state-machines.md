@@ -972,7 +972,7 @@ M4-M6 lifecycle implementation treats every constructor-injected metadata/WAL cl
 `close()` first stops append/trim/read acceptance and closes resolver watch registrations，then shares one
 global `shutdownGrace` budget while waiting for accepted trim and append work. Queued/pre-upload appends fail
 as `STORAGE_CLOSED + KNOWN_NOT_COMMITTED`. It does not close injected clients. Owned-client factories/flags
-and production background-renew wiring remain an M7 adapter/construction concern.
+and production background-renew scheduling remain deferred；M7 owns client construction and lifecycle.
 
 M4 caller cancellation is advisory: `AppendFuture.cancel` signals the shared append deadline instead of
 blindly cancelling the underlying metadata/object future. The public future therefore completes with a

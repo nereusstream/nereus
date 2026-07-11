@@ -28,7 +28,7 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M7 | In progress；M0-M3 complete | M4 append coordinator |
+| F1 Core Stream Storage | Phase 1 M0-M8 | In progress；M0-M7 complete | M8 final acceptance |
 | F2 ManagedLedger Facade | later phase | Designed | F1 append/read API stable |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
@@ -85,7 +85,7 @@ Code-level design: `../phase-1-core-stream-storage/README.md`
 
 ### Current implementation gate
 
-Phase 1 done requires M4-M7 and the full definition in
+Phase 1 done requires M0-M8 and the full definition in
 `../phase-1-core-stream-storage/05-implementation-plan-and-tests.md`。BookKeeper/async profiles are not
 part of that done definition。
 

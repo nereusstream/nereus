@@ -78,6 +78,9 @@ M0 scaffold migration 已完成。当前代码状态：
 - M6 已落地 `TrimCoordinator`、显式 read-cache invalidation、trim deadline/cancellation/close lifecycle，
   以及 metadata-driven `OrphanObjectScanner` 诊断边界；scanner 会先 repair object references，再按
   reachable head chain 分类，且所有分类都不授权物理删除；
+- M7 已落地 `OxiaJavaClientMetadataStore`、`OxiaClientConfiguration` 和 public Oxia 0.9.0 client
+  binding；真实 adapter 使用 dedicated executors、显式 `PartitionKey`、shared metadata codecs、
+  immutable commit intent + stream-head CAS，以及可恢复 derived indexes；
 - `OffsetIndexRecord` 已补齐 `payloadFormat`，因此 resolver 可以只依赖 committed offset index 构造
   `ResolvedObjectRange`，不读取 manifest、不猜测 payload format；
 - `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
@@ -88,10 +91,9 @@ M0 scaffold migration 已完成。当前代码状态：
   WAL round-trip/local-store tests 已存在。2026-07-08 M3 review 发现的 reader multi-range byte-budget 和
   local symlink escape blockers 已修复并补测试；2026-07-10 final Gradle gate 已通过。
 
-M0/M1/M2/M3/M4/M5/M6 已完成。M6 focused core gate passes 42 tests（原有 32 + M6 10）；M6 final
-`./gradlew phase1Check check --rerun-tasks` executed 28 tasks successfully. M4-M6 证明的是 fake metadata +
-local Object WAL reference path，production Oxia adapter 仍由 M7 gate
-负责。
+M0-M7 已完成。M7 verification passes 59 ordinary metadata tests、5 real-adapter Docker tests and 5
+capability-spike Docker tests；`./gradlew phase1Check check --rerun-tasks` executes 28 tasks successfully.
+M8 final acceptance 是 Phase 1 最后一项，只补端到端/restart/failure 验收和文档冻结，不扩展功能面。
 
 Phase 1 允许的依赖方向：
 
@@ -499,4 +501,4 @@ Already settled for Phase 1:
 - 单元测试覆盖 offset dense、partial slice visibility、orphan object、cache stale、checksum mismatch；
 - 代码不依赖 Pulsar/KoP/ManagedLedger。
 - M7 真实 Oxia adapter 通过与 fake 共用的 contract suite 和 Docker/Testcontainers integration gate；
-  在此之前 M4-M6 只证明 core semantic reference path，不宣称完整 Oxia-backed Phase 1 已完成。
+  M8 还必须通过完整 core + real Oxia + local Object WAL restart/failure scenario，才宣称 Phase 1 完成。

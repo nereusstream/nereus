@@ -1,8 +1,8 @@
 # Nereus Future 1：Core Stream Storage
 
-> 状态：In progress
+> 状态：In progress；M0-M7 implemented，M8 final acceptance pending
 > 交付映射：`docs/phase-1-core-stream-storage/`
-> 当前里程碑：M0-M3 与 pre-M4 hardening gate complete，M4 append coordinator next
+> 当前里程碑：M8 final Phase 1 acceptance and freeze
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
 Oxia keys、failure injection 和测试 gate 以代码级文档为准；本文不复制那些合同。
@@ -43,22 +43,21 @@ F1 does not own：
 
 ## 3. Current Phase 1 boundary
 
-### 3.1 Implemented through M3
+### 3.1 Implemented through M7
 
 | Area | Implemented |
 | --- | --- |
 | API | values、validation、canonicalization、errors、profile/durability enums |
-| Metadata | records、binary-v1 codec、keyspace、partition wrapper、fake head-CAS store、repair/watch tests |
+| Metadata | fake + production Oxia adapter、binary-v1 codec、partition wrapper、head-CAS、repair/watch tests |
 | Object WAL | v1 writer/reader、multi-slice object、footer entry index、CRC32C、local fixture |
-| Build | protocol-neutral dependency guard、Phase 1 tasks |
+| Core | append、resolve/read、trim/recovery、resource/deadline/close state machines |
+| Build | protocol-neutral dependency guard、ordinary/Docker Phase 1 tasks |
 
-### 3.2 Pending M4-M7
+### 3.2 Pending M8
 
-- `DefaultStreamStorage` append coordinator and per-stream sequencer；
-- strict append result/replay/timeout behavior；
-- resolve/read cache and repair path；
-- trim/recovery/close/backpressure integration；
-- production Oxia adapter、shared fake/real contract suite and Testcontainers restart/failure gate。
+- full `DefaultStreamStorage` + production Oxia + local Object WAL end-to-end scenario；
+- facade/client restart、orphan invisibility、post-head repair and trim-retention acceptance；
+- final support-matrix/document freeze and `phase1FinalCheck` aggregate gate。
 
 ### 3.3 Supported profile
 
@@ -346,14 +345,22 @@ F2 and F5 own parsing/projection。They cannot reinterpret F1 offset allocation 
 - shared codecs、manifest validator、append outcomes and bounded replay/repair contract tests；
 - Docker/Testcontainers persistence、restart、failure and exception-mapping gate。
 
+Status: implemented and verified on 2026-07-11.
+
+### M8 final acceptance
+
+- aggregate core + production Oxia + Object WAL restart/failure scenario；
+- no new feature or support-surface expansion；
+- final docs/status freeze and one explicit release gate。
+
 The full test matrix and done definition remain authoritative in
 `../phase-1-core-stream-storage/05-implementation-plan-and-tests.md`。
 
 ## 14. F1 exit and deferred work
 
-F1 Phase 1 exits when Object WAL sync append/read/trim works end to end without protocol dependencies and
-the M7 production Oxia adapter passes its shared contract and independent integration gates。M6's fake/local
-scenario is a semantic reference milestone，not the final Oxia-backed exit。
+F1 Phase 1 exits when M8 proves Object WAL sync append/read/trim end to end with production Oxia，including
+restart and repair boundaries. M7's adapter gates are complete prerequisites，not by themselves the final
+facade-level release scenario。
 
 Explicitly deferred：
 

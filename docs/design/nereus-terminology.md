@@ -117,7 +117,7 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 
 - **Future 1-8**：稳定的 capability-track 编号，不代表统一处于未来。
 - **Phase 1**：当前 Future 1 的代码级交付阶段。
-- **M0-M7**：Phase 1 内部里程碑；M7 是 production Oxia adapter/integration exit gate。
+- **M0-M8**：Phase 1 内部里程碑；M7 是 production Oxia adapter gate，M8 是最终端到端验收/冻结。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

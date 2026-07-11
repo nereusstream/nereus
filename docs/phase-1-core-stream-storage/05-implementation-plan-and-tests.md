@@ -1,7 +1,6 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M6 已完成，M7 production Oxia adapter and
-integration gate remain；M6 focused verification passes 42 core tests；
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M7 已完成，M8 final acceptance remains；
 后续每个里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
@@ -249,7 +248,7 @@ M2 review follow-ups before exit:
 - done: require manifest ordinal/list-order agreement and ordered non-overlapping positive slice ranges，
   reject duplicate stream/slice identities in object-reference records，and canonicalize reference-list
   order independent of commit arrival order；
-- review-open: future real adapter must use the same `MetadataCodecRegistry` as the fake store。
+- done: M7 real adapter uses the same `Phase1MetadataCodecs` registry as the fake store。
 
 Tasks:
 
@@ -451,8 +450,8 @@ Exit:
 
 Implementation boundary immediately after M4：`DefaultStreamStorage.read/resolve/trim` returned explicit
 milestone errors. M5 replaced read/resolve and M6 replaced trim with implemented state machines.
-Constructor-injected clients remain externally owned；owned-client factory and production background-renew
-wiring belong with M7 adapter construction. The production Oxia adapter remains M7.
+Constructor-injected clients remain externally owned；M7 now provides production Oxia client construction
+and lifecycle. Automatic background session-renew scheduling remains outside the Phase 1 facade.
 
 Verification completed on 2026-07-11:
 
@@ -567,6 +566,8 @@ executed 28 tasks successfully，including all L0 tests，the dependency guard a
 
 ### M7 Real Oxia adapter and integration gate
 
+Status: implemented and verified on 2026-07-11.
+
 Module:
 
 ```text
@@ -575,13 +576,18 @@ nereus-metadata-oxia
 
 Tasks:
 
-- implement the production Oxia Java client binding using the selected public single-key APIs；
-- reuse `Phase1MetadataCodecs` and `Phase1ObjectManifestValidator`，with no fake-only commit capability；
-- run the same stream/session/manifest/head-CAS/replay/repair/watch contract suite against fake and real
+- done: implement `OxiaJavaClientMetadataStore` using Oxia client 0.9.0 public single-key APIs and explicit
+  partition keys；
+- done: reuse `Phase1MetadataCodecs` and `Phase1ObjectManifestValidator`，with hydrated Oxia `versionId`
+  and no fake-only commit capability；
+- done: run the same stream/session/manifest/head-CAS/replay/repair contract scenario against fake and real
   adapters；
-- add Docker/Testcontainers tests for restart persistence，CAS conflict mapping，partition-key routing，
-  replay scan exhaustion，repair continuation and post-head failure recovery；
-- define production client lifecycle/configuration and exception-to-`NereusException`/`AppendOutcome` mapping。
+- done: add Docker/Testcontainers tests for adapter restart persistence，same-offset CAS conflict mapping，
+  watch delivery，repair continuation and post-head derived-index recovery；
+- done: define `OxiaClientConfiguration`，dedicated operation/client executors，single notification stream
+  fan-out and exception-to-`NereusException`/`AppendOutcome` mapping；
+- done: fix real Oxia offset-index list upper bound to a fixed-width `Long.MAX_VALUE` endpoint rather than
+  the invalid `/~` shortcut。
 
 Exit:
 
@@ -590,6 +596,26 @@ Exit:
 - no operation assumes multi-key conditional atomicity；
 - `phase1Check` keeps Docker optional，while a separate real-adapter integration task is mandatory for the
   final Phase 1 release gate。
+
+M7 verification:
+
+```text
+./gradlew :nereus-metadata-oxia:test --rerun-tasks
+./gradlew :nereus-metadata-oxia:oxiaIntegrationTest --rerun-tasks
+./gradlew :nereus-metadata-oxia:oxiaCapabilitySpike --rerun-tasks
+./gradlew phase1Check check --rerun-tasks
+```
+
+Results: 59 ordinary metadata tests、5 production-adapter Docker tests、5 capability-spike Docker tests，
+and 28 repository-wide tasks passed. The capability result remains
+`NOT_SUPPORTED_BY_PUBLIC_JAVA_API`，which matches the implemented single-key head-CAS protocol.
+
+### M8 Final Phase 1 acceptance and freeze
+
+M8 is an acceptance milestone added after M7；it does not add a new storage feature. It must run the complete
+`DefaultStreamStorage` flow with production Oxia plus local Object WAL，restart both storage facade and
+metadata client，exercise orphan invisibility/post-head repair/trim retention，freeze the final support matrix，
+and make one explicit `phase1FinalCheck` task include both ordinary and Docker-backed gates.
 
 ## 2. Core Test Matrix
 

@@ -1,7 +1,7 @@
 # 08 Risk Register And Design Compromises
 
 本文集中记录 Phase 1 当前最容易误伤实现的风险假设和设计妥协。它不是替代前面文档的总纲，
-而是每个里程碑编码和 review 前必须复读的风险清单。M0-M6 已实现，当前重点是 M7 及后续。
+而是每个里程碑编码和 review 前必须复读的风险清单。M0-M7 已实现，当前重点是 M8 final acceptance。
 
 ## 1. Oxia Conditional Multi-Write Capability
 
@@ -235,7 +235,7 @@ Controls：
   `INLINE`/`OBJECT_FOOTER`/`INDEX_OBJECT` shape rules as public `EntryIndexRef`；
 - done: `Phase1MetadataCodecs` has strict UTF-8 decode plus per-record round-trip/golden/error-path tests；
 - done: fake metadata stored values are codec-backed and use `Phase1MetadataCodecs` envelopes；
-- review-open: future real adapter must use the same metadata codec registry as the fake store；
+- done: M7 real adapter uses the same `Phase1MetadataCodecs` registry as the fake store；
 - `StreamStorageConfig` 包含 read memory/concurrency 限流项；
 - `WalObjectReader` full-slice read 先预留内存，后读取对象；
 - read amplification metrics 已在 `StreamStorageMetrics` 命名；
