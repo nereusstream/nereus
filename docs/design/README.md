@@ -13,7 +13,7 @@
 5. `nereus-futures.md`：能力轨道、依赖关系和交付顺序；
 6. 文件名以 `nereus-futureN-` 开头的文档：各能力轨道详细设计。
 
-Future 1 / Phase 1 已完成。当前轨道是 Future 2：F2-M0 design/API spike 已完成，F2-M1
-projection model 是下一实现里程碑。L0 已实现合同以
+Future 1 / Phase 1 已完成。当前轨道是 Future 2：F2-M0 API spike 和 F2-M0R code-level review
+已完成，F2-M1 projection model 是下一实现里程碑。L0 已实现合同以
 `../phase-1-core-stream-storage/README.md` 为准；active F2 合同、里程碑和 gate 以
 `../phase-2-managed-ledger-facade/README.md` 及该目录下的编号文档为准。

@@ -245,6 +245,23 @@ Bounded chain-search exhaustion is also not proof of non-commit；it returns ret
 progression。Derived-index repair pages count every scanned commit and carry the original observed-head
 anchor plus the exact expected tuple for the next commit。
 
+### 8.1 In-process append recovery handle
+
+Future 2 exposes a callback API that must choose one terminal `addComplete` or `addFailed`. `AppendOutcome` alone says
+how certain the result is but does not identify which physical attempt to replay. Therefore every public append failure
+after the head request is sent also carries an opaque `AppendAttemptId`。
+
+The core retains the exact `CommitSliceRequest`、WAL result and slice behind that ID. `recoverAppend` replays only that
+identity and either returns the original `AppendResult` or preserves/increases certainty. It cannot prepare a new WAL
+object. A stream lane with a non-known attempt remains suspended until recovery returns committed, proves
+`KNOWN_NOT_COMMITTED` by complete commit-identity inspection, or reaches a permanent invariant failure; observing only
+that the head advanced is insufficient because another writer may own the new range。Historical inspection is paged
+from an immutable observed-head anchor and retains its continuation across recovery calls；retrying the newest bounded
+page is not progress。The original mutation runner must quiesce before that anchor can prove non-commit。A committed or
+proven-uncommitted terminal releases retained attempt capacity；a permanent invariant leaves the facade write-fenced。
+
+This is an in-process callback-recovery contract, not producer-sequence deduplication across broker crashes。
+
 ## 9. AutoMQ-like async materialization
 
 > Status: Designed/Reserved

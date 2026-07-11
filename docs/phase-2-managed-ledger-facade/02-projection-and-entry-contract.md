@@ -1,6 +1,6 @@
 # Projection and Pulsar Entry Contract
 
-F2-M0 chooses one concrete Position projection for the first implementation. This removes the
+F2-M0R chooses one concrete Position projection for the first implementation. This removes the
 rollover/allocation ambiguity in the Future 2 overview while preserving a version field for a later
 projection format.
 
@@ -12,7 +12,7 @@ The durable coordinate remains:
 StreamId + non-negative stream offset
 ```
 
-The Pulsar compatibility coordinate is:
+The Pulsar compatibility coordinate for one topic incarnation is:
 
 ```text
 Position(virtualLedgerId, entryId)
@@ -21,15 +21,23 @@ Position(virtualLedgerId, entryId)
 F2 mapping version 1 is:
 
 ```text
-one stream                  <-> one virtual ledger
+one topic incarnation       <-> one stream <-> one virtual ledger
 one persisted Pulsar Entry  <-> one stream offset
 Position.ledgerId           == projection.virtualLedgerId
 Position.entryId            == stream offset
 MessageId.batchIndex        == sub-index inside the persisted Pulsar Entry
 ```
 
-There is no virtual-ledger rollover in Future 2. Physical Object WAL objects, slices, append sessions,
-broker unloads and compaction generations never change the virtual ledger ID.
+The independent durable payload mapping name is `PULSAR_ENTRY_V1`. It is stored in the L0 stream attribute
+`nereus.payloadMapping` and in the authoritative topic projection. Position mapping version 1 and
+`PULSAR_ENTRY_V1` are both required: the first defines coordinates; the second defines that the bytes at one
+coordinate are one complete opaque Pulsar entry. A future KoP adapter must reject this mapping instead of
+assuming each message in a Pulsar batch already has its own L0 offset.
+
+There is no virtual-ledger rollover within an incarnation. Physical Object WAL objects, slices, append sessions,
+broker unloads and compaction generations never change the virtual ledger ID. Logical delete followed by same-name
+topic recreation creates a new incarnation, deterministic stream ID and virtual ledger ID; stale MessageIds then fail
+the ledger-ID check instead of addressing the new topic.
 
 ## 2. Code-level Model
 
@@ -39,33 +47,42 @@ Target package in `nereus-managed-ledger`:
 public record VirtualLedgerProjection(
         StreamId streamId,
         String managedLedgerName,
+        long storageClassBindingGeneration,
+        long incarnation,
         long virtualLedgerId,
         int mappingVersion,
+        String payloadMapping,
         long createdAtMillis,
         long metadataVersion) {
 }
 
 public final class PositionProjection {
-    public Position toPosition(VirtualLedgerProjection projection, long offset);
+    public StreamPositionBounds bounds(
+            VirtualLedgerProjection projection,
+            StreamMetadata stream);
 
-    public long toOffset(
+    public Position entryPosition(VirtualLedgerProjection projection, long offset);
+
+    public long requireReadableEntryOffset(
             VirtualLedgerProjection projection,
             Position position,
             StreamMetadata stream);
 
-    public Position lastConfirmed(
+    public long requireReadPositionOffset(
             VirtualLedgerProjection projection,
+            Position position,
             StreamMetadata stream);
 
-    public Position firstAvailableEntry(
+    public long markDeleteOffsetAfter(
             VirtualLedgerProjection projection,
-            StreamMetadata stream);
-
-    public Position beforeFirstAvailable(
-            VirtualLedgerProjection projection,
+            Position position,
             StreamMetadata stream);
 }
 ```
+
+The complete role-specific target API, including read-position output and max-position normalization, is locked in
+`06-code-level-interface-contract.md`. A generic `toOffset` is forbidden because a readable entry, one-past-tail read
+position and before-first mark-delete position have different valid ranges.
 
 Pulsar types remain in `nereus-managed-ledger`. Durable record types in
 `nereus-metadata-oxia` store primitive fields and do not import Pulsar.
@@ -73,10 +90,19 @@ Pulsar types remain in `nereus-managed-ledger`. Durable record types in
 Validation:
 
 - `virtualLedgerId >= 2^62` and `virtualLedgerId < Long.MAX_VALUE`;
+- `storageClassBindingGeneration >= 1` and equals the fork-owned storage-class permit captured for this open；
+- `incarnation >= 1` and equals the authoritative topic record's current incarnation；
 - `mappingVersion == 1`;
+- `payloadMapping.equals("PULSAR_ENTRY_V1")` and the entire L0 stream attribute map equals exactly
+  `{nereus.payloadMapping=PULSAR_ENTRY_V1}`；
 - managed-ledger name and stream ID exactly match the authoritative topic projection;
-- ordinary positions require the matching ledger ID and `entryId >= 0`;
-- `entryId == -1` is allowed only as the before-first/empty sentinel;
+- readable entries require the matching ledger ID and
+  `trimOffset <= entryId < committedEndOffset`；
+- next-read positions additionally allow `entryId == committedEndOffset`；
+- mark-delete positions allow exactly `trimOffset - 1` through `committedEndOffset - 1`；
+- inclusive max-position input accepts null/`EARLIEST`/`LATEST` or a same-ledger entry ID `>= -1`; it normalizes
+  trimmed values to before-first and future values to current LAC rather than issuing object IO；
+- `entryId == -1` is legal only when the role permits the before-first/empty position；
 - other negative values are invalid;
 - conversion uses checked arithmetic and never narrows a long offset to int.
 
@@ -89,16 +115,28 @@ For mapping version 1:
 | Empty stream LAC | `(virtualLedgerId, -1)` |
 | Non-empty stream LAC | `(virtualLedgerId, committedEndOffset - 1)` |
 | First available entry when data exists | `(virtualLedgerId, trimOffset)` |
-| Cursor sentinel before first available | `(virtualLedgerId, trimOffset - 1)` |
+| Position before first available | `(virtualLedgerId, trimOffset - 1)` |
+| One-past-tail read position | `(virtualLedgerId, committedEndOffset)` |
 | Read EOF boundary | `entryId >= committedEndOffset` |
 | Trimmed position | `0 <= entryId < trimOffset` |
 
 `trimOffset - 1` is safe because `trimOffset` is non-negative; when it is zero the result is the
 legal `-1` sentinel. Trimming never renumbers an entry and never changes the ledger ID.
 
-`PositionFactory.EARLIEST` (`-1:-1`) is an input sentinel, not a stored Nereus position. An open/read
-operation normalizes it to `beforeFirstAvailable`. `PositionFactory.LATEST` is normalized from the
-current stream snapshot. Returned ordinary positions always contain the Nereus virtual ledger ID.
+`PositionFactory.EARLIEST` (`-1:-1`) and `LATEST` are input sentinels, not stored Nereus positions. Normalization is
+method-specific:
+
+- `ManagedLedger.getFirstPosition()` returns `beforeFirstAvailable`；
+- `openReadOnlyCursor(EARLIEST)` starts reading at `trimOffset`；
+- `openReadOnlyCursor(LATEST)` starts at `committedEndOffset`；
+- an earliest durable/non-durable cursor has mark-delete at `trimOffset-1` and read position at `trimOffset`；
+- a latest durable/non-durable cursor has mark-delete at LAC and read position at `committedEndOffset`；
+- direct `asyncReadEntry` accepts neither sentinel。
+
+For cursor read overloads, null/`LATEST` inclusive max means current LAC, while `EARLIEST` means before-first and
+therefore produces an empty read. A non-sentinel max with the wrong virtual ledger ID is invalid.
+
+Returned positions always contain the current Nereus virtual ledger ID.
 
 A sealed stream has the same LAC as its final committed snapshot. An empty sealed stream returns the
 empty sentinel. Append after seal fails with the managed-ledger terminated classification.
@@ -109,12 +147,13 @@ The Pulsar `Position` comparator orders by ledger ID and then entry ID. Hash-der
 concurrently allocated rollover IDs can violate stream order. Publishing a projection after each L0
 append also adds a crash window between the L0 linearization point and the producer callback.
 
-One virtual ledger gives:
+One virtual ledger per incarnation gives:
 
 - direct, order-preserving conversion;
 - no per-append projection write;
 - no append/projection dual commit;
-- restart stability from one small Oxia record;
+- restart stability from one small Oxia record；
+- safe same-name recreation through a new incarnation/ledger ID；
 - no dependency on physical object boundaries;
 - exact entry counts from `committedEndOffset - trimOffset`.
 
@@ -124,12 +163,21 @@ design and mixed-version tests; it is not a transparent optimization.
 
 ## 5. Pulsar Entry Encoding
 
-Target codec:
+Target codec signatures below omit method bodies:
 
-```java
+```text
 public final class PulsarEntryCodec {
+    private final int maxEntryBytes;
+
+    public PulsarEntryCodec(int maxEntryBytes) {
+        if (maxEntryBytes <= 0) {
+            throw new IllegalArgumentException("maxEntryBytes must be positive");
+        }
+        this.maxEntryBytes = maxEntryBytes;
+    }
+
     public EncodedAppend encode(ByteBuf source, int numberOfMessages);
-    public Entry decode(Position position, ReadBatch batch);
+    public Entry decode(Position position, ReadResult result);
 }
 
 public record EncodedAppend(
@@ -141,7 +189,9 @@ public record EncodedAppend(
 
 Encoding rules:
 
-1. Validate `source != null`, `source.readableBytes() > 0` and `numberOfMessages >= 1`.
+1. Validate `source != null`, `0 <= source.readableBytes() <= maxEntryBytes` and
+   `numberOfMessages >= 1`. A zero-byte entry is legal and still consumes one offset, matching L0 and the locked
+   ManagedLedger surface.
 2. Copy exactly `readableBytes()` starting at `readerIndex()`; do not mutate reader/writer indices.
 3. Do not decode, recompress, reframe or checksum-strip Pulsar bytes.
 4. Produce one `AppendEntry` with:
@@ -153,6 +203,15 @@ Encoding rules:
 5. Produce one-entry `AppendBatch` with `PayloadFormat.OPAQUE_RECORD_BATCH`,
    `recordCount=1`, `entryCount=1` and no projection hints.
 6. The append result must cover exactly `[offset, offset + 1)`.
+
+The stream-level `nereus.payloadMapping=PULSAR_ENTRY_V1` attribute is immutable after stream creation. Per-entry
+`pulsar.entryFormatVersion=1` and `pulsar.numberOfMessages` are write-index/audit metadata, not a substitute for the
+stream-level admission gate. The current L0 `ReadBatch` does not expose entry attributes, so F2 read correctness must
+not pretend to validate them; a future consumer that needs them must first version and extend the L0 read surface.
+
+F2 rejects a non-null `ManagedLedgerInterceptor` before the append reaches this codec. Ignoring an interceptor would
+make callback bytes differ from the bytes the broker expects to have persisted; partially emulating payload processors
+is outside F2.
 
 F2 does not switch to `PULSAR_ENTRY_BATCH`: Phase 1 currently rejects that payload format. Changing
 the format requires a separately versioned L0 implementation, not a facade-only label change.
@@ -190,8 +249,13 @@ Before invoking `addComplete`, validate:
 - result range length is one;
 - result payload format is `OPAQUE_RECORD_BATCH`;
 - result record/entry counts are one;
+- result generation is zero, logical bytes equal the copied entry length, and schema/projection refs are empty；
 - result committed end equals range end;
-- current projection still matches the authoritative topic record.
+- the facade is still open on the same projection incarnation.
+
+The last check is local plus lifecycle fencing; it does not add a projection metadata read to every append. A current
+topic incarnation cannot be replaced until its L0 stream has reached logical delete and the old facade has stopped
+admission.
 
 The callback receives a read-only `ByteBuf` containing exact persisted bytes and valid for the callback
 duration. The facade releases its callback buffer after the callback returns. Callback code that needs
@@ -205,15 +269,18 @@ A one-entry read:
 1. take one stream metadata snapshot;
 2. validate/normalize Position against that snapshot;
 3. reject trimmed positions before object IO;
-4. call `StreamStorage.read(streamId, entryId, ReadOptions(maxRecords=1, ...))`;
-5. require exactly one `ReadBatch` starting at `entryId` with range length one;
+4. call `StreamStorage.read(streamId, entryId,
+   ReadOptions(maxRecords=1, maxBytes=factoryConfig.maxEntryBytes(), ...))`;
+5. require `ReadResult.streamId/requestedOffset` to match, exactly one `ReadBatch` starting at `entryId`, range length
+   one, `OPAQUE_RECORD_BATCH`, empty schema/projection refs, payload length `<= maxEntryBytes`, and
+   `nextOffset == entryId + 1`;
 6. wrap its bytes in a Nereus `Entry` whose Position is the requested Position;
 7. complete the read callback on the callback executor.
 
-Range/cursor reads walk dense offsets and stop before the first entry that would exceed
-`maxEntries`, `maxSizeBytes` or `maxPosition`. The first entry may exceed `maxSizeBytes` only if
-the locked Pulsar dispatcher contract requires one-entry progress; this behavior must be covered by a
-broker test before implementation is accepted.
+Range/cursor reads use the code-level one-entry loop in `06`. They walk dense offsets and stop before the next entry
+that would exceed `maxEntries`, `maxSizeBytes` or inclusive `maxPosition`. When data exists, the first entry is returned
+even if it exceeds the caller's `maxSizeBytes`, matching the locked stock cursor's progress behavior; the L0 request
+uses `maxEntryBytes`, not the smaller dispatcher budget.
 
 Every returned `Entry` owns one buffer reference. The caller releases it. Failure paths release all
 entries accumulated before the failure.
@@ -228,7 +295,13 @@ F2-M1 requires deterministic tests for:
 - wrong ledger ID, negative entry IDs and future positions;
 - trim at 0, trim in the middle and fully trimmed streams;
 - Position round trip after reconstructing projection from encoded golden bytes;
+- delete/recreate produces a higher incarnation, a different stream ID and a different virtual ledger ID；
+- storage-class binding generation mismatch rejects open before Position conversion；
+- stale positions from the deleted incarnation are rejected against the new projection；
+- readable-entry, next-read, mark-delete and max-position roles enforce different boundaries；
+- `getFirstPosition()` returns before-first while read-only EARLIEST starts at the first retained entry；
 - batchIndex does not affect stream offset;
 - input `ByteBuf` indices/reference count are unchanged by encoding;
 - callback bytes equal the exact readable source slice;
-- append/read payload round trip for a batched Pulsar Entry treated opaquely.
+- append/read payload round trip for a batched Pulsar Entry treated opaquely；
+- zero-byte entry round trip consumes one offset and cannot stall a cursor read loop；

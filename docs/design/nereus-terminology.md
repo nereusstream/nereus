@@ -87,17 +87,19 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 | Term | Nereus meaning |
 | --- | --- |
 | ManagedLedger facade | 让 Pulsar broker runtime 使用 `StreamStorage` 的兼容层 |
-| Virtual ledger | committed stream ranges 的稳定 Pulsar coordinate projection |
-| `Position(ledgerId, entryId)` | 通过 projection/entry index 映射到 stream entry range |
-| `MessageId(..., batchIndex)` | 映射到 entry 内具体 record offset |
+| Storage-class binding | broker metadata 中按 topic lifetime 单键选择 `bookkeeper`/`nereus` 的状态；不保存 offset/bytes |
+| Projection incarnation | 同名 topic 的一次 Nereus projection 生命期；Nereus delete/recreate 产生新 stream 和 virtual ledger |
+| Virtual ledger | 一个 projection incarnation 内 committed stream ranges 的稳定 Pulsar coordinate projection |
+| `Position(ledgerId, entryId)` | 通过当前 incarnation projection 映射到 stream entry/read/mark-delete coordinate；角色决定合法边界 |
+| `MessageId(..., batchIndex)` | F2 映射为 persisted-entry offset + entry 内 sub-index；`batchIndex` 不消耗 L0 offset |
 | ManagedCursor | Oxia cursor state + optional immutable snapshot object 的 facade |
-| Mark-delete | first not cumulatively acknowledged stream offset |
+| Mark-delete | first not cumulatively acknowledged persisted-entry offset；partial batch 由 entry-keyed ack set 表示 |
 
 ### Kafka / KoP
 
 | Term | Nereus meaning |
 | --- | --- |
-| Kafka offset | 等于 Nereus record offset |
+| Kafka offset | 在 Kafka-compatible/canonical payload mapping 中等于 Nereus record offset；不能直接套用到 `PULSAR_ENTRY_V1` batch entry |
 | Log end/high watermark | 由 stream head 的 `committedEndOffset` 派生 |
 | Fetch target | offset resolver 选择的 current physical generation |
 | Group offset | Kafka group 独有的 Oxia state；不等于 Pulsar cursor |
@@ -116,8 +118,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 ## 7. Delivery terms
 
 - **Future 1-8**：稳定的 capability-track 编号，不代表统一处于未来。
-- **Phase 1**：当前 Future 1 的代码级交付阶段。
+- **Phase 1**：已完成的 Future 1 代码级交付阶段。
 - **M0-M8**：Phase 1 内部里程碑；M7 是 production Oxia adapter gate，M8 是最终端到端验收/冻结。
+- **F2-M0R**：Future 2 API spike 后的代码级复审；锁定 incarnation、append recovery、method matrix 和
+  runtime bootstrap，仍不代表 facade 已实现。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

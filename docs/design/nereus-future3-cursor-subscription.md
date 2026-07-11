@@ -107,9 +107,10 @@ Cursor state 中的核心字段：
 
 | Field | Meaning |
 | --- | --- |
-| `markDeleteOffset` | first not cumulatively acknowledged record offset |
+| `markDeleteOffset` | first persisted-entry offset not cumulatively acknowledged |
 | `readPositionOffset` | next offset the broker should try to dispatch; recovery hint, not ack truth |
-| `individualAckRanges` | acked ranges above `markDeleteOffset`, represented as half-open stream offsets |
+| `individualAckRanges` | fully acknowledged persisted-entry ranges above `markDeleteOffset`, represented as half-open stream offsets |
+| `partialBatchAckSets` | remaining-message bitset keyed by persisted-entry offset for partially acknowledged Pulsar batch entries |
 | `ackSnapshotRef` | object snapshot reference when ack ranges are too large for Oxia value |
 | `cursorVersion` | CAS version for cursor update |
 
@@ -118,12 +119,18 @@ This means:
 ```text
 all offsets < markDeleteOffset are acknowledged
 offsets in individualAckRanges are acknowledged
+an offset in partialBatchAckSets is still readable, but its cleared message indexes are acknowledged
 other offsets >= markDeleteOffset are not acknowledged
 ```
 
 `readPositionOffset` may move ahead of `markDeleteOffset` while messages are dispatched but not acked.
 After broker failover it can be used as a recovery hint, but correctness must be recomputed from
-`markDeleteOffset + individualAckRanges`.
+`markDeleteOffset + individualAckRanges + partialBatchAckSets`.
+
+Future 2 persists one Pulsar entry as exactly one stream offset. It does **not** split a batch entry into one
+offset per message. Consequently, a batch index can never be projected to a stream sub-range. The persisted
+`BatchAckSet` uses Pulsar's convention: a set bit means “still unacknowledged”; updates merge with bitwise AND;
+an empty bitset promotes that whole entry offset into `individualAckRanges`.
 
 ## 6. API Mapping
 
@@ -133,8 +140,8 @@ After broker failover it can be used as a recovery hint, but correctness must be
 | --- | --- |
 | `readEntries` / `asyncReadEntries` | read from `readPositionOffset`, skip acknowledged ranges, advance read-position hint |
 | `readEntriesOrWait` | register waiter on stream notification when no committed offset is available |
-| `markDelete(Position)` | convert position to offset range end, CAS-advance `markDeleteOffset` |
-| `delete(Position)` | add individual ack range, normalize, maybe advance `markDeleteOffset` |
+| `markDelete(Position)` | whole entry: CAS-advance `markDeleteOffset` to `entryOffset + 1`; position with ack set: cumulatively acknowledge earlier entries and persist the target entry's partial batch set |
+| `delete(Position)` | whole entry: add one entry range; position with ack set: merge the target entry's partial batch set; normalize and maybe advance `markDeleteOffset` |
 | `delete(Iterable<Position>)` | batch individual ack update |
 | `getReadPosition` | project `readPositionOffset` to `Position` |
 | `getMarkDeletedPosition` | project `markDeleteOffset - 1` to `Position` if available |
@@ -161,16 +168,16 @@ interface CursorStorage {
             StreamId streamId,
             String cursorName);
 
-    CompletableFuture<CursorUpdateResult> markDelete(
+    CompletableFuture<CursorUpdateResult> cumulativeAck(
             StreamId streamId,
             String cursorName,
-            Offset markDeleteOffset,
+            EntryAck acknowledgement,
             CursorUpdateOptions options);
 
     CompletableFuture<CursorUpdateResult> individualAck(
             StreamId streamId,
             String cursorName,
-            List<OffsetRange> ackRanges,
+            List<EntryAck> acknowledgements,
             CursorUpdateOptions options);
 
     CompletableFuture<CursorUpdateResult> updateReadPosition(
@@ -185,9 +192,31 @@ interface CursorStorage {
             Offset readPositionOffset,
             SeekOptions options);
 }
+
+record EntryAck(
+        Offset entryOffset,
+        Optional<BatchAckSet> partialBatchAckSet) {
+}
+
+record BatchAckSet(int batchSize, long[] remainingIndexes) {
+    BatchAckSet {
+        remainingIndexes = remainingIndexes.clone();
+        // validate batchSize > 0 and every set bit < batchSize
+    }
+
+    @Override
+    public long[] remainingIndexes() {
+        return remainingIndexes.clone();
+    }
+}
 ```
 
-All update methods use Oxia CAS against `cursorVersion`.
+`partialBatchAckSet = Optional.empty()` means the whole persisted entry is acknowledged. `remainingIndexes`
+must be copied on API ingress/egress, must not contain a set bit `>= batchSize`, and is merged with an existing
+set using bitwise AND. The facade obtains `batchSize` by resolving the persisted entry and decoding its Pulsar
+metadata before calling `CursorStorage`; an ack-set `Position` alone cannot reliably reveal trailing cleared
+indexes. A resolution/parse failure fails the ack and performs no cursor CAS. All update methods use Oxia CAS
+against `cursorVersion`.
 
 ## 7. Oxia Metadata Schema
 
@@ -212,6 +241,9 @@ All update methods use Oxia CAS against `cursorVersion`.
   "individualAckInline": [
     {"startOffset": 1049600, "endOffset": 1049664},
     {"startOffset": 1050000, "endOffset": 1050100}
+  ],
+  "partialBatchAckInline": [
+    {"entryOffset": 1050120, "batchSize": 10, "remainingIndexes": [960]}
   ],
   "ackSnapshotRef": "cursor-snapshots/s-123/sub-a/snap-42",
   "ackSnapshotVersion": 42,
@@ -260,8 +292,9 @@ AckRangeSection
   ranges[startOffset,endOffset)
 
 BatchAckSection
-  entryProjectionRef
-  batchAckSet
+  entryOffset
+  batchSize
+  remainingIndexes
 
 Footer
   minAckOffset
@@ -319,13 +352,15 @@ Position p
 
 Steps:
 
-1. Map `Position` to entry offset range.
-2. Compute `newMarkDeleteOffset = entryEndOffset`.
-3. Verify `newMarkDeleteOffset >= current.markDeleteOffset`.
-4. Remove individual ack ranges below new mark-delete.
-5. If the first ack range starts at new mark-delete, fold it into mark-delete and continue.
-6. CAS update cursor state.
-7. Publish cursor notification.
+1. Map `Position` to exactly one persisted-entry offset.
+2. If the position has no ack set, compute `newMarkDeleteOffset = entryOffset + 1`.
+3. If the position has an ack set, cumulatively acknowledge offsets before `entryOffset`, merge the target
+   entry's `BatchAckSet`, and keep `markDeleteOffset <= entryOffset` until its remaining bitset is empty.
+4. Verify the resulting `newMarkDeleteOffset >= current.markDeleteOffset`.
+5. Remove whole-entry ranges and partial batch sets below new mark-delete.
+6. If the first fully acknowledged entry range starts at new mark-delete, fold it into mark-delete and continue.
+7. CAS update cursor state.
+8. Publish cursor notification.
 
 ### 9.4 Individual ack
 
@@ -337,15 +372,23 @@ Position or MessageId
 
 Steps:
 
-1. Map position/batchIndex to one or more stream offset ranges.
-2. Add ranges to `individualAckRanges`.
-3. Merge overlapping or adjacent ranges.
-4. Advance `markDeleteOffset` while the first ack range covers it.
-5. Spill to snapshot if inline state exceeds threshold.
-6. CAS update cursor state.
+1. Map each position to exactly one persisted-entry offset; reject a foreign incarnation or invalid ledger id.
+2. A position without an ack set adds `[entryOffset, entryOffset + 1)` to `individualAckRanges`.
+3. A position with an ack set validates `batchSize`, then merges `remainingIndexes` with the existing set using
+   bitwise AND; it never creates a sub-entry stream offset.
+4. When a merged remaining bitset becomes empty, remove it from `partialBatchAckSets` and promote
+   `[entryOffset, entryOffset + 1)` to `individualAckRanges`.
+5. Merge overlapping or adjacent whole-entry ranges.
+6. Advance `markDeleteOffset` while the first whole-entry ack range covers it; discard partial sets below it.
+7. Spill both whole-entry ranges and partial batch sets to the same immutable snapshot if inline state exceeds
+   the configured byte threshold.
+8. CAS update cursor state; on CAS loss, reload and recompute the merge from the original immutable request.
 
-Partial batch ack is represented at record offset granularity. The batch entry remains readable until all
-unacked records inside it are no longer needed.
+The batch entry remains readable until its remaining bitset is empty. On dispatch, the facade returns the
+entry with that remaining bitset through `getBatchPositionAckSet(Position)` / broker batch-index metadata so
+already acknowledged messages are not delivered again during a healthy session. Recovery may conservatively
+redeliver only when a documented persistence limit was explicitly chosen; the default F3 contract persists all
+partial sets required for correctness.
 
 ### 9.5 Seek / reset
 
@@ -364,6 +407,7 @@ explicitly requests replay and retention still protects the range.
 markDeleteOffset = committedEndOffset
 readPositionOffset = committedEndOffset
 individualAckRanges = empty
+partialBatchAckSets = empty
 ackSnapshotRef = null
 ```
 
@@ -402,11 +446,13 @@ Backlog estimate:
 backlogRecords =
   committedEndOffset
   - markDeleteOffset
-  - acknowledgedRecordsInIndividualAckRanges
+  - acknowledgedEntriesInIndividualAckRanges
 ```
 
-Backlog bytes should use offset index `cumulativeSize` when possible and fall back to estimates when exact
-range accounting would require scanning too many entries.
+This is an entry backlog, matching the ManagedLedger entry coordinate. Message-level backlog additionally
+subtracts cleared indexes in `partialBatchAckSets` and requires the persisted `batchSize`. Backlog bytes should
+use offset index `cumulativeSize` when possible and fall back to estimates when exact range accounting would
+require scanning too many entries.
 
 ## 12. Broker Failover Recovery
 
@@ -417,7 +463,7 @@ On broker failover:
 3. If `ackSnapshotRef` exists, it loads snapshot object and validates checksum/version.
 4. It computes first dispatchable offset:
    ```text
-   firstUnackedOffset(markDeleteOffset, individualAckRanges)
+   firstUnackedOffset(markDeleteOffset, individualAckRanges, partialBatchAckSets)
    ```
 5. It sets read-position hint to first dispatchable offset or a safe value near it.
 6. It resumes dispatch through Future 1 read resolver.
@@ -437,7 +483,7 @@ advancing mark-delete incorrectly is not.
 | Snapshot object missing or checksum fails | Cursor recovery fails safe; no mark-delete advancement |
 | Read position hint stale | Recompute from mark-delete and ack ranges |
 | Trim races with cursor update | Trim uses cursor low-watermark from Oxia; CAS/version prevents unsafe advancement |
-| Ack range grows beyond inline limit | Spill to snapshot and CAS cursor state |
+| Ack range or partial batch state grows beyond inline limit | Spill both structures to snapshot and CAS cursor state |
 
 ## 14. Compatibility Impact
 
@@ -472,16 +518,17 @@ durable progress; broker still owns dispatch policy and flow control.
 ## 15. Design Invariants
 
 1. Cursor durable truth is Oxia cursor state plus referenced snapshot object.
-2. `markDeleteOffset` is the first not cumulatively acknowledged stream offset.
-3. Individual ack ranges are half-open stream offset ranges above mark-delete.
-4. Cursor updates use CAS on `cursorVersion`.
-5. Snapshot object visibility comes from Oxia cursor state reference.
-6. Read position is a dispatch hint, not ack truth.
-7. Broker local state is discardable.
-8. Cursor low-watermark protects stream data from unsafe trim/GC.
-9. Redelivery after failover is allowed; losing acked progress after successful CAS is not.
-10. Cursor state cannot change stream offset ordering or visibility.
-11. Backlog/high-watermark comes from stream-head committed end；offset index只用于 size/range resolution，
+2. `markDeleteOffset` is the first not cumulatively acknowledged persisted-entry offset.
+3. Individual ack ranges are half-open, whole-entry stream offset ranges above mark-delete.
+4. Partial batch ack is an entry-keyed remaining-message bitset; it never changes Future 2 offset allocation.
+5. Cursor updates use CAS on `cursorVersion`.
+6. Snapshot object visibility comes from Oxia cursor state reference.
+7. Read position is a dispatch hint, not ack truth.
+8. Broker local state is discardable.
+9. Cursor low-watermark protects stream data from unsafe trim/GC.
+10. Redelivery after failover is allowed; losing acked progress after successful CAS is not.
+11. Cursor state cannot change stream offset ordering or visibility.
+12. Backlog/high-watermark comes from stream-head committed end；offset index只用于 size/range resolution，
     不是 cursor 可自行推进的 append truth。
 
 ## 16. Future Gate
@@ -492,6 +539,7 @@ Future 3 may enter implementation planning only after the following are reviewed
 - ManagedCursor method mapping；
 - Oxia cursor metadata schema；
 - inline ack range representation；
+- partial batch ack encoding and merge semantics；
 - cursor snapshot object format；
 - mark-delete and individual ack state transitions；
 - read-position recovery semantics；

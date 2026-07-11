@@ -53,7 +53,7 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
 materialization profiles are reserved design/API boundaries, not implemented support.
 
-Future 2 F2-M0 design convergence and the locked Pulsar API spike are complete. The active
+Future 2 F2-M0 API spike and F2-M0R code-level design review are complete. The active
 implementation milestone is F2-M1 (projection model); `nereus-managed-ledger` still has no production
 facade, so Future 2 itself is not implemented.
 

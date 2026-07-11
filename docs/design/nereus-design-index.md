@@ -2,7 +2,8 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-11
-> 当前实现阶段：Future 2，F2-M0 design/API spike complete；下一里程碑为 F2-M1 projection model
+> 当前实现阶段：Future 2，F2-M0 API spike + F2-M0R code-level review complete；下一里程碑为 F2-M1
+> projection model
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -68,8 +69,9 @@ streamId + offset
 | `nereus-core` | `Implemented`（Phase 1） | append、read/resolve、trim/recovery、deadline/resource/close and M8 real-Oxia restart/failure gate |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `In progress`（F2-M0） | code-level design/API spike complete；production module still marker-only |
-| Pulsar / KoP adapters | `Designed` | marker modules only |
+| `nereus-managed-ledger` | `In progress`（F2-M0R） | API spike、code-level method/runtime review complete；production module still marker-only |
+| `nereus-pulsar-adapter` | `In progress`（F2-M0R） | runtime/bootstrap contract complete；module still marker-only |
+| `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -101,6 +103,14 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
    WAL restart and failure scenario。
 10. Java packages and Maven coordinates use the owned-domain namespace `com.nereusstream`；ADR 0003 owns
     this compatibility decision。
+11. F2 `PULSAR_ENTRY_V1` persists one complete Pulsar entry per L0 offset；`batchIndex` is an in-entry sub-index，
+    not another stream offset。
+12. F2 same-name delete/recreate publishes a new projection incarnation、stream and virtual ledger；a stale
+    Position cannot alias the new topic lifetime。
+13. Every post-head-request non-known append result carries an in-process `AppendAttemptId`；the facade recovers
+    that exact retained physical attempt or write-fences，and does not claim producer dedup across broker crashes。
+14. Hybrid first-create/delete/new-lifetime selection is serialized by one broker-metadata storage-class binding；an
+    existing live topic cannot switch between BookKeeper and Nereus without a future migration protocol。
 
 详细协议见 `nereus-commit-protocol.md`，当前 Phase 1 精确合同见
 `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`。
@@ -124,7 +134,7 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0 complete；M1 next） |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R complete；M1 next） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
@@ -146,7 +156,7 @@ range iteration、executor isolation、cache/lane lifecycle and the `com.nereuss
 
 1. `nereus-future2-managed-ledger-facade.md`；
 2. `../phase-2-managed-ledger-facade/README.md`；
-3. 该目录的 `01` 到 `05` active code-level documents；
+3. 该目录的 `01` 到 `07` active code-level documents；
 4. `../phase-2-managed-ledger-facade/spikes/PulsarManagedLedgerApiProbe.java` 与锁定的
    Pulsar fork commit；
 5. 当前里程碑对应的代码和可执行 gate。

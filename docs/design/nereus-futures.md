@@ -29,7 +29,7 @@ protocol/table state = projection
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
 | F1 Core Stream Storage | Phase 1 M0-M8 | Implemented | Future-specific extensions |
-| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0 complete） | F2-M1 projection model |
+| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R complete） | F2-M1 projection model |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
@@ -94,7 +94,7 @@ part of that done definition。
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0 complete；F2-M1 next；production facade not implemented
+Current milestone: F2-M0 API spike + F2-M0R code-level review complete；F2-M1 next；production facade not implemented
 
 ### Owns
 
@@ -106,17 +106,20 @@ Current milestone: F2-M0 complete；F2-M1 next；production facade not implement
 
 ### Entry gate
 
-F2-M0 closed the entry gate:
+F2-M0/M0R closed the design entry gate:
 
 - F1 append/read/trim error semantics are stable；
 - Pulsar fork/API blobs and repository boundary are locked；
 - mapping v1 is one stream/one virtual ledger with `entryId == stream offset`；
+- same-name delete/recreate uses a new projection incarnation/stream/virtual ledger；
+- non-known append outcomes carry and recover the exact retained attempt before writes resume；
 - current object-shaped `AppendResult` is intentionally retained for the object-only F2 rollout；
 - every other Nereus profile is rejected before IO。
 
 ### Exit gate
 
 - Position remains stable across restart and future generation replacement；
+- old-incarnation Position cannot alias a recreated topic；
 - append ack maps selected durability boundary to Pulsar callback once；
 - no broker path assumes virtual ledger id is a BookKeeper ledger id；
 - storage class coexistence/offload behavior is explicit。
@@ -135,7 +138,8 @@ Detailed design: `nereus-future3-cursor-subscription.md`
 
 ### Entry/exit gates
 
-- F2 can map Position/MessageId to record ranges；
+- F2 can map Position to one persisted-entry offset and preserve MessageId batch indexes as in-entry
+  sub-indexes；
 - F1 resolver and trim contract is stable；
 - cursor snapshot ref is authoritative only through Oxia state；
 - ack/trim races and failover redelivery have deterministic tests；
@@ -183,6 +187,8 @@ Detailed design: `nereus-future5-kop-compatibility.md`
 ### Entry/exit gates
 
 - Kafka offset is exactly Nereus record offset；
+- a Kafka-compatible/canonical payload mapping makes each Kafka record consume one L0 offset；
+- `PULSAR_ENTRY_V1` mixed access is rejected until a mapping-version and migration contract exists；
 - ProduceResponse only follows stable append result；
 - record-batch offset rewrite has layered checksum semantics；
 - group offsets remain separate from Pulsar cursors but participate in retention；
