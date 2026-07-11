@@ -1,7 +1,7 @@
 # 05 Implementation Plan and Tests
 
-本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M4 已完成，M5 Resolve/Read 是下一入口；
-2026-07-11 M4 完成后的 `./gradlew phase1Check check --rerun-tasks` 运行 28 个执行任务并全部通过；
+本文把 Phase 1 代码落地拆成可执行步骤和测试矩阵。M0-M5 已完成，M6 Trim/Recovery 是下一入口；
+M5 focused verification currently passes 32 core tests and 23 object-store tests；
 后续每个里程碑完成时都要同步更新本文件，确保文档描述的是当前实现最新版。
 
 ## 1. Milestones
@@ -449,9 +449,10 @@ Exit:
 - a reserved profile/durability combination fails explicitly and cannot create an acknowledged append；
 - producer success waits for reachable head commit and generation-0 offset-index/marker confirmation。
 
-Implementation boundary after M4：`DefaultStreamStorage.read/resolve/trim` return explicit asynchronous
-milestone errors until M5/M6. Constructor-injected clients are externally owned; owned-client factory and
-watch/background-renew lifecycle wiring remain M6. The production Oxia adapter remains M7.
+Implementation boundary immediately after M4：`DefaultStreamStorage.read/resolve/trim` returned explicit
+milestone errors. M5 has now replaced read/resolve with the implemented state machines；trim remains M6.
+Constructor-injected clients are externally owned; owned-client factory and background-renew lifecycle
+wiring remain M6. The production Oxia adapter remains M7.
 
 Verification completed on 2026-07-11:
 
@@ -467,6 +468,8 @@ remains an independent environment check by design.
 
 ### M5 Resolve and read path
 
+Status: implemented on 2026-07-11 with fake Oxia metadata and local Object WAL fixtures.
+
 Module:
 
 ```text
@@ -475,15 +478,25 @@ nereus-core
 
 Tasks:
 
-- add `ReadResolver`；
-- add optional `OffsetIndexCache`；
-- implement generation selection；
-- implement `read` using resolver and WAL reader；
-- implement `maxConcurrentObjectReads` and `maxReadBufferBytes` reservations around full-slice reads；
-- emit read amplification metrics: full-slice bytes downloaded, entry-index bytes downloaded, clipped
+- done: add `ReadResolver` and `ReadCoordinator`；
+- done: add optional positive-only `OffsetIndexCache` with TTL, version-aware watch invalidation, conflict
+  detection and no EOF/negative entries；
+- done: implement highest non-tombstoned generation selection；
+- done: implement bounded missing-index repair from the reachable commit chain with opaque continuation reuse；
+- done: add `payloadFormat` to `OffsetIndexRecord` and its codec golden so resolve is index-only；
+- done: implement `read` using resolver and `WalObjectReader.readWithStats`；
+- done: implement `maxConcurrentObjectReads` and `maxReadBufferBytes` reservations around sequential
+  full-slice reads, with release on success/failure/timeout/cancellation；
+- done: emit read amplification metrics: full-slice bytes downloaded, entry-index bytes downloaded, clipped
   payload bytes returned, and the difference；
-- implement EOF vs gap distinction；
-- implement trimmed offset check。
+- done: implement EOF vs committed gap distinction；
+- done: implement trimmed offset and readable stream/profile checks；
+- done: implement one decreasing read deadline across metadata, payload and entry-index calls, advisory
+  cancellation, stale-cache metadata refetch and metrics-callback isolation；
+- done: add focused tests for adjacent resolve/read, schema/checksum propagation, zero-byte and byte limits,
+  trim, missing-index repair and repair-budget exhaustion, generation selection, amplification, corruption
+  outside clipped bytes, permit/buffer release, timeout/cancel, watch/cache, missing object, manifest-only
+  invisibility, unsupported profile and metrics callback failure。
 
 Exit:
 
@@ -493,6 +506,18 @@ Exit:
 - resolver ignores manifest-only object；
 - read under exhausted read buffer/permit fails before object IO with retriable `BACKPRESSURE_REJECTED`；
 - small clipped reads from large slices emit payload/index download and amplification metrics。
+
+M5 verification completed on 2026-07-11:
+
+```text
+./gradlew :nereus-core:test :nereus-object-store:test :nereus-metadata-oxia:test --rerun-tasks
+./gradlew phase1Check check --rerun-tasks
+```
+
+Focused results: 32 core tests and 23 object-store tests passed. The final combined gate executed 28 tasks
+successfully, including all L0 tests, the dependency guard and `compileOxiaCapabilitySpikeJava`. The
+Docker-backed `oxiaCapabilitySpike` remains an independent environment task and was not launched by this
+gate。
 
 ### M6 Trim and recovery boundaries
 

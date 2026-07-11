@@ -88,11 +88,12 @@ class WalObjectWriterReaderTest {
         assertThat(decoded.objectId()).isEqualTo(result.objectId());
         assertThat(decoded.slices()).hasSize(1);
 
-        List<ReadBatch> batches = reader(store).read(
+        WalReadResult readResult = reader(store).readWithStats(
                 0,
                 List.of(resolved(result.slices().get(0), result, 0)),
                 readOptions(10, 100))
                 .join();
+        List<ReadBatch> batches = readResult.batches();
 
         assertThat(batches).hasSize(2);
         assertThat(new String(batches.get(0).payload(), StandardCharsets.UTF_8)).isEqualTo("a");
@@ -103,6 +104,14 @@ class WalObjectWriterReaderTest {
         assertThat(batches.get(0).sourceObjectLength()).isEqualTo(1);
         assertThat(batches.get(1).sourceObjectOffset()).isEqualTo(result.slices().get(0).objectOffset() + 1);
         assertThat(batches.get(1).sourceObjectLength()).isEqualTo(1);
+        assertThat(readResult.sliceStats()).singleElement().satisfies(stats -> {
+            assertThat(stats.objectId()).isEqualTo(result.objectId());
+            assertThat(stats.objectOffset()).isEqualTo(result.slices().getFirst().objectOffset());
+            assertThat(stats.fullSlicePayloadBytes()).isEqualTo(2);
+            assertThat(stats.entryIndexBytes()).isPositive();
+            assertThat(stats.returnedPayloadBytes()).isEqualTo(2);
+            assertThat(stats.amplificationBytes()).isEqualTo(stats.entryIndexBytes());
+        });
     }
 
     @Test
@@ -199,6 +208,29 @@ class WalObjectWriterReaderTest {
 
         assertThat(result.objectLength()).isGreaterThan(1);
         assertThat(store.lastPutOptions().timeout()).isEqualTo(timeout);
+    }
+
+    @Test
+    void payloadAndEntryIndexReadsShareOneDecreasingDeadline() {
+        LocalFileObjectStore local = new LocalFileObjectStore(root);
+        WalWriteResult result = writer(local).write(new WalWriteRequest(
+                "cluster",
+                "writer",
+                RUN_HASH,
+                7,
+                List.of(new WalStreamSliceInput(new StreamId("stream-a"), batch("a"))),
+                options(false, 1 << 20)))
+                .join();
+        TimeoutRecordingObjectStore recording = new TimeoutRecordingObjectStore(local);
+
+        new DefaultWalObjectReader(recording).read(
+                0,
+                List.of(resolved(result.slices().getFirst(), result, 0)),
+                new ReadOptions(10, 100, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
+                .join();
+
+        assertThat(recording.timeouts()).hasSize(2);
+        assertThat(recording.timeouts().get(1)).isLessThan(recording.timeouts().get(0));
     }
 
     @Test
@@ -774,6 +806,57 @@ class WalObjectWriterReaderTest {
 
         @Override
         public CompletableFuture<io.nereus.objectstore.HeadObjectResult> headObject(io.nereus.api.ObjectKey key, HeadObjectOptions options) {
+            return delegate.headObject(key, options);
+        }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
+    }
+
+    private static final class TimeoutRecordingObjectStore implements ObjectStore {
+        private final ObjectStore delegate;
+        private final List<Duration> timeouts = new ArrayList<>();
+
+        private TimeoutRecordingObjectStore(ObjectStore delegate) {
+            this.delegate = delegate;
+        }
+
+        List<Duration> timeouts() {
+            return List.copyOf(timeouts);
+        }
+
+        @Override
+        public CompletableFuture<PutObjectResult> putObject(
+                io.nereus.api.ObjectKey key,
+                ByteBuffer payload,
+                PutObjectOptions options) {
+            return delegate.putObject(key, payload, options);
+        }
+
+        @Override
+        public CompletableFuture<RangeReadResult> readRange(
+                io.nereus.api.ObjectKey key,
+                long offset,
+                long length,
+                RangeReadOptions options) {
+            timeouts.add(options.timeout());
+            if (timeouts.size() == 1) {
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return CompletableFuture.failedFuture(e);
+                }
+            }
+            return delegate.readRange(key, offset, length, options);
+        }
+
+        @Override
+        public CompletableFuture<io.nereus.objectstore.HeadObjectResult> headObject(
+                io.nereus.api.ObjectKey key,
+                HeadObjectOptions options) {
             return delegate.headObject(key, options);
         }
 

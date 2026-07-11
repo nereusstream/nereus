@@ -21,8 +21,19 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface WalObjectReader {
-    CompletableFuture<List<ReadBatch>> read(
+    /**
+     * Reads resolved ranges sequentially in list order and reports exact accounting for every slice that was
+     * actually downloaded and verified.
+     */
+    CompletableFuture<WalReadResult> readWithStats(
             long startOffset,
             List<ResolvedObjectRange> ranges,
             ReadOptions options);
+
+    default CompletableFuture<List<ReadBatch>> read(
+            long startOffset,
+            List<ResolvedObjectRange> ranges,
+            ReadOptions options) {
+        return readWithStats(startOffset, ranges, options).thenApply(WalReadResult::batches);
+    }
 }

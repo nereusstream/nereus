@@ -31,6 +31,7 @@ public record OffsetIndexRecord(
         String objectType,
         String physicalFormat,
         String logicalFormat,
+        String payloadFormat,
         long objectOffset,
         long objectLength,
         int recordCount,
@@ -54,6 +55,7 @@ public record OffsetIndexRecord(
         objectType = requireNonBlank(objectType, "objectType");
         physicalFormat = requireNonBlank(physicalFormat, "physicalFormat");
         logicalFormat = requireNonBlank(logicalFormat, "logicalFormat");
+        payloadFormat = requireNonBlank(payloadFormat, "payloadFormat");
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");

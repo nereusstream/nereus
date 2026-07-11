@@ -29,12 +29,15 @@ import io.nereus.objectstore.ObjectStore;
 import io.nereus.objectstore.RangeReadOptions;
 import io.nereus.objectstore.RangeReadResult;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class DefaultWalObjectReader implements WalObjectReader {
     private final ObjectStore objectStore;
@@ -55,7 +58,7 @@ public final class DefaultWalObjectReader implements WalObjectReader {
     }
 
     @Override
-    public CompletableFuture<List<ReadBatch>> read(
+    public CompletableFuture<WalReadResult> readWithStats(
             long startOffset,
             List<ResolvedObjectRange> ranges,
             ReadOptions options) {
@@ -66,13 +69,15 @@ public final class DefaultWalObjectReader implements WalObjectReader {
         }
         try {
             List<ReadBatch> batches = new ArrayList<>();
+            List<WalSliceReadStats> sliceStats = new ArrayList<>();
             int remainingRecords = options.maxRecords();
             int remainingBytes = options.maxBytes();
+            ReadDeadline deadline = new ReadDeadline(options.timeout());
             for (ResolvedObjectRange range : ranges) {
                 if (remainingRecords <= 0) {
                     break;
                 }
-                SliceRead sliceRead = readSlice(range, options);
+                SliceRead sliceRead = readSlice(range, deadline);
                 int returnedBefore = batches.stream().mapToInt(batch -> batch.payload().length).sum();
                 ClipResult clipped = clip(
                         startOffset,
@@ -86,21 +91,31 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                 remainingRecords -= clipped.recordsReturned();
                 remainingBytes -= clipped.bytesReturned();
                 int returnedAfter = batches.stream().mapToInt(batch -> batch.payload().length).sum();
-                readObserver.onSliceRead(
+                try {
+                    readObserver.onSliceRead(
+                            range.objectLength(),
+                            range.entryIndexRef().length(),
+                            returnedAfter - returnedBefore);
+                } catch (RuntimeException ignored) {
+                    // Metrics callbacks cannot reclassify a verified read.
+                }
+                sliceStats.add(new WalSliceReadStats(
+                        range.objectId(),
+                        range.objectOffset(),
                         range.objectLength(),
                         range.entryIndexRef().length(),
-                        returnedAfter - returnedBefore);
+                        returnedAfter - returnedBefore));
                 if (clipped.limitReached()) {
                     break;
                 }
             }
-            return CompletableFuture.completedFuture(List.copyOf(batches));
+            return CompletableFuture.completedFuture(new WalReadResult(batches, sliceStats));
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
     }
 
-    private SliceRead readSlice(ResolvedObjectRange range, ReadOptions options) {
+    private SliceRead readSlice(ResolvedObjectRange range, ReadDeadline deadline) {
         validateRange(range);
         long bytesToReserve = checkedAdd(range.objectLength(), range.entryIndexRef().length());
         try (ReadResourceGuard.Reservation ignored = resourceGuard.reserve(bytesToReserve)) {
@@ -108,13 +123,13 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                     range.objectKey(),
                     range.objectOffset(),
                     range.objectLength(),
-                    options);
+                    deadline);
             ObjectKey indexObjectKey = range.entryIndexRef().objectKey().orElse(range.objectKey());
             byte[] entryIndexBytes = readRangeBytes(
                     indexObjectKey,
                     range.entryIndexRef().offset(),
                     range.entryIndexRef().length(),
-                    options);
+                    deadline);
             if (!Crc32cChecksums.checksum(payload, entryIndexBytes).equals(range.sliceChecksum())) {
                 throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "slice checksum mismatch");
             }
@@ -179,16 +194,21 @@ public final class DefaultWalObjectReader implements WalObjectReader {
             ObjectKey objectKey,
             long offset,
             long length,
-            ReadOptions options) {
+            ReadDeadline deadline) {
         RangeReadResult result;
         try {
+            Duration remaining = deadline.remaining();
             result = objectStore.readRange(
                             objectKey,
                             offset,
                             length,
-                            new RangeReadOptions(Optional.empty(), options.timeout()))
+                            new RangeReadOptions(Optional.empty(), remaining))
+                    .orTimeout(remaining.toNanos(), TimeUnit.NANOSECONDS)
                     .join();
         } catch (CompletionException e) {
+            if (e.getCause() instanceof TimeoutException) {
+                throw failure(ErrorCode.TIMEOUT, true, "WAL object range read timed out", e.getCause());
+            }
             if (e.getCause() instanceof RuntimeException runtimeException) {
                 throw runtimeException;
             }
@@ -250,6 +270,35 @@ public final class DefaultWalObjectReader implements WalObjectReader {
             boolean limitReached) {
         private ClipResult {
             batches = List.copyOf(batches);
+        }
+    }
+
+    private static final class ReadDeadline {
+        private final long deadlineNanos;
+
+        private ReadDeadline(Duration timeout) {
+            long timeoutNanos;
+            try {
+                timeoutNanos = timeout.toNanos();
+            } catch (ArithmeticException e) {
+                timeoutNanos = Long.MAX_VALUE;
+            }
+            long now = System.nanoTime();
+            long calculatedDeadline;
+            try {
+                calculatedDeadline = Math.addExact(now, timeoutNanos);
+            } catch (ArithmeticException e) {
+                calculatedDeadline = Long.MAX_VALUE;
+            }
+            deadlineNanos = calculatedDeadline;
+        }
+
+        private Duration remaining() {
+            long nanos = deadlineNanos - System.nanoTime();
+            if (nanos <= 0) {
+                throw failure(ErrorCode.TIMEOUT, true, "WAL object read timed out");
+            }
+            return Duration.ofNanos(nanos);
         }
     }
 }

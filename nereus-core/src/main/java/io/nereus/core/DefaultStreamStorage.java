@@ -35,6 +35,9 @@ import io.nereus.api.StreamStorage;
 import io.nereus.api.TrimOptions;
 import io.nereus.core.append.AppendCoordinator;
 import io.nereus.core.append.AppendSessionManager;
+import io.nereus.core.read.ReadCoordinator;
+import io.nereus.core.read.ReadMetricsObserver;
+import io.nereus.core.read.ReadResolver;
 import io.nereus.metadata.oxia.OxiaMetadataStore;
 import io.nereus.metadata.oxia.records.CommittedEndOffsetRecord;
 import io.nereus.metadata.oxia.records.StreamMetadataRecord;
@@ -51,9 +54,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class DefaultStreamStorage implements StreamStorage {
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
-    private final WalObjectReader walObjectReader;
     private final AppendSessionManager appendSessionManager;
     private final AppendCoordinator appendCoordinator;
+    private final ReadCoordinator readCoordinator;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public DefaultStreamStorage(
@@ -63,12 +66,31 @@ public final class DefaultStreamStorage implements StreamStorage {
             WalObjectReader walObjectReader,
             Clock clock,
             Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                clock,
+                callbackExecutor,
+                ReadMetricsObserver.noop());
+    }
+
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
-        this.walObjectReader = Objects.requireNonNull(walObjectReader, "walObjectReader");
+        Objects.requireNonNull(walObjectReader, "walObjectReader");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(callbackExecutor, "callbackExecutor");
+        Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
         this.appendSessionManager = new AppendSessionManager(config, metadataStore, clock);
         this.appendCoordinator = new AppendCoordinator(
                 config,
@@ -76,6 +98,18 @@ public final class DefaultStreamStorage implements StreamStorage {
                 walObjectWriter,
                 appendSessionManager,
                 clock,
+                callbackExecutor);
+        ReadResolver readResolver = new ReadResolver(
+                config,
+                metadataStore,
+                clock,
+                readMetricsObserver,
+                callbackExecutor);
+        this.readCoordinator = new ReadCoordinator(
+                config,
+                readResolver,
+                walObjectReader,
+                readMetricsObserver,
                 callbackExecutor);
     }
 
@@ -116,8 +150,7 @@ public final class DefaultStreamStorage implements StreamStorage {
             StreamId streamId,
             long startOffset,
             ReadOptions options) {
-        Objects.requireNonNull(walObjectReader, "walObjectReader");
-        return milestoneFailure("read", "M5");
+        return readCoordinator.read(streamId, startOffset, options);
     }
 
     @Override
@@ -125,7 +158,7 @@ public final class DefaultStreamStorage implements StreamStorage {
             StreamId streamId,
             long startOffset,
             ResolveOptions options) {
-        return milestoneFailure("resolve", "M5");
+        return readCoordinator.resolve(streamId, startOffset, options);
     }
 
     @Override
@@ -201,6 +234,7 @@ public final class DefaultStreamStorage implements StreamStorage {
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            readCoordinator.close();
             appendCoordinator.close();
         }
     }

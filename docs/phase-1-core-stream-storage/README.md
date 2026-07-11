@@ -73,6 +73,10 @@ M0 scaffold migration 已完成。当前代码状态：
   层显式拒绝 Phase 1 不支持的 BK/async profiles，未把 metadata persistence 当作执行支持；
 - `nereus-core` 已连接 fake Oxia metadata 与 Object WAL，完成 WAL prepare/upload、manifest put、
   stream-head commit、derived-index confirmation 和 `AppendResult` 组装；
+- M5 已落地 `ReadCoordinator`、`ReadResolver`、positive-only `OffsetIndexCache`、bounded commit-chain
+  repair、generation selection、trim/EOF distinction、full-slice read resource guards 和精确放大指标 hook；
+- `OffsetIndexRecord` 已补齐 `payloadFormat`，因此 resolver 可以只依赖 committed offset index 构造
+  `ResolvedObjectRange`，不读取 manifest、不猜测 payload format；
 - `nereus-metadata-oxia` 已启用 `java-test-fixtures`，为 M2 的 `FakeOxiaMetadataStore` 保留测试夹具
   出口；
 - root `phase1Check` 已存在，并包含 `checkPhase0`、L0 module tests 和 Phase 1 L0 dependency guard。
@@ -81,10 +85,10 @@ M0 scaffold migration 已完成。当前代码状态：
   WAL round-trip/local-store tests 已存在。2026-07-08 M3 review 发现的 reader multi-range byte-budget 和
   local symlink escape blockers 已修复并补测试；2026-07-10 final Gradle gate 已通过。
 
-M0/M1/M2/M3/M4 已完成。2026-07-11 的最终
-`./gradlew phase1Check check --rerun-tasks` 运行 28 个执行任务并全部通过；M5 resolve/read 是下一
-实现项。M4 证明的是 fake metadata + local Object WAL reference path，production Oxia adapter 仍由
-M7 gate 负责。
+M0/M1/M2/M3/M4/M5 已完成。M5 focused tests pass 32 core tests and 23 object-store tests；the final
+`./gradlew phase1Check check --rerun-tasks` executed 28 tasks successfully. M6 trim/recovery 是下一实现项。
+M4-M5 证明的是 fake metadata + local Object WAL reference path，production Oxia adapter 仍由 M7 gate
+负责。
 
 Phase 1 允许的依赖方向：
 
@@ -172,7 +176,7 @@ public interface StreamStorage extends AutoCloseable {
 ```
 
 M0 后，`nereus-api` 里的 `StreamStorage` 已按此 API 形状迁移；append 状态机已在 M4 实现，
-read/resolve 与 trim 状态机仍分别由 M5/M6 实现。
+read/resolve 已在 M5 实现，trim 状态机仍由 M6 实现。
 
 ## 5. Initial Code Package Plan
 
@@ -214,8 +218,12 @@ io.nereus.core
     AppendSessionManager
     WalFlushPlanner
   read/
+    ReadCoordinator
     ReadResolver
     OffsetIndexCache
+    ReadOperationDeadline
+    ReadResourceLimiter
+    ReadMetricsObserver
   trim/
     TrimCoordinator
   recovery/
@@ -255,6 +263,7 @@ io.nereus.objectstore
   wal/
     WalObjectWriter
     WalObjectReader
+    WalReadResult / WalSliceReadStats
     WalObjectLayout
     StreamSliceDescriptor
     EntryIndex

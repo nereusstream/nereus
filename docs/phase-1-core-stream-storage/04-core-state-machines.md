@@ -2,8 +2,8 @@
 
 本文定义 `nereus-core` 的 append、resolve/read、trim 和 recovery 状态机。
 
-Status: M4 append implemented on 2026-07-11；M5 resolve/read and M6 trim/recovery remain. The implemented
-append path matches the strict Object WAL profile boundary and the stream-head single-key CAS protocol。
+Status: M4 append and M5 resolve/read implemented on 2026-07-11；M6 trim/recovery remains. The implemented
+paths match the strict Object WAL profile boundary and the stream-head single-key CAS protocol。
 
 M0.5 status: the append state machine now uses the redesigned Oxia-compatible commit protocol from
 `02-oxia-metadata-and-commit.md`: one stream-head conditional put is the append linearization point, and
@@ -26,10 +26,12 @@ io.nereus.core.append
   WalFlushPlanner (future cross-stream batching)
 
 io.nereus.core.read
+  ReadCoordinator
   ReadResolver
   OffsetIndexCache
+  ReadOperationDeadline
   ReadResourceLimiter
-  ReadResourceReservation
+  ReadMetricsObserver
 
 io.nereus.core.trim
   TrimCoordinator
@@ -546,6 +548,22 @@ Phase 1 generation `0` ranges are non-overlapping, so the selected range normall
 `selected.offsetStart <= cursor` and `selected.offsetEnd > cursor`. Future compaction can add larger
 overlapping higher-generation ranges, but must preserve this resolver contract.
 
+M5 implementation notes:
+
+- `ReadResolver` loads stream state, trim and committed end under one operation deadline before consulting
+  cache or index；
+- each metadata scan is bounded by `maxCommitChainScan` and selects the highest non-tombstoned generation
+  covering the cursor；
+- a missing covering index below committed end triggers paged `repairDerivedStreamIndexes` calls using the
+  returned opaque cursor, `maxDerivedIndexRepairCommitsPerCall`, and one total `maxCommitChainScan` budget；
+- repair-budget exhaustion is retriable `READ_RESOLUTION_FAILED`; target-covered repair followed by another
+  missing scan is `METADATA_INVARIANT_VIOLATION`；
+- `OffsetIndexCache` stores only positive immutable records, merges by `(offsetEnd,generation)`, rejects
+  conflicting bytes, never caches EOF, and conditionally invalidates watch events only when their metadata
+  version is not older than the cached data；
+- watch registration failure is ignored because watch is only an invalidation hint；TTL/read-through scan is
+  always the correctness fallback。
+
 ## 5. Read State Machine
 
 Input:
@@ -684,6 +702,16 @@ lastReturnedReadBatch.range.endOffset
 If no records returned because `maxBytes` is too small for the first entry, fail with a validation-style
 read error rather than looping forever.
 
+M5 `ReadCoordinator` calls `WalObjectReader.readWithStats` once for the bounded contiguous range list. The
+default reader processes those ranges sequentially, so core holds one read permit and reserves the maximum
+single range checksum-domain size rather than the sum of all sequential ranges. `WalReadResult` is validated
+against the submitted object id/offset/length/index-length tuples and its returned-byte total must equal the
+actual `ReadBatch` payload total. Metrics callbacks are isolated and cannot reclassify a successful read。
+
+If object-not-found/read/checksum failure came from a cached resolution, M5 invalidates the cache and performs
+one read-through metadata resolve. Changed ranges are retried once；unchanged ranges surface the original
+object failure. Manifest-only objects remain invisible because neither resolve nor this retry reads manifests。
+
 ## 6. Trim State Machine
 
 Input:
@@ -770,6 +798,11 @@ public final class DefaultStreamStorage implements StreamStorage {
             WalObjectReader walObjectReader,
             Clock clock,
             Executor callbackExecutor) {
+    }
+
+    public DefaultStreamStorage(
+            ...,
+            ReadMetricsObserver readMetricsObserver) {
     }
 }
 ```

@@ -91,6 +91,13 @@ public record CommitSliceRequest(
         return identity.toString();
     }
 
+    public static String emptyProjectionIdentity() {
+        CanonicalIdentity identity = new CanonicalIdentity();
+        identity.add("projectionRef");
+        identity.add("absent");
+        return identity.toString();
+    }
+
     public String commitId() {
         CanonicalIdentity identity = new CanonicalIdentity();
         identity.add(streamId.value());

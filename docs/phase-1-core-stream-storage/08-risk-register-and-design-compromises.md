@@ -1,7 +1,7 @@
 # 08 Risk Register And Design Compromises
 
 本文集中记录 Phase 1 当前最容易误伤实现的风险假设和设计妥协。它不是替代前面文档的总纲，
-而是每个里程碑编码和 review 前必须复读的风险清单。M0-M4 已实现，当前重点是 M5 及后续。
+而是每个里程碑编码和 review 前必须复读的风险清单。M0-M5 已实现，当前重点是 M6 及后续。
 
 ## 1. Oxia Conditional Multi-Write Capability
 
@@ -80,8 +80,8 @@ Residual risks introduced by this mitigation:
 
 ## 2. Read Amplification From Full-Slice Verification
 
-Status: accepted Phase 1 compromise with hard resource guards; M3 object reader has the guard hook, the
-review-found byte-budget clipping bug is fixed, and the 2026-07-10 final local gate passed.
+Status: implemented Phase 1 compromise with hard resource guards and exact metrics；M3 reader and M5 core
+guards are connected, and focused M5 tests cover amplification, timeout/cancel and backpressure release.
 
 Phase 1 read 为了校验 slice checksum，必须读取完整 resolved slice payload 和 entry index 后再按
 `startOffset`、`maxRecords`、`maxBytes` clip。这样能保证返回的 clipped bytes 来自一个完整校验过
@@ -93,14 +93,15 @@ Phase 1 read 为了校验 slice checksum，必须读取完整 resolved slice pay
   injected `ReadResourceGuard.reserve(objectLength + entryIndexLength)`；
 - done: reader now treats a later positive entry that exceeds remaining `maxBytes` after earlier records
   were returned as a normal stop, not `READ_LIMIT_TOO_SMALL`；
-- `DefaultStreamStorage` 必须配置 `maxConcurrentObjectReads` 和 `maxReadBufferBytes`；
-- 每个 resolved range read 前按 `ResolvedObjectRange.objectLength + entryIndexLength` 的 checked sum
-  预留 read buffer bytes；
+- done: `DefaultStreamStorage` 配置并执行 `maxConcurrentObjectReads` 和 `maxReadBufferBytes`；
+- done: M5 对 default reader 的顺序 range list 持有一个 permit，并按所有候选 range 中最大的
+  `ResolvedObjectRange.objectLength + entryIndexLength` checked sum 预留 buffer；
 - 预留失败时返回 retriable `BACKPRESSURE_REJECTED`，不启动 object range read；
 - `maxObjectBytes <= maxReadBufferBytes` 是 Phase 1 full-slice reader 的启动校验；
 - reader 必须在 success、decode failure、checksum failure、cancel、timeout、close 所有终态释放预留；
 - M3 `WalReadObserver` 已暴露 slice payload bytes、entry-index bytes 和 returned payload bytes；
-- M5 core read metrics 必须把这些 byte counts 接到正式指标，并保留 backpressure rejection 计数。
+- done: M5 `ReadMetricsObserver` receives exact verified slice/index/returned byte counts from
+  `WalReadResult`，并保留 backpressure/cache hit/miss hooks；observer failure does not alter read outcome。
 
 观测指标：
 

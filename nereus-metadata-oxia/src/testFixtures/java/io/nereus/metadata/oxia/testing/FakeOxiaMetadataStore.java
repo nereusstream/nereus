@@ -950,6 +950,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
                 commit.objectType(),
                 commit.physicalFormat(),
                 commit.logicalFormat(),
+                commit.payloadFormat(),
                 commit.objectOffset(),
                 commit.objectLength(),
                 commit.recordCount(),
@@ -1699,6 +1700,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
                 && left.objectType().equals(right.objectType())
                 && left.physicalFormat().equals(right.physicalFormat())
                 && left.logicalFormat().equals(right.logicalFormat())
+                && left.payloadFormat().equals(right.payloadFormat())
                 && left.objectOffset() == right.objectOffset()
                 && left.objectLength() == right.objectLength()
                 && left.recordCount() == right.recordCount()

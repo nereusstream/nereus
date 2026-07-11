@@ -253,6 +253,7 @@ class MetadataRecordValidationTest {
                 "MULTI_STREAM_WAL_OBJECT",
                 "WAL_OBJECT_V1",
                 "OPAQUE_SLICE",
+                "OPAQUE_RECORD_BATCH",
                 objectOffset,
                 objectLength,
                 recordCount,

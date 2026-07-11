@@ -329,6 +329,7 @@ public record OffsetIndexRecord(
         String objectType,
         String physicalFormat,
         String logicalFormat,
+        String payloadFormat,
         long objectOffset,
         long objectLength,
         int recordCount,
@@ -346,6 +347,11 @@ public record OffsetIndexRecord(
         long metadataVersion) {
 }
 ```
+
+M5 requires `payloadFormat` in the materialized offset index because resolve/read starts from this record
+and must not consult object manifests or guess a payload decoder. The pre-release metadata codec golden for
+`OffsetIndexRecord` was intentionally updated with this field on 2026-07-11；the production M7 adapter must
+use this exact current shape。
 
 ### `EntryIndexReferenceRecord`
 

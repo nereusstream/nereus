@@ -1,6 +1,6 @@
 # 01 API and Domain Model
 
-本文定义 Phase 1 已落地的 Java API、value object、错误语义和包边界，以及 M4-M7 必须遵守的
+本文定义 Phase 1 已落地的 Java API、value object、错误语义和包边界，以及 M6-M7 必须遵守的
 execution contract。Target profile reservations 与当前 executable support 会明确区分。
 
 ## 1. API Principles

@@ -127,6 +127,12 @@ M0 scaffold status before coding state machines:
   `:nereus-object-store:test` pass.
 - done on 2026-07-11: final `./gradlew phase1Check check --rerun-tasks` executed 28 tasks successfully；
   the L0 dependency guard passed and Oxia capability-spike sources compiled without starting Docker.
+- done on 2026-07-11: M5 adds index-only resolve, positive cache/watch invalidation, bounded derived-index
+  repair, generation selection, full-slice read resource guards, exact `WalReadResult` amplification stats,
+  decreasing read deadlines, stale-cache refetch and trim/EOF/gap classification；focused core and
+  object-store suites pass 32 and 23 tests respectively.
+- done on 2026-07-11: the post-M5 `./gradlew phase1Check check --rerun-tasks` gate executed 28 tasks
+  successfully；the L0 dependency guard passed and capability-spike sources compiled without Docker.
 
 ## 3. Stop-The-Line Conditions
 

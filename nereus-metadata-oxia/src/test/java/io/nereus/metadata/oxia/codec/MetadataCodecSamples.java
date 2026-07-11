@@ -119,6 +119,7 @@ public final class MetadataCodecSamples {
                                 "MULTI_STREAM_WAL_OBJECT",
                                 "WAL_OBJECT_V1",
                                 "OPAQUE_SLICE",
+                                "OPAQUE_RECORD_BATCH",
                                 5,
                                 7,
                                 10,

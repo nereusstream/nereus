@@ -14,7 +14,7 @@ M3 implementation status, verified 2026-07-10 and integrated by M4 on 2026-07-11
   retaining the original one-shot `write` convenience API；
 - `DefaultWalObjectReader` reads the full resolved slice payload plus footer entry index, verifies
   `concat(slicePayloadBytes, entryIndexBytes)`, clips by offset/record/byte limits, and uses an injected
-  `ReadResourceGuard` plus `WalReadObserver` for M5 core integration；
+  `ReadResourceGuard` plus `WalReadObserver`；M5 now consumes its exact `WalReadResult` stats in core；
 - `LocalFileObjectStore` lives under `src/testFixtures` only. It gives tests immutable put, head, range
   read, path traversal rejection, duplicate `ifAbsent` handling, checksum validation, and
   `deleteAllForTesting()` scoped to the injected temp root；
@@ -659,12 +659,21 @@ Failure handling:
 
 ```java
 public interface WalObjectReader {
-    CompletableFuture<List<ReadBatch>> read(
+    CompletableFuture<WalReadResult> readWithStats(
             long startOffset,
             List<ResolvedObjectRange> ranges,
             ReadOptions options);
+
+    default CompletableFuture<List<ReadBatch>> read(...) {
+        return readWithStats(...).thenApply(WalReadResult::batches);
+    }
 }
 ```
+
+`WalReadResult` returns caller batches plus one `WalSliceReadStats` for every slice actually downloaded and
+verified. Stats include object id/offset, full slice payload bytes, entry-index bytes and returned payload
+bytes；this lets M5 emit exact amplification metrics even when the reader downloads one extra slice before a
+byte-limit stop. The compatibility `read` method retains the original batch-only API。
 
 Algorithm:
 
@@ -695,9 +704,11 @@ Phase 1 can perform one range read per resolved object range. Coalescing adjacen
 Full-slice read amplification is an accepted Phase 1 compromise, not a license for unbounded allocation.
 `WalObjectReader` must reserve memory for the full checksum domain:
 `ResolvedObjectRange.objectLength` plus the referenced entry-index byte length, using checked addition,
-before the first `ObjectStore.readRange` starts. In M3, `DefaultWalObjectReader` accepts an injected
-`ReadResourceGuard`; M5 core will bind that guard to `StreamStorageConfig.maxConcurrentObjectReads` and
-`maxReadBufferBytes`. The object-store module keeps the reader API neutral, but the default reader
+before the first `ObjectStore.readRange` starts. `DefaultWalObjectReader` retains its injected
+`ReadResourceGuard`; M5 core additionally owns the configured cross-read limiter. Because the default reader
+processes its range list sequentially, core reserves one object-read permit plus the maximum checked
+slice-payload + entry-index size among the submitted ranges, then releases that reservation when the reader
+future reaches any terminal state. The object-store module keeps the reader API neutral, but the default reader
 implementation must:
 
 - reject negative or overflowing resolved range lengths before allocation；
@@ -707,6 +718,8 @@ implementation must:
   close；
 - report downloaded full-slice payload and entry-index bytes separately from returned clipped payload
   bytes；
+- pass one decreasing deadline through payload and entry-index reads instead of restarting the original
+  `ReadOptions.timeout` for each object-store call；
 - never claim a clipped subrange is independently checksum-verified unless a future block-level checksum
   format exists。
 
