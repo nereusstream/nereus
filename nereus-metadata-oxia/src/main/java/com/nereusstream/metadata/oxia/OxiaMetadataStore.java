@@ -78,6 +78,24 @@ public interface OxiaMetadataStore extends AutoCloseable {
             String cluster,
             CommitSliceRequest request);
 
+    CompletableFuture<StableAppendResult> commitStableAppend(
+            String cluster,
+            CommitAppendRequest request);
+
+    CompletableFuture<CommittedAppend> materializeGenerationZero(
+            String cluster,
+            ReachableCommittedAppend reachableAppend);
+
+    CompletableFuture<AppendReplaySearchResult> searchAppendReplay(
+            String cluster,
+            CommitAppendRequest request,
+            Optional<AppendReplayCursor> continuation,
+            int maxCommitsToScan);
+
+    CompletableFuture<StreamMetadataSnapshot> transitionStreamState(
+            String cluster,
+            StreamStateTransitionRequest request);
+
     CompletableFuture<DerivedIndexRepairResult> repairDerivedStreamIndexes(
             String cluster,
             StreamId streamId,
@@ -98,7 +116,7 @@ public interface OxiaMetadataStore extends AutoCloseable {
                 maxCommitsToScan);
     }
 
-    CompletableFuture<List<OffsetIndexRecord>> scanOffsetIndex(
+    CompletableFuture<List<OffsetIndexEntry>> scanOffsetIndex(
             String cluster,
             StreamId streamId,
             long startOffset,

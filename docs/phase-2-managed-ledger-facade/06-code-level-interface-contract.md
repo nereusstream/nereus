@@ -97,15 +97,16 @@ nereus-managed-ledger/com.nereusstream.managedledger/
 `nereus-managed-ledger` may import Pulsar managed-ledger/common types. No class added to `nereus-api`,
 `nereus-core`, `nereus-metadata-oxia` or `nereus-object-store` imports a Pulsar type.
 
-The L0 API/core classes and append-replay types in this inventory are implemented by Phase 1.5 P15-M1-M4。F2 owns
-only projection metadata and managed-ledger classes after P15-M5；the combined inventory is retained here because
+The L0 API/core classes and append-replay types in this inventory are implemented by Phase 1.5 P15-M1-M4。With
+P15-M5 passed, F2 owns only projection metadata and managed-ledger classes；the combined inventory is retained here because
 these are the exact types the facade consumes。
 
 ## 3. Required Phase 1.5 L0 Contract
 
 The Phase 1 public `StreamStorage` surface cannot fulfill the F2 append and lifecycle promises。Phase 1.5
 `../phase-1.5-core-storage-foundation/` is the implementation authority for the protocol-neutral additions below；
-P15-M5 must pass before F2-M1 starts or `NereusManagedLedger` is exposed。This section remains the F2 consumer
+P15-M5 has passed, so F2-M1 may start；`NereusManagedLedger` still cannot be exposed before its own implementation
+gates pass。This section remains the F2 consumer
 contract and cannot be implemented independently in the facade。
 
 ### 3.1 Recoverable append attempt

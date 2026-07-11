@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-11
-> 当前交付阶段：Phase 1.5，P15-M0 code-level design complete；下一实现里程碑为 P15-M1 target API
+> 当前交付阶段：Phase 1.5 P15-M0-M5 complete；下一实现里程碑为 F2-M1 projection foundation
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -37,7 +37,7 @@ streamId + offset
 
 1. **已实现行为**：生产代码、可执行测试和 durable golden bytes；
 2. **当前代码级合同**：`docs/phase-1-core-stream-storage/` 的已实现 L0 合同、
-   `docs/phase-1.5-core-storage-foundation/` 的 active L0 evolution design，以及
+   `docs/phase-1.5-core-storage-foundation/` 的 implemented L0 evolution contract，以及
    `docs/phase-2-managed-ledger-facade/` 的 reviewed F2 design；
 3. **已接受决策**：`docs/decisions/`；
 4. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
@@ -63,14 +63,14 @@ streamId + offset
 
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
-| `nereus-api` | `Implemented` | protocol-neutral values、validation、`StorageProfile`、`DurabilityLevel`、key/hash helpers |
-| `nereus-metadata-oxia` | `Implemented`（M7） | fake + production Oxia adapter、shared codecs/contract、single-key CAS、repair/watch、Docker gates |
+| `nereus-api` | `Implemented`（P15-M1/M4） | generic target/result、append recovery/lifecycle API、validation、profile/durability、key/hash helpers |
+| `nereus-metadata-oxia` | `Implemented`（P15-M2/M4） | legacy/new codecs、generic new-write、mixed-chain repair/replay、lifecycle CAS、fake/real Docker gates |
 | `nereus-object-store` | `Implemented`（M3） | object-store API、WAL v1 writer/reader、entry index、local test fixture、checksums/tests |
-| `nereus-core` | `Implemented`（Phase 1） | append、read/resolve、trim/recovery、deadline/resource/close and M8 real-Oxia restart/failure gate |
-| Phase 1.5 foundation | `Designed`（P15-M0） | generic target/adapter、metadata dual-read/new-write、append recovery、seal/delete contract；no production code |
+| `nereus-core` | `Implemented`（P15-M3/M4） | primary-WAL registry/Object adapters、strict split commit/materialize、read dispatch、exact recovery、seal/delete |
+| Phase 1.5 foundation | `Implemented`（P15-M0-M5） | generic target/adapter、metadata dual-read/new-write、append recovery、seal/delete；ordinary/Docker gates pass |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `In progress`（F2-M0R complete；gated） | API spike、code-level method/runtime review complete；implementation waits for P15-M5；module marker-only |
+| `nereus-managed-ledger` | `In progress`（F2-M0R complete） | API spike、code-level method/runtime review complete；P15-M5 passed；module marker-only |
 | `nereus-pulsar-adapter` | `In progress`（F2-M0R complete；gated） | runtime/bootstrap contract complete；implementation waits for F2 milestones；module marker-only |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
@@ -85,6 +85,13 @@ Phase 1 ordinary and final gates are：
 `phase1Check` keeps Docker optional；`phase1FinalCheck` includes the production adapter、capability spike and
 full core/Oxia/Object-WAL Testcontainers suites. The post-M8 review also gates one-head snapshots、bounded
 range iteration、executor isolation、cache/lane lifecycle and the `com.nereusstream` namespace。
+
+Phase 1.5 gates are：
+
+```text
+./gradlew phase15Check
+./gradlew phase15FinalCheck --rerun-tasks
+```
 
 ## 5. 当前一致性决策
 
@@ -135,7 +142,7 @@ ADR 0004 owns the delivery-order、generic-target compatibility and support-boun
 | `nereus-commit-protocol.md` | append/head CAS、index repair、generation、cursor/txn/catalog commit | current |
 | `nereus-storage-object-format.md` | 已实现 WAL v1 与未来 object families 的版本边界 | current |
 | `nereus-futures.md` | 能力轨道、依赖 DAG、交付状态 | current |
-| `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | designed / current delivery |
+| `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -146,8 +153,8 @@ ADR 0004 owns the delivery-order、generic-target compatibility and support-boun
 
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
-| `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1）；Phase 1.5 designed extension active |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R complete；M1 after P15-M5） |
+| `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R complete；F2-M1 next） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
@@ -167,7 +174,7 @@ ADR 0004 owns the delivery-order、generic-target compatibility and support-boun
 
 ### 实现 Future 2
 
-1. first complete `../phase-1.5-core-storage-foundation/README.md` P15-M1-M5；
+1. consume the completed `../phase-1.5-core-storage-foundation/README.md` contract；
 2. `nereus-future2-managed-ledger-facade.md`；
 3. `../phase-2-managed-ledger-facade/README.md`；
 4. 该目录的 `01` 到 `07` reviewed code-level documents；
@@ -175,13 +182,13 @@ ADR 0004 owns the delivery-order、generic-target compatibility and support-boun
    Pulsar fork commit；
 6. 当前里程碑对应的代码和可执行 gate。
 
-### 实现 Phase 1.5
+### 评审 Phase 1.5
 
 1. `nereus-future1-core-stream-storage.md`；
 2. `../phase-1.5-core-storage-foundation/README.md`；
 3. 该目录的 `01` 到 `05` code-level documents；
 4. 对照 `../phase-1-core-stream-storage/` 的 frozen legacy contract/goldens；
-5. P15-M1-M5 当前里程碑代码与 gate。
+5. P15-M1-M5 implemented code and passing gates。
 
 ### 评审目标架构
 

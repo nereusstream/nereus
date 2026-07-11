@@ -1,6 +1,6 @@
 # Append Recovery and Stream Lifecycle
 
-> 状态：Phase 1.5 target contract；not implemented
+> 状态：Implemented；P15-M4 recovery/lifecycle contract final-gated on 2026-07-11
 > F2 source：current `../phase-2-managed-ledger-facade/06-code-level-interface-contract.md`
 
 本文把 F2-M0R 锁定的 callback-safety requirements 落到 protocol-neutral L0。Append recovery 解决当前

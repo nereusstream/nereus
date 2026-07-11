@@ -21,6 +21,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import java.time.Clock;
@@ -96,8 +97,8 @@ class OffsetIndexCacheTest {
         assertThat(cache.lookup(another, 0, 0)).isPresent();
     }
 
-    private static OffsetIndexRecord index(long logicalBytes, long metadataVersion) {
-        return new OffsetIndexRecord(
+    private static OffsetIndexEntry index(long logicalBytes, long metadataVersion) {
+        return OffsetIndexEntry.fromLegacy(new OffsetIndexRecord(
                 STREAM_ID.value(),
                 0,
                 1,
@@ -132,16 +133,16 @@ class OffsetIndexCacheTest {
                 1,
                 1,
                 false,
-                metadataVersion);
+                metadataVersion));
     }
 
-    private static OffsetIndexRecord index(
+    private static OffsetIndexEntry index(
             StreamId streamId,
             long startOffset,
             long endOffset,
             long metadataVersion) {
         String suffix = Long.toString(endOffset);
-        return new OffsetIndexRecord(
+        return OffsetIndexEntry.fromLegacy(new OffsetIndexRecord(
                 streamId.value(),
                 startOffset,
                 endOffset,
@@ -176,7 +177,7 @@ class OffsetIndexCacheTest {
                 1,
                 endOffset,
                 false,
-                metadataVersion);
+                metadataVersion));
     }
 
     private static final class MutableClock extends Clock {

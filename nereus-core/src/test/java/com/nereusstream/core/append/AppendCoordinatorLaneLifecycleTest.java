@@ -21,6 +21,7 @@ import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.PayloadFormat;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -66,12 +68,18 @@ class AppendCoordinatorLaneLifecycleTest {
         context.metadata().failNext(
                 FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
 
+        AtomicReference<NereusException> captured = new AtomicReference<>();
         assertThatThrownBy(() -> context.coordinator().append(context.streamId(), batch(), options()).join())
-                .isInstanceOfSatisfying(CompletionException.class, error ->
-                        assertThat((NereusException) error.getCause())
-                                .extracting(failure -> failure.appendOutcome().orElseThrow())
-                                .isEqualTo(AppendOutcome.KNOWN_COMMITTED));
-        assertThat(context.coordinator().retainedLaneCount()).isEqualTo(1);
+                .isInstanceOfSatisfying(CompletionException.class, error -> {
+                    NereusException failure = (NereusException) error.getCause();
+                    captured.set(failure);
+                    assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
+                    assertThat(failure.appendAttemptId()).isPresent();
+                });
+        context.coordinator().recoverAppend(context.streamId(),
+                captured.get().appendAttemptId().orElseThrow(),
+                new AppendRecoveryOptions(Duration.ofSeconds(1))).join();
+        assertThat(context.coordinator().retainedLaneCount()).isZero();
     }
 
     private TestContext context(String name) {

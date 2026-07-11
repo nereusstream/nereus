@@ -31,6 +31,11 @@ public interface StreamStorage extends AutoCloseable {
             AppendBatch batch,
             AppendOptions options);
 
+    CompletableFuture<AppendResult> recoverAppend(
+            StreamId streamId,
+            AppendAttemptId attemptId,
+            AppendRecoveryOptions options);
+
     CompletableFuture<ReadResult> read(
             StreamId streamId,
             long startOffset,
@@ -47,6 +52,10 @@ public interface StreamStorage extends AutoCloseable {
             TrimOptions options);
 
     CompletableFuture<StreamMetadata> getStreamMetadata(StreamId streamId);
+
+    CompletableFuture<StreamMetadata> seal(StreamId streamId, SealOptions options);
+
+    CompletableFuture<StreamMetadata> delete(StreamId streamId, DeleteOptions options);
 
     @Override
     void close();

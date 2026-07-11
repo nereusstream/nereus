@@ -28,10 +28,11 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
-import com.nereusstream.api.ResolvedObjectRange;
+import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairCursor;
@@ -42,7 +43,7 @@ import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.WatchRegistration;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
-import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import java.time.Clock;
@@ -58,9 +59,9 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ReadResolver implements AutoCloseable {
-    private static final Comparator<OffsetIndexRecord> GENERATION_ORDER = Comparator
-            .comparingLong(OffsetIndexRecord::generation)
-            .thenComparingLong(OffsetIndexRecord::commitVersion);
+    private static final Comparator<OffsetIndexEntry> GENERATION_ORDER = Comparator
+            .comparingLong(OffsetIndexEntry::generation)
+            .thenComparingLong(OffsetIndexEntry::commitVersion);
 
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
@@ -182,7 +183,7 @@ public final class ReadResolver implements AutoCloseable {
         }
         return scan(streamId, state.cursor(), snapshot.trim().trimOffset(), options.allowCache(), deadline)
                 .thenComposeAsync(source -> {
-                    OffsetIndexRecord selected = select(streamId, state.cursor(), source.records());
+                    OffsetIndexEntry selected = select(streamId, state.cursor(), source.records());
                     if (selected == null) {
                         if (state.cursor() >= snapshot.committed().committedEndOffset()) {
                             return CompletableFuture.completedFuture(state.withCacheUsed(source.fromCache()));
@@ -203,11 +204,11 @@ public final class ReadResolver implements AutoCloseable {
                                             deadline);
                                 });
                     }
-                    ResolvedObjectRange range = toResolvedRange(selected);
-                    List<ResolvedObjectRange> ranges = new ArrayList<>(state.ranges());
+                    ResolvedRange range = toResolvedRange(selected);
+                    List<ResolvedRange> ranges = new ArrayList<>(state.ranges());
                     ranges.add(range);
                     BuildState advanced = new BuildState(
-                            selected.offsetEnd(),
+                            selected.range().endOffset(),
                             List.copyOf(ranges),
                             Math.max(state.metadataVersion(), selected.metadataVersion()),
                             state.cacheUsed() || source.fromCache());
@@ -229,7 +230,7 @@ public final class ReadResolver implements AutoCloseable {
             boolean allowCache,
             ReadOperationDeadline deadline) {
         if (allowCache) {
-            Optional<List<OffsetIndexRecord>> cached = cache.lookup(streamId, cursor, trimOffset);
+            Optional<List<OffsetIndexEntry>> cached = cache.lookup(streamId, cursor, trimOffset);
             if (cached.isPresent()) {
                 observe(observer::onOffsetIndexCacheHit);
                 return CompletableFuture.completedFuture(new ScanSource(cached.orElseThrow(), true));
@@ -246,8 +247,8 @@ public final class ReadResolver implements AutoCloseable {
                                 config.maxCommitChainScan()),
                         "scan offset index")
                 .thenApplyAsync(records -> {
-                    for (OffsetIndexRecord record : records) {
-                        if (!record.streamId().equals(streamId.value())) {
+                    for (OffsetIndexEntry record : records) {
+                        if (!record.streamId().equals(streamId)) {
                             throw invariant("offset-index scan returned another stream");
                         }
                     }
@@ -322,42 +323,30 @@ public final class ReadResolver implements AutoCloseable {
         return repairPage(streamId, targetOffset, result.continuation(), scanned, deadline);
     }
 
-    private static OffsetIndexRecord select(
+    private static OffsetIndexEntry select(
             StreamId streamId,
             long cursor,
-            List<OffsetIndexRecord> records) {
+            List<OffsetIndexEntry> records) {
         return records.stream()
-                .filter(record -> record.streamId().equals(streamId.value()))
+                .filter(record -> record.streamId().equals(streamId))
                 .filter(record -> !record.tombstoned())
-                .filter(record -> record.offsetStart() <= cursor && cursor < record.offsetEnd())
+                .filter(record -> record.range().startOffset() <= cursor && cursor < record.range().endOffset())
                 .max(GENERATION_ORDER)
                 .orElse(null);
     }
 
-    private static ResolvedObjectRange toResolvedRange(OffsetIndexRecord record) {
+    private static ResolvedRange toResolvedRange(OffsetIndexEntry record) {
         try {
-            if (!"WAL_OBJECT_V1".equals(record.physicalFormat())
-                    || !"OPAQUE_SLICE".equals(record.logicalFormat())) {
-                throw invariant("offset index contains an unsupported physical or logical format");
-            }
-            ObjectType objectType = ObjectType.valueOf(record.objectType());
-            PayloadFormat payloadFormat = PayloadFormat.valueOf(record.payloadFormat());
-            Checksum sliceChecksum = new Checksum(
-                    ChecksumType.valueOf(record.sliceChecksumType()),
-                    record.sliceChecksumValue());
-            return new ResolvedObjectRange(
-                    new OffsetRange(record.offsetStart(), record.offsetEnd()),
+            return new ResolvedRange(
+                    record.range(),
                     record.generation(),
-                    new ObjectId(record.objectId()),
-                    new ObjectKey(record.objectKey()),
-                    objectType,
-                    record.objectOffset(),
-                    record.objectLength(),
-                    sliceChecksum,
-                    payloadFormat,
+                    record.readTarget(),
+                    record.payloadFormat(),
+                    record.recordCount(),
+                    record.entryCount(),
+                    record.logicalBytes(),
                     record.schemaRefs(),
-                    toEntryIndexRef(record.entryIndexRef()),
-                    toProjectionRef(record.projectionRef()),
+                    record.projectionRef(),
                     record.commitVersion());
         } catch (NereusException e) {
             throw e;
@@ -514,12 +503,12 @@ public final class ReadResolver implements AutoCloseable {
             long metadataVersion) {
     }
 
-    private record ScanSource(List<OffsetIndexRecord> records, boolean fromCache) {
+    private record ScanSource(List<OffsetIndexEntry> records, boolean fromCache) {
     }
 
     private record BuildState(
             long cursor,
-            List<ResolvedObjectRange> ranges,
+            List<ResolvedRange> ranges,
             long metadataVersion,
             boolean cacheUsed) {
         private BuildState {

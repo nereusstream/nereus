@@ -40,7 +40,14 @@ public record StreamStorageConfig(
         Duration offsetIndexCacheTtl,
         boolean autoAcquireAppendSession,
         boolean enableMetadataWatch,
-        boolean enableOffsetIndexCache) {
+        boolean enableOffsetIndexCache,
+        String processRunId,
+        Duration appendRecoveryAttemptTimeout,
+        Duration appendRecoveryBackoffMin,
+        Duration appendRecoveryBackoffMax,
+        Duration appendRecoveryTerminalTtl,
+        int maxRetainedAppendAttempts,
+        int maxAppendRecoveryTerminals) {
     public StreamStorageConfig {
         cluster = requireNonBlank(cluster, "cluster");
         writerId = requireNonBlank(writerId, "writerId");
@@ -55,6 +62,14 @@ public record StreamStorageConfig(
         readTimeout = requirePositive(readTimeout, "readTimeout");
         shutdownGrace = requirePositive(shutdownGrace, "shutdownGrace");
         offsetIndexCacheTtl = requirePositive(offsetIndexCacheTtl, "offsetIndexCacheTtl");
+        processRunId = requireNonBlank(processRunId, "processRunId");
+        appendRecoveryAttemptTimeout = requirePositive(appendRecoveryAttemptTimeout, "appendRecoveryAttemptTimeout");
+        appendRecoveryBackoffMin = requirePositive(appendRecoveryBackoffMin, "appendRecoveryBackoffMin");
+        appendRecoveryBackoffMax = requirePositive(appendRecoveryBackoffMax, "appendRecoveryBackoffMax");
+        appendRecoveryTerminalTtl = requirePositive(appendRecoveryTerminalTtl, "appendRecoveryTerminalTtl");
+        if (appendRecoveryBackoffMin.compareTo(appendRecoveryBackoffMax) > 0) {
+            throw new IllegalArgumentException("appendRecoveryBackoffMin must be <= appendRecoveryBackoffMax");
+        }
         if (appendSessionRenewBefore.compareTo(appendSessionTtl) >= 0) {
             throw new IllegalArgumentException("appendSessionRenewBefore must be less than appendSessionTtl");
         }
@@ -73,6 +88,29 @@ public record StreamStorageConfig(
         if (maxObjectBytes > maxReadBufferBytes) {
             throw new IllegalArgumentException("maxObjectBytes must be <= maxReadBufferBytes");
         }
+        if (maxRetainedAppendAttempts <= 0 || maxAppendRecoveryTerminals < maxRetainedAppendAttempts) {
+            throw new IllegalArgumentException("append recovery capacities are invalid");
+        }
+    }
+
+    /** Phase 1 source-compatible constructor with generated process identity and bounded recovery defaults. */
+    public StreamStorageConfig(
+            String cluster, String writerId, Duration appendSessionTtl, Duration appendSessionRenewBefore,
+            Duration appendSessionMinCommitRemaining, Duration appendTimeout, Duration readTimeout,
+            Duration shutdownGrace, int maxResolveRanges, int maxCommitChainScan,
+            int maxDerivedIndexRepairCommitsPerCall, int maxCachedStreams, int maxInFlightAppends,
+            long maxBufferedBytes, int maxConcurrentObjectReads, long maxReadBufferBytes, int maxObjectBytes,
+            int maxAppendBatchRecords, Duration offsetIndexCacheTtl, boolean autoAcquireAppendSession,
+            boolean enableMetadataWatch, boolean enableOffsetIndexCache) {
+        this(cluster, writerId, appendSessionTtl, appendSessionRenewBefore, appendSessionMinCommitRemaining,
+                appendTimeout, readTimeout, shutdownGrace, maxResolveRanges, maxCommitChainScan,
+                maxDerivedIndexRepairCommitsPerCall, maxCachedStreams, maxInFlightAppends, maxBufferedBytes,
+                maxConcurrentObjectReads, maxReadBufferBytes, maxObjectBytes, maxAppendBatchRecords,
+                offsetIndexCacheTtl, autoAcquireAppendSession, enableMetadataWatch, enableOffsetIndexCache,
+                java.util.UUID.randomUUID().toString().replace("-", ""),
+                Duration.ofSeconds(5), Duration.ofMillis(100), Duration.ofSeconds(5), Duration.ofMinutes(10),
+                Math.max(1, maxInFlightAppends),
+                maxInFlightAppends > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : Math.max(2, maxInFlightAppends * 2));
     }
 
     public static StreamStorageConfig defaults(String cluster, String writerId) {
@@ -98,8 +136,19 @@ public record StreamStorageConfig(
                 Duration.ofSeconds(5),
                 true,
                 false,
-                true);
+                true,
+                java.util.UUID.randomUUID().toString().replace("-", ""),
+                Duration.ofSeconds(5),
+                Duration.ofMillis(100),
+                Duration.ofSeconds(5),
+                Duration.ofMinutes(10),
+                1_024,
+                2_048);
     }
+
+    public int maxConcurrentPrimaryReads() { return maxConcurrentObjectReads; }
+    public long maxPrimaryReadBufferBytes() { return maxReadBufferBytes; }
+    public long maxPrimaryAppendBytes() { return maxBufferedBytes; }
 
     private static String requireNonBlank(String value, String name) {
         Objects.requireNonNull(value, name);

@@ -17,6 +17,7 @@ package com.nereusstream.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -407,19 +408,23 @@ class ApiValueValidationTest {
                 range,
                 range.endOffset(),
                 0,
-                new ObjectId("object"),
-                new ObjectKey("object-key"),
-                "slice",
-                objectOffset,
-                objectLength,
+                new ObjectSliceReadTarget(
+                        1,
+                        new ObjectId("object"),
+                        new ObjectKey("object-key"),
+                        ObjectType.MULTI_STREAM_WAL_OBJECT,
+                        "WAL_OBJECT_V1",
+                        "OPAQUE_SLICE",
+                        "slice",
+                        objectOffset,
+                        objectLength,
+                        checksum(),
+                        objectFooterRef()),
                 PayloadFormat.OPAQUE_RECORD_BATCH,
                 recordCount,
                 entryCount,
                 recordCount,
                 List.of(),
-                objectFooterRef(),
-                checksum(),
-                checksum(),
                 Optional.empty(),
                 1);
     }

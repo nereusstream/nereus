@@ -1,16 +1,16 @@
 # Phase 1.5 Core Storage Foundation
 
-> 状态：Designed；P15-M0 code-level design complete，production implementation not started
+> 状态：Implemented；P15-M0-M5 complete and final-gated on 2026-07-11
 > 输入基线：`nereusstream/nereus@8aa684f479994094a612578bbfe27170b077f4ad`
-> 实现基线：Future 1 / Phase 1 M0-M8 at `ad8c272787fe77f908397515864ef1f72945e8ee`
-> 下一里程碑：P15-M1 public target model and API evolution
+> 实现基线：Phase 1.5 working tree based on `da49a97`
+> 下一里程碑：F2-M1 projection foundation
 
 Phase 1.5 是插入 Future 1 与 Future 2 production implementation 之间的 L0 foundation delivery。
 它不是新的 capability track，也不改变 Future 1-8 的编号。它把 Phase 1 已证明的
 `OBJECT_WAL_SYNC_OBJECT` 实现重构成可承载多种 physical read target 的 core，并完成最新
-F2-M0R 已锁定但当前 `StreamStorage` 尚不具备的 append recovery 与 stream lifecycle 合同。
+F2-M0R 已锁定的 append recovery 与 stream lifecycle 合同。
 
-Phase 1.5 完成后，运行时支持面仍然只有：
+Phase 1.5 当前运行时支持面仍然只有：
 
 ```text
 OBJECT_WAL_SYNC_OBJECT
@@ -94,23 +94,22 @@ The accepted delivery/compatibility decision is
 | `04-core-abstractions-and-state-machines.md` | primary-WAL adapter seam, strict append/read dispatch, resources and close |
 | `05-implementation-plan-and-gates.md` | P15-M1 through M5 files, tests, release gates and stop conditions |
 
-The implemented Phase 1 contract in `../phase-1-core-stream-storage/` remains authoritative until a Phase 1.5
-milestone changes code and tests. When implementation begins, each code change must update the matching document here
-and preserve the legacy contract where this design explicitly requires compatibility。
+The implemented Phase 1 contract in `../phase-1-core-stream-storage/` remains the legacy compatibility baseline；
+this directory is authoritative for the implemented Phase 1.5 evolution and its preserved compatibility rules。
 
 ## 5. Delivery Milestones
 
 | Milestone | State | Exit |
 | --- | --- | --- |
 | P15-M0 code-level design | Complete | Documents 01-05 plus overall/roadmap/F2 handoff alignment |
-| P15-M1 target API | Not started | generic target/result values, validation and repository caller migration |
-| P15-M2 metadata evolution | Not started | legacy/new mixed-chain fake/real Oxia parity and lazy repair |
-| P15-M3 core adapter split | Not started | Object WAL sync behavior through generic adapter and split committer/materializer |
-| P15-M4 recovery/lifecycle | Not started | retained exact attempts, multi-page recovery, seal/delete and race gates |
-| P15-M5 final acceptance | Not started | Phase 1 regression + production Oxia/Object WAL restart + F2 prerequisite gate |
+| P15-M1 target API | Complete | generic target/result values, validation and repository caller migration |
+| P15-M2 metadata evolution | Complete | legacy/new mixed-chain fake/real Oxia parity and lazy repair |
+| P15-M3 core adapter split | Complete | Object WAL sync behavior through registry/adapters and split committer/materializer |
+| P15-M4 recovery/lifecycle | Complete | retained exact attempts, multi-page recovery, seal/delete and race gates |
+| P15-M5 final acceptance | Complete | Phase 1 regression + production Oxia/Object WAL restart + F2 prerequisite gate |
 
-F2-M1 production implementation resumes only after P15-M5. Pure review work may continue, but F2 must not create a
-second temporary L0 API or expose `NereusManagedLedger` against a partially implemented Phase 1.5 surface。
+P15-M5 has passed, so F2-M1 production implementation may now begin. F2 must consume this surface and must not create
+a second temporary L0 API。
 
 ## 6. Support Matrix at Exit
 
@@ -127,16 +126,15 @@ second temporary L0 API or expose `NereusManagedLedger` against a partially impl
 | async materialization/higher generation | Future 4 designed, not implemented |
 | physical object deletion | not implemented |
 
-## 7. Planned Aggregate Gates
+## 7. Aggregate Gates
 
-Implementation adds the following aggregate tasks；they do not exist merely because this design document exists：
+The implementation provides and passes these aggregate tasks：
 
 ```bash
 ./gradlew phase15Check
 ./gradlew phase15FinalCheck --rerun-tasks
 ```
 
-`phase15Check` must include all ordinary Phase 1 gates plus new API/codec/fake-metadata/core tests。
-`phase15FinalCheck` must additionally run real Oxia mixed-version restart/recovery/lifecycle scenarios and the
-F2 L0 prerequisite contract suite。Neither gate may weaken or rename the existing `phase1Check` /
-`phase1FinalCheck` tasks。
+`phase15Check` includes all ordinary Phase 1 gates plus new API/codec/fake-metadata/core tests。
+`phase15FinalCheck` additionally runs real Oxia mixed-version restart/recovery/lifecycle scenarios through the
+unchanged `phase1FinalCheck` Docker gates。Neither gate weakens or renames `phase1Check` / `phase1FinalCheck`。

@@ -257,8 +257,8 @@ commitVersion
 ```
 
 Generation 0 is repairable from reachable append commit。Higher generations are conditionally published by
-F4。The production Phase 1 Java type is object-specific；Phase 1.5 has designed the proper tagged target union and
-dual-read/new-write generic metadata, with implementation gated by P15-M1-M5。This does not alter Object WAL bytes or
+F4。Phase 1.5 implements the tagged target union and dual-read/new-write generic metadata while retaining the
+object-specific legacy decoder/adapter boundary。This does not alter Object WAL bytes or
 implement BookKeeper IO。
 
 ## 10. Designed compacted object

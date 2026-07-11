@@ -3,7 +3,8 @@
 本文档目录是 Future 2 的 active code-level design。F2-M0 在 2026-07-11 完成第一轮 API spike；
 同日的代码级复审（F2-M0R）补齐了 append recovery、topic incarnation、role-aware Position、
 exhaustive interface matrix 和 broker runtime bootstrap。生产 facade 仍未实现。Phase 1.5 P15-M0 已把
-这些结论要求的 L0 evolution 冻结成代码级设计；当前实现里程碑是 P15-M1，F2-M1 在 P15-M5 后恢复。
+这些结论要求的 L0 evolution 冻结成代码级设计；P15-M1-M5 随后完成实现和 final gate，当前下一实现
+里程碑是 F2-M1。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -74,8 +75,8 @@ audit must pass again before implementation continues.
 
 ## 3. Phase 1.5 Production Prerequisite
 
-F2-M0R was completed against the exact Phase 1 implementation baseline and remains the facade authority。Before any
-F2-M1 production artifact is exposed, `../phase-1.5-core-storage-foundation/` P15-M1-M5 must implement and prove：
+F2-M0R was completed against the exact Phase 1 implementation baseline and remains the facade authority。
+`../phase-1.5-core-storage-foundation/` P15-M1-M5 have now implemented and proved the prerequisite：
 
 - generic `ReadTarget`/`AppendResult`/`ResolvedRange` with Object WAL strict parity；
 - legacy/new L0 metadata compatibility；
@@ -147,8 +148,8 @@ Those are later milestone gates.
 | --- | --- | --- |
 | F2-M0 design/API spike | Complete | Locked target and successful compile probe |
 | F2-M0R code-level review | Complete | Documents 02-07; L0 prerequisites and exhaustive target behavior frozen |
-| Phase 1.5 P15-M1-M5 | Next prerequisite | Implement generic L0/recovery/lifecycle and final gate |
-| F2-M1 projection model | Gated | Starts after P15-M5；pure model/codec and restart-stable mapping tests |
+| Phase 1.5 P15-M1-M5 | Complete | Generic L0/recovery/lifecycle implemented；ordinary and Docker final gates pass |
+| F2-M1 projection model | Next | Pure model/codec and restart-stable mapping tests |
 | F2-M2 projection metadata | Not started | Fake/real Oxia contract and crash-repair tests |
 | F2-M3 ManagedLedger facade | Not started | Factory/ledger append/read/lifecycle and exactly-once callback tests |
 | F2-M4 cursor boundary | Not started | Read-only/non-durable cursor; explicit durable mutation rejection |

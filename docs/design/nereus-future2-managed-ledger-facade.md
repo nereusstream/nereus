@@ -1,6 +1,6 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 状态：In progress；F2-M0 API spike + F2-M0R code-level review complete，F2-M1 waits for P15-M5
+> 状态：In progress；F2-M0 API spike + F2-M0R code-level review complete，P15-M5 passed，F2-M1 next
 > 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle/generic-result final gate
 > Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 
@@ -70,8 +70,8 @@ Future 2 不解决：
 这些能力在 Future 3、Future 5、Future 6、Future 8 中作为 projection 或上层状态处理。
 
 当前实现约束：`nereus-managed-ledger` 还没有真实 facade；Phase 1 payload 是 one-record-per-entry
-opaque batch，production `AppendResult`/resolve 仍是 object-shaped。Phase 1.5 已冻结 generic target/result、
-exact recovery 和 lifecycle 设计，但 P15-M1-M5 尚未实现。F2 首版在 P15-M5 后仍只接受
+opaque batch。Phase 1.5 已实现 generic target/result、exact recovery 和 lifecycle，并保持 Object WAL
+strict parity。F2 首版仍只接受
 `OBJECT_WAL_SYNC_OBJECT`，并只从 generic result 的 logical range 构造 Position。Broker hybrid mode 中的
 `bookkeeper` 继续走 stock BookKeeper factory，不等于 Nereus BookKeeper profile 已实现。
 
@@ -446,7 +446,7 @@ F2-M0 API spike and F2-M0R code-level review are complete. The review locked:
 - hybrid runtime construction, S3-compatible ObjectStore provider and broker-side unsupported-feature admission。
 - single-key cross-storage binding and explicit rejection of live BookKeeper/Nereus policy switching。
 
-Production implementation is gated by Phase 1.5 P15-M5 proving：
+Phase 1.5 P15-M5 has passed and proves the following production prerequisite：
 
 - generic logical append/resolve results and Object WAL parity；
 - exact retained attempt ID/recovery with multi-page progress；
@@ -456,5 +456,5 @@ Production implementation is gated by Phase 1.5 P15-M5 proving：
 
 The executable API probe passed against interface blobs identical to the locked fork。Code-level
 contracts and F2-M1 through F2-M6 gates are in
-`../phase-2-managed-ledger-facade/README.md`。This closes the design gate only；Future 2 remains
-in progress but implementation-gated until P15-M5, then until all F2 implementation/final-acceptance gates pass。
+`../phase-2-managed-ledger-facade/README.md`。This closes the L0 prerequisite only；Future 2 remains
+in progress until F2-M1 through F2-M6 implementation/final-acceptance gates pass。

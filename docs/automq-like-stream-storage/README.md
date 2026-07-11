@@ -26,7 +26,7 @@ Already present：
 - `DurabilityLevel.WAL_DURABLE` contract name；
 - canonical profile persistence in stream metadata；
 - Object WAL v1 bytes and Phase 1 head-CAS/commit-log primitives。
-- Phase 1.5 code-level design for generic target/adapter and stable-commit/materialization separation（design only）。
+- Phase 1.5 generic target/adapter and stable-commit/materialization separation（implemented and final-gated）。
 
 Not present：
 
@@ -115,7 +115,7 @@ interface Materializer {
 ```
 
 Phase 1.5 freezes the concrete `ReadTarget` union, generic metadata and adapter seam in
-`../phase-1.5-core-storage-foundation/`。They remain design until P15-M1-M5 are implemented；even after P15-M5,
+`../phase-1.5-core-storage-foundation/`。P15-M1-M5 are implemented and final-gated；nevertheless,
 `WAL_DURABLE` and the async coordinator remain separate gates rather than implied support。
 
 ## 6. State machine

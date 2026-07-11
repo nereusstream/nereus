@@ -1,6 +1,6 @@
 # Core Abstractions and State Machines
 
-> 状态：Phase 1.5 target contract；not implemented
+> 状态：Implemented；P15-M3/P15-M4 core contract final-gated on 2026-07-11
 
 本文定义 Phase 1.5 如何在不改变 Object WAL v1 bytes 和 strict success 语义的前提下，把 current
 `DefaultStreamStorage` 从直接依赖 `WalObjectWriter/WalObjectReader` 改成 target-aware L0 core。
@@ -139,9 +139,9 @@ public interface PrimaryWalAppender<P extends PreparedPrimaryAppend> {
 ```
 
 `providerCommitEvidence` is not serialized or exposed and may only be down-cast by the same registered provider。The
-implementation uses a package-private sealed evidence interface rather than accepting arbitrary caller objects；the
-pseudo-code uses `Object` only to keep the public shape short。A provider cannot change any logical field between
-prepare and persist。
+implementation uses the typed `ProviderCommitEvidence` interface and `ObjectWalCommitEvidence`；because the project
+currently builds as an unnamed Java module, the interface is not Java-`sealed`, while registry/type checks still fail
+closed。A provider cannot change any logical field between prepare and persist。
 
 `validateBeforeHeadCommit` proves provider-specific durable target metadata：Object WAL writes/compares the exact
 manifest；future BookKeeper validates the ledger/entry range through its adapter。Failure is
@@ -225,9 +225,10 @@ The lane is removed only when no queued/in-flight operation, recovery, waiter or
 resident-lane test remains part of the Phase 1 post-M8 memory gate。Append/session caches remain distinct；removing a
 lane cannot discard an unresolved attempt or make a durable session authoritative locally。
 
-`StrictAppendCoordinator` replaces the current monolithic `AppendCoordinator` after P15-M3。During implementation,
-the old class may remain behind tests but there is exactly one production append path at each milestone；two
-coordinators cannot concurrently handle the same profile。
+The existing `AppendCoordinator` class name is retained for source compatibility, but its only production path is the
+strict Phase 1.5 pipeline through `PrimaryWalRegistry`、`ObjectWalAppenderAdapter`、`StableAppendCommitter` and
+`GenerationZeroIndexMaterializer`。Its retained-attempt registry and mutation-lane implementation are encapsulated in
+the same coordinator；there is no second legacy production append path。
 
 ## 7. Primary Read Boundary
 

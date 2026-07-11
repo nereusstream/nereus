@@ -18,7 +18,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** A committed offset range mapped to a physical object slice. */
+import com.nereusstream.api.target.ObjectSliceReadTarget;
+
+/** Compatibility view of a generic range when its target is an object slice. */
+@Deprecated(forRemoval = true)
 public record ResolvedObjectRange(
         OffsetRange offsetRange,
         long generation,
@@ -47,5 +50,26 @@ public record ResolvedObjectRange(
         if (generation < 0 || commitVersion < 0) {
             throw new IllegalArgumentException("range numeric fields must be non-negative");
         }
+    }
+
+    public static ResolvedObjectRange from(ResolvedRange range) {
+        Objects.requireNonNull(range, "range");
+        if (!(range.readTarget() instanceof ObjectSliceReadTarget target)) {
+            throw new IllegalArgumentException("resolved range is not backed by an object slice");
+        }
+        return new ResolvedObjectRange(
+                range.offsetRange(),
+                range.generation(),
+                target.objectId(),
+                target.objectKey(),
+                target.objectType(),
+                target.objectOffset(),
+                target.objectLength(),
+                target.sliceChecksum(),
+                range.payloadFormat(),
+                range.schemaRefs(),
+                target.entryIndexRef(),
+                range.projectionRef(),
+                range.commitVersion());
     }
 }

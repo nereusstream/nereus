@@ -37,8 +37,10 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
@@ -93,7 +95,8 @@ class DefaultStreamStorageReadTest {
 
             assertThat(resolved.ranges()).hasSize(2);
             assertThat(resolved.resolvedEndOffset()).isEqualTo(3);
-            assertThat(resolved.ranges().getFirst().sliceChecksum()).isEqualTo(first.sliceChecksum());
+            assertThat(((ObjectSliceReadTarget) resolved.ranges().getFirst().readTarget()).sliceChecksum())
+                    .isEqualTo(((ObjectSliceReadTarget) first.readTarget()).sliceChecksum());
             assertThat(resolved.ranges().getFirst().schemaRefs()).containsExactly(SCHEMA);
             assertThat(read.batches()).hasSize(2);
             assertThat(read.batches()).extracting(batch -> text(batch.payload()))
@@ -218,8 +221,8 @@ class DefaultStreamStorageReadTest {
                     new StreamName("generation"),
                     new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
             writerStorage.append(streamId, batch(List.of(), "a"), appendOptions()).join();
-            OffsetIndexRecord base = metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join().getFirst();
-            OffsetIndexRecord higher = withGeneration(base, 7, base.metadataVersion() + 1);
+            OffsetIndexEntry base = metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join().getFirst();
+            OffsetIndexEntry higher = withGeneration(base, 7, base.metadataVersion() + 1);
             OxiaMetadataStore overlapping = overrideScan(metadata, List.of(base, higher));
             DefaultStreamStorage readerStorage = storage(
                     defaultConfig(false), overlapping, objectStore, new DefaultWalObjectReader(objectStore),
@@ -270,9 +273,10 @@ class DefaultStreamStorageReadTest {
             StreamId streamId = context.createStream("corruption").streamId();
             AppendResult append = context.storage.append(
                     streamId, batch(List.of(), "a", "b"), appendOptions()).join();
-            Path objectPath = root.resolve(append.objectKey().value());
+            ObjectSliceReadTarget target = (ObjectSliceReadTarget) append.readTarget();
+            Path objectPath = root.resolve(target.objectKey().value());
             byte[] bytes = Files.readAllBytes(objectPath);
-            bytes[Math.toIntExact(append.objectOffset() + 1)] ^= 0x01;
+            bytes[Math.toIntExact(target.objectOffset() + 1)] ^= 0x01;
             Files.write(objectPath, bytes);
 
             NereusException corruption = failure(context.storage.read(
@@ -644,35 +648,22 @@ class DefaultStreamStorageReadTest {
         return new String(payload, StandardCharsets.UTF_8);
     }
 
-    private static OffsetIndexRecord withGeneration(
-            OffsetIndexRecord record,
+    private static OffsetIndexEntry withGeneration(
+            OffsetIndexEntry record,
             long generation,
             long metadataVersion) {
-        return new OffsetIndexRecord(
+        return new OffsetIndexEntry(
                 record.streamId(),
-                record.offsetStart(),
-                record.offsetEnd(),
+                record.range(),
                 generation,
                 record.cumulativeSize(),
-                record.objectId(),
-                record.objectKey(),
-                record.sliceId(),
-                record.objectType(),
-                record.physicalFormat(),
-                record.logicalFormat(),
+                record.readTarget(),
                 record.payloadFormat(),
-                record.objectOffset(),
-                record.objectLength(),
                 record.recordCount(),
                 record.entryCount(),
                 record.logicalBytes(),
                 record.schemaRefs(),
-                record.entryIndexRef(),
                 record.projectionRef(),
-                record.sliceChecksumType(),
-                record.sliceChecksumValue(),
-                record.minEventTimeMillis(),
-                record.maxEventTimeMillis(),
                 record.commitVersion(),
                 false,
                 metadataVersion);
@@ -680,7 +671,7 @@ class DefaultStreamStorageReadTest {
 
     private static OxiaMetadataStore overrideScan(
             OxiaMetadataStore delegate,
-            List<OffsetIndexRecord> records) {
+            List<OffsetIndexEntry> records) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
@@ -701,7 +692,7 @@ class DefaultStreamStorageReadTest {
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, args) -> {
-                    if (method.getName().equals("commitStreamSlice")) {
+                    if (method.getName().equals("commitStableAppend")) {
                         return new CompletableFuture<>();
                     }
                     try {

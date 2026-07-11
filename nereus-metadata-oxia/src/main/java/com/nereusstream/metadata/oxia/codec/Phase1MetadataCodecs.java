@@ -122,6 +122,10 @@ public final class Phase1MetadataCodecs {
         return new MapMetadataCodecRegistry.RegisteredCodec<>(recordClass, new RecordMetadataCodec<>(recordClass));
     }
 
+    static <T extends Record> MetadataRecordCodec<T> recordCodec(Class<T> recordClass) {
+        return new RecordMetadataCodec<>(recordClass);
+    }
+
     private static final class RecordMetadataCodec<T extends Record> implements MetadataRecordCodec<T> {
         private final Class<T> recordClass;
 

@@ -32,6 +32,8 @@ import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
+import com.nereusstream.api.StreamState;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
@@ -65,6 +67,49 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
     @Container
     private static final OxiaContainer OXIA =
             new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
+
+    @Test
+    void genericCommitCoexistsWithLegacyChainAndLifecycleSurvivesRestart() {
+        String cluster = "p15/mixed/" + UUID.randomUUID();
+        OxiaClientConfiguration config = configuration();
+        StreamId streamId;
+        CommitAppendRequest generic;
+        try (OxiaJavaClientMetadataStore store = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
+            streamId = new StreamId(store.createOrGetStream(cluster, new StreamName("mixed"),
+                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId());
+            AppendSessionRecord session = store.acquireAppendSession(cluster, streamId,
+                    new AppendSessionOptions(WRITER, Duration.ofSeconds(30), false)).join();
+            CommitSliceRequest legacy = request(streamId, session, "legacy", "slice-legacy", 0);
+            store.putObjectManifest(cluster, manifest(legacy)).join();
+            store.commitStreamSlice(cluster, legacy).join();
+            CommitSliceRequest physical = request(streamId, session, "generic", "slice-generic", 1);
+            store.putObjectManifest(cluster, manifest(physical)).join();
+            generic = genericRequest(physical);
+
+            StableAppendResult stable = store.commitStableAppend(cluster, generic).join();
+            assertThat(stable.headAdvancedByThisCall()).isTrue();
+            assertThat(store.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(1);
+            store.materializeGenerationZero(cluster, stable.reachableAppend()).join();
+            assertThat(store.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(2);
+            assertThat(store.searchAppendReplay(cluster, generic, Optional.empty(), 1).join().status())
+                    .isEqualTo(AppendReplayStatus.FOUND);
+
+            StreamMetadataSnapshot active = store.getStreamSnapshot(cluster, streamId).join();
+            StreamMetadataSnapshot sealed = store.transitionStreamState(cluster, new StreamStateTransitionRequest(
+                    streamId, StreamState.ACTIVE, StreamState.SEALED, active.metadataVersion())).join();
+            StreamMetadataSnapshot deleting = store.transitionStreamState(cluster, new StreamStateTransitionRequest(
+                    streamId, StreamState.SEALED, StreamState.DELETING, sealed.metadataVersion())).join();
+            store.transitionStreamState(cluster, new StreamStateTransitionRequest(
+                    streamId, StreamState.DELETING, StreamState.DELETED, deleting.metadataVersion())).join();
+        }
+        try (OxiaJavaClientMetadataStore restarted = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
+            assertThat(restarted.getStreamSnapshot(cluster, streamId).join().metadata().state())
+                    .isEqualTo(StreamState.DELETED.name());
+            assertThat(restarted.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(2);
+            assertThat(restarted.searchAppendReplay(cluster, generic, Optional.empty(), 10).join().status())
+                    .isEqualTo(AppendReplayStatus.FOUND);
+        }
+    }
 
     @Test
     void productionAdapterPersistsCommitReplayTrimAndReferencesAcrossRestart() throws Exception {
@@ -317,6 +362,17 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                         "UPLOADED")),
                 now + 60_000,
                 0);
+    }
+
+    private static CommitAppendRequest genericRequest(CommitSliceRequest request) {
+        ObjectSliceReadTarget target = new ObjectSliceReadTarget(
+                1, request.objectId(), request.objectKey(), ObjectType.MULTI_STREAM_WAL_OBJECT,
+                "WAL_OBJECT_V1", "OPAQUE_SLICE", request.sliceId(), request.objectOffset(), request.objectLength(),
+                request.sliceChecksum(), request.entryIndexRef());
+        return new CommitAppendRequest(request.streamId(), request.writerId(), request.writerRunIdHash(),
+                request.epoch(), request.fencingToken(), request.expectedStartOffset(), target,
+                request.payloadFormat(), request.recordCount(), request.entryCount(), request.logicalBytes(),
+                request.schemaRefs(), request.minEventTimeMillis(), request.maxEventTimeMillis(), request.projectionRef());
     }
 
     private static Checksum checksum(String value) {

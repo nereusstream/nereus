@@ -17,7 +17,7 @@ package com.nereusstream.core.read;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -31,9 +31,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Positive-only offset-index cache. Empty scans and EOF are never stored. */
 final class OffsetIndexCache {
-    private static final Comparator<OffsetIndexRecord> ORDER = Comparator
-            .comparingLong(OffsetIndexRecord::offsetEnd)
-            .thenComparingLong(OffsetIndexRecord::generation);
+    private static final Comparator<OffsetIndexEntry> ORDER = Comparator
+            .comparingLong((OffsetIndexEntry record) -> record.range().endOffset())
+            .thenComparingLong(OffsetIndexEntry::generation);
 
     private final boolean enabled;
     private final long ttlMillis;
@@ -62,7 +62,7 @@ final class OffsetIndexCache {
         this.maxRecordsPerStream = maxRecordsPerStream;
     }
 
-    Optional<List<OffsetIndexRecord>> lookup(
+    Optional<List<OffsetIndexEntry>> lookup(
             StreamId streamId,
             long targetOffset,
             long currentTrimOffset) {
@@ -81,20 +81,20 @@ final class OffsetIndexCache {
         }
         boolean covers = entry.records().stream().anyMatch(record ->
                 !record.tombstoned()
-                        && record.offsetStart() <= targetOffset
-                        && targetOffset < record.offsetEnd());
+                        && record.range().startOffset() <= targetOffset
+                        && targetOffset < record.range().endOffset());
         return covers ? Optional.of(entry.records()) : Optional.empty();
     }
 
     void putPositive(
             StreamId streamId,
-            List<OffsetIndexRecord> records,
+            List<OffsetIndexEntry> records,
             long trimOffset) {
         if (!enabled || records.isEmpty()) {
             return;
         }
-        List<OffsetIndexRecord> positive = records.stream()
-                .filter(record -> record.streamId().equals(streamId.value()))
+        List<OffsetIndexEntry> positive = records.stream()
+                .filter(record -> record.streamId().equals(streamId))
                 .sorted(ORDER)
                 .toList();
         if (positive.isEmpty()) {
@@ -102,10 +102,10 @@ final class OffsetIndexCache {
         }
         long now = clock.millis();
         entries.compute(streamId, (ignored, existing) -> {
-            Map<IndexIdentity, OffsetIndexRecord> merged = new LinkedHashMap<>();
+            Map<IndexIdentity, OffsetIndexEntry> merged = new LinkedHashMap<>();
             positive.forEach(record -> {
                 IndexIdentity identity = IndexIdentity.of(record);
-                OffsetIndexRecord previous = merged.put(identity, record);
+                OffsetIndexEntry previous = merged.put(identity, record);
                 if (previous != null && !previous.equals(record)) {
                     throw new NereusException(
                             ErrorCode.METADATA_INVARIANT_VIOLATION,
@@ -116,7 +116,7 @@ final class OffsetIndexCache {
             if (existing != null) {
                 existing.records().forEach(record -> {
                     IndexIdentity identity = IndexIdentity.of(record);
-                    OffsetIndexRecord current = merged.get(identity);
+                    OffsetIndexEntry current = merged.get(identity);
                     if (current != null && !current.equals(record)) {
                         throw new NereusException(
                                 ErrorCode.METADATA_INVARIANT_VIOLATION,
@@ -126,13 +126,13 @@ final class OffsetIndexCache {
                     merged.putIfAbsent(identity, record);
                 });
             }
-            List<OffsetIndexRecord> selected = merged.values().stream()
+            List<OffsetIndexEntry> selected = merged.values().stream()
                     .limit(maxRecordsPerStream)
                     .toList();
-            List<OffsetIndexRecord> ordered = new ArrayList<>(selected);
+            List<OffsetIndexEntry> ordered = new ArrayList<>(selected);
             ordered.sort(ORDER);
             long metadataVersion = ordered.stream()
-                    .mapToLong(OffsetIndexRecord::metadataVersion)
+                    .mapToLong(OffsetIndexEntry::metadataVersion)
                     .max()
                     .orElse(0);
             return new CacheEntry(List.copyOf(ordered), trimOffset, now, metadataVersion);
@@ -175,15 +175,15 @@ final class OffsetIndexCache {
     }
 
     private record CacheEntry(
-            List<OffsetIndexRecord> records,
+            List<OffsetIndexEntry> records,
             long trimOffset,
             long createdAtMillis,
             long metadataVersion) {
     }
 
     private record IndexIdentity(long offsetEnd, long generation) {
-        private static IndexIdentity of(OffsetIndexRecord record) {
-            return new IndexIdentity(record.offsetEnd(), record.generation());
+        private static IndexIdentity of(OffsetIndexEntry record) {
+            return new IndexIdentity(record.range().endOffset(), record.generation());
         }
     }
 }

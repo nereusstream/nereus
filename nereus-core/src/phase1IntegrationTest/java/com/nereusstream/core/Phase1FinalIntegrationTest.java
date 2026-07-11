@@ -33,6 +33,7 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.TrimOptions;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.recovery.MetadataOrphanObjectScanner;
 import com.nereusstream.core.recovery.OrphanObjectAssessment;
 import com.nereusstream.core.recovery.OrphanObjectStatus;
@@ -100,6 +101,7 @@ class Phase1FinalIntegrationTest {
                     .join().streamId();
             firstAppend = storage.append(streamId, batch("a", "b", "c"), appendOptions()).join();
             secondAppend = storage.append(streamId, batch("d", "e"), appendOptions()).join();
+            ObjectSliceReadTarget firstTarget = (ObjectSliceReadTarget) firstAppend.readTarget();
 
             assertThat(storage.read(streamId, 0, readOptions()).join().batches())
                     .extracting(value -> text(value.payload()))
@@ -111,7 +113,7 @@ class Phase1FinalIntegrationTest {
                         assertThat(range.offsetRange().endOffset()).isEqualTo(5);
                     });
             long objectLength = objectStore.headObject(
-                    firstAppend.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
+                    firstTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
                     .join().objectLength();
             storage.trim(streamId, 2, new TrimOptions(Duration.ofSeconds(5), "m8-retention")).join();
             assertThat(failure(storage.read(streamId, 1, readOptions())).code())
@@ -120,7 +122,7 @@ class Phase1FinalIntegrationTest {
                     .extracting(value -> text(value.payload()))
                     .containsExactly("c", "d", "e");
             assertThat(objectStore.headObject(
-                    firstAppend.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
+                    firstTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5)))
                     .join().objectLength()).isEqualTo(objectLength);
         }
 
@@ -132,10 +134,13 @@ class Phase1FinalIntegrationTest {
                     .containsExactly("c", "d", "e");
             AppendResult afterRestart = restarted.append(
                     streamId, batch("f"), appendOptions()).join();
+            ObjectSliceReadTarget restartedTarget = (ObjectSliceReadTarget) afterRestart.readTarget();
+            ObjectSliceReadTarget firstTarget = (ObjectSliceReadTarget) firstAppend.readTarget();
+            ObjectSliceReadTarget secondTarget = (ObjectSliceReadTarget) secondAppend.readTarget();
             assertThat(afterRestart.range().startOffset()).isEqualTo(5);
             assertThat(afterRestart.range().endOffset()).isEqualTo(6);
-            assertThat(afterRestart.objectId()).isNotEqualTo(firstAppend.objectId());
-            assertThat(afterRestart.objectId()).isNotEqualTo(secondAppend.objectId());
+            assertThat(restartedTarget.objectId()).isNotEqualTo(firstTarget.objectId());
+            assertThat(restartedTarget.objectId()).isNotEqualTo(secondTarget.objectId());
             assertThat(restarted.getStreamMetadata(streamId).join().committedEndOffset()).isEqualTo(6);
         }
     }
@@ -195,9 +200,6 @@ class Phase1FinalIntegrationTest {
             raw.delete(
                     keyspace.offsetIndexKey(repairStream, committed.range().endOffset(), committed.generation()),
                     Set.of(DeleteOption.PartitionKey(partition)));
-            raw.delete(
-                    keyspace.committedSliceKey(repairStream, committed.objectId(), committed.sliceId()),
-                    Set.of(DeleteOption.PartitionKey(partition)));
         }
 
         try (OxiaJavaClientMetadataStore metadata = metadata();
@@ -210,7 +212,7 @@ class Phase1FinalIntegrationTest {
             assertThat(metadata.scanOffsetIndex(cluster, repairStream, 0, 10).join()).hasSize(1);
             try (MetadataOrphanObjectScanner scanner = new MetadataOrphanObjectScanner(
                     cluster, metadata, RecoveryMetricsObserver.noop(), Runnable::run)) {
-                assertThat(scanner.scan(committed.objectId()).join().status())
+                assertThat(scanner.scan(((ObjectSliceReadTarget) committed.readTarget()).objectId()).join().status())
                         .isEqualTo(OrphanObjectStatus.FULLY_REFERENCED);
             }
         }
@@ -252,7 +254,7 @@ class Phase1FinalIntegrationTest {
                     if (method.getName().equals("putObjectManifest")) {
                         manifestCapture.set((ObjectManifestRecord) args[1]);
                     }
-                    if (method.getName().equals("commitStreamSlice") && fail.compareAndSet(true, false)) {
+                    if (method.getName().equals("commitStableAppend") && fail.compareAndSet(true, false)) {
                         return NereusException.failedAppendFuture(
                                 ErrorCode.METADATA_UNAVAILABLE,
                                 true,

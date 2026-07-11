@@ -22,6 +22,7 @@ import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendResult;
+import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.DurabilityLevel;
@@ -34,6 +35,7 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
@@ -85,8 +87,10 @@ class DefaultStreamStorageAppendTest {
             assertThat(first.range()).isEqualTo(new OffsetRange(0, 2));
             assertThat(second.range()).isEqualTo(new OffsetRange(2, 3));
             assertThat(first.logicalBytes()).isEqualTo(3);
-            assertThat(first.objectId()).isNotEqualTo(second.objectId());
-            assertThat(context.metadata.getObjectManifest("cluster/a", first.objectId()).join()).isPresent();
+            ObjectSliceReadTarget firstTarget = (ObjectSliceReadTarget) first.readTarget();
+            ObjectSliceReadTarget secondTarget = (ObjectSliceReadTarget) second.readTarget();
+            assertThat(firstTarget.objectId()).isNotEqualTo(secondTarget.objectId());
+            assertThat(context.metadata.getObjectManifest("cluster/a", firstTarget.objectId()).join()).isPresent();
             assertThat(context.metadata.scanOffsetIndex("cluster/a", stream.streamId(), 0, 10).join())
                     .extracting(record -> record.offsetEnd())
                     .containsExactly(2L, 3L);
@@ -184,7 +188,7 @@ class DefaultStreamStorageAppendTest {
     @Test
     void unconfirmedCommitResponseIsMayHaveCommittedAndSuspendsLane() {
         FakeOxiaMetadataStore fake = new FakeOxiaMetadataStore(CLOCK::millis);
-        OxiaMetadataStore delayedCommit = delayMethod(fake, "commitStreamSlice");
+        OxiaMetadataStore delayedCommit = delayMethod(fake, "commitStableAppend");
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         try (TestContext context = context(
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
@@ -215,14 +219,18 @@ class DefaultStreamStorageAppendTest {
             NereusException failure = appendFailure(context.storage.append(
                     streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
             assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
+            assertThat(failure.appendAttemptId()).isPresent();
             assertThat(context.metadata.getCommittedEndOffset("cluster/a", streamId).join().committedEndOffset())
                     .isEqualTo(1);
             assertThat(context.metadata.scanOffsetIndex("cluster/a", streamId, 0, 10).join()).isEmpty();
 
-            NereusException suspended = appendFailure(context.storage.append(
-                    streamId, batch("b"), appendOptions(Duration.ofSeconds(1))));
-            assertThat(suspended.code()).isEqualTo(ErrorCode.METADATA_UNAVAILABLE);
-            assertThat(suspended.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
+            AppendResult recovered = context.storage.recoverAppend(
+                    streamId, failure.appendAttemptId().orElseThrow(),
+                    new AppendRecoveryOptions(Duration.ofSeconds(1))).join();
+            assertThat(recovered.range()).isEqualTo(new OffsetRange(0, 1));
+            assertThat(context.storage.append(
+                    streamId, batch("b"), appendOptions(Duration.ofSeconds(1))).join().range())
+                    .isEqualTo(new OffsetRange(1, 2));
         }
     }
 

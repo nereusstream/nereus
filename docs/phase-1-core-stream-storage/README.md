@@ -105,8 +105,9 @@ object-store ordinary tests，
 5 real-adapter、5 capability-spike and 2 final core/Oxia/Object-WAL Docker tests. The release command is
 `./gradlew phase1FinalCheck --rerun-tasks`；M8 没有扩展功能面，只完成端到端/restart/failure 验收和冻结。
 
-Phase 1.5 P15-M0 只完成设计，尚未改变这里描述的生产代码。直到对应 implementation milestone
-落地并同步本文档前，当前 object-shaped API/metadata 和 strict Object WAL runtime facts 仍以本目录为准。
+Phase 1.5 P15-M0-M5 已实现并 final-gated：公共 API/metadata 已演进为 generic target，生产路径仍保持
+strict Object WAL-only 执行边界，并对本目录冻结的 legacy object records 提供 dual-read compatibility。
+后继合同和当前实现状态以 `../phase-1.5-core-storage-foundation/README.md` 为准。
 
 Phase 1 允许的依赖方向：
 

@@ -1,6 +1,6 @@
 # Phase 1.5 Implementation Plan and Gates
 
-> 状态：P15-M0 design complete；P15-M1 through M5 not implemented
+> 状态：P15-M0-M5 complete；final-gated on 2026-07-11
 
 A milestone is complete only when production code, focused tests, aggregate gate wiring and matching documentation
 all exist。Passing the old Phase 1 gate alone cannot prove a new Phase 1.5 contract；a design enum/class alone cannot
@@ -8,12 +8,12 @@ be reported as executable profile support。
 
 ## 1. Build and Compatibility Rules
 
-Before P15-M1 code：
+The completed implementation preserves these rules：
 
 1. retain Java 21 and current Gradle/module boundaries；
 2. keep `checkPhase1L0Dependencies` and namespace guard unchanged and green；
-3. add `phase15Check` only when it has real dependencies, not as an empty lifecycle task；
-4. add `phase15FinalCheck` only when real-Oxia mixed-version/recovery/lifecycle tests exist；
+3. `phase15Check` has real API/codec/fake/core dependencies；
+4. `phase15FinalCheck` includes real-Oxia mixed-version/recovery/lifecycle coverage through the Docker gates；
 5. keep all Phase 1 record/object golden vectors and tasks runnable under their existing names；
 6. add no BookKeeper/Pulsar/Kafka dependency to `nereus-api`、`nereus-core`、`nereus-metadata-oxia` or
    `nereus-object-store`；
@@ -31,6 +31,11 @@ recovery/lifecycle end-to-end tests ----+--> phase15FinalCheck
 F2 L0 prerequisite contract ------------+
 ```
 
+Implementation note：the production strict coordinator retains the existing `AppendCoordinator` class name for
+source compatibility。The legacy `commitStreamSlice` metadata method is retained only for frozen Phase 1 fixtures；
+production append uses generic new-write exclusively。These compatibility choices do not create a second runtime
+append path。
+
 ## 2. P15-M0 — Code-level Design
 
 Deliverables：
@@ -47,7 +52,7 @@ Every Phase 1.5 public type, durable record/key, state machine, compatibility pa
 implementation milestone and downstream handoff has one authoritative document.
 ```
 
-Status：complete when the documentation consistency audit for this change passes。
+Status：complete。
 
 ## 3. P15-M1 — Public Target Model and API Evolution
 
@@ -161,7 +166,7 @@ Exit：
 
 ```text
 One unchanged head can anchor a dense mixed legacy/generic chain.
-Generic writes are proven through the new metadata API; production cutover waits for P15-M3.
+Generic writes are proven through the new metadata API；P15-M3 completed the production cutover.
 Old data remains readable and repairable without eager migration.
 Stable commit and generation-zero materialization are independently retryable metadata operations.
 ```

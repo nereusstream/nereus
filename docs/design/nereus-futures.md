@@ -28,8 +28,8 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 | Phase 1 implemented；P15-M0 design complete | P15-M1 target API |
-| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R complete；implementation gated） | F2-M1 after P15-M5 |
+| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 | Implemented and final-gated | F2/F4 consumers |
+| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R complete；P15 passed） | F2-M1 projection model |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
@@ -39,7 +39,7 @@ protocol/table state = projection
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
-profile after P15-M5；BookKeeper and async profiles remain reservations until their adapters/state machines pass their
+profile from the completed P15-M5 surface；BookKeeper and async profiles remain reservations until their adapters/state machines pass their
 own gates。
 
 ## 3. Dependency graph
@@ -61,9 +61,8 @@ flowchart LR
     F5 -. shared retention/txn contracts .-> F8
 ```
 
-这不是所有设计工作的严格串行计划。F4 schema、F7 routing metadata 可以并行 review，但 F2 production
-implementation 不能越过 P15-M5；F4 production 不能越过 generic target/stable-commit foundation 和它依赖
-的 cursor/reader/reference correctness contracts。
+这不是所有设计工作的严格串行计划。P15-M5 已完成，因此 F2 production 可进入 F2-M1；F4 production
+仍不能越过它依赖的 cursor/reader/reference correctness contracts。
 
 ## 4. F1 — Core Stream Storage
 
@@ -113,7 +112,7 @@ generations remain outside this delivery。
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0 API spike + F2-M0R code-level review complete；F2-M1 waits for P15-M5；production facade not implemented
+Current milestone: F2-M0 API spike + F2-M0R review complete；P15-M5 passed；F2-M1 is next；production facade not implemented
 
 ### Owns
 
@@ -125,7 +124,7 @@ Current milestone: F2-M0 API spike + F2-M0R code-level review complete；F2-M1 w
 
 ### Entry gate
 
-F2-M0/M0R closed the facade design gate。Production entry additionally requires P15-M5：
+F2-M0/M0R closed the facade design gate，and the P15-M5 production prerequisite now passes：
 
 - F1 append/read/trim error semantics are stable；
 - Pulsar fork/API blobs and repository boundary are locked；

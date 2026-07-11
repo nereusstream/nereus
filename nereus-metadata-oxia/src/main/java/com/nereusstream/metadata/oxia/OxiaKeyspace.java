@@ -95,6 +95,11 @@ public final class OxiaKeyspace {
                 + sliceComponent;
     }
 
+    public String committedAppendKey(StreamId streamId, String commitId) {
+        return streamPrefix(streamId) + "/committed-appends/"
+                + KeyComponentCodec.encodeComponent(requireNonBlank(commitId, "commitId"));
+    }
+
     public String streamNameKey(StreamName streamName) {
         return prefix + "/streams/by-name/" + DeterministicIds.streamNameHash(streamName);
     }

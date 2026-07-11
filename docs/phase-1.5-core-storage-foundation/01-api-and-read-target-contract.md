@@ -1,6 +1,6 @@
 # API and Read-target Contract
 
-> 状态：Phase 1.5 target contract；not implemented
+> 状态：Implemented；P15-M1/P15-M4 API contract final-gated on 2026-07-11
 
 本文冻结 Phase 1.5 的 protocol-neutral public surface。示例是 target Java shape，省略 license、import 和
 method body。任何实现差异都必须先更新本文并重新审查 F2/F4 handoff。
@@ -254,8 +254,10 @@ Constructor/factory validation enforces：
 | recovery completely proves absence | `KNOWN_NOT_COMMITTED` | empty in terminal returned failure |
 | non-append failure | empty outcome | empty |
 
-It is illegal to construct a public append exception with `MAY_HAVE_COMMITTED`/`KNOWN_COMMITTED` and no ID, or with
-an attempt ID and no append outcome。Normalization must retain both fields while unwrapping async exceptions。
+The `StreamStorage` boundary never exposes `MAY_HAVE_COMMITTED`/`KNOWN_COMMITTED` without an ID, or an attempt ID
+without an append outcome。Metadata/provider-internal compatibility exceptions may begin without a process-local ID；
+`AppendCoordinator` attaches the retained exact ID before the exception reaches the public future。Normalization
+retains both fields while unwrapping async exceptions。
 
 The Phase 1.5 target adds provider-neutral codes：
 

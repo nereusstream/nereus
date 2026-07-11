@@ -1,6 +1,6 @@
 # Metadata Schema and Compatibility
 
-> 状态：Phase 1.5 target contract；not implemented
+> 状态：Implemented；P15-M2/P15-M3 dual-read/new-write contract final-gated on 2026-07-11
 > Compatibility rule：legacy Phase 1 golden bytes stay frozen；new commits use generic target records
 
 本文定义 physical target 如何进入 commit identity、generation-zero index 和 replay marker，同时允许同一
@@ -351,8 +351,9 @@ revalidates immutable commit/proof identity, then idempotently creates/validates
 target-specific audit/reference repair。It never starts an unbounded reachability scan from a bare commit ID。This split is observable
 inside core tests but Phase 1.5 public append still calls both before success。
 
-The legacy `commitStreamSlice` method remains package-private compatibility code for legacy contract tests during
-migration and is removed from the public metadata interface after P15-M3。No new core caller uses it。
+The legacy `commitStreamSlice` method remains deprecated compatibility surface for Phase 1 contract/integration
+fixtures。No production core caller uses it；all new `DefaultStreamStorage` appends use `commitStableAppend` plus
+`materializeGenerationZero`。Removing the legacy method is deferred to a separately announced compatibility break。
 
 ## 8. Dual-read / New-write Rules
 

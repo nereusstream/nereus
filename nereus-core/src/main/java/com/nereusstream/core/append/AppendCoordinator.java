@@ -15,6 +15,8 @@
 package com.nereusstream.core.append;
 
 import com.nereusstream.api.AppendBatch;
+import com.nereusstream.api.AppendAttemptId;
+import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendResult;
@@ -26,11 +28,21 @@ import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.core.StreamStorageConfig;
-import com.nereusstream.metadata.oxia.CommitSliceRequest;
-import com.nereusstream.metadata.oxia.CommitSliceResult;
+import com.nereusstream.core.profile.Phase15StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolver;
+import com.nereusstream.core.wal.DurablePrimaryAppend;
+import com.nereusstream.core.wal.PrimaryAppendRequest;
+import com.nereusstream.core.wal.PrimaryWalRegistry;
+import com.nereusstream.core.wal.object.ObjectPreparedPrimaryAppend;
+import com.nereusstream.core.wal.object.ObjectWalAppenderAdapter;
+import com.nereusstream.core.wal.object.ObjectWalCommitEvidence;
+import com.nereusstream.metadata.oxia.CommitAppendRequest;
+import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.StableAppendResult;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
@@ -43,7 +55,6 @@ import com.nereusstream.objectstore.wal.WalWriteOptions;
 import com.nereusstream.objectstore.wal.WalWriteRequest;
 import com.nereusstream.objectstore.wal.WalWriteResult;
 import com.nereusstream.objectstore.wal.WrittenStreamSlice;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -53,7 +64,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public final class AppendCoordinator implements AutoCloseable {
@@ -61,13 +79,21 @@ public final class AppendCoordinator implements AutoCloseable {
 
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
-    private final WalObjectWriter walObjectWriter;
+    private final ObjectWalAppenderAdapter primaryAppender;
     private final AppendSessionManager sessionManager;
     private final Clock clock;
     private final Executor callbackExecutor;
     private final String writerRunIdHash;
     private final AppendResourceLimiter resourceLimiter;
+    private final StableAppendCommitter stableCommitter;
+    private final GenerationZeroIndexMaterializer indexMaterializer;
+    private final StorageProfileResolver profileResolver = new Phase15StorageProfileResolver();
     private final ConcurrentHashMap<StreamId, StreamLane> lanes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<AppendAttemptId, Attempt> retainedAttempts = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<AppendAttemptId, TerminalAttempt> terminalAttempts = new ConcurrentHashMap<>();
+    private final Semaphore retainedAttemptPermits;
+    private final AtomicLong attemptSequence = new AtomicLong();
+    private final ScheduledExecutorService recoveryScheduler;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Object lifecycleMonitor = new Object();
     private int activeAppends;
@@ -81,13 +107,26 @@ public final class AppendCoordinator implements AutoCloseable {
             Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
-        this.walObjectWriter = Objects.requireNonNull(walObjectWriter, "walObjectWriter");
+        Objects.requireNonNull(walObjectWriter, "walObjectWriter");
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
-        this.writerRunIdHash = newWriterRunIdHash();
+        this.writerRunIdHash = DeterministicIds.stableHashComponent(config.processRunId());
+        ObjectWalAppenderAdapter objectAppender = new ObjectWalAppenderAdapter(
+                config.cluster(), config.writerId(), writerRunIdHash, config.maxObjectBytes(), walObjectWriter);
+        PrimaryWalRegistry registry = new PrimaryWalRegistry(List.of(objectAppender), List.of());
+        this.primaryAppender = (ObjectWalAppenderAdapter) registry.requireAppender(
+                com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE);
         this.resourceLimiter = new AppendResourceLimiter(
                 config.maxInFlightAppends(), config.maxBufferedBytes());
+        this.retainedAttemptPermits = new Semaphore(config.maxRetainedAppendAttempts());
+        this.stableCommitter = new MetadataStableAppendCommitter(config.cluster(), metadataStore);
+        this.indexMaterializer = new MetadataGenerationZeroIndexMaterializer(config.cluster(), metadataStore);
+        this.recoveryScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "nereus-append-recovery");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     public CompletableFuture<AppendResult> append(
@@ -120,7 +159,25 @@ public final class AppendCoordinator implements AutoCloseable {
                     AppendOutcome.KNOWN_NOT_COMMITTED));
             return result;
         }
-        Attempt attempt = new Attempt(streamId, batch, options, deadline);
+        if (!retainedAttemptPermits.tryAcquire()) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.BACKPRESSURE_REJECTED, true,
+                    "retained append-attempt capacity is exhausted", AppendOutcome.KNOWN_NOT_COMMITTED));
+            return result;
+        }
+        AppendAttemptId attemptId;
+        try {
+            long sequence = attemptSequence.getAndIncrement();
+            if (sequence == -1L) throw new IllegalStateException("append attempt sequence exhausted");
+            attemptId = new AppendAttemptId(config.processRunId() + "/" + Long.toUnsignedString(sequence));
+        } catch (RuntimeException e) {
+            retainedAttemptPermits.release();
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.BACKPRESSURE_REJECTED, false, "cannot allocate append attempt ID", e,
+                    AppendOutcome.KNOWN_NOT_COMMITTED));
+            return result;
+        }
+        Attempt attempt = new Attempt(attemptId, streamId, batch, options, deadline);
         CompletableFuture<AppendResult> pipeline = deadline.bound(
                         () -> metadataStore.getStream(config.cluster(), streamId),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
@@ -129,9 +186,31 @@ public final class AppendCoordinator implements AutoCloseable {
                 .thenComposeAsync(ignored -> acceptAndEnqueue(attempt), callbackExecutor);
         pipeline.whenComplete((value, error) -> {
             if (error == null) {
+                attempt.completeQuiescedIfNoHeadSource();
+                attempt.releasePermit();
                 result.complete(value);
             } else {
-                result.completeExceptionally(normalizeAppendFailure(error, attempt.outcome()));
+                NereusException failure = normalizeAppendFailure(error, attempt.outcome());
+                attempt.completeQuiescedIfNoHeadSource();
+                if (failure.appendAttemptId().isPresent()
+                        && !failure.appendAttemptId().orElseThrow().equals(attempt.id())) {
+                    attempt.releasePermit();
+                    result.completeExceptionally(failure);
+                    return;
+                }
+                if (failure.appendOutcome().orElse(AppendOutcome.KNOWN_NOT_COMMITTED)
+                        == AppendOutcome.KNOWN_NOT_COMMITTED) {
+                    attempt.releasePermit();
+                    result.completeExceptionally(failure);
+                } else {
+                    retainedAttempts.put(attempt.id(), attempt);
+                    NereusException exposed = failure.appendAttemptId().isPresent()
+                            ? failure
+                            : failure.withAppendAttemptId(attempt.id());
+                    attempt.lane().suspend(exposed);
+                    scheduleRecovery(attempt, config.appendRecoveryBackoffMin());
+                    result.completeExceptionally(exposed);
+                }
             }
         });
         return result;
@@ -156,6 +235,15 @@ public final class AppendCoordinator implements AutoCloseable {
         }
         StreamLane lane = retainLane(attempt.streamId());
         try {
+            if (!lane.tryAdmitAppend()) {
+                reservation.close();
+                appendCompleted();
+                releaseLane(attempt.streamId(), lane);
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.STREAM_NOT_ACTIVE, false,
+                        "stream lifecycle barrier rejects new append admission",
+                        AppendOutcome.KNOWN_NOT_COMMITTED));
+            }
             CompletableFuture<AppendResult> queued = lane.enqueue(
                     () -> executeAppend(lane, attempt, reservation), callbackExecutor);
             return queued.whenComplete((ignored, error) -> {
@@ -190,19 +278,196 @@ public final class AppendCoordinator implements AutoCloseable {
         return lanes.size();
     }
 
+    /** Orders a lifecycle barrier after all previously admitted local appends for the stream. */
+    public <T> CompletableFuture<T> enqueueLifecycleMutation(
+            StreamId streamId, Supplier<CompletableFuture<T>> operation) {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(operation, "operation");
+        if (closed.get()) {
+            return NereusException.failedFuture(ErrorCode.STORAGE_CLOSED, false, "stream storage is closed");
+        }
+        StreamLane lane = retainLane(streamId);
+        try {
+            lane.beginLifecycleBarrier();
+            CompletableFuture<T> result = lane.enqueue(() -> {
+                NereusException suspended = lane.suspendedFailure();
+                return suspended == null ? operation.get() : CompletableFuture.failedFuture(suspended);
+            }, callbackExecutor);
+            return result.whenComplete((ignored, error) -> releaseLane(streamId, lane));
+        } catch (RuntimeException e) {
+            releaseLane(streamId, lane);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    public CompletableFuture<AppendResult> recoverAppend(
+            StreamId streamId, AppendAttemptId attemptId, AppendRecoveryOptions options) {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(attemptId, "attemptId");
+        Objects.requireNonNull(options, "options");
+        if (closed.get()) return NereusException.failedFuture(
+                ErrorCode.STORAGE_CLOSED, false, "stream storage is closed");
+        evictExpiredTerminals();
+        TerminalAttempt terminal = terminalAttempts.get(attemptId);
+        if (terminal != null) {
+            if (!terminal.streamId().equals(streamId)) return unknownAttempt();
+            return terminal.result() != null
+                    ? CompletableFuture.completedFuture(terminal.result())
+                    : CompletableFuture.failedFuture(terminal.failure());
+        }
+        Attempt attempt = retainedAttempts.get(attemptId);
+        if (attempt == null || !attempt.streamId().equals(streamId)) return unknownAttempt();
+        attempt.markRecoveryUsed();
+        return callerView(attempt, startRecovery(attempt), options.timeout());
+    }
+
+    private CompletableFuture<AppendResult> startRecovery(Attempt attempt) {
+        return attempt.singleFlight(() -> attempt.originalRunnerQuiesced()
+                .thenCompose(ignored -> metadataStore.getCommittedEndOffset(config.cluster(), attempt.streamId()))
+                .thenCompose(head -> {
+                    long expected = attempt.commitRequest().expectedStartOffset();
+                    if (head.committedEndOffset() < expected) {
+                        return CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                                "stream head moved behind the retained append start"));
+                    }
+                    if (head.committedEndOffset() == expected) {
+                        return stableCommitter.commit(attempt.commitRequest())
+                                .thenCompose(stable -> indexMaterializer.materialize(stable.reachableAppend()));
+                    }
+                    return searchRecoveryPage(attempt, Optional.empty());
+                })
+                .thenApply(commit -> toAppendResult(commit, attempt.slice()))
+                .handle((result, error) -> finishRecovery(attempt, result, error)));
+    }
+
+    private CompletableFuture<CommittedAppend> searchRecoveryPage(
+            Attempt attempt, Optional<com.nereusstream.metadata.oxia.AppendReplayCursor> cursor) {
+        return metadataStore.searchAppendReplay(
+                        config.cluster(), attempt.commitRequest(), cursor,
+                        config.maxDerivedIndexRepairCommitsPerCall())
+                .thenCompose(search -> switch (search.status()) {
+                    case FOUND -> indexMaterializer.materialize(search.committedAppend().orElseThrow());
+                    case PROVEN_NOT_COMMITTED -> CompletableFuture.failedFuture(new NereusException(
+                            ErrorCode.OFFSET_CONFLICT, false,
+                            "exact append recovery proved the attempt was not committed",
+                            AppendOutcome.KNOWN_NOT_COMMITTED));
+                    case CONTINUE -> {
+                        attempt.updateReplayCursor(search.continuation().orElseThrow());
+                        yield searchRecoveryPage(attempt, search.continuation());
+                    }
+                });
+    }
+
+    private AppendResult finishRecovery(Attempt attempt, AppendResult result, Throwable error) {
+        if (error == null) {
+            attempt.lane().advanceExpectedOffset(result.committedEndOffset());
+            attempt.lane().unsuspend();
+            removeLaneIfIdle(attempt.streamId(), attempt.lane());
+            completeAttempt(attempt, new TerminalAttempt(attempt.streamId(), result, null, terminalExpiry()));
+            return result;
+        }
+        Throwable cause = unwrap(error);
+        NereusException failure = cause instanceof NereusException nereus
+                ? nereus
+                : new NereusException(ErrorCode.METADATA_UNAVAILABLE, true,
+                        "append recovery failed", cause);
+        AppendOutcome outcome = failure.appendOutcome().orElse(AppendOutcome.MAY_HAVE_COMMITTED);
+        if (outcome == AppendOutcome.KNOWN_NOT_COMMITTED) {
+            attempt.lane().invalidateExpectedOffset();
+            attempt.lane().unsuspend();
+            removeLaneIfIdle(attempt.streamId(), attempt.lane());
+            completeAttempt(attempt, new TerminalAttempt(attempt.streamId(), null, failure, terminalExpiry()));
+            throw failure;
+        }
+        NereusException exposed = failure.appendAttemptId().isPresent()
+                ? failure
+                : new NereusException(failure.code(), failure.retriable(), failure.getMessage(), failure,
+                        outcome == AppendOutcome.KNOWN_COMMITTED ? outcome : AppendOutcome.MAY_HAVE_COMMITTED,
+                        attempt.id());
+        if (failure.retriable()) {
+            scheduleRecovery(attempt, attempt.nextBackoff(config.appendRecoveryBackoffMax()));
+        } else {
+            completeAttempt(attempt, new TerminalAttempt(attempt.streamId(), null, exposed, terminalExpiry()));
+        }
+        throw exposed;
+    }
+
+    private CompletableFuture<AppendResult> callerView(
+            Attempt attempt, CompletableFuture<AppendResult> source, Duration timeout) {
+        CompletableFuture<AppendResult> view = new CompletableFuture<>();
+        source.whenComplete((value, error) -> {
+            if (error == null) view.complete(value); else view.completeExceptionally(unwrap(error));
+        });
+        recoveryScheduler.schedule(() -> view.completeExceptionally(new NereusException(
+                ErrorCode.TIMEOUT, true, "append recovery caller wait timed out", null,
+                AppendOutcome.MAY_HAVE_COMMITTED, attempt.id())),
+                timeout.toNanos(), TimeUnit.NANOSECONDS);
+        return view;
+    }
+
+    private void scheduleRecovery(Attempt attempt, Duration delay) {
+        if (closed.get() || !retainedAttempts.containsKey(attempt.id())) return;
+        recoveryScheduler.schedule(() -> {
+            if (!closed.get() && retainedAttempts.containsKey(attempt.id())) {
+                startRecovery(attempt).exceptionally(error -> null);
+            }
+        }, delay.toNanos(), TimeUnit.NANOSECONDS);
+    }
+
+    private void completeAttempt(Attempt attempt, TerminalAttempt terminal) {
+        if (retainedAttempts.remove(attempt.id(), attempt)) {
+            attempt.releasePermit();
+        }
+        terminalAttempts.put(attempt.id(), terminal);
+        while (terminalAttempts.size() > config.maxAppendRecoveryTerminals()) {
+            terminalAttempts.entrySet().stream()
+                    .min(java.util.Comparator.comparingLong(entry -> entry.getValue().expiresAtMillis()))
+                    .ifPresent(entry -> terminalAttempts.remove(entry.getKey(), entry.getValue()));
+        }
+    }
+
+    private long terminalExpiry() {
+        long ttl;
+        try { ttl = config.appendRecoveryTerminalTtl().toMillis(); }
+        catch (ArithmeticException e) { ttl = Long.MAX_VALUE; }
+        long now = clock.millis();
+        return ttl >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + ttl;
+    }
+
+    private void evictExpiredTerminals() {
+        long now = clock.millis();
+        terminalAttempts.entrySet().removeIf(entry -> entry.getValue().expiresAtMillis() <= now);
+    }
+
+    private void removeLaneIfIdle(StreamId streamId, StreamLane lane) {
+        lanes.compute(streamId, (ignored, existing) ->
+                existing == lane && lane.removable() ? null : existing);
+    }
+
+    private static <T> CompletableFuture<T> unknownAttempt() {
+        return NereusException.failedFuture(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                "append attempt is unknown, expired, or belongs to another stream");
+    }
+
     private CompletableFuture<AppendResult> executeAppend(
             StreamLane lane,
             Attempt attempt,
             AppendResourceLimiter.Reservation reservation) {
+        attempt.attachLane(lane);
         NereusException suspended = lane.suspendedFailure();
         if (suspended != null) {
             AppendOutcome suspendedOutcome = suspended.appendOutcome().orElse(AppendOutcome.MAY_HAVE_COMMITTED);
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.METADATA_UNAVAILABLE,
-                    true,
-                    "stream append lane is suspended until the original physical attempt is resolved",
-                    suspended,
-                    suspendedOutcome));
+            NereusException failure = suspended.appendAttemptId().isPresent()
+                    ? new NereusException(
+                            ErrorCode.METADATA_UNAVAILABLE, true,
+                            "stream append lane is suspended until the original physical attempt is resolved",
+                            suspended, suspendedOutcome, suspended.appendAttemptId().orElseThrow())
+                    : new NereusException(
+                            ErrorCode.METADATA_UNAVAILABLE, true,
+                            "stream append lane is suspended until the original physical attempt is resolved",
+                            suspended, suspendedOutcome);
+            return CompletableFuture.failedFuture(failure);
         }
         rejectClosedBeforeUpload();
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start append");
@@ -233,29 +498,18 @@ public final class AppendCoordinator implements AutoCloseable {
         rejectClosedBeforeUpload();
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "prepare WAL object");
         reservation.reserveBuffer(config.maxObjectBytes());
-        Duration uploadTimeout = attempt.deadline().remaining();
-        WalWriteRequest request = new WalWriteRequest(
-                config.cluster(),
-                config.writerId(),
-                writerRunIdHash,
-                state.session().epoch(),
-                List.of(new WalStreamSliceInput(attempt.streamId(), attempt.batch())),
-                new WalWriteOptions(
-                        CompressionType.NONE,
-                        config.maxObjectBytes(),
-                        config.maxObjectBytes(),
-                        uploadTimeout,
-                        true));
-        PreparedWalObject preparedObject = walObjectWriter.prepare(request);
-        if (preparedObject.objectLength() > config.maxObjectBytes()) {
+        ObjectPreparedPrimaryAppend prepared = primaryAppender.prepare(new PrimaryAppendRequest(
+                attempt.streamId(), attempt.batch(), state.session(), state.expectedOffset(), attempt.id(),
+                attempt.deadline().remaining()));
+        if (prepared.reservedBytes() > config.maxObjectBytes()) {
             throw new NereusException(
                     ErrorCode.INVALID_ARGUMENT,
                     false,
                     "prepared WAL object exceeds maxObjectBytes",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        reservation.adjustToExactBytes(preparedObject.objectLength());
-        WalWriteResult writeResult = preparedObject.result();
+        reservation.adjustToExactBytes(prepared.reservedBytes());
+        WalWriteResult writeResult = prepared.preparedObject().result();
         if (writeResult.slices().size() != 1
                 || !writeResult.slices().getFirst().streamId().equals(attempt.streamId())) {
             throw new NereusException(
@@ -265,7 +519,7 @@ public final class AppendCoordinator implements AutoCloseable {
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
         validateWrittenSlice(attempt.batch(), writeResult.slices().getFirst());
-        return new PreparedAttempt(state.session(), state.expectedOffset(), preparedObject);
+        return new PreparedAttempt(state.session(), state.expectedOffset(), prepared);
     }
 
     private static void validateWrittenSlice(AppendBatch batch, WrittenStreamSlice slice) {
@@ -313,14 +567,22 @@ public final class AppendCoordinator implements AutoCloseable {
             PreparedAttempt prepared) {
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start WAL upload");
         return attempt.deadline().bound(
-                        () -> walObjectWriter.upload(prepared.preparedObject()),
+                        () -> primaryAppender.persist(
+                                prepared.primaryAppend(), attempt.deadline().remaining()),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "upload WAL object")
-                .thenCompose(writeResult -> {
-                    if (!writeResult.equals(prepared.preparedObject().result())) {
+                .thenCompose(durable -> {
+                    if (!(durable.providerCommitEvidence() instanceof ObjectWalCommitEvidence evidence)) {
                         return CompletableFuture.failedFuture(new NereusException(
                                 ErrorCode.METADATA_INVARIANT_VIOLATION,
                                 false,
+                                "Object WAL adapter returned incompatible commit evidence",
+                                AppendOutcome.KNOWN_NOT_COMMITTED));
+                    }
+                    WalWriteResult writeResult = evidence.writeResult();
+                    if (!writeResult.equals(prepared.primaryAppend().preparedObject().result())) {
+                        return CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION, false,
                                 "WAL upload result does not match the prepared object",
                                 AppendOutcome.KNOWN_NOT_COMMITTED));
                     }
@@ -329,6 +591,8 @@ public final class AppendCoordinator implements AutoCloseable {
                                     () -> metadataStore.putObjectManifest(config.cluster(), manifest),
                                     AppendOutcome.KNOWN_NOT_COMMITTED,
                                     "put WAL object manifest")
+                            .thenCompose(ignored -> primaryAppender.validateBeforeHeadCommit(
+                                    durable, prepared.session(), attempt.deadline().remaining()))
                             .thenApply(ignored -> writeResult);
                 })
                 .thenCompose(writeResult -> sessionManager.ensureCommitWindow(
@@ -343,38 +607,51 @@ public final class AppendCoordinator implements AutoCloseable {
             UploadedAttempt uploaded) {
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start stream-head commit");
         WrittenStreamSlice slice = uploaded.writeResult().slices().getFirst();
-        CommitSliceRequest request = new CommitSliceRequest(
+        ObjectSliceReadTarget target = new ObjectSliceReadTarget(
+                1,
+                uploaded.writeResult().objectId(),
+                uploaded.writeResult().objectKey(),
+                ObjectType.MULTI_STREAM_WAL_OBJECT,
+                "WAL_OBJECT_V1",
+                "OPAQUE_SLICE",
+                slice.sliceId(),
+                slice.objectOffset(),
+                slice.objectLength(),
+                slice.sliceChecksum(),
+                slice.entryIndexRef());
+        CommitAppendRequest request = new CommitAppendRequest(
                 attempt.streamId(),
                 config.writerId(),
                 writerRunIdHash,
                 uploaded.session().epoch(),
                 uploaded.session().fencingToken(),
                 uploaded.expectedOffset(),
-                slice.sliceId(),
+                target,
+                slice.payloadFormat(),
                 slice.recordCount(),
                 slice.entryCount(),
                 slice.logicalBytes(),
                 slice.schemaRefs(),
-                uploaded.writeResult().objectId(),
-                uploaded.writeResult().objectKey(),
-                uploaded.writeResult().objectChecksum(),
-                slice.objectOffset(),
-                slice.objectLength(),
-                slice.entryIndexRef(),
-                slice.sliceChecksum(),
-                slice.payloadFormat(),
                 slice.minEventTimeMillis(),
                 slice.maxEventTimeMillis(),
                 Optional.empty());
-        CompletableFuture<CommitSliceResult> commitFuture = attempt.deadline().bound(
-                () -> {
-                    attempt.markHeadSent();
-                    return metadataStore.commitStreamSlice(config.cluster(), request);
-                },
+        attempt.retainPhysical(request, uploaded.writeResult(), slice);
+        attempt.markHeadSent();
+        CompletableFuture<StableAppendResult> rawCommit = stableCommitter.commit(request);
+        attempt.trackHeadSource(rawCommit);
+        CompletableFuture<StableAppendResult> commitFuture = attempt.deadline().bound(
+                () -> rawCommit,
                 AppendOutcome.KNOWN_NOT_COMMITTED,
                 AppendOutcome.MAY_HAVE_COMMITTED,
                 "commit stream head");
-        return commitFuture.handleAsync((commitResult, error) -> {
+        CompletableFuture<CommittedAppend> strictCommit = commitFuture.thenCompose(stable -> {
+            attempt.markHeadKnownCommitted();
+            return attempt.deadline().bound(
+                    () -> indexMaterializer.materialize(stable.reachableAppend()),
+                    AppendOutcome.KNOWN_COMMITTED,
+                    "materialize generation-zero index");
+        });
+        return strictCommit.handleAsync((commitResult, error) -> {
             if (error != null) {
                 NereusException failure = normalizeAppendFailure(error, attempt.outcome());
                 if (failure.code() == ErrorCode.FENCED_APPEND) {
@@ -387,14 +664,18 @@ public final class AppendCoordinator implements AutoCloseable {
                 }
                 AppendOutcome outcome = failure.appendOutcome().orElse(attempt.outcome());
                 if (outcome != AppendOutcome.KNOWN_NOT_COMMITTED) {
-                    lane.suspend(failure);
+                    NereusException exposed = failure.appendAttemptId().isPresent()
+                            ? failure
+                            : failure.withAppendAttemptId(attempt.id());
+                    lane.suspend(exposed);
+                    throw exposed;
                 }
                 throw failure;
             }
             attempt.markHeadKnownCommitted();
-            lane.advanceExpectedOffset(commitResult.committedEndOffset());
+            lane.advanceExpectedOffset(commitResult.range().endOffset());
             attempt.deadline().check(AppendOutcome.KNOWN_COMMITTED, "ack append result");
-            return toAppendResult(commitResult, uploaded.writeResult(), slice);
+            return toAppendResult(commitResult, slice);
         }, callbackExecutor);
     }
 
@@ -419,20 +700,7 @@ public final class AppendCoordinator implements AutoCloseable {
                     "stream is not active",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT) {
-            throw new NereusException(
-                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
-                    false,
-                    "Phase 1 core append supports only OBJECT_WAL_SYNC_OBJECT",
-                    AppendOutcome.KNOWN_NOT_COMMITTED);
-        }
-        if (options.durabilityLevel() != DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED) {
-            throw new NereusException(
-                    ErrorCode.UNSUPPORTED_DURABILITY_LEVEL,
-                    false,
-                    "Phase 1 core append requires WAL_DURABLE_AND_INDEX_COMMITTED",
-                    AppendOutcome.KNOWN_NOT_COMMITTED);
-        }
+        profileResolver.requireExecutable(profile, options.durabilityLevel(), true, true);
         return metadata;
     }
 
@@ -489,27 +757,19 @@ public final class AppendCoordinator implements AutoCloseable {
     }
 
     private static AppendResult toAppendResult(
-            CommitSliceResult commit,
-            WalWriteResult writeResult,
+            CommittedAppend commit,
             WrittenStreamSlice slice) {
         return new AppendResult(
                 commit.streamId(),
                 commit.range(),
-                commit.committedEndOffset(),
+                commit.range().endOffset(),
                 commit.generation(),
-                writeResult.objectId(),
-                writeResult.objectKey(),
-                slice.sliceId(),
-                slice.objectOffset(),
-                slice.objectLength(),
+                commit.readTarget(),
                 slice.payloadFormat(),
                 slice.recordCount(),
                 slice.entryCount(),
                 slice.logicalBytes(),
                 slice.schemaRefs(),
-                slice.entryIndexRef(),
-                writeResult.objectChecksum(),
-                slice.sliceChecksum(),
                 commit.projectionRef(),
                 commit.commitVersion());
     }
@@ -547,12 +807,6 @@ public final class AppendCoordinator implements AutoCloseable {
         return current;
     }
 
-    private static String newWriterRunIdHash() {
-        byte[] entropy = new byte[16];
-        new SecureRandom().nextBytes(entropy);
-        return DeterministicIds.randomRunIdHash(entropy);
-    }
-
     @Override
     public void close() {
         beginClose();
@@ -561,7 +815,9 @@ public final class AppendCoordinator implements AutoCloseable {
 
     /** Stops admission without waiting for already accepted appends. */
     public void beginClose() {
-        closed.set(true);
+        if (closed.compareAndSet(false, true)) {
+            recoveryScheduler.shutdown();
+        }
     }
 
     /** Waits for accepted appends using the caller's remaining global shutdown budget. */
@@ -613,15 +869,85 @@ public final class AppendCoordinator implements AutoCloseable {
         }
     }
 
-    private record Attempt(
-            StreamId streamId,
-            AppendBatch batch,
-            AppendOptions options,
-            AppendDeadline deadline,
-            AtomicBoolean headSent,
-            AtomicBoolean headKnownCommitted) {
-        Attempt(StreamId streamId, AppendBatch batch, AppendOptions options, AppendDeadline deadline) {
-            this(streamId, batch, options, deadline, new AtomicBoolean(), new AtomicBoolean());
+    private final class Attempt {
+        private final AppendAttemptId id;
+        private final StreamId streamId;
+        private final AppendBatch batch;
+        private final AppendOptions options;
+        private final AppendDeadline deadline;
+        private final AtomicBoolean headSent = new AtomicBoolean();
+        private final AtomicBoolean headKnownCommitted = new AtomicBoolean();
+        private final AtomicBoolean permitReleased = new AtomicBoolean();
+        private final CompletableFuture<Void> originalRunnerQuiesced = new CompletableFuture<>();
+        private volatile CommitAppendRequest commitRequest;
+        private volatile WalWriteResult writeResult;
+        private volatile WrittenStreamSlice slice;
+        private volatile StreamLane lane;
+        private volatile CompletableFuture<StableAppendResult> headSource;
+        private volatile CompletableFuture<AppendResult> recoveryFlight;
+        private volatile com.nereusstream.metadata.oxia.AppendReplayCursor replayCursor;
+        private long nextBackoffNanos;
+        private boolean recoveryUsed;
+
+        Attempt(AppendAttemptId id, StreamId streamId, AppendBatch batch,
+                AppendOptions options, AppendDeadline deadline) {
+            this.id = id;
+            this.streamId = streamId;
+            this.batch = batch;
+            this.options = options;
+            this.deadline = deadline;
+            this.nextBackoffNanos = config.appendRecoveryBackoffMin().toNanos();
+        }
+
+        AppendAttemptId id() { return id; }
+        StreamId streamId() { return streamId; }
+        AppendBatch batch() { return batch; }
+        AppendOptions options() { return options; }
+        AppendDeadline deadline() { return deadline; }
+
+        void attachLane(StreamLane value) { lane = value; }
+        StreamLane lane() { return Objects.requireNonNull(lane, "attempt lane"); }
+
+        void retainPhysical(CommitAppendRequest request, WalWriteResult result, WrittenStreamSlice writtenSlice) {
+            commitRequest = Objects.requireNonNull(request);
+            writeResult = Objects.requireNonNull(result);
+            slice = Objects.requireNonNull(writtenSlice);
+        }
+        CommitAppendRequest commitRequest() { return Objects.requireNonNull(commitRequest, "commitRequest"); }
+        WrittenStreamSlice slice() { return Objects.requireNonNull(slice, "slice"); }
+
+        void trackHeadSource(CompletableFuture<StableAppendResult> source) {
+            headSource = source;
+            source.whenComplete((ignored, error) -> originalRunnerQuiesced.complete(null));
+        }
+
+        void completeQuiescedIfNoHeadSource() {
+            if (headSource == null) originalRunnerQuiesced.complete(null);
+        }
+
+        CompletableFuture<Void> originalRunnerQuiesced() { return originalRunnerQuiesced; }
+
+        synchronized CompletableFuture<AppendResult> singleFlight(
+                Supplier<CompletableFuture<AppendResult>> operation) {
+            if (recoveryFlight == null || recoveryFlight.isDone()) recoveryFlight = operation.get();
+            return recoveryFlight;
+        }
+
+        synchronized Duration nextBackoff(Duration maximum) {
+            long current = nextBackoffNanos;
+            long max;
+            try { max = maximum.toNanos(); } catch (ArithmeticException e) { max = Long.MAX_VALUE; }
+            nextBackoffNanos = current >= max / 2 ? max : Math.min(max, current * 2);
+            return Duration.ofNanos(current);
+        }
+
+        synchronized void markRecoveryUsed() { recoveryUsed = true; }
+        synchronized void updateReplayCursor(com.nereusstream.metadata.oxia.AppendReplayCursor cursor) {
+            replayCursor = cursor;
+        }
+
+        void releasePermit() {
+            if (permitReleased.compareAndSet(false, true)) retainedAttemptPermits.release();
         }
 
         void markHeadSent() {
@@ -640,13 +966,26 @@ public final class AppendCoordinator implements AutoCloseable {
         }
     }
 
+    private record TerminalAttempt(
+            StreamId streamId,
+            AppendResult result,
+            NereusException failure,
+            long expiresAtMillis) {
+        private TerminalAttempt {
+            Objects.requireNonNull(streamId, "streamId");
+            if ((result == null) == (failure == null)) {
+                throw new IllegalArgumentException("terminal attempt must contain exactly one outcome");
+            }
+        }
+    }
+
     private record SessionAndOffset(AppendSession session, long expectedOffset) {
     }
 
     private record PreparedAttempt(
             AppendSession session,
             long expectedOffset,
-            PreparedWalObject preparedObject) {
+            ObjectPreparedPrimaryAppend primaryAppend) {
     }
 
     private record UploadedAttempt(
@@ -659,6 +998,7 @@ public final class AppendCoordinator implements AutoCloseable {
         private CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
         private Long expectedOffset;
         private NereusException suspendedFailure;
+        private boolean lifecycleBarrier;
         private int retainedOperations;
 
         synchronized void retain() {
@@ -684,6 +1024,14 @@ public final class AppendCoordinator implements AutoCloseable {
             return result;
         }
 
+        synchronized boolean tryAdmitAppend() {
+            return !lifecycleBarrier;
+        }
+
+        synchronized void beginLifecycleBarrier() {
+            lifecycleBarrier = true;
+        }
+
         synchronized Long expectedOffset() {
             return expectedOffset;
         }
@@ -704,6 +1052,10 @@ public final class AppendCoordinator implements AutoCloseable {
 
         synchronized void suspend(NereusException failure) {
             suspendedFailure = failure;
+        }
+
+        synchronized void unsuspend() {
+            suspendedFailure = null;
         }
 
         synchronized NereusException suspendedFailure() {

@@ -15,16 +15,20 @@
 package com.nereusstream.core;
 
 import com.nereusstream.api.AppendBatch;
+import com.nereusstream.api.AppendAttemptId;
+import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.DeleteOptions;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
+import com.nereusstream.api.SealOptions;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
@@ -35,6 +39,7 @@ import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.TrimOptions;
 import com.nereusstream.core.append.AppendCoordinator;
 import com.nereusstream.core.append.AppendSessionManager;
+import com.nereusstream.core.lifecycle.StreamLifecycleCoordinator;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.ReadResolver;
@@ -59,6 +64,7 @@ public final class DefaultStreamStorage implements StreamStorage {
     private final AppendCoordinator appendCoordinator;
     private final ReadCoordinator readCoordinator;
     private final TrimCoordinator trimCoordinator;
+    private final StreamLifecycleCoordinator lifecycleCoordinator;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public DefaultStreamStorage(
@@ -141,6 +147,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 readCoordinator::invalidate,
                 trimMetricsObserver,
                 callbackExecutor);
+        this.lifecycleCoordinator = new StreamLifecycleCoordinator(config, metadataStore, appendCoordinator);
     }
 
     @Override
@@ -176,6 +183,12 @@ public final class DefaultStreamStorage implements StreamStorage {
     }
 
     @Override
+    public CompletableFuture<AppendResult> recoverAppend(
+            StreamId streamId, AppendAttemptId attemptId, AppendRecoveryOptions options) {
+        return appendCoordinator.recoverAppend(streamId, attemptId, options);
+    }
+
+    @Override
     public CompletableFuture<ReadResult> read(
             StreamId streamId,
             long startOffset,
@@ -204,6 +217,16 @@ public final class DefaultStreamStorage implements StreamStorage {
         Objects.requireNonNull(streamId, "streamId");
         CompletableFuture<StreamMetadata> rejection = rejectIfClosed();
         return rejection != null ? rejection : loadStreamMetadata(streamId);
+    }
+
+    @Override
+    public CompletableFuture<StreamMetadata> seal(StreamId streamId, SealOptions options) {
+        return lifecycleCoordinator.seal(streamId, options);
+    }
+
+    @Override
+    public CompletableFuture<StreamMetadata> delete(StreamId streamId, DeleteOptions options) {
+        return lifecycleCoordinator.delete(streamId, options);
     }
 
     private CompletableFuture<StreamMetadata> loadStreamMetadata(StreamId streamId) {
@@ -246,6 +269,7 @@ public final class DefaultStreamStorage implements StreamStorage {
         if (closed.compareAndSet(false, true)) {
             long deadlineNanos = shutdownDeadline(config.shutdownGrace());
             appendCoordinator.beginClose();
+            lifecycleCoordinator.close();
             trimCoordinator.beginClose();
             readCoordinator.close();
             trimCoordinator.awaitClose(remainingShutdownGrace(deadlineNanos));

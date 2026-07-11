@@ -1,9 +1,9 @@
 # Nereus Future 1：Core Stream Storage
 
-> 状态：Implemented；Phase 1 M0-M8 complete
+> 状态：Implemented；Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 complete
 > 交付映射：`docs/phase-1-core-stream-storage/`
-> 后继交付：Phase 1.5 P15-M0 design complete；`docs/phase-1.5-core-storage-foundation/`
-> 当前里程碑：P15-M1 target API；Phase 1 production behavior remains unchanged
+> 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
+> 当前里程碑：F2-M1 may consume the completed L0 foundation
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
 Oxia keys、failure injection 和测试 gate 以代码级文档为准；本文不复制那些合同。
@@ -74,12 +74,11 @@ OBJECT_WAL / OBJECT_WAL_SYNC_OBJECT
 Other enum values can be canonicalized and persisted as metadata today, but core must reject their execution
 until the corresponding writer/reader/coordinator exists。This is `Reserved`, not partial support。
 
-### 3.4 Phase 1.5 designed extension
+### 3.4 Phase 1.5 implemented extension
 
-Phase 1.5 is an F1 delivery extension inserted before F2 production implementation。It will add generic read-target
-and primary-WAL adapter boundaries、split stable head commit from generation-zero materialization、dual-read/new-write
-metadata、exact in-process append recovery and seal/logical delete。P15-M0 is design only；until P15-M1-M5 code/gates
-land, none of those additions is an implemented runtime claim。
+Phase 1.5 is an implemented F1 delivery extension inserted before F2 production implementation。It adds generic
+read-target and primary-WAL adapter boundaries、split stable head commit from generation-zero materialization、
+dual-read/new-write metadata、exact in-process append recovery and seal/logical delete。P15-M0-M5 code and gates pass。
 
 P15-M5 deliberately keeps the same supported profile/durability as Phase 1。BookKeeper adapters、non-strict success
 and Future 4 workers remain deferred beyond it。
@@ -383,7 +382,7 @@ facade-level release scenario。
 
 Explicitly deferred：
 
-- Phase 1.5 P15-M1-M5 will implement generic target/result/adapter seams but still defer BookKeeper writer/reader registration；
+- Phase 1.5 generic target/result/adapter seams are implemented；BookKeeper writer/reader registration remains deferred；
 - `WAL_DURABLE` non-strict return implementation remains after the Phase 1.5 internal split；
 - async materialization tasks and retention gate；
 - higher generations/compacted readers；

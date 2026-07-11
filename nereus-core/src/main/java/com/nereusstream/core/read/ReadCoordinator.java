@@ -23,8 +23,11 @@ import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
 import com.nereusstream.api.ResolvedObjectRange;
+import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
+import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.objectstore.wal.WalObjectReader;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import com.nereusstream.objectstore.wal.WalSliceReadStats;
@@ -41,7 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class ReadCoordinator implements AutoCloseable {
     private final StreamStorageConfig config;
     private final ReadResolver resolver;
-    private final WalObjectReader walObjectReader;
+    private final ReadTargetDispatcher targetDispatcher;
     private final ReadResourceLimiter resourceLimiter;
     private final ReadMetricsObserver observer;
     private final Executor callbackExecutor;
@@ -55,7 +58,11 @@ public final class ReadCoordinator implements AutoCloseable {
             Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
-        this.walObjectReader = Objects.requireNonNull(walObjectReader, "walObjectReader");
+        ObjectWalReaderAdapter objectReader = new ObjectWalReaderAdapter(
+                Objects.requireNonNull(walObjectReader, "walObjectReader"));
+        PrimaryWalRegistry registry = new PrimaryWalRegistry(List.of(), List.of(objectReader));
+        registry.requireReader(com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE);
+        this.targetDispatcher = new ReadTargetDispatcher(registry);
         this.observer = Objects.requireNonNull(observer, "observer");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.resourceLimiter = new ReadResourceLimiter(
@@ -173,14 +180,11 @@ public final class ReadCoordinator implements AutoCloseable {
             StreamId streamId,
             long startOffset,
             ReadOptions options,
-            List<ResolvedObjectRange> ranges,
+            List<ResolvedRange> ranges,
             ReadOperationDeadline deadline) {
         long reservationBytes;
         try {
-            reservationBytes = ranges.stream()
-                    .mapToLong(ReadCoordinator::rangeReadBytes)
-                    .max()
-                    .orElseThrow();
+            reservationBytes = targetDispatcher.reservationBytes(ranges);
         } catch (RuntimeException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -206,7 +210,7 @@ public final class ReadCoordinator implements AutoCloseable {
             return CompletableFuture.failedFuture(e);
         }
         CompletableFuture<WalReadResult> walRead = deadline.bound(
-                () -> walObjectReader.readWithStats(startOffset, ranges, boundedOptions),
+                () -> targetDispatcher.read(startOffset, ranges, boundedOptions),
                 "read resolved WAL ranges");
         return walRead.whenComplete((ignored, error) -> reservation.close())
                 .thenApplyAsync(result -> buildReadResult(
@@ -217,7 +221,7 @@ public final class ReadCoordinator implements AutoCloseable {
             StreamId streamId,
             long startOffset,
             ReadOptions options,
-            List<ResolvedObjectRange> ranges,
+            List<ResolvedRange> ranges,
             WalReadResult result) {
         validateReadAccounting(ranges, result);
         result.sliceStats().forEach(stats -> observe(() -> observer.onSliceRead(
@@ -262,10 +266,10 @@ public final class ReadCoordinator implements AutoCloseable {
     }
 
     private static void validateReadAccounting(
-            List<ResolvedObjectRange> ranges,
+            List<ResolvedRange> ranges,
             WalReadResult result) {
         Set<RangeIdentity> expectedRanges = new HashSet<>();
-        ranges.forEach(range -> expectedRanges.add(new RangeIdentity(
+        ranges.stream().map(ResolvedObjectRange::from).forEach(range -> expectedRanges.add(new RangeIdentity(
                 range.objectId(), range.objectOffset(), range.objectLength(), range.entryIndexRef().length())));
         Set<RangeIdentity> observedRanges = new HashSet<>();
         Set<com.nereusstream.api.ObjectId> observedObjects = new HashSet<>();
@@ -315,18 +319,6 @@ public final class ReadCoordinator implements AutoCloseable {
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
                     false,
                     "WAL reader returned-byte accounting does not match batches");
-        }
-    }
-
-    private static long rangeReadBytes(ResolvedObjectRange range) {
-        try {
-            return Math.addExact(range.objectLength(), range.entryIndexRef().length());
-        } catch (ArithmeticException e) {
-            throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "resolved range read reservation overflows",
-                    e);
         }
     }
 

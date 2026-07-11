@@ -1,7 +1,8 @@
 # Future 2 Implementation Plan and Gates
 
-This plan starts after F2-M0/M0R design and the Phase 1.5 P15-M5 final gate. A milestone is complete only when its code, focused tests and listed
-gate exist; documentation alone is not implementation evidence.
+F2-M0/M0R design and the Phase 1.5 P15-M5 final gate have passed, so F2-M1 is the next implementation milestone.
+A milestone is complete only when its code, focused tests and listed gate exist; documentation alone is not
+implementation evidence.
 
 ## 1. Build and Version Gate
 

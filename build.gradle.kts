@@ -123,3 +123,18 @@ tasks.register("phase1FinalCheck") {
     dependsOn(":nereus-metadata-oxia:oxiaIntegrationTest")
     dependsOn(":nereus-core:phase1IntegrationTest")
 }
+
+tasks.register("phase15Check") {
+    group = "verification"
+    description = "Verify the Phase 1.5 generic target, recovery, lifecycle, and compatibility foundation."
+    dependsOn("phase1Check")
+    dependsOn(phase1L0Modules.map { "$it:test" })
+    dependsOn(":nereus-managed-ledger:compileJava")
+}
+
+tasks.register("phase15FinalCheck") {
+    group = "verification"
+    description = "Run the production Oxia/Object WAL Phase 1.5 mixed-version and lifecycle gates."
+    dependsOn("phase15Check")
+    dependsOn("phase1FinalCheck")
+}

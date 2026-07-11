@@ -58,9 +58,9 @@ Future 4 不解决：
 stream-head reachable commit repair。F4 实现前必须冻结 higher-generation conditional
 publish/overlap schema；compaction 不能改写 `StreamHeadRecord.committedEndOffset` 或 commit chain。
 
-Phase 1.5 code-level design freezes only the tagged target/adapter、generic generation-zero record compatibility and
+Phase 1.5 implements the tagged target/adapter、generic generation-zero record compatibility and
 stable-commit/materializer seam。It does not freeze this document's task/checkpoint/source-generation CAS schema and
-does not implement a worker。F4 production starts only after P15-M5 and the remaining reference/publish entry gates。
+does not implement a worker。P15-M5 has passed；F4 production still requires the remaining reference/publish entry gates。
 
 ## 4. Layer Boundary
 

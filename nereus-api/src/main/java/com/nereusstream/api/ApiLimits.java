@@ -19,6 +19,8 @@ public final class ApiLimits {
     public static final int MAX_STREAM_ATTRIBUTES_ENCODED_BYTES = 16 * 1024;
     public static final int MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES = 16 * 1024;
     public static final int MAX_SCHEMA_REFS_ENCODED_BYTES = 16 * 1024;
+    public static final int MAX_READ_TARGET_ENCODED_BYTES = 64 * 1024;
+    public static final int MAX_APPEND_ATTEMPT_ID_ENCODED_BYTES = 256;
 
     private ApiLimits() {
     }

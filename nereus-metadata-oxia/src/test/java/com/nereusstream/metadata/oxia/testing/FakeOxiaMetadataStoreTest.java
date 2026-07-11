@@ -34,11 +34,13 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.CommitSliceResult;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairCursor;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairResult;
 import com.nereusstream.metadata.oxia.MetadataWatcher;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.Phase1ObjectManifestValidator;
 import com.nereusstream.metadata.oxia.WatchRegistration;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodec;
@@ -272,14 +274,15 @@ class FakeOxiaMetadataStoreTest {
         store.putObjectManifest(CLUSTER, manifest(request)).join();
 
         CommitSliceResult result = store.commitStreamSlice(CLUSTER, request).join();
-        List<OffsetIndexRecord> indexes = store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join();
+        List<OffsetIndexEntry> indexes = store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join();
 
         assertThat(result.range().startOffset()).isEqualTo(0);
         assertThat(result.range().endOffset()).isEqualTo(1);
         assertThat(result.commitVersion()).isEqualTo(1);
         assertThat(indexes).hasSize(1);
         assertThat(indexes.get(0).commitVersion()).isEqualTo(result.commitVersion());
-        assertThat(indexes.get(0).sliceChecksumValue()).isEqualTo(request.sliceChecksum().value());
+        assertThat(((ObjectSliceReadTarget) indexes.get(0).readTarget()).sliceChecksum().value())
+                .isEqualTo(request.sliceChecksum().value());
         assertThat(store.getObjectReferences(CLUSTER, request.objectId()).join()).isPresent();
         assertThat(store.accessLog()).allSatisfy(access ->
                 assertThat(access.partitionKey()).isNotBlank());
@@ -680,7 +683,7 @@ class FakeOxiaMetadataStoreTest {
         assertThat(repair.repairedFromOffset()).isEqualTo(2);
         assertThat(repair.repairedToOffset()).isEqualTo(3);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join())
-                .extracting(OffsetIndexRecord::offsetStart)
+                .extracting(OffsetIndexEntry::offsetStart)
                 .containsExactly(2L);
 
         DerivedIndexRepairResult secondRepair = store.repairDerivedStreamIndexes(
@@ -711,7 +714,7 @@ class FakeOxiaMetadataStoreTest {
         assertThat(thirdRepair.repairedFromOffset()).isEqualTo(0);
         assertThat(thirdRepair.repairedToOffset()).isEqualTo(1);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join())
-                .extracting(OffsetIndexRecord::offsetStart)
+                .extracting(OffsetIndexEntry::offsetStart)
                 .containsExactly(0L, 1L, 2L);
     }
 
@@ -885,7 +888,7 @@ class FakeOxiaMetadataStoreTest {
         assertThat(committedEnd.committedEndOffset()).isEqualTo(3);
         assertThat(committedEnd.commitVersion()).isEqualTo(3);
         assertThat(store.scanOffsetIndex(CLUSTER, streamId, 0, 10).join())
-                .extracting(OffsetIndexRecord::commitVersion)
+                .extracting(OffsetIndexEntry::commitVersion)
                 .containsExactly(1L, 2L, 3L);
         assertThat(storedRecords(StreamCommitRecord.class).stream()
                 .map(StreamCommitRecord::commitVersion)
