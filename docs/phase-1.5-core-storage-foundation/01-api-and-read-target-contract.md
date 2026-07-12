@@ -1,7 +1,7 @@
 # API and Read-target Contract
 
-> Implementation status：P15-M1/M4 surface is implemented；the `AppendResult.cumulativeSize` line below is the
-> F2-M0R2-discovered P15-M6 delta and is designed but not yet implemented。
+> Implementation status：P15-M1/M4 surface and the F2-M0R2-discovered P15-M6
+> `AppendResult.cumulativeSize` handoff are implemented/final-gated。
 
 > Base status：P15-M1/P15-M4 API contract implemented/final-gated on 2026-07-11
 
@@ -168,8 +168,9 @@ the returned cumulative value。
 
 The original P15-M1 implementation omitted `cumulativeSize` even though internal `CommittedAppend` already retains
 it。F2-M0R2 identified that omission when specifying exact snapshot advancement after a locally successful append
-whose facade snapshot may lag another broker. P15-M6 adds this one field and constructor/validation/result-fixture tests before
-F2-M1 production code；constructor/normal+recovery result fixtures are updated, but no durable record golden changes。
+whose facade snapshot may lag another broker. P15-M6 added this one field and constructor/validation/result-fixture
+tests before F2-M1 production code；constructor/normal+later-head-recovery result fixtures are updated, but no durable
+record golden changes。
 It changes no durable record、Object WAL byte、commit boundary or recovery identity。
 
 ## 4. Generic Resolve Result

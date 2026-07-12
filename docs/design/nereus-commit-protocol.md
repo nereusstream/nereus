@@ -267,7 +267,7 @@ after the head request is sent also carries an opaque `AppendAttemptId`。
 
 The core retains the exact generic `CommitAppendRequest`、durable provider result and read target behind that ID。
 `recoverAppend` replays only that identity and either returns the original `AppendResult`（including the commit's
-protocol-neutral cumulative logical size after P15-M6）or preserves/increases
+protocol-neutral cumulative logical size implemented by P15-M6）or preserves/increases
 certainty. It cannot prepare a new target or persist new primary bytes. A stream lane with a non-known attempt remains
 suspended until recovery returns committed, proves
 `KNOWN_NOT_COMMITTED` by complete commit-identity inspection, or reaches a permanent invariant failure; observing only
@@ -489,12 +489,13 @@ M7 production Oxia adapter now passes the same manifest validation、single-key 
 replay/repair continuation and watch/partition contract as the fake，plus its independent Docker/Testcontainers
 gate. M8 must compose that adapter with core and Object WAL for final Phase 1 exit。
 
-Phase 1.5 P15-M1-M5 implemented and verified：
+Phase 1.5 P15-M1-M6 implemented and verified：
 
 - generic target API/codec and legacy/new metadata compatibility；
 - Object WAL adapter parity through split stable commit/materialization；
 - exact retained-attempt recovery with anchored multi-page progress；
 - authoritative seal/logical-delete state machines；
+- exact cumulative logical size in normal and recovered public append results；
 - unchanged Phase 1 ordinary/Docker gates and one-way rollout boundary。
 
 Before enabling async/BookKeeper/higher-generation execution after Phase 1.5：

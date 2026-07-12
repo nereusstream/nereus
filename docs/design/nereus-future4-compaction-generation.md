@@ -60,7 +60,8 @@ publish/overlap schema；compaction 不能改写 `StreamHeadRecord.committedEndO
 
 Phase 1.5 implements the tagged target/adapter、generic generation-zero record compatibility and
 stable-commit/materializer seam。It does not freeze this document's task/checkpoint/source-generation CAS schema and
-does not implement a worker。P15-M5 has passed；F4 production still requires the remaining reference/publish entry gates。
+does not implement a worker。Phase 1.5 P15-M0-M6 has passed；F4 production still requires the remaining
+reference/publish entry gates。
 
 ## 4. Layer Boundary
 

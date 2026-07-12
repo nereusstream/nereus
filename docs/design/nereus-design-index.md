@@ -1,8 +1,8 @@
 # Nereus Design Index
 
 > 状态：当前设计索引
-> 最近一次实现同步：2026-07-11
-> 当前交付阶段：Phase 1.5 P15-M0-M5 complete；F2-M0R2 discovered P15-M6 cumulative-result handoff；P15-M6 next，then F2-M1
+> 最近一次实现同步：2026-07-12
+> 当前交付阶段：Phase 1.5 P15-M0-M6 complete/final-gated；F2-M1 next
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -63,14 +63,14 @@ streamId + offset
 
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
-| `nereus-api` | `Implemented`（P15-M1/M4；P15-M6 delta designed） | generic target/result、append recovery/lifecycle API implemented；`AppendResult.cumulativeSize` handoff pending |
+| `nereus-api` | `Implemented`（P15-M1/M4/M6） | generic target/result、exact cumulative append snapshot、append recovery/lifecycle API implemented |
 | `nereus-metadata-oxia` | `Implemented`（P15-M2/M4） | legacy/new codecs、generic new-write、mixed-chain repair/replay、lifecycle CAS、fake/real Docker gates |
 | `nereus-object-store` | `Implemented`（M3） | object-store API、WAL v1 writer/reader、entry index、local test fixture、checksums/tests |
-| `nereus-core` | `Implemented`（P15-M3/M4） | primary-WAL registry/Object adapters、strict split commit/materialize、read dispatch、exact recovery、seal/delete |
-| Phase 1.5 foundation | `In progress`（P15-M0-M5 implemented；P15-M6 next） | original generic target/adapter、recovery、seal/delete gates pass；narrow cumulative-result handoff pending |
+| `nereus-core` | `Implemented`（P15-M3/M4/M6） | primary-WAL registry/Object adapters、strict split commit/materialize、read dispatch、exact recovery、seal/delete、exact cumulative result |
+| Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `In progress`（F2-M0R2 complete） | exact Pulsar API/call-path、code-level method/state/fence review complete；blocked on P15-M6；module marker-only |
+| `nereus-managed-ledger` | `In progress`（F2-M0R2 complete；F2-M1 next） | exact Pulsar API/call-path、code-level method/state/fence review and P15-M6 prerequisite complete；module marker-only |
 | `nereus-pulsar-adapter` | `In progress`（F2-M0R2 complete；gated） | runtime/S3/bootstrap/binding/capability contract complete；implementation waits for F2 milestones；module marker-only |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
@@ -93,7 +93,8 @@ Phase 1.5 gates are：
 ./gradlew phase15FinalCheck --rerun-tasks
 ```
 
-The P15-M5 versions currently pass；P15-M6 must extend the same gates with cumulative-result fixtures before F2-M1。
+Both gates passed again for P15-M6 on 2026-07-12, including normal and later-head recovery cumulative-result
+fixtures。They are now the executable F2-M1 entry gate。
 
 ## 5. 当前一致性决策
 
@@ -159,7 +160,7 @@ decision behind items 14 and 16-18。
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 complete；P15-M6 next，then F2-M1） |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 + P15-M6 prerequisite complete；F2-M1 next） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
@@ -193,7 +194,7 @@ decision behind items 14 and 16-18。
 2. `../phase-1.5-core-storage-foundation/README.md`；
 3. 该目录的 `01` 到 `05` code-level documents；
 4. 对照 `../phase-1-core-stream-storage/` 的 frozen legacy contract/goldens；
-5. P15-M1-M5 implemented code and passing gates。
+5. P15-M1-M6 implemented code and passing gates。
 
 ### 评审目标架构
 

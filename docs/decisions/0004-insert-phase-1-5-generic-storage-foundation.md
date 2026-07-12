@@ -35,9 +35,10 @@ retention、client and execution-profile gates。
 
 P15-M5 passed its accepted generic-target/recovery/lifecycle scope。The later exact F2-M0R2 review proved that public
 `AppendResult` also needs the cumulative logical size already present in internal `CommittedAppend`，otherwise a
-stale facade must guess size or make known append success depend on a fallible second metadata read。P15-M6 adds only
+stale facade must guess size or make known append success depend on a fallible second metadata read。P15-M6 added only
 that protocol-neutral in-memory field and regression fixture；it changes no durable record/WAL byte、commit boundary、
-profile or recovery identity。F2-M1 begins after P15-M6。
+profile or recovery identity。P15-M6 passed its ordinary and Docker-backed final gates on 2026-07-12；F2-M1 may now
+begin。
 
 ## Consequences
 

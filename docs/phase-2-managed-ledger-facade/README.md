@@ -4,9 +4,8 @@
 F2-M0R 补齐 append recovery、topic incarnation、role-aware Position、interface matrix 和 broker runtime
 bootstrap。2026-07-12 的 F2-M0R2 使用锁定 commit 的真实 Pulsar checkout 重新核验接口和 broker 私有
 调用路径，并关闭 metadata type collision、write-fence handoff、storage-state inspection、ack admission、
-S3 provider 和 rollout capability 等实现前缺口。生产 facade 仍未实现；P15-M1-M5 已实现并通过 final
-gate，但 M0R2 还发现 `AppendResult` 少了内部已知的 cumulative logical size。当前下一实现里程碑是窄
-P15-M6 result-snapshot handoff，随后才是 F2-M1。
+S3 provider 和 rollout capability 等实现前缺口。生产 facade 仍未实现；P15-M1-M6 已实现并通过 final
+gate，包括 M0R2 发现的 exact cumulative logical-size handoff。当前下一实现里程碑是 F2-M1。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -17,13 +16,13 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 
 | Input | F2-M0 lock |
 | --- | --- |
-| Nereus implementation baseline | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5） |
+| F2-M0R2 Nereus design baseline | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5） |
 | Pulsar fork | `nereusstream/pulsar` |
 | Pulsar fork commit | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
 | Pulsar version at that commit | `5.0.0-M1-SNAPSHOT` |
 | Java/build baseline | Pulsar JDK 21 or 25; Nereus Java 21 |
 | Executable Nereus profile | `OBJECT_WAL_SYNC_OBJECT` only |
-| Unimplemented F2 prerequisite | P15-M6 adds protocol-neutral `AppendResult.cumulativeSize` from existing `CommittedAppend` truth |
+| Completed F2 prerequisite | P15-M6 carries protocol-neutral `AppendResult.cumulativeSize` from existing `CommittedAppend` truth；final-gated 2026-07-12 |
 
 The original F2-M0 probe predated Phase 1.5. F2-M0R2 therefore replaces that Nereus input with the final-gated P15
 commit above. The authoritative Pulsar source checkout is
@@ -100,12 +99,12 @@ audit must pass again before implementation continues.
 23. S3 `ifAbsent` is one PUT with `If-None-Match:*`；exact CRC32C is computed independently of ETag，range/zero-length
     responses and timeout/cancellation have closed behavior，and production rejects local/file providers。
 24. A successful append must advance both local tail and exact lifetime logical size without a fallible second read。
-    Internal `CommittedAppend` already has that value；P15-M6 adds it to generic `AppendResult` before F2-M1。
+    Internal `CommittedAppend` already has that value；P15-M6 carries it in generic `AppendResult` before F2-M1。
 
 ## 3. Phase 1.5 Production Prerequisite
 
 F2-M0R was completed against the exact Phase 1 implementation baseline and remains the facade authority。
-`../phase-1.5-core-storage-foundation/` P15-M1-M5 have implemented and proved the original prerequisite：
+`../phase-1.5-core-storage-foundation/` P15-M1-M6 have implemented and proved the complete prerequisite：
 
 - generic `ReadTarget`/`AppendResult`/`ResolvedRange` with Object WAL strict parity；
 - legacy/new L0 metadata compatibility；
@@ -113,9 +112,9 @@ F2-M0R was completed against the exact Phase 1 implementation baseline and remai
 - stream `seal` and logical `delete`；
 - protocol-neutral F2 prerequisite fixtures and unchanged Phase 1 gates。
 
-M0R2 found one remaining in-memory handoff gap：generic `AppendResult` omits the committed record's exact cumulative
-logical size。P15-M6 adds only that field/fixture；no durable metadata/WAL byte or commit/recovery boundary changes。
-F2-M1 is gated until P15-M6 passes。
+M0R2 found one remaining in-memory handoff gap：generic `AppendResult` omitted the committed record's exact cumulative
+logical size。P15-M6 added only that field/fixture；no durable metadata/WAL byte or commit/recovery boundary changed。
+Both Phase 1.5 gates passed on 2026-07-12，so F2-M1 may now begin。
 
 F2 must consume those APIs rather than reintroducing temporary L0 types in `nereus-managed-ledger` or implementing
 head/replay/lifecycle truth in projection metadata。
@@ -124,7 +123,7 @@ head/replay/lifecycle truth in projection metadata。
 
 | Repository/module | Ownership |
 | --- | --- |
-| `nereus-api` | P15-M6 adds generic result cumulative-size handoff；F2 consumes result/recovery/lifecycle API and adds no Pulsar or duplicate L0 type |
+| `nereus-api` | P15-M6 implements generic result cumulative-size handoff；F2 consumes result/recovery/lifecycle API and adds no Pulsar or duplicate L0 type |
 | `nereus-metadata-oxia` | Exact managed-ledger name/hash helper；F2 keyspace, records, codecs, fake/real projection metadata contract |
 | `nereus-managed-ledger` | Projection model, entry codec, factory, ledger, entry/read-only/non-durable cursor facade |
 | `nereus-pulsar-adapter` | Product-owned configuration/bootstrap helpers that do not depend on Pulsar private internals |
@@ -183,8 +182,8 @@ Those are later milestone gates.
 | F2-M0R code-level review | Complete | Initial documents 02-07 and L0 prerequisite review |
 | F2-M0R2 code-level closure | Complete | Exact target checkout revalidated；compile/type/state/runtime gaps closed in docs |
 | Phase 1.5 P15-M1-M5 | Complete | Generic L0/recovery/lifecycle implemented；ordinary and Docker final gates pass |
-| Phase 1.5 P15-M6 | Next / designed | Add `AppendResult.cumulativeSize` from existing committed truth and rerun Phase 1/1.5 gates |
-| F2-M1 projection model | Blocked on P15-M6 | Pure model/codec and restart-stable mapping tests |
+| Phase 1.5 P15-M6 | Complete | `AppendResult.cumulativeSize` from existing committed truth；ordinary and Docker final gates pass |
+| F2-M1 projection model | Next | Pure model/codec and restart-stable mapping tests |
 | F2-M2 projection metadata | Not started | Fake/real Oxia contract and crash-repair tests |
 | F2-M3 ManagedLedger facade | Not started | Factory/ledger append/read/lifecycle and exactly-once callback tests |
 | F2-M4 cursor boundary | Not started | Read-only/non-durable cursor; explicit durable mutation rejection |

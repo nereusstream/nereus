@@ -1,6 +1,6 @@
 # Nereus Future 1：Core Stream Storage
 
-> 状态：Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 implemented/final-gated；narrow P15-M6 result handoff designed and pending
+> 状态：Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 implemented/final-gated
 > 交付映射：`docs/phase-1-core-stream-storage/`
 > 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
 > 当前里程碑：F2-M1 may consume the completed L0 foundation
@@ -78,9 +78,10 @@ until the corresponding writer/reader/coordinator exists。This is `Reserved`, n
 
 Phase 1.5 is an implemented F1 delivery extension inserted before F2 production implementation。It adds generic
 read-target and primary-WAL adapter boundaries、split stable head commit from generation-zero materialization、
-dual-read/new-write metadata、exact in-process append recovery and seal/logical delete。P15-M0-M5 code and gates pass。
+dual-read/new-write metadata、exact in-process append recovery、seal/logical delete and exact cumulative-result
+handoff。P15-M0-M6 code and gates pass。
 
-P15-M5 deliberately keeps the same supported profile/durability as Phase 1。BookKeeper adapters、non-strict success
+Phase 1.5 P15-M0-M6 deliberately keeps the same supported profile/durability as Phase 1。BookKeeper adapters、non-strict success
 and Future 4 workers remain deferred beyond it。
 
 ## 4. Layer and module boundary
@@ -390,5 +391,5 @@ Explicitly deferred：
 
 These deferrals must remain visible in docs and runtime errors；they cannot be hidden behind reserved enums。
 
-The exact Phase 1.5 scope、metadata migration、state machines and P15-M1-M5 gates are authoritative in
+The exact Phase 1.5 scope、metadata migration、state machines and P15-M1-M6 gates are authoritative in
 `../phase-1.5-core-storage-foundation/README.md`。

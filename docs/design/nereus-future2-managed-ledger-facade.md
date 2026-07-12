@@ -1,6 +1,6 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 状态：In progress；F2-M0/M0R/M0R2 code-level design complete，P15-M5 original gate passed，P15-M6 next，then F2-M1
+> 状态：In progress；F2-M0/M0R/M0R2 code-level design and P15-M6 prerequisite complete；F2-M1 next
 > 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle + P15-M6 complete logical result handoff
 > Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 
@@ -72,7 +72,7 @@ Future 2 不解决：
 
 当前实现约束：`nereus-managed-ledger` 还没有真实 facade；Phase 1 payload 是 one-record-per-entry
 opaque batch。Phase 1.5 已实现 generic target/result、exact recovery 和 lifecycle，并保持 Object WAL
-strict parity；P15-M6 仍需把 internal commit 已有的 cumulative logical size 交给 public result。F2 首版仍只接受
+strict parity；P15-M6 已把 internal commit 的 cumulative logical size 交给 public result。F2 首版仍只接受
 `OBJECT_WAL_SYNC_OBJECT`，并只从 generic result 的 logical range 构造 Position。Broker hybrid mode 中的
 `bookkeeper` 继续走 stock BookKeeper factory，不等于 Nereus BookKeeper profile 已实现。
 
@@ -467,7 +467,7 @@ F2-M0 API spike and F2-M0R/M0R2 code-level reviews are complete. The review lock
 - lookup-data capability protocol plus namespace policy/first-create serialization；
 - generation-safe `PersistentTopic` write-fence handoff and pre-mutation limited acknowledgement admission。
 
-Phase 1.5 P15-M5 has passed and proves the original production prerequisite；P15-M6 is the remaining narrow handoff：
+Phase 1.5 P15-M6 has passed and proves the complete F2 production prerequisite：
 
 - generic logical append/resolve results and Object WAL parity；
 - exact retained attempt ID/recovery with multi-page progress；
@@ -475,7 +475,7 @@ Phase 1.5 P15-M5 has passed and proves the original production prerequisite；P1
 - legacy/new metadata restart compatibility and unchanged strict durability；
 - no new BookKeeper/async profile claim。
 - public `AppendResult.cumulativeSize` comes from existing committed truth so the facade never guesses complete size
-  or makes a known-success callback depend on a second read（P15-M6，not yet implemented）。
+  or makes a known-success callback depend on a second read（P15-M6，implemented/final-gated）。
 
 The executable API probe passed against interface blobs identical to the locked fork。Code-level
 contracts and F2-M1 through F2-M6 gates are in

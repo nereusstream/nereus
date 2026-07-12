@@ -25,11 +25,15 @@ import java.util.Optional;
  * <p>The requested {@link DurabilityLevel} determines whether generation-zero read-index confirmation is also
  * required. Phase 1 executes only {@link DurabilityLevel#WAL_DURABLE_AND_INDEX_COMMITTED} on the Object WAL
  * profile. Physical selection is represented by a protocol-neutral target.
+ *
+ * <p>{@code cumulativeSize} is the exact lifetime logical byte total at this commit. It is provider-neutral and is
+ * neither physical storage size nor a post-trim estimate.
  */
 public record AppendResult(
         StreamId streamId,
         OffsetRange range,
         long committedEndOffset,
+        long cumulativeSize,
         long generation,
         ReadTarget readTarget,
         PayloadFormat payloadFormat,
@@ -48,6 +52,9 @@ public record AppendResult(
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
         if (committedEndOffset != range.endOffset()) {
             throw new IllegalArgumentException("committedEndOffset must equal range.endOffset");
+        }
+        if (cumulativeSize < logicalBytes) {
+            throw new IllegalArgumentException("cumulativeSize must be at least logicalBytes");
         }
         if (generation != 0) {
             throw new IllegalArgumentException("append generation must be zero");

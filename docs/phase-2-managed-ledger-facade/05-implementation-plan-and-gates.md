@@ -1,8 +1,7 @@
 # Future 2 Implementation Plan and Gates
 
-F2-M0/M0R/M0R2 design and the Phase 1.5 P15-M5 original final gate have passed。M0R2 found one narrow L0 result
-handoff still required：P15-M6 adds `AppendResult.cumulativeSize` from existing committed truth。P15-M6 is the next
-implementation milestone；F2-M1 follows it.
+F2-M0/M0R/M0R2 design and the complete Phase 1.5 P15-M6 final gate have passed。P15-M6 carries
+`AppendResult.cumulativeSize` from existing committed truth。F2-M1 is the next implementation milestone.
 A milestone is complete only when its code, focused tests and listed gate exist; documentation alone is not
 implementation evidence.
 
@@ -10,8 +9,8 @@ implementation evidence.
 
 Before F2-M1 production code:
 
-1. implement P15-M6，then pass `phase15FinalCheck` and the protocol-neutral F2 prerequisite fixture from
-   `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md`；
+1. keep the completed P15-M6 `phase15FinalCheck` and protocol-neutral F2 prerequisite fixtures from
+   `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md` green；
 2. add a pinned Pulsar managed-ledger compile dependency for the locked fork commit;
 3. support a side-by-side Gradle composite build for development/CI, with the Pulsar checkout commit
    verified as `100d3ef0...`;
@@ -487,7 +486,7 @@ evidence for the end-to-end milestone.
 
 Stop implementation and update design if:
 
-- Phase 1.5 P15-M5 API/behavior differs from the locked F2 prerequisite and cannot be reconciled without changing
+- Phase 1.5 P15-M6 API/behavior differs from the locked F2 prerequisite and cannot be reconciled without changing
   Position/callback/lifecycle semantics；
 - P15-M6 cumulative-size handoff is absent and F2 would need to guess size or make a committed callback depend on a
   fallible reread；

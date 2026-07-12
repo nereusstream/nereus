@@ -52,7 +52,7 @@ standardized by `ManagedLedgerErrorMapper.unsupported(operation)` and includes t
 
 ```text
 nereus-api/com.nereusstream.api/
-  AppendResult.java                            # P15-M6 adds cumulativeSize
+  AppendResult.java                            # P15-M6 cumulativeSize handoff
   AppendAttemptId.java
   AppendRecoveryOptions.java
   SealOptions.java
@@ -121,16 +121,16 @@ nereus-managed-ledger/com.nereusstream.managedledger/
 `nereus-managed-ledger` may import Pulsar managed-ledger/common/client-admin-api types. No class added to `nereus-api`,
 `nereus-core`, `nereus-metadata-oxia` or `nereus-object-store` imports a Pulsar type.
 
-The L0 API/core classes and append-replay types in this inventory are implemented by Phase 1.5 P15-M1-M4，except the
-M0R2-discovered `AppendResult.cumulativeSize` handoff，which is designed as P15-M6 and not yet implemented。After
-P15-M6 passes, F2 owns only projection metadata and managed-ledger classes；the combined inventory is retained here
+The L0 API/core classes and append-replay types in this inventory are implemented by Phase 1.5 P15-M1-M6，including
+the M0R2-discovered `AppendResult.cumulativeSize` handoff。F2 owns only projection metadata and managed-ledger
+classes；the combined inventory is retained here
 because these are the exact types the facade consumes。
 
 ## 3. Required Phase 1.5 L0 Contract
 
 The Phase 1 public `StreamStorage` surface cannot fulfill the F2 append and lifecycle promises。Phase 1.5
 `../phase-1.5-core-storage-foundation/` is the implementation authority for the protocol-neutral additions below；
-P15-M5 has passed for recovery/lifecycle, but P15-M6 must add the exact cumulative result before F2-M1 starts；
+P15-M6 has passed for recovery/lifecycle and the exact cumulative result，so F2-M1 may start；
 `NereusManagedLedger` still cannot be exposed before its own implementation
 gates pass。This section remains the F2 consumer
 contract and cannot be implemented independently in the facade。
@@ -159,7 +159,7 @@ public record AppendResult(
 `CommittedAppend.cumulativeSize` for both normal and recovered results。It is not object physical size。Without it，a
 facade snapshot that predates another broker's append cannot combine its stale size with only this append's
 `logicalBytes`；a second metadata read may time out after durability is already known and therefore cannot be the
-success condition。P15-M6 adds this field without changing durable bytes or append certainty。
+success condition。P15-M6 implemented this field without changing durable bytes or append certainty。
 
 ### 3.1 Recoverable append attempt
 

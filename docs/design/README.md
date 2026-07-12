@@ -14,11 +14,11 @@
 5. `nereus-futures.md`：能力轨道、依赖关系和交付顺序；
 6. 文件名以 `nereus-futureN-` 开头的文档：各能力轨道详细设计。
 
-Future 1 / Phase 1 和 Phase 1.5 P15-M0-M5 已完成并通过普通/Docker gate；F2-M0 API spike、F2-M0R
+Future 1 / Phase 1 和 Phase 1.5 P15-M0-M6 已完成并通过普通/Docker gate；F2-M0 API spike、F2-M0R
 和 2026-07-12 F2-M0R2 code-level review 也已完成。M0R2 使用用户提供的 exact Pulsar checkout 关闭了
 type collision、binding/state inspection、auto-unfence、ack admission、S3 和 rollout/namespace race 合同。
-当前下一实现里程碑是 P15-M6 `AppendResult.cumulativeSize` handoff，随后是 F2-M1 projection
-foundation。Legacy L0 合同以
+P15-M6 已把 `AppendResult.cumulativeSize` 从 committed truth 交给 public result；当前下一实现里程碑是
+F2-M1 projection foundation。Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以
 `../phase-2-managed-ledger-facade/README.md` 及该目录下的编号文档为准。

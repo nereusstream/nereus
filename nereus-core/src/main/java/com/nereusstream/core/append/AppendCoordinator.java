@@ -763,6 +763,7 @@ public final class AppendCoordinator implements AutoCloseable {
                 commit.streamId(),
                 commit.range(),
                 commit.range().endOffset(),
+                commit.cumulativeSize(),
                 commit.generation(),
                 commit.readTarget(),
                 slice.payloadFormat(),

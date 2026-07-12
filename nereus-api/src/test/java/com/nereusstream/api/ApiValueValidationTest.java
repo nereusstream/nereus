@@ -296,6 +296,16 @@ class ApiValueValidationTest {
     }
 
     @Test
+    void appendResultRequiresCompleteCumulativeLogicalSize() {
+        AppendResult result = appendResult(new OffsetRange(4, 5), 0, 1, 1, 1, 9);
+
+        assertThat(result.cumulativeSize()).isEqualTo(9);
+        assertThatThrownBy(() -> appendResult(new OffsetRange(4, 5), 0, 1, 1, 1, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cumulativeSize");
+    }
+
+    @Test
     void basicOptionsAndIdsRejectInvalidValues() {
         assertThatThrownBy(() -> new StreamId(" "))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -403,10 +413,21 @@ class ApiValueValidationTest {
             long objectLength,
             int recordCount,
             int entryCount) {
+        return appendResult(range, objectOffset, objectLength, recordCount, entryCount, recordCount);
+    }
+
+    private static AppendResult appendResult(
+            OffsetRange range,
+            long objectOffset,
+            long objectLength,
+            int recordCount,
+            int entryCount,
+            long cumulativeSize) {
         return new AppendResult(
                 new StreamId("stream"),
                 range,
                 range.endOffset(),
+                cumulativeSize,
                 0,
                 new ObjectSliceReadTarget(
                         1,

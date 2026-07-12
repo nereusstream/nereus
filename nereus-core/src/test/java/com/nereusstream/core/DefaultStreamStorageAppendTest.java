@@ -87,6 +87,8 @@ class DefaultStreamStorageAppendTest {
             assertThat(first.range()).isEqualTo(new OffsetRange(0, 2));
             assertThat(second.range()).isEqualTo(new OffsetRange(2, 3));
             assertThat(first.logicalBytes()).isEqualTo(3);
+            assertThat(first.cumulativeSize()).isEqualTo(3);
+            assertThat(second.cumulativeSize()).isEqualTo(6);
             ObjectSliceReadTarget firstTarget = (ObjectSliceReadTarget) first.readTarget();
             ObjectSliceReadTarget secondTarget = (ObjectSliceReadTarget) second.readTarget();
             assertThat(firstTarget.objectId()).isNotEqualTo(secondTarget.objectId());
@@ -228,9 +230,57 @@ class DefaultStreamStorageAppendTest {
                     streamId, failure.appendAttemptId().orElseThrow(),
                     new AppendRecoveryOptions(Duration.ofSeconds(1))).join();
             assertThat(recovered.range()).isEqualTo(new OffsetRange(0, 1));
+            assertThat(recovered.cumulativeSize()).isEqualTo(1);
             assertThat(context.storage.append(
                     streamId, batch("b"), appendOptions(Duration.ofSeconds(1))).join().range())
                     .isEqualTo(new OffsetRange(1, 2));
+        }
+    }
+
+    @Test
+    void laterHeadRecoveryReturnsOriginalCommitCumulativeSize() {
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("later-head-recovery"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
+        DefaultStreamStorage first = new DefaultStreamStorage(
+                recoveryConfig("writer-a", "process-a", Duration.ofSeconds(30)),
+                metadata,
+                newWriter(objectStore),
+                new DefaultWalObjectReader(objectStore),
+                CLOCK,
+                Runnable::run);
+        DefaultStreamStorage second = new DefaultStreamStorage(
+                recoveryConfig("writer-a", "process-b", Duration.ofMillis(100)),
+                metadata,
+                newWriter(objectStore),
+                new DefaultWalObjectReader(objectStore),
+                CLOCK,
+                Runnable::run);
+        try {
+            StreamId streamId = first.createOrGetStream(
+                    new StreamName("later-head-recovery"),
+                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+            metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+
+            NereusException failure = appendFailure(first.append(
+                    streamId, batch("aa"), appendOptions(Duration.ofSeconds(5))));
+            assertThat(failure.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
+
+            AppendResult later = second.append(
+                    streamId, batch("later"), appendOptions(Duration.ofSeconds(5))).join();
+            AppendResult recovered = first.recoverAppend(
+                    streamId,
+                    failure.appendAttemptId().orElseThrow(),
+                    new AppendRecoveryOptions(Duration.ofSeconds(2))).join();
+
+            assertThat(later.range()).isEqualTo(new OffsetRange(1, 2));
+            assertThat(later.cumulativeSize()).isEqualTo(7);
+            assertThat(recovered.range()).isEqualTo(new OffsetRange(0, 1));
+            assertThat(recovered.cumulativeSize()).isEqualTo(2);
+        } finally {
+            first.close();
+            second.close();
+            metadata.close();
+            objectStore.close();
         }
     }
 
@@ -470,6 +520,42 @@ class DefaultStreamStorageAppendTest {
                 true,
                 false,
                 true);
+    }
+
+    private static StreamStorageConfig recoveryConfig(
+            String writerId,
+            String processRunId,
+            Duration recoveryBackoff) {
+        return new StreamStorageConfig(
+                "cluster/a",
+                writerId,
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(2),
+                64,
+                10_000,
+                256,
+                1_000,
+                64,
+                4L << 20,
+                16,
+                4L << 20,
+                1 << 20,
+                10_000,
+                Duration.ofSeconds(5),
+                true,
+                false,
+                true,
+                processRunId,
+                Duration.ofSeconds(5),
+                recoveryBackoff,
+                recoveryBackoff,
+                Duration.ofMinutes(10),
+                64,
+                128);
     }
 
     private static DefaultWalObjectWriter newWriter(LocalFileObjectStore store) {

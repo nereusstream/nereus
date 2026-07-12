@@ -1,6 +1,6 @@
 # Phase 1.5 Implementation Plan and Gates
 
-> 状态：P15-M0-M5 complete/final-gated on 2026-07-11；P15-M6 designed and pending
+> 状态：P15-M0-M6 complete/final-gated；P15-M6 passed ordinary and Docker-backed gates on 2026-07-12
 
 A milestone is complete only when production code, focused tests, aggregate gate wiring and matching documentation
 all exist。Passing the old Phase 1 gate alone cannot prove a new Phase 1.5 contract；a design enum/class alone cannot
@@ -307,8 +307,7 @@ Release output must state：
 - rolling downgrade is unsupported after first generic-target write；
 - executable profile remains Object WAL sync only；
 - BookKeeper target values are reservations, not adapters；
-- F2 production implementation may begin only after the narrow P15-M6 handoff below, while F4/BK/async remain
-  separate gates。
+- the narrow P15-M6 handoff below is complete，so F2-M1 may begin；F4/BK/async remain separate gates。
 
 Exit commands：
 
@@ -349,8 +348,10 @@ Gate：
 - a protocol-neutral F2 snapshot fixture can advance end/size without inspecting `ReadTarget` or performing a second
   metadata read。
 
-P15-M6 is complete only when `phase15Check` and `phase15FinalCheck --rerun-tasks` include these cases. It is not a new
-storage profile or a reopening of P15-M5 durability semantics.
+P15-M6 completed on 2026-07-12。`ApiValueValidationTest` locks the public result invariant；
+`DefaultStreamStorageAppendTest` locks normal cumulative advancement and later-head recovery returning the original
+commit's cumulative total。`phase15Check` and `phase15FinalCheck --rerun-tasks` both passed with these cases。This is
+not a new storage profile or a reopening of P15-M5 durability semantics.
 
 ## 9. F2 Handoff
 
