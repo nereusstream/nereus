@@ -341,7 +341,7 @@ Production targets:
 ```text
 nereus-managed-ledger/.../cursor/
   AbstractNereusCursor.java
-  NereusReadOnlyCursor.java
+  ../NereusReadOnlyCursor.java (implemented beside ReadOnlyManagedLedger)
   NereusNonDurableCursor.java
   NereusManagedCursorBoundary.java
   NereusManagedCursorStats.java
@@ -377,6 +377,18 @@ Exit:
 Reader/non-durable cursor can tail across broker-local facade reopen.
 No test claims durable subscription acknowledgement recovery.
 ```
+
+Implementation evidence（2026-07-12，read-only sub-stage）：
+
+- `NereusReadOnlyManagedLedger.createReadOnlyCursor` normalizes `EARLIEST/LATEST` and validates current-ledger next
+  positions after a get-only metadata refresh；factory sync/async read-only cursor opens reuse the separate bounded
+  read-only handle registry and never create missing storage。
+- `NereusReadOnlyCursor` serializes position mutation，bounds entry count by `maxReadEntries`，honors byte and inclusive
+  max-position limits，releases partial results on failure and implements read position、backlog count、skip、bounded
+  newest-match scan、range count and ordered close。The real Object WAL facade test reads exact persisted bytes through
+  this cursor and verifies tail position/ownership。
+- F2-M4 remains in progress：coalesced tail wait/polling and ManagedCursor-compatible non-durable/durable-boundary
+  implementations are still pending。
 
 ## 6. F2-M5 — Pulsar Fork Integration
 

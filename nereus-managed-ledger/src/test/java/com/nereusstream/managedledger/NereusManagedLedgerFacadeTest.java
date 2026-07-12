@@ -72,6 +72,8 @@ import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerFactoryConfig;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.PositionFactory;
+import org.apache.bookkeeper.mledger.ReadOnlyCursor;
 import org.apache.bookkeeper.mledger.ReadOnlyManagedLedger;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
@@ -174,6 +176,15 @@ class NereusManagedLedgerFacadeTest {
             Entry readOnlyEntry = read(readOnly, position).join();
             assertThat(readOnlyEntry.getData()).isEqualTo(payload);
             readOnlyEntry.release();
+            ReadOnlyCursor readOnlyCursor = factory.openReadOnlyCursor(
+                    NAME, PositionFactory.EARLIEST, config(true));
+            List<Entry> cursorEntries = readOnlyCursor.readEntries(10);
+            assertThat(cursorEntries).singleElement()
+                    .satisfies(cursorEntry -> assertThat(cursorEntry.getData()).isEqualTo(payload));
+            cursorEntries.forEach(Entry::release);
+            assertThat(readOnlyCursor.getReadPosition().getEntryId()).isEqualTo(1);
+            assertThat(readOnlyCursor.hasMoreEntries()).isFalse();
+            readOnlyCursor.close();
             assertThatThrownBy(() -> openReadOnly(
                     factory, "tenant/ns/persistent/missing", config(true)).join())
                     .isInstanceOf(CompletionException.class)

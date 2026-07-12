@@ -185,8 +185,9 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     @Override
     public ReadOnlyCursor openReadOnlyCursor(
             String managedLedgerName, Position startPosition, ManagedLedgerConfig config)
-            throws ManagedLedgerException {
-        throw unsupported("openReadOnlyCursor");
+            throws InterruptedException, ManagedLedgerException {
+        return await(readOnlyFuture(managedLedgerName, config))
+                .createReadOnlyCursor(startPosition);
     }
 
     @Override
@@ -196,7 +197,19 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             ManagedLedgerConfig config,
             OpenReadOnlyCursorCallback callback,
             Object ctx) {
-        callback.openReadOnlyCursorFailed(unsupported("openReadOnlyCursor"), ctx);
+        Objects.requireNonNull(callback, "callback");
+        readOnlyFuture(managedLedgerName, config).whenCompleteAsync((ledger, error) -> {
+            if (error != null) {
+                callback.openReadOnlyCursorFailed(mapFactory(error, "openReadOnlyCursor"), ctx);
+                return;
+            }
+            try {
+                callback.openReadOnlyCursorComplete(ledger.createReadOnlyCursor(startPosition), ctx);
+            } catch (Throwable creationFailure) {
+                callback.openReadOnlyCursorFailed(
+                        mapFactory(creationFailure, "openReadOnlyCursor"), ctx);
+            }
+        }, runtime.callbackExecutor());
     }
 
     @Override

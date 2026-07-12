@@ -3,6 +3,7 @@ package com.nereusstream.managedledger;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.managedledger.entry.PulsarEntryCodec;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.managedledger.errors.OperationContext;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
@@ -106,7 +108,19 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger 
 
     @Override
     public ReadOnlyCursor createReadOnlyCursor(Position position) {
-        throw errorMapper.unsupportedRuntime("createReadOnlyCursorUntilF2M4");
+        if (closed.get()) {
+            throw new IllegalStateException("read-only managed ledger is closed");
+        }
+        StreamMetadata metadata = refreshMetadata().join();
+        long offset;
+        if (samePosition(position, org.apache.bookkeeper.mledger.PositionFactory.EARLIEST)) {
+            offset = metadata.trimOffset();
+        } else if (samePosition(position, org.apache.bookkeeper.mledger.PositionFactory.LATEST)) {
+            offset = metadata.committedEndOffset();
+        } else {
+            offset = positions.requireReadPositionOffset(projection, position, metadata);
+        }
+        return new NereusReadOnlyCursor(this, positions.readPosition(projection, offset, metadata));
     }
 
     @Override
@@ -118,6 +132,42 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger 
         if (closed.compareAndSet(false, true)) {
             onClose.run();
         }
+    }
+
+    NereusManagedLedgerRuntime runtime() {
+        return runtime;
+    }
+
+    StreamMetadata currentMetadata() {
+        return snapshots.current().metadata();
+    }
+
+    CompletableFuture<StreamMetadata> refreshMetadata() {
+        return runtime.streamStorage().getStreamMetadata(projection.streamId())
+                .thenApply(metadata -> snapshots.updateFromMetadata(metadata).metadata());
+    }
+
+    CompletableFuture<Entry> readAt(long offset, StreamMetadata metadata) {
+        Position position = positions.entryPosition(projection, offset);
+        positions.requireReadableEntryOffset(projection, position, metadata);
+        return runtime.streamStorage().read(
+                        projection.streamId(),
+                        offset,
+                        requests.singleEntryReadOptions(
+                                runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
+                .thenApply(result -> codec.decode(position, result));
+    }
+
+    Position readPosition(long offset, StreamMetadata metadata) {
+        return positions.readPosition(projection, offset, metadata);
+    }
+
+    Position normalizeInclusiveMax(Position position, StreamMetadata metadata) {
+        return positions.normalizeInclusiveMaxPosition(projection, position, metadata);
+    }
+
+    private static boolean samePosition(Position left, Position right) {
+        return left.getLedgerId() == right.getLedgerId() && left.getEntryId() == right.getEntryId();
     }
 
     private ManagedLedgerException map(Throwable error) {
