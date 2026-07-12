@@ -1271,7 +1271,9 @@ the bound-class permit as of local commit `0d3a9768b4`；the permit and managed-
 are captured before policy cleanup，storage terminal state precedes the binding tombstone，and the stock loaded-topic
 delete regression passes。This is not F2-M5 exit：feature-admission/namespace coordination/capability/multi-broker
 race/broker-E2E gates
-below remain pending。These commits are local because the active GitHub
+below remain pending。Local commit `4921c2fc7a` publishes the reserved
+`nereus.storage-binding-protocol=1` property only for the enabled hybrid provider and rejects generic lookup-property
+spoofing；cluster convergence checks before policy enablement remain pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 

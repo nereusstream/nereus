@@ -23,7 +23,9 @@ delete/recreate state-machine APIs，distribution dependency/license accounting 
 `PersistencePolicies.equals`。`BrokerService` open now prepares the binding before factory selection and withholds the
 ledger until activation succeeds。Loaded and unloaded delete paths capture the bound-class permit before policy
 cleanup，delete through that class and publish the `DELETED` tombstone only after storage is terminal。Feature-admission
-hooks、namespace/capability convergence，multi-broker lifecycle races and broker E2E gates remain pending；therefore
+hooks、namespace/capability convergence，multi-broker lifecycle races and broker E2E gates remain pending；the broker
+does publish the reserved `nereus.storage-binding-protocol=1` lookup property when the enabled hybrid provider is
+active，and rejects attempts to spoof that property through generic lookup configuration。Therefore
 F2-M5 is not yet complete。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
