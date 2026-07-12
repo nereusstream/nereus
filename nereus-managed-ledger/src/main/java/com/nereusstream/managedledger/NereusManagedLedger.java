@@ -1,6 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.managedledger;
 
+import com.google.common.collect.BoundType;
+import com.google.common.collect.Range;
 import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendResult;
@@ -19,12 +21,14 @@ import com.nereusstream.managedledger.projection.ProjectionValidationException;
 import com.nereusstream.managedledger.projection.StreamPositionBounds;
 import com.nereusstream.managedledger.projection.VirtualLedgerProjection;
 import com.nereusstream.managedledger.snapshot.StreamSnapshotTracker;
+import com.nereusstream.managedledger.stats.NereusManagedLedgerStats;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
@@ -33,11 +37,11 @@ import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.CloseCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteLedgerCallback;
@@ -47,10 +51,13 @@ import org.apache.bookkeeper.mledger.AsyncCallbacks.UpdatePropertiesCallback;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
+import org.apache.bookkeeper.mledger.ManagedLedgerMXBean;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.PositionBound;
 import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.bookkeeper.mledger.proto.ManagedLedgerInfo.LedgerInfo;
+import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
+import org.apache.pulsar.common.util.DateFormatter;
 
 /** One writable Pulsar managed-ledger facade over one immutable F2 virtual-ledger projection. */
 public final class NereusManagedLedger extends AbstractNereusManagedLedger implements NereusWriteFenceView {
@@ -81,6 +88,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     private final SerialCallbackLane callbacks;
     private final AtomicReference<TopicProjectionRecord> topicProjection;
     private final AtomicInteger pendingAdds = new AtomicInteger();
+    private final AtomicLong lastAddEntryTime = new AtomicLong();
+    private final NereusManagedLedgerStats stats;
     private final AtomicBoolean closeNotified = new AtomicBoolean();
     private final Runnable onClose;
     private volatile ManagedLedgerConfig config;
@@ -104,6 +113,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
         this.snapshots = new StreamSnapshotTracker(result.streamMetadata(), 0);
         this.entryCodec = new PulsarEntryCodec(runtime.config().maxEntryBytes());
         this.callbacks = new SerialCallbackLane(runtime.callbackExecutor(), runtime.config().maxPendingCallbacks());
+        this.stats = new NereusManagedLedgerStats(
+                projection.managedLedgerName(), () -> snapshots.current().metadata().cumulativeSize());
         this.state = switch (result.streamMetadata().state()) {
             case ACTIVE -> LocalState.OPEN;
             case SEALED -> LocalState.SEALED;
@@ -215,15 +226,16 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
             return;
         }
         pendingAdds.incrementAndGet();
+        long startedNanos = System.nanoTime();
         runtime.streamStorage().append(
                         projection.streamId(),
                         encoded.appendBatch(),
                         requests.appendOptions(runtime.config().appendTimeout()))
                 .whenComplete((result, error) -> {
                     if (error == null) {
-                        completeAppend(admission, encoded, result, callback, ctx, Optional.empty());
+                        completeAppend(admission, encoded, result, callback, ctx, Optional.empty(), startedNanos);
                     } else {
-                        recoverOrFailAppend(admission, encoded, unwrap(error), callback, ctx);
+                        recoverOrFailAppend(admission, encoded, unwrap(error), callback, ctx, startedNanos);
                     }
                 });
     }
@@ -241,6 +253,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
             offset = positions.requireReadableEntryOffset(
                     projection, position, snapshots.current().metadata());
         } catch (Throwable error) {
+            stats.recordReadFailure();
             fail(admission, callback::readEntryFailed, ctx, error, "readEntry", true);
             return;
         }
@@ -251,6 +264,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                                 runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
                 .whenComplete((result, error) -> {
                     if (error != null) {
+                        stats.recordReadFailure();
                         fail(admission, callback::readEntryFailed, ctx, unwrap(error), "readEntry", true);
                         return;
                     }
@@ -258,9 +272,11 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                     try {
                         entry = entryCodec.decode(position, result);
                     } catch (Throwable invalid) {
+                        stats.recordReadFailure();
                         fail(admission, callback::readEntryFailed, ctx, invariant(invalid), "readEntry", true);
                         return;
                     }
+                    stats.recordReadSuccess(entry.getLength());
                     finish(admission, () -> callback.readEntryComplete(entry, ctx));
                 });
     }
@@ -448,8 +464,27 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     }
 
     @Override
+    public long getNumberOfEntries(Range<Position> range) {
+        Objects.requireNonNull(range, "range");
+        StreamMetadata metadata = snapshots.current().metadata();
+        long lower = metadata.trimOffset();
+        long upper = metadata.committedEndOffset();
+        if (range.hasLowerBound()) {
+            long entry = requireVirtualLedgerPosition(range.lowerEndpoint());
+            lower = range.lowerBoundType() == BoundType.CLOSED ? entry : incrementSaturated(entry);
+        }
+        if (range.hasUpperBound()) {
+            long entry = requireVirtualLedgerPosition(range.upperEndpoint());
+            upper = range.upperBoundType() == BoundType.CLOSED ? incrementSaturated(entry) : entry;
+        }
+        lower = Math.max(lower, metadata.trimOffset());
+        upper = Math.min(upper, metadata.committedEndOffset());
+        return Math.max(0, upper - lower);
+    }
+
+    @Override
     public long getNumberOfActiveEntries() {
-        return getNumberOfEntries();
+        return 0;
     }
 
     @Override
@@ -459,7 +494,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
 
     @Override
     public long getEstimatedBacklogSize() {
-        return getTotalSize();
+        return 0;
     }
 
     @Override
@@ -480,7 +515,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
 
     @Override
     public Position getFirstPosition() {
-        return positions.bounds(projection, snapshots.current().metadata()).firstAvailable();
+        return positions.bounds(projection, snapshots.current().metadata()).beforeFirstAvailable();
     }
 
     @Override
@@ -531,6 +566,116 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     @Override
     public int getPendingAddEntriesCount() {
         return pendingAdds.get();
+    }
+
+    @Override
+    public ManagedLedgerMXBean getStats() {
+        return stats;
+    }
+
+    @Override
+    public CompletableFuture<Long> getEarliestMessagePublishTimeInBacklog() {
+        return CompletableFuture.completedFuture(0L);
+    }
+
+    @Override
+    public CompletableFuture<ManagedLedgerInternalStats> getManagedLedgerInternalStats(
+            boolean includeLedgerMetadata) {
+        StreamMetadata metadata = snapshots.current().metadata();
+        ManagedLedgerInternalStats internal = new ManagedLedgerInternalStats();
+        internal.entriesAddedCounter = stats.getAddEntrySucceedTotal();
+        internal.numberOfEntries = metadata.committedEndOffset() - metadata.trimOffset();
+        internal.totalSize = metadata.cumulativeSize();
+        internal.currentLedgerEntries = metadata.committedEndOffset();
+        internal.currentLedgerSize = metadata.cumulativeSize();
+        internal.lastLedgerCreatedTimestamp = DateFormatter.format(projection.createdAtMillis());
+        internal.waitingCursorsCount = 0;
+        internal.pendingAddEntriesCount = pendingAdds.get();
+        internal.lastConfirmedEntry = lastConfirmed().toString();
+        synchronized (this) {
+            internal.state = switch (state) {
+                case OPEN -> "LedgerOpened";
+                case SEALED -> "Terminated";
+                case TERMINATING, DELETING -> "Closing";
+                case DELETED, CLOSED -> "Closed";
+                case PERMANENTLY_FENCED -> "Fenced";
+            };
+        }
+        internal.properties = new java.util.HashMap<>(getProperties());
+        ManagedLedgerInternalStats.LedgerInfo ledger = new ManagedLedgerInternalStats.LedgerInfo();
+        ledger.ledgerId = projection.virtualLedgerId();
+        ledger.entries = metadata.committedEndOffset();
+        ledger.size = metadata.cumulativeSize();
+        ledger.offloaded = false;
+        ledger.underReplicated = false;
+        ledger.properties = Map.of();
+        ledger.metadata = includeLedgerMetadata
+                ? "nereus{streamId=" + projection.streamId().value()
+                        + ",incarnation=" + projection.incarnation()
+                        + ",profile=" + metadata.profile().name() + "}"
+                : null;
+        internal.ledgers = List.of(ledger);
+        internal.cursors = Map.of();
+        return CompletableFuture.completedFuture(internal);
+    }
+
+    @Override
+    public CompletableFuture<Position> asyncFindPosition(Predicate<Entry> predicate) {
+        Objects.requireNonNull(predicate, "predicate");
+        StreamMetadata metadata = snapshots.current().metadata();
+        long last = metadata.committedEndOffset() - 1;
+        return searchBackward(predicate, last, metadata, runtime.config().maxScanEntries())
+                .thenApply(found -> found
+                        .map(this::getNextValidPosition)
+                        .orElseGet(() -> positions.bounds(projection, metadata).firstAvailable()));
+    }
+
+    @Override
+    public CompletableFuture<Position> getLastDispatchablePosition(
+            Predicate<Entry> predicate, Position startPosition) {
+        Objects.requireNonNull(predicate, "predicate");
+        StreamMetadata metadata = snapshots.current().metadata();
+        Position normalized = positions.normalizeInclusiveMaxPosition(
+                projection, startPosition, metadata);
+        return searchBackward(
+                        predicate,
+                        normalized.getEntryId(),
+                        metadata,
+                        runtime.config().maxScanEntries())
+                .thenApply(found -> found.orElseGet(
+                        () -> positions.bounds(projection, metadata).beforeFirstAvailable()));
+    }
+
+    private CompletableFuture<Optional<Position>> searchBackward(
+            Predicate<Entry> predicate,
+            long offset,
+            StreamMetadata metadata,
+            int remaining) {
+        if (offset < metadata.trimOffset()) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        if (remaining == 0) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.READ_LIMIT_TOO_SMALL, false, "managed-ledger scan budget is exhausted"));
+        }
+        Position position = positions.entryPosition(projection, offset);
+        return runtime.streamStorage().read(
+                        projection.streamId(),
+                        offset,
+                        requests.singleEntryReadOptions(
+                                runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
+                .thenApply(result -> entryCodec.decode(position, result))
+                .thenCompose(entry -> {
+                    boolean matches;
+                    try {
+                        matches = predicate.test(entry);
+                    } finally {
+                        entry.release();
+                    }
+                    return matches
+                            ? CompletableFuture.completedFuture(Optional.of(position))
+                            : searchBackward(predicate, offset - 1, metadata, remaining - 1);
+                });
     }
 
     @Override
@@ -594,8 +739,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     @Override
     public CompletableFuture<LedgerInfo> getLedgerInfo(long ledgerId) {
         if (ledgerId != projection.virtualLedgerId()) {
-            return CompletableFuture.failedFuture(new ManagedLedgerException.LedgerNotExistException(
-                    "unknown Nereus virtual ledger"));
+            return CompletableFuture.completedFuture(null);
         }
         return CompletableFuture.completedFuture(syntheticLedgerInfo());
     }
@@ -619,7 +763,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
             EncodedAppend encoded,
             Throwable error,
             AddEntryCallback callback,
-            Object ctx) {
+            Object ctx,
+            long startedNanos) {
         if (!(error instanceof NereusException nereus)) {
             failAppend(admission, callback, ctx, error);
             return;
@@ -650,7 +795,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                         requests.recoveryOptions(runtime.config().appendRecoveryTimeout()))
                 .whenComplete((result, recoveryError) -> {
                     if (recoveryError == null) {
-                        completeAppend(admission, encoded, result, callback, ctx, Optional.of(fence));
+                        completeAppend(admission, encoded, result, callback, ctx, Optional.of(fence), startedNanos);
                         return;
                     }
                     Throwable cause = unwrap(recoveryError);
@@ -695,7 +840,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
             AppendResult result,
             AddEntryCallback callback,
             Object ctx,
-            Optional<WriteFence> fence) {
+            Optional<WriteFence> fence,
+            long startedNanos) {
         Position position;
         try {
             snapshots.advanceFromAppend(result);
@@ -708,8 +854,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
             return;
         }
         ByteBuf callbackData = Unpooled.wrappedBuffer(encoded.callbackBytes()).asReadOnly();
+        stats.recordAddSuccess(result.logicalBytes(), startedNanos);
         finish(admission, () -> {
             try {
+                lastAddEntryTime.set(System.currentTimeMillis());
                 callback.addComplete(position, callbackData, ctx);
             } finally {
                 callbackData.release();
@@ -719,6 +867,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     }
 
     private void failAppend(Admission admission, AddEntryCallback callback, Object ctx, Throwable error) {
+        stats.recordAddFailure();
         ManagedLedgerException mapped = map(error, "append", false);
         finish(admission, () -> {
             try {
@@ -778,6 +927,11 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     }
 
     private CompletableFuture<TopicProjectionRecord> mirrorState(ManagedLedgerFacadeState target) {
+        return mirrorStateAttempt(target, metadataDeadlineNanos());
+    }
+
+    private CompletableFuture<TopicProjectionRecord> mirrorStateAttempt(
+            ManagedLedgerFacadeState target, long deadlineNanos) {
         TopicProjectionRecord current = topicProjection.get();
         return runtime.projectionStore().mirrorFacadeState(
                         runtime.cluster(),
@@ -785,10 +939,18 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                         current.projectionIdentity(),
                         current.metadataVersion(),
                         target)
-                .thenApply(updated -> {
-                    topicProjection.set(updated);
-                    return updated;
-                });
+                .handle((updated, error) -> {
+                    if (error == null) {
+                        topicProjection.set(updated);
+                        return CompletableFuture.completedFuture(updated);
+                    }
+                    Throwable cause = unwrap(error);
+                    if (!isMetadataConditionFailure(cause) || deadlineExpired(deadlineNanos)) {
+                        return CompletableFuture.<TopicProjectionRecord>failedFuture(cause);
+                    }
+                    return refreshTopic(current).thenCompose(
+                            ignored -> mirrorStateAttempt(target, deadlineNanos));
+                }).thenCompose(value -> value);
     }
 
     private CompletableFuture<TopicProjectionRecord> mirrorDeleteState() {
@@ -828,28 +990,59 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
         if (admission == null) {
             return;
         }
-        TopicProjectionRecord current = topicProjection.get();
-        Map<String, String> updated;
-        try {
-            updated = Map.copyOf(mutation.apply(current.properties()));
-        } catch (Throwable error) {
-            fail(admission, callback::updatePropertiesFailed, ctx, error, "updateProperties", false);
-            return;
-        }
-        runtime.projectionStore().updateProperties(
-                        runtime.cluster(),
-                        getName(),
-                        current.projectionIdentity(),
-                        current.metadataVersion(),
-                        updated)
+        updatePropertiesAttempt(mutation, metadataDeadlineNanos())
                 .whenComplete((record, error) -> {
                     if (error != null) {
                         fail(admission, callback::updatePropertiesFailed, ctx, unwrap(error),
                                 "updateProperties", false);
                     } else {
-                        topicProjection.set(record);
                         finish(admission, () -> callback.updatePropertiesComplete(record.properties(), ctx));
                     }
+                });
+    }
+
+    private CompletableFuture<TopicProjectionRecord> updatePropertiesAttempt(
+            java.util.function.Function<Map<String, String>, Map<String, String>> mutation,
+            long deadlineNanos) {
+        TopicProjectionRecord current = topicProjection.get();
+        Map<String, String> updated;
+        try {
+            updated = Map.copyOf(mutation.apply(current.properties()));
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return runtime.projectionStore().updateProperties(
+                        runtime.cluster(),
+                        getName(),
+                        current.projectionIdentity(),
+                        current.metadataVersion(),
+                        updated)
+                .handle((record, error) -> {
+                    if (error == null) {
+                        topicProjection.set(record);
+                        return CompletableFuture.completedFuture(record);
+                    }
+                    Throwable cause = unwrap(error);
+                    if (!isMetadataConditionFailure(cause) || deadlineExpired(deadlineNanos)) {
+                        return CompletableFuture.<TopicProjectionRecord>failedFuture(cause);
+                    }
+                    return refreshTopic(current).thenCompose(
+                            ignored -> updatePropertiesAttempt(mutation, deadlineNanos));
+                }).thenCompose(value -> value);
+    }
+
+    private CompletableFuture<TopicProjectionRecord> refreshTopic(TopicProjectionRecord expected) {
+        return runtime.projectionStore().getProjection(runtime.cluster(), getName())
+                .thenApply(optional -> {
+                    TopicProjectionRecord refreshed = optional.orElseThrow(() -> invariant(
+                            new IllegalStateException("topic projection disappeared during CAS retry")));
+                    if (!refreshed.projectionIdentity().equals(expected.projectionIdentity())) {
+                        throw invariant(new IllegalStateException(
+                                "topic projection identity changed during CAS retry"));
+                    }
+                    topicProjection.getAndUpdate(current ->
+                            refreshed.metadataVersion() >= current.metadataVersion() ? refreshed : current);
+                    return refreshed;
                 });
     }
 
@@ -931,13 +1124,34 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
         return positions.bounds(projection, snapshots.current().metadata()).lastConfirmed();
     }
 
+    @Override
+    public long getLastAddEntryTime() {
+        return lastAddEntryTime.get();
+    }
+
+    @Override
+    public long getMetadataCreationTimestamp() {
+        return projection.createdAtMillis();
+    }
+
     private LedgerInfo syntheticLedgerInfo() {
         StreamMetadata metadata = snapshots.current().metadata();
         return new LedgerInfo()
                 .setLedgerId(projection.virtualLedgerId())
                 .setEntries(metadata.committedEndOffset())
-                .setSize(metadata.cumulativeSize())
-                .setTimestamp(projection.createdAtMillis());
+                .setSize(metadata.cumulativeSize());
+    }
+
+    private long requireVirtualLedgerPosition(Position position) {
+        Objects.requireNonNull(position, "position");
+        if (position.getLedgerId() != projection.virtualLedgerId()) {
+            throw new ProjectionValidationException("position belongs to a different virtual ledger");
+        }
+        return position.getEntryId();
+    }
+
+    private static long incrementSaturated(long value) {
+        return value == Long.MAX_VALUE ? Long.MAX_VALUE : value + 1;
     }
 
     private void notifyClosed() {
@@ -956,6 +1170,23 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                 && nereus.retriable()
                 && nereus.appendOutcome().orElse(AppendOutcome.MAY_HAVE_COMMITTED)
                         != AppendOutcome.KNOWN_NOT_COMMITTED;
+    }
+
+    private static boolean isMetadataConditionFailure(Throwable error) {
+        return error instanceof NereusException nereus
+                && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
+    }
+
+    private long metadataDeadlineNanos() {
+        try {
+            return Math.addExact(System.nanoTime(), runtime.config().metadataTimeout().toNanos());
+        } catch (ArithmeticException ignored) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    private static boolean deadlineExpired(long deadlineNanos) {
+        return deadlineNanos != Long.MAX_VALUE && System.nanoTime() - deadlineNanos >= 0;
     }
 
     private static NereusException invariant(Throwable cause) {
@@ -978,7 +1209,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     private static <T> T await(CompletableFuture<T> future, Duration timeout)
             throws ManagedLedgerException {
         try {
-            return future.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
+            Objects.requireNonNull(timeout, "timeout");
+            return future.get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ManagedLedgerException(e);
@@ -988,8 +1220,6 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                 throw managedLedger;
             }
             throw new ManagedLedgerException(cause);
-        } catch (TimeoutException e) {
-            throw new ManagedLedgerException("Nereus synchronous managed-ledger operation timed out", e);
         }
     }
 

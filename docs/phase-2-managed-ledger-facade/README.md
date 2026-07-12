@@ -9,9 +9,9 @@ gate，包括 M0R2 发现的 exact cumulative logical-size handoff。F2-M1 proje
 实现并通过 locked-composite gate。F2-M2 projection metadata 已实现：键空间、严格创建请求、四类
 durable record、第三 codec registry、golden bytes、fake/real 单键 CAS/修复合同和 shared Oxia runtime
 均通过普通与 Docker gate。F2-M3 正在实现：配置/runtime/snapshot/callback、open/recreate/get-only
-inspection coordinator、factory exact-name registry，以及 writable ledger 的 append/direct-read/Position/
-properties/lifecycle/write-fence 已落地并通过真实 Object WAL 集成测试；下一子阶段是 read-only ledger、
-per-ledger stats 和剩余并发/失败 gate。
+inspection coordinator、factory exact-name registry、writable/get-only ledger、append/direct-read/Position/
+properties/lifecycle/write-fence、admin/cache/stats 已落地；真实 Object WAL、100-way same-name open、
+out-of-order callback、uncertain recovery 和错误映射 gate 均通过。F2-M3 complete；F2-M4 cursor boundary next。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -201,8 +201,8 @@ was repeated after the M1 implementation and remained green。
 | Phase 1.5 P15-M6 | Complete | `AppendResult.cumulativeSize` from existing committed truth；ordinary and Docker final gates pass |
 | F2-M1 projection model | Complete | Pure model/codec、locked Pulsar composite and restart-stable mapping tests |
 | F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
-| F2-M3 ManagedLedger facade | In progress | Writable factory/ledger path complete；read-only ledger、per-ledger stats and remaining race gates pending |
-| F2-M4 cursor boundary | Not started | Read-only/non-durable cursor; explicit durable mutation rejection |
+| F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
+| F2-M4 cursor boundary | In progress | Read-only/non-durable cursor; explicit durable mutation rejection |
 | F2-M5 broker integration | Not started | Hybrid storage provider and broker load/unload/restart tests |
 | F2-M6 final acceptance | Not started | Real Pulsar + Oxia + Object WAL end-to-end gate |
 

@@ -4,6 +4,7 @@ package com.nereusstream.managedledger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.google.common.collect.Range;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.api.AppendAttemptId;
@@ -58,16 +59,23 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import io.netty.buffer.ByteBuf;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
+import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenReadOnlyManagedLedgerCallback;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedger;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerFactoryConfig;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.ReadOnlyManagedLedger;
+import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
+import org.apache.pulsar.common.policies.data.PersistentOfflineTopicStats;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -100,7 +108,21 @@ class NereusManagedLedgerFacadeTest {
                     new ManagedLedgerFactoryConfig(),
                     false);
 
-            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config(true));
+            List<CompletableFuture<ManagedLedger>> concurrentOpens = IntStream.range(0, 100)
+                    .mapToObj(ignored -> CompletableFuture.supplyAsync(() -> {
+                        try {
+                            return factory.open(NAME, config(true));
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new CompletionException(e);
+                        } catch (ManagedLedgerException e) {
+                            throw new CompletionException(e);
+                        }
+                    }))
+                    .toList();
+            CompletableFuture.allOf(concurrentOpens.toArray(CompletableFuture[]::new)).join();
+            NereusManagedLedger ledger = (NereusManagedLedger) concurrentOpens.getFirst().join();
+            assertThat(concurrentOpens).allSatisfy(open -> assertThat(open.join()).isSameAs(ledger));
             assertThat(factory.open(NAME, config(true))).isSameAs(ledger);
             byte[] payload = "pulsar-entry".getBytes(StandardCharsets.UTF_8);
             Position position = ledger.addEntry(payload, 3);
@@ -110,13 +132,52 @@ class NereusManagedLedgerFacadeTest {
             assertThat(ledger.getNumberOfEntries()).isEqualTo(1);
             assertThat(ledger.getTotalSize()).isEqualTo(payload.length);
             assertThat(ledger.getLastConfirmedEntry()).isEqualTo(position);
+            assertThat(ledger.getFirstPosition().getEntryId()).isEqualTo(-1);
+            assertThat(ledger.getNumberOfEntries(Range.closed(position, position))).isEqualTo(1);
+            assertThat(ledger.getNumberOfActiveEntries()).isZero();
+            assertThat(ledger.getEstimatedBacklogSize()).isZero();
+            assertThat(ledger.getEarliestMessagePublishTimeInBacklog().join()).isZero();
             assertThat(ledger.getLedgersInfo().get(position.getLedgerId()).getEntries()).isEqualTo(1);
+            assertThat(ledger.getStats().getStoredMessagesLogicalSize()).isEqualTo(payload.length);
+            assertThat(ledger.getStats().getAddEntrySucceedTotal()).isEqualTo(1);
+            assertThat(ledger.getStats().getAddEntryBytesTotal()).isEqualTo(payload.length);
+            assertThat(ledger.getStats().getAddEntryWithReplicasBytesTotal()).isEqualTo(payload.length);
             assertThat(factory.getCacheStats().getCacheUsedSize()).isZero();
             assertThat(factory.getEntryCacheManager().getSize()).isZero();
 
             Entry entry = read(ledger, position).join();
             assertThat(entry.getData()).isEqualTo(payload);
             assertThat(entry.release()).isTrue();
+            assertThat(ledger.getStats().getEntriesReadTotalCount()).isEqualTo(1);
+            assertThat(ledger.getStats().getReadEntriesBytesTotal()).isEqualTo(payload.length);
+            assertThat(ledger.asyncFindPosition(candidate -> true).join().getEntryId()).isEqualTo(1);
+            assertThat(ledger.getLastDispatchablePosition(candidate -> true, position).join())
+                    .isEqualTo(position);
+            ManagedLedgerInternalStats internal = ledger.getManagedLedgerInternalStats(true).join();
+            assertThat(internal.numberOfEntries).isEqualTo(1);
+            assertThat(internal.ledgers).singleElement().satisfies(info -> {
+                assertThat(info.ledgerId).isEqualTo(position.getLedgerId());
+                assertThat(info.metadata).contains("nereus{streamId=");
+            });
+            assertThat(factory.asyncExists(NAME).join()).isTrue();
+            assertThat(factory.getManagedLedgerInfo(NAME).ledgers).singleElement()
+                    .satisfies(info -> assertThat(info.ledgerId).isEqualTo(position.getLedgerId()));
+            PersistentOfflineTopicStats offline = new PersistentOfflineTopicStats(NAME, "test-broker");
+            factory.estimateUnloadedTopicBacklog(
+                    offline, TopicName.get("persistent://tenant/ns/facade"), true, new Object());
+            assertThat(offline.totalMessages).isEqualTo(1);
+            assertThat(offline.storageSize).isEqualTo(payload.length);
+            assertThat(offline.dataLedgerDetails).hasSize(1);
+
+            ReadOnlyManagedLedger readOnly = openReadOnly(factory, NAME, config(true)).join();
+            assertThat(readOnly.getNumberOfEntries()).isEqualTo(1);
+            Entry readOnlyEntry = read(readOnly, position).join();
+            assertThat(readOnlyEntry.getData()).isEqualTo(payload);
+            readOnlyEntry.release();
+            assertThatThrownBy(() -> openReadOnly(
+                    factory, "tenant/ns/persistent/missing", config(true)).join())
+                    .isInstanceOf(CompletionException.class)
+                    .hasRootCauseInstanceOf(ManagedLedgerException.ManagedLedgerNotFoundException.class);
 
             ledger.setProperty("owner", "nereus");
             assertThat(ledger.getProperties()).containsEntry("owner", "nereus");
@@ -134,8 +195,17 @@ class NereusManagedLedgerFacadeTest {
             ledger.delete();
             assertThat(factory.inspectStorageState(NAME).join().state())
                     .isEqualTo(NereusDurableStorageState.DELETED);
+            assertThat(factory.asyncExists(NAME).join()).isFalse();
+            assertThatThrownBy(() -> factory.getManagedLedgerPropertiesAsync(NAME).join())
+                    .hasRootCauseInstanceOf(NereusException.class);
             ledger.close();
             assertThat(factory.getManagedLedgers()).isEmpty();
+
+            String unloadName = "tenant/ns/persistent/unload-only";
+            NereusManagedLedger unloadOnly = (NereusManagedLedger) factory.open(unloadName, config(true));
+            unloadOnly.close();
+            assertThat(factory.inspectStorageState(unloadName).join().state())
+                    .isEqualTo(NereusDurableStorageState.ACTIVE);
             factory.shutdown();
         } finally {
             metadata.close();
@@ -172,7 +242,7 @@ class NereusManagedLedgerFacadeTest {
                     ledger.awaitWriteFence(fence.generation());
             assertThat(terminal).isNotDone();
 
-            storage.terminalRecovery.complete(appendResult());
+            storage.terminalRecovery.complete(appendResult(0, 1, 3, 1));
 
             assertThat(terminal.join()).isEqualTo(NereusWriteFenceResolution.COMMITTED);
             assertThat(ledger.currentWriteFence()).isEmpty();
@@ -182,6 +252,47 @@ class NereusManagedLedgerFacadeTest {
             ledger.close();
         } catch (ManagedLedgerException e) {
             throw new AssertionError(e);
+        }
+    }
+
+    @Test
+    void appendCallbacksRemainInAdmissionOrderWhenL0CompletesOutOfOrder() throws Exception {
+        OrderedAppendStorage storage = new OrderedAppendStorage();
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(storage, projections)) {
+            NereusManagedLedger ledger = new NereusManagedLedger(
+                    runtime, opened(), config(true), () -> { });
+            List<Long> callbackOrder = new CopyOnWriteArrayList<>();
+            CompletableFuture<Void> callbacks = new CompletableFuture<>();
+            AddEntryCallback callback = new AddEntryCallback() {
+                @Override
+                public void addComplete(Position position, ByteBuf entryData, Object ctx) {
+                    assertThat(entryData.isReadOnly()).isTrue();
+                    assertThat(entryData.readableBytes()).isEqualTo(3);
+                    callbackOrder.add(position.getEntryId());
+                    if (callbackOrder.size() == 2) {
+                        callbacks.complete(null);
+                    }
+                }
+
+                @Override
+                public void addFailed(ManagedLedgerException exception, Object ctx) {
+                    callbacks.completeExceptionally(exception);
+                }
+            };
+
+            ledger.asyncAddEntry(new byte[] {1, 2, 3}, callback, null);
+            ledger.asyncAddEntry(new byte[] {4, 5, 6}, callback, null);
+            storage.second.complete(appendResult(1, 2, 6, 2));
+            assertThat(callbackOrder).isEmpty();
+            storage.first.complete(appendResult(0, 1, 3, 1));
+
+            callbacks.join();
+            assertThat(callbackOrder).containsExactly(0L, 1L);
+            assertThat(ledger.getStats().getAddEntrySucceedTotal()).isEqualTo(2);
+            ledger.close();
         }
     }
 
@@ -198,6 +309,34 @@ class NereusManagedLedgerFacadeTest {
                 result.completeExceptionally(exception);
             }
         }, null);
+        return result;
+    }
+
+    private static CompletableFuture<Entry> read(ReadOnlyManagedLedger ledger, Position position) {
+        CompletableFuture<Entry> result = new CompletableFuture<>();
+        ledger.asyncReadEntry(position, new ReadEntryCallback() {
+            @Override public void readEntryComplete(Entry entry, Object ctx) { result.complete(entry); }
+            @Override public void readEntryFailed(ManagedLedgerException exception, Object ctx) {
+                result.completeExceptionally(exception);
+            }
+        }, null);
+        return result;
+    }
+
+    private static CompletableFuture<ReadOnlyManagedLedger> openReadOnly(
+            NereusManagedLedgerFactory factory, String name, ManagedLedgerConfig config) {
+        CompletableFuture<ReadOnlyManagedLedger> result = new CompletableFuture<>();
+        factory.asyncOpenReadOnlyManagedLedger(name, new OpenReadOnlyManagedLedgerCallback() {
+            @Override
+            public void openReadOnlyManagedLedgerComplete(ReadOnlyManagedLedger managedLedger, Object ctx) {
+                result.complete(managedLedger);
+            }
+
+            @Override
+            public void openReadOnlyManagedLedgerFailed(ManagedLedgerException exception, Object ctx) {
+                result.completeExceptionally(exception);
+            }
+        }, config, null);
         return result;
     }
 
@@ -257,21 +396,22 @@ class NereusManagedLedgerFacadeTest {
                 metadata);
     }
 
-    private static AppendResult appendResult() {
+    private static AppendResult appendResult(
+            long start, long end, long cumulativeSize, long commitVersion) {
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.OBJECT_FOOTER,
                 Optional.empty(), Optional.empty(), Optional.empty(),
                 0, 1, new Checksum(ChecksumType.CRC32C, "11111111"));
         return new AppendResult(
                 ManagedLedgerProjectionNames.streamId(NAME, 1),
-                new OffsetRange(0, 1),
-                1,
-                3,
+                new OffsetRange(start, end),
+                end,
+                cumulativeSize,
                 0,
                 new ObjectSliceReadTarget(
                         1,
-                        new ObjectId("object"),
-                        new ObjectKey("key"),
+                        new ObjectId("object-" + start),
+                        new ObjectKey("key-" + start),
                         ObjectType.MULTI_STREAM_WAL_OBJECT,
                         "WAL_OBJECT_V1",
                         "OPAQUE_SLICE",
@@ -286,7 +426,7 @@ class NereusManagedLedgerFacadeTest {
                 3,
                 List.of(),
                 Optional.empty(),
-                1);
+                commitVersion);
     }
 
     private static final class FenceStreamStorage implements StreamStorage {
@@ -321,6 +461,33 @@ class NereusManagedLedgerFacadeTest {
             return terminalRecovery;
         }
 
+        @Override public CompletableFuture<StreamMetadata> createOrGetStream(StreamName name, StreamCreateOptions options) { return unsupported(); }
+        @Override public CompletableFuture<AppendSession> acquireAppendSession(StreamId id, AppendSessionOptions options) { return unsupported(); }
+        @Override public CompletableFuture<ReadResult> read(StreamId id, long offset, ReadOptions options) { return unsupported(); }
+        @Override public CompletableFuture<ResolveResult> resolve(StreamId id, long offset, ResolveOptions options) { return unsupported(); }
+        @Override public CompletableFuture<Void> trim(StreamId id, long offset, TrimOptions options) { return unsupported(); }
+        @Override public CompletableFuture<StreamMetadata> getStreamMetadata(StreamId id) { return unsupported(); }
+        @Override public CompletableFuture<StreamMetadata> seal(StreamId id, SealOptions options) { return unsupported(); }
+        @Override public CompletableFuture<StreamMetadata> delete(StreamId id, DeleteOptions options) { return unsupported(); }
+        @Override public void close() { }
+
+        private static <T> CompletableFuture<T> unsupported() {
+            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+    }
+
+    private static final class OrderedAppendStorage implements StreamStorage {
+        private final AtomicInteger appends = new AtomicInteger();
+        private final CompletableFuture<AppendResult> first = new CompletableFuture<>();
+        private final CompletableFuture<AppendResult> second = new CompletableFuture<>();
+
+        @Override
+        public CompletableFuture<AppendResult> append(
+                StreamId streamId, AppendBatch batch, AppendOptions options) {
+            return appends.getAndIncrement() == 0 ? first : second;
+        }
+
+        @Override public CompletableFuture<AppendResult> recoverAppend(StreamId id, AppendAttemptId attempt, AppendRecoveryOptions options) { return unsupported(); }
         @Override public CompletableFuture<StreamMetadata> createOrGetStream(StreamName name, StreamCreateOptions options) { return unsupported(); }
         @Override public CompletableFuture<AppendSession> acquireAppendSession(StreamId id, AppendSessionOptions options) { return unsupported(); }
         @Override public CompletableFuture<ReadResult> read(StreamId id, long offset, ReadOptions options) { return unsupported(); }

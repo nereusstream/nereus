@@ -29,7 +29,7 @@ protocol/table state = projection
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
-| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R/M0R2 design + P15-M6 + F2-M1 complete） | F2-M2 projection metadata |
+| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R/M0R2 + P15-M6 + F2-M1-M3 complete） | F2-M4 cursor boundary |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
@@ -115,7 +115,7 @@ workers and higher generations remain outside this delivery。
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0 API spike + F2-M0R/M0R2 review + P15-M6 + F2-M1 complete；F2-M2 next；production facade not implemented
+Current milestone: F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M3 complete；F2-M4 cursor boundary next；production writable/get-only facade implemented
 
 ### Owns
 
@@ -128,7 +128,7 @@ Current milestone: F2-M0 API spike + F2-M0R/M0R2 review + P15-M6 + F2-M1 complet
 ### Entry gate
 
 F2-M0/M0R/M0R2 closed the facade design gate，and P15-M6 closed the final cumulative-result prerequisite before
-F2-M1 completed these entry contracts；F2-M2 now consumes them：
+F2-M1-M3 completed and consumed these entry contracts；F2-M4 now builds the cursor boundary on them：
 
 - F1 append/read/trim error semantics are stable；
 - Pulsar fork/API blobs and repository boundary are locked；

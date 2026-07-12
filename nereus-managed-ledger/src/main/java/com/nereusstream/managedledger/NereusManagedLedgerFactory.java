@@ -11,7 +11,6 @@ import com.nereusstream.managedledger.errors.OperationContext;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.stats.NereusManagedLedgerFactoryStats;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,8 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -42,9 +39,11 @@ import org.apache.bookkeeper.mledger.ManagedLedgerFactoryMXBean;
 import org.apache.bookkeeper.mledger.ManagedLedgerInfo;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.ReadOnlyCursor;
+import org.apache.bookkeeper.mledger.ReadOnlyManagedLedger;
 import org.apache.bookkeeper.mledger.impl.cache.EntryCacheManager;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.PersistentOfflineTopicStats;
+import org.apache.pulsar.common.util.DateFormatter;
 
 /** F2 factory with exact-name single-flight opens and bounded handle ownership. */
 public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
@@ -54,6 +53,8 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     private final boolean ownsRuntime;
     private final NereusManagedLedgerOpenCoordinator openCoordinator;
     private final ConcurrentMap<String, CompletableFuture<NereusManagedLedger>> ledgers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, CompletableFuture<NereusReadOnlyManagedLedger>> readOnlyLedgers =
+            new ConcurrentHashMap<>();
     private final Semaphore handlePermits;
     private final ManagedLedgerErrorMapper errorMapper = new ManagedLedgerErrorMapper();
     private final NereusNoopEntryCacheManager cacheManager = new NereusNoopEntryCacheManager();
@@ -75,6 +76,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         ManagedLedgerConfigValidator.captureForOperation(defaultConfig);
         this.compatibilityConfig = Objects.requireNonNull(
                 compatibilityFactoryConfig, "compatibilityFactoryConfig");
+        this.compatibilityConfig.setMaxCacheSize(0);
         this.ownsRuntime = ownsRuntime;
         this.openCoordinator = new NereusManagedLedgerOpenCoordinator(
                 runtime, Objects.requireNonNull(creationGuard, "creationGuard"));
@@ -203,7 +205,61 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             OpenReadOnlyManagedLedgerCallback callback,
             ManagedLedgerConfig config,
             Object ctx) {
-        callback.openReadOnlyManagedLedgerFailed(unsupported("openReadOnlyManagedLedger"), ctx);
+        Objects.requireNonNull(callback, "callback");
+        readOnlyFuture(managedLedgerName, config).whenCompleteAsync((ledger, error) -> {
+            if (error == null) {
+                callback.openReadOnlyManagedLedgerComplete(ledger, ctx);
+            } else {
+                callback.openReadOnlyManagedLedgerFailed(mapFactory(error, "openReadOnlyManagedLedger"), ctx);
+            }
+        }, runtime.callbackExecutor());
+    }
+
+    private CompletableFuture<NereusReadOnlyManagedLedger> readOnlyFuture(
+            String name, ManagedLedgerConfig config) {
+        ManagedLedgerOpenConfigView captured;
+        try {
+            captured = ManagedLedgerConfigValidator.captureForOpen(config);
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(factoryClosed());
+        }
+        ManagedLedgerOpenConfigView noCreate = new ManagedLedgerOpenConfigView(
+                captured.operationView(), false, Map.of());
+        CompletableFuture<NereusReadOnlyManagedLedger> existing = readOnlyLedgers.get(name);
+        if (existing != null) {
+            return existing;
+        }
+        CompletableFuture<NereusReadOnlyManagedLedger> candidate = new CompletableFuture<>();
+        existing = readOnlyLedgers.putIfAbsent(name, candidate);
+        if (existing != null) {
+            return existing;
+        }
+        if (!handlePermits.tryAcquire()) {
+            readOnlyLedgers.remove(name, candidate);
+            candidate.completeExceptionally(new NereusException(
+                    ErrorCode.BACKPRESSURE_REJECTED, true, "managed-ledger handle capacity is exhausted"));
+            return candidate;
+        }
+        openCoordinator.open(name, noCreate).whenComplete((opened, error) -> {
+            if (error != null || closed.get()) {
+                readOnlyLedgers.remove(name, candidate);
+                handlePermits.release();
+                candidate.completeExceptionally(error == null ? factoryClosed() : unwrap(error));
+                return;
+            }
+            try {
+                candidate.complete(new NereusReadOnlyManagedLedger(
+                        runtime, opened, () -> releaseReadOnlyLedger(name, candidate)));
+            } catch (Throwable constructionFailure) {
+                readOnlyLedgers.remove(name, candidate);
+                handlePermits.release();
+                candidate.completeExceptionally(constructionFailure);
+            }
+        });
+        return candidate;
     }
 
     @Override
@@ -227,15 +283,15 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
-        return runtime.projectionStore().getProjection(runtime.cluster(), name)
-                .thenCompose(optional -> {
-                    TopicProjectionRecord topic = optional.orElseThrow(() -> new CompletionException(
-                            new NereusException(ErrorCode.STREAM_NOT_FOUND, false,
-                                    "managed ledger does not exist")));
-                    return runtime.streamStorage()
-                            .getStreamMetadata(new com.nereusstream.api.StreamId(topic.streamId()))
-                            .thenApply(metadata -> toManagedLedgerInfo(topic, metadata));
-                });
+        return openCoordinator.inspectStorageState(name).thenCompose(snapshot -> {
+            if (snapshot.state() != NereusDurableStorageState.ACTIVE
+                    && snapshot.state() != NereusDurableStorageState.SEALED) {
+                return notFound("managed ledger is not active or sealed");
+            }
+            return runtime.projectionStore().getProjection(runtime.cluster(), name)
+                    .thenApply(optional -> toManagedLedgerInfo(
+                            optional.orElseThrow(), snapshot.streamMetadata().orElseThrow()));
+        });
     }
 
     @Override
@@ -291,6 +347,10 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
 
     private CompletableFuture<Void> openExistingForDelete(String name, ManagedLedgerConfig config) {
         ManagedLedgerOpenConfigView captured = ManagedLedgerConfigValidator.captureForOpen(config);
+        if (!handlePermits.tryAcquire()) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.BACKPRESSURE_REJECTED, true, "managed-ledger handle capacity is exhausted"));
+        }
         ManagedLedgerOpenConfigView noCreate = new ManagedLedgerOpenConfigView(
                 captured.operationView(), false, Map.of());
         return openCoordinator.open(name, noCreate).thenCompose(opened -> {
@@ -318,7 +378,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                 }
             }, null);
             return result;
-        });
+        }).whenComplete((ignored, error) -> handlePermits.release());
     }
 
     @Override
@@ -345,9 +405,16 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             }, null);
             return closedLedger;
         }).thenCompose(value -> value)));
+        readOnlyLedgers.values().forEach(open -> closes.add(open.handle((ledger, error) -> {
+            if (ledger != null) {
+                ledger.factoryClose();
+            }
+            return null;
+        })));
         return CompletableFuture.allOf(closes.toArray(CompletableFuture[]::new))
                 .thenRun(() -> {
                     ledgers.clear();
+                    readOnlyLedgers.clear();
                     cacheManager.clear();
                 })
                 .thenCompose(ignored -> ownsRuntime
@@ -360,27 +427,39 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
-        return runtime.projectionStore().getProjection(runtime.cluster(), ledgerName)
-                .thenApply(Optional -> Optional.isPresent());
+        return openCoordinator.inspectStorageState(ledgerName)
+                .thenApply(snapshot -> snapshot.state() == NereusDurableStorageState.ACTIVE
+                        || snapshot.state() == NereusDurableStorageState.SEALED);
     }
 
     @Override public EntryCacheManager getEntryCacheManager() { return cacheManager; }
     @Override public void updateCacheEvictionTimeThreshold(long value) {
-        cacheEvictionThresholdNanos.set(Math.max(0, value));
+        if (value < 0) {
+            throw new IllegalArgumentException("cache eviction threshold cannot be negative");
+        }
+        cacheEvictionThresholdNanos.set(value);
     }
     @Override public long getCacheEvictionTimeThreshold() { return cacheEvictionThresholdNanos.get(); }
-    @Override public void updateCacheEvictionExtendTTLOfEntriesWithRemainingExpectedReadsMaxTimes(int value) { }
-    @Override public void updateCacheEvictionExtendTTLOfRecentlyAccessed(boolean value) { }
+    @Override public void updateCacheEvictionExtendTTLOfEntriesWithRemainingExpectedReadsMaxTimes(int value) {
+        cacheManager.updateCacheEvictionExtendTTLOfEntriesWithRemainingExpectedReadsMaxTimes(value);
+    }
+    @Override public void updateCacheEvictionExtendTTLOfRecentlyAccessed(boolean value) {
+        cacheManager.updateCacheEvictionExtendTTLOfRecentlyAccessed(value);
+    }
 
     @Override
     public CompletableFuture<Map<String, String>> getManagedLedgerPropertiesAsync(String name) {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
-        return runtime.projectionStore().getProjection(runtime.cluster(), name)
-                .thenApply(optional -> optional.orElseThrow(() -> new CompletionException(
-                        new NereusException(ErrorCode.STREAM_NOT_FOUND, false,
-                                "managed ledger does not exist"))).properties());
+        return openCoordinator.inspectStorageState(name).thenCompose(snapshot -> {
+            if (snapshot.state() != NereusDurableStorageState.ACTIVE
+                    && snapshot.state() != NereusDurableStorageState.SEALED) {
+                return notFound("managed ledger properties are unavailable");
+            }
+            return runtime.projectionStore().getProjection(runtime.cluster(), name)
+                    .thenApply(optional -> Map.copyOf(optional.orElseThrow().properties()));
+        });
     }
 
     @Override
@@ -402,9 +481,28 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             PersistentOfflineTopicStats offlineTopicStats,
             TopicName topicName,
             boolean accurate,
-            Object ctx) {
-        throw new UnsupportedOperationException(ManagedLedgerErrorMapper.UNSUPPORTED_PREFIX
-                + "estimateUnloadedTopicBacklog");
+            Object ctx) throws Exception {
+        Objects.requireNonNull(offlineTopicStats, "offlineTopicStats");
+        Objects.requireNonNull(topicName, "topicName");
+        String name = topicName.getPersistenceNamingEncoding();
+        NereusStorageStateSnapshot snapshot = await(openCoordinator.inspectStorageState(name));
+        if (snapshot.state() != NereusDurableStorageState.ACTIVE
+                && snapshot.state() != NereusDurableStorageState.SEALED) {
+            throw new ManagedLedgerException.ManagedLedgerNotFoundException(
+                    "managed ledger is not active or sealed");
+        }
+        com.nereusstream.api.StreamMetadata metadata = snapshot.streamMetadata().orElseThrow();
+        offlineTopicStats.reset();
+        offlineTopicStats.totalMessages = metadata.committedEndOffset() - metadata.trimOffset();
+        offlineTopicStats.storageSize = metadata.cumulativeSize();
+        offlineTopicStats.messageBacklog = 0;
+        if (accurate) {
+            offlineTopicStats.addLedgerDetails(
+                    offlineTopicStats.totalMessages,
+                    snapshot.projection().orElseThrow().createdAtMillis(),
+                    metadata.cumulativeSize(),
+                    snapshot.projection().orElseThrow().virtualLedgerId());
+        }
     }
 
     @Override public ManagedLedgerFactoryConfig getConfig() { return compatibilityConfig; }
@@ -416,9 +514,21 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         }
     }
 
+    private void releaseReadOnlyLedger(
+            String name, CompletableFuture<NereusReadOnlyManagedLedger> future) {
+        if (readOnlyLedgers.remove(name, future)) {
+            handlePermits.release();
+        }
+    }
+
     private int completedLedgerCount() {
         int count = 0;
         for (CompletableFuture<NereusManagedLedger> future : ledgers.values()) {
+            if (future.getNow(null) != null) {
+                count++;
+            }
+        }
+        for (CompletableFuture<NereusReadOnlyManagedLedger> future : readOnlyLedgers.values()) {
             if (future.getNow(null) != null) {
                 count++;
             }
@@ -435,6 +545,11 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         return errorMapper.unsupported(operation);
     }
 
+    private static <T> CompletableFuture<T> notFound(String message) {
+        return CompletableFuture.failedFuture(new NereusException(
+                ErrorCode.STREAM_NOT_FOUND, false, message));
+    }
+
     private ManagedLedgerException.ManagedLedgerFactoryClosedException factoryClosed() {
         return new ManagedLedgerException.ManagedLedgerFactoryClosedException(
                 new IllegalStateException("Nereus managed-ledger factory is closed"));
@@ -443,11 +558,9 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     private <T> T await(CompletableFuture<T> future)
             throws InterruptedException, ManagedLedgerException {
         try {
-            return future.get(runtime.config().closeTimeout().toNanos(), TimeUnit.NANOSECONDS);
+            return future.get();
         } catch (ExecutionException e) {
             throw mapFactory(e, "synchronousFactoryOperation");
-        } catch (TimeoutException e) {
-            throw new ManagedLedgerException("Nereus factory operation timed out", e);
         }
     }
 
@@ -456,16 +569,18 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             com.nereusstream.api.StreamMetadata metadata) {
         ManagedLedgerInfo info = new ManagedLedgerInfo();
         info.version = topic.metadataVersion();
-        info.creationDate = Instant.ofEpochMilli(topic.createdAtMillis()).toString();
-        info.modificationDate = info.creationDate;
+        info.creationDate = DateFormatter.format(topic.createdAtMillis());
+        info.modificationDate = null;
         ManagedLedgerInfo.LedgerInfo ledger = new ManagedLedgerInfo.LedgerInfo();
         ledger.ledgerId = topic.virtualLedgerId();
         ledger.entries = metadata.committedEndOffset();
         ledger.size = metadata.cumulativeSize();
-        ledger.timestamp = topic.createdAtMillis();
+        ledger.timestamp = null;
         info.ledgers = List.of(ledger);
         info.cursors = Map.of();
-        info.properties = topic.properties();
+        info.properties = topic.properties().isEmpty()
+                ? null
+                : new java.util.TreeMap<>(topic.properties());
         if (metadata.state() == com.nereusstream.api.StreamState.SEALED) {
             ManagedLedgerInfo.PositionInfo terminated = new ManagedLedgerInfo.PositionInfo();
             terminated.ledgerId = topic.virtualLedgerId();

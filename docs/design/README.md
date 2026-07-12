@@ -17,8 +17,9 @@
 Future 1 / Phase 1 和 Phase 1.5 P15-M0-M6 已完成并通过普通/Docker gate；F2-M0 API spike、F2-M0R
 和 2026-07-12 F2-M0R2 code-level review 也已完成。M0R2 使用用户提供的 exact Pulsar checkout 关闭了
 type collision、binding/state inspection、auto-unfence、ack admission、S3 和 rollout/namespace race 合同。
-P15-M6 已把 `AppendResult.cumulativeSize` 从 committed truth 交给 public result，F2-M1 projection
-foundation 也已实现；当前下一实现里程碑是 F2-M2 projection metadata。Legacy L0 合同以
+P15-M6 已把 `AppendResult.cumulativeSize` 从 committed truth 交给 public result，F2-M1 projection、
+F2-M2 projection metadata 和 F2-M3 factory/ledger facade 也已实现；当前下一实现里程碑是 F2-M4
+cursor boundary。Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以
 `../phase-2-managed-ledger-facade/README.md` 及该目录下的编号文档为准。

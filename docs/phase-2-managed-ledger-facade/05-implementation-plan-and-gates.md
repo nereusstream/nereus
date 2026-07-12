@@ -319,8 +319,16 @@ Implementation evidence（2026-07-12，writable-facade sub-stage）：
   uncertainty test covers callback failure followed by same-generation background recovery resolution。
 - the facade's post-callback terminal observer joins the core retained attempt with one saturated timeout view；it does
   not own a replay registry、physical request or retry scheduler。The P15 core remains the only exact-recovery runner。
-- F2-M3 remains in progress：`NereusReadOnlyManagedLedger`、per-ledger `ManagedLedgerMXBean` and the remaining
-  concurrency/buffer/failure matrix gates are not yet complete。
+- `NereusReadOnlyManagedLedger` now performs strict get-only open、refresh-before-direct-read、retained count and
+  immutable property exposure；cursor construction remains deliberately assigned to F2-M4。
+- `NereusManagedLedgerStats` implements the complete locked `ManagedLedgerMXBean` surface without claiming
+  BookKeeper replicas/cache/pending operations；admin info、offline backlog、internal stats、range counts and bounded
+  predicate scans use the current complete L0 snapshot。
+- 41 clean rerun tests cover F2-M3 foundations plus real Object WAL facade flow、100-way exact-name dedup、get-only
+  missing rejection、out-of-order append completion/callback order、uncertain write-fence terminal handoff、local-only
+  unload、lifecycle-aware exists/properties and the stable error table。
+- F2-M3 is complete；F2-M4 owns read-only/non-durable/durable-boundary cursor classes、tail wait coalescing and all
+  cursor-backed overrides currently routed through audited unsupported channels。
 - `NereusManagedLedgerOpenCoordinator` now implements permit-first first/open/recreate、binding mismatch rejection
   before L0 IO、canonical candidate adoption、missing-head corruption、forward lifecycle mirror reconciliation and
   get-only durable inspection；focused tests cover first create、no-create missing、reopen、sealed mirror、deleted
