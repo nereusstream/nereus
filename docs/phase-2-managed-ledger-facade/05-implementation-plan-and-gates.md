@@ -290,6 +290,21 @@ Every locked default is audited; supported methods are deterministic and unsuppo
 No callback or buffer leak is detected.
 ```
 
+Implementation evidence（2026-07-12，foundation sub-stage）：
+
+- product-owned factory config、immutable stock-config operation/open views、creation permit、durable inspection and
+  write-fence value surfaces are implemented with closed validation；
+- `StreamSnapshotTracker` preserves the P15-M6 exact end/cumulative-size overlay across stale metadata and rejects
+  equal-version drift、newer numeric regression and identity/profile changes；
+- `TerminalCallback` and bounded `SerialCallbackLane` provide exactly-once cleanup and admission-ordered callback
+  delivery across out-of-order operation completions；
+- `NereusManagedLedgerRuntime` validates process/writer identity、owns distinct dependencies、bounds callback
+  admission and closes all resources in dependency-reverse order while aggregating failures；
+- the exact `ObjectStoreProvider`/configuration/secret-resolver bootstrap protocols are present so the runtime public
+  constructor is code-complete；the deployable S3 implementation and provider wiring remain assigned to F2-M5；
+- F2-M3 remains in progress：factory open/inspection、ledger append/read/lifecycle、stats/cache/error mapping and their
+  locked Pulsar interface gates are not yet complete。
+
 ## 5. F2-M4 — Cursor Boundary
 
 Production targets:

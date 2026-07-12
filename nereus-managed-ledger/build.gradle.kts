@@ -15,11 +15,16 @@
 dependencies {
     api(project(":nereus-api"))
     implementation(project(":nereus-metadata-oxia"))
+    api(project(":nereus-object-store"))
     api(libs.pulsar.managed.ledger)
     api(libs.pulsar.common)
     api(libs.pulsar.client.admin.api)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
+    testImplementation(platform(libs.grpc.bom))
+    testImplementation(platform(libs.opentelemetry.bom))
+    testImplementation(platform(libs.opentelemetry.bom.alpha))
+    testImplementation(libs.oxia.client)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

@@ -1,0 +1,200 @@
+/* Licensed under the Apache License, Version 2.0 */
+package com.nereusstream.managedledger;
+
+import com.nereusstream.api.StreamStorage;
+import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
+import com.nereusstream.objectstore.ObjectStore;
+import com.nereusstream.objectstore.ObjectStoreProvider;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
+
+/** Shared F2 owner closed only by the hybrid factory/provider lifecycle. */
+public final class NereusManagedLedgerRuntime implements AutoCloseable {
+    private static final Pattern PROCESS_RUN_ID = Pattern.compile("[A-Za-z0-9_-]{22,256}");
+
+    private final StreamStorage streamStorage;
+    private final ManagedLedgerProjectionMetadataStore projectionStore;
+    private final OxiaMetadataStore l0MetadataStore;
+    private final SharedOxiaClientRuntime sharedOxiaRuntime;
+    private final ObjectStore objectStore;
+    private final ObjectStoreProvider objectStoreProvider;
+    private final ScheduledExecutorService scheduler;
+    private final ExecutorService callbackExecutor;
+    private final NereusManagedLedgerFactoryConfig config;
+    private final String processRunId;
+    private final String writerId;
+    private final Semaphore callbackPermits;
+    private final AtomicBoolean closed = new AtomicBoolean();
+
+    public NereusManagedLedgerRuntime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            OxiaMetadataStore l0MetadataStore,
+            SharedOxiaClientRuntime sharedOxiaRuntime,
+            ObjectStore objectStore,
+            ObjectStoreProvider objectStoreProvider,
+            ScheduledExecutorService scheduler,
+            ExecutorService callbackExecutor,
+            NereusManagedLedgerFactoryConfig config,
+            String processRunId,
+            String writerId) {
+        this.streamStorage = Objects.requireNonNull(streamStorage, "streamStorage");
+        this.projectionStore = Objects.requireNonNull(projectionStore, "projectionStore");
+        this.l0MetadataStore = Objects.requireNonNull(l0MetadataStore, "l0MetadataStore");
+        this.sharedOxiaRuntime = Objects.requireNonNull(sharedOxiaRuntime, "sharedOxiaRuntime");
+        this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
+        this.objectStoreProvider = Objects.requireNonNull(objectStoreProvider, "objectStoreProvider");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
+        this.config = Objects.requireNonNull(config, "config");
+        this.processRunId = requireProcessRunId(processRunId);
+        this.writerId = Objects.requireNonNull(writerId, "writerId");
+        if (!writerId.equals("pulsar-f2/" + processRunId)) {
+            throw new IllegalArgumentException("writerId must equal pulsar-f2/{processRunId}");
+        }
+        requireIdentityDistinct(List.of(
+                streamStorage,
+                projectionStore,
+                l0MetadataStore,
+                sharedOxiaRuntime,
+                objectStore,
+                objectStoreProvider,
+                scheduler,
+                callbackExecutor));
+        this.callbackPermits = new Semaphore(config.maxPendingCallbacks());
+    }
+
+    public StreamStorage streamStorage() {
+        return streamStorage;
+    }
+
+    public ManagedLedgerProjectionMetadataStore projectionStore() {
+        return projectionStore;
+    }
+
+    public ScheduledExecutorService scheduler() {
+        return scheduler;
+    }
+
+    public Executor callbackExecutor() {
+        return callbackExecutor;
+    }
+
+    public NereusManagedLedgerFactoryConfig config() {
+        return config;
+    }
+
+    public String processRunId() {
+        return processRunId;
+    }
+
+    public String writerId() {
+        return writerId;
+    }
+
+    boolean tryAcquireCallbackPermit() {
+        return !closed.get() && callbackPermits.tryAcquire();
+    }
+
+    void releaseCallbackPermit() {
+        callbackPermits.release();
+    }
+
+    boolean isClosed() {
+        return closed.get();
+    }
+
+    @Override
+    public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+        long executorDeadlineNanos = deadlineNanos(config.closeTimeout());
+        List<Throwable> failures = new ArrayList<>();
+        closeOne(projectionStore, failures);
+        closeOne(streamStorage, failures);
+        closeOne(l0MetadataStore, failures);
+        closeOne(objectStore, failures);
+        closeOne(objectStoreProvider, failures);
+        closeOne(sharedOxiaRuntime, failures);
+        shutdown(callbackExecutor, executorDeadlineNanos, failures);
+        shutdown(scheduler, executorDeadlineNanos, failures);
+        if (!failures.isEmpty()) {
+            RuntimeException aggregate = new RuntimeException("failed to close one or more Nereus runtime resources");
+            failures.forEach(aggregate::addSuppressed);
+            throw aggregate;
+        }
+    }
+
+    private static String requireProcessRunId(String value) {
+        Objects.requireNonNull(value, "processRunId");
+        if (!PROCESS_RUN_ID.matcher(value).matches()) {
+            throw new IllegalArgumentException("processRunId must be a URL-safe 128-bit-or-stronger identifier");
+        }
+        return value;
+    }
+
+    private static void requireIdentityDistinct(List<Object> resources) {
+        Map<Object, Boolean> identities = new IdentityHashMap<>();
+        for (Object resource : resources) {
+            if (identities.put(resource, Boolean.TRUE) != null) {
+                throw new IllegalArgumentException("runtime-owned resource identities must be distinct");
+            }
+        }
+    }
+
+    private static void closeOne(AutoCloseable resource, List<Throwable> failures) {
+        try {
+            resource.close();
+        } catch (Throwable error) {
+            failures.add(error);
+        }
+    }
+
+    private static void shutdown(
+            ExecutorService executor,
+            long deadlineNanos,
+            List<Throwable> failures) {
+        executor.shutdown();
+        try {
+            long remaining = deadlineNanos == Long.MAX_VALUE
+                    ? Long.MAX_VALUE
+                    : Math.max(0, deadlineNanos - System.nanoTime());
+            if (remaining == 0 || !executor.awaitTermination(remaining, TimeUnit.NANOSECONDS)) {
+                executor.shutdownNow();
+                failures.add(new IllegalStateException("Nereus runtime executor close deadline expired"));
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            executor.shutdownNow();
+            failures.add(e);
+        }
+    }
+
+    private static long deadlineNanos(Duration timeout) {
+        long timeoutNanos;
+        try {
+            timeoutNanos = timeout.toNanos();
+        } catch (ArithmeticException ignored) {
+            return Long.MAX_VALUE;
+        }
+        try {
+            return Math.addExact(System.nanoTime(), timeoutNanos);
+        } catch (ArithmeticException ignored) {
+            return Long.MAX_VALUE;
+        }
+    }
+}
