@@ -81,14 +81,25 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
     @Override
     public CompletableFuture<TopicProjectionRecord> createFirstProjection(
             String cluster,
-            ProjectionCreateRequest request) {
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard) {
         ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
         Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(publishGuard, "publishGuard");
         return submit(deadline -> {
+            Optional<TopicProjectionRecord> raced = readTopic(
+                    keyspace, request.managedLedgerName(), deadline);
+            if (raced.isPresent()) {
+                TopicProjectionRecord authoritative = raced.orElseThrow();
+                repairInside(keyspace, authoritative, deadline);
+                return authoritative;
+            }
+            requireNoOrphanDerivedRecords(keyspace, request, deadline);
             long ledgerId = allocateLedgerId(keyspace, deadline);
             TopicProjectionRecord candidate = topicCandidate(request, ledgerId);
             String key = keyspace.topicProjectionKey(request.managedLedgerName());
             PartitionKey partitionKey = keyspace.topicProjectionPartitionKey(request.managedLedgerName());
+            deadline.await(publishGuard.validateBeforePublish());
             Optional<Long> version = putIfAbsent(key, partitionKey, candidate, TopicProjectionRecord.class, deadline);
             TopicProjectionRecord authoritative;
             if (version.isPresent()) {
@@ -108,10 +119,12 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
             String cluster,
             ManagedLedgerProjectionIdentity expectedDeletedIdentity,
             long expectedTopicMetadataVersion,
-            ProjectionCreateRequest request) {
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard) {
         ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
         Objects.requireNonNull(expectedDeletedIdentity, "expectedDeletedIdentity");
         Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(publishGuard, "publishGuard");
         requireVersion(expectedTopicMetadataVersion);
         validateRecreationRequest(expectedDeletedIdentity, request);
         return submit(deadline -> {
@@ -136,6 +149,7 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
             TopicProjectionRecord candidate = topicCandidate(request, ledgerId);
             String key = keyspace.topicProjectionKey(request.managedLedgerName());
             PartitionKey partitionKey = keyspace.topicProjectionPartitionKey(request.managedLedgerName());
+            deadline.await(publishGuard.validateBeforePublish());
             Optional<Long> version = putIfVersion(
                     key, partitionKey, expectedTopicMetadataVersion, candidate, TopicProjectionRecord.class, deadline);
             TopicProjectionRecord authoritative;
@@ -370,6 +384,24 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
             throw invariant("managed-ledger topic hash collision or exact-name mismatch");
         }
         return Optional.of(record);
+    }
+
+    private void requireNoOrphanDerivedRecords(
+            ManagedLedgerProjectionKeyspace keyspace,
+            ProjectionCreateRequest request,
+            Deadline deadline) {
+        com.nereusstream.api.StreamId streamId = request.emptyStream().streamId();
+        PartitionKey partitionKey = keyspace.streamPartitionKey(streamId);
+        boolean derivedPresent = get(
+                        keyspace.virtualLedgerProjectionKey(streamId), partitionKey, deadline).isPresent()
+                || get(keyspace.positionIndexKey(streamId), partitionKey, deadline).isPresent();
+        if (!derivedPresent) {
+            return;
+        }
+        Optional<TopicProjectionRecord> raced = readTopic(keyspace, request.managedLedgerName(), deadline);
+        if (raced.isEmpty()) {
+            throw invariant("derived projection exists without topic authority");
+        }
     }
 
     private Optional<PartitionedOxiaClient.VersionedValue> get(

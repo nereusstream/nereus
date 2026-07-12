@@ -22,13 +22,15 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
 
     CompletableFuture<TopicProjectionRecord> createFirstProjection(
             String cluster,
-            ProjectionCreateRequest request);
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard);
 
     CompletableFuture<TopicProjectionRecord> recreateDeletedProjection(
             String cluster,
             ManagedLedgerProjectionIdentity expectedDeletedIdentity,
             long expectedTopicMetadataVersion,
-            ProjectionCreateRequest request);
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard);
 
     CompletableFuture<TopicProjectionRecord> updateProperties(
             String cluster,
@@ -55,6 +57,11 @@ public record ProjectionCreateRequest(
         long incarnation,
         StreamMetadata emptyStream,
         Map<String, String> initialProperties) {
+}
+
+@FunctionalInterface
+public interface ProjectionPublishGuard {
+    CompletableFuture<Void> validateBeforePublish();
 }
 
 public record ManagedLedgerProjectionIdentity(
@@ -93,6 +100,12 @@ protocol's empty stream to be silently reclassified.
 
 `TopicProjectionRecord.createdAtMillis` is copied from `emptyStream.createdAtMillis()`; the caller cannot inject a
 second creation clock.
+
+`ProjectionPublishGuard` is protocol-neutral and mandatory on both publication methods。The store allocates the
+possibly-leaked ledger ID first，then awaits the guard with the operation's existing monotonic deadline immediately
+before topic put/CAS；guard failure performs no topic or derived write。This closes the otherwise unavoidable gap
+between facade-side permit validation and the store-internal allocator/CAS loop。For first create，the store also
+checks both deterministic derived keys before allocation；a derived record without topic authority is corruption。
 
 `ManagedLedgerProjectionMetadataStore.close()` closes only store-local watches/caches and is idempotent; it never
 closes the shared Oxia client or executor runtime.
@@ -304,8 +317,9 @@ When the topic key is missing and `ManagedLedgerConfig.createIfMissing` is true:
    authority, or fail invariant only when the topic is still missing. A stale initial read must not misclassify a
    concurrent creator's valid derived records.
 4. Allocate one ledger ID by bounded allocator CAS.
-5. Call `permit.validateBeforeProjectionPublish()`, build the complete topic candidate with the permit generation and
-   `putIfAbsent(topicKey,candidate)`. A guard
+5. Pass `permit::validateBeforeProjectionPublish` as the mandatory publish guard；inside the same store operation，
+   allocate the ID、await the guard immediately before `putIfAbsent(topicKey,candidate)` and publish the complete
+   topic candidate with the permit generation. A guard
    rejection publishes nothing and leaves only an empty candidate stream/leaked allocation for audit.
 6. If another creator wins, restart open from the topic read. If the current record is still incarnation 1, validate
    every identity field; if it has already advanced through delete/recreate, process that newer record normally.
@@ -332,8 +346,9 @@ When the current record and L0 stream are `DELETED` and create-if-missing is tru
    same deleted topic version is still authoritative. Never publish over committed/terminal candidate state merely
    because its deterministic ID was expected.
 4. Allocate a new virtual ledger ID.
-5. Call `permit.validateBeforeProjectionPublish()`, then CAS-replace the topic key with its binding generation only if
-   the deleted record version still matches.
+5. Pass `permit::validateBeforeProjectionPublish` as the mandatory publish guard；inside the same store operation，
+   allocate the new ID、await the guard immediately before CAS and replace the topic key with its binding generation
+   only if the deleted record version still matches.
 6. On a lost race, restart open from the topic read. Validate an equal-incarnation winner exactly; process a valid
    later incarnation normally; never publish the losing ID or overwrite a later lifecycle.
 7. Repair only the authoritative winner's stream-derived keys. Old and losing-candidate stream-derived keys remain

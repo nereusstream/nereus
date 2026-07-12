@@ -44,8 +44,9 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
     @Override
     public CompletableFuture<TopicProjectionRecord> createFirstProjection(
             String cluster,
-            ProjectionCreateRequest request) {
-        return core.createFirstProjection(cluster, request);
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard) {
+        return core.createFirstProjection(cluster, request, publishGuard);
     }
 
     @Override
@@ -53,9 +54,10 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
             String cluster,
             ManagedLedgerProjectionIdentity expectedDeletedIdentity,
             long expectedTopicMetadataVersion,
-            ProjectionCreateRequest request) {
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard) {
         return core.recreateDeletedProjection(
-                cluster, expectedDeletedIdentity, expectedTopicMetadataVersion, request);
+                cluster, expectedDeletedIdentity, expectedTopicMetadataVersion, request, publishGuard);
     }
 
     @Override

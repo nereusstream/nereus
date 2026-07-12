@@ -66,6 +66,7 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
     private static final String IMAGE = "oxia/oxia:0.16.3";
     private static final String WRITER = "writer-a";
     private static final String RUN = "run-a";
+    private static final ProjectionPublishGuard ALLOW_PUBLISH = () -> CompletableFuture.completedFuture(null);
 
     @Container
     private static final OxiaContainer OXIA =
@@ -85,7 +86,8 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                                 config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
             ProjectionCreateRequest firstRequest = projectionRequest(l0, cluster, managedLedgerName, 3, 1);
             List<CompletableFuture<TopicProjectionRecord>> firstCreates = IntStream.range(0, 16)
-                    .mapToObj(ignored -> projection.createFirstProjection(cluster, firstRequest))
+                    .mapToObj(ignored -> projection.createFirstProjection(
+                            cluster, firstRequest, ALLOW_PUBLISH))
                     .toList();
             CompletableFuture.allOf(firstCreates.toArray(CompletableFuture[]::new)).join();
             TopicProjectionRecord first = firstCreates.getFirst().join();
@@ -112,7 +114,8 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
             ProjectionCreateRequest nextRequest = projectionRequest(l0, cluster, managedLedgerName, 4, 2);
             List<CompletableFuture<TopicProjectionRecord>> recreations = IntStream.range(0, 12)
                     .mapToObj(ignored -> projection.recreateDeletedProjection(
-                            cluster, deleted.projectionIdentity(), deleted.metadataVersion(), nextRequest))
+                            cluster, deleted.projectionIdentity(), deleted.metadataVersion(), nextRequest,
+                            ALLOW_PUBLISH))
                     .toList();
             CompletableFuture.allOf(recreations.toArray(CompletableFuture[]::new)).join();
             recreated = recreations.getFirst().join();

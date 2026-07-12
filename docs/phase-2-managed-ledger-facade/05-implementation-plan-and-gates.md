@@ -127,6 +127,7 @@ nereus-metadata-oxia/.../
   records/VirtualLedgerProjectionRecord.java
   records/PositionIndexRecord.java
   ManagedLedgerProjectionIdentityMismatchException.java
+  ProjectionPublishGuard.java
   ProjectionMetadataStoreConfig.java
   codec/F2MetadataCodecs.java
 ```
@@ -169,6 +170,10 @@ Implementation evidence（2026-07-12，real adapter/final sub-stage）：
   close and full runtime restart；
 - F2-M2 is complete。The projection store still does not orchestrate L0 open/recovery itself；that facade-level
   protocol begins in F2-M3 and continues to consume Phase 1.5 lifecycle/recovery as a black box。
+- the F2-M3 open implementation review added the mandatory protocol-neutral `ProjectionPublishGuard` to both
+  publication calls；the core now evaluates it after allocator CAS and immediately before topic put/CAS under the
+  same deadline，and rejects orphan derived keys before first allocation。Focused fake and real contracts retain the
+  M2 completion gate with this stricter interface。
 
 Tests:
 

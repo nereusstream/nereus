@@ -25,13 +25,15 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
 
     CompletableFuture<TopicProjectionRecord> createFirstProjection(
             String cluster,
-            ProjectionCreateRequest request);
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard);
 
     CompletableFuture<TopicProjectionRecord> recreateDeletedProjection(
             String cluster,
             ManagedLedgerProjectionIdentity expectedDeletedIdentity,
             long expectedTopicMetadataVersion,
-            ProjectionCreateRequest request);
+            ProjectionCreateRequest request,
+            ProjectionPublishGuard publishGuard);
 
     CompletableFuture<TopicProjectionRecord> updateProperties(
             String cluster,

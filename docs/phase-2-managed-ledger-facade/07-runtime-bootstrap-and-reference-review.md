@@ -900,8 +900,10 @@ public interface NereusCreationPermit {
 ```
 
 The factory acquires the permit at the start of every Nereus open, validates an existing projection's persisted
-`storageClassBindingGeneration` against it, and calls its validation method immediately before a new projection
-put/CAS. The production factory requires a non-null guard from `NereusRuntimeContext`; unit tests pass an explicit
+`storageClassBindingGeneration` against it, and passes `permit::validateBeforeProjectionPublish` as the mandatory
+metadata-store `ProjectionPublishGuard`。The projection store awaits it after allocator CAS and immediately before a
+new topic put/CAS under the same operation deadline. The production factory requires a non-null guard from
+`NereusRuntimeContext`; unit tests pass an explicit
 fake. There is no implicit allow-all production constructor.
 
 ### 5.3 Namespace policy/first-create serialization

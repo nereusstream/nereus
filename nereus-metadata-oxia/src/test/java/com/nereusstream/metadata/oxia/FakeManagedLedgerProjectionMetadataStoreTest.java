@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
@@ -29,13 +30,14 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
     private static final String CLUSTER = "cluster/a";
     private static final String NAME = "tenant/ns/persistent/topic";
     private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(999), ZoneOffset.UTC);
+    private static final ProjectionPublishGuard ALLOW_PUBLISH = () -> CompletableFuture.completedFuture(null);
 
     @Test
     void concurrentFirstCreatePublishesOneAuthorityAndLeaksOnlyLosingIds() {
         try (FakeManagedLedgerProjectionMetadataStore store = store(new DurableState())) {
             ProjectionCreateRequest request = request(NAME, 3, 1);
             List<CompletableFuture<TopicProjectionRecord>> futures = IntStream.range(0, 32)
-                    .mapToObj(ignored -> store.createFirstProjection(CLUSTER, request))
+                    .mapToObj(ignored -> store.createFirstProjection(CLUSTER, request, ALLOW_PUBLISH))
                     .toList();
 
             CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
@@ -46,7 +48,7 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
             assertThat(winner.virtualLedgerId()).isGreaterThanOrEqualTo(
                     ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID);
             assertThat(winner.createdAtMillis()).isEqualTo(100);
-            assertThat(store.successfulWrites(FailurePoint.AFTER_ALLOCATOR_WRITE)).isEqualTo(32);
+            assertThat(store.successfulWrites(FailurePoint.AFTER_ALLOCATOR_WRITE)).isBetween(1L, 32L);
             assertThat(store.successfulWrites(FailurePoint.AFTER_TOPIC_WRITE)).isEqualTo(1);
             assertThat(store.successfulWrites(FailurePoint.AFTER_VIRTUAL_LEDGER_WRITE)).isEqualTo(1);
             assertThat(store.successfulWrites(FailurePoint.AFTER_POSITION_INDEX_WRITE)).isEqualTo(1);
@@ -58,7 +60,7 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
         DurableState state = new DurableState();
         TopicProjectionRecord created;
         try (FakeManagedLedgerProjectionMetadataStore first = store(state)) {
-            created = first.createFirstProjection(CLUSTER, request(NAME, 3, 1)).join();
+            created = first.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join();
         }
 
         try (FakeManagedLedgerProjectionMetadataStore restarted = store(state)) {
@@ -83,7 +85,8 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
             try (FakeManagedLedgerProjectionMetadataStore failing = store(state)) {
                 failing.failNext(point);
                 assertNereusFailure(
-                        () -> failing.createFirstProjection(CLUSTER, request(NAME, 3, 1)).join(),
+                        () -> failing.createFirstProjection(
+                                CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join(),
                         ErrorCode.METADATA_UNAVAILABLE);
             }
 
@@ -104,20 +107,80 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
         try (FakeManagedLedgerProjectionMetadataStore store = store(state)) {
             store.failNext(FailurePoint.AFTER_ALLOCATOR_WRITE);
             assertNereusFailure(
-                    () -> store.createFirstProjection(CLUSTER, request(NAME, 3, 1)).join(),
+                    () -> store.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join(),
                     ErrorCode.METADATA_UNAVAILABLE);
             assertThat(store.getProjection(CLUSTER, NAME).join()).isEmpty();
 
-            TopicProjectionRecord created = store.createFirstProjection(CLUSTER, request(NAME, 3, 1)).join();
+            TopicProjectionRecord created = store.createFirstProjection(
+                    CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join();
             assertThat(created.virtualLedgerId())
                     .isEqualTo(ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 1);
         }
     }
 
     @Test
+    void publishGuardRunsAfterAllocationAndBeforeTopicPut() {
+        DurableState state = new DurableState();
+        AtomicInteger validations = new AtomicInteger();
+        ProjectionPublishGuard rejecting = () -> {
+            validations.incrementAndGet();
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.METADATA_CONDITION_FAILED, true, "binding changed"));
+        };
+        try (FakeManagedLedgerProjectionMetadataStore store = store(state)) {
+            assertNereusFailure(
+                    () -> store.createFirstProjection(CLUSTER, request(NAME, 3, 1), rejecting).join(),
+                    ErrorCode.METADATA_CONDITION_FAILED);
+            assertThat(validations).hasValue(1);
+            assertThat(store.successfulWrites(FailurePoint.AFTER_ALLOCATOR_WRITE)).isEqualTo(1);
+            assertThat(store.successfulWrites(FailurePoint.AFTER_TOPIC_WRITE)).isZero();
+            assertThat(store.getProjection(CLUSTER, NAME).join()).isEmpty();
+
+            TopicProjectionRecord retry = store.createFirstProjection(
+                    CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join();
+            assertThat(retry.virtualLedgerId())
+                    .isEqualTo(ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID + 1);
+        }
+    }
+
+    @Test
+    void orphanDerivedRecordBlocksAllocationAndTopicPublication() {
+        DurableState source = new DurableState();
+        try (FakeManagedLedgerProjectionMetadataStore store = store(source)) {
+            store.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join();
+        }
+        ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(CLUSTER);
+        com.nereusstream.api.StreamId streamId = ManagedLedgerProjectionNames.streamId(NAME, 1);
+        FakeManagedLedgerProjectionMetadataStore.StoredValue orphan = source.storedValue(
+                keyspace.virtualLedgerProjectionKey(streamId)).orElseThrow();
+        DurableState corrupted = new DurableState();
+        corrupted.inject(
+                keyspace.virtualLedgerProjectionKey(streamId),
+                keyspace.streamPartitionKey(streamId).value(),
+                orphan.envelope());
+        AtomicInteger validations = new AtomicInteger();
+
+        try (FakeManagedLedgerProjectionMetadataStore store = store(corrupted)) {
+            assertNereusFailure(
+                    () -> store.createFirstProjection(
+                            CLUSTER,
+                            request(NAME, 3, 1),
+                            () -> {
+                                validations.incrementAndGet();
+                                return CompletableFuture.completedFuture(null);
+                            }).join(),
+                    ErrorCode.METADATA_INVARIANT_VIOLATION);
+            assertThat(validations).hasValue(0);
+            assertThat(store.successfulWrites(FailurePoint.AFTER_ALLOCATOR_WRITE)).isZero();
+            assertThat(store.getProjection(CLUSTER, NAME).join()).isEmpty();
+        }
+    }
+
+    @Test
     void propertiesAndLifecycleUseIdentityGuardedSingleKeyCas() {
         try (FakeManagedLedgerProjectionMetadataStore store = store(new DurableState())) {
-            TopicProjectionRecord created = store.createFirstProjection(CLUSTER, request(NAME, 3, 1)).join();
+            TopicProjectionRecord created = store.createFirstProjection(
+                    CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join();
             TopicProjectionRecord properties = store.updateProperties(
                     CLUSTER, NAME, created.projectionIdentity(), created.metadataVersion(), Map.of("owner", "two"))
                     .join();
@@ -153,7 +216,8 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
     @Test
     void concurrentRecreationPublishesOneNewIncarnationAndLedger() {
         try (FakeManagedLedgerProjectionMetadataStore store = store(new DurableState())) {
-            TopicProjectionRecord open = store.createFirstProjection(CLUSTER, request(NAME, 3, 1)).join();
+            TopicProjectionRecord open = store.createFirstProjection(
+                    CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join();
             TopicProjectionRecord deleting = store.mirrorFacadeState(
                     CLUSTER, NAME, open.projectionIdentity(), open.metadataVersion(),
                     ManagedLedgerFacadeState.DELETING).join();
@@ -163,7 +227,7 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
             ProjectionCreateRequest next = request(NAME, 4, 2);
             List<CompletableFuture<TopicProjectionRecord>> futures = IntStream.range(0, 24)
                     .mapToObj(ignored -> store.recreateDeletedProjection(
-                            CLUSTER, deleted.projectionIdentity(), deleted.metadataVersion(), next))
+                            CLUSTER, deleted.projectionIdentity(), deleted.metadataVersion(), next, ALLOW_PUBLISH))
                     .toList();
 
             CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
@@ -184,7 +248,7 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
         DurableState state = new DurableState();
         String otherName = "tenant/ns/persistent/other";
         try (FakeManagedLedgerProjectionMetadataStore store = store(state)) {
-            store.createFirstProjection(CLUSTER, request(otherName, 3, 1)).join();
+            store.createFirstProjection(CLUSTER, request(otherName, 3, 1), ALLOW_PUBLISH).join();
         }
         ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(CLUSTER);
         String otherKey = keyspace.topicProjectionKey(otherName);
@@ -207,7 +271,7 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
         DurableState source = new DurableState();
         TopicProjectionRecord authority;
         try (FakeManagedLedgerProjectionMetadataStore store = store(source)) {
-            authority = store.createFirstProjection(CLUSTER, request(NAME, 3, 1)).join();
+            authority = store.createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW_PUBLISH).join();
         }
         try (FakeManagedLedgerProjectionMetadataStore empty = store(new DurableState())) {
             assertNereusFailure(
@@ -218,7 +282,8 @@ class FakeManagedLedgerProjectionMetadataStoreTest {
 
         String otherName = "tenant/ns/persistent/other-derived";
         try (FakeManagedLedgerProjectionMetadataStore store = store(source)) {
-            TopicProjectionRecord other = store.createFirstProjection(CLUSTER, request(otherName, 4, 1)).join();
+            TopicProjectionRecord other = store.createFirstProjection(
+                    CLUSTER, request(otherName, 4, 1), ALLOW_PUBLISH).join();
             ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(CLUSTER);
             String otherKey = keyspace.positionIndexKey(new com.nereusstream.api.StreamId(other.streamId()));
             FakeManagedLedgerProjectionMetadataStore.StoredValue otherPosition =
