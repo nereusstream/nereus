@@ -58,7 +58,8 @@ Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-
 F2-M2 projection metadata and F2-M3 factory/ledger facade are implemented。`nereus-managed-ledger` now provides the
 writable facade、strict get-only read-only ledger、exact append recovery/write-fence handoff、lifecycle/admin/stats
 surfaces and audited unsupported channels。F2-M4 cursor boundary is implemented；F2-M5 now has product runtime/S3
-gates plus the first fork hybrid-bootstrap/config/distribution slice，while broker admission、binding lifecycle and
+gates plus the first fork hybrid-bootstrap/config/distribution slice and a BookKeeper-existing claim guard，while
+broker admission、the complete binding lifecycle and
 end-to-end restart gates remain in progress。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async

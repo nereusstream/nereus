@@ -1260,8 +1260,11 @@ Implementation evidence（2026-07-12，fork bootstrap slice）：local fork comm
 configuration mapper、hybrid storage/provider classes、initial `NSB1` single-key creation claim、server distribution
 wiring and license inventory。It upgrades the shared Oxia dependency to `0.9.0` to match Nereus，keeps BookKeeper as
 the ordered default and fixes storage-class string comparison to value equality。Scoped tests、affected checkstyle、
-full fork `quickCheck` and `checkBinaryLicense` pass。This is not F2-M5 exit：the current binding implementation only
-guards first Nereus projection publication and still needs the full adoption/delete/restart state machine，and all
+full fork `quickCheck` and `checkBinaryLicense` pass。Follow-up local commit `a6c50fba65` refuses a Nereus claim when
+stock BookKeeper already owns the managed ledger and rechecks BookKeeper absence before projection publication；its two
+focused binding tests and affected checkstyle pass。This is not F2-M5 exit：the current binding implementation only
+guards first Nereus projection publication and the BookKeeper-to-Nereus collision edge；it still needs the full
+adoption/delete/restart state machine，and all
 feature-admission/capability/broker-E2E gates below remain pending。The commit is local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。

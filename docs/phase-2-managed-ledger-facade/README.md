@@ -18,7 +18,8 @@ cryptographic process identity、TCCL-compatible provider construction、shared 
 failure cleanup have unit gates。The deployable S3 provider now satisfies the section-3.2 async/deadline、conditional
 write、checksum、key/metadata、strict-range、redaction and startup-probe contract against pinned LocalStack。The Pulsar
 fork now has typed broker fields、BookKeeper-default/Nereus lookup、runtime assembly、an initial single-key creation
-claim、distribution dependency/license accounting and value-correct `PersistencePolicies.equals`。Admission hooks、
+claim with a BookKeeper-exists recheck before Nereus projection publication、distribution dependency/license accounting
+and value-correct `PersistencePolicies.equals`。Admission hooks、
 complete binding lifecycle/capability convergence and broker E2E gates remain pending；therefore F2-M5 is not yet
 complete。
 
