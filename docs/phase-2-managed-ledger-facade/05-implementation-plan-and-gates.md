@@ -135,6 +135,17 @@ Phase 1.5 already owns `MetadataRecordCodecFactory`、append replay/recovery and
 projection metadata/open/recreate/mirror repair and consumes the implemented L0 operations。The projection adapter
 and L0 adapter share one Oxia client runtime and close it once.
 
+Implementation evidence（2026-07-12，foundation sub-stage）：
+
+- `ManagedLedgerProjectionKeyspace`、protocol-neutral store/config/request/result surface and all four record types
+  are implemented with exact-name/hash/full-identity validation and shared constants；
+- `F2MetadataCodecs` is the third explicit registry after Phase 1 and Phase 1.5，rejects nonzero durable
+  `metadataVersion`，and has frozen golden envelopes for all four record types；
+- the package codec factory preserves Phase 1 bytes while dispatching F2 without decoder probing；canonical empty
+  creation rejects legacy/async profiles、nonzero stream truth、attribute drift and reserved properties；
+- focused metadata and managed-ledger regressions pass。Fake single-key CAS/repair semantics、shared runtime and the
+  real Oxia adapter remain required before F2-M2 can be marked complete。
+
 Tests:
 
 - all document 03 fake/real contract cases;

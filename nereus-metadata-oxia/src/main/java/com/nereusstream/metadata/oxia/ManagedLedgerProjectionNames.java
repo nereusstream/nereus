@@ -26,8 +26,12 @@ import java.util.Objects;
 /** The sole constructor for deterministic F2 managed-ledger projection identities. */
 public final class ManagedLedgerProjectionNames {
     public static final int MAX_MANAGED_LEDGER_NAME_BYTES = 16 * 1024;
+    public static final long MIN_VIRTUAL_LEDGER_ID = 1L << 62;
+    public static final int POSITION_MAPPING_VERSION = 1;
     public static final String PAYLOAD_MAPPING_ATTRIBUTE = "nereus.payloadMapping";
     public static final String PAYLOAD_MAPPING_V1 = "PULSAR_ENTRY_V1";
+    public static final String STORAGE_CLASS = "nereus";
+    public static final String POSITION_FORMULA_V1 = "ENTRY_ID_EQUALS_STREAM_OFFSET";
 
     private static final String NAME_HASH_DOMAIN = "pulsar-managed-ledger-name-v1\0";
     private static final String STREAM_NAME_DOMAIN = "pulsar-ml-v1\0";

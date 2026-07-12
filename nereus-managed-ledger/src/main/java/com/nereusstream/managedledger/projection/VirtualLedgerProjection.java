@@ -29,8 +29,8 @@ public record VirtualLedgerProjection(
         String payloadMapping,
         long createdAtMillis,
         long metadataVersion) {
-    public static final int MAPPING_VERSION = 1;
-    public static final long MIN_VIRTUAL_LEDGER_ID = 1L << 62;
+    public static final int MAPPING_VERSION = ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION;
+    public static final long MIN_VIRTUAL_LEDGER_ID = ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID;
 
     public VirtualLedgerProjection {
         Objects.requireNonNull(streamId, "streamId");
@@ -45,7 +45,7 @@ public record VirtualLedgerProjection(
         if (virtualLedgerId < MIN_VIRTUAL_LEDGER_ID || virtualLedgerId >= Long.MAX_VALUE) {
             throw new ProjectionValidationException("virtualLedgerId is outside the reserved F2 range");
         }
-        if (mappingVersion != MAPPING_VERSION) {
+        if (mappingVersion != ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION) {
             throw new ProjectionValidationException("unsupported projection mappingVersion");
         }
         if (!ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1.equals(payloadMapping)) {

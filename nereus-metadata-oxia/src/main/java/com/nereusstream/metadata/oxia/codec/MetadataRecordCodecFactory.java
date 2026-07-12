@@ -39,7 +39,11 @@ public final class MetadataRecordCodecFactory {
         try {
             return Phase1MetadataCodecs.registry().codecForClass(recordClass);
         } catch (MetadataCodecException ignored) {
-            return L0TargetMetadataCodecs.registry().codecForClass(recordClass);
+            try {
+                return L0TargetMetadataCodecs.registry().codecForClass(recordClass);
+            } catch (MetadataCodecException ignoredL0Target) {
+                return F2MetadataCodecs.registry().codecForClass(recordClass);
+            }
         }
     }
 
@@ -48,7 +52,11 @@ public final class MetadataRecordCodecFactory {
         try {
             return Phase1MetadataCodecs.registry().codecForType(type);
         } catch (MetadataCodecException ignored) {
-            return L0TargetMetadataCodecs.registry().codecForType(type);
+            try {
+                return L0TargetMetadataCodecs.registry().codecForType(type);
+            } catch (MetadataCodecException ignoredL0Target) {
+                return F2MetadataCodecs.registry().codecForType(type);
+            }
         }
     }
 
