@@ -4,11 +4,6 @@ package com.nereusstream.objectstore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
@@ -20,21 +15,37 @@ import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.utility.DockerImageName;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 
 class S3CompatibleObjectStoreLocalStackIntegrationTest {
     private static final DockerImageName IMAGE =
             DockerImageName.parse("localstack/localstack:4.14.0");
 
     @Test
-    void conditionalPutRangeChecksumZeroLengthAndRestart() {
+    void conditionalPutRangeChecksumZeroLengthAndRestart() throws Exception {
         try (LocalStackContainer localstack = new LocalStackContainer(IMAGE)
                 .withServices(LocalStackContainer.Service.S3)) {
             localstack.start();
-            AmazonS3 admin = client(localstack);
+            S3AsyncClient admin = client(localstack);
             try {
-                admin.createBucket("nereus-test");
+                admin.createBucket(CreateBucketRequest.builder().bucket("nereus-test").build()).join();
             } finally {
-                admin.shutdown();
+                admin.close();
+            }
+            S3CompatibleObjectStoreProvider missingBucketProvider = new S3CompatibleObjectStoreProvider();
+            try {
+                assertThatThrownBy(() -> missingBucketProvider.create(
+                                config(localstack, "missing-bucket"),
+                                ref -> Optional.of("test".toCharArray())))
+                        .isInstanceOfSatisfying(NereusException.class,
+                                error -> assertThat(error.code()).isEqualTo(ErrorCode.OBJECT_NOT_FOUND));
+            } finally {
+                missingBucketProvider.close();
             }
             ObjectStoreConfiguration config = config(localstack);
             char[] accessChars = localstack.getAccessKey().toCharArray();
@@ -52,6 +63,8 @@ class S3CompatibleObjectStoreLocalStackIntegrationTest {
             ObjectStore first = firstProvider.create(config, resolver);
             assertThat(accessChars).containsOnly('\0');
             assertThat(secretChars).containsOnly('\0');
+            assertThatThrownBy(() -> firstProvider.create(config, ref -> Optional.empty()))
+                    .isInstanceOf(IllegalStateException.class);
             assertThat(first.putObject(key, ByteBuffer.wrap(payload), put).join().checksum()).isEqualTo(checksum);
             assertNereus(() -> first.putObject(key, ByteBuffer.wrap(payload), put).join(),
                     ErrorCode.OBJECT_UPLOAD_FAILED);
@@ -85,22 +98,25 @@ class S3CompatibleObjectStoreLocalStackIntegrationTest {
         }
     }
 
-    private static AmazonS3 client(LocalStackContainer localstack) {
-        return AmazonS3ClientBuilder.standard()
-                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
-                        localstack.getEndpointOverride(LocalStackContainer.Service.S3).toString(),
-                        localstack.getRegion()))
-                .withPathStyleAccessEnabled(true)
-                .withCredentials(new AWSStaticCredentialsProvider(
-                        new BasicAWSCredentials(localstack.getAccessKey(), localstack.getSecretKey())))
+    private static S3AsyncClient client(LocalStackContainer localstack) {
+        return S3AsyncClient.builder()
+                .endpointOverride(localstack.getEndpointOverride(LocalStackContainer.Service.S3))
+                .region(Region.of(localstack.getRegion()))
+                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(localstack.getAccessKey(), localstack.getSecretKey())))
                 .build();
     }
 
     private static ObjectStoreConfiguration config(LocalStackContainer localstack) {
+        return config(localstack, "nereus-test");
+    }
+
+    private static ObjectStoreConfiguration config(LocalStackContainer localstack, String bucket) {
         return new ObjectStoreConfiguration(
                 S3CompatibleObjectStoreProvider.class.getName(),
                 localstack.getEndpointOverride(LocalStackContainer.Service.S3),
-                localstack.getRegion(), "nereus-test", "objects", true,
+                localstack.getRegion(), bucket, "objects", true,
                 Duration.ofSeconds(10), 4,
                 Optional.of("access"), Optional.of("secret"), Optional.empty());
     }

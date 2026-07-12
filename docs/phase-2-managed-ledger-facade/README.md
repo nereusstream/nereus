@@ -15,8 +15,9 @@ out-of-order callback、uncertain recovery 和错误映射 gate 均通过。F2-M
 non-durable 和 durable-boundary cursor、coalesced tail poll/read-or-wait、local wake/cancel/close 已落地。
 F2-M5 product-side runtime bootstrap is now implemented in `nereus-pulsar-adapter`：typed runtime/projection config、
 cryptographic process identity、TCCL-compatible provider construction、shared Oxia/Object-WAL assembly and partial
-failure cleanup have unit gates。The deployable S3 provider still requires the full section-3.2 hardening gate，and
-the Pulsar-fork hybrid provider/admission/distribution work remains pending；therefore F2-M5 is not yet complete。
+failure cleanup have unit gates。The deployable S3 provider now satisfies the section-3.2 async/deadline、conditional
+write、checksum、key/metadata、strict-range、redaction and startup-probe contract against pinned LocalStack。The
+Pulsar-fork hybrid provider/admission/distribution work remains pending；therefore F2-M5 is not yet complete。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。

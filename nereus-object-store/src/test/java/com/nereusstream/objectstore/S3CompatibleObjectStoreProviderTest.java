@@ -6,16 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import java.time.Duration;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import software.amazon.awssdk.auth.credentials.AwsCredentials;
 
 class S3CompatibleObjectStoreProviderTest {
     @Test
-    void clearsResolverOwnedSecretArraysAndAllowsExactlyOneStore() throws Exception {
+    void clearsResolverOwnedSecretArrays() {
         char[] access = "access-key".toCharArray();
         char[] secret = "secret-key".toCharArray();
-        Map<String, char[]> values = Map.of("access", access, "secret", secret);
         ObjectStoreConfiguration config = new ObjectStoreConfiguration(
                 S3CompatibleObjectStoreProvider.class.getName(),
                 URI.create("http://127.0.0.1:9000"),
@@ -28,17 +27,13 @@ class S3CompatibleObjectStoreProviderTest {
                 Optional.of("access"),
                 Optional.of("secret"),
                 Optional.empty());
-        S3CompatibleObjectStoreProvider provider = new S3CompatibleObjectStoreProvider();
-        ObjectStore store = provider.create(config, reference -> Optional.ofNullable(values.get(reference)));
-        try {
-            assertThat(access).containsOnly('\0');
-            assertThat(secret).containsOnly('\0');
-            assertThatThrownBy(() -> provider.create(config, reference -> Optional.empty()))
-                    .isInstanceOf(IllegalStateException.class);
-        } finally {
-            store.close();
-            provider.close();
-        }
+        AwsCredentials credentials = S3CompatibleObjectStoreProvider.credentials(
+                config, reference -> Optional.of("access".equals(reference) ? access : secret))
+                .resolveCredentials();
+        assertThat(credentials.accessKeyId()).isEqualTo("access-key");
+        assertThat(credentials.secretAccessKey()).isEqualTo("secret-key");
+        assertThat(access).containsOnly('\0');
+        assertThat(secret).containsOnly('\0');
     }
 
     @Test
@@ -49,7 +44,7 @@ class S3CompatibleObjectStoreProviderTest {
                 "us-east-1", "bucket", "prefix", false,
                 Duration.ofSeconds(1), 1,
                 Optional.of("access"), Optional.of("secret"), Optional.empty());
-        assertThatThrownBy(() -> new S3CompatibleObjectStoreProvider().create(
+        assertThatThrownBy(() -> S3CompatibleObjectStoreProvider.credentials(
                 config, new NoopObjectStoreSecretResolver()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unresolved");

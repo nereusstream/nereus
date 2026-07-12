@@ -519,8 +519,8 @@ Broker tests:
 - cluster capability checks reject Nereus policy enablement while any active broker lacks protocol version `1`，and
   first topic creation cannot race an empty-namespace policy update；
 - namespace binding scan is namespace-prefixed/bounded and fails closed on cap、decode or backend failure；
-- S3 integration covers create collision (HTTP 412)、conditional conflict (HTTP 409), CRC32C mismatch,
-  partial/zero-length reads, timeout/cancellation,
+- S3 real-backend integration covers create collision (HTTP 412)、CRC32C mismatch、partial/zero-length reads and
+  restart；the closed error/cancellation unit gate covers conditional conflict (HTTP 409)、timeout/cancellation,
   credential/raw-key redaction、resolver-array zeroing and restart against pinned LocalStack Community S3 `4.14.0`；
 - reflection/TCCL construction, partial initialize cleanup and aggregated close behavior are deterministic.
 - binding-store creation guard is available before facade construction, get-only inspection is unavailable before the
@@ -536,18 +536,22 @@ The stock BookKeeper path remains backward compatible.
 Implementation evidence（2026-07-12，object-provider sub-stage）：
 
 - `ObjectStoreConfiguration`/provider/secret protocols now have a deployable `S3CompatibleObjectStoreProvider` built
-  on the same AWS SDK v1 baseline as the locked Pulsar fork，plus ambient/no-op secret resolution and resolver-array
-  zeroing for explicit credentials。
-- `S3ObjectKeyMapper` enforces one canonical prefix and rejects absolute、empty、traversal and control segments；
+  on pinned AWS SDK v2 `2.47.5` with the Java Netty async transport，plus ambient/no-op secret resolution and
+  resolver-array zeroing for explicit credentials；no SDK-v1 or CRT transport is packaged。
+- `S3ObjectKeyMapper` rejects absolute、empty、traversal and control segments in the configured prefix，then maps each
+  strict-UTF-8 logical key one-to-one through Base64URL under `objects/v1`；
   `S3CompatibleObjectStore` implements conditional `If-None-Match:*` puts、independent CRC32C metadata/verification、
   exact inclusive HTTP ranges、zero-length existence/bounds checks、head and lifecycle/error mapping。
 - the object-store unit suite and pinned LocalStack Community S3 `4.14.0` integration gate rerun cleanly；the real-S3
   gate covers conditional collision、CRC32C metadata/verification、exact and zero-length ranges、provider lifecycle、
   resolver-array zeroing and close/reopen restart readability。
+- the provider now uses pinned AWS SDK v2 `2.47.5` `S3AsyncClient` plus Netty NIO；unit gates additionally prove
+  request cancellation/deadline linkage、closed HTTP error mapping、SDK throwable/raw-key/credential redaction、
+  canonical Base64URL keys and exact request headers/metadata。The runtime classpath contains no SDK-v1 artifact。
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- the full S3 section-3.2 hardening gate and fork broker wiring remain pending，so F2-M5 is still in progress。
+- fork broker wiring remains pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance
 

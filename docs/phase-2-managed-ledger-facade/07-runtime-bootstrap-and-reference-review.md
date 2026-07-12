@@ -302,11 +302,11 @@ short SDK-provider lifetime/close and complete redaction outside that SDK object
 Production targets in `nereus-object-store` are concrete，not a second ObjectStore abstraction：
 
 ```text
-provider/S3CompatibleObjectStoreProvider.java
-provider/S3CompatibleObjectStore.java
-provider/S3ObjectKeyMapper.java
-provider/S3ObjectErrorMapper.java
-provider/NoopObjectStoreSecretResolver.java
+S3CompatibleObjectStoreProvider.java
+S3CompatibleObjectStore.java
+S3ObjectKeyMapper.java
+S3ObjectErrorMapper.java
+NoopObjectStoreSecretResolver.java
 ```
 
 `NoopObjectStoreSecretResolver.resolve` always returns `Optional.empty()` and has no resources。It exists so the SDK
@@ -474,13 +474,13 @@ Exact `ServiceConfiguration` field types/defaults are frozen below；all duratio
 | `nereusOxiaServiceAddress`, `nereusOxiaNamespace` | `String` | empty；required when enabled |
 | `nereusOxiaSessionTimeoutSeconds` | `long` | `30` |
 | `nereusMaxOxiaPendingOperations` | `int` | `1024` |
-| `nereusObjectStoreProviderClassName` | `String` | `com.nereusstream.objectstore.provider.S3CompatibleObjectStoreProvider` |
+| `nereusObjectStoreProviderClassName` | `String` | `com.nereusstream.objectstore.S3CompatibleObjectStoreProvider` |
 | `nereusObjectStoreEndpoint`, `nereusObjectStoreRegion`, `nereusObjectStoreBucket`, `nereusObjectStorePrefix` | `String` | empty；required when enabled |
 | `nereusObjectStorePathStyleAccess` | `boolean` | `false` |
 | `nereusObjectStoreRequestTimeoutSeconds` | `long` | `30` |
 | `nereusObjectStoreMaxConnections` | `int` | `64` |
 | three ObjectStore secret-ref fields | `String` | empty means absent |
-| `nereusObjectStoreSecretResolverClassName` | `String` | `com.nereusstream.objectstore.provider.NoopObjectStoreSecretResolver`；explicit refs require replacing it with a resolving implementation |
+| `nereusObjectStoreSecretResolverClassName` | `String` | `com.nereusstream.objectstore.NoopObjectStoreSecretResolver`；explicit refs require replacing it with a resolving implementation |
 | `nereusMetadataTimeoutSeconds`, `nereusAppendTimeoutSeconds`, `nereusAppendRecoveryTimeoutSeconds`, `nereusReadTimeoutSeconds` | `long` | `30` each |
 | `nereusAppendRecoveryAttemptTimeoutSeconds` | `long` | `5` |
 | `nereusAppendRecoveryBackoffMinMillis` | `long` | `100` |
@@ -1240,7 +1240,7 @@ Rules:
 - duplicate Pulsar/Netty/Oxia versions in the distribution are detected by a dependency gate；
 - the S3 provider uses one release-pinned AWS SDK v2 BOM with `software.amazon.awssdk:s3` and
   `netty-nio-client`；no dynamic version、SDK-v1 `AmazonS3` client or CRT native transport is allowed；the selected
-  numeric version is recorded in the Nereus version catalog/lockfile changed by F2-M5；
+  numeric version is `2.47.5` and is recorded in the Nereus version catalog/lockfile changed by F2-M5；
 - no `mavenLocal()` or floating snapshot is used by release builds；
 - composite-build mode verifies both repository commits before compiling integration tests。
 

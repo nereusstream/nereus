@@ -60,7 +60,7 @@ class ObjectStoreConfigurationTest {
             Optional<String> secret,
             Optional<String> session) {
         return new ObjectStoreConfiguration(
-                "com.nereusstream.objectstore.provider.S3CompatibleObjectStoreProvider",
+                S3CompatibleObjectStoreProvider.class.getName(),
                 endpoint,
                 "us-east-1",
                 "bucket",
