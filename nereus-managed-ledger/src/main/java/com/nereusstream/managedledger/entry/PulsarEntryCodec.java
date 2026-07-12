@@ -98,7 +98,7 @@ public final class PulsarEntryCodec {
                 || result.batches().size() != 1) {
             throw new IllegalArgumentException("read result does not describe exactly the requested entry");
         }
-        ReadBatch batch = result.batches().getFirst();
+        ReadBatch batch = result.batches().get(0);
         if (!batch.range().equals(new OffsetRange(entryId, nextOffset))
                 || batch.payloadFormat() != PayloadFormat.OPAQUE_RECORD_BATCH
                 || !batch.schemaRefs().isEmpty()

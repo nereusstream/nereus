@@ -19,7 +19,10 @@ plugins {
 dependencies {
     api(project(":nereus-api"))
     implementation(platform(libs.aws.sdk.v2.bom))
-    implementation(libs.aws.sdk.v2.s3)
+    implementation(libs.aws.sdk.v2.s3) {
+        exclude(group = "software.amazon.awssdk", module = "apache5-client")
+        exclude(group = "software.amazon.awssdk", module = "aws-crt-core")
+    }
     implementation(libs.aws.sdk.v2.netty.client)
 
     testImplementation(libs.junit.jupiter)

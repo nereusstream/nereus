@@ -32,7 +32,7 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 | Pulsar fork | `nereusstream/pulsar` |
 | Pulsar fork commit | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
 | Pulsar version at that commit | `5.0.0-M1-SNAPSHOT` |
-| Java/build baseline | Pulsar JDK 21 or 25; Nereus Java 21 |
+| Java/build baseline | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode |
 | Executable Nereus profile | `OBJECT_WAL_SYNC_OBJECT` only |
 | Completed F2 prerequisite | P15-M6 carries protocol-neutral `AppendResult.cumulativeSize` from existing `CommittedAppend` truth；final-gated 2026-07-12 |
 

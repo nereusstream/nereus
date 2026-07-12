@@ -52,7 +52,8 @@ public final class ReadTargetDispatcher {
                 newRecords = Math.addExact(newRecords, batch.range().recordCount());
                 newBytes = Math.addExact(newBytes, batch.payload().length);
             }
-            if (result.batches().isEmpty() || next < run.ranges().getLast().offsetRange().endOffset()) {
+            if (result.batches().isEmpty()
+                    || next < run.ranges().get(run.ranges().size() - 1).offsetRange().endOffset()) {
                 return CompletableFuture.completedFuture(new WalReadResult(batches, stats));
             }
             return readRun(runs, index + 1, next, options, batches, stats, newRecords, newBytes);
@@ -67,8 +68,10 @@ public final class ReadTargetDispatcher {
         List<Run> result = new ArrayList<>();
         for (ResolvedRange range : ranges) {
             ReadTargetType type = range.readTarget().type();
-            if (result.isEmpty() || result.getLast().type() != type) result.add(new Run(type, new ArrayList<>()));
-            result.getLast().ranges().add(range);
+            if (result.isEmpty() || result.get(result.size() - 1).type() != type) {
+                result.add(new Run(type, new ArrayList<>()));
+            }
+            result.get(result.size() - 1).ranges().add(range);
         }
         return result;
     }

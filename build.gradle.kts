@@ -35,12 +35,14 @@ configure(subprojects.filter { it.name != "nereus-bom" }) {
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(javaLanguageVersion))
         }
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
         withSourcesJar()
     }
 
     tasks.withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
-        options.release.set(javaLanguageVersion)
+        options.release.set(if (name == "compileJava") 17 else javaLanguageVersion)
     }
 
     tasks.withType<Test>().configureEach {

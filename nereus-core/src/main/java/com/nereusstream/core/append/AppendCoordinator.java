@@ -513,14 +513,14 @@ public final class AppendCoordinator implements AutoCloseable {
         reservation.adjustToExactBytes(prepared.reservedBytes());
         WalWriteResult writeResult = prepared.preparedObject().result();
         if (writeResult.slices().size() != 1
-                || !writeResult.slices().getFirst().streamId().equals(attempt.streamId())) {
+                || !writeResult.slices().get(0).streamId().equals(attempt.streamId())) {
             throw new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
                     false,
                     "single-work-item planner produced an unexpected WAL slice set",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        validateWrittenSlice(attempt.batch(), writeResult.slices().getFirst());
+        validateWrittenSlice(attempt.batch(), writeResult.slices().get(0));
         return new PreparedAttempt(state.session(), state.expectedOffset(), prepared);
     }
 
@@ -608,7 +608,7 @@ public final class AppendCoordinator implements AutoCloseable {
             Attempt attempt,
             UploadedAttempt uploaded) {
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start stream-head commit");
-        WrittenStreamSlice slice = uploaded.writeResult().slices().getFirst();
+        WrittenStreamSlice slice = uploaded.writeResult().slices().get(0);
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1,
                 uploaded.writeResult().objectId(),

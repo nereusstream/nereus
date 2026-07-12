@@ -91,7 +91,7 @@ public final class NereusManagedCursor implements ManagedCursor {
         if (n <= 0 || deleted == IndividualDeletedEntries.Exclude) throw unsupported("getNthEntry");
         Position saved = reader.getReadPosition();
         reader.seekTo(ledger.readPosition(Math.min(ledger.currentMetadata().committedEndOffset(), markDelete.getEntryId() + n), ledger.currentMetadata()));
-        List<Entry> entries = reader.readEntries(1); reader.seekTo(saved); return entries.isEmpty() ? null : entries.getFirst();
+        List<Entry> entries = reader.readEntries(1); reader.seekTo(saved); return entries.isEmpty() ? null : entries.get(0);
     }
     @Override public void asyncGetNthEntry(int n, IndividualDeletedEntries deleted, AsyncCallbacks.ReadEntryCallback cb, Object ctx) {
         try { Entry e = getNthEntry(n, deleted); if (e == null) cb.readEntryFailed(new ManagedLedgerException("entry not found"), ctx); else cb.readEntryComplete(e, ctx); }

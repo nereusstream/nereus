@@ -1251,6 +1251,11 @@ absolute checkout paths while exercising the same `com.nereusstream:nereus-pulsa
 release repository。Release packaging leaves that property unset and resolves only the organization-published,
 version-pinned artifact。
 
+The Nereus build toolchain remains JDK 21，while every production `compileJava` artifact is emitted with Java 17
+bytecode so the adapter can be consumed by Pulsar's Java-17 publication surface。Test and integration source sets may
+use the JDK-21 test baseline。The fork's development coordinate is `0.1.0-f2-dev`；it is intentionally non-release and
+is replaced by the organization release version before F2 final acceptance。
+
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
 topics. An older broker can bypass the binding protocol, so mixed-version ownership during Nereus policy enablement is

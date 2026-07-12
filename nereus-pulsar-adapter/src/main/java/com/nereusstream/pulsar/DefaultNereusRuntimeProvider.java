@@ -81,8 +81,10 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     streamConfig.processRunId(),
                     streamConfig.writerId());
         } catch (Throwable failure) {
+            shutdown(callbackExecutor);
+            shutdown(scheduler);
             closeAfterFailure(failure, streamStorage, projectionStore, l0MetadataStore, objectStore,
-                    objectStoreProvider, sharedOxiaRuntime, callbackExecutor, scheduler);
+                    objectStoreProvider, sharedOxiaRuntime);
             if (failure instanceof Exception exception) {
                 throw exception;
             }
@@ -136,6 +138,12 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             } catch (Throwable closeFailure) {
                 root.addSuppressed(closeFailure);
             }
+        }
+    }
+
+    private static void shutdown(ExecutorService executor) {
+        if (executor != null) {
+            executor.shutdownNow();
         }
     }
 

@@ -36,14 +36,14 @@ public final class ObjectWalAppenderAdapter implements PrimaryWalAppender<Object
         PreparedWalObject prepared = writer.prepare(new WalWriteRequest(cluster, writerId, writerRunIdHash,
                 request.session().epoch(), List.of(new WalStreamSliceInput(request.streamId(), request.batch())),
                 new WalWriteOptions(CompressionType.NONE, maxObjectBytes, maxObjectBytes, request.timeout(), true)));
-        var slice = prepared.result().slices().getFirst();
+        var slice = prepared.result().slices().get(0);
         return new ObjectPreparedPrimaryAppend(request.streamId(), slice.recordCount(), slice.entryCount(),
                 slice.logicalBytes(), prepared.objectLength(), prepared);
     }
     @Override public CompletableFuture<DurablePrimaryAppend> persist(
             ObjectPreparedPrimaryAppend prepared, Duration timeout) {
         return writer.upload(prepared.preparedObject()).thenApply(result -> {
-            var slice = result.slices().getFirst();
+            var slice = result.slices().get(0);
             ObjectSliceReadTarget target = new ObjectSliceReadTarget(1, result.objectId(), result.objectKey(),
                     ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1", "OPAQUE_SLICE", slice.sliceId(),
                     slice.objectOffset(), slice.objectLength(), slice.sliceChecksum(), slice.entryIndexRef());
