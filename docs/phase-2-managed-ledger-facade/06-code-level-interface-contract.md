@@ -269,7 +269,9 @@ but durable replay remains safe through the existing commit identity. F2 does no
 deduplication across a broker crash.
 
 Recovery is single-flight per suspended attempt. The facade's first `recoverAppend` uses the callback recovery budget.
-If that budget expires, it fails the callback once and leaves the facade `WRITE_FENCED`; the already implemented core
+The returned caller view joins the retained attempt's terminal future across retriable single-flight failures; it does
+not expose the first transient recovery-flight exception as a false terminal。If that budget expires, it fails the
+callback once and leaves the facade `WRITE_FENCED`; the already implemented core
 `AppendCoordinator` remains the only retained-attempt registry and the only component allowed to retry that ID, using
 its runtime scheduler with capped exponential backoff and one attempt timeout at a time. F2 must not add a second
 `AppendRecoveryCoordinator`, copy the retained `CommitAppendRequest`, or schedule an independent replay loop. Later

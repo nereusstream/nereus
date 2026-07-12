@@ -178,7 +178,10 @@ starts at `appendRecoveryBackoffMin` and doubles with saturation to `appendRecov
 bounded by its `AppendRecoveryOptions.timeout` while retryable durable uncertainty remains retained for background
 resolution。There is no unbounded blocking task or overlapping recovery flight for one ID。
 
-The public recovery caller may retry sooner and join the same flight。A stream lane stays write-suspended until：
+The public recovery caller may retry sooner and join the same flight。Its timeout view is attached to the retained
+attempt's terminal future rather than to one recovery flight: a retriable flight failure schedules the next
+single-flight attempt and does not prematurely fail a caller whose `AppendRecoveryOptions.timeout` budget remains。
+This behavior is covered by a deterministic transient-first-recovery test。A stream lane stays write-suspended until：
 
 - committed recovery advances/refreshes the lane expected offset；or
 - complete proof of non-commit invalidates/reloads the expected offset。

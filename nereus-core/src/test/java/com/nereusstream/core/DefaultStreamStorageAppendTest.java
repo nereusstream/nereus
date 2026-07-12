@@ -63,6 +63,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -234,6 +235,57 @@ class DefaultStreamStorageAppendTest {
             assertThat(context.storage.append(
                     streamId, batch("b"), appendOptions(Duration.ofSeconds(1))).join().range())
                     .isEqualTo(new OffsetRange(1, 2));
+        }
+    }
+
+    @Test
+    void recoveryCallerWaitsForTerminalOutcomeAcrossRetriableRecoveryFailure() {
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("terminal-recovery"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
+        AtomicBoolean failNextHeadRead = new AtomicBoolean();
+        OxiaMetadataStore transientHeadRead = (OxiaMetadataStore) Proxy.newProxyInstance(
+                OxiaMetadataStore.class.getClassLoader(),
+                new Class<?>[] {OxiaMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("getCommittedEndOffset")
+                            && failNextHeadRead.compareAndSet(true, false)) {
+                        return CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.METADATA_UNAVAILABLE,
+                                true,
+                                "injected recovery metadata failure",
+                                AppendOutcome.MAY_HAVE_COMMITTED));
+                    }
+                    try {
+                        return method.invoke(metadata, args);
+                    } catch (InvocationTargetException e) {
+                        throw e.getCause();
+                    }
+                });
+        try (DefaultStreamStorage storage = new DefaultStreamStorage(
+                recoveryConfig("writer-a", "process-terminal", Duration.ofMillis(100)),
+                transientHeadRead,
+                newWriter(objectStore),
+                new DefaultWalObjectReader(objectStore),
+                CLOCK,
+                Runnable::run)) {
+            StreamId streamId = storage.createOrGetStream(
+                    new StreamName("terminal-recovery"),
+                    new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId();
+            metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+            NereusException appendFailure = appendFailure(storage.append(
+                    streamId, batch("a"), appendOptions(Duration.ofSeconds(5))));
+
+            failNextHeadRead.set(true);
+            AppendResult recovered = storage.recoverAppend(
+                    streamId,
+                    appendFailure.appendAttemptId().orElseThrow(),
+                    new AppendRecoveryOptions(Duration.ofSeconds(3))).join();
+
+            assertThat(recovered.range()).isEqualTo(new OffsetRange(0, 1));
+            assertThat(failNextHeadRead).isFalse();
+        } finally {
+            metadata.close();
+            objectStore.close();
         }
     }
 

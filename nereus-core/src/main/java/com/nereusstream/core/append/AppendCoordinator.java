@@ -318,7 +318,8 @@ public final class AppendCoordinator implements AutoCloseable {
         Attempt attempt = retainedAttempts.get(attemptId);
         if (attempt == null || !attempt.streamId().equals(streamId)) return unknownAttempt();
         attempt.markRecoveryUsed();
-        return callerView(attempt, startRecovery(attempt), options.timeout());
+        startRecovery(attempt).exceptionally(error -> null);
+        return callerView(attempt, attempt.terminalFuture(), options.timeout());
     }
 
     private CompletableFuture<AppendResult> startRecovery(Attempt attempt) {
@@ -420,6 +421,7 @@ public final class AppendCoordinator implements AutoCloseable {
             attempt.releasePermit();
         }
         terminalAttempts.put(attempt.id(), terminal);
+        attempt.completeTerminal(terminal);
         while (terminalAttempts.size() > config.maxAppendRecoveryTerminals()) {
             terminalAttempts.entrySet().stream()
                     .min(java.util.Comparator.comparingLong(entry -> entry.getValue().expiresAtMillis()))
@@ -880,6 +882,7 @@ public final class AppendCoordinator implements AutoCloseable {
         private final AtomicBoolean headKnownCommitted = new AtomicBoolean();
         private final AtomicBoolean permitReleased = new AtomicBoolean();
         private final CompletableFuture<Void> originalRunnerQuiesced = new CompletableFuture<>();
+        private final CompletableFuture<AppendResult> terminalFuture = new CompletableFuture<>();
         private volatile CommitAppendRequest commitRequest;
         private volatile WalWriteResult writeResult;
         private volatile WrittenStreamSlice slice;
@@ -927,6 +930,16 @@ public final class AppendCoordinator implements AutoCloseable {
         }
 
         CompletableFuture<Void> originalRunnerQuiesced() { return originalRunnerQuiesced; }
+
+        CompletableFuture<AppendResult> terminalFuture() { return terminalFuture; }
+
+        void completeTerminal(TerminalAttempt terminal) {
+            if (terminal.result() != null) {
+                terminalFuture.complete(terminal.result());
+            } else {
+                terminalFuture.completeExceptionally(terminal.failure());
+            }
+        }
 
         synchronized CompletableFuture<AppendResult> singleFlight(
                 Supplier<CompletableFuture<AppendResult>> operation) {
