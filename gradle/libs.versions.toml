@@ -32,6 +32,7 @@ pulsar-client-admin-api = { module = "org.apache.pulsar:pulsar-client-admin-api"
 oxia-client = { module = "io.github.oxia-db:oxia-client", version.ref = "oxia" }
 oxia-testcontainers = { module = "io.github.oxia-db:oxia-testcontainers", version.ref = "oxia-testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-localstack = { module = "org.testcontainers:localstack", version.ref = "testcontainers" }
 aws-java-sdk-s3 = { module = "com.amazonaws:aws-java-sdk-s3", version.ref = "aws-sdk" }
 
 [plugins]

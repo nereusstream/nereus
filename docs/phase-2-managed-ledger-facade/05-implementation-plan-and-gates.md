@@ -521,7 +521,7 @@ Broker tests:
 - namespace binding scan is namespace-prefixed/bounded and fails closed on cap、decode or backend failure；
 - S3 integration covers create collision (HTTP 412)、conditional conflict (HTTP 409), CRC32C mismatch,
   partial/zero-length reads, timeout/cancellation,
-  credential/raw-key redaction、resolver-array zeroing and restart against MinIO/equivalent；
+  credential/raw-key redaction、resolver-array zeroing and restart against pinned LocalStack Community S3 `4.14.0`；
 - reflection/TCCL construction, partial initialize cleanup and aggregated close behavior are deterministic.
 - binding-store creation guard is available before facade construction, get-only inspection is unavailable before the
   one exact factory attach, and null/double attach prevents startup。
@@ -541,8 +541,10 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - `S3ObjectKeyMapper` enforces one canonical prefix and rejects absolute、empty、traversal and control segments；
   `S3CompatibleObjectStore` implements conditional `If-None-Match:*` puts、independent CRC32C metadata/verification、
   exact inclusive HTTP ranges、zero-length existence/bounds checks、head and lifecycle/error mapping。
-- the object-store test suite reruns cleanly with canonical-key tests；MinIO conditional/range/restart gates and the
-  `nereus-pulsar-adapter`/fork broker wiring remain pending，so F2-M5 is still in progress。
+- the object-store unit suite and pinned LocalStack Community S3 `4.14.0` integration gate rerun cleanly；the real-S3
+  gate covers conditional collision、CRC32C metadata/verification、exact and zero-length ranges、provider lifecycle、
+  resolver-array zeroing and close/reopen restart readability。
+- the `nereus-pulsar-adapter` and fork broker wiring remain pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance
 
@@ -574,7 +576,7 @@ Required real environment:
 Pulsar fork broker
   + real Oxia
   + Nereus OBJECT_WAL_SYNC_OBJECT
-  + S3-compatible object store provider and MinIO/equivalent fixture
+  + S3-compatible object store provider and pinned LocalStack Community S3 `4.14.0` fixture
 ```
 
 Scenarios:

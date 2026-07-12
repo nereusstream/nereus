@@ -46,21 +46,26 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
 
     private static AWSCredentialsProvider credentials(ObjectStoreConfiguration config, ObjectStoreSecretResolver resolver) {
         if (config.accessKeySecretRef().isEmpty()) return DefaultAWSCredentialsProviderChain.getInstance();
-        char[] access = resolve(resolver, config.accessKeySecretRef().orElseThrow());
-        char[] secret = resolve(resolver, config.secretKeySecretRef().orElseThrow());
-        char[] token = config.sessionTokenSecretRef().map(ref -> resolve(resolver, ref)).orElse(null);
+        char[] access = null;
+        char[] secret = null;
+        char[] token = null;
         try {
+            access = resolve(resolver, config.accessKeySecretRef().orElseThrow());
+            secret = resolve(resolver, config.secretKeySecretRef().orElseThrow());
+            token = config.sessionTokenSecretRef().map(ref -> resolve(resolver, ref)).orElse(null);
             return new AWSStaticCredentialsProvider(token == null
                     ? new BasicAWSCredentials(new String(access), new String(secret))
                     : new BasicSessionCredentials(new String(access), new String(secret), new String(token)));
         } finally {
-            Arrays.fill(access, '\0'); Arrays.fill(secret, '\0'); if (token != null) Arrays.fill(token, '\0');
+            if (access != null) Arrays.fill(access, '\0');
+            if (secret != null) Arrays.fill(secret, '\0');
+            if (token != null) Arrays.fill(token, '\0');
         }
     }
 
     private static char[] resolve(ObjectStoreSecretResolver resolver, String reference) {
         Optional<char[]> value = resolver.resolve(reference);
-        return value.map(chars -> chars.clone()).orElseThrow(() -> new IllegalArgumentException("unresolved object-store secret reference"));
+        return value.orElseThrow(() -> new IllegalArgumentException("unresolved object-store secret reference"));
     }
     private static int toMillis(java.time.Duration duration) { long value = duration.toMillis(); return (int) Math.min(Integer.MAX_VALUE, Math.max(1, value)); }
 }

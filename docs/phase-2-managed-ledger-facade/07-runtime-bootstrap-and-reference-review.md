@@ -269,7 +269,7 @@ public interface ObjectStoreSecretResolver {
 ```
 
 The provider class is configured explicitly and loaded with the broker/plugin classloader. F2 final integration uses
-an S3-compatible provider against MinIO or an equivalent fixture. `LocalFileObjectStore` remains test-only and cannot
+an S3-compatible provider against pinned LocalStack Community S3 `4.14.0`. `LocalFileObjectStore` remains test-only and cannot
 be selected by production broker configuration. Missing provider, credentials, bucket/prefix or unsupported checksum
 behavior fails broker startup.
 
@@ -1266,7 +1266,7 @@ In addition to `05`, F2-M5 requires:
     end-txn, marker and `deliverAtTime` paths fail before pending-write, dedup, transaction-buffer and ledger
     counters/mocks observe a call; publish validation preserves `ByteBuf` indexes/refcount, while a BookKeeper topic
     still uses the configured transaction provider；
-14. MinIO/S3-compatible restart test proves shared Object WAL, not a process-local map, supplies bytes；
+14. pinned LocalStack Community S3 `4.14.0` restart test proves shared Object WAL, not a process-local map, supplies bytes；
 15. the useful `pulsar-storage` smoke shape is adapted to producer plus Reader/non-durable consumer; durable
     subscription creation is rejected before `ManagedLedger.openCursor`；
 16. every typed broker field maps to the expected immutable constructor argument; invalid cross-field bounds fail

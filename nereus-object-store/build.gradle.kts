@@ -24,3 +24,33 @@ dependencies {
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+val s3IntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[s3IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[s3IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(s3IntegrationTest.implementationConfigurationName, project())
+    add(s3IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(s3IntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(s3IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(s3IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(s3IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+tasks.register<Test>("s3IntegrationTest") {
+    group = "verification"
+    description = "Run the F2 S3-compatible provider gate against pinned LocalStack S3."
+    testClassesDirs = s3IntegrationTest.output.classesDirs
+    classpath = s3IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}
