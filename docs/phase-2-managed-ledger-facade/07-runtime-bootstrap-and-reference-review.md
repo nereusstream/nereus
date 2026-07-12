@@ -197,7 +197,8 @@ public record NereusRuntimeConfiguration(
         OxiaClientConfiguration oxia,
         ObjectStoreConfiguration objectStore,
         StreamStorageConfig streamStorage,
-        NereusManagedLedgerFactoryConfig managedLedger) {
+        NereusManagedLedgerFactoryConfig managedLedger,
+        ProjectionMetadataStoreConfig projectionMetadata) {
 }
 
 public record NereusProcessIdentity(
@@ -235,6 +236,16 @@ no fallback to another provider class.
 The event loop, telemetry, classloader, creation guard and secret resolver in `NereusRuntimeContext` are borrowed
 broker resources; neither the runtime nor providers close them. Executors created by the runtime itself remain
 runtime-owned as specified in `06`.
+
+Implementation evidence（2026-07-12）：the adapter now implements these five public boundary types and the production
+assembly. `NereusRuntimeConfiguration` deliberately carries `ProjectionMetadataStoreConfig` as its fifth typed
+component；without it the broker's projection-specific pending-operation and encoded-value limits could not reach the
+runtime without an untyped side channel. Construction validates cross-config scan、capacity and deadline invariants
+before provider/client creation，loads the ObjectStore provider through the supplied classloader and assembles one
+shared Oxia runtime、L0 metadata adapter、projection adapter、Object WAL and `DefaultStreamStorage`。Partial failure
+closes every already-created owned resource while retaining close failures as suppressed exceptions。Unit gates lock
+128-bit URL-safe process identity/temporary-array zeroing、cross-config rejection and provider type/public-constructor
+failure before client construction。Broker-private hybrid storage construction remains fork-owned and pending。
 
 ### 3.1 ObjectStore provider
 

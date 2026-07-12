@@ -16,4 +16,11 @@ dependencies {
     api(project(":nereus-api"))
     api(project(":nereus-core"))
     api(project(":nereus-managed-ledger"))
+    api(libs.opentelemetry.api)
+    implementation(project(":nereus-metadata-oxia"))
+    implementation(project(":nereus-object-store"))
+
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }

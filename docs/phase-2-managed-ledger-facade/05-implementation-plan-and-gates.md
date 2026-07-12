@@ -544,7 +544,10 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - the object-store unit suite and pinned LocalStack Community S3 `4.14.0` integration gate rerun cleanly；the real-S3
   gate covers conditional collision、CRC32C metadata/verification、exact and zero-length ranges、provider lifecycle、
   resolver-array zeroing and close/reopen restart readability。
-- the `nereus-pulsar-adapter` and fork broker wiring remain pending，so F2-M5 is still in progress。
+- `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
+  for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
+  identity zeroing、cross-config invariants and reflection fail-fast behavior。
+- the full S3 section-3.2 hardening gate and fork broker wiring remain pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance
 

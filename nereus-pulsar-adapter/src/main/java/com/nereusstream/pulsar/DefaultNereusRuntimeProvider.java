@@ -1,0 +1,150 @@
+/* Licensed under the Apache License, Version 2.0 */
+package com.nereusstream.pulsar;
+
+import com.nereusstream.api.StreamStorage;
+import com.nereusstream.core.DefaultStreamStorage;
+import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.managedledger.NereusManagedLedgerRuntime;
+import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
+import com.nereusstream.objectstore.ObjectStore;
+import com.nereusstream.objectstore.ObjectStoreProvider;
+import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
+import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicLong;
+
+/** Production Object-WAL/Oxia runtime assembly used by the hybrid broker storage provider. */
+public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider {
+    private static final String WRITER_VERSION = "nereus-pulsar-f2";
+
+    @Override
+    public NereusManagedLedgerRuntime create(
+            NereusRuntimeConfiguration configuration,
+            NereusRuntimeContext context) throws Exception {
+        Objects.requireNonNull(configuration, "configuration");
+        Objects.requireNonNull(context, "context");
+        StreamStorageConfig streamConfig = configuration.streamStorage();
+        requireIdentity(streamConfig);
+
+        ObjectStoreProvider objectStoreProvider = null;
+        ObjectStore objectStore = null;
+        SharedOxiaClientRuntime sharedOxiaRuntime = null;
+        OxiaMetadataStore l0MetadataStore = null;
+        ManagedLedgerProjectionMetadataStore projectionStore = null;
+        ScheduledExecutorService scheduler = null;
+        ExecutorService callbackExecutor = null;
+        StreamStorage streamStorage = null;
+        try {
+            objectStoreProvider = instantiateObjectStoreProvider(
+                    configuration.objectStore().providerClassName(), context.pluginClassLoader());
+            objectStore = objectStoreProvider.create(configuration.objectStore(), context.secretResolver());
+            Clock clock = Clock.systemUTC();
+            sharedOxiaRuntime = SharedOxiaClientRuntime.connect(configuration.oxia(), clock);
+            l0MetadataStore = OxiaJavaClientMetadataStore.usingSharedRuntime(
+                    configuration.oxia(), sharedOxiaRuntime, clock);
+            projectionStore = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
+                    configuration.oxia(), sharedOxiaRuntime, configuration.projectionMetadata(), clock);
+            scheduler = Executors.newSingleThreadScheduledExecutor(daemonFactory("nereus-f2-scheduler"));
+            callbackExecutor = Executors.newFixedThreadPool(
+                    Math.min(Runtime.getRuntime().availableProcessors(), 8),
+                    daemonFactory("nereus-f2-callback"));
+            streamStorage = new DefaultStreamStorage(
+                    streamConfig,
+                    l0MetadataStore,
+                    new DefaultWalObjectWriter(objectStore, WRITER_VERSION, clock),
+                    new DefaultWalObjectReader(objectStore),
+                    clock,
+                    callbackExecutor);
+            return new NereusManagedLedgerRuntime(
+                    streamStorage,
+                    projectionStore,
+                    l0MetadataStore,
+                    sharedOxiaRuntime,
+                    objectStore,
+                    objectStoreProvider,
+                    scheduler,
+                    callbackExecutor,
+                    configuration.managedLedger(),
+                    streamConfig.cluster(),
+                    streamConfig.processRunId(),
+                    streamConfig.writerId());
+        } catch (Throwable failure) {
+            closeAfterFailure(failure, streamStorage, projectionStore, l0MetadataStore, objectStore,
+                    objectStoreProvider, sharedOxiaRuntime, callbackExecutor, scheduler);
+            if (failure instanceof Exception exception) {
+                throw exception;
+            }
+            if (failure instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("unexpected runtime bootstrap failure", failure);
+        }
+    }
+
+    static ObjectStoreProvider instantiateObjectStoreProvider(String className, ClassLoader classLoader)
+            throws ReflectiveOperationException {
+        Class<?> providerClass = Class.forName(
+                Objects.requireNonNull(className, "className"), true,
+                Objects.requireNonNull(classLoader, "classLoader"));
+        if (!ObjectStoreProvider.class.isAssignableFrom(providerClass)) {
+            throw new IllegalArgumentException("configured object-store provider does not implement ObjectStoreProvider");
+        }
+        Constructor<?> constructor = providerClass.getConstructor();
+        try {
+            return (ObjectStoreProvider) constructor.newInstance();
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw exception;
+        }
+    }
+
+    private static void requireIdentity(StreamStorageConfig configuration) {
+        String expectedWriterId = "pulsar-f2/" + configuration.processRunId();
+        if (!expectedWriterId.equals(configuration.writerId())) {
+            throw new IllegalArgumentException("StreamStorage writerId must equal pulsar-f2/{processRunId}");
+        }
+    }
+
+    private static void closeAfterFailure(Throwable root, AutoCloseable... resources) {
+        List<AutoCloseable> unique = new ArrayList<>();
+        for (AutoCloseable resource : resources) {
+            if (resource != null && unique.stream().noneMatch(existing -> existing == resource)) {
+                unique.add(resource);
+            }
+        }
+        for (AutoCloseable resource : unique) {
+            try {
+                resource.close();
+            } catch (Throwable closeFailure) {
+                root.addSuppressed(closeFailure);
+            }
+        }
+    }
+
+    private static ThreadFactory daemonFactory(String prefix) {
+        AtomicLong ids = new AtomicLong();
+        return runnable -> {
+            Thread thread = new Thread(runnable, prefix + "-" + ids.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+}
