@@ -16,8 +16,11 @@ non-durable 和 durable-boundary cursor、coalesced tail poll/read-or-wait、loc
 F2-M5 product-side runtime bootstrap is now implemented in `nereus-pulsar-adapter`：typed runtime/projection config、
 cryptographic process identity、TCCL-compatible provider construction、shared Oxia/Object-WAL assembly and partial
 failure cleanup have unit gates。The deployable S3 provider now satisfies the section-3.2 async/deadline、conditional
-write、checksum、key/metadata、strict-range、redaction and startup-probe contract against pinned LocalStack。The
-Pulsar-fork hybrid provider/admission/distribution work remains pending；therefore F2-M5 is not yet complete。
+write、checksum、key/metadata、strict-range、redaction and startup-probe contract against pinned LocalStack。The Pulsar
+fork now has typed broker fields、BookKeeper-default/Nereus lookup、runtime assembly、an initial single-key creation
+claim、distribution dependency/license accounting and value-correct `PersistencePolicies.equals`。Admission hooks、
+complete binding lifecycle/capability convergence and broker E2E gates remain pending；therefore F2-M5 is not yet
+complete。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -30,7 +33,8 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 | --- | --- |
 | F2-M0R2 Nereus design baseline | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5） |
 | Pulsar fork | `nereusstream/pulsar` |
-| Pulsar fork commit | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
+| Pulsar API/source-review baseline | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
+| Current local implementation commit | `f21661999d`（based on locked baseline；remote publication awaits repository permission） |
 | Pulsar version at that commit | `5.0.0-M1-SNAPSHOT` |
 | Java/build baseline | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode |
 | Executable Nereus profile | `OBJECT_WAL_SYNC_OBJECT` only |
@@ -209,7 +213,7 @@ was repeated after the M1 implementation and remained green。
 | F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
 | F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
 | F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
-| F2-M5 broker integration | In progress | Hybrid storage provider and broker load/unload/restart tests |
+| F2-M5 broker integration | In progress | Hybrid bootstrap/config/distribution gated；admission、binding lifecycle and broker load/unload/restart remain |
 | F2-M6 final acceptance | Not started | Real Pulsar + Oxia + Object WAL end-to-end gate |
 
 Future 2 is not complete until F2-M1 through F2-M6 are implemented and their gates pass.

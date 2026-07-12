@@ -551,7 +551,12 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- fork broker wiring remains pending，so F2-M5 is still in progress。
+- the fork's first broker slice is implemented locally at `f21661999d`：typed fields/map validation、stable ordered
+  `[bookkeeper,nereus]` storage classes、runtime reflection/bootstrap/cleanup、an initial single-key creation claim、
+  distribution dependency/license accounting and `PersistencePolicies` value equality。Scoped tests、touched-module
+  checkstyle、full `quickCheck` and `checkBinaryLicense` pass。
+- complete binding adoption/delete states、broker feature admission/capability convergence and broker E2E restart
+  wiring remain pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance
 

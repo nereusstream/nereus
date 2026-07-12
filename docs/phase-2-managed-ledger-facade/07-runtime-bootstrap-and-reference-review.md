@@ -1256,6 +1256,16 @@ bytecode so the adapter can be consumed by Pulsar's Java-17 publication surface�
 use the JDK-21 test baseline。The fork's development coordinate is `0.1.0-f2-dev`；it is intentionally non-release and
 is replaced by the organization release version before F2 final acceptance。
 
+Implementation evidence（2026-07-12，fork bootstrap slice）：local fork commit `f21661999d` adds the typed broker
+configuration mapper、hybrid storage/provider classes、initial `NSB1` single-key creation claim、server distribution
+wiring and license inventory。It upgrades the shared Oxia dependency to `0.9.0` to match Nereus，keeps BookKeeper as
+the ordered default and fixes storage-class string comparison to value equality。Scoped tests、affected checkstyle、
+full fork `quickCheck` and `checkBinaryLicense` pass。This is not F2-M5 exit：the current binding implementation only
+guards first Nereus projection publication and still needs the full adoption/delete/restart state machine，and all
+feature-admission/capability/broker-E2E gates below remain pending。The commit is local because the active GitHub
+identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
+`100d3ef0ff` until that repository commit is pushed。
+
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
 topics. An older broker can bypass the binding protocol, so mixed-version ownership during Nereus policy enablement is
