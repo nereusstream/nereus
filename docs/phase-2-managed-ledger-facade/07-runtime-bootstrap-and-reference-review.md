@@ -1244,6 +1244,13 @@ Rules:
 - no `mavenLocal()` or floating snapshot is used by release builds；
 - composite-build mode verifies both repository commits before compiling integration tests。
 
+For two-repository local development，Nereus publishes the same Gradle module metadata/POMs to
+`build/development-repository` through `publishAllPublicationsToDevelopmentRepository`；the fork accepts that path
+only through its explicit `nereusDevelopmentRepository` Gradle property。This avoids `mavenLocal()` and hard-coded
+absolute checkout paths while exercising the same `com.nereusstream:nereus-pulsar-adapter` coordinate used by a
+release repository。Release packaging leaves that property unset and resolves only the organization-published,
+version-pinned artifact。
+
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
 topics. An older broker can bypass the binding protocol, so mixed-version ownership during Nereus policy enablement is

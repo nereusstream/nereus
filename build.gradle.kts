@@ -48,6 +48,12 @@ configure(subprojects.filter { it.name != "nereus-bom" }) {
     }
 
     extensions.configure<PublishingExtension>("publishing") {
+        repositories {
+            maven {
+                name = "development"
+                url = rootProject.layout.buildDirectory.dir("development-repository").get().asFile.toURI()
+            }
+        }
         publications {
             create<MavenPublication>("mavenJava") {
                 from(components["java"])
