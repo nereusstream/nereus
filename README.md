@@ -60,7 +60,8 @@ writable facade、strict get-only read-only ledger、exact append recovery/write
 surfaces and audited unsupported channels。F2-M4 cursor boundary is implemented；F2-M5 now has product runtime/S3
 gates plus the fork hybrid bootstrap，durable `NSB1` binding open/delete coordinator and claim-before-open topic
 feature admission。Producer attach、publish metadata、non-durable subscribe、durable-subscription and transaction
-operation gates are also wired before their stock mutations；ack/admin admission、live-policy refresh、
+operation gates are also wired before their stock mutations；the limited non-durable cumulative ack gate runs before
+ack timestamp/counter/pending-ack/cursor mutation。Admin admission、live-policy refresh、
 namespace/capability convergence and the remaining lifecycle race gates and
 end-to-end restart gates remain in progress。
 

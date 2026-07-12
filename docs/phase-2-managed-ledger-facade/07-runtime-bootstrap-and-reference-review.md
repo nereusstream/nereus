@@ -1286,8 +1286,14 @@ runs before topic events，binding preparation and factory IO。Local commit `09
 topic initialization and adds first-mutation gates for remote producer attach，transactional/marker/delayed publish，
 non-durable Exclusive/Failover subscribe admission，durable subscription creation and recovered durable cursors，
 and transaction publish/end-txn。The publish parser preserves `ByteBuf` indexes/reference count，Nereus always uses
-`TransactionBufferDisable`，and 17 focused admission tests plus affected main/test checkstyle pass。Ack/admin gates and
-the authoritative live-policy update coordinator remain pending。These commits are local because the active GitHub
+`TransactionBufferDisable`，and 17 focused admission tests plus affected main/test checkstyle pass。Local commit
+`0062227e77` then adds the closed
+`NereusAcknowledgeValidator` as the first `Consumer.messageAcked(CommandAck, boolean)` action。It admits only the
+nontransactional、non-durable、one-position cumulative whole-entry shape without persisted confirmation；the admitted
+path waits for local cursor completion before ack counters advance，while BookKeeper retains stock timing。Focused
+tests cover every rejected shape，unchanged rejection state and admitted completion timing；all fork Nereus storage
+tests、the stock cumulative-ack regression and affected checkstyle pass。Admin admission and the authoritative
+live-policy update coordinator remain pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 
