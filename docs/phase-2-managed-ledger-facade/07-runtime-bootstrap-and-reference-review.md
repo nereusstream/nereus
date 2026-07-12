@@ -576,8 +576,8 @@ gates rather than one impossible all-purpose check:
 CompletableFuture<StorageClassOpenPermit> prepareStorageClassOpen(
         TopicName topic, String persistenceName, String selectedClass, boolean createIfMissing);
 CompletableFuture<Void> completeStorageClassOpen(StorageClassOpenPermit permit);
-CompletableFuture<StorageClassDeletePermit> prepareStorageClassDelete(
-        TopicName topic, String persistenceName, String selectedClass);
+CompletableFuture<Optional<StorageClassDeletePermit>> prepareStorageClassDelete(
+        String persistenceName);
 CompletableFuture<Void> completeStorageClassDelete(StorageClassDeletePermit permit);
 void validateTopicOpen(TopicName topic, ManagedLedgerConfig config, NereusResolvedTopicFeatures features);
 void validateProducer(TopicName topic, Producer producer, NereusResolvedTopicFeatures features);
@@ -856,6 +856,12 @@ generation. BookKeeper absence is terminal for a prior deleted BookKeeper genera
 | `ACTIVE` | verify bound durable state, CAS to `DELETING`，then call only the bound factory；active-missing is corruption |
 | `DELETING` | return the same-generation permit and resume only the bound factory delete |
 | `DELETED` | idempotent terminal success；do not call either factory |
+
+The returned `Optional` is empty only when preparation itself reaches or observes the terminal `DELETED` binding and
+no factory call is allowed。A missing binding with both storage probes absent still fails with
+`ManagedLedgerNotFoundException`；it is not encoded as empty success。The method deliberately has no selected-class
+argument because delete authority comes exclusively from the durable binding；the broker may use a captured policy
+config as factory input, but never uses that config to choose the delete class。
 
 For Nereus，factory delete success requires `inspectStorageState == DELETED` with the permit generation before the
 binding completes. `DELETING` resumes L0 delete；`MISSING` is corruption. For BookKeeper，post-delete
