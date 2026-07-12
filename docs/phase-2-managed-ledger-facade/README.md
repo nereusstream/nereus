@@ -17,11 +17,12 @@ F2-M5 product-side runtime bootstrap is now implemented in `nereus-pulsar-adapte
 cryptographic process identity、TCCL-compatible provider construction、shared Oxia/Object-WAL assembly and partial
 failure cleanup have unit gates。The deployable S3 provider now satisfies the section-3.2 async/deadline、conditional
 write、checksum、key/metadata、strict-range、redaction and startup-probe contract against pinned LocalStack。The Pulsar
-fork now has typed broker fields、BookKeeper-default/Nereus lookup、runtime assembly、an initial single-key creation
-claim with a BookKeeper-exists recheck before Nereus projection publication、distribution dependency/license accounting
-and value-correct `PersistencePolicies.equals`。Admission hooks、
-complete binding lifecycle/capability convergence and broker E2E gates remain pending；therefore F2-M5 is not yet
-complete。
+fork now has typed broker fields、BookKeeper-default/Nereus lookup、runtime assembly、the deterministic `NSB1`
+codec/keyspace/records，BookKeeper adoption and class-switch rejection，generation-safe open activation and
+delete/recreate state-machine APIs，distribution dependency/license accounting and value-correct
+`PersistencePolicies.equals`。`BrokerService` open now prepares the binding before factory selection and withholds the
+ledger until activation succeeds。Feature-admission hooks、loaded/unloaded broker delete-call-site permit wiring，
+namespace/capability convergence and broker E2E gates remain pending；therefore F2-M5 is not yet complete。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。

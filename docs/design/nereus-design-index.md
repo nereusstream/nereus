@@ -64,14 +64,14 @@ streamId + offset
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
 | `nereus-api` | `Implemented`（P15-M1/M4/M6） | generic target/result、exact cumulative append snapshot、append recovery/lifecycle API implemented |
-| `nereus-metadata-oxia` | `In progress`（P15-M2/M4 + F2-M1 name foundation） | legacy/new L0 codecs、repair/replay/lifecycle plus strict managed-ledger name/hash/stream-ID constructor；F2 projection store begins in M2 |
+| `nereus-metadata-oxia` | `Implemented`（P15-M2/M4 + F2-M1/M2） | legacy/new L0 codecs、repair/replay/lifecycle plus managed-ledger name foundation and projection metadata store |
 | `nereus-object-store` | `Implemented`（M3） | object-store API、WAL v1 writer/reader、entry index、local test fixture、checksums/tests |
 | `nereus-core` | `Implemented`（P15-M3/M4/M6） | primary-WAL registry/Object adapters、strict split commit/materialize、read dispatch、exact recovery、seal/delete、exact cumulative result |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 complete） | projection metadata、factory、writable/get-only ledger、append/read/lifecycle/write-fence、admin/cache/stats and cursor boundary implemented/tested |
-| `nereus-pulsar-adapter` | `In progress`（F2-M0R2 complete；gated） | runtime/S3/bootstrap/binding/capability contract complete；implementation waits for F2 milestones；module marker-only |
+| `nereus-pulsar-adapter` | `Implemented`（F2 product side） | typed runtime assembly and deployable async S3-compatible provider implemented/tested；fork-owned admission/capability completion remains F2-M5 work |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
@@ -160,7 +160,7 @@ decision behind items 14 and 16-18。
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M4 complete；F2-M5 next） |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M4 complete；F2-M5 active） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |

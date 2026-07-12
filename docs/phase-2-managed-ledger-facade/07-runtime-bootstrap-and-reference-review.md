@@ -1262,10 +1262,13 @@ wiring and license inventory。It upgrades the shared Oxia dependency to `0.9.0`
 the ordered default and fixes storage-class string comparison to value equality。Scoped tests、affected checkstyle、
 full fork `quickCheck` and `checkBinaryLicense` pass。Follow-up local commit `a6c50fba65` refuses a Nereus claim when
 stock BookKeeper already owns the managed ledger and rechecks BookKeeper absence before projection publication；its two
-focused binding tests and affected checkstyle pass。This is not F2-M5 exit：the current binding implementation only
-guards first Nereus projection publication and the BookKeeper-to-Nereus collision edge；it still needs the full
-adoption/delete/restart state machine，and all
-feature-admission/capability/broker-E2E gates below remain pending。The commit is local because the active GitHub
+focused binding tests and affected checkstyle pass。Local commit `c24a0bc608` replaces the provisional record with the
+specified namespace-listable keyspace，strict deterministic `NSB1` codec，four lifecycle states，metadata-version
+hydration，CRC32C and golden vectors。Local commit `b62154b343` adds factory attach，missing-binding BookKeeper
+adoption，class-switch rejection，open activation，delete/recreate state-machine APIs and the broker open hook；the
+focused binding/config tests and affected checkstyle pass。This is not F2-M5 exit：the loaded and unloaded broker
+delete call sites do not yet consume the delete permit，and feature-admission/namespace coordination/capability/
+broker-E2E gates below remain pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 
