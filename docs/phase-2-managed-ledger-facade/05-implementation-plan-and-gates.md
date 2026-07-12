@@ -143,8 +143,19 @@ Implementation evidence（2026-07-12，foundation sub-stage）：
   `metadataVersion`，and has frozen golden envelopes for all four record types；
 - the package codec factory preserves Phase 1 bytes while dispatching F2 without decoder probing；canonical empty
   creation rejects legacy/async profiles、nonzero stream truth、attribute drift and reserved properties；
-- focused metadata and managed-ledger regressions pass。Fake single-key CAS/repair semantics、shared runtime and the
-  real Oxia adapter remain required before F2-M2 can be marked complete。
+- focused metadata and managed-ledger regressions pass。The fake sub-stage below now consumes this foundation；shared
+  runtime and the real Oxia adapter remain required before F2-M2 can be marked complete。
+
+Implementation evidence（2026-07-12，fake contract sub-stage）：
+
+- production `ProjectionMetadataStoreCore` owns the allocator、topic CAS、identity-guarded property/state updates
+  and two-key idempotent repair protocol；the fake and real adapters consume this same algorithm；
+- restartable `FakeManagedLedgerProjectionMetadataStore` stores codec envelopes plus backend versions，supports
+  failure after allocator/topic/virtual-ledger/position-index writes and never uses object serialization；
+- focused tests cover 32-way first create、24-way deleted-topic recreation、losing ID gaps、restart hydration、every
+  write-after fault、hash/exact-name and derived-identity conflicts、stale identity、legal lifecycle edges、one
+  monotonic deadline、bounded admission and idempotent close；
+- shared client ownership、the real Java Oxia adapter and Docker parity remain required before F2-M2 completion。
 
 Tests:
 

@@ -7,7 +7,8 @@ bootstrap。2026-07-12 的 F2-M0R2 使用锁定 commit 的真实 Pulsar checkout
 S3 provider 和 rollout capability 等实现前缺口。生产 facade 仍未实现；P15-M1-M6 已实现并通过 final
 gate，包括 M0R2 发现的 exact cumulative logical-size handoff。F2-M1 projection/Position/entry foundation 也已
 实现并通过 locked-composite gate。F2-M2 正在实现：键空间、严格创建请求、四类 durable record、第三
-codec registry 与 golden bytes 已落地；下一子阶段是 fake store 单键 CAS/修复协议。
+codec registry、golden bytes 与 fake 单键 CAS/修复合同已落地；下一子阶段是 shared Oxia runtime 与
+real adapter/Docker contract gate。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -196,7 +197,7 @@ was repeated after the M1 implementation and remained green。
 | Phase 1.5 P15-M1-M5 | Complete | Generic L0/recovery/lifecycle implemented；ordinary and Docker final gates pass |
 | Phase 1.5 P15-M6 | Complete | `AppendResult.cumulativeSize` from existing committed truth；ordinary and Docker final gates pass |
 | F2-M1 projection model | Complete | Pure model/codec、locked Pulsar composite and restart-stable mapping tests |
-| F2-M2 projection metadata | In progress | Model/keyspace/codec complete；fake/real Oxia contract and crash-repair gates pending |
+| F2-M2 projection metadata | In progress | Model/keyspace/codec/fake contract complete；shared runtime、real Oxia and Docker gate pending |
 | F2-M3 ManagedLedger facade | Not started | Factory/ledger append/read/lifecycle and exactly-once callback tests |
 | F2-M4 cursor boundary | Not started | Read-only/non-durable cursor; explicit durable mutation rejection |
 | F2-M5 broker integration | Not started | Hybrid storage provider and broker load/unload/restart tests |
