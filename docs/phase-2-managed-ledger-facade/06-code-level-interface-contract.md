@@ -86,7 +86,6 @@ nereus-managed-ledger/com.nereusstream.managedledger/
   NereusManagedLedgerFactory.java
   NereusManagedLedger.java
   NereusReadOnlyManagedLedger.java
-  NereusEntry.java
   NereusManagedLedgerFactoryConfig.java
   NereusManagedLedgerRuntime.java
   NereusDurableStorageState.java
@@ -99,6 +98,11 @@ nereus-managed-ledger/com.nereusstream.managedledger/
   config/ManagedLedgerConfigView.java
   config/ManagedLedgerOpenConfigView.java
   config/ManagedLedgerConfigValidator.java
+  entry/EncodedAppend.java
+  entry/NereusEntry.java
+  entry/PulsarEntryCodec.java
+  projection/VirtualLedgerProjection.java
+  projection/StreamPositionBounds.java
   projection/PositionProjection.java
   projection/F2L0RequestFactory.java
   snapshot/StreamSnapshotView.java
@@ -121,6 +125,10 @@ nereus-managed-ledger/com.nereusstream.managedledger/
 `nereus-managed-ledger` may import Pulsar managed-ledger/common/client-admin-api types. No class added to `nereus-api`,
 `nereus-core`, `nereus-metadata-oxia` or `nereus-object-store` imports a Pulsar type.
 
+As of F2-M1，`ManagedLedgerProjectionNames`、all `projection/` targets listed above and
+`entry/EncodedAppend`、`entry/NereusEntry`、`entry/PulsarEntryCodec` are implemented and tested。The remaining F2
+names in this inventory are later milestone targets and must not be reported as implemented early。
+
 The L0 API/core classes and append-replay types in this inventory are implemented by Phase 1.5 P15-M1-M6，including
 the M0R2-discovered `AppendResult.cumulativeSize` handoff。F2 owns only projection metadata and managed-ledger
 classes；the combined inventory is retained here
@@ -130,7 +138,8 @@ because these are the exact types the facade consumes。
 
 The Phase 1 public `StreamStorage` surface cannot fulfill the F2 append and lifecycle promises。Phase 1.5
 `../phase-1.5-core-storage-foundation/` is the implementation authority for the protocol-neutral additions below；
-P15-M6 has passed for recovery/lifecycle and the exact cumulative result，so F2-M1 may start；
+P15-M6 has passed for recovery/lifecycle and the exact cumulative result，and F2-M1 now implements the projection、
+Position、entry codec and request foundation；
 `NereusManagedLedger` still cannot be exposed before its own implementation
 gates pass。This section remains the F2 consumer
 contract and cannot be implemented independently in the facade。

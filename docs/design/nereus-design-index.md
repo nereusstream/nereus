@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-12
-> 当前交付阶段：Phase 1.5 P15-M0-M6 complete/final-gated；F2-M1 next
+> 当前交付阶段：Phase 1.5 P15-M0-M6 + F2-M1 complete；F2-M2 next
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -64,13 +64,13 @@ streamId + offset
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
 | `nereus-api` | `Implemented`（P15-M1/M4/M6） | generic target/result、exact cumulative append snapshot、append recovery/lifecycle API implemented |
-| `nereus-metadata-oxia` | `Implemented`（P15-M2/M4） | legacy/new codecs、generic new-write、mixed-chain repair/replay、lifecycle CAS、fake/real Docker gates |
+| `nereus-metadata-oxia` | `In progress`（P15-M2/M4 + F2-M1 name foundation） | legacy/new L0 codecs、repair/replay/lifecycle plus strict managed-ledger name/hash/stream-ID constructor；F2 projection store begins in M2 |
 | `nereus-object-store` | `Implemented`（M3） | object-store API、WAL v1 writer/reader、entry index、local test fixture、checksums/tests |
 | `nereus-core` | `Implemented`（P15-M3/M4/M6） | primary-WAL registry/Object adapters、strict split commit/materialize、read dispatch、exact recovery、seal/delete、exact cumulative result |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `In progress`（F2-M0R2 complete；F2-M1 next） | exact Pulsar API/call-path、code-level method/state/fence review and P15-M6 prerequisite complete；module marker-only |
+| `nereus-managed-ledger` | `In progress`（F2-M1 complete；F2-M2 next） | locked Pulsar composite dependency、virtual projection/Position roles、L0 request factory、entry codec and owned `Entry` implemented/tested；factory/cursor not yet implemented |
 | `nereus-pulsar-adapter` | `In progress`（F2-M0R2 complete；gated） | runtime/S3/bootstrap/binding/capability contract complete；implementation waits for F2 milestones；module marker-only |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
@@ -160,7 +160,7 @@ decision behind items 14 and 16-18。
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 + P15-M6 prerequisite complete；F2-M1 next） |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1 complete；F2-M2 next） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |

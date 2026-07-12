@@ -1,5 +1,7 @@
 # Projection and Pulsar Entry Contract
 
+> Implementation status：F2-M1 implemented；`phase2M1Check` passed against the locked Pulsar composite on 2026-07-12
+
 F2-M0R chooses one concrete Position projection for the first implementation. This removes the
 rollover/allocation ambiguity in the Future 2 overview while preserving a version field for a later
 projection format.
@@ -70,6 +72,7 @@ public record VirtualLedgerProjection(
         String payloadMapping,
         long createdAtMillis,
         long metadataVersion) {
+    public void requireStorageClassBindingGeneration(long expectedGeneration);
 }
 
 public final class PositionProjection {

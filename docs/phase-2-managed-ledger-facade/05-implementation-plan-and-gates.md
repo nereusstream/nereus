@@ -1,19 +1,18 @@
 # Future 2 Implementation Plan and Gates
 
-F2-M0/M0R/M0R2 design and the complete Phase 1.5 P15-M6 final gate have passed。P15-M6 carries
-`AppendResult.cumulativeSize` from existing committed truth。F2-M1 is the next implementation milestone.
+F2-M0/M0R/M0R2 design、the complete Phase 1.5 P15-M6 final gate and F2-M1 have passed。P15-M6 carries
+`AppendResult.cumulativeSize` from existing committed truth。F2-M2 is the next implementation milestone.
 A milestone is complete only when its code, focused tests and listed gate exist; documentation alone is not
 implementation evidence.
 
 ## 1. Build and Version Gate
 
-Before F2-M1 production code:
+F2-M1 build evidence:
 
 1. keep the completed P15-M6 `phase15FinalCheck` and protocol-neutral F2 prerequisite fixtures from
    `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md` green；
-2. add a pinned Pulsar managed-ledger compile dependency for the locked fork commit;
-3. support a side-by-side Gradle composite build for development/CI, with the Pulsar checkout commit
-   verified as `100d3ef0...`;
+2. the managed-ledger compile dependency resolves from the locked Pulsar composite build；
+3. `checkPulsarSourceLock` verifies the side-by-side checkout is clean and exactly `100d3ef0...`；
 4. choose an organization-owned published artifact/version for release builds before publishing any
    Nereus facade artifact;
 5. keep `pulsar-broker` off the Nereus L0 modules' compile/runtime classpaths;
@@ -26,6 +25,11 @@ Before F2-M1 production code:
 
 A floating `master`, unverified `mavenLocal()` or an Apache snapshot that does not contain the locked
 fork commit is not an acceptable dependency lock.
+
+The implemented composite lookup order is `-PpulsarCheckout=...`，then `NEREUS_PULSAR_CHECKOUT`，then the
+development convention `../../nereusstream/pulsar` when present。`checkPulsarSourceLock` fails unless the selected
+checkout is clean and exactly at the locked commit；without a composite, dependency resolution intentionally requires
+the future organization-owned published artifact rather than silently compiling against another Pulsar version。
 
 Expected dependency direction:
 
@@ -94,6 +98,17 @@ One Pulsar Entry consumes exactly one L0 offset.
 Batch index never participates in offset conversion.
 Delete/recreate positions cannot alias because incarnation changes stream and virtual-ledger IDs.
 ```
+
+Implementation evidence（2026-07-12）：
+
+- every production target above exists；`ManagedLedgerProjectionNames` is metadata-owned and strict-UTF-8；
+- `PositionProjection` implements separate readable/read/mark-delete/max roles against the locked Pulsar `Position`；
+- `PulsarEntryCodec` and `NereusEntry` preserve exact bytes、indices、reference ownership、CRC32C and zero-byte
+  progress；
+- the L0 dependency guard scans both build declarations and source imports；
+- `phase2M1Check`、root `check` and the exact Pulsar API compile probe pass；
+- release publication remains forbidden until an organization-owned non-floating Pulsar artifact is selected as
+  required by item 4。
 
 ## 3. F2-M2 — Projection Metadata
 

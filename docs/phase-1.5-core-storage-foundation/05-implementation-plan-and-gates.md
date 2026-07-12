@@ -307,7 +307,7 @@ Release output must state：
 - rolling downgrade is unsupported after first generic-target write；
 - executable profile remains Object WAL sync only；
 - BookKeeper target values are reservations, not adapters；
-- the narrow P15-M6 handoff below is complete，so F2-M1 may begin；F4/BK/async remain separate gates。
+- the narrow P15-M6 handoff below is complete and has been consumed by F2-M1；F4/BK/async remain separate gates。
 
 Exit commands：
 

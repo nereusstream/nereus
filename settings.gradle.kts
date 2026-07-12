@@ -32,6 +32,19 @@ dependencyResolutionManagement {
     }
 }
 
+val configuredPulsarCheckout = providers.gradleProperty("pulsarCheckout").orNull
+    ?: providers.environmentVariable("NEREUS_PULSAR_CHECKOUT").orNull
+val conventionalPulsarCheckout = file("../../nereusstream/pulsar")
+val pulsarCheckout = configuredPulsarCheckout?.let(::file)
+    ?: conventionalPulsarCheckout.takeIf { it.resolve("settings.gradle.kts").isFile }
+
+if (pulsarCheckout != null) {
+    require(pulsarCheckout.resolve("settings.gradle.kts").isFile) {
+        "pulsarCheckout must point at the locked Pulsar Gradle checkout: $pulsarCheckout"
+    }
+    includeBuild(pulsarCheckout)
+}
+
 rootProject.name = "nereus"
 
 include("nereus-bom")

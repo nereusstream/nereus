@@ -12,14 +12,15 @@
  * limitations under the License.
  */
 
-dependencies {
-    api(project(":nereus-api"))
-    implementation(project(":nereus-metadata-oxia"))
-    api(libs.pulsar.managed.ledger)
-    api(libs.pulsar.common)
-    api(libs.pulsar.client.admin.api)
+package com.nereusstream.managedledger.projection;
 
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.assertj)
-    testRuntimeOnly(libs.junit.platform.launcher)
+/** Signals that durable projection identity or a role-specific Position is inconsistent. */
+public final class ProjectionValidationException extends IllegalArgumentException {
+    public ProjectionValidationException(String message) {
+        super(message);
+    }
+
+    public ProjectionValidationException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

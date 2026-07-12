@@ -129,7 +129,6 @@ tasks.register("phase15Check") {
     description = "Verify the Phase 1.5 generic target, recovery, lifecycle, and compatibility foundation."
     dependsOn("phase1Check")
     dependsOn(phase1L0Modules.map { "$it:test" })
-    dependsOn(":nereus-managed-ledger:compileJava")
 }
 
 tasks.register("phase15FinalCheck") {
@@ -137,4 +136,24 @@ tasks.register("phase15FinalCheck") {
     description = "Run the production Oxia/Object WAL Phase 1.5 mixed-version and lifecycle gates."
     dependsOn("phase15Check")
     dependsOn("phase1FinalCheck")
+}
+
+val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
+    .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
+
+tasks.register<Exec>("checkPulsarSourceLock") {
+    group = "verification"
+    description = "Verify the exact clean Pulsar fork checkout used by Phase 2."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-pulsar-source-lock.sh", pulsarCheckoutPath.get())
+}
+
+tasks.register("phase2M1Check") {
+    group = "verification"
+    description = "Verify the F2-M1 projection, Position, entry codec, and L0 request foundation."
+    dependsOn("phase15Check")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn(":nereus-metadata-oxia:test")
+    dependsOn(":nereus-managed-ledger:test")
 }

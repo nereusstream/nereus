@@ -5,7 +5,8 @@ F2-M0R 补齐 append recovery、topic incarnation、role-aware Position、interf
 bootstrap。2026-07-12 的 F2-M0R2 使用锁定 commit 的真实 Pulsar checkout 重新核验接口和 broker 私有
 调用路径，并关闭 metadata type collision、write-fence handoff、storage-state inspection、ack admission、
 S3 provider 和 rollout capability 等实现前缺口。生产 facade 仍未实现；P15-M1-M6 已实现并通过 final
-gate，包括 M0R2 发现的 exact cumulative logical-size handoff。当前下一实现里程碑是 F2-M1。
+gate，包括 M0R2 发现的 exact cumulative logical-size handoff。F2-M1 projection/Position/entry foundation 也已
+实现并通过 locked-composite gate；当前下一实现里程碑是 F2-M2 projection metadata。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -114,7 +115,7 @@ F2-M0R was completed against the exact Phase 1 implementation baseline and remai
 
 M0R2 found one remaining in-memory handoff gap：generic `AppendResult` omitted the committed record's exact cumulative
 logical size。P15-M6 added only that field/fixture；no durable metadata/WAL byte or commit/recovery boundary changed。
-Both Phase 1.5 gates passed on 2026-07-12，so F2-M1 may now begin。
+Both Phase 1.5 gates passed on 2026-07-12，and F2-M1 has consumed that complete prerequisite。
 
 F2 must consume those APIs rather than reintroducing temporary L0 types in `nereus-managed-ledger` or implementing
 head/replay/lifecycle truth in projection metadata。
@@ -174,6 +175,16 @@ blobs in `01`. It
 does not prove implementation behavior, callback ordering, resource ownership or broker integration.
 Those are later milestone gates.
 
+F2-M1 additionally uses the locked checkout as a Gradle composite and provides：
+
+```bash
+./gradlew phase2M1Check
+```
+
+The gate verifies exact clean Pulsar HEAD、the strengthened L0 source/dependency boundary、Phase 1/1.5 regressions、
+deterministic projection/name/Position mappings and Pulsar entry codec/buffer ownership tests。The API compile probe
+was repeated after the M1 implementation and remained green。
+
 ## 7. Milestone State
 
 | Milestone | State | Exit |
@@ -183,8 +194,8 @@ Those are later milestone gates.
 | F2-M0R2 code-level closure | Complete | Exact target checkout revalidated；compile/type/state/runtime gaps closed in docs |
 | Phase 1.5 P15-M1-M5 | Complete | Generic L0/recovery/lifecycle implemented；ordinary and Docker final gates pass |
 | Phase 1.5 P15-M6 | Complete | `AppendResult.cumulativeSize` from existing committed truth；ordinary and Docker final gates pass |
-| F2-M1 projection model | Next | Pure model/codec and restart-stable mapping tests |
-| F2-M2 projection metadata | Not started | Fake/real Oxia contract and crash-repair tests |
+| F2-M1 projection model | Complete | Pure model/codec、locked Pulsar composite and restart-stable mapping tests |
+| F2-M2 projection metadata | Next | Fake/real Oxia contract and crash-repair tests |
 | F2-M3 ManagedLedger facade | Not started | Factory/ledger append/read/lifecycle and exactly-once callback tests |
 | F2-M4 cursor boundary | Not started | Read-only/non-durable cursor; explicit durable mutation rejection |
 | F2-M5 broker integration | Not started | Hybrid storage provider and broker load/unload/restart tests |

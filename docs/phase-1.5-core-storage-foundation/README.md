@@ -3,7 +3,7 @@
 > 状态：P15-M0-M6 implemented/final-gated；P15-M6 passed ordinary and Docker-backed gates on 2026-07-12
 > 输入基线：`nereusstream/nereus@8aa684f479994094a612578bbfe27170b077f4ad`
 > 实现基线：Phase 1.5 working tree based on `da49a97`
-> 下一里程碑：F2-M1 projection foundation
+> 下一里程碑：F2-M2 projection metadata（F2-M1 complete）
 
 Phase 1.5 是插入 Future 1 与 Future 2 production implementation 之间的 L0 foundation delivery。
 它不是新的 capability track，也不改变 Future 1-8 的编号。它把 Phase 1 已证明的
