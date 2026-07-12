@@ -140,8 +140,8 @@ The Phase 1 public `StreamStorage` surface cannot fulfill the F2 append and life
 `../phase-1.5-core-storage-foundation/` is the implementation authority for the protocol-neutral additions below；
 P15-M6 has passed for recovery/lifecycle and the exact cumulative result，and F2-M1 now implements the projection、
 Position、entry codec and request foundation；
-`NereusManagedLedger` still cannot be exposed before its own implementation
-gates pass。This section remains the F2 consumer
+The writable `NereusManagedLedger` implementation now consumes this contract；the facade still cannot be declared
+F2-M3-complete before its read-only/stats/race gates pass。This section remains the F2 consumer
 contract and cannot be implemented independently in the facade。
 
 ### 3.0 Complete logical append snapshot
@@ -1069,6 +1069,11 @@ callback is still non-terminal, local close drains that chain instead of emittin
 callback has failed and background exact recovery owns the suspended attempt, local close may detach without stopping
 the core recovery; terminate/delete must wait for committed/proven-uncommitted recovery or fail before lifecycle CAS.
 A process-level forced shutdown may end the callback domain, but it does not claim a safely retryable producer outcome.
+
+The implemented handoff uses two views of the same retained core attempt：the callback-budget view uses
+`appendRecoveryTimeout`；after that view fails retryably uncertain，one saturated-timeout terminal observer joins the
+same core terminal future。It owns no retained request、retry scheduler or physical replay，and ledger close completes
+only the local generation future exceptionally；the P15 `AppendCoordinator` remains the sole recovery owner。
 
 Append ownership:
 

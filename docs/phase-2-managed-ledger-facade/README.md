@@ -4,12 +4,14 @@
 F2-M0R 补齐 append recovery、topic incarnation、role-aware Position、interface matrix 和 broker runtime
 bootstrap。2026-07-12 的 F2-M0R2 使用锁定 commit 的真实 Pulsar checkout 重新核验接口和 broker 私有
 调用路径，并关闭 metadata type collision、write-fence handoff、storage-state inspection、ack admission、
-S3 provider 和 rollout capability 等实现前缺口。生产 facade 仍未实现；P15-M1-M6 已实现并通过 final
+S3 provider 和 rollout capability 等实现前缺口。P15-M1-M6 已实现并通过 final
 gate，包括 M0R2 发现的 exact cumulative logical-size handoff。F2-M1 projection/Position/entry foundation 也已
 实现并通过 locked-composite gate。F2-M2 projection metadata 已实现：键空间、严格创建请求、四类
 durable record、第三 codec registry、golden bytes、fake/real 单键 CAS/修复合同和 shared Oxia runtime
-均通过普通与 Docker gate。F2-M3 正在实现：配置/runtime/snapshot/callback 基础和 open/recreate/get-only
-inspection coordinator 已落地；下一子阶段是 factory registry 与 ledger append/read/lifecycle。
+均通过普通与 Docker gate。F2-M3 正在实现：配置/runtime/snapshot/callback、open/recreate/get-only
+inspection coordinator、factory exact-name registry，以及 writable ledger 的 append/direct-read/Position/
+properties/lifecycle/write-fence 已落地并通过真实 Object WAL 集成测试；下一子阶段是 read-only ledger、
+per-ledger stats 和剩余并发/失败 gate。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -199,7 +201,7 @@ was repeated after the M1 implementation and remained green。
 | Phase 1.5 P15-M6 | Complete | `AppendResult.cumulativeSize` from existing committed truth；ordinary and Docker final gates pass |
 | F2-M1 projection model | Complete | Pure model/codec、locked Pulsar composite and restart-stable mapping tests |
 | F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
-| F2-M3 ManagedLedger facade | In progress | Foundation and open/recreate/inspect coordinator complete；factory/ledger surfaces pending |
+| F2-M3 ManagedLedger facade | In progress | Writable factory/ledger path complete；read-only ledger、per-ledger stats and remaining race gates pending |
 | F2-M4 cursor boundary | Not started | Read-only/non-durable cursor; explicit durable mutation rejection |
 | F2-M5 broker integration | Not started | Hybrid storage provider and broker load/unload/restart tests |
 | F2-M6 final acceptance | Not started | Real Pulsar + Oxia + Object WAL end-to-end gate |

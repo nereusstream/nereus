@@ -223,10 +223,9 @@ nereus-managed-ledger/.../
   config/ManagedLedgerConfigValidator.java
   NereusManagedLedger.java
   NereusReadOnlyManagedLedger.java
-  NereusManagedLedgerInfo.java (builder/adapter)
-  ZeroCapacityEntryCacheManager.java
-  ZeroCapacityEntryCache.java
-  NereusManagedLedgerFactoryStats.java
+  ManagedLedgerInfo builder (implemented inside NereusManagedLedgerFactory)
+  cache/NereusNoopEntryCacheManager.java
+  stats/NereusManagedLedgerFactoryStats.java
   NereusManagedLedgerStats.java
   callbacks/TerminalCallback.java
   callbacks/SerialCallbackLane.java
@@ -295,7 +294,7 @@ Every locked default is audited; supported methods are deterministic and unsuppo
 No callback or buffer leak is detected.
 ```
 
-Implementation evidence（2026-07-12，foundation sub-stage）：
+Implementation evidence（2026-07-12，writable-facade sub-stage）：
 
 - product-owned factory config、immutable stock-config operation/open views、creation permit、durable inspection and
   write-fence value surfaces are implemented with closed validation；
@@ -307,13 +306,25 @@ Implementation evidence（2026-07-12，foundation sub-stage）：
   admission and closes all resources in dependency-reverse order while aggregating failures；
 - the exact `ObjectStoreProvider`/configuration/secret-resolver bootstrap protocols are present so the runtime public
   constructor is code-complete；the deployable S3 implementation and provider wiring remain assigned to F2-M5；
-- F2-M3 remains in progress：factory open/inspection、ledger append/read/lifecycle、stats/cache/error mapping and their
-  locked Pulsar interface gates are not yet complete。
+- `NereusManagedLedgerFactory` now implements exact-name single-flight open、bounded handles、inspection、delete、
+  properties/info、shutdown、non-null zero-capacity cache and stock zero-value factory MXBean；every currently
+  unsupported read-only factory method fails through the locked callback/exception channel rather than inheriting an
+  unsafe default。
+- `AbstractNereusManagedLedger` explicitly covers every locked non-default `ManagedLedger` method；the concrete
+  `NereusManagedLedger` overrides append overloads、single-entry direct read、exact Position/count/size、synthetic
+  `LedgerInfo`、topic properties、terminate/delete/close and generation-safe write-fence handoff。
+- append input is copied before L0 ownership transfer，callback buffers are read-only and released after callback，and
+  one runtime permit plus `SerialCallbackLane` preserves bounded admission and callback order；the concrete Object WAL
+  integration test covers open dedup、append/read bytes、properties、seal/read/delete/close，while a deterministic
+  uncertainty test covers callback failure followed by same-generation background recovery resolution。
+- the facade's post-callback terminal observer joins the core retained attempt with one saturated timeout view；it does
+  not own a replay registry、physical request or retry scheduler。The P15 core remains the only exact-recovery runner。
+- F2-M3 remains in progress：`NereusReadOnlyManagedLedger`、per-ledger `ManagedLedgerMXBean` and the remaining
+  concurrency/buffer/failure matrix gates are not yet complete。
 - `NereusManagedLedgerOpenCoordinator` now implements permit-first first/open/recreate、binding mismatch rejection
   before L0 IO、canonical candidate adoption、missing-head corruption、forward lifecycle mirror reconciliation and
   get-only durable inspection；focused tests cover first create、no-create missing、reopen、sealed mirror、deleted
-  next-incarnation recreation and nonempty orphan-candidate rejection。Factory registry deduplication and the concrete
-  `ManagedLedger` surface remain pending。
+  next-incarnation recreation and nonempty orphan-candidate rejection。
 
 ## 5. F2-M4 — Cursor Boundary
 
