@@ -1292,8 +1292,13 @@ and transaction publish/end-txn。The publish parser preserves `ByteBuf` indexes
 nontransactional、non-durable、one-position cumulative whole-entry shape without persisted confirmation；the admitted
 path waits for local cursor completion before ack counters advance，while BookKeeper retains stock timing。Focused
 tests cover every rejected shape，unchanged rejection state and admitted completion timing；all fork Nereus storage
-tests、the stock cumulative-ack regression and affected checkstyle pass。Admin admission and the authoritative
-live-policy update coordinator remain pending。These commits are local because the active GitHub
+tests、the stock cumulative-ack regression and affected checkstyle pass。Local commit `23290be187` adds the closed
+`NereusAdminOperation` exhaustive validator and hooks loaded topic/namespace delete-subscription、clear/skip/expire/
+reset，compaction/offload trigger/status，truncate and shadow-update paths before mutation；cluster migration fails
+before `ledger.asyncMigrate`，while terminate/delete/unload remain admitted。The 18-test feature suite、Nereus-vs-
+BookKeeper topic split test，all fork Nereus storage tests，selected topic/namespace stock admin regressions and
+affected checkstyle pass。The authoritative live-policy update coordinator and binding-aware unloaded policy-update
+guard remain pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 

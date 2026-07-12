@@ -61,7 +61,8 @@ surfaces and audited unsupported channels。F2-M4 cursor boundary is implemented
 gates plus the fork hybrid bootstrap，durable `NSB1` binding open/delete coordinator and claim-before-open topic
 feature admission。Producer attach、publish metadata、non-durable subscribe、durable-subscription and transaction
 operation gates are also wired before their stock mutations；the limited non-durable cumulative ack gate runs before
-ack timestamp/counter/pending-ack/cursor mutation。Admin admission、live-policy refresh、
+ack timestamp/counter/pending-ack/cursor mutation。Loaded-topic admin mutation gates now reject durable-subscription、
+backlog/cursor、compaction/offload、truncate、shadow and migration operations。Authoritative live-policy refresh、
 namespace/capability convergence and the remaining lifecycle race gates and
 end-to-end restart gates remain in progress。
 
