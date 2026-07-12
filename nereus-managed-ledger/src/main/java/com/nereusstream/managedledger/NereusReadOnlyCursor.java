@@ -25,13 +25,13 @@ import org.apache.bookkeeper.mledger.ReadOnlyCursor;
 
 /** Serialized broker-local read-only cursor over dense F2 offsets. */
 public final class NereusReadOnlyCursor implements ReadOnlyCursor {
-    private final NereusReadOnlyManagedLedger ledger;
+    private final NereusCursorLedgerView ledger;
     private final ManagedLedgerErrorMapper errorMapper = new ManagedLedgerErrorMapper();
     private CompletableFuture<Void> tail = CompletableFuture.completedFuture(null);
     private Position readPosition;
     private boolean closed;
 
-    NereusReadOnlyCursor(NereusReadOnlyManagedLedger ledger, Position readPosition) {
+    NereusReadOnlyCursor(NereusCursorLedgerView ledger, Position readPosition) {
         this.ledger = Objects.requireNonNull(ledger, "ledger");
         this.readPosition = Objects.requireNonNull(readPosition, "readPosition");
     }
@@ -93,6 +93,13 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
     @Override
     public synchronized Position getReadPosition() {
         return readPosition;
+    }
+
+    synchronized void seekTo(Position position) {
+        if (closed) {
+            throw new IllegalStateException("read-only cursor is closed");
+        }
+        readPosition = Objects.requireNonNull(position, "position");
     }
 
     @Override

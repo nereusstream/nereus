@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-12
-> 当前交付阶段：Phase 1.5 P15-M0-M6 + F2-M1-M3 complete；F2-M4 next
+> 当前交付阶段：Phase 1.5 P15-M0-M6 + F2-M1-M4 complete；F2-M5 next
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -70,7 +70,7 @@ streamId + offset
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `In progress`（F2-M1-M3 complete；F2-M4 next） | projection metadata、factory、writable/get-only ledger、append/read/lifecycle/write-fence、admin/cache/stats implemented/tested；cursor boundary next |
+| `nereus-managed-ledger` | `Implemented`（F2-M1-M4 complete） | projection metadata、factory、writable/get-only ledger、append/read/lifecycle/write-fence、admin/cache/stats and cursor boundary implemented/tested |
 | `nereus-pulsar-adapter` | `In progress`（F2-M0R2 complete；gated） | runtime/S3/bootstrap/binding/capability contract complete；implementation waits for F2 milestones；module marker-only |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
@@ -160,7 +160,7 @@ decision behind items 14 and 16-18。
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M3 complete；F2-M4 next） |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M4 complete；F2-M5 next） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |

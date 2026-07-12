@@ -11,8 +11,8 @@ durable record、第三 codec registry、golden bytes、fake/real 单键 CAS/修
 均通过普通与 Docker gate。F2-M3 正在实现：配置/runtime/snapshot/callback、open/recreate/get-only
 inspection coordinator、factory exact-name registry、writable/get-only ledger、append/direct-read/Position/
 properties/lifecycle/write-fence、admin/cache/stats 已落地；真实 Object WAL、100-way same-name open、
-out-of-order callback、uncertain recovery 和错误映射 gate 均通过。F2-M3 complete；F2-M4 正在实现，
-read-only cursor 的 get-only open、批量 read/limits、position/skip/find/range/close 已落地。
+out-of-order callback、uncertain recovery 和错误映射 gate 均通过。F2-M3/M4 complete：read-only、
+non-durable 和 durable-boundary cursor、coalesced tail poll/read-or-wait、local wake/cancel/close 已落地。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -203,8 +203,8 @@ was repeated after the M1 implementation and remained green。
 | F2-M1 projection model | Complete | Pure model/codec、locked Pulsar composite and restart-stable mapping tests |
 | F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
 | F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
-| F2-M4 cursor boundary | In progress | Read-only cursor implemented；tail wait、non-durable/durable-boundary cursor pending |
-| F2-M5 broker integration | Not started | Hybrid storage provider and broker load/unload/restart tests |
+| F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
+| F2-M5 broker integration | In progress | Hybrid storage provider and broker load/unload/restart tests |
 | F2-M6 final acceptance | Not started | Real Pulsar + Oxia + Object WAL end-to-end gate |
 
 Future 2 is not complete until F2-M1 through F2-M6 are implemented and their gates pass.

@@ -1,6 +1,6 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 状态：In progress；F2-M0/M0R/M0R2、P15-M6 and F2-M1-M3 complete；F2-M4 cursor boundary next
+> 状态：In progress；F2-M0/M0R/M0R2、P15-M6 and F2-M1-M4 complete；F2-M5 broker integration next
 > 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle + P15-M6 complete logical result handoff
 > Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 

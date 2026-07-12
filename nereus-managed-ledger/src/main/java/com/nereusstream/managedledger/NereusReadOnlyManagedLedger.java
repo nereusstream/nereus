@@ -26,7 +26,7 @@ import org.apache.bookkeeper.mledger.ReadOnlyCursor;
 import org.apache.bookkeeper.mledger.ReadOnlyManagedLedger;
 
 /** Get-only F2 ledger handle; cursor construction is completed by F2-M4. */
-public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger {
+public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger, NereusCursorLedgerView {
     private final NereusManagedLedgerRuntime runtime;
     private final VirtualLedgerProjection projection;
     private final Map<String, String> properties;
@@ -134,20 +134,24 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger 
         }
     }
 
-    NereusManagedLedgerRuntime runtime() {
+    @Override
+    public NereusManagedLedgerRuntime runtime() {
         return runtime;
     }
 
-    StreamMetadata currentMetadata() {
+    @Override
+    public StreamMetadata currentMetadata() {
         return snapshots.current().metadata();
     }
 
-    CompletableFuture<StreamMetadata> refreshMetadata() {
+    @Override
+    public CompletableFuture<StreamMetadata> refreshMetadata() {
         return runtime.streamStorage().getStreamMetadata(projection.streamId())
                 .thenApply(metadata -> snapshots.updateFromMetadata(metadata).metadata());
     }
 
-    CompletableFuture<Entry> readAt(long offset, StreamMetadata metadata) {
+    @Override
+    public CompletableFuture<Entry> readAt(long offset, StreamMetadata metadata) {
         Position position = positions.entryPosition(projection, offset);
         positions.requireReadableEntryOffset(projection, position, metadata);
         return runtime.streamStorage().read(
@@ -158,11 +162,13 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger 
                 .thenApply(result -> codec.decode(position, result));
     }
 
-    Position readPosition(long offset, StreamMetadata metadata) {
+    @Override
+    public Position readPosition(long offset, StreamMetadata metadata) {
         return positions.readPosition(projection, offset, metadata);
     }
 
-    Position normalizeInclusiveMax(Position position, StreamMetadata metadata) {
+    @Override
+    public Position normalizeInclusiveMax(Position position, StreamMetadata metadata) {
         return positions.normalizeInclusiveMaxPosition(projection, position, metadata);
     }
 

@@ -57,7 +57,7 @@ materialization profiles are reserved design/API boundaries, not implemented sup
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6、F2-M1 projection foundation、
 F2-M2 projection metadata and F2-M3 factory/ledger facade are implemented。`nereus-managed-ledger` now provides the
 writable facade、strict get-only read-only ledger、exact append recovery/write-fence handoff、lifecycle/admin/stats
-surfaces and audited unsupported channels；F2-M4 cursor boundary is next。
+surfaces and audited unsupported channels。F2-M4 cursor boundary is implemented；F2-M5 broker integration is next。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
 materialization and Future 4 workers remain designed/reserved.

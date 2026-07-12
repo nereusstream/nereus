@@ -21,6 +21,7 @@ import com.nereusstream.managedledger.projection.ProjectionValidationException;
 import com.nereusstream.managedledger.projection.StreamPositionBounds;
 import com.nereusstream.managedledger.projection.VirtualLedgerProjection;
 import com.nereusstream.managedledger.snapshot.StreamSnapshotTracker;
+import com.nereusstream.managedledger.snapshot.TailPollCoordinator;
 import com.nereusstream.managedledger.stats.NereusManagedLedgerStats;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
@@ -36,6 +37,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,6 +47,8 @@ import java.util.function.Predicate;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.CloseCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteLedgerCallback;
+import org.apache.bookkeeper.mledger.AsyncCallbacks.DeleteCursorCallback;
+import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenCursorCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.TerminateCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.UpdatePropertiesCallback;
@@ -52,15 +56,18 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerMXBean;
+import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.PositionBound;
 import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.bookkeeper.mledger.proto.ManagedLedgerInfo.LedgerInfo;
+import org.apache.pulsar.common.api.proto.CommandSubscribe.InitialPosition;
 import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
 import org.apache.pulsar.common.util.DateFormatter;
 
 /** One writable Pulsar managed-ledger facade over one immutable F2 virtual-ledger projection. */
-public final class NereusManagedLedger extends AbstractNereusManagedLedger implements NereusWriteFenceView {
+public final class NereusManagedLedger extends AbstractNereusManagedLedger
+        implements NereusWriteFenceView, NereusCursorLedgerView {
     private static final Duration TERMINAL_OBSERVER_TIMEOUT = Duration.ofNanos(Long.MAX_VALUE);
 
     private enum LocalState {
@@ -87,9 +94,11 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     private final F2L0RequestFactory requests = new F2L0RequestFactory();
     private final SerialCallbackLane callbacks;
     private final AtomicReference<TopicProjectionRecord> topicProjection;
+    private final ConcurrentHashMap<String, NereusManagedCursor> cursors = new ConcurrentHashMap<>();
     private final AtomicInteger pendingAdds = new AtomicInteger();
     private final AtomicLong lastAddEntryTime = new AtomicLong();
     private final NereusManagedLedgerStats stats;
+    private final TailPollCoordinator tailPoll;
     private final AtomicBoolean closeNotified = new AtomicBoolean();
     private final Runnable onClose;
     private volatile ManagedLedgerConfig config;
@@ -115,6 +124,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
         this.callbacks = new SerialCallbackLane(runtime.callbackExecutor(), runtime.config().maxPendingCallbacks());
         this.stats = new NereusManagedLedgerStats(
                 projection.managedLedgerName(), () -> snapshots.current().metadata().cumulativeSize());
+        this.tailPoll = new TailPollCoordinator(
+                runtime.scheduler(), runtime.config().tailPollInterval(),
+                this::refreshMetadata, this::currentMetadata);
         this.state = switch (result.streamMetadata().state()) {
             case ACTIVE -> LocalState.OPEN;
             case SEALED -> LocalState.SEALED;
@@ -126,6 +138,44 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
 
     public VirtualLedgerProjection projection() {
         return projection;
+    }
+
+    @Override
+    public NereusManagedLedgerRuntime runtime() {
+        return runtime;
+    }
+
+    @Override
+    public StreamMetadata currentMetadata() {
+        return snapshots.current().metadata();
+    }
+
+    @Override
+    public CompletableFuture<StreamMetadata> refreshMetadata() {
+        return runtime.streamStorage().getStreamMetadata(projection.streamId())
+                .thenApply(metadata -> snapshots.updateFromMetadata(metadata).metadata());
+    }
+
+    @Override
+    public CompletableFuture<Entry> readAt(long offset, StreamMetadata metadata) {
+        Position position = positions.entryPosition(projection, offset);
+        positions.requireReadableEntryOffset(projection, position, metadata);
+        return runtime.streamStorage().read(
+                        projection.streamId(),
+                        offset,
+                        requests.singleEntryReadOptions(
+                                runtime.config().maxEntryBytes(), runtime.config().readTimeout()))
+                .thenApply(result -> entryCodec.decode(position, result));
+    }
+
+    @Override
+    public Position readPosition(long offset, StreamMetadata metadata) {
+        return positions.readPosition(projection, offset, metadata);
+    }
+
+    @Override
+    public Position normalizeInclusiveMax(Position position, StreamMetadata metadata) {
+        return positions.normalizeInclusiveMaxPosition(projection, position, metadata);
     }
 
     @Override
@@ -143,6 +193,107 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
         ManagedLedgerConfigValidator.captureForOperation(newConfig);
         config = newConfig;
     }
+
+    @Override
+    public ManagedCursor openCursor(String name) throws ManagedLedgerException {
+        return openCursor(name, InitialPosition.Earliest);
+    }
+
+    @Override
+    public ManagedCursor openCursor(String name, InitialPosition initialPosition) throws ManagedLedgerException {
+        return openCursor(name, initialPosition, Map.of(), Map.of());
+    }
+
+    @Override
+    public ManagedCursor openCursor(
+            String name,
+            InitialPosition initialPosition,
+            Map<String, Long> properties,
+            Map<String, String> cursorProperties) throws ManagedLedgerException {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(initialPosition, "initialPosition");
+        try {
+            return cursors.computeIfAbsent(name, ignored -> initialCursor(
+                    name, true, initialPosition, properties, cursorProperties));
+        } catch (CompletionException e) {
+            Throwable cause = unwrap(e);
+            if (cause instanceof ManagedLedgerException managedLedger) throw managedLedger;
+            throw new ManagedLedgerException(cause);
+        }
+    }
+
+    @Override
+    public void asyncOpenCursor(String name, OpenCursorCallback callback, Object ctx) {
+        asyncOpenCursor(name, InitialPosition.Earliest, callback, ctx);
+    }
+
+    @Override
+    public void asyncOpenCursor(
+            String name, InitialPosition initialPosition, OpenCursorCallback callback, Object ctx) {
+        asyncOpenCursor(name, initialPosition, Map.of(), Map.of(), callback, ctx);
+    }
+
+    @Override
+    public void asyncOpenCursor(
+            String name,
+            InitialPosition initialPosition,
+            Map<String, Long> properties,
+            Map<String, String> cursorProperties,
+            OpenCursorCallback callback,
+            Object ctx) {
+        try {
+            callback.openCursorComplete(openCursor(
+                    name, initialPosition, properties, cursorProperties), ctx);
+        } catch (ManagedLedgerException e) {
+            callback.openCursorFailed(e, ctx);
+        }
+    }
+
+    @Override
+    public ManagedCursor newNonDurableCursor(Position startCursorPosition) throws ManagedLedgerException {
+        return newNonDurableCursor(startCursorPosition, "non-durable-" + System.identityHashCode(startCursorPosition));
+    }
+
+    @Override
+    public ManagedCursor newNonDurableCursor(Position startPosition, String subscriptionName)
+            throws ManagedLedgerException {
+        return newNonDurableCursor(startPosition, subscriptionName, InitialPosition.Earliest, false);
+    }
+
+    @Override
+    public ManagedCursor newNonDurableCursor(
+            Position startPosition,
+            String subscriptionName,
+            InitialPosition initialPosition,
+            boolean isReadCompacted) throws ManagedLedgerException {
+        if (isReadCompacted) {
+            throw unsupported("newNonDurableCursor(readCompacted)");
+        }
+        StreamMetadata metadata = currentMetadata();
+        long offset = normalizeCursorReadOffset(startPosition, initialPosition, metadata);
+        Position read = readPosition(offset, metadata);
+        Position markDelete = PositionFactory.create(projection.virtualLedgerId(), offset - 1);
+        return createLocalCursor(subscriptionName, false, markDelete, read, Map.of(), Map.of());
+    }
+
+    @Override
+    public void deleteCursor(String name) throws ManagedLedgerException {
+        NereusManagedCursor cursor = cursors.remove(name);
+        if (cursor == null) {
+            throw new ManagedLedgerException.CursorNotFoundException("cursor does not exist");
+        }
+        cursor.close();
+    }
+
+    @Override
+    public void asyncDeleteCursor(String name, DeleteCursorCallback callback, Object ctx) {
+        try { deleteCursor(name); callback.deleteCursorComplete(ctx); }
+        catch (ManagedLedgerException e) { callback.deleteCursorFailed(e, ctx); }
+    }
+
+    @Override public Iterable<ManagedCursor> getCursors() { return List.copyOf(cursors.values()); }
+    @Override public Iterable<ManagedCursor> getActiveCursors() { return cursors.values().stream().filter(ManagedCursor::isActive).map(value -> (ManagedCursor) value).toList(); }
+    @Override public void removeWaitingCursor(ManagedCursor cursor) { }
 
     @Override
     public Position addEntry(byte[] data) throws ManagedLedgerException {
@@ -434,6 +585,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
             return;
         }
         callbacks.complete(sequence, () -> {
+            tailPoll.close();
+            List.copyOf(cursors.values()).forEach(NereusManagedCursor::close);
             notifyClosed();
             callback.closeComplete(ctx);
         });
@@ -484,7 +637,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
 
     @Override
     public long getNumberOfActiveEntries() {
-        return 0;
+        ManagedCursor slowest = getSlowestConsumer();
+        return slowest == null ? 0 : slowest.getNumberOfEntriesInBacklog(true);
     }
 
     @Override
@@ -494,13 +648,15 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
 
     @Override
     public long getEstimatedBacklogSize() {
-        return 0;
+        ManagedCursor slowest = getSlowestConsumer();
+        return slowest == null ? 0 : getEstimatedBacklogSize(slowest.getReadPosition());
     }
 
     @Override
     public long getEstimatedBacklogSize(Position position) {
         StreamMetadata metadata = snapshots.current().metadata();
-        long offset = positions.requireReadPositionOffset(projection, position, metadata);
+        long offset = requireVirtualLedgerPosition(position);
+        offset = Math.max(metadata.trimOffset(), Math.min(offset, metadata.committedEndOffset()));
         long entries = metadata.committedEndOffset() - offset;
         if (entries == 0 || metadata.committedEndOffset() == 0) {
             return 0;
@@ -564,6 +720,14 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
     }
 
     @Override
+    public ManagedCursor getSlowestConsumer() {
+        return cursors.values().stream()
+                .filter(NereusManagedCursor::isDurable)
+                .min(java.util.Comparator.comparing(NereusManagedCursor::getMarkDeletedPosition))
+                .orElse(null);
+    }
+
+    @Override
     public int getPendingAddEntriesCount() {
         return pendingAdds.get();
     }
@@ -615,7 +779,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                         + ",profile=" + metadata.profile().name() + "}"
                 : null;
         internal.ledgers = List.of(ledger);
-        internal.cursors = Map.of();
+        java.util.TreeMap<String, ManagedLedgerInternalStats.CursorStats> cursorStats = new java.util.TreeMap<>();
+        cursors.forEach((name, cursor) -> cursorStats.put(name, cursor.getCursorStats()));
+        internal.cursors = Map.copyOf(cursorStats);
         return CompletableFuture.completedFuture(internal);
     }
 
@@ -845,6 +1011,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
         Position position;
         try {
             snapshots.advanceFromAppend(result);
+            tailPoll.signalLocalAppend();
             position = positions.entryPosition(projection, result.range().startOffset());
             fence.ifPresent(value -> resolveFence(
                     value, NereusWriteFenceResolution.COMMITTED, null));
@@ -1140,6 +1307,73 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger imple
                 .setLedgerId(projection.virtualLedgerId())
                 .setEntries(metadata.committedEndOffset())
                 .setSize(metadata.cumulativeSize());
+    }
+
+    private NereusManagedCursor initialCursor(
+            String name,
+            boolean durable,
+            InitialPosition initialPosition,
+            Map<String, Long> properties,
+            Map<String, String> cursorProperties) {
+        StreamMetadata metadata = currentMetadata();
+        long offset = initialPosition == InitialPosition.Latest
+                ? metadata.committedEndOffset()
+                : metadata.trimOffset();
+        Position read = readPosition(offset, metadata);
+        Position markDelete = PositionFactory.create(projection.virtualLedgerId(), offset - 1);
+        return new NereusManagedCursor(
+                this, name, durable, markDelete, read, properties, cursorProperties);
+    }
+
+    NereusManagedCursor createLocalCursor(
+            String name,
+            boolean durable,
+            Position markDelete,
+            Position read,
+            Map<String, Long> properties,
+            Map<String, String> cursorProperties) {
+        NereusManagedCursor cursor = new NereusManagedCursor(
+                this, name, durable, markDelete, read, properties, cursorProperties);
+        if (name != null) {
+            NereusManagedCursor existing = cursors.putIfAbsent(name, cursor);
+            if (existing != null) return existing;
+        }
+        return cursor;
+    }
+
+    void removeCursor(NereusManagedCursor cursor) {
+        if (cursor.getName() != null) {
+            cursors.remove(cursor.getName(), cursor);
+        }
+    }
+
+    TailPollCoordinator tailPoll() {
+        return tailPoll;
+    }
+
+    long positionsMarkDeleteAfter(Position position) {
+        return positions.markDeleteOffsetAfter(projection, position, currentMetadata());
+    }
+
+    long requireCursorReadOffset(Position position) {
+        return positions.requireReadPositionOffset(projection, position, currentMetadata());
+    }
+
+    private long normalizeCursorReadOffset(
+            Position position, InitialPosition initialPosition, StreamMetadata metadata) {
+        if (position == null || samePosition(position, PositionFactory.EARLIEST)) {
+            return initialPosition == InitialPosition.Latest
+                    ? metadata.committedEndOffset()
+                    : metadata.trimOffset();
+        }
+        if (samePosition(position, PositionFactory.LATEST)) {
+            return metadata.committedEndOffset();
+        }
+        return positions.requireReadPositionOffset(projection, position, metadata);
+    }
+
+    private static boolean samePosition(Position left, Position right) {
+        return left.getLedgerId() == right.getLedgerId() && left.getEntryId() == right.getEntryId();
     }
 
     private long requireVirtualLedgerPosition(Position position) {

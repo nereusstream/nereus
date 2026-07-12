@@ -68,6 +68,7 @@ import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenReadOnlyManagedLedgerCallback;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedLedger;
+import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerFactoryConfig;
@@ -126,8 +127,16 @@ class NereusManagedLedgerFacadeTest {
             NereusManagedLedger ledger = (NereusManagedLedger) concurrentOpens.getFirst().join();
             assertThat(concurrentOpens).allSatisfy(open -> assertThat(open.join()).isSameAs(ledger));
             assertThat(factory.open(NAME, config(true))).isSameAs(ledger);
+            ManagedCursor tailCursor = ledger.newNonDurableCursor(PositionFactory.LATEST, "tail-reader");
+            CompletableFuture<List<Entry>> tailRead = readOrWait(tailCursor, 1);
+            assertThat(tailRead).isNotDone();
             byte[] payload = "pulsar-entry".getBytes(StandardCharsets.UTF_8);
             Position position = ledger.addEntry(payload, 3);
+            List<Entry> awakened = tailRead.join();
+            assertThat(awakened).singleElement()
+                    .satisfies(value -> assertThat(value.getData()).isEqualTo(payload));
+            awakened.forEach(Entry::release);
+            tailCursor.close();
 
             assertThat(position.getLedgerId()).isEqualTo(ledger.projection().virtualLedgerId());
             assertThat(position.getEntryId()).isZero();
@@ -152,6 +161,24 @@ class NereusManagedLedgerFacadeTest {
             assertThat(entry.release()).isTrue();
             assertThat(ledger.getStats().getEntriesReadTotalCount()).isEqualTo(1);
             assertThat(ledger.getStats().getReadEntriesBytesTotal()).isEqualTo(payload.length);
+
+            ManagedCursor durableCursor = ledger.openCursor("subscription");
+            assertThat(durableCursor.isDurable()).isTrue();
+            assertThat(durableCursor.getNumberOfEntriesInBacklog(true)).isEqualTo(1);
+            List<Entry> durableRead = durableCursor.readEntries(1);
+            assertThat(durableRead).hasSize(1);
+            durableRead.forEach(Entry::release);
+            assertThatThrownBy(() -> durableCursor.markDelete(position))
+                    .isInstanceOf(ManagedLedgerException.class)
+                    .hasMessageStartingWith("NEREUS_UNSUPPORTED_OPERATION:");
+            ManagedCursor nonDurable = ledger.newNonDurableCursor(
+                    PositionFactory.EARLIEST, "reader");
+            assertThat(nonDurable.isDurable()).isFalse();
+            nonDurable.markDelete(position);
+            assertThat(nonDurable.getMarkDeletedPosition()).isEqualTo(position);
+            assertThat(nonDurable.getNumberOfEntriesInBacklog(true)).isZero();
+            nonDurable.close();
+            ledger.deleteCursor("subscription");
             assertThat(ledger.asyncFindPosition(candidate -> true).join().getEntryId()).isEqualTo(1);
             assertThat(ledger.getLastDispatchablePosition(candidate -> true, position).join())
                     .isEqualTo(position);
@@ -320,6 +347,15 @@ class NereusManagedLedgerFacadeTest {
                 result.completeExceptionally(exception);
             }
         }, null);
+        return result;
+    }
+
+    private static CompletableFuture<List<Entry>> readOrWait(ManagedCursor cursor, int count) {
+        CompletableFuture<List<Entry>> result = new CompletableFuture<>();
+        cursor.asyncReadEntriesOrWait(count, new org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntriesCallback() {
+            @Override public void readEntriesComplete(List<Entry> entries, Object ctx) { result.complete(entries); }
+            @Override public void readEntriesFailed(ManagedLedgerException exception, Object ctx) { result.completeExceptionally(exception); }
+        }, null, null);
         return result;
     }
 

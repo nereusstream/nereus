@@ -3,7 +3,7 @@
 > 状态：Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 implemented/final-gated
 > 交付映射：`docs/phase-1-core-stream-storage/`
 > 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
-> 当前里程碑：F2-M1-M3 have consumed the completed L0 foundation；F2-M4 next
+> 当前里程碑：F2-M1-M4 have consumed the completed L0 foundation；F2-M5 next
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
 Oxia keys、failure injection 和测试 gate 以代码级文档为准；本文不复制那些合同。

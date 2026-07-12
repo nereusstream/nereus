@@ -387,8 +387,15 @@ Implementation evidence（2026-07-12，read-only sub-stage）：
   max-position limits，releases partial results on failure and implements read position、backlog count、skip、bounded
   newest-match scan、range count and ordered close。The real Object WAL facade test reads exact persisted bytes through
   this cursor and verifies tail position/ownership。
-- F2-M4 remains in progress：coalesced tail wait/polling and ManagedCursor-compatible non-durable/durable-boundary
-  implementations are still pending。
+- `NereusManagedCursor` implements the complete locked `ManagedCursor` surface：durable-boundary mutations fail with
+  the stable unsupported prefix，non-durable cumulative mark-delete/clear/reset/properties stay local，individual ack
+  holes stay unsupported，and replay/scan/read/seek/skip/stats/batch-ack compatibility channels are explicit。
+- `TailPollCoordinator` gives every writable ledger one timer and at most one refresh for all pending cursors；
+  register-then-recheck closes the local-append race，local append signals without waiting for a poll，cancel removes
+  without callback，close fails once and sealed tail fails instead of waiting forever。
+- real Object WAL coverage now includes durable read with rejected durable mark-delete、local non-durable mark-delete、
+  read-only cursor ownership and append-wakes-tail-read；a focused two-waiter test proves one shared metadata poll。
+- F2-M4 is complete；F2-M5 broker integration is next。
 
 ## 6. F2-M5 — Pulsar Fork Integration
 
