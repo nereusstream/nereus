@@ -551,7 +551,7 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- the fork bootstrap starts at local `f21661999d`；through `23290be187` it now has typed config/runtime assembly，
+- the fork bootstrap starts at local `f21661999d`；through `f529d79420` it now has typed config/runtime assembly，
   stable ordered `[bookkeeper,nereus]` classes，deterministic `NSB1` binding records，BookKeeper adoption，bound
   open/delete/recreate coordination，loaded/unloaded broker hooks，reserved capability publication and same-snapshot
   topic-open feature admission，plus pre-mutation remote-producer、publish-metadata、non-durable-subscribe、durable-
@@ -563,8 +563,13 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - the closed admin enum now gates loaded topic/namespace durable-subscription、backlog/cursor、compaction/offload、
   truncate、shadow and migration mutations while allowing terminate/delete/unload；the 18-test feature suite、topic
   storage split and selected stock admin regressions pass。
-- authoritative live-policy refresh and binding-aware unloaded policy updates，namespace policy serialization/capability
-  convergence，multi-broker binding races and broker E2E restart wiring remain pending，so F2-M5 is still in progress。
+- authoritative live-policy refresh now refetches one namespace/global/local tuple，validates before mutation，applies
+  only the newest monotonic sequence on the policy executor and makes stale success/failure follow that newest result；
+  Nereus initialization uses the same path before subscription creation，while BookKeeper retains its stock policy
+  path。Focused ordering/rejection tests，all fork Nereus storage tests，two stock policy regressions and affected
+  checkstyle pass。
+- binding-aware unloaded policy updates，namespace policy serialization/capability convergence，multi-broker binding
+  races and broker E2E restart wiring remain pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance
 

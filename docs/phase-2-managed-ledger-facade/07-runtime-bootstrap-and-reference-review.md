@@ -1297,8 +1297,15 @@ tests、the stock cumulative-ack regression and affected checkstyle pass。Local
 reset，compaction/offload trigger/status，truncate and shadow-update paths before mutation；cluster migration fails
 before `ledger.asyncMigrate`，while terminate/delete/unload remain admitted。The 18-test feature suite、Nereus-vs-
 BookKeeper topic split test，all fork Nereus storage tests，selected topic/namespace stock admin regressions and
-affected checkstyle pass。The authoritative live-policy update coordinator and binding-aware unloaded policy-update
-guard remain pending。These commits are local because the active GitHub
+affected checkstyle pass。Local commit `f529d79420` adds the authoritative same-snapshot live-policy path。
+`BrokerService` refetches one namespace/global/local tuple and derives both `ManagedLedgerConfig` and the feature view
+from it；Nereus initialization refreshes before subscription creation，and live notification payloads are treated only
+as hints。A per-topic monotonic coordinator applies only the newest sequence on the policy executor，makes stale
+success/failure follow the newest result，and includes accepted policy side effects in that result。Validation precedes
+config/hierarchy mutation；a current rejection marks local admission failed and asynchronously closes the topic。
+Focused stale-ordering and unsafe-snapshot tests，all fork Nereus storage tests，BookKeeper persistence-policy/delete-
+namespace regressions and affected main/test checkstyle pass。The binding-aware unloaded policy-update guard remains
+pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 
