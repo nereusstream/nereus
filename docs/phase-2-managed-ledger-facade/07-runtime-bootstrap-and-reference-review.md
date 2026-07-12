@@ -1266,9 +1266,12 @@ focused binding tests and affected checkstyle pass。Local commit `c24a0bc608` r
 specified namespace-listable keyspace，strict deterministic `NSB1` codec，four lifecycle states，metadata-version
 hydration，CRC32C and golden vectors。Local commit `b62154b343` adds factory attach，missing-binding BookKeeper
 adoption，class-switch rejection，open activation，delete/recreate state-machine APIs and the broker open hook；the
-focused binding/config tests and affected checkstyle pass。This is not F2-M5 exit：the loaded and unloaded broker
-delete call sites do not yet consume the delete permit，and feature-admission/namespace coordination/capability/
-broker-E2E gates below remain pending。These commits are local because the active GitHub
+focused binding/config tests and affected checkstyle pass。The loaded and unloaded broker delete call sites consume
+the bound-class permit as of local commit `0d3a9768b4`；the permit and managed-ledger config
+are captured before policy cleanup，storage terminal state precedes the binding tombstone，and the stock loaded-topic
+delete regression passes。This is not F2-M5 exit：feature-admission/namespace coordination/capability/multi-broker
+race/broker-E2E gates
+below remain pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 
