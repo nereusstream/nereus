@@ -23,7 +23,11 @@ delete/recreate state-machine APIs，distribution dependency/license accounting 
 `PersistencePolicies.equals`。`BrokerService` open now prepares the binding before factory selection and withholds the
 ledger until activation succeeds。Loaded and unloaded delete paths capture the bound-class permit before policy
 cleanup，delete through that class and publish the `DELETED` tombstone only after storage is terminal。Feature-admission
-hooks、namespace/capability convergence，multi-broker lifecycle races and broker E2E gates remain pending；the broker
+now resolves the managed-ledger config and immutable effective feature view from one local/global/namespace snapshot；
+Nereus system/internal topics，replication，dedup，TTL/expiration，retention，compaction，backlog eviction，Pulsar
+offload，entry filters，shadow/migration，auto-skip and managed-ledger interceptors fail before topic events，binding
+claim or factory IO。Producer/publish/subscribe/ack/admin admission、namespace/capability convergence，multi-broker
+lifecycle races and broker E2E gates remain pending；the broker
 does publish the reserved `nereus.storage-binding-protocol=1` lookup property when the enabled hybrid provider is
 active，and rejects attempts to spoof that property through generic lookup configuration。Therefore
 F2-M5 is not yet complete。
@@ -219,7 +223,7 @@ was repeated after the M1 implementation and remained green。
 | F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
 | F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
 | F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
-| F2-M5 broker integration | In progress | Hybrid bootstrap/config/distribution gated；admission、binding lifecycle and broker load/unload/restart remain |
+| F2-M5 broker integration | In progress | Hybrid bootstrap、binding open/delete and topic-open admission gated；operation admission、namespace convergence and broker restart remain |
 | F2-M6 final acceptance | Not started | Real Pulsar + Oxia + Object WAL end-to-end gate |
 
 Future 2 is not complete until F2-M1 through F2-M6 are implemented and their gates pass.

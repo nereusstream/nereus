@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-12
-> 当前交付阶段：Phase 1.5 P15-M0-M6 + F2-M1-M4 complete；F2-M5 next
+> 当前交付阶段：Phase 1.5 P15-M0-M6 + F2-M1-M4 complete；F2-M5 active
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。

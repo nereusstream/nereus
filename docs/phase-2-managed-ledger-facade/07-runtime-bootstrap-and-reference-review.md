@@ -1279,7 +1279,11 @@ delete regression passes。This is not F2-M5 exit：feature-admission/namespace 
 race/broker-E2E gates
 below remain pending。Local commit `4921c2fc7a` publishes the reserved
 `nereus.storage-binding-protocol=1` property only for the enabled hybrid provider and rejects generic lookup-property
-spoofing；cluster convergence checks before policy enablement remain pending。These commits are local because the active GitHub
+spoofing；cluster convergence checks before policy enablement remain pending。Local commit `33b0e5fb70` implements
+the same-snapshot `NereusTopicOpenContext` resolver and closed topic-open validator；15 focused admission tests，all
+fork Nereus storage tests，affected checkstyle and stock offload/system-topic/deadlock regressions pass。The validator
+runs before topic events，binding preparation and factory IO。Operation-specific producer/publish/subscribe/ack/admin
+gates remain pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 
