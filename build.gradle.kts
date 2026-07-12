@@ -157,3 +157,18 @@ tasks.register("phase2M1Check") {
     dependsOn(":nereus-metadata-oxia:test")
     dependsOn(":nereus-managed-ledger:test")
 }
+
+tasks.register("phase2M2Check") {
+    group = "verification"
+    description = "Verify the F2-M2 projection metadata model, codec, CAS, repair, and shared-runtime contracts."
+    dependsOn("phase2M1Check")
+    dependsOn(":nereus-metadata-oxia:test")
+    dependsOn(":nereus-metadata-oxia:compileOxiaIntegrationTestJava")
+}
+
+tasks.register("phase2M2FinalCheck") {
+    group = "verification"
+    description = "Run the ordinary and Docker-backed real Oxia F2-M2 projection metadata gates."
+    dependsOn("phase2M2Check")
+    dependsOn(":nereus-metadata-oxia:oxiaIntegrationTest")
+}

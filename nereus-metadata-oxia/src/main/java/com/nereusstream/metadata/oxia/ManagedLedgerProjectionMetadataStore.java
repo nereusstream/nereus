@@ -3,12 +3,22 @@ package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
+import java.time.Clock;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Protocol-neutral metadata contract for authoritative and derived F2 projections. */
 public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
+    static ManagedLedgerProjectionMetadataStore usingSharedRuntime(
+            OxiaClientConfiguration clientConfig,
+            SharedOxiaClientRuntime runtime,
+            ProjectionMetadataStoreConfig storeConfig,
+            Clock clock) {
+        return OxiaJavaManagedLedgerProjectionMetadataStore.usingSharedRuntime(
+                clientConfig, runtime, storeConfig, clock);
+    }
+
     CompletableFuture<Optional<TopicProjectionRecord>> getProjection(
             String cluster,
             String managedLedgerName);

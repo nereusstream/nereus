@@ -56,10 +56,8 @@ import com.nereusstream.metadata.oxia.records.StreamNameRecord;
 import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.metadata.oxia.records.VisibleSliceReferenceRecord;
-import io.oxia.client.api.OxiaClientBuilder;
 import io.oxia.client.api.SyncOxiaClient;
 import io.oxia.client.api.exceptions.KeyAlreadyExistsException;
-import io.oxia.client.api.exceptions.OxiaException;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
 import java.time.Clock;
 import java.time.Duration;
@@ -74,7 +72,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -88,12 +85,11 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private static final int MAX_CAS_RETRIES = 64;
 
     private final OxiaClientConfiguration configuration;
-    private final SyncOxiaClient oxiaClient;
+    private final SharedOxiaClientRuntime runtime;
+    private final boolean ownsRuntime;
     private final PartitionedOxiaClient client;
     private final Clock clock;
     private final ExecutorService operationExecutor;
-    private final ExecutorService clientExecutor;
-    private final ExecutorService watchExecutor;
     private final CopyOnWriteArrayList<WatchRegistration> watches = new CopyOnWriteArrayList<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -101,33 +97,37 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             OxiaClientConfiguration configuration,
             Clock clock) {
         Objects.requireNonNull(configuration, "configuration");
-        try {
-            SyncOxiaClient client = OxiaClientBuilder.create(configuration.serviceAddress())
-                    .namespace(configuration.namespace())
-                    .requestTimeout(configuration.requestTimeout())
-                    .sessionTimeout(configuration.sessionTimeout())
-                    .syncClient();
-            return new OxiaJavaClientMetadataStore(configuration, client, clock);
-        } catch (OxiaException e) {
-            throw new NereusException(
-                    ErrorCode.METADATA_UNAVAILABLE, true, "failed to create Oxia metadata client", e);
-        }
+        SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, clock);
+        return new OxiaJavaClientMetadataStore(configuration, runtime, clock, true);
+    }
+
+    public static OxiaJavaClientMetadataStore usingSharedRuntime(
+            OxiaClientConfiguration configuration,
+            SharedOxiaClientRuntime runtime,
+            Clock clock) {
+        return new OxiaJavaClientMetadataStore(configuration, runtime, clock, false);
     }
 
     OxiaJavaClientMetadataStore(
             OxiaClientConfiguration configuration,
             SyncOxiaClient oxiaClient,
             Clock clock) {
+        this(configuration, SharedOxiaClientRuntime.usingClient(configuration, oxiaClient, clock), clock, true);
+    }
+
+    private OxiaJavaClientMetadataStore(
+            OxiaClientConfiguration configuration,
+            SharedOxiaClientRuntime runtime,
+            Clock clock,
+            boolean ownsRuntime) {
         this.configuration = Objects.requireNonNull(configuration, "configuration");
-        this.oxiaClient = Objects.requireNonNull(oxiaClient, "oxiaClient");
+        this.runtime = Objects.requireNonNull(runtime, "runtime");
+        runtime.requireCompatible(configuration);
+        this.ownsRuntime = ownsRuntime;
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.client = runtime.client();
         this.operationExecutor = boundedExecutor(
                 4, configuration.maxPendingOperations(), "nereus-oxia-operation");
-        this.clientExecutor = Executors.newFixedThreadPool(8, daemonFactory("nereus-oxia-client"));
-        this.watchExecutor = boundedExecutor(
-                2, configuration.maxPendingOperations(), "nereus-oxia-watch");
-        this.client = new PartitionedOxiaClient(
-                new OxiaJavaClientBackend(oxiaClient, clientExecutor, watchExecutor));
     }
 
     @Override
@@ -509,12 +509,8 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         watches.forEach(WatchRegistration::close);
         watches.clear();
         operationExecutor.shutdown();
-        watchExecutor.shutdown();
-        clientExecutor.shutdown();
-        try {
-            oxiaClient.close();
-        } catch (Exception ignored) {
-            // Close is best effort after admission has stopped.
+        if (ownsRuntime) {
+            runtime.close();
         }
     }
 

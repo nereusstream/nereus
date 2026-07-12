@@ -31,6 +31,7 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
@@ -38,6 +39,7 @@ import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
 import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
+import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import com.nereusstream.metadata.oxia.testing.OxiaMetadataStoreContractScenario;
 import io.oxia.client.api.OxiaClientBuilder;
 import io.oxia.client.api.options.DeleteOption;
@@ -53,6 +55,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -67,6 +70,75 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
     @Container
     private static final OxiaContainer OXIA =
             new OxiaContainer(DockerImageName.parse(IMAGE)).withShards(4);
+
+    @Test
+    void sharedRuntimeProjectionContractSurvivesRepairRecreationAndRestart() throws Exception {
+        String cluster = "f2/projection/" + UUID.randomUUID();
+        String managedLedgerName = "tenant/ns/persistent/" + UUID.randomUUID();
+        OxiaClientConfiguration config = configuration();
+        TopicProjectionRecord recreated;
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(config, Clock.systemUTC());
+                OxiaJavaClientMetadataStore l0 =
+                        OxiaJavaClientMetadataStore.usingSharedRuntime(config, runtime, Clock.systemUTC());
+                ManagedLedgerProjectionMetadataStore projection =
+                        ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
+                                config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
+            ProjectionCreateRequest firstRequest = projectionRequest(l0, cluster, managedLedgerName, 3, 1);
+            List<CompletableFuture<TopicProjectionRecord>> firstCreates = IntStream.range(0, 16)
+                    .mapToObj(ignored -> projection.createFirstProjection(cluster, firstRequest))
+                    .toList();
+            CompletableFuture.allOf(firstCreates.toArray(CompletableFuture[]::new)).join();
+            TopicProjectionRecord first = firstCreates.getFirst().join();
+            assertThat(firstCreates).allSatisfy(future -> assertThat(future.join()).isEqualTo(first));
+
+            ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
+            StreamId firstStreamId = new StreamId(first.streamId());
+            try (var raw = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
+                raw.delete(
+                        keyspace.positionIndexKey(firstStreamId),
+                        Set.of(DeleteOption.PartitionKey(keyspace.streamPartitionKey(firstStreamId).value())));
+            }
+            assertThat(projection.repairProjectionIndexes(cluster, first).join())
+                    .isEqualTo(new ProjectionRepairResult(
+                            ProjectionRepairStatus.ALREADY_VALID,
+                            ProjectionRepairStatus.CREATED));
+
+            TopicProjectionRecord deleting = projection.mirrorFacadeState(
+                    cluster, managedLedgerName, first.projectionIdentity(), first.metadataVersion(),
+                    ManagedLedgerFacadeState.DELETING).join();
+            TopicProjectionRecord deleted = projection.mirrorFacadeState(
+                    cluster, managedLedgerName, deleting.projectionIdentity(), deleting.metadataVersion(),
+                    ManagedLedgerFacadeState.DELETED).join();
+            ProjectionCreateRequest nextRequest = projectionRequest(l0, cluster, managedLedgerName, 4, 2);
+            List<CompletableFuture<TopicProjectionRecord>> recreations = IntStream.range(0, 12)
+                    .mapToObj(ignored -> projection.recreateDeletedProjection(
+                            cluster, deleted.projectionIdentity(), deleted.metadataVersion(), nextRequest))
+                    .toList();
+            CompletableFuture.allOf(recreations.toArray(CompletableFuture[]::new)).join();
+            recreated = recreations.getFirst().join();
+            assertThat(recreations).allSatisfy(future -> assertThat(future.join()).isEqualTo(recreated));
+            assertThat(recreated.incarnation()).isEqualTo(2);
+            assertThat(recreated.streamId()).isNotEqualTo(first.streamId());
+            assertThat(recreated.virtualLedgerId()).isNotEqualTo(first.virtualLedgerId());
+
+            projection.close();
+            assertThat(l0.getStreamSnapshot(cluster, new StreamId(recreated.streamId())).join().metadata().state())
+                    .isEqualTo(StreamState.ACTIVE.name());
+        }
+
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(config, Clock.systemUTC());
+                ManagedLedgerProjectionMetadataStore restarted =
+                        ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
+                                config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
+            TopicProjectionRecord recovered = restarted.getProjection(cluster, managedLedgerName)
+                    .join().orElseThrow();
+            assertThat(recovered).isEqualTo(recreated);
+            assertThat(restarted.repairProjectionIndexes(cluster, recovered).join())
+                    .isEqualTo(new ProjectionRepairResult(
+                            ProjectionRepairStatus.ALREADY_VALID,
+                            ProjectionRepairStatus.ALREADY_VALID));
+        }
+    }
 
     @Test
     void genericCommitCoexistsWithLegacyChainAndLifecycleSurvivesRestart() {
@@ -284,6 +356,37 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                 Duration.ofSeconds(30),
                 100,
                 1_024);
+    }
+
+    private static ProjectionCreateRequest projectionRequest(
+            OxiaJavaClientMetadataStore l0,
+            String cluster,
+            String managedLedgerName,
+            long bindingGeneration,
+            long incarnation) {
+        StreamName streamName = ManagedLedgerProjectionNames.streamName(managedLedgerName, incarnation);
+        Map<String, String> attributes = Map.of(
+                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
+                ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1);
+        StreamId streamId = new StreamId(l0.createOrGetStream(
+                        cluster,
+                        streamName,
+                        new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, attributes))
+                .join().streamId());
+        StreamMetadataSnapshot snapshot = l0.getStreamSnapshot(cluster, streamId).join();
+        StreamMetadata empty = new StreamMetadata(
+                streamId,
+                streamName,
+                StreamState.valueOf(snapshot.metadata().state()),
+                StorageProfile.valueOf(snapshot.metadata().profile()),
+                snapshot.metadata().attributes(),
+                snapshot.metadata().createdAtMillis(),
+                snapshot.metadataVersion(),
+                snapshot.committedEnd().committedEndOffset(),
+                snapshot.committedEnd().cumulativeSize(),
+                snapshot.trim().trimOffset());
+        return new ProjectionCreateRequest(
+                managedLedgerName, bindingGeneration, incarnation, empty, Map.of("owner", "integration"));
     }
 
     private static CommitSliceRequest request(

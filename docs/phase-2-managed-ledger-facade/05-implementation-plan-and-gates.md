@@ -1,7 +1,7 @@
 # Future 2 Implementation Plan and Gates
 
-F2-M0/M0R/M0R2 design、the complete Phase 1.5 P15-M6 final gate and F2-M1 have passed。P15-M6 carries
-`AppendResult.cumulativeSize` from existing committed truth。F2-M2 is the next implementation milestone.
+F2-M0/M0R/M0R2 design、the complete Phase 1.5 P15-M6 final gate、F2-M1 and F2-M2 have passed。P15-M6 carries
+`AppendResult.cumulativeSize` from existing committed truth。F2-M3 is the next implementation milestone.
 A milestone is complete only when its code, focused tests and listed gate exist; documentation alone is not
 implementation evidence.
 
@@ -155,7 +155,20 @@ Implementation evidence（2026-07-12，fake contract sub-stage）：
 - focused tests cover 32-way first create、24-way deleted-topic recreation、losing ID gaps、restart hydration、every
   write-after fault、hash/exact-name and derived-identity conflicts、stale identity、legal lifecycle edges、one
   monotonic deadline、bounded admission and idempotent close；
-- shared client ownership、the real Java Oxia adapter and Docker parity remain required before F2-M2 completion。
+- this fake sub-stage was followed by the shared client ownership、real Java Oxia adapter and Docker parity evidence
+  below；no fake-only behavior is accepted as F2-M2 completion evidence。
+
+Implementation evidence（2026-07-12，real adapter/final sub-stage）：
+
+- `SharedOxiaClientRuntime` owns exactly one sync client plus client/watch executors；legacy L0 `connect/close`
+  remains owning，while both adapters' `usingSharedRuntime` factories close only their local operation admission；
+- `OxiaJavaManagedLedgerProjectionMetadataStore` consumes the same production CAS/repair core as the fake and never
+  closes the caller-owned runtime；runtime/adapter configuration drift is rejected before operation admission；
+- `phase2M2Check` is the ordinary gate and `phase2M2FinalCheck` adds the real Oxia Docker suite；the F2 Docker case
+  covers shared L0/projection use、16-way first create、derived deletion/repair、12-way recreation、adapter-local
+  close and full runtime restart；
+- F2-M2 is complete。The projection store still does not orchestrate L0 open/recovery itself；that facade-level
+  protocol begins in F2-M3 and continues to consume Phase 1.5 lifecycle/recovery as a black box。
 
 Tests:
 
