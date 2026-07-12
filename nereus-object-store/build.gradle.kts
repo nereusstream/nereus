@@ -18,6 +18,7 @@ plugins {
 
 dependencies {
     api(project(":nereus-api"))
+    implementation(libs.aws.java.sdk.s3)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)

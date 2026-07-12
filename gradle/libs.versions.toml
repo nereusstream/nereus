@@ -12,6 +12,7 @@ junit-platform = "1.13.4"
 oxia-testcontainers = "0.7.4"
 testcontainers = "1.20.4"
 assertj = "3.27.7"
+aws-sdk = "1.12.788"
 
 [libraries]
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
@@ -31,5 +32,6 @@ pulsar-client-admin-api = { module = "org.apache.pulsar:pulsar-client-admin-api"
 oxia-client = { module = "io.github.oxia-db:oxia-client", version.ref = "oxia" }
 oxia-testcontainers = { module = "io.github.oxia-db:oxia-testcontainers", version.ref = "oxia-testcontainers" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+aws-java-sdk-s3 = { module = "com.amazonaws:aws-java-sdk-s3", version.ref = "aws-sdk" }
 
 [plugins]

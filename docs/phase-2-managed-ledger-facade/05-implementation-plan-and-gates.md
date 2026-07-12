@@ -533,6 +533,17 @@ Hybrid selection is explicit and restart-safe.
 The stock BookKeeper path remains backward compatible.
 ```
 
+Implementation evidence（2026-07-12，object-provider sub-stage）：
+
+- `ObjectStoreConfiguration`/provider/secret protocols now have a deployable `S3CompatibleObjectStoreProvider` built
+  on the same AWS SDK v1 baseline as the locked Pulsar fork，plus ambient/no-op secret resolution and resolver-array
+  zeroing for explicit credentials。
+- `S3ObjectKeyMapper` enforces one canonical prefix and rejects absolute、empty、traversal and control segments；
+  `S3CompatibleObjectStore` implements conditional `If-None-Match:*` puts、independent CRC32C metadata/verification、
+  exact inclusive HTTP ranges、zero-length existence/bounds checks、head and lifecycle/error mapping。
+- the object-store test suite reruns cleanly with canonical-key tests；MinIO conditional/range/restart gates and the
+  `nereus-pulsar-adapter`/fork broker wiring remain pending，so F2-M5 is still in progress。
+
 ## 7. F2-M6 — Final Acceptance
 
 Ordinary Nereus gate:
