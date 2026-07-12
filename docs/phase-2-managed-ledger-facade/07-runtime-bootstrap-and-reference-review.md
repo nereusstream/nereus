@@ -1305,7 +1305,12 @@ success/failure follow the newest result，and includes accepted policy side eff
 config/hierarchy mutation；a current rejection marks local admission failed and asynchronously closes the topic。
 Focused stale-ordering and unsafe-snapshot tests，all fork Nereus storage tests，BookKeeper persistence-policy/delete-
 namespace regressions and affected main/test checkstyle pass。The binding-aware unloaded policy-update guard remains
-pending。These commits are local because the active GitHub
+pending。Local commit `b2a591bd61` replaces config-only capability publication with the initialized-runtime
+`NereusBrokerCapabilityCoordinator`：the concrete extensible registry attaches once before advertisement，configured
+reserved-key spoofing fails startup，and `requireClusterReady` validates two stable snapshots containing exact protocol
+version `1` on every persistent broker。Empty/error/changing/missing-version sets fail closed under the metadata
+deadline；the first create-if-missing Nereus binding path runs this gate before binding IO。All fork Nereus storage
+tests and the stock broker-registry test pass。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 

@@ -551,7 +551,7 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- the fork bootstrap starts at local `f21661999d`；through `f529d79420` it now has typed config/runtime assembly，
+- the fork bootstrap starts at local `f21661999d`；through `b2a591bd61` it now has typed config/runtime assembly，
   stable ordered `[bookkeeper,nereus]` classes，deterministic `NSB1` binding records，BookKeeper adoption，bound
   open/delete/recreate coordination，loaded/unloaded broker hooks，reserved capability publication and same-snapshot
   topic-open feature admission，plus pre-mutation remote-producer、publish-metadata、non-durable-subscribe、durable-
@@ -568,8 +568,12 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
   Nereus initialization uses the same path before subscription creation，while BookKeeper retains its stock policy
   path。Focused ordering/rejection tests，all fork Nereus storage tests，two stock policy regressions and affected
   checkstyle pass。
-- binding-aware unloaded policy updates，namespace policy serialization/capability convergence，multi-broker binding
-  races and broker E2E restart wiring remain pending，so F2-M5 is still in progress。
+- capability publication now requires initialized hybrid storage plus one attached extensible registry，and the first
+  Nereus binding claim requires two stable snapshots in which every persistent broker advertises exact protocol `1`；
+  missing/unknown/changing/empty broker sets fail closed before binding IO。All fork Nereus storage tests and the stock
+  broker-registry regression pass。
+- binding-aware unloaded policy updates，namespace policy serialization，multi-broker binding races and broker E2E
+  restart wiring remain pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance
 
