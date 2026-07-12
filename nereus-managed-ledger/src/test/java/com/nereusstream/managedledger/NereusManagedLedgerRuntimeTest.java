@@ -43,6 +43,7 @@ class NereusManagedLedgerRuntimeTest {
                 scheduler,
                 callbacks,
                 NereusManagedLedgerFactoryConfig.defaults(1024),
+                "cluster/a",
                 PROCESS_RUN_ID,
                 "pulsar-f2/" + PROCESS_RUN_ID);
 
@@ -74,6 +75,7 @@ class NereusManagedLedgerRuntimeTest {
                 scheduler,
                 callbacks,
                 NereusManagedLedgerFactoryConfig.defaults(1024),
+                "cluster/a",
                 PROCESS_RUN_ID,
                 "pulsar-f2/" + PROCESS_RUN_ID);
 
@@ -104,6 +106,7 @@ class NereusManagedLedgerRuntimeTest {
                             scheduler,
                             callbacks,
                             NereusManagedLedgerFactoryConfig.defaults(1024),
+                            "cluster/a",
                             "too-short",
                             "pulsar-f2/too-short"))
                     .isInstanceOf(IllegalArgumentException.class)

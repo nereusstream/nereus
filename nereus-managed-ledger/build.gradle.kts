@@ -26,5 +26,6 @@ dependencies {
     testImplementation(platform(libs.opentelemetry.bom))
     testImplementation(platform(libs.opentelemetry.bom.alpha))
     testImplementation(libs.oxia.client)
+    testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testRuntimeOnly(libs.junit.platform.launcher)
 }

@@ -309,6 +309,11 @@ Implementation evidence（2026-07-12，foundation sub-stage）：
   constructor is code-complete；the deployable S3 implementation and provider wiring remain assigned to F2-M5；
 - F2-M3 remains in progress：factory open/inspection、ledger append/read/lifecycle、stats/cache/error mapping and their
   locked Pulsar interface gates are not yet complete。
+- `NereusManagedLedgerOpenCoordinator` now implements permit-first first/open/recreate、binding mismatch rejection
+  before L0 IO、canonical candidate adoption、missing-head corruption、forward lifecycle mirror reconciliation and
+  get-only durable inspection；focused tests cover first create、no-create missing、reopen、sealed mirror、deleted
+  next-incarnation recreation and nonempty orphan-candidate rejection。Factory registry deduplication and the concrete
+  `ManagedLedger` surface remain pending。
 
 ## 5. F2-M4 — Cursor Boundary
 

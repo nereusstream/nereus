@@ -34,6 +34,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private final ScheduledExecutorService scheduler;
     private final ExecutorService callbackExecutor;
     private final NereusManagedLedgerFactoryConfig config;
+    private final String cluster;
     private final String processRunId;
     private final String writerId;
     private final Semaphore callbackPermits;
@@ -49,6 +50,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             ScheduledExecutorService scheduler,
             ExecutorService callbackExecutor,
             NereusManagedLedgerFactoryConfig config,
+            String cluster,
             String processRunId,
             String writerId) {
         this.streamStorage = Objects.requireNonNull(streamStorage, "streamStorage");
@@ -60,6 +62,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.config = Objects.requireNonNull(config, "config");
+        this.cluster = requireCluster(cluster);
         this.processRunId = requireProcessRunId(processRunId);
         this.writerId = Objects.requireNonNull(writerId, "writerId");
         if (!writerId.equals("pulsar-f2/" + processRunId)) {
@@ -95,6 +98,10 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
 
     public NereusManagedLedgerFactoryConfig config() {
         return config;
+    }
+
+    public String cluster() {
+        return cluster;
     }
 
     public String processRunId() {
@@ -143,6 +150,14 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         Objects.requireNonNull(value, "processRunId");
         if (!PROCESS_RUN_ID.matcher(value).matches()) {
             throw new IllegalArgumentException("processRunId must be a URL-safe 128-bit-or-stronger identifier");
+        }
+        return value;
+    }
+
+    private static String requireCluster(String value) {
+        Objects.requireNonNull(value, "cluster");
+        if (value.isBlank() || value.indexOf('\0') >= 0) {
+            throw new IllegalArgumentException("cluster cannot be blank or contain NUL");
         }
         return value;
     }

@@ -356,6 +356,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             ScheduledExecutorService scheduler,
             ExecutorService callbackExecutor,
             NereusManagedLedgerFactoryConfig config,
+            String cluster,
             String processRunId,
             String writerId);
 
@@ -364,6 +365,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     public ScheduledExecutorService scheduler();
     public Executor callbackExecutor();
     public NereusManagedLedgerFactoryConfig config();
+    public String cluster();
     public String processRunId();
     public String writerId();
     public void close();
@@ -455,6 +457,12 @@ constructs managed-ledger storage before the final broker ID exists. It generate
 `processRunId` with `SecureRandom` and freezes `writerId="pulsar-f2/" + processRunId`；both accessors return those
 immutable values. They are diagnostic/session identities only, never durable topic identity. The fork publishes its
 broker capability later, after a broker ID exists and before load-manager advertisement, as specified in `07`.
+
+The runtime also freezes the nonblank exact `cluster` passed from `StreamStorageConfig.cluster()`。Projection metadata
+methods require that cluster to construct their Oxia keyspace，while `StreamStorage` intentionally exposes no config
+accessor；therefore omitting it from the runtime constructor would make the factory open protocol unimplementable or
+force an unsafe namespace inference。The runtime accessor is the only facade-side source of this identity，and
+changing it requires rebuilding the runtime。
 
 The factory retains the exact constructor-supplied `defaultManagedLedgerConfig` for both no-config `open` methods；it
 does not create a new default per call. `compatibilityFactoryConfig` is factory-owned and returned by `getConfig()`.

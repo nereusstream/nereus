@@ -538,6 +538,11 @@ The conversion is constructor-by-constructor, with no untyped property bag:
 | `StreamStorageConfig` fixed F2 fields | `maxAppendBatchRecords=1`, `autoAcquireAppendSession=true`; metadata watch and offset cache use their explicit booleans/TTL |
 | `NereusManagedLedgerFactoryConfig` | metadata/append/recovery/read/close/poll deadlines and entry/read/open/callback/retained-attempt/scan limits |
 | `ProjectionMetadataStoreConfig` | metadata timeout, projection-specific pending-operation limit and max encoded value bytes |
+
+`DefaultNereusRuntimeProvider` passes the already-frozen `StreamStorageConfig.cluster()` into
+`NereusManagedLedgerRuntime` as its exact `cluster` constructor argument。This is not inferred from the Oxia
+namespace：projection metadata needs the logical cluster key component，and the protocol-neutral `StreamStorage`
+surface deliberately has no configuration getter。
 | `NereusStorageClassBindingStore` | metadata timeout and binding pending-operation limit；admission occurs before metadata-store calls |
 | `NamespaceStorageClassPolicyGuard` | metadata timeout and namespace binding-scan cap；binding reads use a bounded async fan-out |
 
