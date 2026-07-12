@@ -1282,8 +1282,12 @@ below remain pending。Local commit `4921c2fc7a` publishes the reserved
 spoofing；cluster convergence checks before policy enablement remain pending。Local commit `33b0e5fb70` implements
 the same-snapshot `NereusTopicOpenContext` resolver and closed topic-open validator；15 focused admission tests，all
 fork Nereus storage tests，affected checkstyle and stock offload/system-topic/deadlock regressions pass。The validator
-runs before topic events，binding preparation and factory IO。Operation-specific producer/publish/subscribe/ack/admin
-gates remain pending。These commits are local because the active GitHub
+runs before topic events，binding preparation and factory IO。Local commit `09d9668713` installs that context before
+topic initialization and adds first-mutation gates for remote producer attach，transactional/marker/delayed publish，
+non-durable Exclusive/Failover subscribe admission，durable subscription creation and recovered durable cursors，
+and transaction publish/end-txn。The publish parser preserves `ByteBuf` indexes/reference count，Nereus always uses
+`TransactionBufferDisable`，and 17 focused admission tests plus affected main/test checkstyle pass。Ack/admin gates and
+the authoritative live-policy update coordinator remain pending。These commits are local because the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 

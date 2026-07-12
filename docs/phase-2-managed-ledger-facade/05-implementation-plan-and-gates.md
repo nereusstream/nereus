@@ -551,12 +551,13 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- the fork bootstrap starts at local `f21661999d`；through `33b0e5fb70` it now has typed config/runtime assembly，
+- the fork bootstrap starts at local `f21661999d`；through `09d9668713` it now has typed config/runtime assembly，
   stable ordered `[bookkeeper,nereus]` classes，deterministic `NSB1` binding records，BookKeeper adoption，bound
   open/delete/recreate coordination，loaded/unloaded broker hooks，reserved capability publication and same-snapshot
-  topic-open feature admission。Focused tests and touched-module checkstyle pass；the earlier bootstrap commit also
-  passed full `quickCheck` and `checkBinaryLicense`。
-- operation-specific producer/publish/subscribe/ack/admin admission，namespace policy serialization/capability
+  topic-open feature admission，plus pre-mutation remote-producer、publish-metadata、non-durable-subscribe、durable-
+  subscription and transaction gates。The operation validator's 17 focused tests and touched-module checkstyle pass；
+  the earlier bootstrap commit also passed full `quickCheck` and `checkBinaryLicense`。
+- acknowledgement/admin admission，authoritative live-policy refresh，namespace policy serialization/capability
   convergence，multi-broker binding races and broker E2E restart wiring remain pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance

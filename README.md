@@ -59,8 +59,9 @@ F2-M2 projection metadata and F2-M3 factory/ledger facade are implemented。`ner
 writable facade、strict get-only read-only ledger、exact append recovery/write-fence handoff、lifecycle/admin/stats
 surfaces and audited unsupported channels。F2-M4 cursor boundary is implemented；F2-M5 now has product runtime/S3
 gates plus the fork hybrid bootstrap，durable `NSB1` binding open/delete coordinator and claim-before-open topic
-feature admission，while producer/publish/subscribe/ack/admin admission、namespace/capability convergence and the
-remaining lifecycle race gates and
+feature admission。Producer attach、publish metadata、non-durable subscribe、durable-subscription and transaction
+operation gates are also wired before their stock mutations；ack/admin admission、live-policy refresh、
+namespace/capability convergence and the remaining lifecycle race gates and
 end-to-end restart gates remain in progress。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
