@@ -1,6 +1,8 @@
 # Future 2 Implementation Plan and Gates
 
-F2-M0/M0R design and the Phase 1.5 P15-M5 final gate have passed, so F2-M1 is the next implementation milestone.
+F2-M0/M0R/M0R2 design and the Phase 1.5 P15-M5 original final gate have passed。M0R2 found one narrow L0 result
+handoff still required：P15-M6 adds `AppendResult.cumulativeSize` from existing committed truth。P15-M6 is the next
+implementation milestone；F2-M1 follows it.
 A milestone is complete only when its code, focused tests and listed gate exist; documentation alone is not
 implementation evidence.
 
@@ -8,7 +10,7 @@ implementation evidence.
 
 Before F2-M1 production code:
 
-1. pass `phase15FinalCheck` and the protocol-neutral F2 prerequisite fixture from
+1. implement P15-M6，then pass `phase15FinalCheck` and the protocol-neutral F2 prerequisite fixture from
    `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md`；
 2. add a pinned Pulsar managed-ledger compile dependency for the locked fork commit;
 3. support a side-by-side Gradle composite build for development/CI, with the Pulsar checkout commit
@@ -16,9 +18,10 @@ Before F2-M1 production code:
 4. choose an organization-owned published artifact/version for release builds before publishing any
    Nereus facade artifact;
 5. keep `pulsar-broker` off the Nereus L0 modules' compile/runtime classpaths;
-6. run the API compile probe in CI.
+6. run the API compile probe in CI against the exact clean checkout
+   `/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`；
 7. lock and diff the additional read-only/Entry/Position/callback/exception/config/scan/admin/cache/MXBean blobs in
-   document 06;
+   document 01 and keep their method classifications in document 06;
 8. generate a `javap -public` inventory and fail if a locked method has no `I/L/N/U/D` assignment.
 9. verify the broker-private call-site blobs in document 01 and require a source/admission-order re-review on drift.
 
@@ -30,10 +33,9 @@ Expected dependency direction:
 ```text
 nereus-managed-ledger
   -> nereus-api
-  -> Pulsar managed-ledger/common artifacts (locked)
-
-nereus-managed-ledger
   -> nereus-metadata-oxia projection metadata contract
+  -> nereus-object-store provider/object lifecycle contract
+  -> Pulsar managed-ledger/common/client-admin-api artifacts (locked；admin DTOs come from client-admin-api)
 
 nereus-pulsar-adapter
   -> nereus-managed-ledger
@@ -48,10 +50,14 @@ Pulsar fork broker provider
 Production targets:
 
 ```text
+nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/
+  ManagedLedgerProjectionNames.java
+
 nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/projection/
   VirtualLedgerProjection.java
   StreamPositionBounds.java
   PositionProjection.java
+  F2L0RequestFactory.java
   ProjectionValidationException.java
 
 nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/entry/
@@ -61,7 +67,10 @@ nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/entry/
 ```
 
 Consume the implemented Phase 1.5 lifecycle/recovery/generic-result surface。F2-M1 adds no protocol-neutral L0 type
-and does not duplicate a target, attempt or lifecycle value in `nereus-managed-ledger`。
+and does not duplicate a target, attempt or lifecycle value in `nereus-managed-ledger`。The pure exact-name/hash
+helper is metadata-owned so M2 keyspace and the facade share it without a circular module dependency。
+`AppendResult.cumulativeSize` must already exist；F2 must not reconstruct it from local `logicalBytes` or make known
+append success depend on a second metadata read。
 
 Tests:
 
@@ -74,6 +83,9 @@ Tests:
 - `ByteBuf` reference-count leak tests;
 - no Pulsar imports in L0 modules;
 - only `OBJECT_WAL_SYNC_OBJECT` accepted.
+- every `F2L0RequestFactory` method freezes the exact create/append/read/recover/seal/delete option fields and no
+  facade call site constructs those options independently；
+- `EncodedAppend` defensively copies on construction/access and its CRC32C golden vectors match JDK CRC32C。
 
 Exit:
 
@@ -97,10 +109,11 @@ nereus-metadata-oxia/.../
   SharedOxiaClientRuntime.java
   records/LedgerIdAllocatorRecord.java
   records/TopicProjectionRecord.java
-  records/ProjectionIdentity.java
+  records/ManagedLedgerProjectionIdentity.java
   records/VirtualLedgerProjectionRecord.java
   records/PositionIndexRecord.java
-  ProjectionIdentityMismatchException.java
+  ManagedLedgerProjectionIdentityMismatchException.java
+  ProjectionMetadataStoreConfig.java
   codec/F2MetadataCodecs.java
 ```
 
@@ -115,6 +128,11 @@ Tests:
 - existing topic projection with missing L0 head never calls create-or-get；
 - concurrent deleted-topic recreation publishes one next incarnation；
 - golden bytes and registry backward compatibility;
+- prove F2 registers a third explicit codec registry without shadowing Phase 1/1.5 record types；enum state persists as
+  its canonical name string, unknown values fail decode, and backend versions hydrate every F2 `metadataVersion`；
+- exact managed-ledger name plus full identity is present in each derived record and is validated after hash-key
+  lookup, including an injected hash-collision test；
+- one monotonic operation deadline and bounded pending-operation permit cover every retry/repair path；
 - single-key CAS assertions and fault injection after every write;
 - existing Phase 1/1.5 gates remain green;
 - projection open/reconciliation exercises Phase 1.5 seal/delete/recovery as a black-box contract without
@@ -139,6 +157,11 @@ nereus-managed-ledger/.../
   NereusManagedLedgerFactory.java
   NereusManagedLedgerFactoryConfig.java
   NereusManagedLedgerRuntime.java
+  NereusDurableStorageState.java
+  NereusStorageStateSnapshot.java
+  NereusWriteFenceResolution.java
+  NereusWriteFenceSnapshot.java
+  NereusWriteFenceView.java
   integration/NereusCreationGuard.java
   integration/NereusCreationPermit.java
   config/ManagedLedgerConfigView.java
@@ -153,6 +176,10 @@ nereus-managed-ledger/.../
   NereusManagedLedgerStats.java
   callbacks/TerminalCallback.java
   callbacks/SerialCallbackLane.java
+  snapshot/StreamSnapshotView.java
+  snapshot/StreamSnapshotTracker.java
+  snapshot/PendingReadWaiter.java
+  snapshot/TailPollCoordinator.java
   errors/ManagedLedgerErrorMapper.java
 ```
 
@@ -164,6 +191,9 @@ Implement:
 - properties, terminate, close and logical delete;
 - every factory/ledger/read-only/Entry signature and audited default in document 06;
 - one synthetic virtual `LedgerInfo` and exact Nereus stats semantics;
+- a get-only `inspectStorageState` surface for the broker binding protocol and a generation-safe
+  `NereusWriteFenceView` for broker unfence decisions；
+- one per-facade monotonic snapshot tracker and one coalesced tail-poll coordinator；
 - zero-capacity Pulsar entry cache while retaining bounded L0 caches;
 - explicit failures for unsupported offload/migrate/truncate paths.
 
@@ -177,20 +207,31 @@ Focused tests:
 - append callbacks preserve admission order across out-of-order completions; pending-operation and retained-attempt
   limits reject before byte/WAL allocation；
 - append success callback bytes parse identically to input;
+- a stale facade snapshot advances to the result's exact committed end/cumulative size before success callback；no
+  `ReadTarget` field or post-commit metadata read participates；
 - `KNOWN_COMMITTED` recovery returns the committed Position;
 - `MAY_HAVE_COMMITTED` recovery uses the same physical target/commit identity or write-fences the facade；
 - background recovery that later proves `KNOWN_NOT_COMMITTED` releases the lane/capacity without a second callback,
   while permanent invariant/corruption remains fenced；
 - uncertain append fences the local writer rather than inventing a result;
+- the implemented Phase 1.5 `AppendCoordinator` remains the sole retained-attempt owner；no F2 recovery registry or
+  second physical replay runner is constructed；
+- `inspectStorageState` performs no create/repair/write, distinguishes all durable states, and treats present
+  projection plus missing/mismatched L0 truth as corruption；
+- stale write-fence generation completion and `readyToCreateNewLedger()` cannot clear a current fence；
 - read releases every facade-owned entry/buffer on success, partial failure and callback exception; a throwing test
   callback releases the entry ownership it accepted;
 - close/unload does not seal/delete/trim;
 - terminate and delete partial failures reconcile after restart;
 - delete followed by create-if-missing opens the next incarnation; stale positions fail；
 - non-null interceptor/offload/shadow/auto-skip config fails before storage IO; read-compacted cursor args fail before
-  read IO.
+  read IO；
 - `getConfig()` preserves stock reference identity; `setConfig()` publishes only a fully validated replacement, and a
-  concurrent direct mutation after operation-view capture cannot change that admitted operation's behavior.
+  concurrent direct mutation after operation-view capture cannot change that admitted operation's behavior；
+- no-config factory opens reuse the constructor-supplied default `ManagedLedgerConfig`；admin/protobuf `LedgerInfo`
+  field sets are tested as distinct DTOs；
+- runtime construction succeeds before Pulsar assigns a broker ID and freezes a fresh
+  `pulsar-f2/{processRunId}` writer identity。
 
 Exit:
 
@@ -210,7 +251,6 @@ nereus-managed-ledger/.../cursor/
   NereusReadOnlyCursor.java
   NereusNonDurableCursor.java
   NereusManagedCursorBoundary.java
-  PendingReadWaiter.java
   NereusManagedCursorStats.java
 ```
 
@@ -224,6 +264,10 @@ Tests:
 - bounded max entries/bytes/Position;
 - append wakes a waiter once;
 - remote-broker append wakes a waiter through metadata polling with watches disabled；
+- many cursors share one timer/one in-flight metadata poll and late generation completion cannot wake a removed
+  waiter；
+- `Predicate<Position>` skip is evaluated before L0 IO/Entry allocation；all-skipped visible positions install a
+  register-then-recheck waiter and a predicate exception fails once；
 - cancel/close/append races;
 - cancel does not invoke the pending callback, while close fails it exactly once；
 - wrong-ledger and trimmed position errors;
@@ -256,12 +300,33 @@ pulsar-broker/.../storage/nereus/
   NereusTopicOpenContext.java
   NereusTopicPolicyUpdateCoordinator.java
   NereusStorageClassMigrationGuard.java
+  NamespaceStorageClassPolicyGuard.java
+  NamespaceStorageClassPermit.java
+  NamespaceStorageClassLockData.java
+  NereusBrokerCapabilityCoordinator.java
+  NereusAcknowledgeValidator.java
+  NereusWriteFenceBridge.java
+  NereusWriteFenceCompletion.java
   NereusStorageClassBindingStore.java
+  StorageClassBindingKeyspace.java
+  StorageClassBindingCodec.java
   StorageClassBindingState.java
   StorageClassBindingRecord.java
   StorageClassOpenPermit.java
   StorageClassDeletePermit.java
   NereusAdminOperation.java
+
+fork call-site modifications (exact blobs locked in document 01):
+  pulsar-broker-common/.../ServiceConfiguration.java
+  pulsar-client-admin-api/.../PersistencePolicies.java
+  pulsar-broker/.../PulsarService.java
+  pulsar-broker/.../loadbalance/extensions/BrokerRegistryImpl.java
+  pulsar-broker/.../service/BrokerService.java
+  pulsar-broker/.../service/AbstractTopic.java
+  pulsar-broker/.../service/Consumer.java
+  pulsar-broker/.../service/persistent/PersistentTopic.java
+  pulsar-broker/.../admin/impl/NamespacesBase.java
+  pulsar-broker/.../admin/impl/PersistentTopicsBase.java
 
 distribution/server build/runtime dependency wiring
 conf/broker.conf and standalone documentation
@@ -271,12 +336,18 @@ nereus-pulsar-adapter/.../
   NereusRuntimeProvider.java
   DefaultNereusRuntimeProvider.java
   NereusRuntimeConfiguration.java
+  NereusRuntimeContext.java
+  NereusProcessIdentity.java
 
 nereus-object-store/.../
   ObjectStoreProvider.java
   ObjectStoreConfiguration.java
   ObjectStoreSecretResolver.java
+  NoopObjectStoreSecretResolver.java
   S3CompatibleObjectStoreProvider.java
+  S3CompatibleObjectStore.java
+  S3ObjectKeyMapper.java
+  S3ObjectErrorMapper.java
 ```
 
 Provider rules:
@@ -297,8 +368,18 @@ Provider rules:
 - select `TransactionBufferDisable` for Nereus topics even when the broker transaction coordinator is globally
   enabled; reject end-txn before buffer access without changing the BookKeeper topic path；
 - require a deployable S3-compatible ObjectStore provider; local filesystem remains test-only.
-- require cluster-wide binding-capable broker convergence before enabling any Nereus policy; old brokers may not own
-  those namespaces during rollout.
+- require the S3 provider to map keys under one normalized prefix, issue asynchronous conditional create with
+  `If-None-Match:*` for `ifAbsent`, verify exact CRC32C independently of ETag, implement strict range/zero-length/error
+  semantics and resolve secrets without retaining plaintext configuration；
+- require cluster-wide binding-capable broker convergence before enabling any Nereus policy；publish the exact
+  capability only after hybrid storage initialization and before load-manager advertisement；
+- serialize empty-namespace storage policy transition against first topic creation so an old/default-class create
+  cannot cross the policy decision；
+- validate Nereus acknowledgements before broker counters、transaction handling or cursor mutation, admitting only
+  nontransactional whole-entry cumulative ack on a non-durable cursor；
+- intercept stock `PersistentTopic` auto-unfence and await the matching `NereusWriteFenceView` generation before
+  calling `unfence()`；permanent recovery failure closes/unloads the topic；
+- compare storage class strings with value equality (`Objects.equals`) in `PersistencePolicies.equals`。
 
 Broker tests:
 
@@ -308,16 +389,30 @@ Broker tests:
 - concurrent first-create with conflicting class selections produces one `CLAIMED/ACTIVE` binding and never two live
   durable views; crash at claim/open/activation/delete transitions resumes only the bound class；
 - an `ACTIVE` binding with missing selected storage is corruption, while a `CLAIMED` binding may resume creation；
+- a missing binding adopts existing BookKeeper as `ACTIVE` but never adopts a live Nereus projection；present Nereus
+  storage without its generation-bearing binding is corruption；`DELETING` always resumes the bound factory delete；
 - policy selecting an absent/failed Nereus class fails load;
 - Nereus topic load/unload/reload preserves Position;
 - broker restart/failover preserves projection and reads;
 - producer plus Reader/non-durable cursor works;
+- individual ack, batch AckSet, transaction ack and durable-subscription ack are rejected before counters/transaction
+  buffer/cursor mutation；the one admitted non-durable cumulative whole-entry ack advances only local state；
+- generic add failure cannot trigger stock auto-unfence while exact Nereus recovery is unresolved；stale recovery
+  generation cannot unfence a later attempt；
 - durable subscription creation is rejected before cursor open; the direct facade boundary remains unit-tested for
   explicit mutation failure；
 - virtual ledger ID never reaches mocked/real BookKeeper read/delete/offload APIs;
 - default broker stats remain valid and Nereus-specific stats do not claim BookKeeper ledgers;
 - namespace-level Nereus selection cannot silently pull system topics onto an unsupported path；
+- cluster capability checks reject Nereus policy enablement while any active broker lacks protocol version `1`，and
+  first topic creation cannot race an empty-namespace policy update；
+- namespace binding scan is namespace-prefixed/bounded and fails closed on cap、decode or backend failure；
+- S3 integration covers create collision (HTTP 412)、conditional conflict (HTTP 409), CRC32C mismatch,
+  partial/zero-length reads, timeout/cancellation,
+  credential/raw-key redaction、resolver-array zeroing and restart against MinIO/equivalent；
 - reflection/TCCL construction, partial initialize cleanup and aggregated close behavior are deterministic.
+- binding-store creation guard is available before facade construction, get-only inspection is unavailable before the
+  one exact factory attach, and null/double attach prevents startup。
 
 Exit:
 
@@ -377,7 +472,13 @@ Scenarios:
 12. disable watch delivery and prove a remote append wakes a waiter through polling;
 13. reject every unsupported broker feature at its topic/producer/publish/subscribe/admin gate before the relevant mutation
     or storage IO;
-14. fail broker-metadata/Oxia/object IO at each boundary and prove binding/callback/resource recovery.
+14. fail broker-metadata/Oxia/object IO at each boundary and prove binding/callback/resource recovery；
+15. hold a Nereus append in retryably uncertain recovery and prove the stock pending-write path does not auto-unfence
+    until the matching generation reaches committed/proven-not-committed；
+16. exercise every allowed/rejected F2 acknowledgement shape and prove rejection precedes broker/cursor mutation；
+17. attempt Nereus policy enablement with a mixed-capability broker set and race an empty-namespace policy update with
+    first topic creation；both must preserve one durable storage-class truth；
+18. run S3 conditional-create/range/checksum/timeout/restart cases and prove no production path selects local files。
 
 F2 completion requires all scenarios. A green projection unit test or a broker that only starts is not
 evidence for the end-to-end milestone.
@@ -388,6 +489,8 @@ Stop implementation and update design if:
 
 - Phase 1.5 P15-M5 API/behavior differs from the locked F2 prerequisite and cannot be reconciled without changing
   Position/callback/lifecycle semantics；
+- P15-M6 cumulative-size handoff is absent and F2 would need to guess size or make a committed callback depend on a
+  fallible reread；
 - Pulsar target interface blobs differ from the lock;
 - one Pulsar Entry cannot remain one L0 offset;
 - a required broker path needs durable ack semantics from Future 3;
@@ -404,4 +507,8 @@ Stop implementation and update design if:
 - a non-null interceptor can reach append while the codec promises byte-for-byte persistence；
 - a system/internal topic can reach Nereus before the F8 bootstrap contract；
 - production bootstrap has no non-local shared ObjectStore provider；
+- broker generic add-failure logic can unfence a Nereus topic before exact attempt resolution；
+- a broker ack path can mutate counters、transaction state or a cursor before F2 capability validation；
+- an S3 `ifAbsent` implementation depends on read-before-write, ETag-as-CRC32C, or an unbounded blocking SDK call；
+- namespace storage-class policy update cannot be serialized with first topic creation；
 - snapshot/count/size must be approximated for a broker correctness decision.

@@ -9,6 +9,12 @@ Add a separate interface in `nereus-metadata-oxia`. It receives an already-creat
 `StreamStorage` or pretend it can validate L0 state by itself:
 
 ```java
+public record ProjectionMetadataStoreConfig(
+        Duration operationTimeout,
+        int maxPendingOperations,
+        int maxValueBytes) {
+}
+
 public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
     CompletableFuture<Optional<TopicProjectionRecord>> getProjection(
             String cluster,
@@ -20,20 +26,21 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
 
     CompletableFuture<TopicProjectionRecord> recreateDeletedProjection(
             String cluster,
+            ManagedLedgerProjectionIdentity expectedDeletedIdentity,
             long expectedTopicMetadataVersion,
             ProjectionCreateRequest request);
 
     CompletableFuture<TopicProjectionRecord> updateProperties(
             String cluster,
             String managedLedgerName,
-            ProjectionIdentity expectedIdentity,
+            ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedVersion,
             Map<String, String> properties);
 
     CompletableFuture<TopicProjectionRecord> mirrorFacadeState(
             String cluster,
             String managedLedgerName,
-            ProjectionIdentity expectedIdentity,
+            ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedVersion,
             ManagedLedgerFacadeState state);
 
@@ -50,11 +57,28 @@ public record ProjectionCreateRequest(
         Map<String, String> initialProperties) {
 }
 
-public record ProjectionIdentity(
+public record ManagedLedgerProjectionIdentity(
         long storageClassBindingGeneration,
         long incarnation,
         String streamId,
         long virtualLedgerId) {
+}
+
+public enum ManagedLedgerFacadeState {
+    OPEN,
+    SEALED,
+    DELETING,
+    DELETED
+}
+
+public enum ProjectionRepairStatus {
+    ALREADY_VALID,
+    CREATED
+}
+
+public record ProjectionRepairResult(
+        ProjectionRepairStatus virtualLedger,
+        ProjectionRepairStatus positionIndex) {
 }
 ```
 
@@ -72,6 +96,16 @@ second creation clock.
 
 `ManagedLedgerProjectionMetadataStore.close()` closes only store-local watches/caches and is idempotent; it never
 closes the shared Oxia client or executor runtime.
+
+`ManagedLedgerProjectionIdentity` is deliberately not named `ProjectionIdentity`：Phase 1.5 already owns
+`com.nereusstream.metadata.oxia.ProjectionIdentity` for L0 `ProjectionRef` decoding。Reintroducing that simple name
+would be a same-package compile failure。All identity fields are immutable and validated as positive/nonblank；the
+record has no Oxia version because identity and conditional-update version are separate concepts。
+
+`ProjectionMetadataStoreConfig` requires a positive timeout、positive pending-operation bound and
+`maxValueBytes == 64 * 1024` in F2。Each public call creates one monotonic deadline；every get/CAS retry and repair
+sub-step consumes the same deadline rather than resetting it。Operation admission is bounded before submitting to the
+adapter executor；rejection is retriable `BACKPRESSURE_REJECTED` and performs no Oxia call。
 
 ## 2. Keyspace
 
@@ -99,6 +133,28 @@ The L0 stream name is independently domain-separated and includes the decimal in
 Hash keys never replace collision validation: every decoded topic record contains the original exact
 name, which must match the lookup request.
 
+Target key builder API is fixed：
+
+```java
+public final class ManagedLedgerProjectionKeyspace {
+    public ManagedLedgerProjectionKeyspace(String cluster);
+
+    public String ledgerIdAllocatorKey();
+    public PartitionKey ledgerIdAllocatorPartitionKey();
+    public String topicProjectionKey(String managedLedgerName);
+    public PartitionKey topicProjectionPartitionKey(String managedLedgerName);
+    public String virtualLedgerProjectionKey(StreamId streamId);
+    public String positionIndexKey(StreamId streamId);
+    public PartitionKey streamPartitionKey(StreamId streamId);
+    public static String managedLedgerNameHash(String managedLedgerName);
+}
+```
+
+It delegates name/hash validation to the same-module `com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames`
+and cluster/component encoding to the existing Nereus helpers。The managed-ledger module imports this helper；the
+metadata module never imports `nereus-managed-ledger`。No caller assembles a path or partition key by string
+concatenation。
+
 The allocator uses its own stable partition key. The stable topic key always uses
 `PartitionKey("managed-ledger-topic/" + managedLedgerNameHash)` so same-name recreation never changes the partition
 key for an existing Oxia key. Virtual-ledger and position-index keys use the corresponding stream partition key.
@@ -118,7 +174,7 @@ public record LedgerIdAllocatorRecord(
 
 Initial `nextLedgerId` is `1L << 62`. Allocation returns the current value and CAS-advances it by
 one. `Long.MAX_VALUE` is reserved and exhaustion is a terminal configuration/capacity error. CAS
-conflicts retry with bounded exponential backoff and the caller deadline.
+conflicts retry with bounded exponential backoff and the operation deadline.
 
 IDs may be leaked by crashes or create races. They are never reused. A gap is not corruption.
 
@@ -137,7 +193,7 @@ public record TopicProjectionRecord(
         long virtualLedgerId,
         int positionMappingVersion,
         String payloadMapping,
-        ManagedLedgerFacadeState state,
+        String facadeState,
         Map<String, String> properties,
         long createdAtMillis,
         long stateVersion,
@@ -145,7 +201,8 @@ public record TopicProjectionRecord(
 }
 ```
 
-Allowed values in F2:
+`facadeState` is stored as the exact enum name so the existing deterministic record codec needs no enum extension；
+the adapter converts with `ManagedLedgerFacadeState.valueOf` and rejects unknown strings。Allowed values in F2:
 
 - `storageClass == "nereus"`;
 - `storageProfile == "OBJECT_WAL_SYNC_OBJECT"`;
@@ -164,9 +221,12 @@ Initial and replacement maps are normalized with
 `MetadataCanonicalizer.canonicalStringMap(..., ApiLimits.MAX_STREAM_ATTRIBUTES_ENCODED_BYTES,
 "managedLedgerProperties")`; null is normalized to the immutable empty map before the metadata call. The encoded
 size limit is checked before allocator/topic writes, so an oversized property update cannot partially mutate state.
+Keys beginning with `nereus.` and the exact Pulsar key `PULSAR.SHADOW_SOURCE` are reserved and rejected on initial
+create and every update；otherwise a property mutation could enable a shadow/protocol behavior after open without
+passing F2 admission。
 
-Every mutable-topic CAS compares `ProjectionIdentity` as well as the Oxia version. A stale facade receives
-`ProjectionIdentityMismatchException` containing expected/actual binding generation, incarnation, stream ID and
+Every mutable-topic CAS compares `ManagedLedgerProjectionIdentity` as well as the Oxia version. A stale facade receives
+`ManagedLedgerProjectionIdentityMismatchException` containing expected/actual binding generation, incarnation, stream ID and
 virtual ledger ID, and must close/fence locally; it never reloads a newer incarnation and
 retries its old property or lifecycle mutation against that new topic lifetime.
 
@@ -179,12 +239,11 @@ and L0 stream are `DELETED`, one CAS publishes `incarnation + 1`, a new stream a
 
 ```java
 public record VirtualLedgerProjectionRecord(
+        String managedLedgerName,
         String managedLedgerNameHash,
-        String streamId,
-        long virtualLedgerId,
+        ManagedLedgerProjectionIdentity identity,
         long startOffset,
         int positionMappingVersion,
-        long sourceIncarnation,
         long metadataVersion) {
 }
 ```
@@ -197,17 +256,21 @@ truth and is forbidden.
 
 ```java
 public record PositionIndexRecord(
-        String streamId,
-        long virtualLedgerId,
+        String managedLedgerName,
+        String managedLedgerNameHash,
+        ManagedLedgerProjectionIdentity identity,
         int positionMappingVersion,
         String formula,
-        long sourceIncarnation,
         long metadataVersion) {
 }
 ```
 
 For v1, `formula == "ENTRY_ID_EQUALS_STREAM_OFFSET"`. This is one record per stream, not one record
 per Position. Entry boundaries remain in the Object WAL entry index and L0 offset index.
+
+Both derived records carry the exact name plus its domain hash and the complete immutable identity。A cryptographic
+hash or stream-key location never substitutes for exact-name/binding/incarnation validation。Their identity fields
+must exactly equal the authoritative topic record；property/state metadata-version changes do not invalidate them。
 
 ## 4. Open, First Create and Recreation Protocols
 
@@ -260,7 +323,8 @@ leaves an authoritative projection whose derived keys are repairable.
 
 When the current record and L0 stream are `DELETED` and create-if-missing is true:
 
-1. Read and retain the deleted topic record's Oxia `metadataVersion`.
+1. Read and retain the deleted topic record's complete `ManagedLedgerProjectionIdentity` and Oxia
+   `metadataVersion`；both are passed to `recreateDeletedProjection`。
 2. Acquire a fresh Nereus creation permit, require its binding generation to be greater than the deleted record's,
    then compute `nextIncarnation = Math.addExact(old.incarnation, 1)` and its new deterministic stream name/ID.
 3. Create/get the new L0 stream. If it is no longer the canonical empty `ACTIVE` candidate, re-read the topic key:
@@ -278,8 +342,8 @@ When the current record and L0 stream are `DELETED` and create-if-missing is tru
 Crash before the topic CAS can leave an empty orphan incarnation stream. Crash after CAS leaves the new mapping
 authoritative and repairable. Old MessageIds carry a different virtual ledger ID and cannot address the new stream.
 
-Derived records reference immutable `sourceIncarnation`, not the topic key's Oxia `metadataVersion`. Property/state
-mirror CAS updates therefore do not make a valid position projection look stale.
+Derived records reference the complete immutable `identity`, not the topic key's Oxia `metadataVersion`。Property/state
+mirror CAS updates therefore do not make a valid position projection look stale。
 
 ## 5. Open and Repair
 
@@ -313,6 +377,8 @@ Append does not write F2 projection metadata. After open repair has completed, m
 Append success still requires the Phase 1 L0 success boundary. Projection metadata is not written. If L0 completes
 with `KNOWN_COMMITTED` or `MAY_HAVE_COMMITTED`, the exception must carry `AppendAttemptId` and the facade calls
 `StreamStorage.recoverAppend` for that same physical attempt. Successful recovery supplies the exact result/Position.
+Normal and recovered P15-M6 results also carry cumulative logical size at that commit，so facade snapshot advancement
+never requires a projection write or a post-commit metadata reread。
 Recovery that proves `KNOWN_NOT_COMMITTED` fails the pending callback, releases the exact attempt and may reopen the
 local write lane without inventing a Position. Retryable uncertainty fails the callback once and write-fences the
 facade while background recovery continues; a permanent invariant keeps that facade fenced.
@@ -322,10 +388,10 @@ facade while background recovery continues; a permanent invariant keeps that fac
 Topic properties live in the authoritative topic record. Updates:
 
 1. read the current record;
-2. validate it exactly equals the caller's `ProjectionIdentity`;
+2. validate it exactly equals the caller's `ManagedLedgerProjectionIdentity`;
 3. apply a bounded canonical map update;
 4. CAS the same key by `metadataVersion`;
-5. retry conflicts until the caller deadline only while `ProjectionIdentity` is unchanged; a newer incarnation fails
+5. retry conflicts until the operation deadline only while `ManagedLedgerProjectionIdentity` is unchanged; a newer incarnation fails
    immediately.
 
 Facade state mirroring is similar, but L0 lifecycle is authoritative:
@@ -358,10 +424,32 @@ F2 records use the same envelope/version/CRC conventions as Phase 1. Each record
 - metadata version hydrated from Oxia, not trusted from encoded bytes;
 - durable golden bytes in tests.
 
+The exact F2 registry is：
+
+```text
+LedgerIdAllocatorRecord             recordType=LedgerIdAllocatorRecord
+TopicProjectionRecord               recordType=TopicProjectionRecord
+VirtualLedgerProjectionRecord       recordType=VirtualLedgerProjectionRecord
+PositionIndexRecord                 recordType=PositionIndexRecord
+schemaVersion=1
+minReaderSchemaVersion=1
+payloadEncoding=binary-v1
+envelopeMagic=NRM1
+```
+
+Record component order shown in section 3 is the durable field order；maps use the existing strict-UTF-8 key sort。
+Every value, including envelope overhead, must be `<= ProjectionMetadataStoreConfig.maxValueBytes` before an Oxia
+write。All write candidates carry `metadataVersion=0` into the encoder；every decode discards that encoded zero and
+hydrates the Oxia `VersionedValue.version()`。A nonzero encoded metadata version, unknown `facadeState`, invalid nested
+identity, duplicate map key, malformed UTF-8, CRC failure or trailing byte is corruption。
+
 The Phase 1 `Phase1MetadataCodecs` registry and generic record codec are private/static。Phase 1.5 P15-M2 introduces
 the package-level `MetadataRecordCodecFactory` while preserving every Phase 1 method/type/schema/golden byte。F2-M2
-consumes that implemented factory and adds only the `F2MetadataCodecs` registry/records；it must not perform a second
-codec refactor or change an L0 type ID。
+adds `F2MetadataCodecs` as the third explicit dispatch family after Phase 1 and L0-target registries；it must not probe
+decoders, perform a second envelope refactor or change an L0 type。`Phase1MetadataCodecs.recordCodec` is reused for
+these primitive/map/nested-record shapes；`facadeState` remains a String specifically because that codec has no enum
+wire type。The real adapter adds explicit hydration branches for all four records and the fake uses the same codec
+factory, not object serialization。
 
 The current Phase 1 `OxiaJavaClientMetadataStore` owns its `SyncOxiaClient`, `PartitionedOxiaClient` and executors, so
 M2 must perform an explicit ownership-preserving refactor:
@@ -385,6 +473,15 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             OxiaClientConfiguration config,
             SharedOxiaClientRuntime runtime,
             Clock clock); // does not own runtime
+}
+
+public final class OxiaJavaManagedLedgerProjectionMetadataStore
+        implements ManagedLedgerProjectionMetadataStore {
+    public static OxiaJavaManagedLedgerProjectionMetadataStore usingSharedRuntime(
+            OxiaClientConfiguration clientConfig,
+            SharedOxiaClientRuntime runtime,
+            ProjectionMetadataStoreConfig storeConfig,
+            Clock clock);
 }
 ```
 
@@ -427,3 +524,10 @@ Run every case against fake and real Oxia:
 - codec golden bytes and corruption/unknown-version rejection;
 - no operation requires multi-key conditional commit;
 - no append performs a projection metadata write.
+- the four F2 record types dispatch without changing any Phase 1/1.5 golden bytes；encoded metadata version is zero
+  and decoded version is hydrated from the backend；
+- exact-name/hash collision checks cover both derived records, and a same stream/ledger tuple with another binding
+  generation or name is corruption rather than repair；
+- every CAS retry shares one deadline and pending-operation rejection performs zero backend calls；
+- the existing Phase 1.5 `ProjectionIdentity` class remains loadable and unmodified while
+  `ManagedLedgerProjectionIdentity` compiles in the same package。

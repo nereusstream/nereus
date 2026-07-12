@@ -28,8 +28,8 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 | Implemented and final-gated | F2/F4 consumers |
-| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R complete；P15 passed） | F2-M1 projection model |
+| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | M0-M5 implemented/final-gated；M6 handoff pending | P15-M6 result snapshot |
+| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R/M0R2 complete；P15-M6 handoff pending） | P15-M6，then F2-M1 projection model |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
@@ -61,7 +61,8 @@ flowchart LR
     F5 -. shared retention/txn contracts .-> F8
 ```
 
-这不是所有设计工作的严格串行计划。P15-M5 已完成，因此 F2 production 可进入 F2-M1；F4 production
+这不是所有设计工作的严格串行计划。P15-M5 已完成原范围，但 F2-M0R2 新发现的 P15-M6 cumulative
+result handoff 必须先完成，之后 F2 production 才进入 F2-M1；F4 production
 仍不能越过它依赖的 cursor/reader/reference correctness contracts。
 
 ## 4. F1 — Core Stream Storage
@@ -96,7 +97,8 @@ part of that done definition。
 
 ### Phase 1.5 delivery extension
 
-F2-M0R exposed shared L0 prerequisites, so the roadmap inserts P15-M0-M5 before F2-M1：
+F2-M0R exposed the original shared L0 prerequisites and M0R2 exposed one result handoff，so the roadmap places
+P15-M0-M6 before F2-M1：
 
 - tagged Object/BookKeeper `ReadTarget` values and generic result/resolve contracts；
 - primary-WAL adapter registry with Object WAL v1 parity；
@@ -104,15 +106,16 @@ F2-M0R exposed shared L0 prerequisites, so the roadmap inserts P15-M0-M5 before 
 - legacy-record dual-read and generic-target new-write；
 - exact retained append attempt recovery；
 - authoritative seal/logical-delete lifecycle。
+- P15-M6 public cumulative logical size copied from existing committed truth。
 
-P15-M5 still supports only strict Object WAL。BookKeeper IO、`WAL_DURABLE` success、async workers and higher
-generations remain outside this delivery。
+P15-M5 original scope and P15-M6 still support only strict Object WAL。BookKeeper IO、`WAL_DURABLE` success、async
+workers and higher generations remain outside this delivery。
 
 ## 5. F2 — ManagedLedger Facade
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0 API spike + F2-M0R review complete；P15-M5 passed；F2-M1 is next；production facade not implemented
+Current milestone: F2-M0 API spike + F2-M0R/M0R2 review complete；P15-M5 original gate passed；P15-M6 is next，then F2-M1；production facade not implemented
 
 ### Owns
 
@@ -124,7 +127,8 @@ Current milestone: F2-M0 API spike + F2-M0R review complete；P15-M5 passed；F2
 
 ### Entry gate
 
-F2-M0/M0R closed the facade design gate，and the P15-M5 production prerequisite now passes：
+F2-M0/M0R/M0R2 closed the facade design gate。The P15-M5 original production prerequisite passes，while its narrow
+P15-M6 cumulative-result handoff remains before F2-M1：
 
 - F1 append/read/trim error semantics are stable；
 - Pulsar fork/API blobs and repository boundary are locked；

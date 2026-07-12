@@ -1,9 +1,9 @@
 # Phase 1.5 Core Storage Foundation
 
-> 状态：Implemented；P15-M0-M5 complete and final-gated on 2026-07-11
+> 状态：P15-M0-M5 implemented/final-gated；F2-M0R2 discovered narrow P15-M6 result-snapshot handoff（designed, not implemented）
 > 输入基线：`nereusstream/nereus@8aa684f479994094a612578bbfe27170b077f4ad`
 > 实现基线：Phase 1.5 working tree based on `da49a97`
-> 下一里程碑：F2-M1 projection foundation
+> 下一里程碑：P15-M6 `AppendResult.cumulativeSize`，then F2-M1 projection foundation
 
 Phase 1.5 是插入 Future 1 与 Future 2 production implementation 之间的 L0 foundation delivery。
 它不是新的 capability track，也不改变 Future 1-8 的编号。它把 Phase 1 已证明的
@@ -83,6 +83,8 @@ The accepted delivery/compatibility decision is
 9. `seal` linearizes at `ACTIVE -> SEALED` head CAS. Logical delete linearizes at the first
    `ACTIVE/SEALED -> DELETING` head CAS；`DELETED` records terminal completion and removes no bytes。
 10. F2 consumes logical append/read results and must not inspect object IDs/keys to derive Position semantics。
+11. F2 exact local snapshot advancement also consumes protocol-neutral `AppendResult.cumulativeSize`；the internal
+    committed record already owns that value, but the public result addition is P15-M6。
 
 ## 4. Document Map
 
@@ -92,7 +94,7 @@ The accepted delivery/compatibility decision is
 | `02-metadata-schema-and-compatibility.md` | generic target codecs, new records/keys, dual-read/new-write and repair |
 | `03-append-recovery-and-lifecycle.md` | retained attempts, paged recovery, seal/delete and mutation ordering |
 | `04-core-abstractions-and-state-machines.md` | primary-WAL adapter seam, strict append/read dispatch, resources and close |
-| `05-implementation-plan-and-gates.md` | P15-M1 through M5 files, tests, release gates and stop conditions |
+| `05-implementation-plan-and-gates.md` | P15-M1 through M5 implementation plus P15-M6 follow-up files, tests, release gates and stop conditions |
 
 The implemented Phase 1 contract in `../phase-1-core-stream-storage/` remains the legacy compatibility baseline；
 this directory is authoritative for the implemented Phase 1.5 evolution and its preserved compatibility rules。
@@ -107,9 +109,12 @@ this directory is authoritative for the implemented Phase 1.5 evolution and its 
 | P15-M3 core adapter split | Complete | Object WAL sync behavior through registry/adapters and split committer/materializer |
 | P15-M4 recovery/lifecycle | Complete | retained exact attempts, multi-page recovery, seal/delete and race gates |
 | P15-M5 final acceptance | Complete | Phase 1 regression + production Oxia/Object WAL restart + F2 prerequisite gate |
+| P15-M6 F2 result-snapshot handoff | Designed / next | Add protocol-neutral `AppendResult.cumulativeSize` from existing committed truth；constructor/caller/result-fixture/regression gates |
 
-P15-M5 has passed, so F2-M1 production implementation may now begin. F2 must consume this surface and must not create
-a second temporary L0 API。
+P15-M5 remains passed for its original generic-target/recovery/lifecycle scope。F2-M0R2 subsequently proved that
+`AppendResult` needs one already-known cumulative logical-size field so a facade can advance an exact local snapshot
+without a fallible post-commit reread。F2-M1 production implementation is therefore gated on P15-M6；F2 must consume
+that surface and must not create a second temporary L0 API。
 
 ## 6. Support Matrix at Exit
 
@@ -120,6 +125,7 @@ a second temporary L0 API。
 | `OBJECT_WAL_SYNC_OBJECT` strict append/read | implemented and regression-gated |
 | exact in-process append recovery | implemented |
 | seal/logical delete | implemented |
+| `AppendResult.cumulativeSize` public handoff | P15-M6 designed, not implemented |
 | BookKeeper target value/codec | implemented reservation, no IO support |
 | BookKeeper profiles | reserved/rejected before IO |
 | `WAL_DURABLE` success | reserved/rejected before IO |
@@ -138,3 +144,5 @@ The implementation provides and passes these aggregate tasks：
 `phase15Check` includes all ordinary Phase 1 gates plus new API/codec/fake-metadata/core tests。
 `phase15FinalCheck` additionally runs real Oxia mixed-version restart/recovery/lifecycle scenarios through the
 unchanged `phase1FinalCheck` Docker gates。Neither gate weakens or renames `phase1Check` / `phase1FinalCheck`。
+The current P15-M5 invocations remain green；P15-M6 completion must add cumulative-result normal/recovery fixtures to
+these same task names before they again serve as the F2 entry gate。

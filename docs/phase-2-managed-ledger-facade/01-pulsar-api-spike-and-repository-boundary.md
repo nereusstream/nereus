@@ -20,6 +20,9 @@ Target: `nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`,
 | `ReadOnlyManagedLedger.java` | `91b8f92eb637e6350c659f4a44df24800696c88b` |
 | `Entry.java` | `24ea5c17c0d66c324e73b60d3c53bf991cd456fd` |
 | `Position.java` | `d0d6d865c9558a7a02707c48fb19b09d7fc1014b` |
+| `PositionFactory.java` | `481619b8db7a60ff8d7e70a5e211f606eba71c65` |
+| `ImmutablePositionImpl.java` | `06245a6b5f33af1c4d38ca9da73655a5e1bb0165` |
+| `AckSetState.java` | `03ff50c1c7fe5487812fbe6485eed66debfe4b74` |
 | `AsyncCallbacks.java` | `70db427afce4f811670dd018c6dd98d44230d4bc` |
 | `ManagedLedgerException.java` | `1fa565d6ec788df22f5fe725afdaea73141e024a` |
 | `ManagedLedgerInfo.java` | `3e4e56187e5eed531a33e1d0cf8d9bab0c94116c` |
@@ -33,12 +36,11 @@ Target: `nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`,
 | `ManagedLedgerFactoryConfig.java` | `a915d651bd6b2bf01eb9aadb26d1c82fa6f60a0b` |
 | `ScanOutcome.java` | `c679c40e85e9174da793cc99ebd73009a55e7dfe` |
 | `PersistentOfflineTopicStats.java` | `f1cb0dfd088803be1cf4c9b88525d31c0af6ddc8` |
+| `Commands.java` | `a9626a3b4cb669a3aba481446be926aaf1fa9128` |
 
-The core interface/DTO blobs above were present in the local compile checkout at `320fbce6d540...`, except
-`ManagedLedgerConfig.java`: the local blob is `20da70bece85789e0610b26b7d571be8441cc3c0` and adds only the later
-`unackedRangesOpenCacheSetEnabled` field/getter/setter. The probe therefore compiled the exact locked facade
-interfaces against a source-compatible config superset. The target config blob was separately source-audited and is
-the implementation authority; F2 uses none of the later field.
+F2-M0R2 verified these blobs directly in the clean target checkout
+`/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0...`。There is no longer a compatible-checkout delta in
+the active evidence：the target source itself is the compile and review authority。
 
 The first six rows are the original provider/core facade probe. The added rows are also locked because F2 production
 code directly implements or returns them, including cache and statistics compatibility objects. An upgrade gate
@@ -73,11 +75,14 @@ insufficient. The target commit source audit locks:
 | File | Locked Git blob | F2 reason |
 | --- | --- | --- |
 | `ServiceConfiguration.java` | `8b2e28f80f25a09ce2d079712a392f8f5a001a3e` | typed broker config/default feature inputs |
+| `PulsarService.java` | `f80465ed3c65dad72fd4fad06a4483ef99fb706d` | storage initialization order、late broker ID and capability startup hook |
 | `BrokerService.java` | `f618ed206b613e005bf6948930c1f7624fd04cc8` | config/storage-class selection path |
 | `AbstractTopic.java` | `3975b180cf6cae9c78ceaf971323366800f40e5e` | effective policy hierarchy/update ordering |
 | `PersistentTopic.java` | `5eba52c8da50383bf28c5267eb454b6277269687` | open, producer, publish, subscribe, txn and delete hooks |
 | `Topic.java` | `684e5c6c83a102d77a8c10b02547d622bcebe643` | `PublishContext`/topic operation signatures |
 | `Producer.java` | `3649da70c2ab97f9f80d340f88c730428f7de106` | remote producer and publish metadata behavior |
+| `Consumer.java` | `fdad3200482d023cd41186dbb5d04064a1c65899` | ack admission before counters/txn/cursor mutation |
+| `PersistentSubscription.java` | `e77ced8da168faffa73f39eb3fc900c77a5fe6b6` | cumulative/individual cursor mutation call path |
 | `MessageDeduplication.java` | `a980556f49baad059a0e57460cd8649ab78dcc17` | dedup cursor/state mutation boundary |
 | `TopicPolicyListenerWrapper.java` | `da22b44a632c2375db321202d5966c047418477f` | live policy listener admission ordering |
 | `ManagedLedgerInterceptorImpl.java` | `f598b3ebf6a302d0ec09dfe1ebfde73343b12881` | broker metadata/payload processor composition |
@@ -88,8 +93,14 @@ insufficient. The target commit source audit locks:
 | `TopicPolicies.java` | `356e2a4e072f84fa795092de2f42c6d302d0533e` | topic local/global feature inputs |
 | `HierarchyTopicPolicies.java` | `b476c9d290052b510ff4ff4b96b1a4a76dcee330` | effective precedence parity oracle |
 | `PersistencePolicies.java` | `684c202f15852edec092772974b1c1be9bc0c404` | selected storage-class field |
+| `BrokerRegistry.java` | `d154edfbb320ea30486735d899f5462860b1c3a4` | active-broker set for rollout convergence |
+| `BrokerRegistryImpl.java` | `dbc3c52be5cc805ef035220451b76ded72bdfbde` | broker visibility ordering |
+| `BrokerLookupData.java` | `f3dbec5fadd7d705cd8c51de1e6faecc0f58812a` | capability evidence carried by active broker data |
 | `MetadataStore.java` | `00c8e205e0e0ef6fdfd13f6a21adabbd71c6c4e6` | binding sync/get/conditional-put contract |
 | `MetadataStoreExtended.java` | `22838154098b23828023f118680fd3faa9d55a79` | broker-supplied shared metadata handle |
+| `CoordinationService.java` | `708f91f4a33cacc423afae8938a78d77fe9ce17c` | namespace first-create lock-manager factory |
+| `LockManager.java` | `cb6601b170135465d3ae27f6eef35080e79780f6` | bounded namespace resource-lock acquisition |
+| `ResourceLock.java` | `c85b13cdc1440986859dec61ec9458fcb74e0fae` | async permit release/session-loss behavior |
 | `GetResult.java` | `6bb42202b1d2254506912c73c0e59d70265a027c` | binding bytes plus stat |
 | `Stat.java` | `36874e5bc387a0205215248178e2487f507d4cbe` | binding expected-version source |
 
@@ -212,6 +223,28 @@ Locked defaults are not automatically safe. F2 overrides `ManagedLedger.getLastD
 returns `EARLIEST`), `ManagedCursor.isCursorDataFullyPersistable` (whose default returns true), scan and
 read-with-skip defaults where inherited behavior would misstate F2 capability.
 
+### 3.5 F2-M0R2 broker-path findings
+
+The exact target source adds four implementation constraints that were not closed by the original compile probe：
+
+1. `PulsarService.newManagedLedgerStorage()` runs before the final bound addresses and `brokerId` are created。
+   Runtime construction therefore generates its own cryptographically random `processRunId` and uses
+   `pulsar-f2/{processRunId}` as the diagnostic writer ID；it cannot require a broker ID during
+   `ManagedLedgerStorage.initialize`。A separate late PulsarService hook starts broker capability publication only
+   after `brokerId` exists and before the broker becomes visible through load management。
+2. `PersistentTopic.addFailed` normally fences, disconnects producers and then
+   `decrementPendingWriteOpsAndCheck()` calls `readyToCreateNewLedger()` and unfences when pending writes reach zero。
+   Nereus must install the write-fence handoff in documents 06/07 so this stock path waits for exact recovery rather
+   than clearing an unresolved attempt。
+3. `Consumer.messageAcked` reaches `PersistentSubscription.acknowledgeMessageAsync` after transaction/batch-ack
+   interpretation。F2 admission must run before those mutations and accept only non-transactional, non-durable,
+   one-position whole-entry cumulative ack with no batch fields/persisted-ack request；individual or ack-set input is
+   rejected。The admitted Nereus path waits for local async mark-delete before recording ack counters but does not
+   claim restart persistence。
+4. The locked `PersistencePolicies.equals` compares `managedLedgerStorageClassName` by reference identity。F2 fork
+   work must replace that comparison with `Objects.equals` and add an equal-content/different-instance regression
+   test before storage-class policy updates are trusted。
+
 ## 4. Compile Probe
 
 `spikes/PulsarManagedLedgerApiProbe.java` uses exact overloads with real Pulsar types. The companion
@@ -228,7 +261,8 @@ export NEREUS_F2_PROBE_DIR="$NEREUS_REPO/docs/phase-2-managed-ledger-facade/spik
   :pulsar-broker:compileF2ApiProbeJava
 ```
 
-F2-M0 result: `BUILD SUCCESSFUL`.
+F2-M0 result: `BUILD SUCCESSFUL`。F2-M0R2 repeated the command against the exact target checkout on 2026-07-12；
+all 84 scheduled tasks, including `:pulsar-broker:compileF2ApiProbeJava`, completed with `BUILD SUCCESSFUL`。
 
 For a target upgrade:
 

@@ -27,8 +27,17 @@ Insert a Phase 1.5 delivery between Phase 1 and F2 production implementation。I
 6. implement head-authoritative seal and logical delete；
 7. keep executable support at strict Object WAL only through P15-M5。
 
-F2-M1 begins after the P15-M5 final gate。Future 4 and BookKeeper implementations reuse the seam but retain their own
-task/checkpoint、retention、client and execution-profile gates。
+F2-M1 was originally scheduled after the P15-M5 final gate；the implementation addendum below adds one narrow
+result-handoff gate。Future 4 and BookKeeper implementations reuse the seam but retain their own task/checkpoint、
+retention、client and execution-profile gates。
+
+## 2026-07-12 Implementation Addendum
+
+P15-M5 passed its accepted generic-target/recovery/lifecycle scope。The later exact F2-M0R2 review proved that public
+`AppendResult` also needs the cumulative logical size already present in internal `CommittedAppend`，otherwise a
+stale facade must guess size or make known append success depend on a fallible second metadata read。P15-M6 adds only
+that protocol-neutral in-memory field and regression fixture；it changes no durable record/WAL byte、commit boundary、
+profile or recovery identity。F2-M1 begins after P15-M6。
 
 ## Consequences
 

@@ -123,11 +123,16 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 
 - **Future 1-8**：稳定的 capability-track 编号，不代表统一处于未来。
 - **Phase 1**：已完成的 Future 1 代码级交付阶段。
-- **Phase 1.5 / P15-M0-M5**：F1 与 F2 production 之间已完成并 final-gated 的 L0 foundation delivery；
+- **Phase 1.5 / P15-M0-M5**：F1 与 F2 production 之间已完成并 final-gated 的原 L0 foundation delivery；
   它不是新的 Future 编号，也没有扩张 executable profile support。
+- **P15-M6**：F2-M0R2 新发现的窄结果交接；把 internal committed truth 已有的 cumulative logical size
+  加入 generic `AppendResult`，不改变 durable format/profile/commit boundary；尚未实现。
 - **M0-M8**：Phase 1 内部里程碑；M7 是 production Oxia adapter gate，M8 是最终端到端验收/冻结。
 - **F2-M0R**：Future 2 API spike 后的代码级复审；锁定 incarnation、append recovery、method matrix 和
   runtime bootstrap，仍不代表 facade 已实现。
+- **F2-M0R2**：在 exact target Pulsar checkout 上完成的实现前闭环；锁定 metadata type、durable binding
+  inspection、write-fence/ack broker handoff、S3 provider、capability rollout 与 namespace first-create race，
+  仍不代表 facade 已实现。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

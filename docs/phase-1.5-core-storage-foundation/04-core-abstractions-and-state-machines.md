@@ -29,23 +29,23 @@ nereus-core/com.nereusstream.core.wal/
   PrimaryAppendRequest.java
   PreparedPrimaryAppend.java
   DurablePrimaryAppend.java
-  PrimaryReadRequest.java
-  PrimaryReadResult.java
-  PrimaryReadReservation.java
+  ProviderCommitEvidence.java
 
 nereus-core/com.nereusstream.core.wal.object/
   ObjectWalAppenderAdapter.java
   ObjectWalReaderAdapter.java
-  ObjectWalCommitHook.java
+  ObjectPreparedPrimaryAppend.java
+  ObjectWalCommitEvidence.java
 
 nereus-core/com.nereusstream.core.append/
-  StrictAppendCoordinator.java
+  AppendCoordinator.java
+  AppendDeadline.java
+  AppendResourceLimiter.java
+  AppendSessionManager.java
   StableAppendCommitter.java
+  MetadataStableAppendCommitter.java
   GenerationZeroIndexMaterializer.java
-  AppendRecoveryCoordinator.java
-  RetainedAppendAttempt.java
-  RetainedAppendRegistry.java
-  StreamMutationLaneRegistry.java
+  MetadataGenerationZeroIndexMaterializer.java
 
 nereus-core/com.nereusstream.core.lifecycle/
   StreamLifecycleCoordinator.java
@@ -58,6 +58,11 @@ nereus-core/com.nereusstream.core.read/
 because they translate between core domain and that module。A later BookKeeper implementation belongs in a separate
 module (target name `nereus-bookkeeper-wal`) and registers through the interfaces；Phase 1.5 L0 modules do not add
 `org.apache.bookkeeper` dependencies。
+
+The list above is the implemented class layout。`AppendCoordinator` deliberately contains the stream lane、retained
+physical attempt、terminal cache and recovery single-flight state as private implementation types；the superseded
+design names `StrictAppendCoordinator`、`AppendRecoveryCoordinator`、`RetainedAppendAttempt`、
+`RetainedAppendRegistry` and `StreamMutationLaneRegistry` must not be recreated as parallel production owners。
 
 ## 2. Profile Execution Plan
 
@@ -79,7 +84,8 @@ public interface StorageProfileResolver {
     StorageExecutionPlan requireExecutable(
             StorageProfile profile,
             DurabilityLevel requestedDurability,
-            PrimaryWalRegistry registry);
+            boolean primaryAppenderInstalled,
+            boolean primaryReaderInstalled);
 }
 ```
 
@@ -124,7 +130,7 @@ public record DurablePrimaryAppend(
         List<SchemaRef> schemaRefs,
         long minEventTimeMillis,
         long maxEventTimeMillis,
-        Object providerCommitEvidence) {
+        ProviderCommitEvidence providerCommitEvidence) {
 }
 
 public interface PrimaryWalAppender<P extends PreparedPrimaryAppend> {
@@ -143,8 +149,9 @@ implementation uses the typed `ProviderCommitEvidence` interface and `ObjectWalC
 currently builds as an unnamed Java module, the interface is not Java-`sealed`, while registry/type checks still fail
 closed。A provider cannot change any logical field between prepare and persist。
 
-`validateBeforeHeadCommit` proves provider-specific durable target metadata：Object WAL writes/compares the exact
-manifest；future BookKeeper validates the ledger/entry range through its adapter。Failure is
+`validateBeforeHeadCommit` is the provider-specific durable-target validation seam。For the current Object path,
+`AppendCoordinator` writes/compares the exact manifest immediately before this call and the adapter then validates
+the typed `ObjectWalCommitEvidence`；a future BookKeeper adapter validates its ledger/entry range here。Failure is
 `KNOWN_NOT_COMMITTED` because no head request has been sent, although orphan durable bytes may remain。
 
 ## 4. Object WAL Adapter
@@ -157,7 +164,8 @@ manifest；future BookKeeper validates the ledger/entry range through its adapte
 4. delegates immutable upload；
 5. constructs one `ObjectSliceReadTarget` from `WalWriteResult + WrittenStreamSlice`；
 6. stores the full `WalWriteResult` as sealed provider evidence；
-7. `ObjectWalCommitHook` builds and put/compares the existing `ObjectManifestRecord` before head commit。
+7. `AppendCoordinator.uploadAndCommit` builds and put/compares the existing `ObjectManifestRecord` before invoking
+   the adapter's `validateBeforeHeadCommit` hook。
 
 No WAL magic、section、footer、checksum or object-key change occurs。Existing direct object-store tests and golden
 bytes remain authoritative。Manifest/object/slice mismatch remains an object-specific invariant/error and cannot be
@@ -167,15 +175,11 @@ normalized into a generic successful target。
 
 ```java
 public interface StableAppendCommitter {
-    CompletableFuture<StableAppendResult> commit(
-            CommitAppendRequest request,
-            AppendDeadline deadline);
+    CompletableFuture<StableAppendResult> commit(CommitAppendRequest request);
 }
 
 public interface GenerationZeroIndexMaterializer {
-    CompletableFuture<CommittedAppend> materialize(
-            ReachableCommittedAppend reachableAppend,
-            AppendDeadline deadline);
+    CompletableFuture<CommittedAppend> materialize(ReachableCommittedAppend reachableAppend);
 }
 ```
 
@@ -213,17 +217,18 @@ not a one-line early return。
 
 ## 6. Shared Stream Mutation Lane
 
-`StreamMutationLaneRegistry` stores one bounded local lane per active stream。A lane owns：
+`AppendCoordinator` stores one private `StreamLane` per locally retained stream。A lane owns：
 
 - expected committed end cache；
 - FIFO mutation tail for append/seal/delete barriers；
-- optional unresolved `AppendAttemptId`；
-- retain count and last-access timestamp；
+- an optional suspended failure/fence tied to the unresolved physical attempt kept in the coordinator's
+  `retainedAttempts` map；
+- lifecycle admission barrier and retain count；
 - permanent local fence when exact recovery finds corruption/invariant failure。
 
-The lane is removed only when no queued/in-flight operation, recovery, waiter or terminal fence remains。A bounded
-resident-lane test remains part of the Phase 1 post-M8 memory gate。Append/session caches remain distinct；removing a
-lane cannot discard an unresolved attempt or make a durable session authoritative locally。
+The lane is removed only when its retain count reaches zero and no suspended failure remains。A bounded resident-lane
+test remains part of the Phase 1 post-M8 memory gate。Append/session caches remain distinct；removing a lane cannot
+discard an unresolved attempt or make a durable session authoritative locally。
 
 The existing `AppendCoordinator` class name is retained for source compatibility, but its only production path is the
 strict Phase 1.5 pipeline through `PrimaryWalRegistry`、`ObjectWalAppenderAdapter`、`StableAppendCommitter` and
@@ -233,29 +238,13 @@ the same coordinator；there is no second legacy production append path。
 ## 7. Primary Read Boundary
 
 ```java
-public record PrimaryReadRequest(
-        long requestedOffset,
-        List<ResolvedRange> ranges,
-        ReadOptions options) {
-}
-
-public record PrimaryReadReservation(
-        long bufferedBytes,
-        int concurrentOperations) {
-}
-
-public record PrimaryReadResult(
-        List<ReadBatch> batches,
-        long physicalBytesRead,
-        Map<ReadTargetIdentity, Long> bytesByTarget) {
-}
-
 public interface PrimaryWalReader {
     ReadTargetType targetType();
-    PrimaryReadReservation estimateReservation(PrimaryReadRequest request);
-    CompletableFuture<PrimaryReadResult> read(
-            PrimaryReadRequest request,
-            Duration timeout);
+    long reservationBytes(ResolvedRange range);
+    CompletableFuture<WalReadResult> readWithStats(
+            long startOffset,
+            List<ResolvedRange> ranges,
+            ReadOptions options);
 }
 ```
 
@@ -264,9 +253,9 @@ reader type, while preserving logical order and one caller record/byte budget ac
 future profile migration/mixed historical ranges；it cannot assume one stream has one target type forever。
 
 Phase 1.5 registry contains only `ObjectWalReaderAdapter`。It validates every target is
-`ObjectSliceReadTarget`, converts to current reader inputs, delegates checksum/index decoding and converts exact stats
-back to generic accounting。A BookKeeper target reaches no object method and fails before resource reservation with
-`UNSUPPORTED_READ_TARGET`。
+`ObjectSliceReadTarget`, converts to current reader inputs and delegates checksum/index decoding；the existing
+`WalReadResult` carries batches plus per-slice stats back to generic accounting。A BookKeeper target reaches no object
+method and fails before resource reservation with `UNSUPPORTED_READ_TARGET`。
 
 ## 8. Resolve and Cache Changes
 

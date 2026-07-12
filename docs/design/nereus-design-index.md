@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次实现同步：2026-07-11
-> 当前交付阶段：Phase 1.5 P15-M0-M5 complete；下一实现里程碑为 F2-M1 projection foundation
+> 当前交付阶段：Phase 1.5 P15-M0-M5 complete；F2-M0R2 discovered P15-M6 cumulative-result handoff；P15-M6 next，then F2-M1
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -63,15 +63,15 @@ streamId + offset
 
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
-| `nereus-api` | `Implemented`（P15-M1/M4） | generic target/result、append recovery/lifecycle API、validation、profile/durability、key/hash helpers |
+| `nereus-api` | `Implemented`（P15-M1/M4；P15-M6 delta designed） | generic target/result、append recovery/lifecycle API implemented；`AppendResult.cumulativeSize` handoff pending |
 | `nereus-metadata-oxia` | `Implemented`（P15-M2/M4） | legacy/new codecs、generic new-write、mixed-chain repair/replay、lifecycle CAS、fake/real Docker gates |
 | `nereus-object-store` | `Implemented`（M3） | object-store API、WAL v1 writer/reader、entry index、local test fixture、checksums/tests |
 | `nereus-core` | `Implemented`（P15-M3/M4） | primary-WAL registry/Object adapters、strict split commit/materialize、read dispatch、exact recovery、seal/delete |
-| Phase 1.5 foundation | `Implemented`（P15-M0-M5） | generic target/adapter、metadata dual-read/new-write、append recovery、seal/delete；ordinary/Docker gates pass |
+| Phase 1.5 foundation | `In progress`（P15-M0-M5 implemented；P15-M6 next） | original generic target/adapter、recovery、seal/delete gates pass；narrow cumulative-result handoff pending |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `In progress`（F2-M0R complete） | API spike、code-level method/runtime review complete；P15-M5 passed；module marker-only |
-| `nereus-pulsar-adapter` | `In progress`（F2-M0R complete；gated） | runtime/bootstrap contract complete；implementation waits for F2 milestones；module marker-only |
+| `nereus-managed-ledger` | `In progress`（F2-M0R2 complete） | exact Pulsar API/call-path、code-level method/state/fence review complete；blocked on P15-M6；module marker-only |
+| `nereus-pulsar-adapter` | `In progress`（F2-M0R2 complete；gated） | runtime/S3/bootstrap/binding/capability contract complete；implementation waits for F2 milestones；module marker-only |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
@@ -92,6 +92,8 @@ Phase 1.5 gates are：
 ./gradlew phase15Check
 ./gradlew phase15FinalCheck --rerun-tasks
 ```
+
+The P15-M5 versions currently pass；P15-M6 must extend the same gates with cumulative-result fixtures before F2-M1。
 
 ## 5. 当前一致性决策
 
@@ -118,17 +120,20 @@ Phase 1.5 gates are：
     Position cannot alias the new topic lifetime。
 13. Every post-head-request non-known append result carries an in-process `AppendAttemptId`；the facade recovers
     that exact retained physical attempt or write-fences，and does not claim producer dedup across broker crashes。
-14. Hybrid first-create/delete/new-lifetime selection is serialized by one broker-metadata storage-class binding；an
+14. P15-M6 generic `AppendResult` carries the exact cumulative logical size already stored in committed truth；F2
+    never derives it from a stale local total plus this append's bytes。
+15. Hybrid first-create/delete/new-lifetime selection is serialized by one broker-metadata storage-class binding；an
     existing live topic cannot switch between BookKeeper and Nereus without a future migration protocol。
-15. Phase 1.5 design replaces mandatory object-shaped common results/metadata with a tagged `ReadTarget` and uses
+16. Phase 1.5 design replaces mandatory object-shaped common results/metadata with a tagged `ReadTarget` and uses
     dual-read/new-write metadata；legacy Phase 1 golden bytes remain frozen and one unchanged head may link a mixed
     commit chain。
-16. Stable head commit and generation-zero index materialization become separate idempotent L0 operations, while
+17. Stable head commit and generation-zero index materialization become separate idempotent L0 operations, while
     Phase 1.5 public success remains strict and continues rejecting `WAL_DURABLE` before IO。
-17. F2-required append recovery、seal and logical delete must be implemented in L0 before F2 production code；logical
+18. F2-required append recovery、seal and logical delete must be implemented in L0 before F2 production code；logical
     delete never implies physical object deletion。
 
-ADR 0004 owns the delivery-order、generic-target compatibility and support-boundary decision behind items 15-17。
+ADR 0004 and its 2026-07-12 addendum own the delivery-order、generic-target compatibility and support-boundary
+decision behind items 14 and 16-18。
 
 详细协议见 `nereus-commit-protocol.md`，当前 Phase 1 精确合同见
 `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`。
@@ -154,7 +159,7 @@ ADR 0004 owns the delivery-order、generic-target compatibility and support-boun
 | 文档 | 能力轨道 | 当前状态 |
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
-| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R complete；F2-M1 next） |
+| `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `In progress`（F2-M0/M0R/M0R2 complete；P15-M6 next，then F2-M1） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |

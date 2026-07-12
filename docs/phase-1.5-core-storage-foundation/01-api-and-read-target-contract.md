@@ -1,6 +1,9 @@
 # API and Read-target Contract
 
-> 状态：Implemented；P15-M1/P15-M4 API contract final-gated on 2026-07-11
+> Implementation status：P15-M1/M4 surface is implemented；the `AppendResult.cumulativeSize` line below is the
+> F2-M0R2-discovered P15-M6 delta and is designed but not yet implemented。
+
+> Base status：P15-M1/P15-M4 API contract implemented/final-gated on 2026-07-11
 
 本文冻结 Phase 1.5 的 protocol-neutral public surface。示例是 target Java shape，省略 license、import 和
 method body。任何实现差异都必须先更新本文并重新审查 F2/F4 handoff。
@@ -134,6 +137,7 @@ public record AppendResult(
         StreamId streamId,
         OffsetRange range,
         long committedEndOffset,
+        long cumulativeSize,
         long generation,
         ReadTarget readTarget,
         PayloadFormat payloadFormat,
@@ -149,14 +153,24 @@ public record AppendResult(
 Common validation：
 
 - `committedEndOffset == range.endOffset()`；
+- `cumulativeSize` is the exact lifetime logical byte total at this commit，is nonnegative and at least
+  `logicalBytes`；it comes directly from the already implemented `CommittedAppend.cumulativeSize`；
 - `generation == 0` for an append result；higher generations are never a new append result；
 - `readTarget` is the durable primary target recorded by that commit；
 - positive record/entry counts and `recordCount == range.recordCount()`；
 - payload/count/schema/projection validation remains identical to Phase 1；
 - `commitVersion > 0` for every visible append。
 
-The public result deliberately omits object-only convenience fields。Callers that truly need physical details use a
-total type switch over `readTarget`。F2 does not switch；it derives Position only from the logical range。
+The public result deliberately omits object-only convenience fields。`cumulativeSize` is protocol-neutral logical
+head state, not object size。Callers that truly need physical details use a total type switch over `readTarget`。F2
+does not switch；it derives Position only from the logical range and advances its complete local size snapshot from
+the returned cumulative value。
+
+The original P15-M1 implementation omitted `cumulativeSize` even though internal `CommittedAppend` already retains
+it。F2-M0R2 identified that omission when specifying exact snapshot advancement after a locally successful append
+whose facade snapshot may lag another broker. P15-M6 adds this one field and constructor/validation/result-fixture tests before
+F2-M1 production code；constructor/normal+recovery result fixtures are updated, but no durable record golden changes。
+It changes no durable record、Object WAL byte、commit boundary or recovery identity。
 
 ## 4. Generic Resolve Result
 

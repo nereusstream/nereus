@@ -266,7 +266,8 @@ how certain the result is but does not identify which physical attempt to replay
 after the head request is sent also carries an opaque `AppendAttemptId`。
 
 The core retains the exact generic `CommitAppendRequest`、durable provider result and read target behind that ID。
-`recoverAppend` replays only that identity and either returns the original `AppendResult` or preserves/increases
+`recoverAppend` replays only that identity and either returns the original `AppendResult`（including the commit's
+protocol-neutral cumulative logical size after P15-M6）or preserves/increases
 certainty. It cannot prepare a new target or persist new primary bytes. A stream lane with a non-known attempt remains
 suspended until recovery returns committed, proves
 `KNOWN_NOT_COMMITTED` by complete commit-identity inspection, or reaches a permanent invariant failure; observing only

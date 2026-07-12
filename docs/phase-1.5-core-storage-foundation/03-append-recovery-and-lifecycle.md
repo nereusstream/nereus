@@ -172,9 +172,11 @@ Important rules：
 
 ## 6. Background Retry and Fencing
 
-`AppendRecoveryCoordinator` owns one scheduled retry per unresolved attempt。Backoff starts at
-`appendRecoveryBackoffMin`, doubles with saturation to `appendRecoveryBackoffMax`, and each metadata attempt is bounded
-by `appendRecoveryAttemptTimeout`。There is no unbounded blocking task or overlapping timer for one ID。
+The implemented `AppendCoordinator` owns the retained-attempt map、single recovery scheduler and one single-flight
+recovery future per unresolved attempt；there is no separate `AppendRecoveryCoordinator` production class。Backoff
+starts at `appendRecoveryBackoffMin` and doubles with saturation to `appendRecoveryBackoffMax`。Each public waiter is
+bounded by its `AppendRecoveryOptions.timeout` while retryable durable uncertainty remains retained for background
+resolution。There is no unbounded blocking task or overlapping recovery flight for one ID。
 
 The public recovery caller may retry sooner and join the same flight。A stream lane stays write-suspended until：
 
@@ -267,8 +269,8 @@ operations is resumed by delete/open reconciliation。
 
 ## 10. Local and Remote Ordering
 
-`StreamMutationLaneRegistry` replaces the append coordinator's private lane ownership。Append、recover、seal and
-delete for one local stream use the same ordered lane。Rules：
+`AppendCoordinator` keeps the private `StreamLane` ownership；append and exact recovery use it directly, while
+`StreamLifecycleCoordinator` enters the same lane through `enqueueLifecycleMutation` for seal/delete。Rules：
 
 - an append accepted before a lifecycle barrier either reaches a terminal exact outcome first or causes the
   lifecycle call to fail before any lifecycle CAS when its recovery budget is exhausted；

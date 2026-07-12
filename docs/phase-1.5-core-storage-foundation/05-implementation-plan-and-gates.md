@@ -1,6 +1,6 @@
 # Phase 1.5 Implementation Plan and Gates
 
-> 状态：P15-M0-M5 complete；final-gated on 2026-07-11
+> 状态：P15-M0-M5 complete/final-gated on 2026-07-11；P15-M6 designed and pending
 
 A milestone is complete only when production code, focused tests, aggregate gate wiring and matching documentation
 all exist。Passing the old Phase 1 gate alone cannot prove a new Phase 1.5 contract；a design enum/class alone cannot
@@ -179,10 +179,9 @@ Production targets：
 nereus-core/.../profile/...
 nereus-core/.../wal/...
 nereus-core/.../wal/object/...
-nereus-core/.../append/StrictAppendCoordinator.java
+nereus-core/.../append/AppendCoordinator.java
 nereus-core/.../append/StableAppendCommitter.java
 nereus-core/.../append/GenerationZeroIndexMaterializer.java
-nereus-core/.../append/StreamMutationLaneRegistry.java
 nereus-core/.../read/ReadTargetDispatcher.java
 nereus-core/.../read/ReadResolver.java
 nereus-core/.../read/ReadCoordinator.java
@@ -201,8 +200,9 @@ Implement：
 - target-aware positive cache identity/invalidation；
 - explicit rejection of BookKeeper/async/non-strict profiles。
 
-The old monolithic `AppendCoordinator` is removed or made test-only once parity tests pass。There must not be two
-production append paths selected by timing/configuration。
+The existing `AppendCoordinator` is the single production owner after cutover；its only path uses the generic adapter、
+stable committer and generation-zero materializer。There must not be two production append paths selected by
+timing/configuration。
 
 Tests：
 
@@ -228,9 +228,12 @@ Production targets：
 
 ```text
 nereus-core/.../append/
-  AppendRecoveryCoordinator.java
-  RetainedAppendAttempt.java
-  RetainedAppendRegistry.java
+  AppendCoordinator.java             (Attempt/TerminalAttempt/StreamLane private state)
+  AppendDeadline.java
+  StableAppendCommitter.java
+  MetadataStableAppendCommitter.java
+  GenerationZeroIndexMaterializer.java
+  MetadataGenerationZeroIndexMaterializer.java
 
 nereus-core/.../lifecycle/
   StreamLifecycleCoordinator.java
@@ -247,6 +250,9 @@ nereus-metadata-oxia/.../
 ```
 
 Implement every state/timeout/capacity/close rule in document 03, including：
+
+- the implemented `AppendCoordinator` is the sole retained-attempt registry、recovery single-flight and retry owner；
+- no standalone `AppendRecoveryCoordinator`、`RetainedAppendRegistry` or facade-owned replay loop is added；
 
 - attempt permit before WAL allocation；
 - exact request/provider result retention；
@@ -301,7 +307,8 @@ Release output must state：
 - rolling downgrade is unsupported after first generic-target write；
 - executable profile remains Object WAL sync only；
 - BookKeeper target values are reservations, not adapters；
-- F2 production implementation may begin, while F4/BK/async remain separate gates。
+- F2 production implementation may begin only after the narrow P15-M6 handoff below, while F4/BK/async remain
+  separate gates。
 
 Exit commands：
 
@@ -313,13 +320,46 @@ Exit commands：
 ./gradlew check
 ```
 
-## 8. F2 Handoff
+## 8. P15-M6 — F2 Result-snapshot Handoff
 
-After P15-M5, F2-M1 consumes these implemented facts and must not reimplement them：
+F2-M0R2 found one protocol-neutral in-memory result gap after P15-M5：`CommittedAppend` already holds exact
+`cumulativeSize` at each commit, but `AppendResult` drops it. A facade whose cached head predates another broker's
+append cannot reconstruct the exact lifetime size from its own append's `logicalBytes`，and a fallible post-commit
+metadata reread cannot be allowed to turn known durable success into failure.
+
+Production targets：
+
+```text
+nereus-api/.../AppendResult.java
+nereus-core/.../append/AppendCoordinator.java
+all production/test AppendResult constructor call sites
+```
+
+Changes are limited to adding `long cumulativeSize` after `committedEndOffset`，validating it and passing
+`CommittedAppend.cumulativeSize()` in normal and recovered result construction. No durable codec/record、WAL byte、
+head CAS、read target、outcome or attempt ID changes.
+
+Gate：
+
+- normal append returns the exact new cumulative total；
+- an append whose start is later than a stale caller snapshot still returns the complete prefix size；
+- exact recovery returns the original commit's cumulative total and later-head recovery never fabricates the current
+  head size；
+- every Phase 1/1.5 ordinary and Docker gate remains green and every old durable golden byte is byte-identical；
+- a protocol-neutral F2 snapshot fixture can advance end/size without inspecting `ReadTarget` or performing a second
+  metadata read。
+
+P15-M6 is complete only when `phase15Check` and `phase15FinalCheck --rerun-tasks` include these cases. It is not a new
+storage profile or a reopening of P15-M5 durability semantics.
+
+## 9. F2 Handoff
+
+After P15-M6, F2-M1 consumes these facts and must not reimplement them：
 
 | F2 requirement | Phase 1.5 owner |
 | --- | --- |
 | logical generic `AppendResult` | P15-M1/M3 |
+| exact cumulative logical size at the returned commit | P15-M6 |
 | `AppendAttemptId` and exception contract | P15-M1/M4 |
 | exact `recoverAppend` | P15-M4 |
 | paged replay cursor/search | P15-M2/M4 |
@@ -331,7 +371,7 @@ F2 remains owner of projection identity/records、Position/Entry mapping、facad
 binding and broker admission。The Phase 1.5 final fixture validates only the protocol-neutral prerequisite；it does
 not claim a ManagedLedger implementation。
 
-## 9. Future 4 and BookKeeper Handoff
+## 10. Future 4 and BookKeeper Handoff
 
 Phase 1.5 gives later work：
 
@@ -350,7 +390,7 @@ It deliberately does not freeze：
 Those items retain their own design/implementation gates。A later adapter must pass the same identity/recovery/read
 contracts rather than adding a parallel BookKeeper commit truth。
 
-## 10. Stop-the-line Conditions
+## 11. Stop-the-line Conditions
 
 Stop the current milestone and revise design before continuing if：
 
@@ -366,3 +406,5 @@ Stop the current milestone and revise design before continuing if：
 - F2/BookKeeper/Pulsar types enter L0 modules；
 - a reserved profile reaches provider IO；
 - implementation changes code without updating its matching Phase 1.5 detailed contract。
+- F2 can advance a known committed end but must guess cumulative logical size or make callback success depend on a
+  second metadata read。

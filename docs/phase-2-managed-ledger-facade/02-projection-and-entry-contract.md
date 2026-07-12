@@ -41,9 +41,25 @@ the ledger-ID check instead of addressing the new topic.
 
 ## 2. Code-level Model
 
-Target package in `nereus-managed-ledger`:
+Target package `com.nereusstream.metadata.oxia` in `nereus-metadata-oxia`：
 
 ```java
+public final class ManagedLedgerProjectionNames {
+    public static final int MAX_MANAGED_LEDGER_NAME_BYTES = 16 * 1024;
+    public static final String PAYLOAD_MAPPING_ATTRIBUTE = "nereus.payloadMapping";
+    public static final String PAYLOAD_MAPPING_V1 = "PULSAR_ENTRY_V1";
+
+    public static String requireManagedLedgerName(String managedLedgerName);
+    public static String managedLedgerNameHash(String managedLedgerName);
+    public static StreamName streamName(String managedLedgerName, long incarnation);
+    public static StreamId streamId(String managedLedgerName, long incarnation);
+}
+```
+
+Target package `com.nereusstream.managedledger.projection` in `nereus-managed-ledger`：
+
+```java
+
 public record VirtualLedgerProjection(
         StreamId streamId,
         String managedLedgerName,
@@ -78,14 +94,52 @@ public final class PositionProjection {
             Position position,
             StreamMetadata stream);
 }
+
+public final class F2L0RequestFactory {
+    public StreamCreateOptions createOptions();
+    public AppendOptions appendOptions(Duration timeout);
+    public AppendRecoveryOptions recoveryOptions(Duration timeout);
+    public ReadOptions singleEntryReadOptions(int maxEntryBytes, Duration timeout);
+    public SealOptions sealOptions(Duration timeout);
+    public DeleteOptions deleteOptions(Duration timeout);
+}
 ```
 
 The complete role-specific target API, including read-position output and max-position normalization, is locked in
 `06-code-level-interface-contract.md`. A generic `toOffset` is forbidden because a readable entry, one-past-tail read
 position and before-first mark-delete position have different valid ranges.
 
-Pulsar types remain in `nereus-managed-ledger`. Durable record types in
-`nereus-metadata-oxia` store primitive fields and do not import Pulsar.
+Pulsar types remain in `nereus-managed-ledger`. `ManagedLedgerProjectionNames` uses only Nereus API identity/hash
+types and strict strings；placing it beside `ManagedLedgerProjectionKeyspace` gives metadata one-way ownership and
+avoids a forbidden `nereus-metadata-oxia -> nereus-managed-ledger -> nereus-metadata-oxia` cycle. Durable record types
+in `nereus-metadata-oxia` store primitive fields and do not import Pulsar.
+
+`ManagedLedgerProjectionNames` is the only identity constructor。It validates nonblank strict UTF-8, rejects NUL and
+encoded length above `MAX_MANAGED_LEDGER_NAME_BYTES`, then computes：
+
+```text
+managedLedgerNameHash = DeterministicIds.stableHashComponent(
+    "pulsar-managed-ledger-name-v1\0" + exactManagedLedgerName)
+streamName = new StreamName(
+    "pulsar-ml-v1\0" + exactManagedLedgerName + "\0" + decimalIncarnation)
+streamId = DeterministicIds.streamIdFor(streamName)
+```
+
+No caller independently concatenates these strings。The required golden vector is：
+
+```text
+managedLedgerName = tenant/ns/persistent/topic
+incarnation = 1
+managedLedgerNameHash = ugjdjmjjmrnhrunnrjqftfjyy62cvr2tsg5d5ps35t6c5xsexnuq
+streamId = s-uf6gggaiiw66rofdsii3n4jdckm2y26wr2zmabukunoszlplbg4a
+```
+
+`F2L0RequestFactory` freezes every L0 option rather than rebuilding options at call sites：creation uses canonical
+`OBJECT_WAL_SYNC_OBJECT` plus exactly `{nereus.payloadMapping=PULSAR_ENTRY_V1}`；append uses empty session、
+`WAL_DURABLE_AND_INDEX_COMMITTED`、auto-acquire true and empty tags；read uses `maxRecords=1`、the configured positive
+`maxEntryBytes` and `ReadIsolation.COMMITTED`；seal/delete reasons are respectively
+`pulsar-managed-ledger-terminate` and `pulsar-managed-ledger-delete`。Supplied durations are the already selected
+operation budget and are never silently replaced by a larger default。
 
 Validation:
 
@@ -105,6 +159,9 @@ Validation:
 - `entryId == -1` is legal only when the role permits the before-first/empty position；
 - other negative values are invalid;
 - conversion uses checked arithmetic and never narrows a long offset to int.
+- `metadataVersion >= 0` and `createdAtMillis >= 0`；all record maps/strings are defensive immutable values；
+- every returned ordinary Position is created through `PositionFactory.create(virtualLedgerId, entryId)`；F2 does
+  not implement a second `Position` class or attach `AckSetState` extensions。
 
 ## 3. Empty, Trimmed and Terminated Positions
 
@@ -184,6 +241,18 @@ public record EncodedAppend(
         AppendBatch appendBatch,
         byte[] callbackBytes,
         int numberOfMessages) {
+    public EncodedAppend {
+        Objects.requireNonNull(appendBatch, "appendBatch");
+        callbackBytes = Objects.requireNonNull(callbackBytes, "callbackBytes").clone();
+        if (numberOfMessages < 1) {
+            throw new IllegalArgumentException("numberOfMessages must be positive");
+        }
+    }
+
+    @Override
+    public byte[] callbackBytes() {
+        return callbackBytes.clone();
+    }
 }
 ```
 
@@ -201,7 +270,9 @@ Encoding rules:
    - attributes `pulsar.numberOfMessages=<decimal>` and
      `pulsar.entryFormatVersion=1`.
 5. Produce one-entry `AppendBatch` with `PayloadFormat.OPAQUE_RECORD_BATCH`,
-   `recordCount=1`, `entryCount=1` and no projection hints.
+   `recordCount=1`, `entryCount=1`, `minEventTimeMillis=maxEventTimeMillis=0`, empty schema refs/projection hints and
+   a present CRC32C checksum over the exact copied entry bytes。The checksum value is eight lowercase hex digits,
+   including leading zeroes。
 6. The append result must cover exactly `[offset, offset + 1)`.
 
 The stream-level `nereus.payloadMapping=PULSAR_ENTRY_V1` attribute is immutable after stream creation. Per-entry
@@ -251,7 +322,12 @@ Before invoking `addComplete`, validate:
 - result record/entry counts are one;
 - result generation is zero, logical bytes equal the copied entry length, and schema/projection refs are empty；
 - result committed end equals range end;
+- P15-M6 result cumulative size is at least this entry's logical bytes and advances the tracker's exact complete
+  prefix without adding `logicalBytes` to a potentially stale local total；
 - the facade is still open on the same projection incarnation.
+
+The append call itself must use `F2L0RequestFactory.appendOptions`。No facade branch requests `WAL_DURABLE`, embeds
+an `AppendSession`, or submits profile-dependent tags。
 
 The Phase 1.5 `ReadTarget` carried by the result is validated/owned by L0。F2 neither requires an object target nor
 reads physical fields to construct the Position；its separate open-time profile admission still limits the first
@@ -274,7 +350,7 @@ A one-entry read:
 2. validate/normalize Position against that snapshot;
 3. reject trimmed positions before object IO;
 4. call `StreamStorage.read(streamId, entryId,
-   ReadOptions(maxRecords=1, maxBytes=factoryConfig.maxEntryBytes(), ...))`;
+   F2L0RequestFactory.singleEntryReadOptions(factoryConfig.maxEntryBytes(), remainingDeadline))`;
 5. require `ReadResult.streamId/requestedOffset` to match, exactly one `ReadBatch` starting at `entryId`, range length
    one, `OPAQUE_RECORD_BATCH`, empty schema/projection refs, payload length `<= maxEntryBytes`, and
    `nextOffset == entryId + 1`;
@@ -288,6 +364,12 @@ uses `maxEntryBytes`, not the smaller dispatcher budget.
 
 Every returned `Entry` owns one buffer reference. The caller releases it. Failure paths release all
 entries accumulated before the failure.
+
+F2 deliberately ignores the legacy object-source fields still carried inside `ReadBatch`。It neither validates an
+Object ID/key nor uses those fields for Position construction；the logical range/payload contract above is sufficient
+and remains valid when L0 later supplies another registered read target。`ReadResult.endOfStream` is also not used as
+the tail authority：the one-entry loop compares its captured `StreamMetadata.committedEndOffset` and refreshes before
+installing a waiter。
 
 ## 9. Projection Tests
 
@@ -309,3 +391,8 @@ F2-M1 requires deterministic tests for:
 - callback bytes equal the exact readable source slice;
 - append/read payload round trip for a batched Pulsar Entry treated opaquely；
 - zero-byte entry round trip consumes one offset and cannot stall a cursor read loop；
+- the exact name/hash/stream-ID vector above plus malformed surrogate、NUL、blank and over-limit name rejection；
+- every `F2L0RequestFactory` method produces the exact profile/durability/isolation/reason fields above；
+- mutating a source array after `EncodedAppend` construction or an array returned by `callbackBytes()` cannot change
+  the retained callback bytes；
+- payload CRC32C uses leading-zero lowercase canonical form and rejects a deliberately corrupted byte；

@@ -1,7 +1,7 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 状态：In progress；F2-M0 API spike + F2-M0R code-level review complete，P15-M5 passed，F2-M1 next
-> 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle/generic-result final gate
+> 状态：In progress；F2-M0/M0R/M0R2 code-level design complete，P15-M5 original gate passed，P15-M6 next，then F2-M1
+> 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle + P15-M6 complete logical result handoff
 > Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 
 本文定义 Nereus 如何通过 Pulsar ManagedLedger API 暴露给 `PersistentTopic`、dispatcher、
@@ -51,6 +51,7 @@ Future 2 覆盖：
 - read-only cursor boundary；
 - basic cursor open boundary；
 - broker 内 stock BookKeeper storage class 与 Nereus storage class 的 hybrid selection；
+- deployable S3-compatible ObjectStore provider、binding/capability rollout guard and broker write-fence handoff；
 - 首版 `OBJECT_WAL_SYNC_OBJECT` facade，以及未来 profile 共用 projection contract 的版本边界。
 
 ## 3. Non-scope
@@ -71,7 +72,7 @@ Future 2 不解决：
 
 当前实现约束：`nereus-managed-ledger` 还没有真实 facade；Phase 1 payload 是 one-record-per-entry
 opaque batch。Phase 1.5 已实现 generic target/result、exact recovery 和 lifecycle，并保持 Object WAL
-strict parity。F2 首版仍只接受
+strict parity；P15-M6 仍需把 internal commit 已有的 cumulative logical size 交给 public result。F2 首版仍只接受
 `OBJECT_WAL_SYNC_OBJECT`，并只从 generic result 的 logical range 构造 Position。Broker hybrid mode 中的
 `bookkeeper` 继续走 stock BookKeeper factory，不等于 Nereus BookKeeper profile 已实现。
 
@@ -146,6 +147,7 @@ NereusManagedLedgerStorageClass implements ManagedLedgerStorageClass
 | `getManagedLedgerInfo(name)` | synthesize info from stream metadata, offset index summary, trim state |
 | `delete(name)` | transition stream state to deleting; actual object deletion follows GC rules |
 | `asyncExists(name)` | read topic projection, then verify exact current L0 stream state without create |
+| fork-only `inspectStorageState(name)` | get-only `MISSING/ACTIVE/SEALED/DELETING/DELETED` binding probe；never create/repair |
 | `getEntryCacheManager()` | return Nereus-aware cache manager or compatibility adapter |
 | `shutdown()` | close facade resources, caches, watchers, StreamStorage clients |
 
@@ -164,6 +166,7 @@ NereusManagedLedgerStorageClass implements ManagedLedgerStorageClass
 | `terminate` | L0 stream-head seal CAS first, then reconcile the topic projection's monotonic mirror |
 | `close` | close facade, release local cache/session, not stream data |
 | `deleteCursor` | remove the F2 local cursor; Future 3 owns durable cursor deletion |
+| product `NereusWriteFenceView` | expose generation + exact recovery terminal so stock topic auto-unfence cannot bypass an uncertain append |
 | offload APIs | fail explicitly in F2；never route virtual ledger IDs to BookKeeper/offloader code |
 
 Synchronous methods can be implemented as compatibility wrappers over async operations, but they must not block
@@ -188,6 +191,8 @@ Future 2 supports:
 - read current cursor state；
 - basic read position initialization；
 - mapping cursor positions to `Position` for broker compatibility。
+- local non-durable whole-entry cumulative mark-delete；broker admits only its one-position nontransactional ack
+  shape and rejects individual/batch/durable ack before mutation。
 
 Future 3 owns:
 
@@ -251,6 +256,8 @@ The complete model, sentinel behavior and entry byte contract are defined by
 BrokerService
   -> get ManagedLedgerConfig
   -> storageClassName == "nereus"
+  -> cluster capability + namespace first-create guard
+  -> durable per-topic storage-class binding permit
   -> NereusManagedLedgerFactory.open(name, config)
   -> read authoritative topic projection first
   -> existing: get exact L0 stream, never recreate a missing head
@@ -305,7 +312,7 @@ Future 2 adds projection and facade metadata on top of Future 1:
 
 ```text
 broker metadata store:
-  /managed-ledger-storage-bindings/v1/{managedLedgerNameHash}
+  /managed-ledger-storage-bindings/v1/{namespaceHash}/{managedLedgerNameHash}
 
 Oxia:
 /nereus/clusters/{cluster}/facade/managed-ledger/ledger-id-allocator
@@ -314,8 +321,8 @@ Oxia:
 /nereus/clusters/{cluster}/streams/{streamId}/facade/managed-ledger/position-index
 ```
 
-The fork-owned binding is the single-key authority for one topic lifetime's selected storage class and follows
-`CLAIMED -> ACTIVE -> DELETING -> DELETED`. It prevents concurrent BookKeeper/Nereus first-create and rejects a live
+The fork-owned binding is the single-topic-key authority for one topic lifetime's selected storage class and follows
+`CLAIMED -> ACTIVE -> DELETING -> DELETED`，with `CLAIMED -> DELETING` for an aborted/unactivated claim. It prevents concurrent BookKeeper/Nereus first-create and rejects a live
 class switch. It does not contain offsets or bytes and does not replace either storage's lifecycle truth. A Nereus
 projection stores the binding generation captured for its open.
 
@@ -401,11 +408,13 @@ Migration from existing BookKeeper topics is a separate future. Future 2 only en
 | Projection cache stale | Refresh the authoritative topic record, validate the same incarnation, then repair derived records |
 | Append succeeds in L0 but broker crashes before returning `Position` | Data is visible; F2 has no producer-sequence dedup, so a later producer retry may append a duplicate |
 | Append response is `KNOWN_COMMITTED`/`MAY_HAVE_COMMITTED` in-process | Recover the exact retained attempt ID; otherwise write-fence, never re-append physical bytes |
+| Producer callback fails while exact recovery remains uncertain | Keep `PersistentTopic` fenced through the matching generation；stock pending-write drain cannot auto-unfence |
 | `Position` references trimmed data | Return managed-ledger-compatible trimmed/invalid position error |
 | Facade receives another `ledgerId` | Reject against its fixed incarnation; never adopt a newer topic lifetime to satisfy the old request |
 | BookKeeper storage class missing in hybrid provider | Broker startup/config error, not topic runtime fallback |
 | Nereus storage class missing for policy | Same behavior as current storage class not found |
 | Current projection exists but L0 head is missing | Metadata invariant; never call create-or-get |
+| Binding key missing while a Nereus projection exists | Metadata invariant；Nereus embeds a generation and its binding key is never removed, so no adoption is allowed |
 | Topic is deleted then recreated | Publish next incarnation/new stream/new virtual ledger; old positions fail ledger-ID validation |
 | Existing topic policy switches storage class | Reject before creating/opening an empty second storage view; F2 has no migration |
 
@@ -427,10 +436,18 @@ Migration from existing BookKeeper topics is a separate future. Future 2 only en
 13. One broker-metadata binding generation selects BookKeeper or Nereus for a topic lifetime; class migration is not
     inferred from policy and cannot create two live durable views。
 14. F2 never branches on `ReadTarget` to allocate Position；physical target selection/reading stays in L0。
+15. Runtime bootstrap does not require a not-yet-created Pulsar broker ID；writer identity is
+    `pulsar-f2/{cryptographicProcessRunId}`。
+16. Cluster capability version `1` and the namespace first-create guard are required before Nereus policy can create
+    durable state；a policy scan alone is insufficient。
+17. Production `ifAbsent` ObjectStore upload is one conditional S3 PUT，CRC32C is independent of ETag，and local files
+    remain test-only。
+18. A local append overlay advances end and lifetime size from one generic result；`logicalBytes` is never added to a
+    potentially stale total and known success never depends on a second metadata read。
 
 ## 14. Future Gate
 
-F2-M0 API spike and F2-M0R code-level review are complete. The review locked:
+F2-M0 API spike and F2-M0R/M0R2 code-level reviews are complete. The review locked:
 
 - `nereusstream/pulsar@100d3ef0...` / `5.0.0-M1-SNAPSHOT` and exact interface blobs；
 - fork-owned hybrid `ManagedLedgerStorage` with stock BookKeeper as default；
@@ -442,17 +459,23 @@ F2-M0 API spike and F2-M0R code-level review are complete. The review locked:
 - role-specific Position conversion, including stock-compatible before-first `getFirstPosition`；
 - exact callback、buffer、open/close/terminate/delete, append-recovery and unsupported-method behavior；
 - read-only/non-durable cursor delivery boundary and Future 3 durable-ack boundary；
-- object-only rollout and explicit rejection of every unimplemented profile/offload path。
-- hybrid runtime construction, S3-compatible ObjectStore provider and broker-side unsupported-feature admission。
-- single-key cross-storage binding and explicit rejection of live BookKeeper/Nereus policy switching。
+- object-only rollout and explicit rejection of every unimplemented profile/offload path；
+- hybrid runtime construction before broker-ID creation，code-level S3 conditional/range/checksum contract and
+  broker-side unsupported-feature admission；
+- single-key cross-storage binding、`NSB1` codec、get-only durable state inspection and explicit rejection of live
+  BookKeeper/Nereus policy switching；
+- lookup-data capability protocol plus namespace policy/first-create serialization；
+- generation-safe `PersistentTopic` write-fence handoff and pre-mutation limited acknowledgement admission。
 
-Phase 1.5 P15-M5 has passed and proves the following production prerequisite：
+Phase 1.5 P15-M5 has passed and proves the original production prerequisite；P15-M6 is the remaining narrow handoff：
 
 - generic logical append/resolve results and Object WAL parity；
 - exact retained attempt ID/recovery with multi-page progress；
 - authoritative L0 seal and logical delete；
 - legacy/new metadata restart compatibility and unchanged strict durability；
 - no new BookKeeper/async profile claim。
+- public `AppendResult.cumulativeSize` comes from existing committed truth so the facade never guesses complete size
+  or makes a known-success callback depend on a second read（P15-M6，not yet implemented）。
 
 The executable API probe passed against interface blobs identical to the locked fork。Code-level
 contracts and F2-M1 through F2-M6 gates are in

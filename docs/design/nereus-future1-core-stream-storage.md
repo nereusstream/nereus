@@ -1,6 +1,6 @@
 # Nereus Future 1：Core Stream Storage
 
-> 状态：Implemented；Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 complete
+> 状态：Phase 1 M0-M8 + Phase 1.5 P15-M0-M5 implemented/final-gated；narrow P15-M6 result handoff designed and pending
 > 交付映射：`docs/phase-1-core-stream-storage/`
 > 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
 > 当前里程碑：F2-M1 may consume the completed L0 foundation

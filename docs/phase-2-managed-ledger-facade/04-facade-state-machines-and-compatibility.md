@@ -16,6 +16,7 @@ NereusManagedLedgerFactory
        -> ManagedLedgerProjectionMetadataStore
        -> PositionProjection
        -> PulsarEntryCodec
+       -> StreamSnapshotTracker / TailPollCoordinator
        -> NereusReadOnlyCursor / NereusNonDurableCursor / NereusManagedCursorBoundary
 ```
 
@@ -70,8 +71,9 @@ open restarts from projection authority; `DELETED` is removed only after termina
 `WRITE_FENCED` remains readable but is never replaced merely to bypass its suspended L0 attempt. This prevents an
 open/delete race from constructing a facade over an incarnation whose tombstone is still in flight.
 
-The synchronous `open` methods are compatibility wrappers with the configured metadata deadline. They
-restore interruption and throw `ManagedLedgerException`. Broker hot paths must use async methods; no
+The synchronous `open` methods are stock-shaped compatibility wrappers that wait for the async core's one terminal
+callback；they add no second timer, while the async metadata operations share the configured deadline. They restore
+interruption and throw `ManagedLedgerException`. Broker hot paths must use async methods; no
 sync wrapper is called from event-loop/ordered callback threads.
 
 ## 3. Ledger Lifecycle
@@ -85,6 +87,23 @@ TERMINATED -> CLOSING -> CLOSED
 OPEN/TERMINATED -> DELETING -> DELETED
 ```
 
+Admission changes state before an operation is enqueued, under one short facade lock/atomic transition。The exact
+matrix is：
+
+| State | append | read/getter | terminate | logical delete | local close |
+| --- | --- | --- | --- | --- | --- |
+| `OPEN` | admit | admit | install barrier | install delete barrier | install close barrier |
+| `TERMINATING` | reject | admit | join same future | delete supersedes after terminate resolution | join/queue close |
+| `TERMINATED` | terminated failure | admit | return final LAC | admit delete | admit close |
+| `WRITE_FENCED` | reject with current fence | admit | fail before L0 CAS | fail before L0 CAS | admit/detach |
+| `CLOSING/CLOSED` | reject | reject | reject | reject | join/idempotent |
+| `DELETING/DELETED` | reject | reject | reject | join/idempotent | join local cleanup |
+
+Once a terminate/delete/close barrier is installed, a later append is rejected before byte copying even if the
+barrier has not yet reached the ordered lane。Delete may supersede a pending terminate, but both share the same lane
+and only the L0 head decides whether the final path is `SEALED -> DELETING` or `ACTIVE -> DELETING`。Close never
+supersedes durable lifecycle work；it waits for an already accepted terminate/delete and then performs local cleanup。
+
 - `close` releases only local lanes, waiters, caches, cached session references and watches.
 - `terminate` performs an L0 seal and then reconciles projection state.
 - `delete` performs an L0 logical tombstone and then projection state; it does not delete objects.
@@ -95,6 +114,19 @@ OPEN/TERMINATED -> DELETING -> DELETED
   incarnation after the tombstone is confirmed.
 - terminate/delete do not bypass `WRITE_FENCED`: they wait for exact append recovery or fail without starting a
   lifecycle CAS. Local close is still allowed because it does not mutate durable stream state.
+
+Lifecycle completion rules close timeout/CAS ambiguity：
+
+| Observation after operation failure/timeout | Facade result/state |
+| --- | --- |
+| fresh L0 remains `ACTIVE` and no lifecycle CAS could have landed | fail mapped error；remove barrier and return `OPEN` |
+| fresh L0 is `SEALED` during terminate | succeed with its final LAC；state `TERMINATED`；repair mirror asynchronously |
+| fresh L0 is `DELETING/DELETED` during delete | continue/resume to `DELETED`, then succeed；state `DELETED` |
+| fresh L0 is later than requested transition | accept the later authoritative state；never report rollback |
+| L0 state cannot be reread before deadline | fail operation and keep the lifecycle barrier/facade non-writable；open-time reconciliation is required before reuse |
+| projection mirror alone fails after L0 terminal | operation still succeeds；bounded mirror repair is scheduled |
+
+The implementation never restores `OPEN` from a timeout based only on the original exceptional completion。
 
 F2 consumes the protocol-neutral L0 methods defined in `06` and implemented by Phase 1.5 P15-M4 before
 terminate/delete can be implemented:
@@ -125,7 +157,7 @@ validate arguments
   -> classify AppendResult or AppendOutcome + AppendAttemptId
   -> validate one-entry result
   -> create Position(virtualLedgerId, startOffset)
-  -> update local monotonic snapshot/cache
+  -> update local monotonic end/cumulative snapshot from P15-M6 result
   -> terminal callback
 ```
 
@@ -153,6 +185,19 @@ Outcome handling:
 F2 has no producer-level dedup. A caller retry after a genuinely uncertain publish can create a second
 entry. The facade must preserve the uncertainty classification; it cannot promise deduplication.
 
+Each transition into `WRITE_FENCED` allocates a monotonically increasing facade fence generation and publishes the
+attempt ID through the product-owned `NereusWriteFenceView` defined in `06`。The original callback may fail once at
+its recovery budget, but the fence-resolution future remains attached to the core exact-recovery attempt：
+
+- committed recovery completes it with `COMMITTED`；
+- proven-not-committed completes it with `PROVEN_NOT_COMMITTED`；
+- permanent invariant/corruption completes it exceptionally and never reopens this facade；
+- retryable uncertainty keeps it incomplete；
+- a stale completion whose generation is no longer current cannot change facade state。
+
+The Pulsar fork consumes this view before its stock pending-write auto-unfence branch。It must not infer readiness from
+`pendingWriteOps == 0` or from a void `readyToCreateNewLedger()` call。
+
 ## 5. Callback and Buffer Rules
 
 - Validate callback and arguments before enqueuing, but report async-overload failures through callback.
@@ -175,6 +220,14 @@ Tests race success/failure/timeout/close in a loop and assert one terminal callb
 bounded L0 reads. There is at most one pending `readEntriesOrWait` callback per cursor, matching the
 locked interface's concurrent-wait failure behavior.
 
+`StreamSnapshotTracker` accepts only snapshots for the same stream/name/profile and separates backend metadata version
+from append `commitVersion`。A remote snapshot enforces monotonic backend version、committed end、cumulative size、trim
+and lifecycle state；equal backend version with different remote content or a newer-version numeric regression is an
+invariant failure。An older watch/poll result is dropped。Append success installs a marked local overlay using exact
+P15-M6 `AppendResult.committedEndOffset/cumulativeSize/commitVersion`，so a stale facade never guesses missing remote
+bytes and never waits on a second post-commit read。That overlay retains the last remote version/trim/lifecycle and is
+cleared only when remote metadata catches up；it cannot synthesize trim or lifecycle fields。
+
 When a read reaches current LAC:
 
 - ordinary read returns an empty/no-more-entries result according to the called API;
@@ -184,6 +237,12 @@ When a read reaches current LAC:
 - close removes the waiter and fails its callback once;
 - `cancelPendingReadRequest()` removes the waiter without invoking the cancelled callback, matching stock behavior;
 - Oxia watch is an invalidation/wakeup hint, not the proof that data is committed.
+
+`TailPollCoordinator` is one per ledger, not one scheduled task per cursor。The first installed waiter starts a single
+poll timer；all cursor waiters share at most one in-flight `getStreamMetadata`。A poll refreshes
+`StreamSnapshotTracker`, signals only waiters whose bound can now progress, and reschedules while at least one waiter
+remains。Removing the last waiter or closing the ledger cancels the timer；late poll completion is generation-checked
+and cannot invoke a removed callback。
 
 Two terminal cases do not install a waiter: an exhausted inclusive `maxPosition` completes with an empty list, while
 a sealed ledger at final LAC fails read-or-wait with `NoMoreEntriesToReadException` because no append can wake it.
@@ -218,7 +277,7 @@ review summary; they do not replace the complete matrix.
 
 | Group | F2 behavior |
 | --- | --- |
-| add overloads | Implement through one async core; sync overloads are bounded wrappers |
+| add overloads | Implement through one async core；sync overloads add no independent timer and wait for that core's deadline/recovery terminal |
 | direct read | Implement |
 | LAC, first/next/previous/after-N, counts and size | Role-aware exact formulas; first position is before-first; size is exact lifetime logical bytes |
 | properties | Implement through authoritative topic record |
@@ -256,6 +315,12 @@ extent as a real BookKeeper ledger。
 | durable reset/properties persistence | Fail unsupported until F3 |
 | replay overloads | Direct non-mutating reread; return locally mark-deleted positions as skipped, honor sort flag, and do not infer individual ack holes |
 
+At the broker boundary F2 accepts only a non-durable cumulative acknowledgement covering a whole Entry：one Position,
+no transaction bits and no `AckSetState` extension。`Consumer.messageAcked` performs this validation before ack
+counters、pending-ack/transaction paths or `PersistentSubscription.acknowledgeMessageAsync`。Individual ack and
+partial-batch cumulative ack fail explicitly；therefore F2 claims Reader and limited non-durable consumption, not a
+general Consumer acknowledgement implementation。
+
 The F2 broker acceptance scenario uses producer plus Reader/non-durable cursor. It does not claim
 durable Consumer subscription recovery.
 
@@ -277,6 +342,12 @@ durable Consumer subscription recovery.
 | primary-WAL target not found/checksum mismatch | `NonRecoverableLedgerException` |
 | unsupported profile/format/operation | explicit `ManagedLedgerException` with stable Nereus error code in message/cause |
 | timeout/cancel | managed-ledger timeout/cancel wrapper preserving cause |
+
+A callback-time unresolved exact recovery uses the ordinary mapped storage exception for the Pulsar callback while
+the concrete ledger exposes its nonempty `NereusWriteFenceView`。It is intentionally not mapped to
+`ManagedLedgerFencedException`：the stock handler closes immediately on that subtype and loses the explicit
+committed-vs-proven-not-committed readiness handoff。The fork checks the view first and follows the special fenced
+path defined in `07`。
 
 Retriability comes from the Nereus exception classification, not string matching.
 
