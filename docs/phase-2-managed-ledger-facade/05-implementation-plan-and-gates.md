@@ -1,7 +1,7 @@
 # Future 2 Implementation Plan and Gates
 
-F2-M0/M0R/M0R2 design、the complete Phase 1.5 P15-M6 final gate and F2-M1-M5 have passed。P15-M6 carries
-`AppendResult.cumulativeSize` from existing committed truth。F2-M6 final acceptance is the active milestone.
+F2-M0/M0R/M0R2 design、the complete Phase 1.5 P15-M6 final gate and F2-M1-M6 have passed。P15-M6 carries
+`AppendResult.cumulativeSize` from existing committed truth。Future 2 is implemented and final-gated.
 A milestone is complete only when its code, focused tests and listed gate exist; documentation alone is not
 implementation evidence.
 
@@ -13,7 +13,7 @@ F2-M1 build evidence:
    `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md` green；
 2. the managed-ledger compile dependency resolves from the locked Pulsar composite build；
 3. the F2-M1 baseline probe verified clean `100d3ef0...`；the active Phase 2 gate now locks the implemented local fork
-   at `277212f87c942a3fb694fd25b1c056630260b3fe`；
+   at `f8efefa7193698823eab267de95c76d08ed54165`；
 4. choose an organization-owned published artifact/version for release builds before publishing any
    Nereus facade artifact;
 5. keep `pulsar-broker` off the Nereus L0 modules' compile/runtime classpaths;
@@ -30,7 +30,7 @@ artifact。
 
 The implemented composite lookup order is `-PpulsarCheckout=...`，then `NEREUS_PULSAR_CHECKOUT`，then the
 development convention `../../nereusstream/pulsar` when present。`checkPulsarSourceLock` fails unless the selected
-checkout is clean and exactly at the configured full commit（default `277212f87c...`）。Source-bound tasks fail during
+checkout is clean and exactly at the configured full commit（default `f8efefa719...`）。Source-bound tasks fail during
 settings evaluation when no composite checkout exists；they never fall through to the nonexistent Maven snapshot。
 GitHub Actions checks out the exact `100d3ef0...` API baseline under `.ci/pulsar` for the ordinary product build。
 
@@ -399,7 +399,7 @@ Implementation evidence（2026-07-12，read-only sub-stage）：
   without callback，close fails once and sealed tail fails instead of waiting forever。
 - real Object WAL coverage now includes durable read with rejected durable mark-delete、local non-durable mark-delete、
   read-only cursor ownership and append-wakes-tail-read；a focused two-waiter test proves one shared metadata poll。
-- F2-M4 is complete；F2-M5 subsequently completed，and F2-M6 final acceptance is now active。
+- F2-M4、F2-M5 and F2-M6 are complete。
 
 ## 6. F2-M5 — Pulsar Fork Integration
 
@@ -604,8 +604,11 @@ Implementation evidence（through 2026-07-13）：
   concrete Nereus/BookKeeper ledger types and positive S3 object presence。The same commit requires persistent topics
   plus `ExtensibleLoadManagerImpl` at startup，accepts only an empty `KeySharedMeta` carrier for admitted readers and
   preserves stock NotFound for missing-topic persistence APIs outside hybrid mode。All fork Nereus storage tests、
-  focused stock persistence regressions and main/test checkstyle pass。F2-M5 is complete；the broader scenario
-  composition below remains F2-M6。
+  focused stock persistence regressions and main/test checkstyle pass。F2-M5 is complete。
+- fork commit `f8efefa719` extends that same real dual-broker gate by enumerating the broker's actual BookKeeper
+  ledger namespace through `BookKeeperAdmin` and proving the active Nereus projection's virtual ledger ID is absent。
+  The focused integration test and test checkstyle pass；this is runtime evidence for the BookKeeper-isolation half
+  of scenario 11，not only a source-dependency assertion。
 
 ## 7. F2-M6 — Final Acceptance
 
@@ -669,7 +672,7 @@ Scenarios:
 F2 completion requires all scenarios. A green projection unit test or a broker that only starts is not
 evidence for the end-to-end milestone.
 
-Current F2-M6 evidence boundary（2026-07-13）：
+Final F2-M6 evidence（2026-07-13）：
 
 | Scenario(s) | State | Current evidence / remaining work |
 | --- | --- | --- |
@@ -677,11 +680,19 @@ Current F2-M6 evidence boundary（2026-07-13）：
 | 3 | Complete slice | `committedResponseLossRecoversOneSuccessCallbackAndOnePosition` injects loss after the real L0 head CAS，then proves facade recovery of the retained attempt emits one success callback、one Position and exact readable bytes |
 | 4 | Complete slice | `projectionDerivedIndexesRepairOnlyAfterRealOxiaRestart` removes both real-Oxia derived projection keys，closes the shared client runtime，reconnects and proves authority-only idempotent repair |
 | 5-8 | Complete slice | `closeTrimReopenTerminateDeleteAndRecreatePreservePositionAndObjectContracts` composes local facade close、harness L0 trim、reopen、old/retained Position behavior、stable terminate LAC、logical delete without object removal and next-incarnation namespace isolation |
-| 10-18 | Component-gated | Binding、BookKeeper isolation、polling、admission、failure injection、write-fence、ack、capability/policy and LocalStack suites cover their owning contracts；their explicit final composition/aggregation remains |
-| aggregate build tasks | Complete | `phase2Check` and `phase2FinalCheck --rerun-tasks` are executable；both passed on 2026-07-13 with an exact clean Pulsar source lock and fixed `0.1.0-f2-dev` product publication |
+| 10 | Complete slice | `NereusStorageClassBindingMultiBrokerTest` races conflicting first-create class claims against one shared real-CAS metadata store，proves one durable class view，runs peer delete/restart and permits the other class only in the next generation；`NamespaceStorageClassPolicyGuardTest` proves live policy mutation is serialized/rejected before persistence mutation |
+| 11 | Complete slice | `NereusMultiBrokerIntegrationTest` enumerates the real broker BookKeeper namespace and proves it contains stock ledgers but not the active Nereus virtual ledger ID；`checkPhase2StorageIsolation` also rejects production facade/adapter dependencies or routing that could send that ID into BookKeeper |
+| 12 | Complete slice | `remoteAppendWakesWaitingCursorThroughPollingWithMetadataWatchDisabled` creates independent reader/writer storage runtimes over one shared metadata authority，asserts metadata watch delivery is disabled，then proves a remote facade append wakes a latest waiter through bounded polling with the exact Position/bytes |
+| 13 | Complete slice | `NereusTopicFeatureResolverTest` exhausts the closed topic/producer/publish/subscribe/admin surface；`PersistentTopicNereusAdmissionTest.rejectsUnsafeLiveSnapshotBeforeLedgerConfigMutation` proves the stock topic branch rejects before managed-ledger configuration mutation，and that stock-path class is explicitly selected by `phase2PulsarCheck` |
+| 14 | Complete slice | Exact boundary owners are aggregated in one gate：binding-store fake metadata failures，projection fake/real Oxia CAS/restart repair，core append timeout/cancel/commit-response loss，Object-WAL upload/read/checksum failures and facade callback/resource recovery；`objectUploadFailureReleasesFacadeAdmissionAndNextAppendStartsAtZero` additionally crosses Object-WAL failure through the facade and proves the next append succeeds at entry 0 without fencing or duplicate callback |
+| 15 | Complete slice | `PersistentTopicNereusAdmissionTest` exercises the actual stock `PersistentTopic` pending-write branch for newest-generation wait、early completion、attach race and permanent failure；only the matching terminal generation may auto-unfence，while permanent recovery failure closes the topic |
+| 16 | Complete slice | `NereusAcknowledgeValidatorTest` covers every admitted/rejected F2 acknowledgement field and proves rejection occurs before consumer/cursor mutation while admitted local cumulative acknowledgement waits for cursor completion |
+| 17 | Complete slice | `NereusStorageBindingCapabilityTest` rejects missing、spoofed、mixed and unstable broker capability snapshots；`NamespaceStorageClassPolicyGuardTest` races the namespace policy lock with first creation and proves versioned pre/post scans preserve one durable storage-class truth |
+| 18 | Complete slice | `S3CompatibleObjectStoreLocalStackIntegrationTest.conditionalPutRangeChecksumZeroLengthAndRestart` covers conditional create、strict ranges、checksum、zero-length object and client restart against pinned LocalStack Community S3；`checkPhase2StorageIsolation` rejects `LocalFileObjectStore` from production roots and asserts the broker default is `S3CompatibleObjectStoreProvider` |
+| aggregate build tasks | Complete | `phase2Check` and `phase2FinalCheck --rerun-tasks` are executable；both pass with exact clean local Pulsar fork `f8efefa719...`，fixed `0.1.0-f2-dev` product publication and the pinned LocalStack Community S3 fixture |
 
-Therefore scenarios 1–9 are complete slices；F2-M6 and Future 2 remain in progress until scenarios 10–18 are
-explicitly composed and the aggregate gates pass again。
+Therefore scenarios 1–18 are complete slices and the aggregate ordinary/Docker gates pass。F2-M6 and Future 2 are
+complete；later F3/F4 work must consume these contracts without weakening them。
 
 ## 8. Stop-the-line Conditions
 

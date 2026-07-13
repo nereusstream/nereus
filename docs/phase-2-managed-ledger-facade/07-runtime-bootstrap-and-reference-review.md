@@ -3,7 +3,7 @@
 本文补齐 F2 从 facade 类到真实 broker runtime 之间的构造、配置、feature admission 和资源所有权。
 真实目标接口与 broker call path 的 review baseline 是用户提供的 clean checkout
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`；同一 checkout
-现已在本地实现分支推进到 `277212f87c`。本文也保留
+现已在本地实现分支推进到 `f8efefa719`。本文也保留
 对 `/Users/liusinan/apps/ideaproject/GITHUB/pulsar-storage` 原型的源码评审结论；该原型只用于提供扩展点
 探索证据，不是 Nereus durability/position/cursor 合同的来源。没有使用在线源码。
 
@@ -1376,15 +1376,25 @@ rejected。Its real two-broker gate runs against real Oxia、pinned LocalStack C
 BookKeeper，then proves exact single/batched bytes and coordinates across unload、owner failover、process restart and
 reverse takeover，plus binding/class/ledger-type truth and real S3 objects。All fork Nereus storage tests、focused
 stock persistence regressions and affected main/test checkstyle pass。The Pulsar commits remain local because the
-active GitHub identity lacks repository write permission；F2-M6 still owns the broader final scenario composition。
+active GitHub identity lacks repository write permission。
 
-The next F2-M6 slice composes scenarios 3–8 instead of relying on their isolated component tests。The facade now has
+F2-M6 first composes scenarios 3–8 instead of relying on their isolated component tests。The facade has
 an acceptance test that injects response loss after a real `DefaultStreamStorage` head CAS and proves one recovered
 success callback/Position。A second facade/Object-WAL flow closes、trims through L0、reopens、terminates、logically
 deletes and recreates the same name，checking stable retained entry IDs、old-position rejection、new incarnation/
 virtual-ledger isolation and physical retention of the old object。A real-Oxia integration test independently removes
 both projection-derived keys，fully closes the shared client runtime，reconnects and repairs both from the topic
-authority。Scenarios 1–9 now have complete slices；10–18 remain the active F2-M6 boundary。
+authority。
+
+The final F2-M6 slice closes scenarios 10–18 with executable evidence。Two independent facade/storage runtimes over
+one shared metadata authority prove polling wakes a remote waiter while metadata watches are disabled。A fail-first real
+Object-WAL writer proves upload failure emits one failure callback、does not fence or consume entry 0，and releases
+admission for the next successful append。The ordinary gate now explicitly selects the stock
+`PersistentTopicNereusAdmissionTest` rather than relying on its package placement。A production isolation gate rejects
+local-file object storage and BookKeeper client/stock-ledger routing from the Nereus facade/adapter。Finally local fork
+commit `f8efefa719` extends the real two-broker test to enumerate the broker's actual BookKeeper ledgers and prove the
+active Nereus virtual ledger ID is absent。Scenarios 1–18 and the aggregate ordinary/Docker gates now pass；F2-M6 and
+Future 2 are complete。
 
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
@@ -1394,7 +1404,7 @@ or protocol-0 rejoin is forbidden while Nereus policy/binding state exists.
 
 ## 8. Broker Integration Tests
 
-In addition to `05`, the F2-M5 gates include and now pass:
+In addition to `05`, the F2-M5/F2-M6 gates include and now pass:
 
 1. reflection construction through `ManagedLedgerStorage.create(...)` and the thread context classloader；
 2. exact `[bookkeeper,nereus]` order, null/default lookup and unknown-name behavior；
@@ -1414,7 +1424,8 @@ In addition to `05`, the F2-M5 gates include and now pass:
    mutation or append/read IO；
 11. broker-entry metadata and payload-processor configurations both produce a non-null
    `ManagedLedgerInterceptor` and are rejected before the first append；
-12. a remote-broker append wakes a local read waiter with Oxia watch delivery disabled, through polling；
+12. independent reader/writer facade runtimes over one shared metadata authority wake a local read waiter through polling
+    while metadata watch delivery is explicitly disabled；
 13. with the broker transaction coordinator enabled, a Nereus topic constructs only `TransactionBufferDisable`; txn,
     end-txn, marker and `deliverAtTime` paths fail before pending-write, dedup, transaction-buffer and ledger
     counters/mocks observe a call; publish validation preserves `ByteBuf` indexes/refcount, while a BookKeeper topic
@@ -1426,7 +1437,8 @@ In addition to `05`, the F2-M5 gates include and now pass:
     before provider/client construction；
 17. explicit secret references resolve once, returned arrays are zeroed, and injected sentinel credentials appear in
     no config `toString`, error, projection, log or metric；
-18. BookKeeper-only and Nereus topics coexist without virtual ledger IDs appearing in BookKeeper mocks/logs；
+18. BookKeeper-only and Nereus topics coexist；the real dual-broker gate enumerates the broker's actual BookKeeper
+    ledger namespace and proves the active Nereus virtual ledger ID is absent；
 19. a rollout gate refuses Nereus policy enablement while any namespace-owning broker lacks the binding-capable
     version；existing BookKeeper topics are adopted without data movement；
 20. the capability property is absent before complete hybrid initialization, present with exact value `1` in
@@ -1459,7 +1471,10 @@ In addition to `05`, the F2-M5 gates include and now pass:
     hash-range list remains rejected；
 31. explicit Reader `EARLIEST` starts at the trim offset even when the overload's default initial position is Latest；
 32. two real brokers transfer ownership in both directions across process restart while exact single/batched
-    `MessageIdAdv` coordinates、BookKeeper coexistence and positive S3 object presence remain stable。
+    `MessageIdAdv` coordinates、BookKeeper coexistence and positive S3 object presence remain stable；
+33. a cross-layer Object-WAL upload failure emits one failure callback，leaves the ledger writable/unfenced and lets
+    the next append succeed at entry 0；the storage-isolation gate rejects production local-file fallback and any
+    Nereus facade/adapter dependency that could route virtual ledger IDs through stock BookKeeper storage。
 
 ## 9. Release Claim Boundary
 

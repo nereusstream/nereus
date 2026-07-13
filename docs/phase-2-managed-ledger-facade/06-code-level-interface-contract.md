@@ -140,8 +140,8 @@ The Phase 1 public `StreamStorage` surface cannot fulfill the F2 append and life
 `../phase-1.5-core-storage-foundation/` is the implementation authority for the protocol-neutral additions below；
 P15-M6 has passed for recovery/lifecycle and the exact cumulative result，and F2-M1 now implements the projection、
 Position、entry codec and request foundation；
-The F2-M3 writable/get-only ledger、factory/stats、F2-M4 cursor and F2-M5 broker integration now consume this
-contract；F2-M6 composes their final acceptance。This section remains the F2 consumer
+The F2-M3 writable/get-only ledger、factory/stats、F2-M4 cursor and F2-M5 broker integration consume this
+contract；F2-M6 has composed their final acceptance。This section remains the F2 consumer
 contract and cannot be implemented independently in the facade。
 
 ### 3.0 Complete logical append snapshot
@@ -1146,8 +1146,8 @@ documented neutral result (`N`) or a stable runtime unsupported exception (`U`);
 
 ## 15. Contract Gates
 
-The facade contract passed F2-M5 only after tests proved the list below；`05` assigns each unit、contract or broker
-integration case to its owning milestone and F2-M6 composition：
+The facade contract passed F2-M6 after tests proved the list below；`05` assigns each unit、contract or broker
+integration case to its owning milestone and final composition：
 
 1. the winning open acquires one binding permit; generation mismatch fails before L0 IO and publish-time permit
    invalidation leaves no topic projection；

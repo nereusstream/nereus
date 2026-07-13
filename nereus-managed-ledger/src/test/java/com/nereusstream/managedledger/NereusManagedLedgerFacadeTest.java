@@ -46,12 +46,17 @@ import com.nereusstream.managedledger.integration.NereusCreationPermit;
 import com.nereusstream.metadata.oxia.FakeManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
+import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import com.nereusstream.objectstore.HeadObjectOptions;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
+import com.nereusstream.objectstore.wal.PreparedWalObject;
+import com.nereusstream.objectstore.wal.WalObjectWriter;
+import com.nereusstream.objectstore.wal.WalWriteRequest;
+import com.nereusstream.objectstore.wal.WalWriteResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -62,6 +67,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
@@ -464,6 +471,135 @@ class NereusManagedLedgerFacadeTest {
     }
 
     @Test
+    void remoteAppendWakesWaitingCursorThroughPollingWithMetadataWatchDisabled() throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("remote-poll"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore.DurableState projectionState =
+                new FakeManagedLedgerProjectionMetadataStore.DurableState();
+        FakeManagedLedgerProjectionMetadataStore readerProjections =
+                new FakeManagedLedgerProjectionMetadataStore(
+                        projectionState, ProjectionMetadataStoreConfig.defaults(), clock);
+        FakeManagedLedgerProjectionMetadataStore writerProjections =
+                new FakeManagedLedgerProjectionMetadataStore(
+                        projectionState, ProjectionMetadataStoreConfig.defaults(), clock);
+        StreamStorageConfig readerConfig = StreamStorageConfig.defaults("cluster/a", "remote-poll-reader");
+        StreamStorageConfig writerConfig = StreamStorageConfig.defaults("cluster/a", "remote-poll-writer");
+        assertThat(readerConfig.enableMetadataWatch()).isFalse();
+        assertThat(writerConfig.enableMetadataWatch()).isFalse();
+        DefaultStreamStorage readerStorage = new DefaultStreamStorage(
+                readerConfig,
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "remote-poll-reader", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        DefaultStreamStorage writerStorage = new DefaultStreamStorage(
+                writerConfig,
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "remote-poll-writer", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        try (NereusManagedLedgerRuntime readerRuntime =
+                        ManagedLedgerRuntimeTestSupport.runtime(readerStorage, readerProjections);
+                NereusManagedLedgerRuntime writerRuntime =
+                        ManagedLedgerRuntimeTestSupport.runtime(writerStorage, writerProjections)) {
+            NereusManagedLedgerFactory readerFactory = new NereusManagedLedgerFactory(
+                    readerRuntime, fixedGuard(7), config(true), new ManagedLedgerFactoryConfig(), false);
+            NereusManagedLedgerFactory writerFactory = new NereusManagedLedgerFactory(
+                    writerRuntime, fixedGuard(7), config(true), new ManagedLedgerFactoryConfig(), false);
+            NereusManagedLedger reader = (NereusManagedLedger) readerFactory.open(NAME, config(true));
+            NereusManagedLedger writer = (NereusManagedLedger) writerFactory.open(NAME, config(true));
+            assertThat(reader.projection()).isEqualTo(writer.projection());
+            ManagedCursor cursor = reader.newNonDurableCursor(PositionFactory.LATEST, "remote-reader");
+            CompletableFuture<List<Entry>> waiting = readOrWait(cursor, 1);
+            assertThat(waiting).isNotDone();
+            byte[] payload = "remote-append-visible-by-poll".getBytes(StandardCharsets.UTF_8);
+
+            Position remotePosition = writer.addEntry(payload);
+            List<Entry> awakened = waiting.get(5, TimeUnit.SECONDS);
+
+            assertThat(awakened).singleElement().satisfies(entry -> {
+                assertThat(entry.getPosition()).isEqualTo(remotePosition);
+                assertThat(entry.getData()).isEqualTo(payload);
+            });
+            awakened.forEach(Entry::release);
+            assertThat(reader.currentMetadata().committedEndOffset()).isEqualTo(1);
+            cursor.close();
+            reader.close();
+            writer.close();
+            readerFactory.shutdown();
+            writerFactory.shutdown();
+        } finally {
+            metadata.close();
+            objectStore.close();
+        }
+    }
+
+    @Test
+    void objectUploadFailureReleasesFacadeAdmissionAndNextAppendStartsAtZero() throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("upload-recovery"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        FailFirstUploadWalWriter writer = new FailFirstUploadWalWriter(
+                new DefaultWalObjectWriter(objectStore, "upload-recovery", clock));
+        DefaultStreamStorage storage = new DefaultStreamStorage(
+                StreamStorageConfig.defaults("cluster/a", "pulsar-upload-recovery"),
+                metadata,
+                writer,
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(storage, projections)) {
+            NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
+                    runtime, fixedGuard(7), config(true), new ManagedLedgerFactoryConfig(), false);
+            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config(true));
+            AtomicInteger successes = new AtomicInteger();
+            AtomicInteger failures = new AtomicInteger();
+            CompletableFuture<ManagedLedgerException> failedCallback = new CompletableFuture<>();
+
+            ledger.asyncAddEntry(new byte[] {1, 2, 3}, new AddEntryCallback() {
+                @Override
+                public void addComplete(Position position, ByteBuf entryData, Object ctx) {
+                    successes.incrementAndGet();
+                    failedCallback.completeExceptionally(new AssertionError(
+                            "failed upload must not produce a Position"));
+                }
+
+                @Override
+                public void addFailed(ManagedLedgerException exception, Object ctx) {
+                    failures.incrementAndGet();
+                    failedCallback.complete(exception);
+                }
+            }, null);
+
+            assertThat(failedCallback.join()).isNotNull();
+            assertThat(successes).hasValue(0);
+            assertThat(failures).hasValue(1);
+            assertThat(writer.uploadAttempts).hasValue(1);
+            assertThat(ledger.currentWriteFence()).isEmpty();
+            assertThat(ledger.getNumberOfEntries()).isZero();
+
+            byte[] recoveredPayload = "append-after-upload-failure".getBytes(StandardCharsets.UTF_8);
+            Position recovered = ledger.addEntry(recoveredPayload);
+            assertThat(recovered.getEntryId()).isZero();
+            assertThat(writer.uploadAttempts).hasValue(2);
+            Entry entry = read(ledger, recovered).join();
+            assertThat(entry.getData()).isEqualTo(recoveredPayload);
+            entry.release();
+            ledger.close();
+            factory.shutdown();
+        } finally {
+            metadata.close();
+            objectStore.close();
+        }
+    }
+
+    @Test
     void appendCallbacksRemainInAdmissionOrderWhenL0CompletesOutOfOrder() throws Exception {
         OrderedAppendStorage storage = new OrderedAppendStorage();
         FakeManagedLedgerProjectionMetadataStore projections =
@@ -739,6 +875,31 @@ class NereusManagedLedgerFacadeTest {
 
         private static <T> CompletableFuture<T> unsupported() {
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+    }
+
+    private static final class FailFirstUploadWalWriter implements WalObjectWriter {
+        private final WalObjectWriter delegate;
+        private final AtomicBoolean fail = new AtomicBoolean(true);
+        private final AtomicInteger uploadAttempts = new AtomicInteger();
+
+        private FailFirstUploadWalWriter(WalObjectWriter delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public PreparedWalObject prepare(WalWriteRequest request) {
+            return delegate.prepare(request);
+        }
+
+        @Override
+        public CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject) {
+            uploadAttempts.incrementAndGet();
+            if (fail.compareAndSet(true, false)) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.OBJECT_UPLOAD_FAILED, true, "injected first Object WAL upload failure"));
+            }
+            return delegate.upload(preparedObject);
         }
     }
 }

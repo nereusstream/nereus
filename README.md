@@ -54,7 +54,7 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
 materialization profiles are reserved design/API boundaries, not implemented support.
 
-Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M5 are implemented。
+Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the
 writable facade、strict get-only read-only ledger、exact append recovery/write-fence handoff、lifecycle/admin/stats
 surfaces and audited unsupported channels。F2-M4 cursor boundary is implemented；F2-M5 has product runtime/S3
@@ -68,7 +68,9 @@ A real two-broker Oxia/LocalStack/BookKeeper test proves unload、ownership fail
 exact single/batch Position and bytes、hybrid coexistence and real S3 objects。`phase2Check` and Docker-backed
 `phase2FinalCheck` exist and pass。F2-M6 now also composes committed-response loss into one recovered callback/
 Position，real-Oxia restart repair of both derived projection indexes，and facade close/trim/reopen/terminate/
-logical-delete/recreate with retained Object-WAL bytes。F2-M6 remains active for scenarios 10–18。
+logical-delete/recreate with retained Object-WAL bytes。The final slice proves real BookKeeper virtual-ledger
+isolation、watch-disabled cross-runtime polling wake、Object-WAL failure recovery、stock topic admission/write-fence
+behavior and the complete binding/ack/capability/S3 matrix。All F2-M6 scenarios 1–18 pass；Future 2 is complete。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
 materialization and Future 4 workers remain designed/reserved.

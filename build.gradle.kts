@@ -165,7 +165,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("277212f87c942a3fb694fd25b1c056630260b3fe")
+    .orElse("f8efefa7193698823eab267de95c76d08ed54165")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -176,6 +176,18 @@ tasks.register<Exec>("checkPulsarSourceLock") {
         "scripts/check-pulsar-source-lock.sh",
         pulsarCheckoutPath.get(),
         pulsarExpectedHead.get(),
+    )
+}
+
+tasks.register<Exec>("checkPhase2StorageIsolation") {
+    group = "verification"
+    description = "Verify virtual-ledger routing cannot enter BookKeeper APIs and production has no local object path."
+    dependsOn("checkPulsarSourceLock")
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase2-storage-isolation.sh",
+        pulsarCheckoutPath.get(),
     )
 }
 
@@ -233,6 +245,7 @@ tasks.register<Exec>("phase2PulsarCheck") {
         ":pulsar-broker:checkstyleTest",
         ":pulsar-broker:test",
         "--tests", "org.apache.pulsar.broker.storage.nereus.*",
+        "--tests", "org.apache.pulsar.broker.service.persistent.PersistentTopicNereusAdmissionTest",
         "--tests", "org.apache.pulsar.broker.admin.TopicPoliciesTest.testPersistencePolicyRejectsMissingTopic",
         "--tests", "org.apache.pulsar.broker.admin.TopicPoliciesTest.testGetPersistenceApplied",
         "--tests", "org.apache.pulsar.broker.admin.TopicPoliciesTest.testSetPersistence",
@@ -250,6 +263,7 @@ tasks.register("phase2Check") {
     dependsOn(":nereus-managed-ledger:check")
     dependsOn(":nereus-object-store:check")
     dependsOn(":nereus-pulsar-adapter:check")
+    dependsOn("checkPhase2StorageIsolation")
     dependsOn("phase2PulsarCheck")
 }
 
