@@ -48,12 +48,14 @@ import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
+import com.nereusstream.objectstore.HeadObjectOptions;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +63,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import io.netty.buffer.ByteBuf;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
@@ -309,6 +312,158 @@ class NereusManagedLedgerFacadeTest {
     }
 
     @Test
+    void committedResponseLossRecoversOneSuccessCallbackAndOnePosition() throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("response-loss"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        DefaultStreamStorage storage = new DefaultStreamStorage(
+                StreamStorageConfig.defaults("cluster/a", "pulsar-response-loss"),
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "response-loss", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(storage, projections)) {
+            NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
+                    runtime,
+                    fixedGuard(7),
+                    config(true),
+                    new ManagedLedgerFactoryConfig(),
+                    false);
+            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config(true));
+            metadata.failNext(FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+            AtomicInteger successes = new AtomicInteger();
+            AtomicInteger failures = new AtomicInteger();
+            CompletableFuture<Position> callback = new CompletableFuture<>();
+            byte[] payload = "committed-before-response-loss".getBytes(StandardCharsets.UTF_8);
+
+            ledger.asyncAddEntry(payload, new AddEntryCallback() {
+                @Override
+                public void addComplete(Position position, ByteBuf entryData, Object ctx) {
+                    try {
+                        successes.incrementAndGet();
+                        assertThat(entryData.isReadOnly()).isTrue();
+                        assertThat(entryData.readableBytes()).isEqualTo(payload.length);
+                        callback.complete(position);
+                    } catch (Throwable error) {
+                        callback.completeExceptionally(error);
+                    }
+                }
+
+                @Override
+                public void addFailed(ManagedLedgerException exception, Object ctx) {
+                    failures.incrementAndGet();
+                    callback.completeExceptionally(exception);
+                }
+            }, null);
+
+            Position recovered = callback.join();
+            assertThat(successes).hasValue(1);
+            assertThat(failures).hasValue(0);
+            assertThat(recovered.getLedgerId()).isEqualTo(ledger.projection().virtualLedgerId());
+            assertThat(recovered.getEntryId()).isZero();
+            assertThat(ledger.currentWriteFence()).isEmpty();
+            assertThat(ledger.getNumberOfEntries()).isEqualTo(1);
+            Entry entry = read(ledger, recovered).join();
+            assertThat(entry.getData()).isEqualTo(payload);
+            entry.release();
+            ledger.close();
+            factory.shutdown();
+        } finally {
+            metadata.close();
+            objectStore.close();
+        }
+    }
+
+    @Test
+    void closeTrimReopenTerminateDeleteAndRecreatePreservePositionAndObjectContracts()
+            throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("lifecycle"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        DefaultStreamStorage storage = new DefaultStreamStorage(
+                StreamStorageConfig.defaults("cluster/a", "pulsar-lifecycle"),
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "lifecycle", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        AtomicLong bindingGeneration = new AtomicLong(7);
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(storage, projections)) {
+            NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
+                    runtime,
+                    mutableGuard(bindingGeneration),
+                    config(true),
+                    new ManagedLedgerFactoryConfig(),
+                    false);
+            NereusManagedLedger first = (NereusManagedLedger) factory.open(NAME, config(true));
+            Position trimmed0 = first.addEntry("trimmed-0".getBytes(StandardCharsets.UTF_8));
+            Position trimmed1 = first.addEntry("trimmed-1".getBytes(StandardCharsets.UTF_8));
+            Position retained = first.addEntry("retained-2".getBytes(StandardCharsets.UTF_8));
+            long firstLedgerId = first.projection().virtualLedgerId();
+            long firstIncarnation = first.projection().incarnation();
+            StreamId firstStreamId = first.projection().streamId();
+            first.close();
+
+            storage.trim(firstStreamId, 2, new TrimOptions(Duration.ofSeconds(5), "f2 acceptance trim"))
+                    .join();
+            NereusManagedLedger reopened = (NereusManagedLedger) factory.open(NAME, config(true));
+            assertThat(reopened).isNotSameAs(first);
+            assertThat(reopened.projection().virtualLedgerId()).isEqualTo(firstLedgerId);
+            assertThat(reopened.projection().incarnation()).isEqualTo(firstIncarnation);
+            assertThat(reopened.getFirstPosition().getEntryId()).isEqualTo(1);
+            assertThat(reopened.getLastConfirmedEntry()).isEqualTo(retained);
+            assertThat(reopened.getNumberOfEntries()).isEqualTo(1);
+            assertReadFails(reopened, trimmed0);
+            assertReadFails(reopened, trimmed1);
+            Entry retainedEntry = read(reopened, retained).join();
+            assertThat(retainedEntry.getData()).isEqualTo("retained-2".getBytes(StandardCharsets.UTF_8));
+            retainedEntry.release();
+
+            ObjectSliceReadTarget retainedTarget = (ObjectSliceReadTarget) metadata.scanOffsetIndex(
+                    "cluster/a", firstStreamId, 2, 1).join().getFirst().readTarget();
+            long retainedObjectLength = objectStore.headObject(
+                    retainedTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5))).join().objectLength();
+            Position finalLac = reopened.terminate();
+            assertThat(finalLac).isEqualTo(retained);
+            assertThat(reopened.terminate()).isEqualTo(finalLac);
+            assertThatThrownBy(() -> reopened.addEntry(new byte[] {9}))
+                    .isInstanceOf(ManagedLedgerException.ManagedLedgerTerminatedException.class);
+
+            reopened.delete();
+            assertThat(objectStore.headObject(
+                    retainedTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5))).join().objectLength())
+                    .isEqualTo(retainedObjectLength);
+            reopened.close();
+            bindingGeneration.incrementAndGet();
+
+            NereusManagedLedger recreated = (NereusManagedLedger) factory.open(NAME, config(true));
+            assertThat(recreated.projection().incarnation()).isEqualTo(firstIncarnation + 1);
+            assertThat(recreated.projection().streamId()).isNotEqualTo(firstStreamId);
+            assertThat(recreated.projection().virtualLedgerId()).isNotEqualTo(firstLedgerId);
+            assertReadFails(recreated, retained);
+            Position newPosition = recreated.addEntry("new-incarnation-0".getBytes(StandardCharsets.UTF_8));
+            assertThat(newPosition.getEntryId()).isZero();
+            assertThat(newPosition.getLedgerId()).isEqualTo(recreated.projection().virtualLedgerId());
+            assertThat(newPosition.getLedgerId()).isNotEqualTo(retained.getLedgerId());
+            assertThat(objectStore.headObject(
+                    retainedTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5))).join().objectLength())
+                    .isEqualTo(retainedObjectLength);
+            recreated.close();
+            factory.shutdown();
+        } finally {
+            metadata.close();
+            objectStore.close();
+        }
+    }
+
+    @Test
     void appendCallbacksRemainInAdmissionOrderWhenL0CompletesOutOfOrder() throws Exception {
         OrderedAppendStorage storage = new OrderedAppendStorage();
         FakeManagedLedgerProjectionMetadataStore projections =
@@ -418,6 +573,28 @@ class NereusManagedLedgerFacadeTest {
                 return CompletableFuture.completedFuture(null);
             }
         });
+    }
+
+    private static NereusCreationGuard mutableGuard(AtomicLong generation) {
+        return name -> {
+            long acquiredGeneration = generation.get();
+            return CompletableFuture.completedFuture(new NereusCreationPermit() {
+                @Override public String persistenceName() { return name; }
+                @Override public long bindingGeneration() { return acquiredGeneration; }
+                @Override public CompletableFuture<Void> validateBeforeProjectionPublish() {
+                    return generation.get() == acquiredGeneration
+                            ? CompletableFuture.completedFuture(null)
+                            : CompletableFuture.failedFuture(new IllegalStateException(
+                                    "binding generation changed before projection publish"));
+                }
+            });
+        };
+    }
+
+    private static void assertReadFails(ManagedLedger ledger, Position position) {
+        assertThatThrownBy(() -> read(ledger, position).join())
+                .isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(ManagedLedgerException.class);
     }
 
     private static NereusLedgerOpenResult opened() {

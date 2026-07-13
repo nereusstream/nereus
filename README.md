@@ -66,8 +66,9 @@ backlog/cursor、compaction/offload、truncate、shadow and migration operations
 namespace/capability convergence、generation-safe write-fence recovery and shared-store peer lifecycle are gated。
 A real two-broker Oxia/LocalStack/BookKeeper test proves unload、ownership failover、process restart/reverse takeover、
 exact single/batch Position and bytes、hybrid coexistence and real S3 objects。`phase2Check` and Docker-backed
-`phase2FinalCheck` exist and pass；F2-M6 remains active for the remaining response-loss、repair、trim、lifecycle and
-failure-injection scenario composition。
+`phase2FinalCheck` exist and pass。F2-M6 now also composes committed-response loss into one recovered callback/
+Position，real-Oxia restart repair of both derived projection indexes，and facade close/trim/reopen/terminate/
+logical-delete/recreate with retained Object-WAL bytes。F2-M6 remains active for scenarios 10–18。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
 materialization and Future 4 workers remain designed/reserved.

@@ -53,7 +53,9 @@ two-broker `PulsarService` gate uses real Oxia、pinned LocalStack Community S3 
 BookKeeper control path，then verifies not-yet-created topic policy、single/batched exact bytes and `MessageIdAdv`
 coordinates、unload/reload、owner shutdown/takeover、original-owner process restart/reverse takeover、binding
 generation/class、concrete ledger types and positive S3 object presence。F2-M6 final acceptance is active and still
-must compose the remaining response-loss、repair、trim、terminate/delete/recreate and failure-injection scenarios。
+has now composed scenarios 3–8：committed-response loss recovers one callback/Position，real Oxia restart repairs
+both removed derived indexes，and close/trim/reopen/terminate/delete/recreate preserves retained Position and object
+contracts。Scenarios 10–18 remain active。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -67,7 +69,7 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 | F2-M0R2 Nereus design baseline | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5） |
 | Pulsar fork | `nereusstream/pulsar` |
 | Pulsar API/source-review baseline | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
-| Current product implementation commit | `f4213f2`（published on Nereus `main`） |
+| Current product implementation commit | `248257d`（published on Nereus `main`；F2-M6 scenario 3–8 work follows） |
 | Current local Pulsar implementation commit | `277212f87c`（based on locked baseline；remote publication awaits repository permission） |
 | Pulsar source-project version at that commit | `5.0.0-M1-SNAPSHOT`（source composite selector，not a published Maven snapshot） |
 | Java/build baseline | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode |
@@ -260,6 +262,6 @@ was repeated after the M1 implementation and remained green。
 | F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
 | F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
 | F2-M5 broker integration | Complete | Hybrid bootstrap/binding/admission/capability/policy/write-fence/peer lifecycle plus real dual-broker Oxia/LocalStack/BookKeeper restart/failover E2E pass |
-| F2-M6 final acceptance | In progress | `phase2Check` and Docker-backed `phase2FinalCheck --rerun-tasks` exist and pass；remaining response-loss/repair/trim/lifecycle/failure-injection scenario composition remains |
+| F2-M6 final acceptance | In progress | aggregate gates pass；scenarios 1–9 are composed，while scenarios 10–18 remain |
 
 Future 2 is not complete until F2-M1 through F2-M6 are implemented and their gates pass.

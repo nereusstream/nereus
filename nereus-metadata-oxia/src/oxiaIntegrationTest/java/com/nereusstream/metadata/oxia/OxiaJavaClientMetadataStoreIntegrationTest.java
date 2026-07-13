@@ -144,6 +144,50 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
     }
 
     @Test
+    void projectionDerivedIndexesRepairOnlyAfterRealOxiaRestart() throws Exception {
+        String cluster = "f2/projection-restart-repair/" + UUID.randomUUID();
+        String managedLedgerName = "tenant/ns/persistent/" + UUID.randomUUID();
+        OxiaClientConfiguration config = configuration();
+        TopicProjectionRecord authority;
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(config, Clock.systemUTC());
+                OxiaJavaClientMetadataStore l0 =
+                        OxiaJavaClientMetadataStore.usingSharedRuntime(config, runtime, Clock.systemUTC());
+                ManagedLedgerProjectionMetadataStore projection =
+                        ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
+                                config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
+            authority = projection.createFirstProjection(
+                    cluster,
+                    projectionRequest(l0, cluster, managedLedgerName, 3, 1),
+                    ALLOW_PUBLISH).join();
+            ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
+            StreamId streamId = new StreamId(authority.streamId());
+            Set<DeleteOption> partition = Set.of(
+                    DeleteOption.PartitionKey(keyspace.streamPartitionKey(streamId).value()));
+            try (var raw = OxiaClientBuilder.create(OXIA.getServiceAddress()).syncClient()) {
+                raw.delete(keyspace.virtualLedgerProjectionKey(streamId), partition);
+                raw.delete(keyspace.positionIndexKey(streamId), partition);
+            }
+        }
+
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(config, Clock.systemUTC());
+                ManagedLedgerProjectionMetadataStore restarted =
+                        ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
+                                config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC())) {
+            TopicProjectionRecord recovered = restarted.getProjection(cluster, managedLedgerName)
+                    .join().orElseThrow();
+            assertThat(recovered).isEqualTo(authority);
+            assertThat(restarted.repairProjectionIndexes(cluster, recovered).join())
+                    .isEqualTo(new ProjectionRepairResult(
+                            ProjectionRepairStatus.CREATED,
+                            ProjectionRepairStatus.CREATED));
+            assertThat(restarted.repairProjectionIndexes(cluster, recovered).join())
+                    .isEqualTo(new ProjectionRepairResult(
+                            ProjectionRepairStatus.ALREADY_VALID,
+                            ProjectionRepairStatus.ALREADY_VALID));
+        }
+    }
+
+    @Test
     void genericCommitCoexistsWithLegacyChainAndLifecycleSurvivesRestart() {
         String cluster = "p15/mixed/" + UUID.randomUUID();
         OxiaClientConfiguration config = configuration();

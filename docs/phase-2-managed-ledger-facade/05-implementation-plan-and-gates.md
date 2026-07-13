@@ -674,10 +674,14 @@ Current F2-M6 evidence boundary（2026-07-13）：
 | Scenario(s) | State | Current evidence / remaining work |
 | --- | --- | --- |
 | 1, 2, 9 | Complete slice | `NereusMultiBrokerIntegrationTest` proves exact single/batch bytes and coordinates across unload、owner failover、process restart/reverse takeover with BookKeeper coexistence and real S3 objects |
-| 3-8, 10-18 | Component-gated | Facade、projection/Oxia、binding、write-fence、ack/admission and LocalStack suites cover their owning component contracts；they still need the explicit final composition/aggregation required by each scenario |
+| 3 | Complete slice | `committedResponseLossRecoversOneSuccessCallbackAndOnePosition` injects loss after the real L0 head CAS，then proves facade recovery of the retained attempt emits one success callback、one Position and exact readable bytes |
+| 4 | Complete slice | `projectionDerivedIndexesRepairOnlyAfterRealOxiaRestart` removes both real-Oxia derived projection keys，closes the shared client runtime，reconnects and proves authority-only idempotent repair |
+| 5-8 | Complete slice | `closeTrimReopenTerminateDeleteAndRecreatePreservePositionAndObjectContracts` composes local facade close、harness L0 trim、reopen、old/retained Position behavior、stable terminate LAC、logical delete without object removal and next-incarnation namespace isolation |
+| 10-18 | Component-gated | Binding、BookKeeper isolation、polling、admission、failure injection、write-fence、ack、capability/policy and LocalStack suites cover their owning contracts；their explicit final composition/aggregation remains |
 | aggregate build tasks | Complete | `phase2Check` and `phase2FinalCheck --rerun-tasks` are executable；both passed on 2026-07-13 with an exact clean Pulsar source lock and fixed `0.1.0-f2-dev` product publication |
 
-Therefore F2-M6 and Future 2 remain in progress even though the real broker restart/failover slice is green。
+Therefore scenarios 1–9 are complete slices；F2-M6 and Future 2 remain in progress until scenarios 10–18 are
+explicitly composed and the aggregate gates pass again。
 
 ## 8. Stop-the-line Conditions
 

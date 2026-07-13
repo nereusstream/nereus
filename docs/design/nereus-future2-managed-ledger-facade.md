@@ -77,7 +77,9 @@ cluster capability convergence、namespace/topic storage-policy serialization �
 write-fence handoff；shared-store conflicting first-create/peer lifecycle resume 已通过真实 CAS gate。F2-M5 的
 real dual-broker gate 已通过 real Oxia、pinned LocalStack Community S3 `4.14.0` 和 stock BookKeeper 验证
 ownership failover、process restart、unload/reload、exact bytes/Position 与 hybrid coexistence。Response-loss、
-repair、trim、terminate/delete/recreate 和 failure-injection 的 final composition 仍属于 active F2-M6。
+repair、trim、terminate/delete/recreate 的场景 3–8 跨层组合也已通过；场景 10–18 的 binding isolation、
+polling/admission、failure injection、write-fence、ack、capability/policy 与 S3 final composition 仍属于 active
+F2-M6。
 Phase 1 payload 是 one-record-per-entry opaque batch。Phase 1.5 已实现 generic target/result、exact recovery
 和 lifecycle，并保持 Object WAL strict parity；P15-M6 已把 internal commit 的 cumulative logical size 交给
 public result。F2 首版仍只接受

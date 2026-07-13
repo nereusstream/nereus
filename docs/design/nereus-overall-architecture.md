@@ -61,7 +61,9 @@ facade/fork race gates；shared-store conflicting first-create and peer lifecycl
 真实双 Broker gate 进一步通过 real Oxia、pinned LocalStack Community S3 `4.14.0` 和 stock BookKeeper
 验证 ownership failover、broker process restart、unload/reload、exact bytes/Position 与 hybrid coexistence。
 `phase2Check` 与 Docker-backed `phase2FinalCheck --rerun-tasks` 已存在并通过；当前下一里程碑是 F2-M6
-尚余 failure/lifecycle scenario composition。
+场景 10–18 的最终组合。场景 3–8 已新增跨层证据：head-CAS 后响应丢失只产生一个恢复 callback/Position，
+真实 Oxia 重启后从 authority 修复两条派生索引，以及 facade close/trim/reopen/terminate/delete/recreate 保持
+Position namespace 与旧 Object-WAL bytes 合同。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -71,8 +73,8 @@ alias。
 - BookKeeper primary WAL execution；
 - `WAL_DURABLE` fast boundary 和 async materialization workers；
 - durable cursor/ack authority、KoP、routing、compaction、lakehouse、advanced Pulsar semantics；
-- F2-M6 尚未完成的 response-loss、repair、trim、terminate/delete/recreate、failure-injection 等 final
-  acceptance composition；真实 broker ownership restart/failover slice 已通过。
+- F2-M6 尚未完成的场景 10–18 final acceptance composition；场景 1–9 的 multi-broker、response-loss、
+  repair、trim、lifecycle 与 coexistence slices 已通过。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
 

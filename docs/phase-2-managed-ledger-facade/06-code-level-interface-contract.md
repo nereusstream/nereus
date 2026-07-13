@@ -1182,3 +1182,13 @@ integration case to its owning milestone and F2-M6 composition：
 19. a stale facade snapshot advances end and cumulative size from one normal/recovered `AppendResult` without a
     second metadata read；local overlay versus remote metadata races never regress either value and never confuse
     commit version with backend metadata version。
+20. committed-response loss after the real L0 head CAS recovers the retained attempt through the facade and produces
+    exactly one successful callback、one Position and exact readable bytes；
+21. both derived projection keys may be removed from real Oxia，followed by complete client-runtime close/reconnect and
+    authority-only idempotent repair；
+22. local close followed by harness-driven L0 trim and reopen preserves the virtual ledger/incarnation，rejects old
+    Positions and leaves retained entry IDs unchanged；
+23. terminate returns one stable final LAC and rejects append，while logical delete leaves the committed Object-WAL
+    object physically present；
+24. same-name recreation after delete uses the next incarnation、new stream and virtual-ledger ID，rejects an old
+    Position and restarts entry numbering only inside the new Position namespace。

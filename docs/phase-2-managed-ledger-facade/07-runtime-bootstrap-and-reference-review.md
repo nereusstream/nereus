@@ -1378,6 +1378,14 @@ reverse takeover，plus binding/class/ledger-type truth and real S3 objects。Al
 stock persistence regressions and affected main/test checkstyle pass。The Pulsar commits remain local because the
 active GitHub identity lacks repository write permission；F2-M6 still owns the broader final scenario composition。
 
+The next F2-M6 slice composes scenarios 3–8 instead of relying on their isolated component tests。The facade now has
+an acceptance test that injects response loss after a real `DefaultStreamStorage` head CAS and proves one recovered
+success callback/Position。A second facade/Object-WAL flow closes、trims through L0、reopens、terminates、logically
+deletes and recreates the same name，checking stable retained entry IDs、old-position rejection、new incarnation/
+virtual-ledger isolation and physical retention of the old object。A real-Oxia integration test independently removes
+both projection-derived keys，fully closes the shared client runtime，reconnects and repairs both from the topic
+authority。Scenarios 1–9 now have complete slices；10–18 remain the active F2-M6 boundary。
+
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
 topics. An older broker can bypass the binding protocol, so mixed-version ownership during Nereus policy enablement is
