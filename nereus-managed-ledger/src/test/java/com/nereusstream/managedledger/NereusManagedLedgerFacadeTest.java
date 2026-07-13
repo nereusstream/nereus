@@ -76,6 +76,7 @@ import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.bookkeeper.mledger.ReadOnlyCursor;
 import org.apache.bookkeeper.mledger.ReadOnlyManagedLedger;
+import org.apache.pulsar.common.api.proto.CommandSubscribe.InitialPosition;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
 import org.apache.pulsar.common.policies.data.PersistentOfflineTopicStats;
@@ -110,6 +111,7 @@ class NereusManagedLedgerFacadeTest {
                     config(true),
                     new ManagedLedgerFactoryConfig(),
                     false);
+            assertThat(factory.getManagedLedgerPropertiesAsync(NAME).join()).isEmpty();
 
             List<CompletableFuture<ManagedLedger>> concurrentOpens = IntStream.range(0, 100)
                     .mapToObj(ignored -> CompletableFuture.supplyAsync(() -> {
@@ -174,10 +176,17 @@ class NereusManagedLedgerFacadeTest {
             ManagedCursor nonDurable = ledger.newNonDurableCursor(
                     PositionFactory.EARLIEST, "reader");
             assertThat(nonDurable.isDurable()).isFalse();
+            assertThat(nonDurable.getReadPosition().getEntryId()).isZero();
+            assertThat(nonDurable.getMarkDeletedPosition().getEntryId()).isEqualTo(-1);
             nonDurable.markDelete(position);
             assertThat(nonDurable.getMarkDeletedPosition()).isEqualTo(position);
             assertThat(nonDurable.getNumberOfEntriesInBacklog(true)).isZero();
             nonDurable.close();
+            ManagedCursor explicitEarliest = ledger.newNonDurableCursor(
+                    PositionFactory.EARLIEST, "explicit-earliest", InitialPosition.Latest, false);
+            assertThat(explicitEarliest.getReadPosition().getEntryId()).isZero();
+            assertThat(explicitEarliest.getMarkDeletedPosition().getEntryId()).isEqualTo(-1);
+            explicitEarliest.close();
             ledger.deleteCursor("subscription");
             assertThat(ledger.asyncFindPosition(candidate -> true).join().getEntryId()).isEqualTo(1);
             assertThat(ledger.getLastDispatchablePosition(candidate -> true, position).join())

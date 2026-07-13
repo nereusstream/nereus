@@ -1382,10 +1382,13 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     private long normalizeCursorReadOffset(
             Position position, InitialPosition initialPosition, StreamMetadata metadata) {
-        if (position == null || samePosition(position, PositionFactory.EARLIEST)) {
+        if (position == null) {
             return initialPosition == InitialPosition.Latest
                     ? metadata.committedEndOffset()
                     : metadata.trimOffset();
+        }
+        if (samePosition(position, PositionFactory.EARLIEST)) {
+            return metadata.trimOffset();
         }
         if (samePosition(position, PositionFactory.LATEST)) {
             return metadata.committedEndOffset();

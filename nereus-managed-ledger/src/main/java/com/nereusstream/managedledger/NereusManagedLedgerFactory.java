@@ -466,6 +466,9 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         return openCoordinator.inspectStorageState(name).thenCompose(snapshot -> {
+            if (snapshot.state() == NereusDurableStorageState.MISSING) {
+                return CompletableFuture.completedFuture(Map.of());
+            }
             if (snapshot.state() != NereusDurableStorageState.ACTIVE
                     && snapshot.state() != NereusDurableStorageState.SEALED) {
                 return notFound("managed ledger properties are unavailable");
