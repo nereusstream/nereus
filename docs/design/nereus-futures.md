@@ -29,7 +29,7 @@ protocol/table state = projection
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
-| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R/M0R2 + P15-M6 + F2-M1-M4 complete） | F2-M5 broker integration |
+| F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | In progress（M0/M0R/M0R2 + P15-M6 + F2-M1-M4 complete） | F2-M5 multi-broker restart/failover and broker E2E |
 | F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
@@ -115,7 +115,7 @@ workers and higher generations remain outside this delivery。
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M4 complete；F2-M5 broker integration active；production facade/cursor implemented
+Current milestone: F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M4 complete；F2-M5 multi-broker/restart/failover and broker E2E active；production facade/cursor and generation-safe broker write-fence handoff implemented
 
 ### Owns
 

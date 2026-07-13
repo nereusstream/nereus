@@ -551,7 +551,7 @@ Implementation evidence（through 2026-07-13）：
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- the fork bootstrap starts at local `f21661999d`；through `b94d5e7c48` it now has typed config/runtime assembly，
+- the fork bootstrap starts at local `f21661999d`；through `3979860cc6` it now has typed config/runtime assembly，
   stable ordered `[bookkeeper,nereus]` classes，deterministic `NSB1` binding records，BookKeeper adoption，bound
   open/delete/recreate coordination，loaded/unloaded broker hooks，reserved capability publication and same-snapshot
   topic-open feature admission，plus pre-mutation remote-producer、publish-metadata、non-durable-subscribe、durable-
@@ -578,8 +578,14 @@ Implementation evidence（through 2026-07-13）：
   or deadline failure。Loaded and unloaded topic mutations validate the effective post-mutation class and live binding
   before writing；same-effective-class updates remain allowed。All fork Nereus storage tests，lock/timeout/scan unit
   gates，stock namespace/topic persistence regressions and touched checkstyle pass。
-- generation-safe broker write-fence handoff，multi-broker binding/lifecycle races and broker E2E restart/failover
-  wiring remain pending，so F2-M5 is still in progress。
+- product commit `aea88bd` keeps an unresolved fence visible through the broker failure callback and starts the
+  saturated terminal observer only after callback return。Fork commit `3979860cc6` captures that generation before
+  producer disconnect，coalesces duplicate attachments，retains an early terminal until `pendingWriteOps==0`，
+  fresh-checks later generations and closes instead of unfencing on permanent recovery/executor failure。Facade
+  module check、bridge/topic race tests、all fork Nereus storage tests、the stock BookKeeper managed-ledger failure
+  regression and touched checkstyle pass。
+- multi-broker binding/lifecycle races and broker E2E restart/failover wiring remain pending，so F2-M5 is still in
+  progress。
 
 ## 7. F2-M6 — Final Acceptance
 

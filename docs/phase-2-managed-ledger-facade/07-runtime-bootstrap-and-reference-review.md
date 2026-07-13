@@ -1165,6 +1165,13 @@ the stock action；nonempty cancels `cancelFencedTopicMonitoringTask()`，calls 
 executor and returns without unfencing. The bridge coalesces by generation and joins `awaitWriteFence(generation)`
 without blocking a broker thread.
 
+The implemented facade does not start the saturated terminal observer until its `addFailed` callback has returned，
+and it keeps `currentWriteFence()` nonempty throughout that callback。`PersistentTopic.addFailed` therefore captures
+the generation immediately after stock `fence()` and before producer disconnect begins；waiting until pending writes
+reach zero would leave a snapshot/terminal delivery gap。The broker pre-arms its awaiting flag before registering the
+continuation，so a terminal completed in the attach window may run inline without a later write restoring a stale
+`awaiting=true` state。
+
 `PersistentTopic.onNereusWriteFenceCompletion` receives completion on its ordered executor and synchronizes on the
 topic. It may reset dedup、call `readyToCreateNewLedger` and `unfence` only when the topic is still fenced/not closing,
 `pendingWriteOps==0` and a fresh fence read is empty。
@@ -1173,7 +1180,10 @@ If a higher generation is present, it attaches that generation and the stale com
 permanent recovery calls the topic's close/unload path and never unfences it；broker/runtime shutdown may close the bridge but
 bridge close only detaches its continuation and never cancels the core recovery future。Shutdown cannot report a
 safely retryable append outcome. Rejected publishes while fenced may drive pending count back to zero,
-but they join the same generation instead of creating duplicate waiters.
+but they join the same generation instead of creating duplicate waiters。If a completion arrives while producer
+disconnect still keeps `pendingWriteOps` nonzero，the topic retains the newest immutable completion and consumes it at
+the zero transition；it does not drop the only terminal after the facade has cleared `currentWriteFence()`。Executor
+rejection is converted to a failure completion and closes the topic rather than authorizing an inline success。
 
 | Broker feature | F2 admission |
 | --- | --- |
@@ -1324,10 +1334,16 @@ bounded namespace-prefixed non-deleted binding scans and binding-aware loaded/un
 Policy/binding revalidation happens before factory IO or policy mutation；a newly invalid no-storage claim is moved to
 the terminal tombstone，lock-busy retry and the entire critical section share one absolute deadline，and BrokerService
 closes the owned lock manager。Focused lock/version/timeout/scan/corruption tests，all fork Nereus storage tests，the
-stock broker-registry test and stock namespace/topic persistence regressions pass。These commits are local because
-the active GitHub
-identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
-`100d3ef0ff` until that repository commit is pushed。
+stock broker-registry test and stock namespace/topic persistence regressions pass。Published product commit
+`aea88bd` makes the fence/callback ordering executable：retryably uncertain and permanent recovery completion begins
+only after `addFailed` returns，while an ID-less non-known outcome maps to `ManagedLedgerFencedException`。Local Pulsar
+commit `3979860cc6` adds `NereusWriteFenceCompletion`、the generation-coalescing bridge and the `PersistentTopic`
+handoff/lifecycle hooks。Deterministic tests cover same-generation coalescing，stale/newer generations，early terminal
+retention across producer disconnect，completion during attach，permanent recovery，executor rejection and bridge
+detach without cancelling core recovery。The full managed-ledger module check，all fork Nereus storage tests，the
+stock BookKeeper managed-ledger failure regression and affected main/test checkstyle pass。The fork commits are local
+because the active GitHub identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the
+published parent `100d3ef0ff` until those repository commits are pushed。
 
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
@@ -1387,8 +1403,10 @@ In addition to `05`, F2-M5 requires:
 24. every rejected ack shape leaves timestamp/rate/counter/pending-ack/cursor state unchanged；the one admitted local
     cumulative whole-entry ack advances only the non-durable cursor，and its counters wait for local async completion/
     remain unchanged on a close-race failure；
-25. retryably uncertain add failure remains topic-fenced after pending writes drain, stale generation cannot unfence,
-    exact committed/proven-not-committed terminal can unfence once, and permanent recovery closes/unloads；
+25. retryably uncertain add failure remains topic-fenced after pending writes drain，a terminal delivered before
+    producer disconnect completes is retained，attach-window inline completion cannot leave stale awaiting state，
+    stale generation cannot unfence，exact committed/proven-not-committed terminal can unfence once，and permanent
+    recovery/executor rejection closes/unloads；
 26. `PersistencePolicies.equals/hashCode` treats equal-content distinct storage-class Strings as equal；
 27. bootstrap completes before `brokerId` exists and two process starts produce distinct 128-bit-or-more process IDs
     and exact `pulsar-f2/{processRunId}` writer IDs。
