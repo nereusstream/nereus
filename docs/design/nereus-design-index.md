@@ -71,7 +71,7 @@ streamId + offset
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 complete） | projection metadata、factory、writable/get-only ledger、append/read/lifecycle/write-fence、admin/cache/stats and cursor boundary implemented/tested |
-| `nereus-pulsar-adapter` | `Implemented`（F2 product side） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization and generation-safe write-fence bridge implemented/tested；multi-broker and broker E2E remain F2-M5 work |
+| `nereus-pulsar-adapter` | `Implemented`（F2 product side） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge and shared-store peer lifecycle implemented/tested；real broker restart/failover and E2E remain F2-M5 work |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 

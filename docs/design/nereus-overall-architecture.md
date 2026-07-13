@@ -57,7 +57,8 @@ L0 前置已经实现并通过普通与 Docker-backed final gates，包括 M0R2 
 cumulative-result handoff。F2-M1-M4 已完成；F2-M5 已实现 product-side runtime/S3 provider，以及 Pulsar
 fork 的 hybrid storage、durable binding、feature/operation admission、cluster capability convergence 和
 namespace/topic storage-policy serialization。Generation-safe broker write-fence handoff 也已实现并通过
-facade/fork race gates；当前下一里程碑是 multi-broker restart/failover 与 broker E2E gates。
+facade/fork race gates；shared-store conflicting first-create and peer lifecycle resume 也已有真实 CAS gate。当前
+下一里程碑是真实 broker ownership restart/failover 与 broker E2E gates。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -67,7 +68,7 @@ alias。
 - BookKeeper primary WAL execution；
 - `WAL_DURABLE` fast boundary 和 async materialization workers；
 - durable cursor/ack authority、KoP、routing、compaction、lakehouse、advanced Pulsar semantics；
-- F2 尚未完成的 multi-broker restart/failover 和 final E2E acceptance。
+- F2 尚未完成的真实 broker ownership restart/failover 和 final E2E acceptance。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
 

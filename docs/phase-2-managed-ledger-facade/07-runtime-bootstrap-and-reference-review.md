@@ -1343,7 +1343,14 @@ retention across producer disconnect，completion during attach，permanent reco
 detach without cancelling core recovery。The full managed-ledger module check，all fork Nereus storage tests，the
 stock BookKeeper managed-ledger failure regression and affected main/test checkstyle pass。The fork commits are local
 because the active GitHub identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the
-published parent `100d3ef0ff` until those repository commits are pushed。
+published parent `100d3ef0ff` until those repository commits are pushed。Local fork commit `f8b411db2e` closes the
+next peer-lifecycle gap：`validateStorageClassOpenPermit` and `completeStorageClassOpen` accept an already-`ACTIVE`
+same class/generation completed by another broker，while `CLAIMED` still requires the exact metadata version；an
+activation CAS loser rereads with the shared deadline/retry cap。A real in-memory CAS MetadataStore test races 50
+conflicting first creates and drives one Nereus lifetime across three store instances through activation，delete
+resume，terminal completion and a BookKeeper generation-2 claim。All fork Nereus storage tests、the stock broker-
+registry regression and affected checkstyle pass。This is coordinator-level multi-broker evidence；real broker
+ownership transfer/restart/failover remains an F2-M5/M6 E2E gate。
 
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new

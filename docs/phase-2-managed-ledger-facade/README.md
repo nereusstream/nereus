@@ -47,8 +47,9 @@ pre/post empty scans，and live binding class switches fail before policy mutati
 handoff is now implemented。The facade keeps the fence visible through `addFailed` and starts its terminal observer
 only after that callback returns；the fork captures it before producer disconnect，coalesces by generation，retains an
 early terminal until pending writes drain，fresh-checks a newer generation and fails closed on permanent recovery or
-executor rejection。Multi-broker lifecycle/restart/failover races and broker E2E gates remain pending。Therefore
-F2-M5 is not yet complete。
+executor rejection。The shared binding coordinator now also gates conflicting first-create races and peer-broker
+`CLAIMED/ACTIVE/DELETING/DELETED` restart/resume through a real CAS MetadataStore。Real multi-broker broker-ownership
+restart/failover and broker E2E gates remain pending。Therefore F2-M5 is not yet complete。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -62,7 +63,7 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 | F2-M0R2 Nereus design baseline | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5） |
 | Pulsar fork | `nereusstream/pulsar` |
 | Pulsar API/source-review baseline | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
-| Current local implementation commit | `3979860cc6`（based on locked baseline；remote publication awaits repository permission） |
+| Current local implementation commit | `f8b411db2e`（based on locked baseline；remote publication awaits repository permission） |
 | Pulsar version at that commit | `5.0.0-M1-SNAPSHOT` |
 | Java/build baseline | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode |
 | Executable Nereus profile | `OBJECT_WAL_SYNC_OBJECT` only |
@@ -241,7 +242,7 @@ was repeated after the M1 implementation and remained green。
 | F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
 | F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
 | F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
-| F2-M5 broker integration | In progress | Hybrid bootstrap、binding/open/delete、operation admission、capability convergence、namespace/topic policy serialization and generation-safe write-fence bridge gated；multi-broker restart/failover and broker E2E remain |
+| F2-M5 broker integration | In progress | Hybrid bootstrap、binding/open/delete、operation admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge and shared-store peer lifecycle gated；real multi-broker broker restart/failover and broker E2E remain |
 | F2-M6 final acceptance | Not started | Real Pulsar + Oxia + Object WAL end-to-end gate |
 
 Future 2 is not complete until F2-M1 through F2-M6 are implemented and their gates pass.

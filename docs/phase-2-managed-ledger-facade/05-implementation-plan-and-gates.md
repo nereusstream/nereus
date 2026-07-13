@@ -551,7 +551,7 @@ Implementation evidence（through 2026-07-13）：
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- the fork bootstrap starts at local `f21661999d`；through `3979860cc6` it now has typed config/runtime assembly，
+- the fork bootstrap starts at local `f21661999d`；through `f8b411db2e` it now has typed config/runtime assembly，
   stable ordered `[bookkeeper,nereus]` classes，deterministic `NSB1` binding records，BookKeeper adoption，bound
   open/delete/recreate coordination，loaded/unloaded broker hooks，reserved capability publication and same-snapshot
   topic-open feature admission，plus pre-mutation remote-producer、publish-metadata、non-durable-subscribe、durable-
@@ -584,7 +584,12 @@ Implementation evidence（through 2026-07-13）：
   fresh-checks later generations and closes instead of unfencing on permanent recovery/executor failure。Facade
   module check、bridge/topic race tests、all fork Nereus storage tests、the stock BookKeeper managed-ledger failure
   regression and touched checkstyle pass。
-- multi-broker binding/lifecycle races and broker E2E restart/failover wiring remain pending，so F2-M5 is still in
+- fork commit `f8b411db2e` makes same-generation/class peer activation idempotent after either an observed `ACTIVE`
+  state or an activation-CAS loss。A shared real CAS MetadataStore gate races 50 conflicting BookKeeper/Nereus first
+  creates and proves one winner，then moves Nereus `ACTIVE -> DELETING -> DELETED` and a class-changing generation-2
+  claim across three broker-store instances/restarts。Focused tests、all fork Nereus storage tests、the stock broker-
+  registry regression and touched checkstyle pass。
+- real multi-broker broker-ownership restart/failover and broker E2E wiring remain pending，so F2-M5 is still in
   progress。
 
 ## 7. F2-M6 — Final Acceptance
