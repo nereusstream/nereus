@@ -945,7 +945,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             synchronized (this) {
                 state = LocalState.PERMANENTLY_FENCED;
             }
-            failAppend(admission, callback, ctx, invariant(nereus));
+            failAppend(admission, callback, ctx, fencedOrClosed("append"));
             return;
         }
         WriteFence fence;
@@ -970,11 +970,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                         failAppend(admission, callback, ctx, cause);
                         return;
                     }
-                    failAppend(admission, callback, ctx, cause);
                     if (isRetriableUncertainty(cause)) {
-                        observeFenceTerminal(fence);
+                        failAppend(admission, callback, ctx, cause, () -> observeFenceTerminal(fence));
                     } else {
-                        resolveFence(fence, null, cause);
+                        failAppend(admission, callback, ctx, cause, () -> resolveFence(fence, null, cause));
                     }
                 });
     }
@@ -1016,8 +1015,16 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             fence.ifPresent(value -> resolveFence(
                     value, NereusWriteFenceResolution.COMMITTED, null));
         } catch (Throwable invalid) {
-            fence.ifPresent(value -> resolveFence(value, null, invalid));
-            failAppend(admission, callback, ctx, invariant(invalid));
+            if (fence.isPresent()) {
+                failAppend(
+                        admission,
+                        callback,
+                        ctx,
+                        invariant(invalid),
+                        () -> resolveFence(fence.orElseThrow(), null, invalid));
+            } else {
+                failAppend(admission, callback, ctx, invariant(invalid));
+            }
             return;
         }
         ByteBuf callbackData = Unpooled.wrappedBuffer(encoded.callbackBytes()).asReadOnly();
@@ -1034,13 +1041,27 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private void failAppend(Admission admission, AddEntryCallback callback, Object ctx, Throwable error) {
+        failAppend(admission, callback, ctx, error, () -> { });
+    }
+
+    private void failAppend(
+            Admission admission,
+            AddEntryCallback callback,
+            Object ctx,
+            Throwable error,
+            Runnable afterCallback) {
+        Objects.requireNonNull(afterCallback, "afterCallback");
         stats.recordAddFailure();
         ManagedLedgerException mapped = map(error, "append", false);
         finish(admission, () -> {
             try {
                 callback.addFailed(mapped, ctx);
             } finally {
-                pendingAdds.decrementAndGet();
+                try {
+                    pendingAdds.decrementAndGet();
+                } finally {
+                    afterCallback.run();
+                }
             }
         });
     }

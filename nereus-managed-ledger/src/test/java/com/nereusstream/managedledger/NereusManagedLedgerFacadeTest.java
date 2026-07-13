@@ -270,7 +270,13 @@ class NereusManagedLedgerFacadeTest {
 
                 @Override
                 public void addFailed(ManagedLedgerException exception, Object ctx) {
-                    callbackFailure.complete(exception);
+                    try {
+                        assertThat(storage.recoveries).hasValue(1);
+                        assertThat(ledger.currentWriteFence()).isPresent();
+                        callbackFailure.complete(exception);
+                    } catch (Throwable assertion) {
+                        callbackFailure.completeExceptionally(assertion);
+                    }
                 }
             }, null);
 
