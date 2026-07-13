@@ -958,8 +958,16 @@ public final class NamespaceStorageClassPolicyGuard implements AutoCloseable {
     public CompletableFuture<NamespaceStorageClassPermit> acquireFirstCreate(
             NamespaceName namespace, TopicName topic, String selectedStorageClass);
 
-    public CompletableFuture<Void> updateNamespaceStorageClass(
-            NamespaceName namespace, String targetStorageClass, long expectedPolicyVersion);
+    public CompletableFuture<Void> updateNamespacePersistence(
+            NamespaceName namespace, PersistencePolicies targetPersistence);
+    public CompletableFuture<Void> asyncClose();
+}
+
+public final class NereusStorageClassMigrationGuard {
+    public CompletableFuture<Void> updateTopicPersistence(
+            TopicName topic,
+            Supplier<CompletableFuture<String>> proposedStorageClassLoader,
+            Supplier<CompletableFuture<Void>> policyMutation);
 }
 ```
 
@@ -977,8 +985,8 @@ after that claim and before either factory can create storage. On mismatch it ta
 `CLAIMED -> DELETING -> DELETED` and returns a retryable policy-change error. The permit is released before slow
 factory IO；close is idempotent and a leaked process lock is session-released.
 
-`updateNamespaceStorageClass` first runs `requireClusterReady` when the target is Nereus, acquires the same lock,
-reloads the expected policy version, and lists existing persistent topics plus non-`DELETED` binding records for the
+`updateNamespacePersistence` first runs `requireClusterReady` when the effective class changes to Nereus, acquires
+the same lock, reloads the expected policy version, and lists existing persistent topics plus non-`DELETED` binding records for the
 namespace. Any result rejects before policy mutation. Otherwise it CAS-writes the policy, reloads it, and repeats the
 topic/binding check before success. A split/stale lock owner can at most publish a no-storage `CLAIMED` record：its
 mandatory post-claim policy validation aborts that record before factory open, and the updater waits/retries the
@@ -1304,13 +1312,20 @@ as hints。A per-topic monotonic coordinator applies only the newest sequence on
 success/failure follow the newest result，and includes accepted policy side effects in that result。Validation precedes
 config/hierarchy mutation；a current rejection marks local admission failed and asynchronously closes the topic。
 Focused stale-ordering and unsafe-snapshot tests，all fork Nereus storage tests，BookKeeper persistence-policy/delete-
-namespace regressions and affected main/test checkstyle pass。The binding-aware unloaded policy-update guard remains
-pending。Local commit `b2a591bd61` replaces config-only capability publication with the initialized-runtime
+namespace regressions and affected main/test checkstyle pass。Local commit `b2a591bd61` replaces config-only
+capability publication with the initialized-runtime
 `NereusBrokerCapabilityCoordinator`：the concrete extensible registry attaches once before advertisement，configured
 reserved-key spoofing fails startup，and `requireClusterReady` validates two stable snapshots containing exact protocol
 version `1` on every persistent broker。Empty/error/changing/missing-version sets fail closed under the metadata
 deadline；the first create-if-missing Nereus binding path runs this gate before binding IO。All fork Nereus storage
-tests and the stock broker-registry test pass。These commits are local because the active GitHub
+tests and the stock broker-registry test pass。Local commit `b94d5e7c48` adds the namespace-scoped resource-lock guard
+to both BookKeeper and Nereus create-if-missing paths，authoritative namespace policy version reads/full-policy CAS，
+bounded namespace-prefixed non-deleted binding scans and binding-aware loaded/unloaded topic persistence mutation。
+Policy/binding revalidation happens before factory IO or policy mutation；a newly invalid no-storage claim is moved to
+the terminal tombstone，lock-busy retry and the entire critical section share one absolute deadline，and BrokerService
+closes the owned lock manager。Focused lock/version/timeout/scan/corruption tests，all fork Nereus storage tests，the
+stock broker-registry test and stock namespace/topic persistence regressions pass。These commits are local because
+the active GitHub
 identity lacks write permission to `nereusstream/pulsar`；the design baseline remains the published parent
 `100d3ef0ff` until that repository commit is pushed。
 

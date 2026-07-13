@@ -533,7 +533,7 @@ Hybrid selection is explicit and restart-safe.
 The stock BookKeeper path remains backward compatible.
 ```
 
-Implementation evidence（2026-07-12，object-provider sub-stage）：
+Implementation evidence（through 2026-07-13）：
 
 - `ObjectStoreConfiguration`/provider/secret protocols now have a deployable `S3CompatibleObjectStoreProvider` built
   on pinned AWS SDK v2 `2.47.5` with the Java Netty async transport，plus ambient/no-op secret resolution and
@@ -551,7 +551,7 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。
-- the fork bootstrap starts at local `f21661999d`；through `b2a591bd61` it now has typed config/runtime assembly，
+- the fork bootstrap starts at local `f21661999d`；through `b94d5e7c48` it now has typed config/runtime assembly，
   stable ordered `[bookkeeper,nereus]` classes，deterministic `NSB1` binding records，BookKeeper adoption，bound
   open/delete/recreate coordination，loaded/unloaded broker hooks，reserved capability publication and same-snapshot
   topic-open feature admission，plus pre-mutation remote-producer、publish-metadata、non-durable-subscribe、durable-
@@ -572,8 +572,14 @@ Implementation evidence（2026-07-12，object-provider sub-stage）：
   Nereus binding claim requires two stable snapshots in which every persistent broker advertises exact protocol `1`；
   missing/unknown/changing/empty broker sets fail closed before binding IO。All fork Nereus storage tests and the stock
   broker-registry regression pass。
-- binding-aware unloaded policy updates，namespace policy serialization，multi-broker binding races and broker E2E
-  restart wiring remain pending，so F2-M5 is still in progress。
+- namespace/topic persistence changes now use the namespace-scoped resource lock shared by both storage classes'
+  create-if-missing path。Namespace class transitions re-read an authoritative version，require bounded persistent-
+  topic/non-deleted-binding scans before and after a full-policy version-CAS，and fail closed on scan cap、decode、get
+  or deadline failure。Loaded and unloaded topic mutations validate the effective post-mutation class and live binding
+  before writing；same-effective-class updates remain allowed。All fork Nereus storage tests，lock/timeout/scan unit
+  gates，stock namespace/topic persistence regressions and touched checkstyle pass。
+- generation-safe broker write-fence handoff，multi-broker binding/lifecycle races and broker E2E restart/failover
+  wiring remain pending，so F2-M5 is still in progress。
 
 ## 7. F2-M6 — Final Acceptance
 

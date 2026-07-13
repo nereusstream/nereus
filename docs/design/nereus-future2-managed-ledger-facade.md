@@ -70,10 +70,14 @@ Future 2 不解决：
 
 这些能力在 Future 3、Future 5、Future 6、Future 8 中作为 projection 或上层状态处理。
 
-当前实现约束：`nereus-managed-ledger` 已实现 F2-M1 projection/Position/entry foundation，但还没有 factory/
-ledger facade；Phase 1 payload 是 one-record-per-entry opaque batch。Phase 1.5 已实现 generic target/result、
-exact recovery 和 lifecycle，并保持 Object WAL strict parity；P15-M6 已把 internal commit 的 cumulative
-logical size 交给 public result。F2 首版仍只接受
+当前实现约束：`nereus-managed-ledger` 已完成 F2-M1-M4 projection metadata、factory/ledger facade、
+append/read/recovery/lifecycle 和 read-only/non-durable cursor boundary。Product-side runtime 与 deployable
+S3-compatible provider 已实现；Pulsar fork 已实现 hybrid binding/open/delete、feature/operation admission、
+cluster capability convergence 和 namespace/topic storage-policy serialization。Generation-safe broker
+write-fence handoff、multi-broker restart/failover 和 broker E2E acceptance 仍属于 active F2-M5/M6 工作。
+Phase 1 payload 是 one-record-per-entry opaque batch。Phase 1.5 已实现 generic target/result、exact recovery
+和 lifecycle，并保持 Object WAL strict parity；P15-M6 已把 internal commit 的 cumulative logical size 交给
+public result。F2 首版仍只接受
 `OBJECT_WAL_SYNC_OBJECT`，并只从 generic result 的 logical range 构造 Position。Broker hybrid mode 中的
 `bookkeeper` 继续走 stock BookKeeper factory，不等于 Nereus BookKeeper profile 已实现。
 

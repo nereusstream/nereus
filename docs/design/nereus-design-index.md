@@ -1,7 +1,7 @@
 # Nereus Design Index
 
 > 状态：当前设计索引
-> 最近一次实现同步：2026-07-12
+> 最近一次实现同步：2026-07-13
 > 当前交付阶段：Phase 1.5 P15-M0-M6 + F2-M1-M4 complete；F2-M5 active
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
@@ -71,7 +71,7 @@ streamId + offset
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 complete） | projection metadata、factory、writable/get-only ledger、append/read/lifecycle/write-fence、admin/cache/stats and cursor boundary implemented/tested |
-| `nereus-pulsar-adapter` | `Implemented`（F2 product side） | typed runtime assembly and deployable async S3-compatible provider implemented/tested；fork-owned admission/capability completion remains F2-M5 work |
+| `nereus-pulsar-adapter` | `Implemented`（F2 product side） | typed runtime/S3 provider plus fork binding、admission、capability convergence and namespace/topic policy serialization implemented/tested；write-fence bridge and broker E2E remain F2-M5 work |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 

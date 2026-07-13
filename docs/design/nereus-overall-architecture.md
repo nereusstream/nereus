@@ -1,7 +1,7 @@
 # Nereus 总体架构设计
 
 > 状态：North-star design；Future 1 / Phase 1 + Phase 1.5 P15-M0-M6 + F2-M1-M4 complete，F2-M5 active
-> 最近实现同步：2026-07-12
+> 最近实现同步：2026-07-13
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
 ## 1. 摘要
@@ -35,7 +35,7 @@ Pulsar and Kafka protocol projections
 
 ### 2.1 已实现
 
-截至 2026-07-11：
+截至 2026-07-13：
 
 - protocol-neutral `nereus-api` values、validation、structured `AppendOutcome` errors、key/hash helpers；
 - `StorageProfile` / `DurabilityLevel` names and helpers；
@@ -54,8 +54,10 @@ Pulsar and Kafka protocol projections
 
 Future 1 / Phase 1 M0-M8 和 Phase 1.5 P15-M0-M6 已完成。F2-M0/M0R/M0R2 设计/API review 锁定的共享
 L0 前置已经实现并通过普通与 Docker-backed final gates，包括 M0R2 新发现的窄 P15-M6
-cumulative-result handoff。F2-M1 projection foundation 也已实现；当前下一里程碑是 F2-M2 projection
-metadata。
+cumulative-result handoff。F2-M1-M4 已完成；F2-M5 已实现 product-side runtime/S3 provider，以及 Pulsar
+fork 的 hybrid storage、durable binding、feature/operation admission、cluster capability convergence 和
+namespace/topic storage-policy serialization。当前下一里程碑是 generation-safe broker write-fence handoff，
+随后完成 multi-broker restart/failover 与 broker E2E gates。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -64,8 +66,8 @@ alias。
 
 - BookKeeper primary WAL execution；
 - `WAL_DURABLE` fast boundary 和 async materialization workers；
-- ManagedLedger facade（F2 code-level design complete，production marker-only）、durable cursor、KoP、routing、
-  compaction、lakehouse、advanced Pulsar semantics。
+- durable cursor/ack authority、KoP、routing、compaction、lakehouse、advanced Pulsar semantics；
+- F2 尚未完成的 broker write-fence handoff、multi-broker restart/failover 和 final E2E acceptance。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
 
@@ -202,7 +204,7 @@ flowchart TB
         Cache["Discardable caches"]
     end
     subgraph Adapters["Compatibility projections"]
-        MLF["ManagedLedger facade (F2 in progress; not implemented)"]
+        MLF["ManagedLedger facade (F2-M1-M4 implemented; M5 active)"]
         KAF["Kafka projection (Designed)"]
     end
     subgraph L0["Core Stream Storage"]
@@ -258,14 +260,14 @@ flowchart TB
 
 ## 8. Repository module boundary
 
-| Module | Target responsibility | Current status (2026-07-11) |
+| Module | Target responsibility | Current status (2026-07-13) |
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented |
 | `nereus-core` | coordinators and state machines | primary-WAL adapters、split commit/materialize、exact recovery、seal/delete implemented |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay and Docker gates implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
-| `nereus-managed-ledger` | ManagedLedger facade | F2 in progress；M0/M0R design complete，production marker only |
-| `nereus-pulsar-adapter` | broker integration/config/policy | marker only |
+| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 implemented/tested；projection、ledger/factory、append/read/lifecycle and cursor boundary complete |
+| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider implemented；fork binding/admission/capability/policy guards implemented，M5 acceptance active |
 | `nereus-kop-adapter` | Kafka projection | marker only |
 
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、
