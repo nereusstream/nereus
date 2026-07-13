@@ -48,8 +48,12 @@ handoff is now implemented。The facade keeps the fence visible through `addFail
 only after that callback returns；the fork captures it before producer disconnect，coalesces by generation，retains an
 early terminal until pending writes drain，fresh-checks a newer generation and fails closed on permanent recovery or
 executor rejection。The shared binding coordinator now also gates conflicting first-create races and peer-broker
-`CLAIMED/ACTIVE/DELETING/DELETED` restart/resume through a real CAS MetadataStore。Real multi-broker broker-ownership
-restart/failover and broker E2E gates remain pending。Therefore F2-M5 is not yet complete。
+`CLAIMED/ACTIVE/DELETING/DELETED` restart/resume through a real CAS MetadataStore。F2-M5 is complete：a real
+two-broker `PulsarService` gate uses real Oxia、pinned LocalStack Community S3 `4.14.0` and a real one-bookie
+BookKeeper control path，then verifies not-yet-created topic policy、single/batched exact bytes and `MessageIdAdv`
+coordinates、unload/reload、owner shutdown/takeover、original-owner process restart/reverse takeover、binding
+generation/class、concrete ledger types and positive S3 object presence。F2-M6 final acceptance is active and still
+must compose the remaining response-loss、repair、trim、terminate/delete/recreate and failure-injection scenarios。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
@@ -63,16 +67,18 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 | F2-M0R2 Nereus design baseline | `nereusstream/nereus@fb98174c99a7379deb684d6f8d5f1fa74517c5f5`（P15-M5） |
 | Pulsar fork | `nereusstream/pulsar` |
 | Pulsar API/source-review baseline | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
-| Current local implementation commit | `f8b411db2e`（based on locked baseline；remote publication awaits repository permission） |
-| Pulsar version at that commit | `5.0.0-M1-SNAPSHOT` |
+| Current product implementation commit | `f4213f2`（published on Nereus `main`） |
+| Current local Pulsar implementation commit | `277212f87c`（based on locked baseline；remote publication awaits repository permission） |
+| Pulsar source-project version at that commit | `5.0.0-M1-SNAPSHOT`（source composite selector，not a published Maven snapshot） |
 | Java/build baseline | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode |
 | Executable Nereus profile | `OBJECT_WAL_SYNC_OBJECT` only |
 | Completed F2 prerequisite | P15-M6 carries protocol-neutral `AppendResult.cumulativeSize` from existing `CommittedAppend` truth；final-gated 2026-07-12 |
 
 The original F2-M0 probe predated Phase 1.5. F2-M0R2 therefore replaces that Nereus input with the final-gated P15
-commit above. The authoritative Pulsar source checkout is
+commit above. The API/source review used
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar` at the exact clean target commit；the compile probe and every
-recorded interface/call-site blob were revalidated there on 2026-07-12. Exact evidence is in
+recorded interface/call-site blob were revalidated there on 2026-07-12。The same implementation checkout now carries
+the reviewed local fork commits through `277212f87c`。Exact baseline evidence is in
 `01-pulsar-api-spike-and-repository-boundary.md`。
 
 An upgrade to another Pulsar commit invalidates the lock. The API probe and broker integration call-site
@@ -145,6 +151,17 @@ audit must pass again before implementation continues.
     responses and timeout/cancellation have closed behavior，and production rejects local/file providers。
 24. A successful append must advance both local tail and exact lifetime logical size without a fallible second read。
     Internal `CommittedAppend` already has that value；P15-M6 carries it in generic `AppendResult` before F2-M1。
+25. `ManagedLedgerFactory.getManagedLedgerPropertiesAsync` returns an empty map for a genuinely missing ledger so
+    broker pre-create probing matches stock behavior；`DELETING/DELETED` and corrupt published state still fail
+    closed rather than masquerading as missing。
+26. An explicit `PositionFactory.EARLIEST` always starts at the retained trim offset。`InitialPosition.Latest` applies
+    only when the caller supplied no start Position；it cannot override an explicit Reader start coordinate。
+27. The target `ServerCnx` supplies an empty non-null `KeySharedMeta` even for ordinary subscriptions。F2 accepts
+    that empty carrier for admitted Exclusive/Failover readers but rejects any actual hash range and every
+    unsupported subscription type。
+28. In hybrid mode only，topic persistence GET/SET/DELETE may validate namespace/bundle ownership and operate before
+    the topic exists，without creating it。BookKeeper-only mode retains the stock NotFound behavior。Hybrid startup
+    also requires persistent topics and `ExtensibleLoadManagerImpl` before any Nereus client is constructed。
 
 ## 3. Phase 1.5 Production Prerequisite
 
@@ -242,7 +259,7 @@ was repeated after the M1 implementation and remained green。
 | F2-M2 projection metadata | Complete | Model/keyspace/codec、fake/real CAS/repair、shared runtime and Docker restart/race gates |
 | F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
 | F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
-| F2-M5 broker integration | In progress | Hybrid bootstrap、binding/open/delete、operation admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge and shared-store peer lifecycle gated；real multi-broker broker restart/failover and broker E2E remain |
-| F2-M6 final acceptance | Not started | Real Pulsar + Oxia + Object WAL end-to-end gate |
+| F2-M5 broker integration | Complete | Hybrid bootstrap/binding/admission/capability/policy/write-fence/peer lifecycle plus real dual-broker Oxia/LocalStack/BookKeeper restart/failover E2E pass |
+| F2-M6 final acceptance | In progress | `phase2Check` and Docker-backed `phase2FinalCheck --rerun-tasks` exist and pass；remaining response-loss/repair/trim/lifecycle/failure-injection scenario composition remains |
 
 Future 2 is not complete until F2-M1 through F2-M6 are implemented and their gates pass.

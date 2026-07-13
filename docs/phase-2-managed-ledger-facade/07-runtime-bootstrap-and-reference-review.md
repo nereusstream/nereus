@@ -1,8 +1,9 @@
 # Runtime Bootstrap, Broker Admission and Reference Review
 
 本文补齐 F2 从 facade 类到真实 broker runtime 之间的构造、配置、feature admission 和资源所有权。
-真实目标接口与 broker call path 的唯一权威是用户提供的 clean checkout
-`/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`。本文也保留
+真实目标接口与 broker call path 的 review baseline 是用户提供的 clean checkout
+`/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`；同一 checkout
+现已在本地实现分支推进到 `277212f87c`。本文也保留
 对 `/Users/liusinan/apps/ideaproject/GITHUB/pulsar-storage` 原型的源码评审结论；该原型只用于提供扩展点
 探索证据，不是 Nereus durability/position/cursor 合同的来源。没有使用在线源码。
 
@@ -56,6 +57,11 @@ Target-source re-review adds four implementation-critical facts，all locked in 
    `PersistentSubscription.acknowledgeMessageAsync`；F2 capability validation must run before those mutations；
 4. target `PersistencePolicies.equals` compares storage-class strings by reference identity；the fork must replace
    that comparison with `Objects.equals` and lock the behavior with equal-content/different-instance tests。
+
+The later real-broker gate additionally locked four runtime facts：missing-ledger property probing must be empty and
+write-free；explicit Reader `EARLIEST` must beat an overload default of Latest；`ServerCnx` supplies an empty non-null
+`KeySharedMeta` to ordinary subscriptions；and a topic-level persistence policy needs a hybrid-only pre-create admin
+path while stock BookKeeper-only missing-topic behavior remains NotFound。
 
 ## 2. Fork-owned Hybrid Provider
 
@@ -534,6 +540,11 @@ Validation before client construction:
   provider/client creation；
 - local filesystem/test providers are rejected outside the integration-test profile。
 
+The fork mapper now enforces the first two bullets directly：`enablePersistentTopics=false` fails startup，and the
+configured `loadManagerClassName` must load through the thread context classloader and be assignable to
+`ExtensibleLoadManagerImpl`。This check runs before runtime/ObjectStore construction；capability publication does not
+serve as a late substitute for an invalid startup mode。
+
 Dynamic updates to these fields are not supported in F2. Ordinary topic policies can select the storage class, but
 changing connectivity, identity or durability configuration requires broker restart.
 
@@ -1004,6 +1015,13 @@ protocol above；otherwise operators use per-topic selection for not-yet-created
 idempotent. Topic deletion must reach the selected storage's terminal delete before a newly created lifetime can
 choose another class. These restrictions are an F2 product boundary, not a claim of BookKeeper/Nereus data migration.
 
+The v2 persistence-policy GET/SET/DELETE endpoints use a persistence-specific prevalidation path。When hybrid
+storage-class bindings are active and the topic is genuinely absent，it still validates global namespace and target
+bundle ownership, then reads/mutates the topic-policy record without creating the business topic。Every other topic
+policy keeps the ordinary existence check，and a stock BookKeeper-only broker preserves NotFound for all three
+persistence operations。The Nereus factory's pre-create property probe returns an empty map only for durable state
+`MISSING`；`DELETING/DELETED` or projection corruption remains an error。
+
 The fork-owned enum is closed for F2; broker call sites do not pass free-form strings:
 
 ```java
@@ -1349,8 +1367,16 @@ same class/generation completed by another broker，while `CLAIMED` still requir
 activation CAS loser rereads with the shared deadline/retry cap。A real in-memory CAS MetadataStore test races 50
 conflicting first creates and drives one Nereus lifetime across three store instances through activation，delete
 resume，terminal completion and a BookKeeper generation-2 claim。All fork Nereus storage tests、the stock broker-
-registry regression and affected checkstyle pass。This is coordinator-level multi-broker evidence；real broker
-ownership transfer/restart/failover remains an F2-M5/M6 E2E gate。
+registry regression and affected checkstyle pass。Published product commit `f4213f2` aligns the facade with the
+broker's pre-create and Reader paths：missing properties are empty，while an explicit `EARLIEST` beats a default
+`InitialPosition.Latest`。Local fork commit `277212f87c` then completes F2-M5：startup requires persistent topics and
+the extensible load manager；hybrid persistence-policy validation admits a not-yet-created topic without creating it
+while stock mode retains NotFound；an empty `ServerCnx` `KeySharedMeta` carrier is accepted but real hash ranges remain
+rejected。Its real two-broker gate runs against real Oxia、pinned LocalStack Community S3 `4.14.0` and a real
+BookKeeper，then proves exact single/batched bytes and coordinates across unload、owner failover、process restart and
+reverse takeover，plus binding/class/ledger-type truth and real S3 objects。All fork Nereus storage tests、focused
+stock persistence regressions and affected main/test checkstyle pass。The Pulsar commits remain local because the
+active GitHub identity lacks repository write permission；F2-M6 still owns the broader final scenario composition。
 
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
@@ -1360,7 +1386,7 @@ or protocol-0 rejoin is forbidden while Nereus policy/binding state exists.
 
 ## 8. Broker Integration Tests
 
-In addition to `05`, F2-M5 requires:
+In addition to `05`, the F2-M5 gates include and now pass:
 
 1. reflection construction through `ManagedLedgerStorage.create(...)` and the thread context classloader；
 2. exact `[bookkeeper,nereus]` order, null/default lookup and unknown-name behavior；
@@ -1416,7 +1442,16 @@ In addition to `05`, F2-M5 requires:
     recovery/executor rejection closes/unloads；
 26. `PersistencePolicies.equals/hashCode` treats equal-content distinct storage-class Strings as equal；
 27. bootstrap completes before `brokerId` exists and two process starts produce distinct 128-bit-or-more process IDs
-    and exact `pulsar-f2/{processRunId}` writer IDs。
+    and exact `pulsar-f2/{processRunId}` writer IDs；
+28. startup rejects disabled persistent topics and any load-manager class outside `ExtensibleLoadManagerImpl` before
+    creating Nereus clients；
+29. hybrid persistence GET/SET/DELETE works for a not-yet-created topic without creating it，while the stock provider
+    returns NotFound for the same three calls；
+30. an empty non-null `KeySharedMeta` passed by `ServerCnx` is equivalent to no key-shared request，while a populated
+    hash-range list remains rejected；
+31. explicit Reader `EARLIEST` starts at the trim offset even when the overload's default initial position is Latest；
+32. two real brokers transfer ownership in both directions across process restart while exact single/batched
+    `MessageIdAdv` coordinates、BookKeeper coexistence and positive S3 object presence remain stable。
 
 ## 9. Release Claim Boundary
 

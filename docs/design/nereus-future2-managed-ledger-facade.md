@@ -1,6 +1,6 @@
 # Nereus Future 2：ManagedLedger Facade
 
-> 状态：In progress；F2-M0/M0R/M0R2、P15-M6 and F2-M1-M4 complete；F2-M5 broker integration active
+> 状态：In progress；F2-M0/M0R/M0R2、P15-M6 and F2-M1-M5 complete；F2-M6 final acceptance active
 > 前置：Future 1 append/read/trim contract + Phase 1.5 recovery/lifecycle + P15-M6 complete logical result handoff
 > Active code-level contract：`../phase-2-managed-ledger-facade/README.md`
 
@@ -74,8 +74,10 @@ Future 2 不解决：
 append/read/recovery/lifecycle 和 read-only/non-durable cursor boundary。Product-side runtime 与 deployable
 S3-compatible provider 已实现；Pulsar fork 已实现 hybrid binding/open/delete、feature/operation admission、
 cluster capability convergence、namespace/topic storage-policy serialization 和 generation-safe broker
-write-fence handoff；shared-store conflicting first-create/peer lifecycle resume 已通过真实 CAS gate。Real broker
-ownership restart/failover 和 broker E2E acceptance 仍属于 active F2-M5/M6 工作。
+write-fence handoff；shared-store conflicting first-create/peer lifecycle resume 已通过真实 CAS gate。F2-M5 的
+real dual-broker gate 已通过 real Oxia、pinned LocalStack Community S3 `4.14.0` 和 stock BookKeeper 验证
+ownership failover、process restart、unload/reload、exact bytes/Position 与 hybrid coexistence。Response-loss、
+repair、trim、terminate/delete/recreate 和 failure-injection 的 final composition 仍属于 active F2-M6。
 Phase 1 payload 是 one-record-per-entry opaque batch。Phase 1.5 已实现 generic target/result、exact recovery
 和 lifecycle，并保持 Object WAL strict parity；P15-M6 已把 internal commit 的 cumulative logical size 交给
 public result。F2 首版仍只接受
@@ -455,7 +457,8 @@ Migration from existing BookKeeper topics is a separate future. Future 2 only en
 
 F2-M0 API spike and F2-M0R/M0R2 code-level reviews are complete. The review locked:
 
-- `nereusstream/pulsar@100d3ef0...` / `5.0.0-M1-SNAPSHOT` and exact interface blobs；
+- `nereusstream/pulsar@100d3ef0...` / source-project selector `5.0.0-M1-SNAPSHOT`（not a published Maven
+  snapshot）and exact interface blobs；
 - fork-owned hybrid `ManagedLedgerStorage` with stock BookKeeper as default；
 - Nereus-owned factory/ledger/projection metadata implementation boundary；
 - one incarnation/one stream/one virtual ledger and `entryId == stream offset` mapping v1；

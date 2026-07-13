@@ -6,7 +6,8 @@ fork commit; interface names remembered from another release are not accepted ev
 ## 1. Locked Pulsar Surface
 
 Target: `nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`,
-`version=5.0.0-M1-SNAPSHOT`.
+`version=5.0.0-M1-SNAPSHOT`。This is the fork source project's Gradle version and a composite-build selector，not a
+published Maven snapshot coordinate。
 
 | File | Locked Git blob |
 | --- | --- |

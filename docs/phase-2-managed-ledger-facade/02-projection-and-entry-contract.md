@@ -156,6 +156,8 @@ Validation:
 - readable entries require the matching ledger ID and
   `trimOffset <= entryId < committedEndOffset`；
 - next-read positions additionally allow `entryId == committedEndOffset`；
+- for non-durable cursor creation，an explicit `EARLIEST`/`LATEST` is normalized before the overload default；
+  `InitialPosition.Earliest/Latest` selects trim/tail only when no Position was supplied；
 - mark-delete positions allow exactly `trimOffset - 1` through `committedEndOffset - 1`；
 - inclusive max-position input accepts null/`EARLIEST`/`LATEST` or a same-ledger entry ID `>= -1`; it normalizes
   trimmed values to before-first and future values to current LAC rather than issuing object IO；

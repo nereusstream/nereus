@@ -1,6 +1,8 @@
 [versions]
-# Keep Java aligned with the current Apache Pulsar Gradle build baseline.
+# Keep Java aligned with the current Pulsar source-build baseline.
 java = "21"
+# Source-composite selector only. This version is declared by the locked fork checkout but is not resolved from a
+# Maven snapshot repository; settings.gradle.kts fails source-bound tasks when the checkout is absent.
 pulsar = "5.0.0-M1-SNAPSHOT"
 oxia = "0.9.0"
 slf4j = "2.0.18"
@@ -24,8 +26,8 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
 assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 
-# The locked fork is consumed through the optional Gradle composite configured in settings.gradle.kts.
-# Release builds must replace the snapshot with an organization-owned published artifact.
+# The locked fork is consumed only through the Gradle source composite configured in settings.gradle.kts.
+# Release publication must replace these source-build coordinates with organization-owned published artifacts.
 pulsar-broker = { module = "org.apache.pulsar:pulsar-broker", version.ref = "pulsar" }
 pulsar-managed-ledger = { module = "org.apache.pulsar:managed-ledger", version.ref = "pulsar" }
 pulsar-common = { module = "org.apache.pulsar:pulsar-common", version.ref = "pulsar" }

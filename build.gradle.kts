@@ -18,7 +18,22 @@ plugins {
 }
 
 group = providers.gradleProperty("nereusGroup").get()
-version = providers.gradleProperty("nereusVersion").getOrElse("0.1.0-SNAPSHOT")
+val phase2DevelopmentVersion = "0.1.0-f2-dev"
+val phase2GateRequested = gradle.startParameter.taskNames.any { requested ->
+    requested.substringAfterLast(':').startsWith("phase2")
+        || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
+}
+version = gradle.startParameter.projectProperties["nereusVersion"]
+    ?: if (phase2GateRequested) {
+        phase2DevelopmentVersion
+    } else {
+        providers.gradleProperty("nereusVersion").getOrElse("0.1.0-SNAPSHOT")
+    }
+if (phase2GateRequested) {
+    check(version.toString() == phase2DevelopmentVersion) {
+        "Phase 2 development gates require version $phase2DevelopmentVersion, got $version"
+    }
+}
 
 val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::toInt).getOrElse(21)
 
@@ -149,12 +164,19 @@ tasks.register("phase15FinalCheck") {
 val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
+val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
+    .orElse("277212f87c942a3fb694fd25b1c056630260b3fe")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
     description = "Verify the exact clean Pulsar fork checkout used by Phase 2."
     workingDir = layout.projectDirectory.asFile
-    commandLine("bash", "scripts/check-pulsar-source-lock.sh", pulsarCheckoutPath.get())
+    commandLine(
+        "bash",
+        "scripts/check-pulsar-source-lock.sh",
+        pulsarCheckoutPath.get(),
+        pulsarExpectedHead.get(),
+    )
 }
 
 tasks.register("phase2M1Check") {
@@ -179,4 +201,81 @@ tasks.register("phase2M2FinalCheck") {
     description = "Run the ordinary and Docker-backed real Oxia F2-M2 projection metadata gates."
     dependsOn("phase2M2Check")
     dependsOn(":nereus-metadata-oxia:oxiaIntegrationTest")
+}
+
+val phase2PublishedModules = listOf(
+    ":nereus-api",
+    ":nereus-core",
+    ":nereus-metadata-oxia",
+    ":nereus-object-store",
+    ":nereus-managed-ledger",
+    ":nereus-pulsar-adapter",
+)
+
+tasks.register("publishPhase2DevelopmentArtifacts") {
+    group = "verification"
+    description = "Publish the exact Nereus F2 development coordinate for the Pulsar fork gate."
+    dependsOn(phase2PublishedModules.map { "$it:publishAllPublicationsToDevelopmentRepository" })
+}
+
+val phase2DevelopmentRepository = layout.buildDirectory.dir("development-repository")
+val pulsarGradleWrapper = file(pulsarCheckoutPath.get()).resolve("gradlew").absolutePath
+
+tasks.register<Exec>("phase2PulsarCheck") {
+    group = "verification"
+    description = "Run ordinary Pulsar fork Nereus tests, stock persistence regressions, and checkstyle."
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.*",
+        "--tests", "org.apache.pulsar.broker.admin.TopicPoliciesTest.testPersistencePolicyRejectsMissingTopic",
+        "--tests", "org.apache.pulsar.broker.admin.TopicPoliciesTest.testGetPersistenceApplied",
+        "--tests", "org.apache.pulsar.broker.admin.TopicPoliciesTest.testSetPersistence",
+        "--tests", "org.apache.pulsar.broker.admin.TopicPoliciesTest.testRemovePersistence",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase2Check") {
+    group = "verification"
+    description = "Run every ordinary Nereus F2 product and Pulsar fork gate."
+    dependsOn("phase2M2Check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+    dependsOn("phase2PulsarCheck")
+}
+
+tasks.register<Exec>("phase2PulsarFinalCheck") {
+    group = "verification"
+    description = "Run the real two-broker Oxia/LocalStack/BookKeeper Nereus recovery gate."
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase2PulsarCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusMultiBrokerIntegrationTest",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase2FinalCheck") {
+    group = "verification"
+    description = "Run every ordinary and Docker-backed Nereus F2 release gate."
+    dependsOn("phase2Check")
+    dependsOn("phase15FinalCheck")
+    dependsOn("phase2M2FinalCheck")
+    dependsOn(":nereus-object-store:s3IntegrationTest")
+    dependsOn("phase2PulsarFinalCheck")
 }

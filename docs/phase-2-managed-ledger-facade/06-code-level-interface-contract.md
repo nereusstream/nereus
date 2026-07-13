@@ -140,8 +140,8 @@ The Phase 1 public `StreamStorage` surface cannot fulfill the F2 append and life
 `../phase-1.5-core-storage-foundation/` is the implementation authority for the protocol-neutral additions below；
 P15-M6 has passed for recovery/lifecycle and the exact cumulative result，and F2-M1 now implements the projection、
 Position、entry codec and request foundation；
-The F2-M3 writable/get-only ledger、factory/stats and F2-M4 cursor implementation now consume this contract；broker
-storage-class wiring remains the F2-M5 boundary。This section remains the F2 consumer
+The F2-M3 writable/get-only ledger、factory/stats、F2-M4 cursor and F2-M5 broker integration now consume this
+contract；F2-M6 composes their final acceptance。This section remains the F2 consumer
 contract and cannot be implemented independently in the facade。
 
 ### 3.0 Complete logical append snapshot
@@ -629,7 +629,7 @@ All 26 declared members are covered below.
 | `I` | `getEntryCacheManager()` | Return the F2 zero-capacity manager described in section 11. |
 | `I` | `updateCacheEvictionTimeThreshold(long)`; `getCacheEvictionTimeThreshold()` | Validate/store the compatibility setting; it does not create a BookKeeper cache. |
 | `I` | both cache TTL extension update defaults | Override and forward to the zero-capacity manager so target drift is visible in tests. |
-| `I` | `getManagedLedgerPropertiesAsync(String)` | Read a defensive property snapshot only for the current `ACTIVE/SEALED` projection; never create and treat `DELETING/DELETED` as not found. |
+| `I` | `getManagedLedgerPropertiesAsync(String)` | Return an empty map for genuinely `MISSING` state so broker pre-create probing remains write-free；return a defensive property snapshot for `ACTIVE/SEALED`；treat `DELETING/DELETED` as not found and projection/L0 mismatch as corruption. |
 | `I` | `getManagedLedgers()` | Return an immutable snapshot containing only live writable facades. |
 | `I` | `getCacheStats()` | Return Nereus counters; BookKeeper hit/miss/eviction counters remain zero. |
 | `I` | `estimateUnloadedTopicBacklog(...)` | Blocking admin-only get bounded by metadata timeout. Ignore the BookKeeper-shaped `ctx`; set one virtual-ledger detail only when `accurate=true`; no durable cursor detail in F2; deleted is not found. |
@@ -701,7 +701,7 @@ All 87 declared members, including defaults that could be semantically unsafe, a
 | `I` | all four synchronous `addEntry(byte[]...)` overloads | Validate slice/count, copy exact bytes, call the same async core and wait for its single terminal callback. Like locked stock code, the wrapper adds no second timeout race；the admitted async operation already owns append/recovery deadlines. Interruption is restored and propagated. |
 | `I` | all five `asyncAddEntry(...)` overloads | Funnel into `asyncAddEntry(ByteBuf,int,...)`; one Pulsar Entry consumes one L0 offset. |
 | `I` | three `openCursor(...)` overloads; three `asyncOpenCursor(...)` overloads | Create/join an F2 durable-boundary cursor. Its initial state is local; durable progress mutation is unsupported. |
-| `I` | three `newNonDurableCursor(...)` overloads | Create/join a broker-local cursor; reject `isReadCompacted=true`. |
+| `I` | three `newNonDurableCursor(...)` overloads | Create/join a broker-local cursor; reject `isReadCompacted=true`。A supplied `EARLIEST` maps to `trimOffset` and a supplied `LATEST` maps to `committedEndOffset`；`InitialPosition` is consulted only when the Position argument is null, so Latest never overrides explicit EARLIEST. |
 | `L` | `deleteCursor(String)`; `asyncDeleteCursor(...)` | Close/remove the local cursor. Missing name is `CursorNotFoundException`; no durable cursor record is claimed. |
 | `I` | `removeWaitingCursor(ManagedCursor)` | Remove only that cursor's registered waiter; identity mismatch is ignored after validation. |
 | `I` | `getCursors()`; `getActiveCursors()` | Immutable snapshots; active variant filters the cursor-local active flag. |
@@ -1146,8 +1146,8 @@ documented neutral result (`N`) or a stable runtime unsupported exception (`U`);
 
 ## 15. Contract Gates
 
-The facade contract cannot pass F2-M5 until tests prove the list below；`05` assigns each unit、contract or broker
-integration case to its owning milestone：
+The facade contract passed F2-M5 only after tests proved the list below；`05` assigns each unit、contract or broker
+integration case to its owning milestone and F2-M6 composition：
 
 1. the winning open acquires one binding permit; generation mismatch fails before L0 IO and publish-time permit
    invalidation leaves no topic projection；

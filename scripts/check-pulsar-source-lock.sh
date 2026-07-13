@@ -2,8 +2,13 @@
 
 set -euo pipefail
 
-EXPECTED_HEAD="100d3ef0ff7c7da36d497453b141ddff6f34a9d3"
-PULSAR_CHECKOUT="${1:?usage: check-pulsar-source-lock.sh PULSAR_CHECKOUT}"
+PULSAR_CHECKOUT="${1:?usage: check-pulsar-source-lock.sh PULSAR_CHECKOUT EXPECTED_HEAD}"
+EXPECTED_HEAD="${2:?usage: check-pulsar-source-lock.sh PULSAR_CHECKOUT EXPECTED_HEAD}"
+
+if [[ ! "${EXPECTED_HEAD}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Expected Pulsar HEAD must be one full lowercase commit hash: ${EXPECTED_HEAD}" >&2
+  exit 1
+fi
 
 if [[ ! -f "${PULSAR_CHECKOUT}/settings.gradle.kts" ]]; then
   echo "Pulsar checkout is missing or not the locked Gradle source tree: ${PULSAR_CHECKOUT}" >&2

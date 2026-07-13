@@ -1,7 +1,7 @@
 # Future 2 Implementation Plan and Gates
 
-F2-M0/M0R/M0R2 design、the complete Phase 1.5 P15-M6 final gate、F2-M1 and F2-M2 have passed。P15-M6 carries
-`AppendResult.cumulativeSize` from existing committed truth。F2-M3 is the next implementation milestone.
+F2-M0/M0R/M0R2 design、the complete Phase 1.5 P15-M6 final gate and F2-M1-M5 have passed。P15-M6 carries
+`AppendResult.cumulativeSize` from existing committed truth。F2-M6 final acceptance is the active milestone.
 A milestone is complete only when its code, focused tests and listed gate exist; documentation alone is not
 implementation evidence.
 
@@ -12,24 +12,27 @@ F2-M1 build evidence:
 1. keep the completed P15-M6 `phase15FinalCheck` and protocol-neutral F2 prerequisite fixtures from
    `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md` green；
 2. the managed-ledger compile dependency resolves from the locked Pulsar composite build；
-3. `checkPulsarSourceLock` verifies the side-by-side checkout is clean and exactly `100d3ef0...`；
+3. the F2-M1 baseline probe verified clean `100d3ef0...`；the active Phase 2 gate now locks the implemented local fork
+   at `277212f87c942a3fb694fd25b1c056630260b3fe`；
 4. choose an organization-owned published artifact/version for release builds before publishing any
    Nereus facade artifact;
 5. keep `pulsar-broker` off the Nereus L0 modules' compile/runtime classpaths;
-6. run the API compile probe in CI against the exact clean checkout
-   `/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`；
+6. run the ordinary product build/API compile path in CI against an explicit clean source checkout at
+   `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` until the local fork commits are publishable；
 7. lock and diff the additional read-only/Entry/Position/callback/exception/config/scan/admin/cache/MXBean blobs in
    document 01 and keep their method classifications in document 06;
 8. generate a `javap -public` inventory and fail if a locked method has no `I/L/N/U/D` assignment.
 9. verify the broker-private call-site blobs in document 01 and require a source/admission-order re-review on drift.
 
-A floating `master`, unverified `mavenLocal()` or an Apache snapshot that does not contain the locked
-fork commit is not an acceptable dependency lock.
+A floating `master`、unverified `mavenLocal()` or attempting to download the source project's
+`5.0.0-M1-SNAPSHOT` identifier from Maven is not an acceptable dependency lock；that identifier is not a published
+artifact。
 
 The implemented composite lookup order is `-PpulsarCheckout=...`，then `NEREUS_PULSAR_CHECKOUT`，then the
 development convention `../../nereusstream/pulsar` when present。`checkPulsarSourceLock` fails unless the selected
-checkout is clean and exactly at the locked commit；without a composite, dependency resolution intentionally requires
-the future organization-owned published artifact rather than silently compiling against another Pulsar version。
+checkout is clean and exactly at the configured full commit（default `277212f87c...`）。Source-bound tasks fail during
+settings evaluation when no composite checkout exists；they never fall through to the nonexistent Maven snapshot。
+GitHub Actions checks out the exact `100d3ef0...` API baseline under `.ci/pulsar` for the ordinary product build。
 
 Expected dependency direction:
 
@@ -305,7 +308,8 @@ Implementation evidence（2026-07-12，writable-facade sub-stage）：
 - `NereusManagedLedgerRuntime` validates process/writer identity、owns distinct dependencies、bounds callback
   admission and closes all resources in dependency-reverse order while aggregating failures；
 - the exact `ObjectStoreProvider`/configuration/secret-resolver bootstrap protocols are present so the runtime public
-  constructor is code-complete；the deployable S3 implementation and provider wiring remain assigned to F2-M5；
+  constructor is code-complete；at this sub-stage the deployable S3 implementation and provider wiring remained
+  assigned to F2-M5 and were later completed there；
 - `NereusManagedLedgerFactory` now implements exact-name single-flight open、bounded handles、inspection、delete、
   properties/info、shutdown、non-null zero-capacity cache and stock zero-value factory MXBean；every currently
   unsupported read-only factory method fails through the locked callback/exception channel rather than inheriting an
@@ -395,7 +399,7 @@ Implementation evidence（2026-07-12，read-only sub-stage）：
   without callback，close fails once and sealed tail fails instead of waiting forever。
 - real Object WAL coverage now includes durable read with rejected durable mark-delete、local non-durable mark-delete、
   read-only cursor ownership and append-wakes-tail-read；a focused two-waiter test proves one shared metadata poll。
-- F2-M4 is complete；F2-M5 broker integration is next。
+- F2-M4 is complete；F2-M5 subsequently completed，and F2-M6 final acceptance is now active。
 
 ## 6. F2-M5 — Pulsar Fork Integration
 
@@ -589,12 +593,23 @@ Implementation evidence（through 2026-07-13）：
   creates and proves one winner，then moves Nereus `ACTIVE -> DELETING -> DELETED` and a class-changing generation-2
   claim across three broker-store instances/restarts。Focused tests、all fork Nereus storage tests、the stock broker-
   registry regression and touched checkstyle pass。
-- real multi-broker broker-ownership restart/failover and broker E2E wiring remain pending，so F2-M5 is still in
-  progress。
+- product commit `f4213f2` makes missing managed-ledger property probing return an empty map without weakening
+  `DELETING/DELETED` fail-closed behavior，and makes an explicit `EARLIEST` cursor coordinate take precedence over
+  a default `InitialPosition.Latest`。The full managed-ledger module check passes。
+- fork commit `277212f87c` closes F2-M5 with `NereusMultiBrokerIntegrationTest`。It starts two real
+  `PulsarService` brokers against real Oxia、one real BookKeeper and pinned LocalStack Community S3 `4.14.0`；sets
+  Nereus persistence before topic creation without creating the topic；writes single and batched entries；checks
+  exact bytes and all `MessageIdAdv` coordinates；unloads/reloads；stops the current owner and takes over on its
+  peer；restarts the original owner、stops the peer and takes over in reverse；then checks binding generation/class、
+  concrete Nereus/BookKeeper ledger types and positive S3 object presence。The same commit requires persistent topics
+  plus `ExtensibleLoadManagerImpl` at startup，accepts only an empty `KeySharedMeta` carrier for admitted readers and
+  preserves stock NotFound for missing-topic persistence APIs outside hybrid mode。All fork Nereus storage tests、
+  focused stock persistence regressions and main/test checkstyle pass。F2-M5 is complete；the broader scenario
+  composition below remains F2-M6。
 
 ## 7. F2-M6 — Final Acceptance
 
-Ordinary Nereus gate:
+Implemented ordinary Nereus gate：
 
 ```bash
 ./gradlew phase2Check
@@ -610,7 +625,7 @@ Required composition:
 - M4 cursor boundary tests;
 - dependency guard.
 
-Final Docker/broker gate:
+Implemented final Docker/broker gate：
 
 ```bash
 ./gradlew phase2FinalCheck --rerun-tasks
@@ -653,6 +668,16 @@ Scenarios:
 
 F2 completion requires all scenarios. A green projection unit test or a broker that only starts is not
 evidence for the end-to-end milestone.
+
+Current F2-M6 evidence boundary（2026-07-13）：
+
+| Scenario(s) | State | Current evidence / remaining work |
+| --- | --- | --- |
+| 1, 2, 9 | Complete slice | `NereusMultiBrokerIntegrationTest` proves exact single/batch bytes and coordinates across unload、owner failover、process restart/reverse takeover with BookKeeper coexistence and real S3 objects |
+| 3-8, 10-18 | Component-gated | Facade、projection/Oxia、binding、write-fence、ack/admission and LocalStack suites cover their owning component contracts；they still need the explicit final composition/aggregation required by each scenario |
+| aggregate build tasks | Complete | `phase2Check` and `phase2FinalCheck --rerun-tasks` are executable；both passed on 2026-07-13 with an exact clean Pulsar source lock and fixed `0.1.0-f2-dev` product publication |
+
+Therefore F2-M6 and Future 2 remain in progress even though the real broker restart/failover slice is green。
 
 ## 8. Stop-the-line Conditions
 
