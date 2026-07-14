@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次设计/实现同步：2026-07-14
-> 当前交付阶段：Future 2 final-gated；Phase 3 F3-M0/M0R design-gated，F3-M1-M6 not started
+> 当前交付阶段：Future 2 final-gated；Phase 3 F3-M0/M0R design-gated，F3-M1 foundation in progress
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -181,7 +181,7 @@ decision behind items 14 and 16-18。
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
-| `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed`（M0/M0R gated，implementation-ready） |
+| `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed / In progress`（M0/M0R gated；M1 foundation implementation underway） |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |

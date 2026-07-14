@@ -42,6 +42,12 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
             long expectedVersion,
             Map<String, String> properties);
 
+    CompletableFuture<TopicProjectionRecord> activateCursorProtocol(
+            String cluster,
+            String managedLedgerName,
+            ManagedLedgerProjectionIdentity expectedIdentity,
+            long expectedMetadataVersion);
+
     CompletableFuture<TopicProjectionRecord> mirrorFacadeState(
             String cluster,
             String managedLedgerName,

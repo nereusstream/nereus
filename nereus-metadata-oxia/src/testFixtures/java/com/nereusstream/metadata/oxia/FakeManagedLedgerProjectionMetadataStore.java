@@ -240,6 +240,16 @@ public final class FakeManagedLedgerProjectionMetadataStore
     }
 
     @Override
+    public CompletableFuture<TopicProjectionRecord> activateCursorProtocol(
+            String cluster,
+            String managedLedgerName,
+            ManagedLedgerProjectionIdentity expectedIdentity,
+            long expectedMetadataVersion) {
+        return core.activateCursorProtocol(
+                cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
+    }
+
+    @Override
     public CompletableFuture<TopicProjectionRecord> mirrorFacadeState(
             String cluster,
             String managedLedgerName,

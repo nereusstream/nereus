@@ -4,7 +4,7 @@ package com.nereusstream.metadata.oxia.records;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
-import com.nereusstream.metadata.oxia.ProjectionCreateRequest;
+import com.nereusstream.metadata.oxia.ManagedLedgerCursorProtocol;
 import java.util.Map;
 import java.util.Objects;
 
@@ -35,7 +35,7 @@ public record TopicProjectionRecord(
         Objects.requireNonNull(storageProfile, "storageProfile");
         Objects.requireNonNull(payloadMapping, "payloadMapping");
         Objects.requireNonNull(facadeState, "facadeState");
-        properties = ProjectionCreateRequest.canonicalProperties(properties);
+        properties = ManagedLedgerCursorProtocol.canonicalDurableProperties(properties);
         if (!managedLedgerNameHash.equals(ManagedLedgerProjectionNames.managedLedgerNameHash(managedLedgerName))) {
             throw new IllegalArgumentException("managed-ledger name hash mismatch");
         }

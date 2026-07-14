@@ -2,8 +2,10 @@
 
 ## 1. Current Status
 
-F3-M0 and F3-M0R are complete as design gates。No F3 production code、test code、Gradle gate or Pulsar fork
-implementation is claimed by this document set。
+F3-M0 and F3-M0R are complete as design gates。F3-M1 is now in progress：cursor metadata records、canonical
+codecs、single-key store/core/Oxia adapter contract、F2 activation-marker preservation、cursor ack domain、snapshot
+codec/store and focused unit/contract/golden tests exist。The M1 Gradle gates and real Oxia/ObjectStore integration
+evidence are not complete yet，so F3-M1 is not claimed complete；F3-M2-M6 and Pulsar fork integration have not started。
 
 A later milestone is complete only when：
 

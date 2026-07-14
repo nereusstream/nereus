@@ -146,7 +146,10 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
             }
 
             long ledgerId = allocateLedgerId(keyspace, deadline);
-            TopicProjectionRecord candidate = topicCandidate(request, ledgerId);
+            TopicProjectionRecord candidate = withProperties(
+                    topicCandidate(request, ledgerId),
+                    ManagedLedgerCursorProtocol.replaceExternalProperties(
+                            deleted.properties(), request.initialProperties()));
             String key = keyspace.topicProjectionKey(request.managedLedgerName());
             PartitionKey partitionKey = keyspace.topicProjectionPartitionKey(request.managedLedgerName());
             deadline.await(publishGuard.validateBeforePublish());
@@ -187,7 +190,55 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                 expectedIdentity,
                 expectedVersion,
                 deadline,
-                current -> withProperties(current, canonical)));
+                current -> withProperties(
+                        current,
+                        ManagedLedgerCursorProtocol.replaceExternalProperties(current.properties(), canonical))));
+    }
+
+    @Override
+    public CompletableFuture<TopicProjectionRecord> activateCursorProtocol(
+            String cluster,
+            String managedLedgerName,
+            ManagedLedgerProjectionIdentity expectedIdentity,
+            long expectedMetadataVersion) {
+        ManagedLedgerProjectionKeyspace keyspace = new ManagedLedgerProjectionKeyspace(cluster);
+        String exactName = ManagedLedgerProjectionNames.requireManagedLedgerName(managedLedgerName);
+        Objects.requireNonNull(expectedIdentity, "expectedIdentity");
+        requireVersion(expectedMetadataVersion);
+        return submit(deadline -> {
+            boolean firstRead = true;
+            long backoff = INITIAL_BACKOFF_NANOS;
+            while (true) {
+                TopicProjectionRecord current = readTopic(keyspace, exactName, deadline)
+                        .orElseThrow(() -> invariant("topic projection is missing"));
+                requireIdentity(expectedIdentity, current);
+                if (ManagedLedgerCursorProtocol.isActivated(current)) {
+                    return current;
+                }
+                if (firstRead && current.metadataVersion() != expectedMetadataVersion) {
+                    throw conditionFailed("topic metadata version changed before cursor activation");
+                }
+                if (current.parsedFacadeState() == ManagedLedgerFacadeState.DELETING
+                        || current.parsedFacadeState() == ManagedLedgerFacadeState.DELETED) {
+                    throw invariant("cursor protocol cannot activate a deleting or deleted projection");
+                }
+                TopicProjectionRecord candidate = withProperties(
+                        current, ManagedLedgerCursorProtocol.activate(current.properties()));
+                Optional<Long> version = putIfVersion(
+                        keyspace.topicProjectionKey(exactName),
+                        keyspace.topicProjectionPartitionKey(exactName),
+                        current.metadataVersion(),
+                        candidate,
+                        TopicProjectionRecord.class,
+                        deadline);
+                if (version.isPresent()) {
+                    writeObserver.afterWrite(WriteKind.TOPIC);
+                    return withMetadataVersion(candidate, version.orElseThrow());
+                }
+                firstRead = false;
+                backoff = deadline.backoff(backoff);
+            }
+        });
     }
 
     @Override
