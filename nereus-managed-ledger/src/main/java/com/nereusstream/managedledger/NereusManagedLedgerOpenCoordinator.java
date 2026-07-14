@@ -8,19 +8,25 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.managedledger.config.ManagedLedgerOpenConfigView;
+import com.nereusstream.managedledger.cursor.CursorLedgerIdentity;
+import com.nereusstream.managedledger.cursor.CursorOwnerSession;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.integration.NereusCreationPermit;
 import com.nereusstream.managedledger.projection.F2L0RequestFactory;
 import com.nereusstream.managedledger.projection.VirtualLedgerProjection;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
+import com.nereusstream.metadata.oxia.CursorIds;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import com.nereusstream.metadata.oxia.ProjectionCreateRequest;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
+import java.security.SecureRandom;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Supplier;
 
 /** Recoverable first/open/recreate protocol shared by factory open and durable-state inspection. */
 public final class NereusManagedLedgerOpenCoordinator {
@@ -30,13 +36,23 @@ public final class NereusManagedLedgerOpenCoordinator {
 
     private final NereusManagedLedgerRuntime runtime;
     private final NereusCreationGuard creationGuard;
+    private final Supplier<String> ownerSessionIdSupplier;
     private final F2L0RequestFactory requests = new F2L0RequestFactory();
 
     public NereusManagedLedgerOpenCoordinator(
             NereusManagedLedgerRuntime runtime,
             NereusCreationGuard creationGuard) {
+        this(runtime, creationGuard, secureRandomIdSupplier());
+    }
+
+    NereusManagedLedgerOpenCoordinator(
+            NereusManagedLedgerRuntime runtime,
+            NereusCreationGuard creationGuard,
+            Supplier<String> ownerSessionIdSupplier) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.creationGuard = Objects.requireNonNull(creationGuard, "creationGuard");
+        this.ownerSessionIdSupplier = Objects.requireNonNull(
+                ownerSessionIdSupplier, "ownerSessionIdSupplier");
     }
 
     public CompletableFuture<NereusLedgerOpenResult> open(
@@ -52,6 +68,40 @@ public final class NereusManagedLedgerOpenCoordinator {
                                     .map(topic -> openExisting(topic, permit, config))
                                     .orElseGet(() -> createFirst(exactName, permit, config)));
                 });
+    }
+
+    public CompletableFuture<NereusWritableLedgerOpenResult> openWritable(
+            String managedLedgerName,
+            ManagedLedgerOpenConfigView config,
+            NereusManagedLedgerOwnershipGuard ownershipGuard) {
+        Objects.requireNonNull(ownershipGuard, "ownershipGuard");
+        return ownershipGuard.requireOwned("writable open before cursor claim")
+                .thenCompose(ignored -> open(managedLedgerName, config))
+                .thenCompose(ledger -> hydrateWritable(ledger, ownershipGuard));
+    }
+
+    private CompletableFuture<NereusWritableLedgerOpenResult> hydrateWritable(
+            NereusLedgerOpenResult ledger,
+            NereusManagedLedgerOwnershipGuard ownershipGuard) {
+        final CursorOwnerSession owner;
+        try {
+            String managedLedgerName = ledger.topicProjection().managedLedgerName();
+            CursorLedgerIdentity cursorLedger = new CursorLedgerIdentity(
+                    managedLedgerName,
+                    ManagedLedgerProjectionNames.managedLedgerNameHash(managedLedgerName),
+                    ledger.topicProjection().projectionIdentity());
+            owner = new CursorOwnerSession(
+                    cursorLedger,
+                    CursorIds.requireRandomId(ownerSessionIdSupplier.get(), "ownerSessionId"));
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return runtime.cursorStorage().claimAndLoadActiveCursors(owner)
+                .thenCompose(cursors -> runtime.cursorStorage().retentionView(owner)
+                        .thenCompose(retention -> ownershipGuard
+                                .requireOwned("writable open final publication")
+                                .thenApply(ignored -> new NereusWritableLedgerOpenResult(
+                                        ledger, owner, cursors, retention))));
     }
 
     public CompletableFuture<NereusStorageStateSnapshot> inspectStorageState(String managedLedgerName) {
@@ -375,5 +425,14 @@ public final class NereusManagedLedgerOpenCoordinator {
             String message,
             Throwable cause) {
         return CompletableFuture.failedFuture(new NereusException(code, retriable, message, cause));
+    }
+
+    private static Supplier<String> secureRandomIdSupplier() {
+        SecureRandom random = new SecureRandom();
+        return () -> {
+            byte[] bytes = new byte[16];
+            random.nextBytes(bytes);
+            return HexFormat.of().formatHex(bytes);
+        };
     }
 }

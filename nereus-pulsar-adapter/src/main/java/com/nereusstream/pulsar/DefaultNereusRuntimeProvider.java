@@ -5,6 +5,17 @@ import com.nereusstream.api.StreamStorage;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.NereusManagedLedgerRuntime;
+import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
+import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
+import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
+import com.nereusstream.managedledger.cursor.CursorStateMachine;
+import com.nereusstream.managedledger.cursor.CursorStatePersistencePlanner;
+import com.nereusstream.managedledger.cursor.CursorStorage;
+import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.managedledger.cursor.DefaultCursorRetentionCoordinator;
+import com.nereusstream.managedledger.cursor.DefaultCursorSnapshotStore;
+import com.nereusstream.managedledger.cursor.DefaultCursorStorage;
+import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -43,9 +54,13 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         SharedOxiaClientRuntime sharedOxiaRuntime = null;
         OxiaMetadataStore l0MetadataStore = null;
         ManagedLedgerProjectionMetadataStore projectionStore = null;
+        CursorMetadataStore cursorMetadataStore = null;
         ScheduledExecutorService scheduler = null;
         ExecutorService callbackExecutor = null;
         StreamStorage streamStorage = null;
+        CursorSnapshotStore cursorSnapshotStore = null;
+        CursorRetentionCoordinator cursorRetentionCoordinator = null;
+        CursorStorage cursorStorage = null;
         try {
             objectStoreProvider = instantiateObjectStoreProvider(
                     configuration.objectStore().providerClassName(), context.pluginClassLoader());
@@ -56,6 +71,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     configuration.oxia(), sharedOxiaRuntime, clock);
             projectionStore = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, configuration.projectionMetadata(), clock);
+            cursorMetadataStore = CursorMetadataStore.usingSharedRuntime(
+                    configuration.oxia(), sharedOxiaRuntime, configuration.cursorMetadata());
             scheduler = Executors.newSingleThreadScheduledExecutor(daemonFactory("nereus-f2-scheduler"));
             callbackExecutor = Executors.newFixedThreadPool(
                     Math.min(Runtime.getRuntime().availableProcessors(), 8),
@@ -67,9 +84,50 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     new DefaultWalObjectReader(objectStore),
                     clock,
                     callbackExecutor);
+            CursorStorageConfig cursorConfig = configuration.cursorStorage();
+            CursorProtocolActivationGuard activationGuard = context.cursorProtocolActivationGuard();
+            cursorSnapshotStore = new DefaultCursorSnapshotStore(
+                    streamConfig.cluster(),
+                    objectStore,
+                    cursorConfig,
+                    configuration.objectStore().requestTimeout(),
+                    clock);
+            CursorStateMachine stateMachine = new CursorStateMachine(cursorConfig);
+            CursorStatePersistencePlanner persistencePlanner = new CursorStatePersistencePlanner(
+                    streamConfig.cluster(), cursorConfig);
+            cursorRetentionCoordinator = new DefaultCursorRetentionCoordinator(
+                    streamConfig.cluster(),
+                    streamStorage,
+                    projectionStore,
+                    cursorMetadataStore,
+                    cursorSnapshotStore,
+                    activationGuard,
+                    stateMachine,
+                    cursorConfig,
+                    clock,
+                    scheduler);
+            cursorStorage = new DefaultCursorStorage(
+                    streamConfig.cluster(),
+                    streamStorage,
+                    projectionStore,
+                    cursorMetadataStore,
+                    cursorSnapshotStore,
+                    cursorRetentionCoordinator,
+                    activationGuard,
+                    stateMachine,
+                    persistencePlanner,
+                    cursorConfig,
+                    clock,
+                    scheduler);
             return new NereusManagedLedgerRuntime(
                     streamStorage,
                     projectionStore,
+                    cursorMetadataStore,
+                    cursorSnapshotStore,
+                    cursorRetentionCoordinator,
+                    cursorStorage,
+                    cursorConfig,
+                    activationGuard,
                     l0MetadataStore,
                     sharedOxiaRuntime,
                     objectStore,
@@ -81,10 +139,20 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     streamConfig.processRunId(),
                     streamConfig.writerId());
         } catch (Throwable failure) {
+            closeAfterFailure(
+                    failure,
+                    cursorStorage,
+                    cursorRetentionCoordinator,
+                    cursorSnapshotStore,
+                    cursorMetadataStore,
+                    projectionStore,
+                    streamStorage,
+                    l0MetadataStore,
+                    objectStore,
+                    objectStoreProvider,
+                    sharedOxiaRuntime);
             shutdown(callbackExecutor);
             shutdown(scheduler);
-            closeAfterFailure(failure, streamStorage, projectionStore, l0MetadataStore, objectStore,
-                    objectStoreProvider, sharedOxiaRuntime);
             if (failure instanceof Exception exception) {
                 throw exception;
             }

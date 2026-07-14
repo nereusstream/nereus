@@ -1,7 +1,8 @@
 # Phase 3 Cursor / Subscription Detailed Design
 
 > 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation 与 F3-M2
-> CursorStorage/retention state machines complete/final-gated；F3-M3+ pending
+> CursorStorage/retention state machines complete/final-gated；F3-M3 writable-open/runtime/hydration foundation
+> implemented，ManagedCursor surface/gate in progress；F3-M4+ pending
 >
 > Gate 日期：2026-07-14
 
@@ -154,7 +155,7 @@ retention coordinator。
 | F3-M0R | code-level protocol and narrow Future 4 compatibility gate | complete, design-only |
 | F3-M1 | metadata records/codecs/store + snapshot codec/store | complete/final-gated；真实 Oxia 与 LocalStack conditional-create/restart 证据通过 |
 | F3-M2 | CursorStorage ack/reset/property/retention state machines | complete/final-gated；deterministic failure/concurrency models 与真实 Oxia + LocalStack S3 跨 runtime 恢复通过 |
-| F3-M3 | durable `NereusManagedCursor` and ledger hydration/enumeration | not started |
+| F3-M3 | durable `NereusManagedCursor` and ledger hydration/enumeration | in progress；runtime/provider cursor resources、checked/trusted ownership guard、writable claim/hydration publication boundary 与 storage-backed exact-name durable open 已实现；完整 cursor surface/gate 待完成 |
 | F3-M4 | Pulsar fork durable subscribe/ack/admin/capability integration | not started |
 | F3-M5 | two-broker/Oxia/ObjectStore recovery and retention barrier gates | not started |
 | F3-M6 | compatibility/failure/final gate and F4 handoff | not started |

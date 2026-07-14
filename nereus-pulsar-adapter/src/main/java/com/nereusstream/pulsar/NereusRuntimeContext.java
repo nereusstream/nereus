@@ -2,6 +2,7 @@
 package com.nereusstream.pulsar;
 
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
+import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import io.netty.channel.EventLoopGroup;
 import io.opentelemetry.api.OpenTelemetry;
@@ -12,12 +13,29 @@ public record NereusRuntimeContext(
         EventLoopGroup eventLoopGroup,
         OpenTelemetry openTelemetry,
         NereusCreationGuard creationGuard,
+        CursorProtocolActivationGuard cursorProtocolActivationGuard,
         ObjectStoreSecretResolver secretResolver,
         ClassLoader pluginClassLoader) {
+    public NereusRuntimeContext(
+            EventLoopGroup eventLoopGroup,
+            OpenTelemetry openTelemetry,
+            NereusCreationGuard creationGuard,
+            ObjectStoreSecretResolver secretResolver,
+            ClassLoader pluginClassLoader) {
+        this(
+                eventLoopGroup,
+                openTelemetry,
+                creationGuard,
+                CursorProtocolActivationGuard.unavailable(),
+                secretResolver,
+                pluginClassLoader);
+    }
+
     public NereusRuntimeContext {
         Objects.requireNonNull(eventLoopGroup, "eventLoopGroup");
         Objects.requireNonNull(openTelemetry, "openTelemetry");
         Objects.requireNonNull(creationGuard, "creationGuard");
+        Objects.requireNonNull(cursorProtocolActivationGuard, "cursorProtocolActivationGuard");
         Objects.requireNonNull(secretResolver, "secretResolver");
         Objects.requireNonNull(pluginClassLoader, "pluginClassLoader");
     }

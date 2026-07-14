@@ -2,6 +2,12 @@
 package com.nereusstream.managedledger;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
+import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
+import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
+import com.nereusstream.managedledger.cursor.CursorStorage;
+import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
@@ -21,12 +27,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-/** Shared F2 owner closed only by the hybrid factory/provider lifecycle. */
+/** Shared F2/F3 owner closed only by the hybrid factory/provider lifecycle. */
 public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private static final Pattern PROCESS_RUN_ID = Pattern.compile("[A-Za-z0-9_-]{22,256}");
 
     private final StreamStorage streamStorage;
     private final ManagedLedgerProjectionMetadataStore projectionStore;
+    private final CursorMetadataStore cursorMetadataStore;
+    private final CursorSnapshotStore cursorSnapshotStore;
+    private final CursorRetentionCoordinator cursorRetentionCoordinator;
+    private final CursorStorage cursorStorage;
+    private final CursorStorageConfig cursorStorageConfig;
+    private final CursorProtocolActivationGuard cursorProtocolActivationGuard;
     private final OxiaMetadataStore l0MetadataStore;
     private final SharedOxiaClientRuntime sharedOxiaRuntime;
     private final ObjectStore objectStore;
@@ -43,6 +55,12 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     public NereusManagedLedgerRuntime(
             StreamStorage streamStorage,
             ManagedLedgerProjectionMetadataStore projectionStore,
+            CursorMetadataStore cursorMetadataStore,
+            CursorSnapshotStore cursorSnapshotStore,
+            CursorRetentionCoordinator cursorRetentionCoordinator,
+            CursorStorage cursorStorage,
+            CursorStorageConfig cursorStorageConfig,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
             OxiaMetadataStore l0MetadataStore,
             SharedOxiaClientRuntime sharedOxiaRuntime,
             ObjectStore objectStore,
@@ -55,6 +73,14 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             String writerId) {
         this.streamStorage = Objects.requireNonNull(streamStorage, "streamStorage");
         this.projectionStore = Objects.requireNonNull(projectionStore, "projectionStore");
+        this.cursorMetadataStore = Objects.requireNonNull(cursorMetadataStore, "cursorMetadataStore");
+        this.cursorSnapshotStore = Objects.requireNonNull(cursorSnapshotStore, "cursorSnapshotStore");
+        this.cursorRetentionCoordinator = Objects.requireNonNull(
+                cursorRetentionCoordinator, "cursorRetentionCoordinator");
+        this.cursorStorage = Objects.requireNonNull(cursorStorage, "cursorStorage");
+        this.cursorStorageConfig = Objects.requireNonNull(cursorStorageConfig, "cursorStorageConfig");
+        this.cursorProtocolActivationGuard = Objects.requireNonNull(
+                cursorProtocolActivationGuard, "cursorProtocolActivationGuard");
         this.l0MetadataStore = Objects.requireNonNull(l0MetadataStore, "l0MetadataStore");
         this.sharedOxiaRuntime = Objects.requireNonNull(sharedOxiaRuntime, "sharedOxiaRuntime");
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
@@ -71,6 +97,10 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         requireIdentityDistinct(List.of(
                 streamStorage,
                 projectionStore,
+                cursorMetadataStore,
+                cursorSnapshotStore,
+                cursorRetentionCoordinator,
+                cursorStorage,
                 l0MetadataStore,
                 sharedOxiaRuntime,
                 objectStore,
@@ -86,6 +116,22 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
 
     public ManagedLedgerProjectionMetadataStore projectionStore() {
         return projectionStore;
+    }
+
+    public CursorStorage cursorStorage() {
+        return cursorStorage;
+    }
+
+    public CursorRetentionCoordinator cursorRetentionCoordinator() {
+        return cursorRetentionCoordinator;
+    }
+
+    public CursorStorageConfig cursorStorageConfig() {
+        return cursorStorageConfig;
+    }
+
+    public CursorProtocolActivationGuard cursorProtocolActivationGuard() {
+        return cursorProtocolActivationGuard;
     }
 
     public ScheduledExecutorService scheduler() {
@@ -131,6 +177,10 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         }
         long executorDeadlineNanos = deadlineNanos(config.closeTimeout());
         List<Throwable> failures = new ArrayList<>();
+        closeOne(cursorStorage, failures);
+        closeOne(cursorRetentionCoordinator, failures);
+        closeOne(cursorSnapshotStore, failures);
+        closeOne(cursorMetadataStore, failures);
         closeOne(projectionStore, failures);
         closeOne(streamStorage, failures);
         closeOne(l0MetadataStore, failures);

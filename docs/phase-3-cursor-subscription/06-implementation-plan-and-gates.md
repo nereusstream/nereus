@@ -7,8 +7,14 @@ codecs、single-key store/core/Oxia adapter、F2 activation-marker preservation�
 snapshot codec/store all exist；unit/golden/contract tests plus real Oxia and LocalStack integrations pass。
 F3-M2 is also complete and final-gated：`CursorStorage`、retention/protection/trim recovery、owner claim/fencing、
 snapshot publication/hydration and bounded mutation lanes exist；deterministic state-machine/property/concurrency/
-failure-injection suites plus a real Oxia + LocalStack S3 multi-runtime recovery gate pass。F3-M3-M6 and the F3
-Pulsar fork integration have not started。
+failure-injection suites plus a real Oxia + LocalStack S3 multi-runtime recovery gate pass。F3-M3 is in progress：
+the canonical runtime/provider now owns cursor metadata、snapshot、retention and storage resources；the exact
+broker ownership supplier is represented by a checked guard，while only the named direct/no-checker path is trusted；
+`openWritable` performs pre-claim/final-publication checks、fresh owner creation、stable claim/hydration and retention
+validation before constructing the ledger；hydrated durable cursors are registered before visibility，and later
+exact-name durable opens call `CursorStorage.open` through one local flight。The remaining ManagedCursor read/mutation/
+property/close surface、classification suite and `phase3M3Check` are not complete。F3-M4-M6 and the F3 Pulsar fork
+integration have not started。
 
 A later milestone is complete only when：
 
@@ -442,7 +448,8 @@ PersistentTopic can enumerate hydrated cursors without broker changes yet.
 No deployable artifact combines the marker-aware decoder with the old F2 empty-cursor writable open.
 ```
 
-Planned gate：`phase3M3Check` including the locked Pulsar composite API compile。
+Implementation status：the runtime/writable-open/hydration foundation above is present and unit-compiled；the full
+exit conditions are not yet met。Planned gate：`phase3M3Check` including the locked Pulsar composite API compile。
 
 ## 7. F3-M4 — Pulsar Broker Integration
 

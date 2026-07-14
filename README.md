@@ -87,8 +87,12 @@ F3-M2 CursorStorage/retention state machines 也已完成并通过普通与 Dock
 create/ack/reset/property/delete、owner claim/fencing、snapshot spill/hydration、recoverable protection/trim
 barrier、CAS/trim 响应丢失和并发模型均有确定性测试；新增真实 Oxia + LocalStack S3 组合门禁验证两个
 独立 runtime 接管、旧 owner fencing 与第三 runtime 重启 hydration。`phase3M2Check --rerun-tasks` 和
-`phase3M2FinalCheck --rerun-tasks` 已通过。F3-M3-M6 尚未完成；因此仍不能描述为已支持 durable
-Nereus subscriptions。
+`phase3M2FinalCheck --rerun-tasks` 已通过。F3-M3 已进入实现：runtime/provider 现已拥有并按依赖逆序关闭
+cursor metadata/snapshot/retention/storage 资源；broker ownership checker 已贯穿 writable open 的 claim 前与
+publication 前边界；writable open 会生成 fresh owner session、claim/hydrate 全部 ACTIVE durable roots 后再
+构造 ledger，且 durable `openCursor` 已不再创建 ledger-local-only 状态。完整 ManagedCursor mutation/read/
+property/close surface、M3 分类测试与 M3 gate 仍在实现中；F3-M3-M6 尚未完成，因此仍不能描述为已支持
+durable Nereus subscriptions。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
 materialization and Future 4 workers remain designed/reserved.

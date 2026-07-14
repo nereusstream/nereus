@@ -12,6 +12,11 @@ import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.managedledger.callbacks.SerialCallbackLane;
 import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
+import com.nereusstream.managedledger.cursor.CursorHandle;
+import com.nereusstream.managedledger.cursor.CursorOpenRequest;
+import com.nereusstream.managedledger.cursor.CursorOwnerSession;
+import com.nereusstream.managedledger.cursor.CursorRetentionView;
+import com.nereusstream.managedledger.cursor.InitialCursorPosition;
 import com.nereusstream.managedledger.entry.EncodedAppend;
 import com.nereusstream.managedledger.entry.PulsarEntryCodec;
 import com.nereusstream.managedledger.errors.OperationContext;
@@ -88,6 +93,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     }
 
     private final NereusManagedLedgerRuntime runtime;
+    private final CursorOwnerSession cursorOwnerSession;
+    private final NereusManagedLedgerOwnershipGuard ownershipGuard;
+    private volatile CursorRetentionView cursorRetention;
     private final VirtualLedgerProjection projection;
     private final StreamSnapshotTracker snapshots;
     private final PulsarEntryCodec entryCodec;
@@ -96,6 +104,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     private final SerialCallbackLane callbacks;
     private final AtomicReference<TopicProjectionRecord> topicProjection;
     private final ConcurrentHashMap<String, NereusManagedCursor> cursors = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<NereusManagedCursor>> cursorOpenFlights =
+            new ConcurrentHashMap<>();
     private final AtomicInteger pendingAdds = new AtomicInteger();
     private final AtomicLong lastAddEntryTime = new AtomicLong();
     private final NereusManagedLedgerStats stats;
@@ -110,11 +120,16 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     public NereusManagedLedger(
             NereusManagedLedgerRuntime runtime,
-            NereusLedgerOpenResult opened,
+            NereusWritableLedgerOpenResult opened,
+            NereusManagedLedgerOwnershipGuard ownershipGuard,
             ManagedLedgerConfig config,
             Runnable onClose) {
         this.runtime = Objects.requireNonNull(runtime, "runtime");
-        NereusLedgerOpenResult result = Objects.requireNonNull(opened, "opened");
+        NereusWritableLedgerOpenResult writable = Objects.requireNonNull(opened, "opened");
+        NereusLedgerOpenResult result = writable.ledger();
+        this.cursorOwnerSession = writable.cursorOwnerSession();
+        this.cursorRetention = writable.cursorRetention();
+        this.ownershipGuard = Objects.requireNonNull(ownershipGuard, "ownershipGuard");
         this.config = Objects.requireNonNull(config, "config");
         ManagedLedgerConfigValidator.captureForOperation(config);
         this.onClose = Objects.requireNonNull(onClose, "onClose");
@@ -135,10 +150,28 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             case DELETED -> LocalState.DELETED;
             case CREATING -> throw new IllegalArgumentException("published ledger cannot be CREATING");
         };
+        writable.durableCursors().forEach(handle -> {
+            NereusManagedCursor cursor = new NereusManagedCursor(this, handle);
+            if (cursors.putIfAbsent(cursor.getName(), cursor) != null) {
+                throw new IllegalArgumentException("duplicate hydrated durable cursor name");
+            }
+        });
     }
 
     public VirtualLedgerProjection projection() {
         return projection;
+    }
+
+    CursorOwnerSession cursorOwnerSession() {
+        return cursorOwnerSession;
+    }
+
+    NereusManagedLedgerOwnershipGuard ownershipGuard() {
+        return ownershipGuard;
+    }
+
+    CursorRetentionView cursorRetention() {
+        return cursorRetention;
     }
 
     @Override
@@ -211,16 +244,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             InitialPosition initialPosition,
             Map<String, Long> properties,
             Map<String, String> cursorProperties) throws ManagedLedgerException {
-        Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(initialPosition, "initialPosition");
-        try {
-            return cursors.computeIfAbsent(name, ignored -> initialCursor(
-                    name, true, initialPosition, properties, cursorProperties));
-        } catch (CompletionException e) {
-            Throwable cause = unwrap(e);
-            if (cause instanceof ManagedLedgerException managedLedger) throw managedLedger;
-            throw new ManagedLedgerException(cause);
-        }
+        return await(openDurableCursor(
+                name, initialPosition, properties, cursorProperties), runtime.config().metadataTimeout());
     }
 
     @Override
@@ -242,11 +267,99 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             Map<String, String> cursorProperties,
             OpenCursorCallback callback,
             Object ctx) {
+        Objects.requireNonNull(callback, "callback");
+        openDurableCursor(name, initialPosition, properties, cursorProperties)
+                .whenCompleteAsync((cursor, error) -> {
+                    if (error == null) {
+                        callback.openCursorComplete(cursor, ctx);
+                    } else {
+                        callback.openCursorFailed(map(error, "openCursor", false), ctx);
+                    }
+                }, runtime.callbackExecutor());
+    }
+
+    private CompletableFuture<NereusManagedCursor> openDurableCursor(
+            String name,
+            InitialPosition initialPosition,
+            Map<String, Long> properties,
+            Map<String, String> cursorProperties) {
+        Objects.requireNonNull(name, "name");
+        InitialPosition normalizedInitial = initialPosition == null
+                ? InitialPosition.Latest
+                : initialPosition;
+        Map<String, Long> normalizedPositionProperties = properties == null ? Map.of() : properties;
+        Map<String, String> normalizedCursorProperties = cursorProperties == null ? Map.of() : cursorProperties;
+
+        NereusManagedCursor registered = cursors.get(name);
+        if (registered != null) {
+            if (!registered.isDurable()) {
+                return CompletableFuture.failedFuture(new ManagedLedgerException(
+                        "a non-durable cursor already uses the exact name"));
+            }
+            return ownershipGuard.requireOwned("existing durable cursor open")
+                    .thenApply(ignored -> registered);
+        }
+
+        CompletableFuture<NereusManagedCursor> candidate = new CompletableFuture<>();
+        CompletableFuture<NereusManagedCursor> existing = cursorOpenFlights.putIfAbsent(name, candidate);
+        if (existing != null) {
+            return existing;
+        }
+
+        final CursorOpenRequest request;
         try {
-            callback.openCursorComplete(openCursor(
-                    name, initialPosition, properties, cursorProperties), ctx);
-        } catch (ManagedLedgerException e) {
-            callback.openCursorFailed(e, ctx);
+            StreamMetadata observed = currentMetadata();
+            InitialCursorPosition internalInitial = normalizedInitial == InitialPosition.Earliest
+                    ? new InitialCursorPosition.Earliest()
+                    : new InitialCursorPosition.Latest();
+            request = new CursorOpenRequest(
+                    internalInitial,
+                    normalizedPositionProperties,
+                    normalizedCursorProperties,
+                    observed.trimOffset(),
+                    observed.committedEndOffset());
+        } catch (Throwable error) {
+            cursorOpenFlights.remove(name, candidate);
+            candidate.completeExceptionally(error);
+            return candidate;
+        }
+
+        ownershipGuard.requireOwned("durable cursor open before mutation")
+                .thenCompose(ignored -> runtime.cursorStorage().open(cursorOwnerSession, name, request))
+                .thenCompose(handle -> ownershipGuard
+                        .requireOwned("durable cursor open final publication")
+                        .thenApply(ignored -> handle))
+                .whenComplete((handle, error) -> completeDurableCursorOpen(
+                        name, candidate, handle, error));
+        return candidate;
+    }
+
+    private void completeDurableCursorOpen(
+            String name,
+            CompletableFuture<NereusManagedCursor> candidate,
+            CursorHandle handle,
+            Throwable error) {
+        cursorOpenFlights.remove(name, candidate);
+        if (error != null) {
+            candidate.completeExceptionally(unwrap(error));
+            return;
+        }
+        try {
+            NereusManagedCursor created = new NereusManagedCursor(this, handle);
+            NereusManagedCursor registered = cursors.putIfAbsent(name, created);
+            if (registered != null && !registered.isDurable()) {
+                created.close();
+                candidate.completeExceptionally(new ManagedLedgerException(
+                        "a non-durable cursor already uses the exact name"));
+                return;
+            }
+            if (registered != null) {
+                created.closeDetached();
+            }
+            candidate.complete(registered == null ? created : registered);
+        } catch (Throwable constructionFailure) {
+            handle.closeAsync();
+            candidate.completeExceptionally(constructionFailure);
         }
     }
 
@@ -1336,22 +1449,6 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                 .setSize(metadata.cumulativeSize());
     }
 
-    private NereusManagedCursor initialCursor(
-            String name,
-            boolean durable,
-            InitialPosition initialPosition,
-            Map<String, Long> properties,
-            Map<String, String> cursorProperties) {
-        StreamMetadata metadata = currentMetadata();
-        long offset = initialPosition == InitialPosition.Latest
-                ? metadata.committedEndOffset()
-                : metadata.trimOffset();
-        Position read = readPosition(offset, metadata);
-        Position markDelete = PositionFactory.create(projection.virtualLedgerId(), offset - 1);
-        return new NereusManagedCursor(
-                this, name, durable, markDelete, read, properties, cursorProperties);
-    }
-
     NereusManagedCursor createLocalCursor(
             String name,
             boolean durable,
@@ -1388,6 +1485,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     long cursorReadOffsetAfter(Position position, StreamMetadata metadata) {
         return positions.cursorReadOffsetAfter(projection, position, metadata);
+    }
+
+    Position positionBeforeOffset(long nextReadOffset) {
+        return PositionFactory.create(projection.virtualLedgerId(), Math.subtractExact(nextReadOffset, 1));
     }
 
     long normalizeCursorResetReadOffset(Position position, StreamMetadata metadata) {

@@ -101,12 +101,20 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
     @Override
     public ManagedLedger open(String name, ManagedLedgerConfig config)
             throws InterruptedException, ManagedLedgerException {
-        return await(openFuture(name, config));
+        return await(openFuture(
+                name,
+                config,
+                NereusManagedLedgerOwnershipGuard.trustedDirect(runtime.config().metadataTimeout())));
     }
 
     @Override
     public void asyncOpen(String name, OpenLedgerCallback callback, Object ctx) {
-        asyncOpen(name, defaultConfig, callback, () -> CompletableFuture.completedFuture(true), ctx);
+        openWithCallback(
+                name,
+                defaultConfig,
+                callback,
+                NereusManagedLedgerOwnershipGuard.trustedDirect(runtime.config().metadataTimeout()),
+                ctx);
     }
 
     @Override
@@ -118,7 +126,22 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             Object ctx) {
         Objects.requireNonNull(callback, "callback");
         Objects.requireNonNull(mlOwnershipChecker, "mlOwnershipChecker");
-        openFuture(name, config).whenCompleteAsync((ledger, error) -> {
+        openWithCallback(
+                name,
+                config,
+                callback,
+                NereusManagedLedgerOwnershipGuard.checked(
+                        mlOwnershipChecker, runtime.config().metadataTimeout()),
+                ctx);
+    }
+
+    private void openWithCallback(
+            String name,
+            ManagedLedgerConfig config,
+            OpenLedgerCallback callback,
+            NereusManagedLedgerOwnershipGuard ownershipGuard,
+            Object ctx) {
+        openFuture(name, config, ownershipGuard).whenCompleteAsync((ledger, error) -> {
             if (error == null) {
                 callback.openLedgerComplete(ledger, ctx);
             } else {
@@ -127,8 +150,12 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         }, runtime.callbackExecutor());
     }
 
-    private CompletableFuture<NereusManagedLedger> openFuture(String name, ManagedLedgerConfig config) {
+    private CompletableFuture<NereusManagedLedger> openFuture(
+            String name,
+            ManagedLedgerConfig config,
+            NereusManagedLedgerOwnershipGuard ownershipGuard) {
         Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(ownershipGuard, "ownershipGuard");
         ManagedLedgerOpenConfigView configView;
         try {
             configView = ManagedLedgerConfigValidator.captureForOpen(config);
@@ -140,12 +167,12 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         }
         CompletableFuture<NereusManagedLedger> existing = ledgers.get(name);
         if (existing != null) {
-            return existing;
+            return requireOwnershipBeforeCachedReturn(existing, ownershipGuard);
         }
         CompletableFuture<NereusManagedLedger> candidate = new CompletableFuture<>();
         existing = ledgers.putIfAbsent(name, candidate);
         if (existing != null) {
-            return existing;
+            return requireOwnershipBeforeCachedReturn(existing, ownershipGuard);
         }
         if (!handlePermits.tryAcquire()) {
             ledgers.remove(name, candidate);
@@ -153,7 +180,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                     ErrorCode.BACKPRESSURE_REJECTED, true, "managed-ledger handle capacity is exhausted"));
             return candidate;
         }
-        openCoordinator.open(name, configView).whenComplete((opened, error) -> {
+        openCoordinator.openWritable(name, configView, ownershipGuard).whenComplete((opened, error) -> {
             if (error != null) {
                 ledgers.remove(name, candidate);
                 handlePermits.release();
@@ -170,6 +197,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                 NereusManagedLedger ledger = new NereusManagedLedger(
                         runtime,
                         opened,
+                        ownershipGuard,
                         config,
                         () -> releaseLedger(name, candidate));
                 candidate.complete(ledger);
@@ -180,6 +208,16 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             }
         });
         return candidate;
+    }
+
+    private static CompletableFuture<NereusManagedLedger> requireOwnershipBeforeCachedReturn(
+            CompletableFuture<NereusManagedLedger> existing,
+            NereusManagedLedgerOwnershipGuard ownershipGuard) {
+        return ownershipGuard.requireOwned("cached writable open")
+                .thenCompose(ignored -> existing)
+                .thenCompose(ledger -> ownershipGuard
+                        .requireOwned("cached writable open final return")
+                        .thenApply(ignored -> ledger));
     }
 
     @Override
@@ -366,9 +404,12 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
         }
         ManagedLedgerOpenConfigView noCreate = new ManagedLedgerOpenConfigView(
                 captured.operationView(), false, Map.of());
-        return openCoordinator.open(name, noCreate).thenCompose(opened -> {
+        NereusManagedLedgerOwnershipGuard ownershipGuard =
+                NereusManagedLedgerOwnershipGuard.trustedDirect(runtime.config().metadataTimeout());
+        return openCoordinator.openWritable(name, noCreate, ownershipGuard).thenCompose(opened -> {
             CompletableFuture<Void> result = new CompletableFuture<>();
-            NereusManagedLedger ephemeral = new NereusManagedLedger(runtime, opened, config, () -> { });
+            NereusManagedLedger ephemeral = new NereusManagedLedger(
+                    runtime, opened, ownershipGuard, config, () -> { });
             ephemeral.asyncDelete(new DeleteLedgerCallback() {
                 @Override
                 public void deleteLedgerComplete(Object ctx) {

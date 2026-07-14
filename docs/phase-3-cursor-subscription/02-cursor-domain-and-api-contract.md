@@ -74,9 +74,10 @@ Every state accepted by constructors/codecs/mutations satisfies：
 
 ## 2. Package and File Boundary
 
-The M1 value/domain/snapshot subset in this section now exists and is final-gated。The M2 storage/state-machine and
-M3 facade types remain planned under the same boundary；a literal Java name collision may change spelling，but
-semantic ownership must not change。
+The M1 value/domain/snapshot subset and M2 storage/state-machine subset in this section now exist and are
+final-gated。M3's `NereusManagedLedgerOwnershipGuard`、`NereusWritableLedgerOpenResult`、runtime resource wiring and
+writable claim/hydration boundary now exist；the complete `NereusManagedCursor` facade remains in progress under the
+same boundary。A literal Java name collision may change spelling，but semantic ownership must not change。
 
 ```text
 nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/cursor/

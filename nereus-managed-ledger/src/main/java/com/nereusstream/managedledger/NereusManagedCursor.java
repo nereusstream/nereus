@@ -5,6 +5,8 @@ import com.google.common.collect.Range;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.managedledger.cursor.CursorHandle;
+import com.nereusstream.managedledger.cursor.OffsetRange;
 import com.nereusstream.managedledger.snapshot.PendingReadWaiter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,6 +38,7 @@ import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
 public final class NereusManagedCursor implements ManagedCursor {
     private final NereusManagedLedger ledger;
     private final NereusReadOnlyCursor reader;
+    private final CursorHandle durableHandle;
     private final String name;
     private final boolean durable;
     private final ManagedLedgerErrorMapper errors = new ManagedLedgerErrorMapper();
@@ -58,14 +61,66 @@ public final class NereusManagedCursor implements ManagedCursor {
             Position readPosition,
             Map<String, Long> properties,
             Map<String, String> cursorProperties) {
+        this(
+                ledger,
+                name,
+                durable,
+                null,
+                markDelete,
+                readPosition,
+                properties,
+                cursorProperties);
+    }
+
+    NereusManagedCursor(NereusManagedLedger ledger, CursorHandle handle) {
+        this(
+                ledger,
+                handle.identity().cursorName(),
+                true,
+                handle,
+                ledger.positionBeforeOffset(handle.state().acknowledgements().markDeleteOffset()),
+                ledger.readPosition(
+                        firstUnackedOffset(handle), ledger.currentMetadata()),
+                handle.state().positionProperties(),
+                handle.state().cursorProperties());
+    }
+
+    private NereusManagedCursor(
+            NereusManagedLedger ledger,
+            String name,
+            boolean durable,
+            CursorHandle durableHandle,
+            Position markDelete,
+            Position readPosition,
+            Map<String, Long> properties,
+            Map<String, String> cursorProperties) {
         this.ledger = Objects.requireNonNull(ledger, "ledger");
         this.name = Objects.requireNonNull(name, "name");
         this.durable = durable;
+        this.durableHandle = durableHandle;
+        if (durable != (durableHandle != null)) {
+            throw new IllegalArgumentException("durable cursor requires its authoritative handle");
+        }
         this.markDelete = Objects.requireNonNull(markDelete, "markDelete");
         this.reader = new NereusReadOnlyCursor(ledger, Objects.requireNonNull(readPosition, "readPosition"));
         this.properties.putAll(properties == null ? Map.of() : properties);
         this.cursorProperties.putAll(cursorProperties == null ? Map.of() : cursorProperties);
         this.stats = new NereusManagedCursorStats(name, ledger.getName());
+    }
+
+    CursorHandle durableHandle() {
+        return durableHandle;
+    }
+
+    void closeDetached() {
+        Pending waiter = pending.getAndSet(null);
+        if (waiter != null) {
+            ledger.tailPoll().remove(waiter);
+            waiter.tryFail(new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
+                    "cursor closed while waiting"));
+        }
+        closed = true;
+        reader.close();
     }
 
     @Override public String getName() { return name; }
@@ -206,7 +261,7 @@ public final class NereusManagedCursor implements ManagedCursor {
         try { cb.readEntriesComplete(replayEntries(p), ctx); return Set.of(); }
         catch (ManagedLedgerException e) { cb.readEntriesFailed(e, ctx); return new HashSet<>(p); }
     }
-    @Override public void close() { Pending waiter = pending.getAndSet(null); if (waiter != null) { ledger.tailPoll().remove(waiter); waiter.tryFail(new ManagedLedgerException.ManagedLedgerAlreadyClosedException("cursor closed while waiting")); } closed = true; reader.close(); ledger.removeCursor(this); }
+    @Override public void close() { Pending waiter = pending.getAndSet(null); if (waiter != null) { ledger.tailPoll().remove(waiter); waiter.tryFail(new ManagedLedgerException.ManagedLedgerAlreadyClosedException("cursor closed while waiting")); } closed = true; reader.close(); if (durableHandle != null) durableHandle.closeAsync(); ledger.removeCursor(this); }
     @Override public void asyncClose(AsyncCallbacks.CloseCallback cb, Object ctx) { close(); cb.closeComplete(ctx); }
     @Override public Position getFirstPosition() { return ledger.getFirstPosition(); }
     @Override public void setActive() { if (!alwaysInactive) active = true; }
@@ -259,6 +314,19 @@ public final class NereusManagedCursor implements ManagedCursor {
         return left != null
                 && left.getLedgerId() == right.getLedgerId()
                 && left.getEntryId() == right.getEntryId();
+    }
+    private static long firstUnackedOffset(CursorHandle handle) {
+        long offset = handle.state().acknowledgements().markDeleteOffset();
+        for (OffsetRange range : handle.state().acknowledgements().wholeAckRanges()) {
+            if (range.endOffset() <= offset) {
+                continue;
+            }
+            if (range.startOffset() > offset) {
+                break;
+            }
+            offset = range.endOffset();
+        }
+        return offset;
     }
     private ManagedLedgerException unsupported(String operation) { return errors.unsupported(operation); }
     private UnsupportedOperationException unsupportedRuntime(String operation) { return errors.unsupportedRuntime(operation); }

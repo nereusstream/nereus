@@ -5,6 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
+import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
+import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
+import com.nereusstream.managedledger.cursor.CursorStorage;
+import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -20,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +43,12 @@ class NereusManagedLedgerRuntimeTest {
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
+                proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
+                proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
+                proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
+                proxy(CursorStorage.class, "cursor-storage", closes, false),
+                CursorStorageConfig.defaults(),
+                allowActivation(),
                 proxy(OxiaMetadataStore.class, "l0", closes, false),
                 shared,
                 proxy(ObjectStore.class, "object", closes, false),
@@ -52,7 +65,16 @@ class NereusManagedLedgerRuntimeTest {
         runtime.close();
         runtime.close();
 
-        assertThat(closes).containsExactly("projection", "stream", "l0", "object", "provider");
+        assertThat(closes).containsExactly(
+                "cursor-storage",
+                "cursor-retention",
+                "cursor-snapshot",
+                "cursor-metadata",
+                "projection",
+                "stream",
+                "l0",
+                "object",
+                "provider");
         assertThat(sharedClientCloses).hasValue(1);
         assertThat(callbacks.isShutdown()).isTrue();
         assertThat(scheduler.isShutdown()).isTrue();
@@ -68,6 +90,12 @@ class NereusManagedLedgerRuntimeTest {
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, true),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, true),
+                proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
+                proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
+                proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
+                proxy(CursorStorage.class, "cursor-storage", closes, false),
+                CursorStorageConfig.defaults(),
+                allowActivation(),
                 proxy(OxiaMetadataStore.class, "l0", closes, false),
                 sharedRuntime(sharedClientCloses),
                 proxy(ObjectStore.class, "object", closes, false),
@@ -83,7 +111,16 @@ class NereusManagedLedgerRuntimeTest {
                 .isInstanceOf(RuntimeException.class)
                 .satisfies(error -> assertThat(error.getSuppressed()).hasSize(2));
 
-        assertThat(closes).containsExactly("projection", "stream", "l0", "object", "provider");
+        assertThat(closes).containsExactly(
+                "cursor-storage",
+                "cursor-retention",
+                "cursor-snapshot",
+                "cursor-metadata",
+                "projection",
+                "stream",
+                "l0",
+                "object",
+                "provider");
         assertThat(sharedClientCloses).hasValue(1);
         assertThat(callbacks.isShutdown()).isTrue();
         assertThat(scheduler.isShutdown()).isTrue();
@@ -99,6 +136,12 @@ class NereusManagedLedgerRuntimeTest {
             assertThatThrownBy(() -> new NereusManagedLedgerRuntime(
                             proxy(StreamStorage.class, "stream", closes, false),
                             proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
+                            proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
+                            proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
+                            proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
+                            proxy(CursorStorage.class, "cursor-storage", closes, false),
+                            CursorStorageConfig.defaults(),
+                            allowActivation(),
                             proxy(OxiaMetadataStore.class, "l0", closes, false),
                             shared,
                             proxy(ObjectStore.class, "object", closes, false),
@@ -161,5 +204,9 @@ class NereusManagedLedgerRuntimeTest {
         factory.setAccessible(true);
         return (SharedOxiaClientRuntime) factory.invoke(
                 null, OxiaClientConfiguration.defaults("unused:6648"), client, Clock.systemUTC());
+    }
+
+    private static CursorProtocolActivationGuard allowActivation() {
+        return ledger -> CompletableFuture.completedFuture(null);
     }
 }

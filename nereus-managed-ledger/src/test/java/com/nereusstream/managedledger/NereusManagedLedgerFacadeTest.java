@@ -423,7 +423,12 @@ class NereusManagedLedgerFacadeTest {
         try (NereusManagedLedgerRuntime runtime =
                 ManagedLedgerRuntimeTestSupport.runtime(storage, projections)) {
             NereusManagedLedger ledger = new NereusManagedLedger(
-                    runtime, opened(), config(true), () -> { });
+                    runtime,
+                    ManagedLedgerRuntimeTestSupport.writable(runtime, opened()),
+                    NereusManagedLedgerOwnershipGuard.trustedDirect(
+                            runtime.config().metadataTimeout()),
+                    config(true),
+                    () -> { });
             CompletableFuture<ManagedLedgerException> callbackFailure = new CompletableFuture<>();
 
             ledger.asyncAddEntry(new byte[] {1, 2, 3}, new AddEntryCallback() {
@@ -752,7 +757,12 @@ class NereusManagedLedgerFacadeTest {
         try (NereusManagedLedgerRuntime runtime =
                 ManagedLedgerRuntimeTestSupport.runtime(storage, projections)) {
             NereusManagedLedger ledger = new NereusManagedLedger(
-                    runtime, opened(), config(true), () -> { });
+                    runtime,
+                    ManagedLedgerRuntimeTestSupport.writable(runtime, opened()),
+                    NereusManagedLedgerOwnershipGuard.trustedDirect(
+                            runtime.config().metadataTimeout()),
+                    config(true),
+                    () -> { });
             List<Long> callbackOrder = new CopyOnWriteArrayList<>();
             CompletableFuture<Void> callbacks = new CompletableFuture<>();
             AddEntryCallback callback = new AddEntryCallback() {
