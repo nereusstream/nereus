@@ -169,9 +169,9 @@ audit must pass again before implementation continues.
     responses and timeout/cancellation have closed behavior，and production rejects local/file providers。
 24. A successful append must advance both local tail and exact lifetime logical size without a fallible second read。
     Internal `CommittedAppend` already has that value；P15-M6 carries it in generic `AppendResult` before F2-M1。
-25. `ManagedLedgerFactory.getManagedLedgerPropertiesAsync` returns an empty map for a genuinely missing ledger so
-    broker pre-create probing matches stock behavior；`DELETING/DELETED` and corrupt published state still fail
-    closed rather than masquerading as missing。
+25. `ManagedLedgerFactory.getManagedLedgerPropertiesAsync` returns an empty map for a genuinely missing ledger or a
+    terminal `DELETED` lifetime so broker pre-create probing and immediate same-name recreation match stock behavior；
+    `DELETING` and corrupt published state still fail closed rather than masquerading as missing。
 26. An explicit `PositionFactory.EARLIEST` always starts at the retained trim offset. A concrete non-durable
     `startCursorPosition` is already consumed and reads its next retained Entry. Null、`LATEST` and concrete future
     positions consult `InitialPosition`; the two-argument overload defaults Latest. Direct seek/reset positions remain

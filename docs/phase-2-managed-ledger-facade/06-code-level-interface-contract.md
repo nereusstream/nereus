@@ -647,7 +647,7 @@ All 26 declared members are covered below.
 | `I` | `getEntryCacheManager()` | Return the F2 zero-capacity manager described in section 11. |
 | `I` | `updateCacheEvictionTimeThreshold(long)`; `getCacheEvictionTimeThreshold()` | Validate/store the compatibility setting; it does not create a BookKeeper cache. |
 | `I` | both cache TTL extension update defaults | Override and forward to the zero-capacity manager so target drift is visible in tests. |
-| `I` | `getManagedLedgerPropertiesAsync(String)` | Return an empty map for genuinely `MISSING` state so broker pre-create probing remains write-free；return a defensive property snapshot for `ACTIVE/SEALED`；treat `DELETING/DELETED` as not found and projection/L0 mismatch as corruption. |
+| `I` | `getManagedLedgerPropertiesAsync(String)` | Return an empty map for genuinely `MISSING` state or a terminal `DELETED` lifetime so broker pre-create probing and immediate recreation remain write-free；return a defensive property snapshot for `ACTIVE/SEALED`；treat `DELETING` as not found and projection/L0 mismatch as corruption. |
 | `I` | `getManagedLedgers()` | Return an immutable snapshot containing only live writable facades. |
 | `I` | `getCacheStats()` | Return Nereus counters; BookKeeper hit/miss/eviction counters remain zero. |
 | `I` | `estimateUnloadedTopicBacklog(...)` | Blocking admin-only get bounded by metadata timeout. Ignore the BookKeeper-shaped `ctx`; set one virtual-ledger detail only when `accurate=true`; no durable cursor detail in F2; deleted is not found. |
@@ -746,7 +746,7 @@ All 87 declared members, including defaults that could be semantically unsafe, a
 | `I` | `terminate()`; `asyncTerminate(...)`; `isTerminated()` | Ordered append barrier, L0 `seal`, final LAC. Idempotent. |
 | `U` | `asyncMigrate()`; `isMigrated()` | Future fails; `isMigrated()` is false. Migration is not silently treated as termination. |
 | `I` | `close()`; `asyncClose(...)` | Local close only; accepted operations drain before resources are released. |
-| `I` | `delete()`; `asyncDelete(...)` | Logical L0 delete and local removal; no object deletion. |
+| `I` | `delete()`; `asyncDelete(...)` | Logical L0 delete；on success close/release the local facade and remove its factory handle before completing the caller callback, so an immediate same-name open cannot reuse the deleted stream. No object is physically deleted. |
 | `U` | `offloadPrefix(...)`; `asyncOffloadPrefix(...)` | Checked throw or failure callback. Virtual IDs never reach an offloader. |
 | `I` | `getConfig()`; `setConfig(...)` | Retain/return the exact current config reference like stock. `setConfig` validates then atomically replaces the volatile reference. Each operation captures one immutable validated view before admission and never rereads the mutable object during that operation. |
 | `I` | `getLastConfirmedEntry()` | `(virtualLedgerId,-1)` only for a never-appended stream; otherwise `(virtualLedgerId, committedEndOffset-1)`, even after full trim. |

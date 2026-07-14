@@ -37,12 +37,20 @@ reconstructs subscriptions from hydrated durable cursors，and defers durable ac
 persistence succeeds。The exact eight focused broker suites and broker/broker-common spotless checks pass through
 `phase3M4Check` together with the complete M1-M3 dependency chain。
 
-F3-M5 is complete and final-gated against the current clean Pulsar fork
+F3-M5 is complete and final-gated against its historical clean Pulsar fork
 `master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`。The deterministic suites cover every CAS、snapshot、generation、
 retention and delayed-owner cut；`CursorStorageScaleTest` exercises the exact 10,000-record/page/count boundary；and
 the real two-broker test proves durable subscription recovery、stable MessageIds、expiry-only cursor mutations and
 BookKeeper coexistence over real Oxia and pinned LocalStack S3。`phase3M5Check` and `phase3M5FinalCheck` are green。
-F3-M6 has not started。
+
+F3-M6 is complete and final-gated against the current clean Pulsar fork
+`master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`。It preserves exact ordinary/middle-batch MessageIds across
+history、seek、unload、owner failover and broker restart；preserves internal cursor properties；closes reset、root/
+snapshot limit、activation rollout、topic-incarnation and callback rejection boundaries；publishes a read-only F4
+snapshot inventory；and audits every loaded、unloaded and namespace admin route。The real gate also proves that topic
+delete releases the old managed-ledger factory handle before callback and that a `DELETED` projection exposes empty
+pre-open properties so same-name recreation reaches a fresh F2 incarnation。`phase3M6Check`、`phase3M6FinalCheck`、
+`phase3Check` and `phase3FinalCheck` are the executable completion gates。
 
 A later milestone is complete only when：
 
@@ -252,10 +260,12 @@ Required cases are the complete codec/store list in document 03, plus：
 One key/version owns all cursor correctness fields.
 Every metadata/object byte is canonical, bounded, checksummed and golden-tested.
 A stable root reference hydrates exactly one full effective ack state.
-No cursor state machine or Pulsar callback is implemented yet.
+At the M1 boundary no cursor state machine or Pulsar callback was implemented.
 ```
 
-Implemented gates：`phase3M1Check` and the real Oxia/ObjectStore extension `phase3M1FinalCheck`。
+That statement is the historical M1 exit boundary；M2-M6 subsequently implemented and final-gated the state
+machines、ManagedCursor/Pulsar callbacks、recovery and compatibility behavior。Implemented M1 gates are
+`phase3M1Check` and the real Oxia/ObjectStore extension `phase3M1FinalCheck`。
 
 ### 4.4 Completion Evidence
 
@@ -649,6 +659,8 @@ orphan snapshot；physical orphan deletion remains the explicit F4 handoff。
 
 ## 9. F3-M6 — Compatibility and Final Gate
 
+**Result：PASS。** All scenarios 17–26 have production code plus deterministic or real-broker evidence。
+
 Final scenarios extend M5（numbering continues after M5）：
 
 17. save ordinary and middle-batch MessageIds, then unload、owner failover、process restart、seek/reset/history read；
@@ -668,14 +680,45 @@ Final scenarios extend M5（numbering continues after M5）：
 25. feature/admin bypass audit covers every loaded/unloaded/namespace route；
 26. async cancellation/close/executor rejection produces exactly one callback and no ref-count leak。
 
-Planned aggregate gates：
+Implemented milestone and aggregate gates：
 
 ```text
+./gradlew phase3M6Check
+./gradlew phase3M6FinalCheck --rerun-tasks
 ./gradlew phase3Check
 ./gradlew phase3FinalCheck --rerun-tasks
 ```
 
-They do not exist at M0R and must not be cited as passing until M1-M6 implementation adds them。
+`phase3M5PulsarFinalCheck` is pinned to the historical M5 method only；`phase3M6PulsarFinalCheck` independently runs
+`NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts` so M6
+cannot pass by accidentally reusing the M5 recovery scenario。The current exact source lock is
+`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`。
+
+The aggregate gate runs with Gradle parallelism enabled，but every nested build that writes the same Pulsar checkout
+is explicitly serialized：local Nereus compile/test and Docker gates finish first，then Phase 2 ordinary Pulsar、M4
+ordinary Pulsar、Phase 2 real two-broker、M5 real two-broker and M6 real two-broker run in that order。This ordering is
+part of the gate contract；a `--rerun-tasks` build must never delete shared Pulsar class outputs while another nested
+build or a Nereus test is consuming them。
+
+Code-level evidence mapping：
+
+| Scenario | Executable evidence |
+| --- | --- |
+| 17, 19, 24, 25 | Pulsar `NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts`；the same method covers reader/consumer seek, owner/runtime cuts, internal properties, loaded compaction, unloaded shadow policy, namespace clear and same-name recreation |
+| 18 | `NereusManagedCursorResetSeekTest.ordinaryResetNormalizesTrimmedAndFutureTargetsWhileForceCannotResurrectBytes` |
+| 20 | `CursorStorageLimitExhaustionTest` plus `CursorStorageSnapshotSpillTest`；failed mutations leave the last admitted full truth intact |
+| 21 | `CursorStorageOpenTest.activatesProjectionBeforeFirstCursorRootWithoutChangingTheF2PreactivationRecord` and the locked F2 `ProjectionCreateRequest` rejection |
+| 22 | `NereusManagedLedgerFacadeTest` committed-response-loss/write-fence suites and the inherited Phase 1/1.5/2 dependency chain |
+| 23 | `CursorSnapshotInventory`、`CursorSnapshotKeys`、`CursorSnapshotInventoryTest` and concurrent replacement-orphan coverage in `CursorStorageSnapshotSpillTest` |
+| 24 storage-only isolation | `ManagedLedgerCursorProtocolTest.topicRecreationUsesANewCursorNamespaceThatCannotAliasTheOldIncarnation` |
+| 25 static completeness | `scripts/check-phase3-pulsar-admin-routes.sh` and `checkPhase3PulsarAdminRoutes` |
+| 26 | `NereusManagedCursorCallbackSafetyTest.cancellationCloseAndReadCompletionSurviveCallbackExecutorRejectionWithoutLeaks` and `CallbackPrimitivesTest.executorRejectionDrainsEveryAdmittedTerminalCallbackExactlyOnce` |
+
+The real scenario exposed two compatibility defects and keeps their regressions in
+`NereusManagedLedgerFacadeTest.factoryLedgerAppendReadPropertiesLifecycleAndReopenUseL0Truth` and
+`closeTrimReopenTerminateDeleteAndRecreatePreservePositionAndObjectContracts`：a terminal `DELETED` projection is an
+empty pre-open property view，while `DELETING` remains fail-closed；successful ledger delete closes/releases the old
+factory handle before its callback，so immediate same-name recreation cannot return the deleted stream。
 
 Final gate also reruns：
 
@@ -697,10 +740,9 @@ Every implementation milestone updates：
 - terminology when a durable term changes；
 - F4 design if the handoff contract changes。
 
-“Designed / M0R-passed” must not be changed to “Implemented” until M6 final gate。Current partial-milestone language is
-`M1-M5 complete/gated; M6 pending`。M1/M2 outputs are repository/test milestones and must not be published or
-deployed as broker artifacts by themselves；the marker-aware decoder、M3 writable cursor runtime and M4 admission form
-one release boundary。
+Future 3 may be described as `Implemented / final-gated` only together with the passing M6 and aggregate gates above。
+M1/M2 outputs remain repository/test milestones and must not be published or deployed as broker artifacts by
+themselves；the marker-aware decoder、M3 writable cursor runtime and M4 admission form one release boundary。
 
 ## 11. Stop Conditions During Implementation
 

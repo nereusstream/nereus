@@ -1,7 +1,7 @@
 # Nereus Terminology
 
 > 状态：Current
-> 适用范围：总体设计、Future 1-8、Phase 1/1.5/2 实现合同、Phase 3 code-level target 和实现注释
+> 适用范围：总体设计、Future 1-8、Phase 1/1.5/2/3 实现合同和实现注释
 
 Nereus 以 stream 术语描述内部正确性。Pulsar ledger、Kafka log、对象和表都是投影或物理
 承载，不能取代逻辑 truth。

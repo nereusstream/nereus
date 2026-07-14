@@ -2,8 +2,8 @@
 
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
-> final-gated；F3 cursor protocol 已通过 design-only M0/M0R 并冻结到代码级但尚未实现；generation、txn、
-> catalog 部分仍为 target design。
+> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；generation、
+> txn、catalog 部分仍为 target design。
 
 ## 1. Purpose
 
@@ -372,7 +372,7 @@ retained。
 
 ## 12. Cursor commit protocol
 
-> Status: F3-M0/M0R design-gated；not implemented
+> Status: F3-M0/M0R design-gated；F3-M1-M6 implemented/final-gated
 
 One `CursorStateRecord` key owns exact projection/name、current writable-ledger `ownerSessionId`、cursor
 generation/lifecycle、`ackStateEpoch`、first-unacked `markDeleteOffset`、normalized whole ranges、partial-batch

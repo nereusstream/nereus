@@ -76,9 +76,10 @@ dispatch read position 不参与 retention；`ackStateEpoch` 只围住 destructi
 cursor roots；topic-owned trim mutation 必须携带当前 session。只读 planner/GC worker 不 claim cursor
 ownership，而是通过 versioned `CursorMetadataStore` read/scan surface 读取并在执行边界重验 root
 version/session；任何 owner change 都使本轮 snapshot 失效重试。
-它们不能把 Pulsar ownership/watch 当作 cursor CAS fence。F3-M1-M5 已完成相应 implementation gates，
-包括 real two-broker recovery/retention 与 10,000-root scale final gate；M6 final compatibility gate 尚未完成。
-在 F3 gates 完成前，F4 不得先行启用 generation publish 或 physical GC。
+它们不能把 Pulsar ownership/watch 当作 cursor CAS fence。F3-M1-M6 已完成 implementation/final gates，
+包括 real two-broker recovery/retention、10,000-root scale、stable MessageId/incarnation、read-only
+`CursorSnapshotInventory` 与 pending-lifecycle deletion veto。F4 可以开始实现，但在自己的 generation/
+reference-revalidation/physical-GC gates 完成前不得发布 higher generation 或删除 bytes。
 
 ## 4. Layer Boundary
 

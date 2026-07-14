@@ -166,7 +166,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("a2bad4cfa260cc4575ae759f8a345ce969c8ec3a")
+    .orElse("c2f7c22fdc562022b992a5c7aecb5fd5c02d318d")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -239,6 +239,9 @@ tasks.register<Exec>("phase2PulsarCheck") {
     description = "Run ordinary Pulsar fork Nereus tests, stock persistence regressions, and checkstyle."
     dependsOn("checkPulsarSourceLock")
     dependsOn("publishPhase2DevelopmentArtifacts")
+    // phase3FinalCheck runs with org.gradle.parallel=true and --rerun-tasks. Keep the first
+    // nested Pulsar build behind every local task that consumes the included Pulsar outputs.
+    mustRunAfter("phase3M3Check", "phase3M2FinalCheck")
     workingDir = file(pulsarCheckoutPath.get())
     commandLine(
         pulsarGradleWrapper,
@@ -273,7 +276,7 @@ tasks.register<Exec>("phase2PulsarFinalCheck") {
     description = "Run the real two-broker Oxia/LocalStack/BookKeeper Nereus recovery gate."
     dependsOn("checkPulsarSourceLock")
     dependsOn("publishPhase2DevelopmentArtifacts")
-    mustRunAfter("phase2PulsarCheck")
+    mustRunAfter("phase2PulsarCheck", "phase3M6Check")
     workingDir = file(pulsarCheckoutPath.get())
     commandLine(
         pulsarGradleWrapper,
@@ -345,6 +348,8 @@ tasks.register<Exec>("phase3M4PulsarCheck") {
     description = "Run the exact F3-M4 Pulsar broker capability, admission, recovery, ack, and admin suites."
     dependsOn("checkPulsarSourceLock")
     dependsOn("publishPhase2DevelopmentArtifacts")
+    dependsOn("phase3M3Check")
+    mustRunAfter("phase2PulsarCheck")
     workingDir = file(pulsarCheckoutPath.get())
     commandLine(
         pulsarGradleWrapper,
@@ -379,12 +384,31 @@ tasks.register("phase3M5Check") {
     dependsOn(":nereus-managed-ledger:test")
 }
 
+tasks.register<Exec>("checkPhase3PulsarAdminRoutes") {
+    group = "verification"
+    description = "Audit every loaded, unloaded, and namespace Nereus admin route in the locked Pulsar fork."
+    dependsOn("checkPulsarSourceLock")
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase3-pulsar-admin-routes.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("checkPhase3Documentation") {
+    group = "verification"
+    description = "Verify Phase 3 docs carry the implemented M6 contract, source lock, gates, and F4 handoff."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase3-documentation.sh")
+}
+
 tasks.register<Exec>("phase3M5PulsarFinalCheck") {
     group = "verification"
     description = "Run the real two-broker F3-M5 durable cursor recovery, expiry, and coexistence gate."
     dependsOn("checkPulsarSourceLock")
     dependsOn("publishPhase2DevelopmentArtifacts")
-    mustRunAfter("phase3M4PulsarCheck")
+    mustRunAfter("phase3M4PulsarCheck", "phase3M2FinalCheck", "phase2PulsarFinalCheck")
     workingDir = file(pulsarCheckoutPath.get())
     commandLine(
         pulsarGradleWrapper,
@@ -392,7 +416,7 @@ tasks.register<Exec>("phase3M5PulsarFinalCheck") {
         ":pulsar-broker:checkstyleMain",
         ":pulsar-broker:checkstyleTest",
         ":pulsar-broker:test",
-        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesDurableCursorTruthAcrossUnloadFailoverRestartExpiryAndBookKeeper",
         "--rerun-tasks",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
@@ -405,4 +429,59 @@ tasks.register("phase3M5FinalCheck") {
     dependsOn("phase3M5Check")
     dependsOn("phase3M2FinalCheck")
     dependsOn("phase3M5PulsarFinalCheck")
+}
+
+tasks.register("phase3M6Check") {
+    group = "verification"
+    description = "Verify F3-M6 compatibility, incarnation, rollout, F4 handoff, and admin-route boundaries."
+    dependsOn("phase3M5Check")
+    dependsOn("checkPhase2StorageIsolation")
+    dependsOn("checkPhase3Documentation")
+    dependsOn("checkPhase3PulsarAdminRoutes")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("phase3M6PulsarFinalCheck") {
+    group = "verification"
+    description = "Run the real two-broker F3-M6 MessageId, property, admin-route, and incarnation gate."
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase3M5PulsarFinalCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase3M6FinalCheck") {
+    group = "verification"
+    description = "Run every ordinary and real-service F3-M6 compatibility and F4-handoff gate."
+    dependsOn("phase3M6Check")
+    dependsOn("phase3M5FinalCheck")
+    dependsOn("phase3M6PulsarFinalCheck")
+}
+
+tasks.register("phase3Check") {
+    group = "verification"
+    description = "Run every ordinary Phase 3 cursor/subscription product gate."
+    dependsOn("phase3M6Check")
+}
+
+tasks.register("phase3FinalCheck") {
+    group = "verification"
+    description = "Run the complete Phase 1, 1.5, 2, and 3 release gate."
+    dependsOn("phase3Check")
+    dependsOn("phase2FinalCheck")
+    dependsOn("phase3M6FinalCheck")
 }

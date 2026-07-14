@@ -899,6 +899,11 @@ storage's irreversible delete schedules binding repair and does not claim rollba
 the mirror reaches `DELETED`. The binding owns only class/lifetime selection. BookKeeper metadata or the Nereus topic
 projection/L0 stream remains the storage-specific data and lifecycle authority.
 
+After a Nereus facade reaches terminal delete, its successful `asyncDelete` closes local cursor/session resources and
+removes the exact writable handle from the factory before invoking the caller callback. The broker may therefore claim
+the next binding generation and reopen the same persistence name immediately without reusing the prior generation's
+deleted stream. This is local-handle release only；durable objects remain governed by retention/GC.
+
 F2 never removes the binding key. `DELETED` is a small tombstone that is CAS-replaced by the next generation, so a
 delete/create race cannot observe key absence and independently claim both classes.
 The implementation uses only the locked `MetadataStore` primitives: `sync(key)` then `get(key)`, create with
@@ -1027,8 +1032,9 @@ The v2 persistence-policy GET/SET/DELETE endpoints use a persistence-specific pr
 storage-class bindings are active and the topic is genuinely absent，it still validates global namespace and target
 bundle ownership, then reads/mutates the topic-policy record without creating the business topic。Every other topic
 policy keeps the ordinary existence check，and a stock BookKeeper-only broker preserves NotFound for all three
-persistence operations。The Nereus factory's pre-create property probe returns an empty map only for durable state
-`MISSING`；`DELETING/DELETED` or projection corruption remains an error。
+persistence operations。The Nereus factory's pre-create property probe returns an empty map for durable state
+`MISSING` and terminal `DELETED` so a new binding generation can recreate the topic；`DELETING` or projection
+corruption remains an error。
 
 The fork-owned enum is closed for F2; broker call sites do not pass free-form strings:
 

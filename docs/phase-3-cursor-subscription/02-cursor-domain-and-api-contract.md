@@ -716,7 +716,10 @@ Rules：
 - M2 `CursorHandle.closeAsync()` marks the handle terminal、rejects new and queued mutations，and completes only after
   the already-running admitted mutation finishes；the later M3 ledger/managed-cursor shutdown owns the outer close
   deadline and waiter/callback cancellation；
-- callback dispatch is on the ManagedLedger callback executor, outside the lane and exactly once。
+- callback dispatch is outside the lane and exactly once。`CallbackDispatcher` uses the ManagedLedger callback
+  executor when it accepts work；a synchronous `RejectedExecutionException` runs the same terminal wrapper on the
+  rejecting completion thread so shutdown cannot strand callback permits or Entry/ByteBuf cleanup。Callback throws
+  are swallowed only after the terminal wrapper has executed its cleanup。
 
 ## 6. Mutation Result and Retry Contract
 
@@ -1148,7 +1151,8 @@ new generation：it sets `createdAtMillis=nowMillis` while keeping the monotonic
 
 ## 11. Async Safety Invariants
 
-1. Every Pulsar callback is invoked exactly once on the designated callback executor。
+1. Every Pulsar callback is invoked exactly once on the designated callback executor when it accepts work；executor
+   rejection invokes the same non-throwing terminal wrapper exactly once on the rejecting completion thread。
 2. No callback is invoked while holding cursor, ledger, waiter, metadata-client or Netty buffer locks。
 3. Callback success occurs only after the authoritative root CAS succeeds or the latest root proves the mutation
    already applied；protected create/backward-reset additionally requires matching retention pending -> ACTIVE

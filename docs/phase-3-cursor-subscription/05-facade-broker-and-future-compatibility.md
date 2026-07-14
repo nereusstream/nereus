@@ -178,9 +178,10 @@ Still rejected：
 
 The M4 fork changes below landed at local Pulsar
 `master@12edc9381c147ceec8bedd530acb5be7db339707` and are locked by `phase3M4Check`。The current implementation/source
-lock is `master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a` after M5 recovery hardening。`phase3M5Check` and
-`phase3M5FinalCheck` run the focused suites、real two-broker gate、spotless and checkstyle against that exact clean
-checkout。
+lock is `master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d` after M6 compatibility hardening；the M5 historical checkpoint
+remains `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`。`phase3M6Check` and `phase3M6FinalCheck` run the focused suites、
+loaded/unloaded/namespace route audit、real two-broker MessageId/property/incarnation gate、spotless and checkstyle
+against that exact clean checkout。
 
 ### 5.1 `NereusTopicFeatureValidator`
 
@@ -335,6 +336,32 @@ can stop delivery despite correct durable cursor state。
 Owner failover acceptance closes the old clients，waits for the surviving authoritative broker to own the topic，then
 opens the same Failover/Shared durable subscription directly against that broker。This proves hydrated cursor truth and
 stable MessageIds without conflating it with multi-address client connection-cache behavior。
+
+### 5.7 M6 unloaded-admin and recreation hardening
+
+An admin route is not allowed to infer “BookKeeper or missing” merely because `BrokerService.getTopicIfExists` is
+empty。`NereusStorageClassBindingStore.getBinding` performs exact `sync + get + decode` on the durable `NSB1` key；
+`NereusManagedLedgerStorage.validateUnloadedAdminOperation` applies the same closed `NereusAdminOperation` validator
+to every non-DELETED Nereus binding and allows missing、BookKeeper or terminal DELETED bindings。
+
+`PersistentTopicsBase.validateNereusAdminOperationForLoadedOrBoundTopic` first delegates to a loaded
+`PersistentTopic`，otherwise consults that exact binding。Topic delete and internal shadow-policy mutation use this
+path。The v2 `setShadowTopics` entry point repeats it before generic `preValidation(authoritative)` because that stock
+validation returns topic-not-found for an unloaded Nereus topic before the storage-specific policy rejection can run；
+the internal path validates again immediately before policy mutation。Namespace clear-backlog/delete-subscription
+fan-out still validates each loaded topic，and topic migration validates inside `PersistentTopic`。
+
+`scripts/check-phase3-pulsar-admin-routes.sh` treats the enum as a closed route inventory：every operation must appear
+in the validator and a guarded broker route，the binding-aware unloaded chain and shadow ordering must remain present，
+and namespace/migration entry points cannot bypass the topic validator。The real M6 test additionally executes loaded
+compaction rejection、unloaded shadow rejection with unchanged policies and namespace clear backlog。
+
+Pulsar reads managed-ledger properties before opening a recreated topic。A terminal F2 `DELETED` projection therefore
+returns an empty property view（like MISSING），while `DELETING` remains unavailable。Successful
+`NereusManagedLedger.asyncDelete` closes/releases its factory handle before the delete callback，matching stock
+ManagedLedger behavior；otherwise immediate same-name creation would return the cached old stream。The new binding
+generation then creates the next projection incarnation/stream/virtual ledger，and old cursor roots stay namespaced by
+the old stream ID for F4 reclamation。
 
 ## 6. Broker Topic-open Ordering
 

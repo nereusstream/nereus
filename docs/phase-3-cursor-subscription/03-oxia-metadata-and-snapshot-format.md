@@ -940,8 +940,19 @@ Object lifecycle：
 | snapshot of DELETED cursor | never referenced after delete CAS | delete CAS succeeds | F4 |
 | old stream-incarnation snapshots | old stream is deleted | stream deletion/reference grace satisfied | F4 |
 
-F3 must expose snapshot key/generation/ref metrics or scan data needed by F4。F4 must reread authoritative cursor root
-before deletion and honor its own reader/reference grace；it cannot infer liveness from object age alone。
+F3-M6 exposes this handoff without taking ownership of deletion：
+
+- `CursorSnapshotKeys.streamPrefix` and `objectKey` define the canonical cluster/stream/cursor-hash/generation/
+  snapshot-ID object namespace；`belongsToStream` rejects a listing from another stream incarnation；
+- `CursorSnapshotInventory.classify` consumes one exact `CursorLedgerIdentity`、versioned retention root、versioned
+  cursor-root scan and discovered object-key set。It records the retention owner/lifecycle/version/sequence，each
+  cursor generation/lifecycle/root version/reference，the live reference map and the unreferenced candidate set；
+- listing that omits a live reference、contains another projection/name hash、duplicates a cursor root/reference or
+  crosses the stream prefix fails closed；
+- `deletionVetoed()` is true for both `PROTECTION_PENDING` and `TRIM_PENDING`；`stillMatches` rebuilds classification
+  from the final authoritative retention/root reread and returns false on any owner/session/version/reference change；
+- the inventory is read-only and has no object-delete method。F4 must additionally establish its reader/reference
+  grace and then revalidate the inventory immediately before deletion；object age alone is never evidence。
 
 ## 13. Codec and Store Test Contract
 

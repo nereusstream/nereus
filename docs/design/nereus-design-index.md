@@ -2,9 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次设计/实现同步：2026-07-14
-> 当前交付阶段：Future 2 final-gated；Phase 3 F3-M0/M0R design-gated，F3-M1 foundation、F3-M2
-> state machines 与 F3-M5 recovery/scale complete/final-gated，F3-M3 facade 与 F3-M4 broker integration
-> complete/gated；仅 F3-M6 pending
+> 当前交付阶段：Future 2 与 Future 3 complete/final-gated；下一 production track 是 Future 4
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -40,8 +38,8 @@ streamId + offset
 1. **已实现行为**：生产代码、可执行测试和 durable golden bytes；
 2. **当前代码级合同**：`docs/phase-1-core-stream-storage/` 的已实现 L0 合同、
    `docs/phase-1.5-core-storage-foundation/` 的 implemented L0 evolution contract，以及
-   `docs/phase-2-managed-ledger-facade/` 的 implemented F2 contract；对于尚未完成的 F3 track，
-   `docs/phase-3-cursor-subscription/` 是 reviewed code-level target and incremental implementation contract；
+   `docs/phase-2-managed-ledger-facade/` 的 implemented F2 contract，以及
+   `docs/phase-3-cursor-subscription/` 的 implemented/final-gated F3 contract；
 3. **已接受决策**：`docs/decisions/`；
 4. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
 5. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
@@ -73,10 +71,10 @@ streamId + offset
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names exist；task/checkpoint/materializer/retention gate do not |
-| `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M5） | F2 ledger facade/cursor boundary plus F3 ack domain、immutable NCS1 snapshot codec/store、durable CursorStorage、retention/protection/trim state machines、dual-mode ManagedCursor facade/hydration/lifecycle and exact 10,000-root admission/hydration boundary are implemented/tested |
-| `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3-M3 runtime handoff） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle and real dual-broker restart/failover implemented/tested；F3 canonical cursor config/context and fail-closed activation-guard handoff are wired |
+| `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6） | F2 ledger facade/cursor boundary plus F3 ack domain、immutable NCS1 snapshot codec/store、durable CursorStorage、retention/protection/trim state machines、dual-mode ManagedCursor facade/hydration/lifecycle、exact 10,000-root boundary、reset/limit/rollout and F4 snapshot inventory are implemented/tested |
+| `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle、canonical cursor context、unloaded binding-aware admin validation and real dual-broker M6 compatibility cuts are implemented/tested |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
-| Future 3 cursor/subscription | `Designed / In progress`（F3-M1-M5 complete/gated） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration and M5 real two-broker recovery/retention/scale pass their gates；M6 final compatibility remains pending |
+| Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -142,8 +140,22 @@ Phase 3 M5 gates are：
 Both passed on 2026-07-14。The ordinary gate locks the clean Pulsar fork at
 `master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a` and adds the exact 10,000-root scale/admission gate；the final
 gate composes real Oxia、pinned LocalStack and the two-broker recovery suite covering stable MessageId、ack holes、
-partial batches、TTL/subscription expiration and stock BookKeeper coexistence。Future 3 remains
-`Designed / In progress` only until the M6 final compatibility gate passes。
+partial batches、TTL/subscription expiration and stock BookKeeper coexistence。The hash remains historical M5 evidence。
+
+Phase 3 M6 and aggregate gates are：
+
+```text
+./gradlew phase3M6Check
+./gradlew phase3M6FinalCheck --rerun-tasks
+./gradlew phase3Check
+./gradlew phase3FinalCheck --rerun-tasks
+```
+
+They pass against the current clean Pulsar fork
+`master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`。M6 covers exact ordinary/middle-batch MessageIds across history/
+seek/unload/failover/restart、cursor internal properties、reset/limit/rollout/incarnation boundaries、read-only F4
+snapshot inventory、callback rejection and loaded/unloaded/namespace admin-route audit。The aggregate final task also
+reruns Phase 1、1.5 and 2 final gates。Future 3 is `Implemented / final-gated`。
 
 ## 5. 当前一致性决策
 
@@ -215,7 +227,7 @@ decision behind items 14 and 16-18。
 | `nereus-futures.md` | 能力轨道、依赖 DAG、交付状态 | current |
 | `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
-| `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | M0/M0R design-gated；M1-M5 complete/gated；M6 pending |
+| `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -228,7 +240,7 @@ decision behind items 14 and 16-18。
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
-| `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed / In progress`（M0/M0R gated；M1-M5 complete/gated；M6 next） |
+| `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Implemented / final-gated`（M0/M0R + M1-M6） |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
@@ -255,14 +267,14 @@ decision behind items 14 and 16-18。
    Pulsar fork commit；
 6. 当前里程碑对应的代码和可执行 gate。
 
-### 实现 Future 3
+### 评审已实现 Future 3
 
 1. `nereus-future3-cursor-subscription.md`；
 2. `../phase-3-cursor-subscription/README.md`；
 3. 依次评审该目录的 `01` 到 `06` code-level documents；
-4. 使用本地 Pulsar `master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a` 重新验证当前 implementation/source lock；M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史完成证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`；
-5. F3-M1-M5 已完成相应 gate；从 F3-M6 final compatibility gate 继续推进；
-6. 在 F3-M6 之前保持状态为 `Designed/In progress`，不得写成 `Implemented`。
+4. 使用本地 Pulsar `master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d` 重新验证当前 implementation/source lock；M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
+5. 执行 `phase3Check` 和 `phase3FinalCheck --rerun-tasks`；
+6. 后续 F4/F5/F8 必须消费 F3 已冻结的 cursor/reference/MessageId contract，不得另建 correctness owner。
 
 ### 评审 Phase 1.5
 

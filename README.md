@@ -26,7 +26,7 @@ nereus/
   docs/phase-1-core-stream-storage/     implemented Phase 1 contracts and milestones
   docs/phase-1.5-core-storage-foundation/ implemented L0 evolution and gates
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
-  docs/phase-3-cursor-subscription/      F3 code-level contract and implemented M1-M5 gates
+  docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/automq-like-stream-storage/      reserved async materialization profile design
 ```
 
@@ -106,8 +106,16 @@ retention crash cuts，隔离规模夹具验证 10,000 个 cursor、40 个 bound
 拒绝和超限元数据 fail-closed；真实 Oxia、LocalStack S3、两 broker 与 BookKeeper 控制路径验证
 Exclusive/Failover/Shared、稳定 MessageId、partial-batch ack、owner/runtime restart、TTL/subscription expiry 和
 storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、Shared dispatcher 所需 mutable entry list
-以及首次 policy-system-topic 初始化时的 namespace lock 递归。F3-M6 final compatibility gate 尚未完成，
-因此 Future 3 仍是 `Designed / In progress`，不能描述为完整 production support。
+以及首次 policy-system-topic 初始化时的 namespace lock 递归。
+
+F3-M6 已在当前 Pulsar source lock `master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d` 完成。M6 增加
+普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
+property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
+F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace admin route 静态审计。
+真实 gate 还捕获并修复了两个仅在同名 delete/recreate 出现的问题：`DELETED` topic 的 properties probe
+必须返回空视图以允许重建，且 `ManagedLedger.asyncDelete` 必须像 stock BookKeeper 一样在 callback 前释放
+factory cache，避免新 broker topic 复用已删除 stream。`phase3M6Check`、`phase3M6FinalCheck`、
+`phase3Check` 和 `phase3FinalCheck` 构成完整 release gate；Future 3 已实现并 final-gated。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
 materialization and Future 4 workers remain designed/reserved.
@@ -144,4 +152,10 @@ The Phase 2 broker gates require the clean implemented fork commit currently rec
 ./gradlew phase3M2FinalCheck --rerun-tasks
 ./gradlew phase3M3Check
 ./gradlew phase3M4Check
+./gradlew phase3M5Check
+./gradlew phase3M5FinalCheck --rerun-tasks
+./gradlew phase3M6Check
+./gradlew phase3M6FinalCheck --rerun-tasks
+./gradlew phase3Check
+./gradlew phase3FinalCheck --rerun-tasks
 ```

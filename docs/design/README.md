@@ -22,7 +22,7 @@ P15-M6 已把 `AppendResult.cumulativeSize` 从 committed truth 交给 public re
 F2-M2 projection metadata、F2-M3 factory/ledger facade、F2-M4 cursor boundary、F2-M5 broker integration
 和 F2-M6 final acceptance 也已实现。真实双 Broker gate 已用 real Oxia、pinned LocalStack Community S3
 `4.14.0` 和 stock BookKeeper 验证 ownership failover、进程重启、unload/reload、Position/bytes 稳定与
-两类存储共存。Future 2 已 final-gated；下一阶段先在该 facade 合同上实施 Future 3，并把其
+两类存储共存。Future 2 已 final-gated；Future 3 在该 facade 合同上实现，并把其
 cursor/reference/retention 合同作为 Future 4 production 的前置。
 2026-07-14 已完成 Phase 3 的 design-only M0/M0R：durable cursor 的 single-root CAS、snapshot bytes、
 generation/tombstone、destructive `ackStateEpoch`、local read-position、per-writable-open owner-session claim、
@@ -30,9 +30,9 @@ broker ownership guard、retention barrier 和 Pulsar fork method mapping 已冻
 基础代码、golden/contract tests、真实 Oxia 和 LocalStack gate 已完成并 final-gated；F3-M2
 CursorStorage/retention state machines、failure injection、并发/property model 与真实 Oxia + LocalStack S3
 跨 runtime 恢复门禁也已完成并 final-gated。F3-M3 ManagedCursor facade/runtime/hydration、F3-M4 Pulsar
-capability/admission/durable-ack integration 与 F3-M5 deterministic/10k/two-broker real recovery gates 均已完成；
-M6 final compatibility/aggregate gate 尚未开始。实施顺序先完成 Phase 3，
-再进入依赖 cursor/reference correctness 的 Phase 4 production。
+capability/admission/durable-ack integration、F3-M5 deterministic/10k/two-broker real recovery 及 F3-M6
+MessageId/property/reset/limit/rollout/incarnation/F4-handoff gates 均已完成；Phase 3 已 final-gated。下一实施
+阶段可进入依赖 cursor/reference correctness 的 Phase 4 production。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以
