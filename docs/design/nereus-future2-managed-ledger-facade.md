@@ -496,5 +496,5 @@ contracts and F2-M1 through F2-M6 gates are in
 `../phase-2-managed-ledger-facade/README.md`。All F2 implementation/final-acceptance gates pass；Future 2 is
 complete。Future 3 已完成 design-only M0/M0R 并在不改变 F2 projection/MessageId 的前提下冻结 code-level
 cursor contract；F3-M1 foundation 及 F3-M2 CursorStorage/retention state machines 与真实 Oxia/S3 gate 已
-final-gated，F3-M3 facade 与 F3-M4 broker integration 已完成普通 gate，M5-M6 仍待完成。Future 4 remains
-a separate designed track。
+final-gated，F3-M3 facade 与 F3-M4 broker integration 已完成普通 gate，F3-M5 real recovery/retention/scale
+已完成最终 gate；仅 M6 仍待完成。Future 4 remains a separate designed track。

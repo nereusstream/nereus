@@ -176,9 +176,10 @@ Still rejected：
 
 ## 5. Pulsar Fork Changes
 
-The fork changes below are implemented at local Pulsar
-`master@12edc9381c147ceec8bedd530acb5be7db339707` and are locked by `phase3M4Check`。The gate runs the eight focused
-broker suites named in document 06 together with broker/broker-common spotless checks against an exact clean source
+The M4 fork changes below landed at local Pulsar
+`master@12edc9381c147ceec8bedd530acb5be7db339707` and are locked by `phase3M4Check`。The current implementation/source
+lock is `master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a` after M5 recovery hardening。`phase3M5Check` and
+`phase3M5FinalCheck` run the focused suites、real two-broker gate、spotless and checkstyle against that exact clean
 checkout。
 
 ### 5.1 `NereusTopicFeatureValidator`
@@ -319,6 +320,21 @@ from durable mark-delete and copies the current whole/partial ack view without p
 `PersistentTopicsBase.trimNonPartitionedTopic` validates `TRIM_TOPIC` immediately after resolving the loaded topic and
 before invoking `trimConsumedLedgersInBackground`；partitioned trim reaches the same check on each child。F3 rejects
 that admin operation explicitly while BrokerService periodic housekeeping continues to receive a normal no-op。
+
+### 5.6 M5 recovery hardening
+
+The first access to Pulsar's topic-policy service may lazily create its namespace system topic。A topic persistence
+mutation therefore initializes/reads that policy snapshot before acquiring the Nereus namespace storage-class lock，
+then reads a fresh snapshot again inside the lock。Creating the policy system topic while already holding the same
+first-durable-open lock is forbidden because it is a recursive lock acquisition and would time out。
+
+ManagedCursor read and replay results remain mutable `List<Entry>` instances。Pulsar's Shared dispatcher replaces
+elements with metadata wrappers before dispatch；returning an immutable copy violates the locked caller contract and
+can stop delivery despite correct durable cursor state。
+
+Owner failover acceptance closes the old clients，waits for the surviving authoritative broker to own the topic，then
+opens the same Failover/Shared durable subscription directly against that broker。This proves hydrated cursor truth and
+stable MessageIds without conflating it with multi-address client connection-cache behavior。
 
 ## 6. Broker Topic-open Ordering
 

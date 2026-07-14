@@ -29,9 +29,9 @@ generation/tombstone、destructive `ackStateEpoch`、local read-position、per-w
 broker ownership guard、retention barrier 和 Pulsar fork method mapping 已冻结。F3-M1 metadata/snapshot
 基础代码、golden/contract tests、真实 Oxia 和 LocalStack gate 已完成并 final-gated；F3-M2
 CursorStorage/retention state machines、failure injection、并发/property model 与真实 Oxia + LocalStack S3
-跨 runtime 恢复门禁也已完成并 final-gated。F3-M3 ManagedCursor facade/runtime/hydration 与 F3-M4 Pulsar
-capability/admission/durable-ack integration 也已完成并通过普通 gate；M5-M6 尚未开始。实施顺序先完成
-Phase 3，
+跨 runtime 恢复门禁也已完成并 final-gated。F3-M3 ManagedCursor facade/runtime/hydration、F3-M4 Pulsar
+capability/admission/durable-ack integration 与 F3-M5 deterministic/10k/two-broker real recovery gates 均已完成；
+M6 final compatibility/aggregate gate 尚未开始。实施顺序先完成 Phase 3，
 再进入依赖 cursor/reference correctness 的 Phase 4 production。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

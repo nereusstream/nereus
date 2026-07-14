@@ -2,7 +2,7 @@
 
 > 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation 与 F3-M2
 > CursorStorage/retention state machines complete/final-gated；F3-M3 facade 与 F3-M4 broker integration
-> complete/gated；F3-M5-M6 pending
+> complete/gated；F3-M5 real recovery/retention complete/final-gated；F3-M6 pending
 >
 > 代码级合同：[Phase 3 Cursor / Subscription Detailed Design](../phase-3-cursor-subscription/README.md)
 >
@@ -389,8 +389,10 @@ Future 2's compatibility model can carry Future 3 and Future 4.
 Future 3's durable protocol is implementation-ready.
 F3-M1 metadata/snapshot foundation and F3-M2 CursorStorage/retention state machines pass ordinary and
 real Oxia/LocalStack gates; F3-M3 ManagedCursor facade and F3-M4 Pulsar broker integration pass their ordinary gates;
-M5-M6 remain pending.
+F3-M5 passes deterministic crash-cut and exact 10,000-cursor scale gates plus real Oxia/LocalStack/two-broker/
+BookKeeper recovery acceptance; M6 remains pending.
 ```
 
-Implementation continues with F3-M5 real recovery and M6 final compatibility gate。See the detailed
+Implementation continues with F3-M6 final compatibility and aggregate release gates。The current Pulsar source lock is
+`master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`。See the detailed
 [implementation plan](../phase-3-cursor-subscription/06-implementation-plan-and-gates.md)。

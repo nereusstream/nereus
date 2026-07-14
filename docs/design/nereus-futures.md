@@ -30,7 +30,7 @@ protocol/table state = projection
 | --- | --- | --- | --- |
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
-| F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Designed/In progress；M0/M0R gated, M1-M4 complete/gated | implement F3-M5 real recovery/retention gates |
+| F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Designed/In progress；M0/M0R gated, M1-M5 complete/gated | implement F3-M6 final compatibility and aggregate gates |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
@@ -64,9 +64,9 @@ flowchart LR
 这不是所有设计工作的严格串行计划。F2-M0R2 新发现的 P15-M6 cumulative-result handoff 与 F2-M1-M6
 production milestones 已完成；Future 2 已 final-gated。Phase 3 的 M0/M0R 已把 cursor/reference/trim
 handoff 冻结到代码级，F3-M1 metadata/snapshot foundation 与 F3-M2 CursorStorage/retention state machines
-已 final-gated；F3-M3 facade 与 F3-M4 Pulsar broker integration 也已完成并通过普通 gate；接下来推进
-M5-M6。F4 production 在 F3 durable cursor/retention gates 完成前
-不得启动会发布 generation 或删除 physical bytes 的路径。
+已 final-gated；F3-M3 facade、F3-M4 Pulsar broker integration 与 F3-M5 real recovery/retention 也已完成并通过
+对应 gate；接下来推进 M6 final compatibility/aggregate exit。F4 production 在 F3-M6 完成前不得启动会发布
+generation 或删除 physical bytes 的路径。
 
 ## 4. F1 — Core Stream Storage
 
@@ -155,7 +155,7 @@ failure/lifecycle acceptance matrix：
 
 Detailed design: `nereus-future3-cursor-subscription.md`
 Code-level design: `../phase-3-cursor-subscription/README.md`
-Current milestone: F3-M0/M0R complete（design-only）；F3-M1-M4 complete/gated，M5 real recovery/retention next
+Current milestone: F3-M0/M0R complete（design-only）；F3-M1-M5 complete/gated，M6 final compatibility next
 
 ### Owns
 

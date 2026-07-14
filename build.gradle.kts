@@ -166,7 +166,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("12edc9381c147ceec8bedd530acb5be7db339707")
+    .orElse("a2bad4cfa260cc4575ae759f8a345ce969c8ec3a")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -370,4 +370,39 @@ tasks.register("phase3M4Check") {
     description = "Verify the complete F3-M4 Pulsar broker integration against the exact local fork."
     dependsOn("phase3M3Check")
     dependsOn("phase3M4PulsarCheck")
+}
+
+tasks.register("phase3M5Check") {
+    group = "verification"
+    description = "Verify F3-M5 deterministic recovery cuts and the exact 10,000-cursor scale boundary."
+    dependsOn("phase3M4Check")
+    dependsOn(":nereus-managed-ledger:test")
+}
+
+tasks.register<Exec>("phase3M5PulsarFinalCheck") {
+    group = "verification"
+    description = "Run the real two-broker F3-M5 durable cursor recovery, expiry, and coexistence gate."
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase3M4PulsarCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorMultiBrokerIntegrationTest",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase3M5FinalCheck") {
+    group = "verification"
+    description = "Run every ordinary and real-service F3-M5 cursor recovery and retention gate."
+    dependsOn("phase3M5Check")
+    dependsOn("phase3M2FinalCheck")
+    dependsOn("phase3M5PulsarFinalCheck")
 }

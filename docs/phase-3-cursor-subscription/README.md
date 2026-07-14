@@ -3,7 +3,7 @@
 > 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation 与 F3-M2
 > CursorStorage/retention state machines complete/final-gated；F3-M3 writable-open/runtime/hydration、dual-mode
 > ManagedCursor facade 与 conformance suite complete/gated；F3-M4 Pulsar broker integration complete/gated；
-> F3-M5-M6 pending
+> F3-M5 real recovery/retention complete/final-gated；F3-M6 pending
 >
 > Gate 日期：2026-07-14
 
@@ -30,7 +30,7 @@ Pulsar ManagedCursor API
 | Nereus baseline | `nereusstream/nereus@623662d9796af1bf2ff929f41df1a8c946a02279`；F2 final-gated |
 | Pulsar fork checkout | `/Users/liusinan/apps/ideaproject/nereusstream/pulsar` |
 | Pulsar M0 source/API audit baseline | local `master@7efae25af39a15407c1397d9e1f4ac4658d09daa`；historical blob/member evidence remains pinned |
-| Pulsar current implementation/source lock | local `master@12edc9381c147ceec8bedd530acb5be7db339707`；contains F3-M4 fork integration |
+| Pulsar current implementation/source lock | local `master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；contains F3-M5 real recovery/failover gate and policy-lock ordering fix |
 | Pulsar version interpretation | checkout 中的 `5.0.0-M1-SNAPSHOT` 只是本地 master 的 source-project selector，不是已发布的 M1 snapshot |
 | Executable Nereus profile inherited from F2 | `OBJECT_WAL_SYNC_OBJECT` only |
 | Coordinate contract | one Pulsar Entry = one Nereus stream offset；`Position.entryId == offset` |
@@ -159,7 +159,7 @@ retention coordinator。
 | F3-M2 | CursorStorage ack/reset/property/retention state machines | complete/final-gated；deterministic failure/concurrency models 与真实 Oxia + LocalStack S3 跨 runtime 恢复通过 |
 | F3-M3 | durable `NereusManagedCursor` and ledger hydration/enumeration | complete/gated；runtime/provider cursor resources、checked/trusted ownership guard、writable claim/hydration publication boundary、storage-backed exact-name durable open、dual-mode ack/read facade、tombstone delete/recreate、registry/admission/async close drain、完整 public API classification 与全部 12 个计划专项 suites 已实现；`phase3M3Check` 通过 locked Pulsar source/API、managed-ledger 与 adapter gates |
 | F3-M4 | Pulsar fork durable subscribe/ack/admin/capability integration | complete/gated；独立 cursor capability、two-stable-snapshot activation、canonical typed cursor config/context、F3 topic/ack/admin admission、durable ack completion ordering、hydrated subscription recreation 与 8 个 fork focused suites 已实现；`phase3M4Check` 通过 exact clean fork source lock、M1-M3 chain 与 spotless/test gates |
-| F3-M5 | two-broker/Oxia/ObjectStore recovery and retention barrier gates | not started |
+| F3-M5 | two-broker/Oxia/ObjectStore recovery and retention barrier gates | complete/final-gated；all 16 required scenarios are covered by deterministic failure models、the exact 10,000-root scale fixture and the real two-broker acceptance gate |
 | F3-M6 | compatibility/failure/final gate and F4 handoff | not started |
 
 后续里程碑不得以“先写一个多 key cursor schema”或“先持久化 readPosition”作为临时实现；这两种临时路径

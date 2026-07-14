@@ -619,23 +619,25 @@ public final class DefaultCursorStorage implements CursorStorage {
             StreamMetadata stream,
             int index,
             List<CursorState> states) {
-        if (index >= records.size()) {
-            return CompletableFuture.completedFuture(List.copyOf(states));
-        }
-        VersionedCursorState root = records.get(index);
-        if (root.value().lifecycle() == CursorRecordLifecycle.DELETED) {
-            return hydrateActiveRoots(owner, records, stream, index + 1, states);
-        }
-        return hydrator.hydrate(owner.ledger(), root).thenCompose(hydrated -> {
-            try {
-                requireStateOwner(owner, hydrated.state());
-                validateStateBounds(hydrated.state(), stream);
-                states.add(hydrated.state());
-                return hydrateActiveRoots(owner, records, stream, index + 1, states);
-            } catch (Throwable error) {
-                return CompletableFuture.failedFuture(error);
+        CompletableFuture<Void> hydration = CompletableFuture.completedFuture(null);
+        for (int cursor = index; cursor < records.size(); cursor++) {
+            VersionedCursorState root = records.get(cursor);
+            if (root.value().lifecycle() == CursorRecordLifecycle.DELETED) {
+                continue;
             }
-        });
+            hydration = hydration.thenCompose(ignored ->
+                    hydrator.hydrate(owner.ledger(), root).thenCompose(hydrated -> {
+                        try {
+                            requireStateOwner(owner, hydrated.state());
+                            validateStateBounds(hydrated.state(), stream);
+                            states.add(hydrated.state());
+                            return CompletableFuture.completedFuture(null);
+                        } catch (Throwable error) {
+                            return CompletableFuture.failedFuture(error);
+                        }
+                    }));
+        }
+        return hydration.thenApply(ignored -> List.copyOf(states));
     }
 
     private CompletableFuture<CursorMutationResult> cumulativeAckAttempt(

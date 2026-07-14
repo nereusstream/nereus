@@ -858,25 +858,27 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
             StreamMetadata stream,
             int index,
             List<CursorState> states) {
-        if (index >= records.size()) {
-            return CompletableFuture.completedFuture(List.copyOf(states));
-        }
-        VersionedCursorState record = records.get(index);
-        if (record.value().lifecycle() == CursorRecordLifecycle.DELETED) {
-            return hydrateActive(owner, records, stream, index + 1, states);
-        }
-        if (!record.value().ownerSessionId().equals(owner.ownerSessionId())) {
-            return CompletableFuture.failedFuture(fenced(
-                    "ACTIVE cursor root is not claimed by the current retention owner"));
-        }
-        return hydrator.hydrate(owner.ledger(), record).thenCompose(hydrated -> {
-            if (hydrated.state().acknowledgements().markDeleteOffset() < stream.trimOffset()) {
-                return CompletableFuture.failedFuture(invariant(
-                        "ACTIVE cursor mark-delete is behind the L0 trim offset"));
+        CompletableFuture<Void> hydration = CompletableFuture.completedFuture(null);
+        for (int cursor = index; cursor < records.size(); cursor++) {
+            VersionedCursorState record = records.get(cursor);
+            if (record.value().lifecycle() == CursorRecordLifecycle.DELETED) {
+                continue;
             }
-            states.add(hydrated.state());
-            return hydrateActive(owner, records, stream, index + 1, states);
-        });
+            if (!record.value().ownerSessionId().equals(owner.ownerSessionId())) {
+                return CompletableFuture.failedFuture(fenced(
+                        "ACTIVE cursor root is not claimed by the current retention owner"));
+            }
+            hydration = hydration.thenCompose(ignored ->
+                    hydrator.hydrate(owner.ledger(), record).thenAccept(hydrated -> {
+                        if (hydrated.state().acknowledgements().markDeleteOffset()
+                                < stream.trimOffset()) {
+                            throw invariant(
+                                    "ACTIVE cursor mark-delete is behind the L0 trim offset");
+                        }
+                        states.add(hydrated.state());
+                    }));
+        }
+        return hydration.thenApply(ignored -> List.copyOf(states));
     }
 
     private CompletableFuture<CursorRetentionView> requestTrimAttempt(

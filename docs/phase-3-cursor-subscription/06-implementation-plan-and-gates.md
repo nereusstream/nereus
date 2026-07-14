@@ -35,7 +35,14 @@ requires two stable all-persistent-broker snapshots before first activation，ma
 seven-argument runtime configuration and six-argument context，admits only the F3 topic/subscription/ack/admin matrix，
 reconstructs subscriptions from hydrated durable cursors，and defers durable acknowledgement side effects until cursor
 persistence succeeds。The exact eight focused broker suites and broker/broker-common spotless checks pass through
-`phase3M4Check` together with the complete M1-M3 dependency chain。F3-M5-M6 have not started。
+`phase3M4Check` together with the complete M1-M3 dependency chain。
+
+F3-M5 is complete and final-gated against the current clean Pulsar fork
+`master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`。The deterministic suites cover every CAS、snapshot、generation、
+retention and delayed-owner cut；`CursorStorageScaleTest` exercises the exact 10,000-record/page/count boundary；and
+the real two-broker test proves durable subscription recovery、stable MessageIds、expiry-only cursor mutations and
+BookKeeper coexistence over real Oxia and pinned LocalStack S3。`phase3M5Check` and `phase3M5FinalCheck` are green。
+F3-M6 has not started。
 
 A later milestone is complete only when：
 
@@ -602,7 +609,43 @@ Required scenarios：
 Exit requires no orphan/reference leak to be mistaken for visible state；physical orphan deletion is not an F3 exit
 condition and remains an observable F4 handoff。
 
-Planned gate：`phase3M5Check`；Docker/real-service gate：`phase3M5FinalCheck`。
+Implemented gate：`phase3M5Check`；Docker/real-service gate：`phase3M5FinalCheck`。
+
+### 8.1 Completion Evidence
+
+F3-M5 completed on 2026-07-14 against Pulsar
+`master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`：
+
+```text
+./gradlew phase3M5Check
+./gradlew phase3M5FinalCheck --rerun-tasks
+```
+
+The ordinary gate preserves the full M1-M4 dependency chain and executes the deterministic tests that prove scenarios
+5-11、13 and 16。Those suites cover lost CAS responses and exact-result retries、snapshot threshold/replacement/
+missing/corrupt handling、delete/recreate fencing、clear-backlog append races、every protection/trim pending crash cut、
+watch-disabled authoritative convergence and delayed old-owner mutations。The M5 scale fixture seeds exactly 10,000
+durable roots，reads them in 40 bounded pages（39 x 256 + 16），hydrates every root without call-stack growth，rejects
+the 10,001st create without publishing a root，and fails closed if storage already contains 10,001 roots。This gate
+found and removed recursive hydration in both `DefaultCursorStorage` and `DefaultCursorRetentionCoordinator`。
+
+`NereusCursorMultiBrokerIntegrationTest` supplies scenarios 1-4、12 and 15 using two real broker services、real Oxia、
+pinned LocalStack Community S3 `4.14.0` and a real BookKeeper control path。It proves Earliest/Latest cumulative state
+through unload，delivered-unacked Failover redelivery with byte-identical `MessageIdAdv` coordinates，Shared individual
+ack holes after owner loss，partial-batch remaining indexes through failover and runtime restart，cursor-only TTL and
+inactive-subscription expiry with unchanged object count，and stock BookKeeper subscription behavior。Every invocation
+uses fresh topic identities，and the failover phase reconnects directly to the authoritative surviving owner so the
+gate measures broker recovery rather than a stale client bootstrap connection。
+
+The same real gate requires the very first topic persistence-policy write to succeed。M5 found that lazy policy-system-
+topic creation could recursively request the namespace storage-class lock while the outer policy mutation held it；
+`BrokerService.updateTopicPersistence` now initializes that system topic before entering the critical section and
+re-reads the proposed state under the lock。It also found that Pulsar Shared dispatch mutates the returned entry list；
+Nereus cursor read/replay results now preserve the mutable `List<Entry>` contract instead of returning `List.copyOf`。
+
+The rerun final gate executed 96 Nereus tasks and 138 Pulsar tasks，including real M1/M2 Oxia/S3 recovery prerequisites、
+Pulsar spotless/checkstyle and the full two-broker acceptance scenario。No visible cursor state is inferred from an
+orphan snapshot；physical orphan deletion remains the explicit F4 handoff。
 
 ## 9. F3-M6 — Compatibility and Final Gate
 
@@ -655,7 +698,7 @@ Every implementation milestone updates：
 - F4 design if the handoff contract changes。
 
 “Designed / M0R-passed” must not be changed to “Implemented” until M6 final gate。Current partial-milestone language is
-`M1-M4 complete/gated; M5-M6 pending`。M1/M2 outputs are repository/test milestones and must not be published or
+`M1-M5 complete/gated; M6 pending`。M1/M2 outputs are repository/test milestones and must not be published or
 deployed as broker artifacts by themselves；the marker-aware decoder、M3 writable cursor runtime and M4 admission form
 one release boundary。
 
