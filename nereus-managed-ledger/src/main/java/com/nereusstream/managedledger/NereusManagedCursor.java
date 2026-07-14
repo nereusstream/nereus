@@ -1434,7 +1434,7 @@ public final class NereusManagedCursor implements ManagedCursor {
                         }
                         long size = entries.stream().mapToLong(Entry::getLength).sum();
                         updateReadStats(entries.size(), size);
-                        return List.copyOf(entries);
+                        return entries;
                     })
                     .exceptionallyCompose(error -> {
                         entries.forEach(Entry::release);
@@ -1729,7 +1729,7 @@ public final class NereusManagedCursor implements ManagedCursor {
             int index,
             List<Entry> entries) {
         if (index >= offsets.size()) {
-            return CompletableFuture.completedFuture(List.copyOf(entries));
+            return CompletableFuture.completedFuture(entries);
         }
         return ledger.readAt(offsets.get(index), metadata)
                 .thenCompose(entry -> {

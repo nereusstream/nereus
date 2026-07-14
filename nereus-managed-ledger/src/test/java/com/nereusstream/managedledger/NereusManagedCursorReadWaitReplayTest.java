@@ -87,6 +87,7 @@ class NereusManagedCursorReadWaitReplayTest {
                     null,
                     false).join();
             assertThat(bounded).extracting(Entry::getPosition).containsExactly(first, third);
+            bounded.set(0, bounded.get(0));
             bounded.forEach(Entry::release);
             assertThat(reader.getReadPosition().getEntryId()).isEqualTo(3);
 
@@ -111,6 +112,7 @@ class NereusManagedCursorReadWaitReplayTest {
             ReplayResult replay = replay(reader, Set.of(first, second, foreign));
             assertThat(replay.skipped()).isEqualTo(Set.of(second, foreign));
             assertThat(replay.entries().join()).extracting(Entry::getPosition).containsExactly(first);
+            replay.entries().join().set(0, replay.entries().join().get(0));
             replay.entries().join().forEach(Entry::release);
 
             assertThat(reader.findNewestMatching(
