@@ -1,6 +1,6 @@
 # Nereus Future 3：Cursor / Subscription State
 
-> 状态：Designed；当前仓库没有 cursor implementation
+> 状态：Designed；仓库已有 F2 broker-local non-durable/durable-boundary cursor，但尚无 F3 durable CursorStorage implementation
 > 前置：Future 2 Position projection、Future 1 read/trim semantics
 
 本文定义 Pulsar durable cursor progress 如何从 BookKeeper cursor ledger 迁移到 Oxia + immutable
@@ -330,6 +330,12 @@ Initial position:
 
 Open is idempotent. Multiple brokers may open the same durable cursor facade, but updates must use CAS.
 
+This table stores the **first not cumulatively acknowledged offset**, not a raw ManagedLedger mark-delete Position.
+At the API boundary `newNonDurableCursor(P)` follows the F2/stock rule that `P` is already consumed, so F2 first maps
+it once to `max(trimOffset, P.entryId + 1)`. F3 persists that resulting offset directly and must not apply another
+increment. Conversely, `seek(P)` and `resetCursor(P)` treat `P` as a direct read target; they never reuse the
+cursor-creation conversion.
+
 ### 9.2 Read
 
 ```text
@@ -401,6 +407,11 @@ readPositionOffset = max(targetOffset, markDeleteOffset)
 If force reset is allowed by Pulsar semantics, the target can move before mark-delete only when the caller
 explicitly requests replay and retention still protects the range.
 
+Resetting to a trimmed offset cannot recreate bytes: without a compacted view that still protects that coordinate,
+the target advances to trim or fails according to the public method's force contract. This is separate from
+non-durable cursor behavior, which never contributes a retention low-watermark and always advances its next read to
+the first retained offset after trim overtakes it.
+
 ### 9.6 Clear backlog
 
 ```text
@@ -439,6 +450,8 @@ Rules:
 - Unacked gaps above `markDeleteOffset` must remain readable.
 - Cursor snapshot objects are protected by cursor state references.
 - Reader leases and future Kafka group offsets can add additional protection.
+- Broker-local/non-durable cursors do not enter this minimum and cannot block trim or GC; reads from an overtaken local
+  position resume at `trimOffset` while preserving the surviving MessageIds.
 
 Backlog estimate:
 

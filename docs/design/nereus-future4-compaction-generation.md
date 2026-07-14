@@ -9,6 +9,10 @@
 > 对 AutoMQ-like profile，Future 4 的 worker 也是 append ack 之后的 async object
 > materialization 路径。
 
+“Compaction”在本文中包含两个不能混用的 domain：`COMMITTED` view 的 generation replacement 是无损
+physical-layout compaction；Pulsar/Kafka 按 key 丢弃旧值属于独立的 `TOPIC_COMPACTED` semantic view。后者
+永远不能仅凭更高 generation 成为普通 committed read 的 physical target。
+
 ## 1. Motivation
 
 Future 1 的 object WAL 面向写入效率，一个物理 object 可以包含多个 stream slices。这个形态
@@ -35,7 +39,7 @@ Future 4 覆盖：
 - generation overlay；
 - highest-generation read resolver；
 - old generation fallback；
-- topic compaction primitive；
+- view-scoped topic compaction primitive；
 - compaction checkpoint；
 - materialization lag checkpoint；
 - GC protection and object reference rules。
@@ -92,6 +96,7 @@ Future 4 不能做：
 - 改变 stream offset；
 - 改变 `committedEndOffset`；
 - 改变 producer ack 已经返回的 protocol projection；
+- 将丢失 Entry/record 的 semantic-compaction output 发布到普通 committed-read offset index；
 - 让 object list 决定可见性；
 - 删除仍被 cursor、reader、catalog 或 task 引用的 object；
 - 让 lakehouse catalog commit 进入 producer ack path。
@@ -116,8 +121,16 @@ interface GenerationCommitter {
             CompactionOutput output);
 }
 
+enum ReadView {
+    COMMITTED,
+    TOPIC_COMPACTED
+}
+
 interface GenerationReadResolver {
-    CompletableFuture<ResolvedRange> resolve(StreamId streamId, Offset offset);
+    CompletableFuture<ResolvedRange> resolve(
+            StreamId streamId,
+            Offset offset,
+            ReadView view);
 }
 ```
 
@@ -131,6 +144,7 @@ interface GenerationReadResolver {
 /nereus/clusters/{cluster}/streams/{streamId}/compaction/tasks/{taskId}
 /nereus/clusters/{cluster}/streams/{streamId}/compaction/checkpoints/{plannerId}
 /nereus/clusters/{cluster}/streams/{streamId}/offset-index/{offsetEnd}/{generation}
+/nereus/clusters/{cluster}/streams/{streamId}/views/topic-compacted/index/{offsetEnd}/{generation}
 /nereus/clusters/{cluster}/objects/{objectId}/manifest
 /nereus/clusters/{cluster}/objects/{objectId}/references/{refType}/{refId}
 ```
@@ -143,6 +157,7 @@ interface GenerationReadResolver {
   "streamId": "s-123",
   "offsetStart": 1048576,
   "offsetEnd": 1114112,
+  "readView": "COMMITTED",
   "sourceEntries": [
     {
       "offsetEnd": 1064960,
@@ -172,10 +187,10 @@ Task state 只是 compaction workflow state，不决定 logical append visibilit
 generation 决定已提交 range 的 physical read target；stream head + reachable commit log 仍决定该
 range 是否逻辑提交。
 
-## 7. Compacted Object Format
+## 7. Read-optimized Object Format
 
-Compacted object 是 per-stream object，默认物理格式为 Parquet，逻辑上保留 Nereus record
-fields。
+Read-optimized object 是 per-stream object，默认物理格式为 Parquet。其 schema 由 `readView` 和 payload
+mapping 共同约束；“包含可重建字段”不能替代 observable bytes 合同。
 
 ```json
 {
@@ -184,6 +199,7 @@ fields。
   "offsetStart": 1048576,
   "offsetEnd": 1114112,
   "generation": 18,
+  "readView": "COMMITTED",
   "recordCount": 65536,
   "entryCount": 4096,
   "physicalFormat": "PARQUET",
@@ -204,7 +220,7 @@ fields。
 }
 ```
 
-Compacted object 必须保留：
+所有 view 的 object 必须保留：
 
 - stream offset；
 - publish time / event time；
@@ -214,6 +230,17 @@ Compacted object 必须保留：
 - transaction marker / abort visibility reference；
 - Pulsar entry projection metadata；
 - Kafka record batch projection metadata where needed。
+
+For `COMMITTED + PULSAR_ENTRY_V1`, every covered stream offset must additionally contain exactly one complete opaque
+Pulsar ManagedLedger Entry byte sequence and its entry boundary. Reading the replacement must return byte-for-byte the
+same Entry as generation 0. The object container may apply lossless compression/encryption, but the worker cannot
+split、merge、rebatch、re-encode or semantically reconstruct that Entry. `Position.entryId` remains the stream offset;
+batch index remains inside those exact bytes. A replacement that cannot prove exact Entry count、offset coverage and
+payload checksum is not publishable to the `COMMITTED` view.
+
+`TOPIC_COMPACTED` objects may omit superseded keyed records while retaining declared logical coverage/tombstones, but
+they are eligible only for an explicitly compacted read. They use their separate view index and cannot shadow a
+`COMMITTED` generation regardless of generation number.
 
 ## 8. Generation Replacement
 
@@ -231,6 +258,7 @@ Generation replacement 发布一个更高 generation 的 index entry：
   "offsetStart": 1048576,
   "offsetEnd": 1114112,
   "generation": 18,
+  "readView": "COMMITTED",
   "objectType": "STREAM_COMPACTED_OBJECT",
   "objectId": "co-s-123-1048576-1114112-g18",
   "supersedes": ["1064960/17", "1114112/17"],
@@ -238,19 +266,21 @@ Generation replacement 发布一个更高 generation 的 index entry：
 }
 ```
 
-Reader selection rule：
+The ordinary offset-index namespace contains only `COMMITTED` lossless targets. Reader selection is view-scoped：
 
 ```text
-resolve(streamId, offset):
+resolve(streamId, offset, requestedView):
+  select only requestedView's index namespace
   find entries where offsetStart <= offset < offsetEnd
   ignore tombstoned entries
-  choose highest visible generation
+  choose highest visible generation within that view
   if chosen generation read fails checksum/object validation:
       fallback only to still-visible lower generation
       surface data-integrity error if no safe fallback exists
 ```
 
-Fallback 不是正常读路径的 correctness 依赖，只是发布新 generation 后的安全垫。长期依赖
+Generation counters and supersession sets are scoped to one view. A `TOPIC_COMPACTED` generation can never outrank or
+supersede a `COMMITTED` target. Fallback 不是正常读路径的 correctness 依赖，只是发布新 generation 后的安全垫。长期依赖
 fallback 说明 compacted object 或 GC policy 有问题。
 
 ## 9. State Transitions
@@ -301,15 +331,41 @@ PUBLISHED
 
 GC readiness 不等于立即删除 object。实际删除仍由 GC worker 按引用模型执行。
 
+Source index and object retirement is a separate two-stage protocol:
+
+```text
+publish replacement in one view
+  -> tombstone superseded source index keys with expected generation/checksum
+  -> keep source object while any visible index, reachable-commit recovery root,
+     reader lease/cache pin, cursor/group/catalog reference or task protects it
+  -> mark GC candidate with the complete observed reference/version set
+  -> wait for pre-existing bounded reader leases to release/expire
+  -> re-read and CAS-validate every root
+  -> delete object idempotently
+  -> delete/tombstone retired metadata keys and record audit result
+```
+
+Resolve-to-read must close the deletion race: before object IO, the reader acquires a bounded lease/pin conditioned on
+the selected `(streamId, range, view, generation, target identity, checksum)` still being visible; GC snapshots these
+leases, waits out older leases and revalidates after the wait. A cache reference is equivalent only if it participates
+in the same authoritative pin protocol. Until this protocol and a reachable-commit recovery checkpoint/root are
+implemented, higher generation may be published but source bytes and source index keys are retention-protected.
+
+This retirement also bounds the F2 `O(committed append ranges)` offset-index count. Old incarnation projection mirrors
+may be removed only after current topic authority points elsewhere and no reader/task/audit/recovery reference needs
+the old stream; their absence never permits an old MessageId to address the new incarnation.
+
 ## 10. Topic Compaction Primitive
 
-Pulsar topic compaction 和 Kafka topic compaction 可以复用 generation replacement：
+Pulsar topic compaction 和 Kafka topic compaction reuse the immutable-object/task/CAS machinery but publish only to
+the separate `TOPIC_COMPACTED` view：
 
 1. Planner 选择 compactable offset range。
 2. Worker 根据 key 保留最高 offset record。
 3. Worker 写 compacted object，并保留 offset coverage。
-4. Committer 发布更高 generation。
-5. Reader 读取最高 generation，并按 topic compaction visibility 过滤。
+4. Committer publishes a higher generation under `views/topic-compacted/index`。
+5. Only a reader that explicitly requests `TOPIC_COMPACTED` selects that generation and applies topic-compaction
+   visibility；ordinary readers continue to resolve the lossless `COMMITTED` view。
 
 被 compact 掉的 record 不再返回给 compacted read，但 offset range 仍然连续覆盖，不能制造
 offset gap。
@@ -323,6 +379,8 @@ offset gap。
 | Worker crash after object upload before publish | Object is orphan until task retry or GC |
 | Publish CAS conflict | Task refreshes source entries; old output may become orphan |
 | New generation object checksum failure | Reader falls back only if lower generation still visible |
+| Lossy or byte-rewritten Pulsar output proposed for `COMMITTED` | Publish invariant failure; no index mutation |
+| Semantic-view generation visible to ordinary resolver | Namespace/view validation failure; never fall back across views |
 | Old generation deleted too early | GC invariant violation; Future 4 must prevent this by reference rules |
 | Cursor lags behind compacted range | Cursor reads through highest valid generation; old object kept only if needed |
 | Catalog references old generation | Future 6 catalog reference protects object from GC |
@@ -332,8 +390,10 @@ offset gap。
 ### Pulsar
 
 - `MessageId` / `Position` projection must remain stable across generation replacement.
+- `PULSAR_ENTRY_V1` ordinary reads return the exact original Entry bytes and one offset remains one Entry across every
+  physical generation.
 - ManagedCursor backlog and retention use offsets and cumulative size, not object identity.
-- Topic compaction can use the same generation primitive but keeps Pulsar observable semantics.
+- Topic compaction uses only the separate compacted-read view and keeps Pulsar observable semantics.
 
 ### KoP / Kafka
 
@@ -354,9 +414,12 @@ Future 4 may enter implementation planning only after the following are reviewed
 - generation replacement CAS conditions；
 - highest-generation read resolver；
 - compacted object required fields；
+- exact opaque-entry preservation for `COMMITTED + PULSAR_ENTRY_V1` and equivalent mapping-specific lossless rules；
+- explicit read-view enum、separate index namespaces and prohibition on cross-view supersession/fallback；
 - fallback and checksum behavior；
 - topic compaction primitive；
 - old generation reference and GC protection；
+- reader resolve/pin/read/release protocol、reachable-commit recovery root and source-index retirement；
 - AutoMQ-like materialization lag and primary WAL retention protection；
 - interactions with Future 3 cursor low-watermark and Future 6 catalog snapshots。
 

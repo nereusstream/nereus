@@ -281,7 +281,7 @@ review summary; they do not replace the complete matrix.
 | direct read | Implement |
 | LAC, first/next/previous/after-N, counts and size | Role-aware exact formulas; first position is before-first; size is exact lifetime logical bytes |
 | properties | Implement through authoritative topic record |
-| open read-only/non-durable cursor | Implement |
+| open read-only/non-durable cursor | Implement; a concrete non-durable start Position is already consumed and the first read is its next retained Entry; null/`LATEST`/future consult `InitialPosition`, and the two-argument overload defaults Latest |
 | open durable cursor | Basic boundary only; mutation methods explicitly unsupported until F3 |
 | terminate/isTerminated | Implement with L0 seal |
 | close | Implement local close |
@@ -306,11 +306,11 @@ extent as a real BookKeeper ledger。
 
 | Group | F2 behavior |
 | --- | --- |
-| read/read-or-wait/skip/seek/rewind | Implement for non-durable and durable-boundary cursor; ReadOnlyCursor has its locked subset |
+| read/read-or-wait/skip/seek/rewind | Implement for non-durable and durable-boundary cursor; direct seek has no start-position `+1`, non-force seek cannot cross local mark-delete, and rewind uses next-valid after mark-delete; ReadOnlyCursor has its locked subset |
 | read position/count/backlog | Exact offset formulas for read-only/non-durable cursor |
 | active/inactive/close/cancel waiter | Implement local state |
 | durable open/state view | Expose basic local boundary and report `isCursorDataFullyPersistable=false` |
-| non-durable cumulative mark-delete/clear/reset | Implement locally only |
+| non-durable cumulative mark-delete/clear/reset | Implement locally only; reset treats its Position as the direct read target and normalizes sentinels/trim/tail separately from cursor creation |
 | durable mark-delete and all individual delete/ack sets | Fail unsupported until F3 |
 | durable reset/properties persistence | Fail unsupported until F3 |
 | replay overloads | Direct non-mutating reread; return locally mark-deleted positions as skipped, honor sort flag, and do not infer individual ack holes |

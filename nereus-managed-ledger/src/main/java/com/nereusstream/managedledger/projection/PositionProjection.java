@@ -74,6 +74,46 @@ public final class PositionProjection {
         return entryId;
     }
 
+    /**
+     * Converts a concrete ManagedLedger cursor-start/mark-delete coordinate to
+     * the next retained read offset. Unlike an ordinary read position, a
+     * cursor-start coordinate denotes the entry that has already been
+     * consumed. Positions older than the retained range are advanced to the
+     * first retained offset, matching BookKeeper ManagedLedger's
+     * getNextValidPosition behavior after ledger trimming.
+     */
+    public long cursorReadOffsetAfter(
+            VirtualLedgerProjection projection,
+            Position position,
+            StreamMetadata snapshot) {
+        StreamPositionBounds current = bounds(projection, snapshot);
+        long entryId = requireCurrentLedger(projection, position);
+        if (entryId < -1 || entryId >= current.committedEndOffset()) {
+            throw new ProjectionValidationException(
+                    "cursor-start position is before the coordinate origin or beyond LAC");
+        }
+        try {
+            return Math.max(current.trimOffset(), Math.addExact(entryId, 1));
+        } catch (ArithmeticException e) {
+            throw new ProjectionValidationException("cursor-start position overflows", e);
+        }
+    }
+
+    /** Normalizes a direct reset read position to the retained/tail range. */
+    public long normalizeResetReadPositionOffset(
+            VirtualLedgerProjection projection,
+            Position position,
+            StreamMetadata snapshot) {
+        StreamPositionBounds current = bounds(projection, snapshot);
+        long entryId = requireCurrentLedger(projection, position);
+        if (entryId < -1) {
+            throw new ProjectionValidationException("reset read position is before the coordinate origin");
+        }
+        return Math.max(
+                current.trimOffset(),
+                Math.min(entryId, current.committedEndOffset()));
+    }
+
     public long markDeleteOffsetAfter(
             VirtualLedgerProjection projection,
             Position position,

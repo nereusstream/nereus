@@ -104,12 +104,16 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
 
     @Override
     public synchronized boolean hasMoreEntries() {
-        return !closed && readPosition.getEntryId() < ledger.currentMetadata().committedEndOffset();
+        StreamMetadata metadata = ledger.currentMetadata();
+        return !closed && Math.max(readPosition.getEntryId(), metadata.trimOffset())
+                < metadata.committedEndOffset();
     }
 
     @Override
     public synchronized long getNumberOfEntries() {
-        return Math.max(0, ledger.currentMetadata().committedEndOffset() - readPosition.getEntryId());
+        StreamMetadata metadata = ledger.currentMetadata();
+        return Math.max(0, metadata.committedEndOffset()
+                - Math.max(readPosition.getEntryId(), metadata.trimOffset()));
     }
 
     @Override
@@ -120,7 +124,9 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
         StreamMetadata metadata = ledger.currentMetadata();
         long target;
         try {
-            target = Math.addExact(readPosition.getEntryId(), numEntriesToSkip);
+            target = Math.addExact(
+                    Math.max(readPosition.getEntryId(), metadata.trimOffset()),
+                    numEntriesToSkip);
         } catch (ArithmeticException ignored) {
             target = Long.MAX_VALUE;
         }
@@ -208,7 +214,7 @@ public final class NereusReadOnlyCursor implements ReadOnlyCursor {
             Position inclusiveMax = ledger.normalizeInclusiveMax(maxPosition, metadata);
             long start;
             synchronized (this) {
-                start = readPosition.getEntryId();
+                start = Math.max(readPosition.getEntryId(), metadata.trimOffset());
             }
             long endExclusive = Math.min(
                     metadata.committedEndOffset(), inclusiveMax.getEntryId() + 1);

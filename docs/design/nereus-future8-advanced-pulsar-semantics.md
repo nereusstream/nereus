@@ -295,14 +295,16 @@ Schema state belongs to Pulsar metadata layer, not L0 per-record storage truth.
 
 ## 12. Topic Compaction Compatibility
 
-Pulsar topic compaction uses Future 4 generation replacement:
+Pulsar topic compaction uses Future 4's separate `TOPIC_COMPACTED` view and immutable-object/task/CAS machinery. It
+never publishes a lossy target into the ordinary `COMMITTED` offset index:
 
 - compact by key；
 - preserve offset coverage；
 - latest value by key remains visible in compacted read；
 - tombstone semantics follow Pulsar policy；
 - MessageId projection remains stable；
-- compacted object must retain enough entry metadata to serve Pulsar reads。
+- compacted object must retain the exact entry/projection information required by the compacted-read contract；ordinary
+  `PULSAR_ENTRY_V1` reads continue to use a lossless generation containing the exact opaque Entry bytes。
 
 Topic compaction state:
 

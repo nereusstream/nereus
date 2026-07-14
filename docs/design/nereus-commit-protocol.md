@@ -358,10 +358,14 @@ Publish conditions include：
 - expected source generations/checksums match；
 - output exactly covers the declared offset range；
 - projection/transaction information is preserved；
+- the target carries a closed read-view identity; ordinary offset-index publication requires `COMMITTED` and the
+  payload mapping's lossless observable-byte/entry-boundary proof；
 - target generation is monotonic and idempotent。
 
 The generation entry publish is the physical-target switch point，not a new logical append。Reader picks
-the highest valid visible generation。Lower-generation fallback is permitted only while explicitly retained。
+the highest valid visible generation within the requested view。`TOPIC_COMPACTED` uses a separate index namespace and
+cannot supersede or serve as fallback for `COMMITTED`。Lower-generation fallback is permitted only while explicitly
+retained。
 
 ## 12. Cursor commit protocol
 
@@ -442,6 +446,16 @@ An object is deletable only when all relevant conditions are true：
 - no catalog snapshot/delivery references it；
 - orphan TTL/audit/ownership/checksum state allows deletion。
 
+Superseded offset-index keys are themselves retained metadata until the same root scan permits tombstone/removal;
+otherwise physical compaction would leave Oxia cardinality at `O(all historical appends)`. Resolve-to-read acquires a
+bounded authoritative pin on the exact view/generation/target/checksum before IO. GC waits for prior pins to expire or
+release and then revalidates every root. A process-local cache flag is insufficient.
+
+If the reachable commit chain still names the primary target needed for exact append recovery, that target remains a
+GC root even after a higher physical generation is visible. F4 must publish a recovery checkpoint/anchor that proves
+the older primary is no longer needed before source deletion; without it, generation publish is allowed but deletion
+is disabled.
+
 Recommended sequence：
 
 ```text
@@ -504,7 +518,9 @@ Before enabling async/BookKeeper/higher-generation execution after Phase 1.5：
 - define `WAL_DURABLE` read-after-success SLA and repair error mapping；
 - freeze async task/checkpoint/idempotence schema；
 - freeze higher-generation publish CAS and overlap rules；
+- freeze view-scoped index namespaces and lossless `COMMITTED` payload-mapping validation；
 - add retention protection across primary WAL、readers、cursor/group and catalogs；
+- implement reader pins、reachable-commit recovery checkpoints and superseded-index retirement before physical GC；
 - provide fault injection at every irreversible boundary；
 - keep code/docs/golden bytes updated together。
 

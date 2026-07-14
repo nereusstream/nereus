@@ -73,6 +73,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 import io.netty.buffer.ByteBuf;
+import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.AddEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.mledger.AsyncCallbacks.OpenReadOnlyManagedLedgerCallback;
@@ -267,6 +268,150 @@ class NereusManagedLedgerFacadeTest {
         } finally {
             metadata.close();
             objectStore.close();
+        }
+    }
+
+    @Test
+    void nonDurableCursorStartSeekResetAndTrimMatchStockContract() throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("cursor-contract"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        DefaultStreamStorage storage = new DefaultStreamStorage(
+                StreamStorageConfig.defaults("cluster/a", "cursor-contract-test"),
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "cursor-contract-test", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(storage, projections)) {
+            NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
+                    runtime,
+                    fixedGuard(7),
+                    config(true),
+                    new ManagedLedgerFactoryConfig(),
+                    false);
+            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(NAME, config(true));
+            Position first = ledger.addEntry("entry-0".getBytes(StandardCharsets.UTF_8));
+            Position second = ledger.addEntry("entry-1".getBytes(StandardCharsets.UTF_8));
+            Position third = ledger.addEntry("entry-2".getBytes(StandardCharsets.UTF_8));
+            long ledgerId = ledger.projection().virtualLedgerId();
+
+            ManagedCursor afterFirst = ledger.newNonDurableCursor(first, "after-first");
+            assertCursorBoundary(afterFirst, 1, 0);
+            List<Entry> afterFirstEntries = afterFirst.readEntries(1);
+            assertThat(afterFirstEntries).singleElement()
+                    .satisfies(entry -> assertThat(entry.getPosition()).isEqualTo(second));
+            afterFirstEntries.forEach(Entry::release);
+
+            ManagedCursor beforeFirst = ledger.newNonDurableCursor(
+                    PositionFactory.create(ledgerId, -1), "before-first");
+            assertCursorBoundary(beforeFirst, 0, -1);
+
+            ManagedCursor defaultLatest = ledger.newNonDurableCursor(null, "default-latest");
+            assertCursorBoundary(defaultLatest, 3, 2);
+
+            ManagedCursor latestWithEarliestDefault = ledger.newNonDurableCursor(
+                    PositionFactory.LATEST,
+                    "latest-with-earliest-default",
+                    InitialPosition.Earliest,
+                    false);
+            assertCursorBoundary(latestWithEarliestDefault, 0, -1);
+
+            ManagedCursor earliestWithLatestDefault = ledger.newNonDurableCursor(
+                    PositionFactory.EARLIEST,
+                    "earliest-with-latest-default",
+                    InitialPosition.Latest,
+                    false);
+            assertCursorBoundary(earliestWithLatestDefault, 0, -1);
+
+            ManagedCursor futureWithEarliestDefault = ledger.newNonDurableCursor(
+                    PositionFactory.create(ledgerId, 99),
+                    "future-with-earliest-default",
+                    InitialPosition.Earliest,
+                    false);
+            assertCursorBoundary(futureWithEarliestDefault, 0, -1);
+
+            assertThatThrownBy(() -> ledger.newNonDurableCursor(
+                    PositionFactory.create(ledgerId + 1, 0), "wrong-ledger"))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            ManagedCursor anonymousOne = ledger.newNonDurableCursor(first);
+            ManagedCursor anonymousTwo = ledger.newNonDurableCursor(first);
+            assertThat(anonymousOne).isNotSameAs(anonymousTwo);
+
+            ManagedCursor navigation = ledger.newNonDurableCursor(
+                    PositionFactory.EARLIEST, "navigation");
+            assertThat(navigation.getPersistentMarkDeletedPosition()).isNull();
+            navigation.markDelete(second);
+            navigation.seek(first, false);
+            assertCursorBoundary(navigation, 2, 1);
+            navigation.seek(first, true);
+            assertCursorBoundary(navigation, 0, 1);
+            navigation.rewind();
+            assertCursorBoundary(navigation, 2, 1);
+            navigation.resetCursor(second);
+            assertCursorBoundary(navigation, 1, 0);
+            navigation.resetCursor(PositionFactory.EARLIEST);
+            assertCursorBoundary(navigation, 0, -1);
+            navigation.resetCursor(PositionFactory.LATEST);
+            assertCursorBoundary(navigation, 3, 2);
+            assertThat(resetCursorAsync(navigation, first, true).join()).isEqualTo(first);
+            assertCursorBoundary(navigation, 0, -1);
+            assertThat(resetCursorAsync(
+                    navigation, PositionFactory.create(ledgerId, 99), false).join())
+                    .isEqualTo(PositionFactory.create(ledgerId, 3));
+            assertCursorBoundary(navigation, 3, 2);
+            assertThatThrownBy(() -> navigation.rewind(true))
+                    .isInstanceOf(UnsupportedOperationException.class)
+                    .hasMessageStartingWith("NEREUS_UNSUPPORTED_OPERATION:");
+
+            ManagedCursor trimFollower = ledger.newNonDurableCursor(
+                    PositionFactory.EARLIEST, "trim-follower");
+            storage.trim(
+                    ledger.projection().streamId(),
+                    2,
+                    new TrimOptions(Duration.ofSeconds(5), "cursor contract trim")).join();
+            ledger.refreshMetadata().join();
+            assertThat(trimFollower.getNumberOfEntries()).isEqualTo(1);
+            assertThat(trimFollower.getNumberOfEntriesInBacklog(true)).isEqualTo(1);
+            List<Entry> retained = trimFollower.readEntries(1);
+            assertThat(retained).singleElement()
+                    .satisfies(entry -> assertThat(entry.getPosition()).isEqualTo(third));
+            retained.forEach(Entry::release);
+
+            ManagedCursor trimmedStart = ledger.newNonDurableCursor(first, "trimmed-start");
+            assertCursorBoundary(trimmedStart, 2, 1);
+            ManagedCursor firstRetainedBatchStart = ledger.newNonDurableCursor(
+                    PositionFactory.create(ledgerId, 1), "first-retained-batch-start");
+            assertCursorBoundary(firstRetainedBatchStart, 2, 1);
+            assertThatThrownBy(() -> resetCursorAsync(navigation, first, true).join())
+                    .isInstanceOf(CompletionException.class)
+                    .hasCauseInstanceOf(ManagedLedgerException.InvalidCursorPositionException.class);
+
+            List.of(
+                    afterFirst,
+                    beforeFirst,
+                    defaultLatest,
+                    latestWithEarliestDefault,
+                    earliestWithLatestDefault,
+                    futureWithEarliestDefault,
+                    anonymousOne,
+                    anonymousTwo,
+                    navigation,
+                    trimFollower,
+                    trimmedStart,
+                    firstRetainedBatchStart).forEach(cursor -> {
+                        try {
+                            cursor.close();
+                        } catch (InterruptedException | ManagedLedgerException error) {
+                            throw new AssertionError(error);
+                        }
+                    });
+            ledger.close();
+            factory.shutdown();
         }
     }
 
@@ -653,6 +798,29 @@ class NereusManagedLedgerFacadeTest {
                 result.completeExceptionally(exception);
             }
         }, null);
+        return result;
+    }
+
+    private static void assertCursorBoundary(
+            ManagedCursor cursor, long expectedReadEntryId, long expectedMarkDeleteEntryId) {
+        assertThat(cursor.getReadPosition().getEntryId()).isEqualTo(expectedReadEntryId);
+        assertThat(cursor.getMarkDeletedPosition().getEntryId()).isEqualTo(expectedMarkDeleteEntryId);
+    }
+
+    private static CompletableFuture<Position> resetCursorAsync(
+            ManagedCursor cursor, Position position, boolean force) {
+        CompletableFuture<Position> result = new CompletableFuture<>();
+        cursor.asyncResetCursor(position, force, new AsyncCallbacks.ResetCursorCallback() {
+            @Override
+            public void resetComplete(Object context) {
+                result.complete((Position) context);
+            }
+
+            @Override
+            public void resetFailed(ManagedLedgerException exception, Object context) {
+                result.completeExceptionally(exception);
+            }
+        });
         return result;
     }
 

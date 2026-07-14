@@ -265,7 +265,9 @@ implement BookKeeper IO。
 
 > Status: Designed
 
-A compacted object is per-stream and covers a declared half-open offset range。Required logical columns/fields：
+A read-optimized object is per-stream and covers a declared half-open offset range. Its durable header includes a
+closed read-view value (`COMMITTED` or `TOPIC_COMPACTED`); view-specific indexes and generation ordering never cross.
+Required logical columns/fields：
 
 - stream offset and record identity；
 - publish/event time、key、payload/normalized fields；
@@ -274,11 +276,19 @@ A compacted object is per-stream and covers a declared half-open offset range。
 - Pulsar entry/batch projection information；
 - source generation/checksum lineage。
 
+For `COMMITTED + PULSAR_ENTRY_V1`, the schema also contains one opaque binary Entry value and boundary per stream
+offset. A reader must reproduce the exact generation-0 ManagedLedger Entry bytes; normalized columns are auxiliary and
+cannot be the reconstruction authority. Container-level lossless compression is allowed, but Entry split/merge/rebatch/
+re-encoding is forbidden. A lossy keyed-compaction result is stored only as `TOPIC_COMPACTED` and is never referenced
+by the ordinary offset-index namespace.
+
 Default target is Parquet with row-group offset bounds。Before implementation F4 must freeze：
 
 - projection-preserving schema；
 - row-group index/checksum semantics；
 - topic-compaction tombstone/coverage behavior；
+- closed read-view encoding and separate view index references；
+- exact opaque Entry checksum/round-trip rules for `PULSAR_ENTRY_V1`；
 - higher-generation publish and fallback validation。
 
 ## 11. Designed snapshot objects
@@ -341,6 +351,11 @@ An object can be protected by：
 - materialization/compaction/repair task；
 - SBT/SDT catalog snapshot/delivery；
 - retention/orphan grace policy。
+
+Physical generation replacement also retains superseded offset-index metadata until the same reference scan permits
+retirement. Reader protection is an authoritative resolve/pin/read/release lease, not merely an in-process cache hit.
+Old incarnation projection mirrors are separately collectible only after current topic authority and every recovery/
+task/audit reference have moved away from their stream.
 
 GC may use object listing to find candidates，but all deletion decisions are validated against authoritative
 metadata and ownership。

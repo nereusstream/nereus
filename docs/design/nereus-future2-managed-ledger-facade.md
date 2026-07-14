@@ -77,7 +77,7 @@ cluster capability convergence、namespace/topic storage-policy serialization �
 write-fence handoff；shared-store conflicting first-create/peer lifecycle resume 已通过真实 CAS gate。F2-M5 的
 real dual-broker gate 已通过 real Oxia、pinned LocalStack Community S3 `4.14.0` 和 stock BookKeeper 验证
 ownership failover、process restart、unload/reload、exact bytes/Position 与 hybrid coexistence。Response-loss、
-repair、trim、terminate/delete/recreate 的场景 3–8 跨层组合也已通过；场景 10–18 的 binding isolation、
+repair、trim、terminate/delete/recreate 的场景 3–8 跨层组合也已通过；场景 10–19 的 binding isolation、
 real BookKeeper virtual-ledger isolation、watch-disabled polling、admission、failure recovery、stock write-fence、
 ack、capability/policy 与 S3 gates 也已聚合通过。F2-M6 and Future 2 are complete。
 Phase 1 payload 是 one-record-per-entry opaque batch。Phase 1.5 已实现 generic target/result、exact recovery
@@ -252,6 +252,9 @@ Rules:
 - trim never renumbers an entry or changes the ledger id；
 - position mapping is formula-based and does not add one Oxia record/write per entry；
 - a returned `Position` remains resolvable until retention/trim legally removes its offset；
+- a concrete `newNonDurableCursor(P)` start is an already-consumed coordinate and first reads
+  `max(trimOffset, P.entryId + 1)`；null/`LATEST`/future consult `InitialPosition`, while direct seek/reset treats P as
+  the read target；
 - virtual ledger IDs are never passed to BookKeeper clients, handles, offloaders or metadata paths；
 - a later rollover scheme requires a new mapping version and mixed-version compatibility design。
 

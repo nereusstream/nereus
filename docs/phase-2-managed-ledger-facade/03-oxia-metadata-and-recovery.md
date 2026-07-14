@@ -248,6 +248,10 @@ two disagree. Same-name recreation is the only operation that replaces the proje
 and L0 stream are `DELETED`, one CAS publishes `incarnation + 1`, a new stream and a new ledger ID with state `OPEN`.
 `stateVersion` resets to zero for the new incarnation and otherwise increments on mirror transitions.
 
+Projection metadata is a correctness owner only for this immutable Pulsar compatibility identity. It never owns offset
+allocation、append commit、fencing、trim or read visibility. Those remain L0 stream-head plus reachable-commit truth;
+there is no projection write on append and no projected end offset from which a broker may infer visibility.
+
 ### 3.3 VirtualLedgerProjectionRecord — derived
 
 ```java
@@ -284,6 +288,20 @@ per Position. Entry boundaries remain in the Object WAL entry index and L0 offse
 Both derived records carry the exact name plus its domain hash and the complete immutable identity。A cryptographic
 hash or stream-key location never substitutes for exact-name/binding/incarnation validation。Their identity fields
 must exactly equal the authoritative topic record；property/state metadata-version changes do not invalidate them。
+
+### 3.5 Index ownership and cardinality
+
+| Data | Durable location | Cardinality / lifecycle |
+| --- | --- | --- |
+| Current topic/incarnation/virtual-ledger identity | one authoritative topic projection key | `O(current managed-ledger names)` |
+| Virtual-ledger and Position formula mirrors | two derived keys under each incarnation stream | `O(topic incarnations)`; old-incarnation cleanup is an F4 GC obligation, never an open-path alias mechanism |
+| Logical committed range to physical target | L0 Oxia offset index | `O(committed append ranges)` in F2; one Pulsar Entry per append is therefore approximately `O(entries)` until F4 publishes coalesced ranges and retires superseded keys |
+| Entry byte boundaries | immutable Object WAL/compacted-object entry index | one bounded item per stored Entry inside an object; object and entry-index limits bound each value |
+| Pulsar batch membership | exact opaque Pulsar Entry bytes plus bounded entry attributes | no Oxia key per message or batch index; all batch MessageIds share the Entry's stream offset |
+
+Higher-generation publication alone does not bound metadata count. F4 must define source-index tombstone/removal after
+reader/task/recovery references are gone; until then retaining the lower generation is a safe leak, not permission to
+delete it. Projection records do not substitute for either entry indexes or L0 offset indexes.
 
 ## 4. Open, First Create and Recreation Protocols
 

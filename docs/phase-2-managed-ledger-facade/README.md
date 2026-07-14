@@ -55,10 +55,12 @@ coordinates、unload/reload、owner shutdown/takeover、original-owner process r
 generation/class、concrete ledger types and positive S3 object presence。F2-M6 then composed scenarios 3–8：
 committed-response loss recovers one callback/Position，real Oxia restart repairs
 both removed derived indexes，and close/trim/reopen/terminate/delete/recreate preserves retained Position and object
-contracts。Its final slice closes scenarios 10–18：real BookKeeper enumeration proves virtual-ledger isolation，
+contracts。Its final slice closes scenarios 10–19：real BookKeeper enumeration proves virtual-ledger isolation，
 watch-disabled independent runtimes prove remote polling wake，the stock `PersistentTopic` branch is explicitly
 gated，a cross-layer Object-WAL upload failure proves callback/admission recovery，and the aggregate binding、feature、
-ack、capability/policy and LocalStack suites are selected by the release gates。All 18 scenarios pass；F2-M6 and
+ack、capability/policy and LocalStack suites are selected by the release gates。Scenario 19 additionally verifies
+saved ordinary and middle-batch MessageIds in exclusive/inclusive Reader modes across unload、owner failover and
+runtime restart。All 19 scenarios pass；F2-M6 and
 Future 2 are complete。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
@@ -74,7 +76,7 @@ class 可以在 broker 内共存，但这不表示 Nereus 的 BookKeeper primary
 | Pulsar fork | `nereusstream/pulsar` |
 | Pulsar API/source-review baseline | `100d3ef0ff7c7da36d497453b141ddff6f34a9d3` |
 | Current product implementation | current Nereus commit（this document is committed with the F2-M6 completion code/gates） |
-| Current local Pulsar implementation commit | `f8efefa7193698823eab267de95c76d08ed54165`（based on locked baseline；remote publication awaits repository permission） |
+| Current local Pulsar implementation commit | `7efae25af39a15407c1397d9e1f4ac4658d09daa`（based on locked baseline；remote publication awaits repository permission） |
 | Pulsar source-project version at that commit | `5.0.0-M1-SNAPSHOT`（source composite selector，not a published Maven snapshot） |
 | Java/build baseline | Pulsar/Nereus build with JDK 21 or 25；published production classes target Java 17 bytecode |
 | Executable Nereus profile | `OBJECT_WAL_SYNC_OBJECT` only |
@@ -84,7 +86,7 @@ The original F2-M0 probe predated Phase 1.5. F2-M0R2 therefore replaces that Ner
 commit above. The API/source review used
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar` at the exact clean target commit；the compile probe and every
 recorded interface/call-site blob were revalidated there on 2026-07-12。The same implementation checkout now carries
-the reviewed local fork commits through `f8efefa719`。Exact baseline evidence is in
+the reviewed local fork commits through `7efae25af3`。Exact baseline evidence is in
 `01-pulsar-api-spike-and-repository-boundary.md`。
 
 An upgrade to another Pulsar commit invalidates the lock. The API probe and broker integration call-site
@@ -95,8 +97,8 @@ audit must pass again before implementation continues.
 1. The broker passes `TopicName.getPersistenceNamingEncoding()` and the facade treats it as an exact opaque
    identity. A topic projection has a monotonic incarnation. Incarnation 1 uses
    `"pulsar-ml-v1\0" + managedLedgerName + "\0" + "1"`; delete/recreate increments the incarnation and therefore
-   creates a new deterministic stream ID and a new virtual ledger ID. The facade never reconstructs or normalizes a
-   topic URI.
+   creates a new deterministic stream ID and a newly allocated, durably persisted virtual ledger ID. The facade never
+   reconstructs or normalizes a topic URI.
 2. F2 v1 creates one stable virtual ledger for one stream/incarnation and does not roll it. A positive, high-range
    `virtualLedgerId` is allocated through one Oxia allocator key. The value is a compatibility coordinate,
    never a BookKeeper ledger ID.
@@ -160,8 +162,10 @@ audit must pass again before implementation continues.
 25. `ManagedLedgerFactory.getManagedLedgerPropertiesAsync` returns an empty map for a genuinely missing ledger so
     broker pre-create probing matches stock behavior；`DELETING/DELETED` and corrupt published state still fail
     closed rather than masquerading as missing。
-26. An explicit `PositionFactory.EARLIEST` always starts at the retained trim offset。`InitialPosition.Latest` applies
-    only when the caller supplied no start Position；it cannot override an explicit Reader start coordinate。
+26. An explicit `PositionFactory.EARLIEST` always starts at the retained trim offset. A concrete non-durable
+    `startCursorPosition` is already consumed and reads its next retained Entry. Null、`LATEST` and concrete future
+    positions consult `InitialPosition`; the two-argument overload defaults Latest. Direct seek/reset positions remain
+    read targets and do not reuse the cursor-start increment。
 27. The target `ServerCnx` supplies an empty non-null `KeySharedMeta` even for ordinary subscriptions。F2 accepts
     that empty carrier for admitted Exclusive/Failover readers but rejects any actual hash range and every
     unsupported subscription type。
@@ -266,6 +270,6 @@ was repeated after the M1 implementation and remained green。
 | F2-M3 ManagedLedger facade | Complete | Writable/get-only factory/ledger、recovery/lifecycle/admin/cache/stats and locked interface audit gates pass |
 | F2-M4 cursor boundary | Complete | Read-only/non-durable/durable-boundary cursors and shared tail polling implemented/tested |
 | F2-M5 broker integration | Complete | Hybrid bootstrap/binding/admission/capability/policy/write-fence/peer lifecycle plus real dual-broker Oxia/LocalStack/BookKeeper restart/failover E2E pass |
-| F2-M6 final acceptance | Complete | all scenarios 1–18 are executable slices；ordinary and Docker-backed aggregate gates pass with exact source and storage-isolation locks |
+| F2-M6 final acceptance | Complete | all scenarios 1–19 are executable slices；ordinary and Docker-backed aggregate gates pass with exact source and storage-isolation locks |
 
 Future 2 is complete。F3/F4 may now consume this facade contract；neither capability is implied by F2 completion。

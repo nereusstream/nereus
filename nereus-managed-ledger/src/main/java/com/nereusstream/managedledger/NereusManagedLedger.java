@@ -35,6 +35,7 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -251,13 +252,15 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     @Override
     public ManagedCursor newNonDurableCursor(Position startCursorPosition) throws ManagedLedgerException {
-        return newNonDurableCursor(startCursorPosition, "non-durable-" + System.identityHashCode(startCursorPosition));
+        return newNonDurableCursor(
+                startCursorPosition,
+                "non-durable-cursor-" + UUID.randomUUID());
     }
 
     @Override
     public ManagedCursor newNonDurableCursor(Position startPosition, String subscriptionName)
             throws ManagedLedgerException {
-        return newNonDurableCursor(startPosition, subscriptionName, InitialPosition.Earliest, false);
+        return newNonDurableCursor(startPosition, subscriptionName, InitialPosition.Latest, false);
     }
 
     @Override
@@ -270,7 +273,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             throw unsupported("newNonDurableCursor(readCompacted)");
         }
         StreamMetadata metadata = currentMetadata();
-        long offset = normalizeCursorReadOffset(startPosition, initialPosition, metadata);
+        long offset = normalizeNonDurableCursorReadOffset(
+                startPosition,
+                Objects.requireNonNull(initialPosition, "initialPosition"),
+                metadata);
         Position read = readPosition(offset, metadata);
         Position markDelete = PositionFactory.create(projection.virtualLedgerId(), offset - 1);
         return createLocalCursor(subscriptionName, false, markDelete, read, Map.of(), Map.of());
@@ -1376,28 +1382,50 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return positions.markDeleteOffsetAfter(projection, position, currentMetadata());
     }
 
-    long requireCursorReadOffset(Position position) {
-        return positions.requireReadPositionOffset(projection, position, currentMetadata());
+    long requireCursorReadOffset(Position position, StreamMetadata metadata) {
+        return positions.requireReadPositionOffset(projection, position, metadata);
     }
 
-    private long normalizeCursorReadOffset(
-            Position position, InitialPosition initialPosition, StreamMetadata metadata) {
-        if (position == null) {
-            return initialPosition == InitialPosition.Latest
-                    ? metadata.committedEndOffset()
-                    : metadata.trimOffset();
-        }
+    long cursorReadOffsetAfter(Position position, StreamMetadata metadata) {
+        return positions.cursorReadOffsetAfter(projection, position, metadata);
+    }
+
+    long normalizeCursorResetReadOffset(Position position, StreamMetadata metadata) {
         if (samePosition(position, PositionFactory.EARLIEST)) {
             return metadata.trimOffset();
         }
         if (samePosition(position, PositionFactory.LATEST)) {
             return metadata.committedEndOffset();
         }
-        return positions.requireReadPositionOffset(projection, position, metadata);
+        return positions.normalizeResetReadPositionOffset(projection, position, metadata);
+    }
+
+    private long normalizeNonDurableCursorReadOffset(
+            Position position, InitialPosition initialPosition, StreamMetadata metadata) {
+        if (samePosition(position, PositionFactory.EARLIEST)) {
+            return metadata.trimOffset();
+        }
+        if (position == null || samePosition(position, PositionFactory.LATEST)) {
+            return initialReadOffset(initialPosition, metadata);
+        }
+        long entryId = requireVirtualLedgerPosition(position);
+        if (entryId >= metadata.committedEndOffset()) {
+            return initialReadOffset(initialPosition, metadata);
+        }
+        return positions.cursorReadOffsetAfter(projection, position, metadata);
+    }
+
+    private static long initialReadOffset(
+            InitialPosition initialPosition, StreamMetadata metadata) {
+        return initialPosition == InitialPosition.Latest
+                ? metadata.committedEndOffset()
+                : metadata.trimOffset();
     }
 
     private static boolean samePosition(Position left, Position right) {
-        return left.getLedgerId() == right.getLedgerId() && left.getEntryId() == right.getEntryId();
+        return left != null
+                && left.getLedgerId() == right.getLedgerId()
+                && left.getEntryId() == right.getEntryId();
     }
 
     private long requireVirtualLedgerPosition(Position position) {

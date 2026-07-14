@@ -82,6 +82,50 @@ class PositionProjectionTest {
     }
 
     @Test
+    void convertsCursorStartToTheNextRetainedOffsetWithoutWeakeningOtherRoles() {
+        StreamMetadata snapshot = snapshot(2, 5);
+
+        assertThat(positions.cursorReadOffsetAfter(projection, position(-1), snapshot)).isEqualTo(2);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(0), snapshot)).isEqualTo(2);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(1), snapshot)).isEqualTo(2);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(2), snapshot)).isEqualTo(3);
+        assertThat(positions.cursorReadOffsetAfter(projection, position(4), snapshot)).isEqualTo(5);
+        assertThat(positions.cursorReadOffsetAfter(
+                projection, position(4), snapshot(5, 5))).isEqualTo(5);
+
+        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(
+                projection, position(-2), snapshot))
+                .isInstanceOf(ProjectionValidationException.class);
+        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(
+                projection, position(5), snapshot))
+                .isInstanceOf(ProjectionValidationException.class);
+        assertThatThrownBy(() -> positions.cursorReadOffsetAfter(
+                projection, PositionFactory.create(LEDGER_ID + 1, 2), snapshot))
+                .isInstanceOf(ProjectionValidationException.class);
+    }
+
+    @Test
+    void normalizesResetReadPositionsWithoutChangingDirectReadValidation() {
+        StreamMetadata snapshot = snapshot(2, 5);
+
+        assertThat(positions.normalizeResetReadPositionOffset(
+                projection, position(-1), snapshot)).isEqualTo(2);
+        assertThat(positions.normalizeResetReadPositionOffset(
+                projection, position(0), snapshot)).isEqualTo(2);
+        assertThat(positions.normalizeResetReadPositionOffset(
+                projection, position(3), snapshot)).isEqualTo(3);
+        assertThat(positions.normalizeResetReadPositionOffset(
+                projection, position(99), snapshot)).isEqualTo(5);
+
+        assertThatThrownBy(() -> positions.normalizeResetReadPositionOffset(
+                projection, position(-2), snapshot))
+                .isInstanceOf(ProjectionValidationException.class);
+        assertThatThrownBy(() -> positions.requireReadPositionOffset(
+                projection, position(0), snapshot))
+                .isInstanceOf(ProjectionValidationException.class);
+    }
+
+    @Test
     void normalizesInclusiveMaxWithoutIssuingFutureReads() {
         StreamMetadata snapshot = snapshot(2, 5);
 

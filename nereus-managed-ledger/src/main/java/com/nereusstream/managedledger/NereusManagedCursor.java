@@ -90,7 +90,16 @@ public final class NereusManagedCursor implements ManagedCursor {
     @Override public Entry getNthEntry(int n, IndividualDeletedEntries deleted) throws InterruptedException, ManagedLedgerException {
         if (n <= 0 || deleted == IndividualDeletedEntries.Exclude) throw unsupported("getNthEntry");
         Position saved = reader.getReadPosition();
-        reader.seekTo(ledger.readPosition(Math.min(ledger.currentMetadata().committedEndOffset(), markDelete.getEntryId() + n), ledger.currentMetadata()));
+        StreamMetadata metadata = ledger.currentMetadata();
+        long firstUnacknowledged = ledger.cursorReadOffsetAfter(markDelete, metadata);
+        long requested;
+        try {
+            requested = Math.addExact(firstUnacknowledged, n - 1L);
+        } catch (ArithmeticException ignored) {
+            requested = Long.MAX_VALUE;
+        }
+        reader.seekTo(ledger.readPosition(
+                Math.min(metadata.committedEndOffset(), requested), metadata));
         List<Entry> entries = reader.readEntries(1); reader.seekTo(saved); return entries.isEmpty() ? null : entries.get(0);
     }
     @Override public void asyncGetNthEntry(int n, IndividualDeletedEntries deleted, AsyncCallbacks.ReadEntryCallback cb, Object ctx) {
@@ -124,7 +133,11 @@ public final class NereusManagedCursor implements ManagedCursor {
     @Override public boolean cancelPendingReadRequest() { Pending waiter = pending.getAndSet(null); return waiter != null && ledger.tailPoll().remove(waiter); }
     @Override public boolean hasMoreEntries() { return reader.hasMoreEntries(); }
     @Override public long getNumberOfEntries() { return reader.getNumberOfEntries(); }
-    @Override public long getNumberOfEntriesInBacklog(boolean precise) { return Math.max(0, ledger.currentMetadata().committedEndOffset() - markDelete.getEntryId() - 1); }
+    @Override public long getNumberOfEntriesInBacklog(boolean precise) {
+        StreamMetadata metadata = ledger.currentMetadata();
+        return Math.max(0, metadata.committedEndOffset()
+                - ledger.cursorReadOffsetAfter(markDelete, metadata));
+    }
     @Override public void markDelete(Position position) throws ManagedLedgerException { markDelete(position, Map.of()); }
     @Override public void markDelete(Position position, Map<String, Long> values) throws ManagedLedgerException {
         requireLocal("markDelete"); long next = ledger.positionsMarkDeleteAfter(position); markDelete = position; reader.seekTo(ledger.readPosition(next, ledger.currentMetadata())); properties.clear(); properties.putAll(values);
@@ -137,9 +150,24 @@ public final class NereusManagedCursor implements ManagedCursor {
     @Override public void asyncDelete(Iterable<Position> p, AsyncCallbacks.DeleteCallback cb, Object ctx) { cb.deleteFailed(unsupported("individualDelete"), ctx); }
     @Override public Position getReadPosition() { return reader.getReadPosition(); }
     @Override public Position getMarkDeletedPosition() { return markDelete; }
-    @Override public Position getPersistentMarkDeletedPosition() { return markDelete; }
-    @Override public void rewind() { reader.seekTo(ledger.readPosition(markDelete.getEntryId() + 1, ledger.currentMetadata())); }
-    @Override public void seek(Position p, boolean force) { long offset = ledger.requireCursorReadOffset(p); reader.seekTo(ledger.readPosition(offset, ledger.currentMetadata())); }
+    @Override public Position getPersistentMarkDeletedPosition() { return null; }
+    @Override public void rewind() {
+        StreamMetadata metadata = ledger.currentMetadata();
+        long offset = ledger.cursorReadOffsetAfter(markDelete, metadata);
+        reader.seekTo(ledger.readPosition(offset, metadata));
+    }
+    @Override public void rewind(boolean readCompacted) {
+        if (readCompacted) throw unsupportedRuntime("rewind(readCompacted)");
+        rewind();
+    }
+    @Override public void seek(Position p, boolean force) {
+        StreamMetadata metadata = ledger.currentMetadata();
+        long offset = ledger.requireCursorReadOffset(p, metadata);
+        if (!force) {
+            offset = Math.max(offset, ledger.cursorReadOffsetAfter(markDelete, metadata));
+        }
+        reader.seekTo(ledger.readPosition(offset, metadata));
+    }
     @Override public void clearBacklog() throws ManagedLedgerException { requireLocal("clearBacklog"); Position lac = ledger.getLastConfirmedEntry(); markDelete = lac; reader.seekTo(ledger.readPosition(lac.getEntryId() + 1, ledger.currentMetadata())); }
     @Override public void asyncClearBacklog(AsyncCallbacks.ClearBacklogCallback cb, Object ctx) { try { clearBacklog(); cb.clearBacklogComplete(ctx); } catch (ManagedLedgerException e) { cb.clearBacklogFailed(e, ctx); } }
     @Override public void skipEntries(int count, IndividualDeletedEntries deleted) throws ManagedLedgerException { if (deleted == IndividualDeletedEntries.Exclude) throw unsupported("skipDeletedHoles"); reader.skipEntries(count); }
@@ -148,14 +176,22 @@ public final class NereusManagedCursor implements ManagedCursor {
     @Override public Position findNewestMatching(FindPositionConstraint c, Predicate<Entry> condition) throws InterruptedException, ManagedLedgerException { return reader.findNewestMatching(c, condition); }
     @Override public void asyncFindNewestMatching(FindPositionConstraint c, Predicate<Entry> condition, AsyncCallbacks.FindEntryCallback cb, Object ctx) { asyncFindNewestMatching(c, condition, cb, ctx, true); }
     @Override public void asyncFindNewestMatching(FindPositionConstraint c, Predicate<Entry> condition, AsyncCallbacks.FindEntryCallback cb, Object ctx, boolean fromLedger) { try { cb.findEntryComplete(findNewestMatching(c, condition), ctx); } catch (Exception e) { cb.findEntryFailed(e instanceof ManagedLedgerException m ? m : new ManagedLedgerException(e), Optional.empty(), ctx); } }
-    @Override public void resetCursor(Position p) throws ManagedLedgerException { requireLocal("resetCursor"); seek(p, true); markDelete = PositionFactory.create(p.getLedgerId(), p.getEntryId() - 1); }
-    @Override public void asyncResetCursor(Position p, boolean force, AsyncCallbacks.ResetCursorCallback cb) { try { resetCursor(p); cb.resetComplete(null); } catch (ManagedLedgerException e) { cb.resetFailed(e, null); } }
+    @Override public void resetCursor(Position p) throws ManagedLedgerException {
+        resetCursorInternal(p, false);
+    }
+    @Override public void asyncResetCursor(Position p, boolean force, AsyncCallbacks.ResetCursorCallback cb) {
+        try {
+            cb.resetComplete(resetCursorInternal(p, force));
+        } catch (ManagedLedgerException e) {
+            cb.resetFailed(e, p);
+        }
+    }
     @Override public List<Entry> replayEntries(Set<? extends Position> requested) throws ManagedLedgerException {
         List<Position> ordered = requested.stream().map(value -> (Position) value).sorted().toList();
         List<Entry> result = new ArrayList<>();
         try {
             for (Position position : ordered) {
-                long offset = ledger.requireCursorReadOffset(position);
+                long offset = ledger.requireCursorReadOffset(position, ledger.currentMetadata());
                 if (offset >= ledger.currentMetadata().committedEndOffset()) continue;
                 result.add(ledger.readAt(offset, ledger.currentMetadata()).join());
             }
@@ -200,6 +236,30 @@ public final class NereusManagedCursor implements ManagedCursor {
     @Override public void updateReadStats(int count, long size) { updateLastActive(); }
 
     private void requireLocal(String operation) throws ManagedLedgerException { if (durable) throw unsupported(operation); }
+    private Position resetCursorInternal(Position position, boolean force) throws ManagedLedgerException {
+        requireLocal("resetCursor");
+        StreamMetadata metadata = ledger.currentMetadata();
+        long offset;
+        try {
+            boolean sentinel = samePosition(position, PositionFactory.EARLIEST)
+                    || samePosition(position, PositionFactory.LATEST);
+            offset = force && !sentinel
+                    ? ledger.requireCursorReadOffset(position, metadata)
+                    : ledger.normalizeCursorResetReadOffset(position, metadata);
+        } catch (IllegalArgumentException error) {
+            throw new ManagedLedgerException.InvalidCursorPositionException(error.getMessage());
+        }
+        Position readPosition = ledger.readPosition(offset, metadata);
+        reader.seekTo(readPosition);
+        markDelete = PositionFactory.create(
+                readPosition.getLedgerId(), readPosition.getEntryId() - 1);
+        return readPosition;
+    }
+    private static boolean samePosition(Position left, Position right) {
+        return left != null
+                && left.getLedgerId() == right.getLedgerId()
+                && left.getEntryId() == right.getEntryId();
+    }
     private ManagedLedgerException unsupported(String operation) { return errors.unsupported(operation); }
     private UnsupportedOperationException unsupportedRuntime(String operation) { return errors.unsupportedRuntime(operation); }
     private <T> CompletableFuture<T> unsupportedFuture(String operation) { return CompletableFuture.failedFuture(unsupported(operation)); }

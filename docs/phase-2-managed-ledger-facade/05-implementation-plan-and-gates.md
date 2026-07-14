@@ -13,7 +13,7 @@ F2-M1 build evidence:
    `../phase-1.5-core-storage-foundation/05-implementation-plan-and-gates.md` green；
 2. the managed-ledger compile dependency resolves from the locked Pulsar composite build；
 3. the F2-M1 baseline probe verified clean `100d3ef0...`；the active Phase 2 gate now locks the implemented local fork
-   at `f8efefa7193698823eab267de95c76d08ed54165`；
+   at `7efae25af39a15407c1397d9e1f4ac4658d09daa`；
 4. choose an organization-owned published artifact/version for release builds before publishing any
    Nereus facade artifact;
 5. keep `pulsar-broker` off the Nereus L0 modules' compile/runtime classpaths;
@@ -30,7 +30,7 @@ artifact。
 
 The implemented composite lookup order is `-PpulsarCheckout=...`，then `NEREUS_PULSAR_CHECKOUT`，then the
 development convention `../../nereusstream/pulsar` when present。`checkPulsarSourceLock` fails unless the selected
-checkout is clean and exactly at the configured full commit（default `f8efefa719...`）。Source-bound tasks fail during
+checkout is clean and exactly at the configured full commit（default `7efae25af3...`）。Source-bound tasks fail during
 settings evaluation when no composite checkout exists；they never fall through to the nonexistent Maven snapshot。
 GitHub Actions checks out the exact `100d3ef0...` API baseline under `.ci/pulsar` for the ordinary product build。
 
@@ -105,7 +105,8 @@ Delete/recreate positions cannot alias because incarnation changes stream and vi
 Implementation evidence（2026-07-12）：
 
 - every production target above exists；`ManagedLedgerProjectionNames` is metadata-owned and strict-UTF-8；
-- `PositionProjection` implements separate readable/read/mark-delete/max roles against the locked Pulsar `Position`；
+- `PositionProjection` implements separate readable/read/cursor-start/reset/mark-delete/max roles against the locked
+  Pulsar `Position`；
 - `PulsarEntryCodec` and `NereusEntry` preserve exact bytes、indices、reference ownership、CRC32C and zero-byte
   progress；
 - the L0 dependency guard scans both build declarations and source imports；
@@ -357,7 +358,11 @@ Non-durable cumulative mark-delete/clear/reset and properties are local-only; in
 
 Tests:
 
-- earliest/latest/trimmed initialization;
+- earliest/latest/trimmed initialization, including stock next-after semantics for a concrete non-durable
+  `startCursorPosition`；
+- null/`LATEST`/future interaction with both `InitialPosition` values, explicit `EARLIEST` precedence and the
+  two-argument Latest default；
+- first-entry and first-retained-entry broker step-back coordinates (`-1` and `trimOffset - 1`)；
 - bounded max entries/bytes/Position;
 - append wakes a waiter once;
 - remote-broker append wakes a waiter through metadata polling with watches disabled；
@@ -368,6 +373,8 @@ Tests:
 - cancel/close/append races;
 - cancel does not invoke the pending callback, while close fails it exactly once；
 - wrong-ledger and trimmed position errors;
+- seek before/after mark-delete with both force values, reset sentinel/direct-target semantics, rewind after trim and
+  non-durable read/count clamping when trim overtakes the cursor；
 - durable mark-delete/individual-delete/reset/property mutations never report success; direct replay remains a
   non-mutating read and follows document 06.
 - `isCursorDataFullyPersistable` is false for the durable boundary and batch ack getters return null.
@@ -399,6 +406,9 @@ Implementation evidence（2026-07-12，read-only sub-stage）：
   without callback，close fails once and sealed tail fails instead of waiting forever。
 - real Object WAL coverage now includes durable read with rejected durable mark-delete、local non-durable mark-delete、
   read-only cursor ownership and append-wakes-tail-read；a focused two-waiter test proves one shared metadata poll。
+- the 2026-07-14 narrow compatibility gate added `cursorReadOffsetAfter` as a separate projection role, restored the
+  stock two-argument Latest default and anonymous cursor uniqueness, and locked concrete/trimmed/future start plus
+  seek/reset/rewind behavior in `PositionProjectionTest` and `NereusManagedLedgerFacadeTest`。
 - F2-M4、F2-M5 and F2-M6 are complete。
 
 ## 6. F2-M5 — Pulsar Fork Integration
@@ -609,6 +619,10 @@ Implementation evidence（through 2026-07-13）：
   ledger namespace through `BookKeeperAdmin` and proving the active Nereus projection's virtual ledger ID is absent。
   The focused integration test and test checkstyle pass；this is runtime evidence for the BookKeeper-isolation half
   of scenario 11，not only a source-dependency assertion。
+- fork commit `7efae25af3` closes the 2026-07-14 narrow MessageId gate。The real dual-broker test starts Readers from
+  saved ordinary-entry and middle-batch `MessageIdAdv` coordinates in both stock-exclusive and inclusive modes，then
+  repeats those assertions after topic unload、owner failover and broker-runtime restart。The exact first delivered
+  payload and complete ledger/entry/partition/batch coordinate remain stable in every phase。
 
 ## 7. F2-M6 — Final Acceptance
 
@@ -668,11 +682,14 @@ Scenarios:
 17. attempt Nereus policy enablement with a mixed-capability broker set and race an empty-namespace policy update with
     first topic creation；both must preserve one durable storage-class truth；
 18. run S3 conditional-create/range/checksum/timeout/restart cases and prove no production path selects local files。
+19. start a Reader from saved ordinary and middle-batch MessageIds in exclusive and inclusive modes, including the
+    first Entry boundary, then repeat after unload、owner failover and runtime restart; every delivered coordinate must
+    match stock next-after/batch filtering and retain the original full `MessageIdAdv`。
 
 F2 completion requires all scenarios. A green projection unit test or a broker that only starts is not
 evidence for the end-to-end milestone.
 
-Final F2-M6 evidence（2026-07-13）：
+Final F2-M6 evidence（2026-07-14）：
 
 | Scenario(s) | State | Current evidence / remaining work |
 | --- | --- | --- |
@@ -689,10 +706,30 @@ Final F2-M6 evidence（2026-07-13）：
 | 16 | Complete slice | `NereusAcknowledgeValidatorTest` covers every admitted/rejected F2 acknowledgement field and proves rejection occurs before consumer/cursor mutation while admitted local cumulative acknowledgement waits for cursor completion |
 | 17 | Complete slice | `NereusStorageBindingCapabilityTest` rejects missing、spoofed、mixed and unstable broker capability snapshots；`NamespaceStorageClassPolicyGuardTest` races the namespace policy lock with first creation and proves versioned pre/post scans preserve one durable storage-class truth |
 | 18 | Complete slice | `S3CompatibleObjectStoreLocalStackIntegrationTest.conditionalPutRangeChecksumZeroLengthAndRestart` covers conditional create、strict ranges、checksum、zero-length object and client restart against pinned LocalStack Community S3；`checkPhase2StorageIsolation` rejects `LocalFileObjectStore` from production roots and asserts the broker default is `S3CompatibleObjectStoreProvider` |
-| aggregate build tasks | Complete | `phase2Check` and `phase2FinalCheck --rerun-tasks` are executable；both pass with exact clean local Pulsar fork `f8efefa719...`，fixed `0.1.0-f2-dev` product publication and the pinned LocalStack Community S3 fixture |
+| 19 | Complete slice | `NereusMultiBrokerIntegrationTest` starts Readers from saved ordinary and middle-batch `MessageIdAdv` values in exclusive/inclusive modes before and after unload、owner failover and runtime restart；payload plus complete coordinate match the stock next-after/batch-filtering contract every time |
+| aggregate build tasks | Complete | `phase2Check` and `phase2FinalCheck --rerun-tasks` pass with the corrected product、exact clean local Pulsar fork `7efae25af3...`、fixed `0.1.0-f2-dev` publication and pinned LocalStack Community S3 fixture |
 
-Therefore scenarios 1–18 are complete slices and the aggregate ordinary/Docker gates pass。F2-M6 and Future 2 are
-complete；later F3/F4 work must consume these contracts without weakening them。
+Scenarios 1–18 retain their completed evidence and scenario 19 now has real-broker evidence. The 2026-07-14 narrow
+gate and both aggregate gates pass with the corrected product and locked Pulsar commit；Future 2 remains complete。
+Later F3/F4 work must consume these contracts without weakening them。
+
+### 7.1 2026-07-14 narrow design-gate decision
+
+**Result: PASS.** Future 3 and Future 4 can continue without replacing the F2 compatibility model。
+
+| Review concern | Locked result |
+| --- | --- |
+| `streamId + offset -> MessageId` | topic authority resolves the incarnation's stable virtual ledger ID；`entryId == offset`；partition and batch index remain protocol sub-coordinates |
+| forward/reverse conversion | virtual ledger + entry identifies exactly one incarnation/offset；batch index never creates another L0 offset and is validated inside the exact Entry |
+| restart、owner change、seek、history | projection identity is durable；direct seek/reset and cursor-start next-after are separate roles；scenario 19 proves ordinary/middle-batch IDs across unload、failover and restart |
+| correctness owner | projection owns immutable compatibility identity only；L0 reachable commit/head owns append、fencing、visibility and trim |
+| metadata scale | topic/derived projection keys are per incarnation；L0 offset index is `O(appends)` until F4 coalesces and safely retires superseded index keys；batch metadata creates no per-message Oxia key |
+| Future 1 reuse | F2 performs no second commit protocol and consumes the existing L0 commit、fence、recovery、visibility and trim contracts |
+| compaction / GC safety | ordinary `COMMITTED` replacement must preserve exact opaque Entry bytes；lossy `TOPIC_COMPACTED` uses a separate view；source deletion waits for authoritative reader pins、reachable-recovery roots and index retirement |
+
+The compatibility model is therefore not the next implementation blocker. F3 must persist the resulting first-unacked
+offset without applying cursor-start `+1` twice；F4 must implement the view/pin/retirement contracts before enabling
+physical GC。
 
 ## 8. Stop-the-line Conditions
 

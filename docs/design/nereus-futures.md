@@ -115,7 +115,7 @@ workers and higher generations remain outside this delivery。
 
 Detailed design: `nereus-future2-managed-ledger-facade.md`
 Code-level design: `../phase-2-managed-ledger-facade/README.md`
-Current milestone: F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete/final-gated；production facade/cursor、generation-safe write-fence handoff、shared-store peer lifecycle、real dual-broker restart/failover and scenarios 1–18 are implemented and gated
+Current milestone: F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete/final-gated；production facade/cursor、generation-safe write-fence handoff、shared-store peer lifecycle、real dual-broker restart/failover and scenarios 1–19 are implemented and gated
 
 ### Owns
 

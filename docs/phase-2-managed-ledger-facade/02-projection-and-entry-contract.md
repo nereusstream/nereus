@@ -38,8 +38,9 @@ assuming each message in a Pulsar batch already has its own L0 offset.
 
 There is no virtual-ledger rollover within an incarnation. Physical Object WAL objects, slices, append sessions,
 broker unloads and compaction generations never change the virtual ledger ID. Logical delete followed by same-name
-topic recreation creates a new incarnation, deterministic stream ID and virtual ledger ID; stale MessageIds then fail
-the ledger-ID check instead of addressing the new topic.
+topic recreation creates a new incarnation, a deterministic stream ID and a newly allocated, durably persisted virtual
+ledger ID; stale MessageIds then fail the ledger-ID check instead of addressing the new topic. The virtual ledger ID is
+stable after publication, but is deliberately not hash-derived or otherwise deterministic before allocator CAS.
 
 ## 2. Code-level Model
 
@@ -88,6 +89,16 @@ public final class PositionProjection {
             StreamMetadata stream);
 
     public long requireReadPositionOffset(
+            VirtualLedgerProjection projection,
+            Position position,
+            StreamMetadata stream);
+
+    public long cursorReadOffsetAfter(
+            VirtualLedgerProjection projection,
+            Position cursorStartOrMarkDeletePosition,
+            StreamMetadata stream);
+
+    public long normalizeResetReadPositionOffset(
             VirtualLedgerProjection projection,
             Position position,
             StreamMetadata stream);
@@ -156,8 +167,13 @@ Validation:
 - readable entries require the matching ledger ID and
   `trimOffset <= entryId < committedEndOffset`；
 - next-read positions additionally allow `entryId == committedEndOffset`；
-- for non-durable cursor creation，an explicit `EARLIEST`/`LATEST` is normalized before the overload default；
-  `InitialPosition.Earliest/Latest` selects trim/tail only when no Position was supplied；
+- for non-durable cursor creation, a concrete current-ledger Position is an already-consumed/mark-delete coordinate;
+  the first read offset is `max(trimOffset, entryId + 1)` rather than `entryId`；
+- explicit `EARLIEST` always selects trim. Null、`LATEST` and a concrete current-ledger Position beyond LAC use the
+  supplied `InitialPosition.Earliest/Latest`; the two-argument overload supplies stock's `InitialPosition.Latest`；
+- a concrete cursor-start Position older than trim advances to the first retained offset, while a non-sentinel Position
+  carrying another virtual ledger ID is rejected before fallback；
+- direct read/seek Positions remain next-read coordinates and never receive the cursor-start `+1` conversion；
 - mark-delete positions allow exactly `trimOffset - 1` through `committedEndOffset - 1`；
 - inclusive max-position input accepts null/`EARLIEST`/`LATEST` or a same-ledger entry ID `>= -1`; it normalizes
   trimmed values to before-first and future values to current LAC rather than issuing object IO；
@@ -194,6 +210,24 @@ method-specific:
 - an earliest durable/non-durable cursor has mark-delete at `trimOffset-1` and read position at `trimOffset`；
 - a latest durable/non-durable cursor has mark-delete at LAC and read position at `committedEndOffset`；
 - direct `asyncReadEntry` accepts neither sentinel。
+
+The exact non-durable creation matrix is:
+
+| Input | Read offset | Local mark-delete Position |
+| --- | --- | --- |
+| `EARLIEST` | `trimOffset` | `trimOffset - 1` |
+| null or `LATEST` | trim/tail selected by `InitialPosition` | `readOffset - 1` |
+| concrete current-ledger `P <= LAC` | `max(trimOffset, P.entryId + 1)` | `readOffset - 1` |
+| concrete current-ledger `P > LAC` | trim/tail selected by `InitialPosition` | `readOffset - 1` |
+| non-sentinel wrong-ledger Position | fail | none |
+
+This mirrors stock `NonDurableCursorImpl`: `startCursorPosition` is a mark-delete coordinate. It also composes with
+`PersistentTopic`, which steps back one entry before creating a non-durable subscription so the client can apply
+ordinary/inclusive and batch-index filtering. `seek(Position)` is intentionally different: its Position is the direct
+next-read target; with `force=false` it is clamped only to the next retained position after local mark-delete. Reset
+normalizes `EARLIEST`/`LATEST` and trimmed/future direct targets, and rewind uses the next retained position after
+mark-delete. A non-durable cursor never protects retention; if trim passes its local position, its next read advances to
+`trimOffset` without renumbering any MessageId.
 
 For cursor read overloads, null/`LATEST` inclusive max means current LAC, while `EARLIEST` means before-first and
 therefore produces an empty read. A non-sentinel max with the wrong virtual ledger ID is invalid.
@@ -390,6 +424,11 @@ F2-M1 requires deterministic tests for:
 - storage-class binding generation mismatch rejects open before Position conversion；
 - stale positions from the deleted incarnation are rejected against the new projection；
 - readable-entry, next-read, mark-delete and max-position roles enforce different boundaries；
+- concrete non-durable cursor start reads the next Entry, including `trimOffset - 1`, older-trimmed and fully-trimmed
+  boundaries, without weakening direct read/seek validation；
+- null/`LATEST`/future cursor starts consult `InitialPosition`, explicit `EARLIEST` wins, and the two-argument overload
+  defaults to Latest；
+- non-durable seek/force/reset/rewind and a cursor overtaken by trim preserve the distinct read versus ack roles；
 - `getFirstPosition()` returns before-first while read-only EARLIEST starts at the first retained entry；
 - batchIndex does not affect stream offset;
 - input `ByteBuf` indices/reference count are unchanged by encoding;

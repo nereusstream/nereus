@@ -63,9 +63,10 @@ facade/fork race gates；shared-store conflicting first-create and peer lifecycl
 `phase2Check` 与 Docker-backed `phase2FinalCheck --rerun-tasks` 已存在并通过。F2-M6 场景 3–8 的跨层证据包括：
 head-CAS 后响应丢失只产生一个恢复 callback/Position，
 真实 Oxia 重启后从 authority 修复两条派生索引，以及 facade close/trim/reopen/terminate/delete/recreate 保持
-Position namespace 与旧 Object-WAL bytes 合同。场景 10–18 进一步通过真实 BookKeeper ledger 枚举、禁用
+Position namespace 与旧 Object-WAL bytes 合同。场景 10–19 进一步通过真实 BookKeeper ledger 枚举、禁用
 watch 的跨 runtime polling、stock topic admission/write-fence、ack/capability/policy、failure recovery、
-LocalStack 与 production storage-isolation gates。Future 2 is complete。
+LocalStack 与 production storage-isolation gates，以及跨 unload、owner failover、runtime restart 的保存
+`MessageIdAdv` 普通/批内起点回归。Future 2 is complete。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -75,7 +76,7 @@ alias。
 - BookKeeper primary WAL execution；
 - `WAL_DURABLE` fast boundary 和 async materialization workers；
 - durable cursor/ack authority、KoP、routing、compaction、lakehouse、advanced Pulsar semantics；
-- Future 3 durable cursor/subscription、Future 4 materialization/compaction and later tracks；F2-M6 scenarios 1–18
+- Future 3 durable cursor/subscription、Future 4 materialization/compaction and later tracks；F2-M6 scenarios 1–19
   are implemented/final-gated。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
@@ -142,15 +143,18 @@ reachable immutable StreamCommitRecord chain
 正常读从 generation-aware offset index 或 validated positive cache 开始：
 
 ```text
-offset -> highest valid generation covering the offset -> physical read target
+offset + requested read view
+  -> highest valid generation covering the offset within that view
+  -> physical read target
 ```
 
 Phase 1 generation 0 是 reachable commit 的派生记录。如果 head 已推进而 index 缺失，resolver
 必须在预算/timeout 内从 commit-log repair 后重试，不能把 committed bytes 当成未提交，也不能从
 object list 猜测。
 
-Future 4 的 higher generation 是 physical selection truth：发布后 reader 优先选择它，但 logical
-append truth 和 offsets 不变。
+Future 4 的 `COMMITTED` higher generation 是 ordinary physical selection truth：发布后 ordinary reader 优先选择
+同 view 的最高 generation，但 logical append truth 和 offsets 不变。Lossy topic compaction publishes into a
+separate `TOPIC_COMPACTED` view and can never outrank or backstop an ordinary committed read。
 
 ### 4.3 Physical truth
 
@@ -368,7 +372,7 @@ protocol coordinate
   -> validate trim/head committed end
   -> scan generation-aware offset index or positive cache
   -> repair missing generation-0 entries from reachable commit log
-  -> choose highest valid generation
+  -> choose highest valid generation within the requested read view
   -> dispatch tagged ReadTarget to its registered reader and validate checksums
   -> clip by record and byte limits
   -> protocol projection
@@ -424,7 +428,8 @@ mapping and migration contract.
 - generation 0: primary WAL read target derived from append truth；
 - generation > 0: materialized/compacted alternative target；
 - publish is conditional on source identity/checksum；
-- highest valid visible generation wins；
+- highest valid visible generation wins only within its closed read view；ordinary `COMMITTED` physical replacement is
+  lossless, while lossy `TOPIC_COMPACTED` output uses a separate index namespace；
 - old targets remain protected until readers、cursors、tasks、catalogs and retention allow GC。
 
 ### 13.2 SBT and SDT

@@ -579,6 +579,16 @@ public final class PositionProjection {
             Position position,
             StreamMetadata snapshot);
 
+    public long cursorReadOffsetAfter(
+            VirtualLedgerProjection projection,
+            Position cursorStartOrMarkDeletePosition,
+            StreamMetadata snapshot);
+
+    public long normalizeResetReadPositionOffset(
+            VirtualLedgerProjection projection,
+            Position position,
+            StreamMetadata snapshot);
+
     public long markDeleteOffsetAfter(
             VirtualLedgerProjection projection,
             Position position,
@@ -602,6 +612,8 @@ Legal ranges:
 | --- | --- |
 | readable entry | `[trimOffset, committedEndOffset)` |
 | next-read position | `[trimOffset, committedEndOffset]` |
+| concrete cursor-start/mark-delete input used to find next-valid | same-ledger `[-1, committedEndOffset)`; values before trim advance to trim |
+| reset read-position input | same-ledger `[-1, Long.MAX_VALUE]`; clamp to retained/tail range |
 | mark-delete position | `[trimOffset - 1, committedEndOffset - 1]` |
 | inclusive max position input | null, `EARLIEST`, `LATEST`, or current-ledger entry ID `>= -1` |
 
@@ -611,6 +623,12 @@ or an already-trimmed same-ledger value to `beforeFirstAvailable`, and a same-le
 `lastConfirmed`. This matches stock's “read no farther than the current LAC” behavior instead of rejecting a harmless
 future max bound. `ManagedLedger.getFirstPosition()` returns `beforeFirstAvailable`, not the first readable entry.
 This is intentionally different from the `pulsar-storage` prototype.
+
+`cursorReadOffsetAfter` accepts only a concrete current-ledger coordinate and returns
+`max(trimOffset, entryId + 1)` with checked arithmetic. Sentinel/default handling stays in `NereusManagedLedger`:
+explicit `EARLIEST` selects trim; null、`LATEST` and concrete future positions use `InitialPosition`; the two-argument
+overload supplies `Latest`. The returned local mark-delete is always `readOffset - 1`, including after trim clamping.
+This method must not replace `requireReadPositionOffset`: direct seek/reset/read coordinates do not receive `+1`.
 
 ## 6. ManagedLedgerFactory Surface
 
@@ -701,7 +719,7 @@ All 87 declared members, including defaults that could be semantically unsafe, a
 | `I` | all four synchronous `addEntry(byte[]...)` overloads | Validate slice/count, copy exact bytes, call the same async core and wait for its single terminal callback. Like locked stock code, the wrapper adds no second timeout race；the admitted async operation already owns append/recovery deadlines. Interruption is restored and propagated. |
 | `I` | all five `asyncAddEntry(...)` overloads | Funnel into `asyncAddEntry(ByteBuf,int,...)`; one Pulsar Entry consumes one L0 offset. |
 | `I` | three `openCursor(...)` overloads; three `asyncOpenCursor(...)` overloads | Create/join an F2 durable-boundary cursor. Its initial state is local; durable progress mutation is unsupported. |
-| `I` | three `newNonDurableCursor(...)` overloads | Create/join a broker-local cursor; reject `isReadCompacted=true`。A supplied `EARLIEST` maps to `trimOffset` and a supplied `LATEST` maps to `committedEndOffset`；`InitialPosition` is consulted only when the Position argument is null, so Latest never overrides explicit EARLIEST. |
+| `I` | three `newNonDurableCursor(...)` overloads | Create/join a broker-local cursor; reject `isReadCompacted=true`。A concrete Position is the already-consumed coordinate and reads next-valid; explicit `EARLIEST` maps to trim; null、`LATEST` and concrete future Positions consult `InitialPosition`; the two-argument overload defaults Latest. Anonymous cursors use collision-resistant unique names. |
 | `L` | `deleteCursor(String)`; `asyncDeleteCursor(...)` | Close/remove the local cursor. Missing name is `CursorNotFoundException`; no durable cursor record is claimed. |
 | `I` | `removeWaitingCursor(ManagedCursor)` | Remove only that cursor's registered waiter; identity mismatch is ignored after validation. |
 | `I` | `getCursors()`; `getActiveCursors()` | Immutable snapshots; active variant filters the cursor-local active flag. |
@@ -913,11 +931,11 @@ does not invoke it.
 | `delete(Position/Iterable)` and async variants | failure (`U`); individual ack holes are F3 | failure (`U`) |
 | `getReadPosition`, `getMarkDeletedPosition` | local values | local values |
 | `getPersistentMarkDeletedPosition` | null | null; F2 has persisted no cursor progress |
-| `rewind`, `rewind(boolean)` | reset to next after local mark-delete; reject `readCompacted=true` | same local read-position behavior |
-| `seek(Position[,force])` | role-aware local read-position update | same; does not change ack truth |
+| `rewind`, `rewind(boolean)` | reset to next retained offset after local mark-delete; reject `readCompacted=true` | same local read-position behavior |
+| `seek(Position[,force])` | direct read-position update with no `+1`; when force is false clamp to next after local mark-delete | same; does not change ack truth |
 | `clearBacklog` / async | local mark-delete to current LAC | failure (`U`) |
 | `skipEntries` / async | local next-read advance | same |
-| `resetCursor` / async | local mark-delete/read reset | failure (`U`) |
+| `resetCursor` / async | Position is direct read target; normalize `EARLIEST`/`LATEST` and trimmed/future targets, set mark-delete to the previous retained coordinate; force cannot resurrect trimmed F2 bytes | failure (`U`) |
 | replay overloads | synchronously return positions at/below local mark-delete as skipped, asynchronously reread every other retained position, honor `sortEntries`, and fail callback on a wrong/trimmed/future position | same; no individual ack-hole inference |
 
 ### 9.3 Search, lifecycle and stats

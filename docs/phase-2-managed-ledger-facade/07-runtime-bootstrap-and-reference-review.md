@@ -3,7 +3,7 @@
 本文补齐 F2 从 facade 类到真实 broker runtime 之间的构造、配置、feature admission 和资源所有权。
 真实目标接口与 broker call path 的 review baseline 是用户提供的 clean checkout
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar@100d3ef0ff7c7da36d497453b141ddff6f34a9d3`；同一 checkout
-现已在本地实现分支推进到 `f8efefa719`。本文也保留
+现已在本地实现分支推进到 `7efae25af3`。本文也保留
 对 `/Users/liusinan/apps/ideaproject/GITHUB/pulsar-storage` 原型的源码评审结论；该原型只用于提供扩展点
 探索证据，不是 Nereus durability/position/cursor 合同的来源。没有使用在线源码。
 
@@ -62,6 +62,14 @@ The later real-broker gate additionally locked four runtime facts：missing-ledg
 write-free；explicit Reader `EARLIEST` must beat an overload default of Latest；`ServerCnx` supplies an empty non-null
 `KeySharedMeta` to ordinary subscriptions；and a topic-level persistence policy needs a hybrid-only pre-create admin
 path while stock BookKeeper-only missing-topic behavior remains NotFound。
+
+The 2026-07-14 narrow MessageId review of the same local Pulsar master locked one more call-path contract. Wire
+`startMessageId` is reconstructed by `ServerCnx` as `BatchMessageIdImpl`; `PersistentTopic` steps its entry ID back by
+one before `newNonDurableCursor`; stock `NonDurableCursorImpl` treats that Position as mark-delete and reads
+`getNextValidPosition(start)`. Therefore Nereus must also read next-valid, including current-ledger `-1` and
+`trimOffset - 1`. A concrete start on an older trimmed offset advances to trim, wrong virtual-ledger IDs still fail,
+and direct seek/reset remain read-position operations. Stock's two-argument overload defaults Latest, while explicit
+`EARLIEST` wins and null/`LATEST`/future starts consult the supplied `InitialPosition`.
 
 ## 2. Fork-owned Hybrid Provider
 
@@ -1386,15 +1394,18 @@ virtual-ledger isolation and physical retention of the old object。A real-Oxia 
 both projection-derived keys，fully closes the shared client runtime，reconnects and repairs both from the topic
 authority。
 
-The final F2-M6 slice closes scenarios 10–18 with executable evidence。Two independent facade/storage runtimes over
+The final F2-M6 slice closes scenarios 10–19 with executable evidence。Two independent facade/storage runtimes over
 one shared metadata authority prove polling wakes a remote waiter while metadata watches are disabled。A fail-first real
 Object-WAL writer proves upload failure emits one failure callback、does not fence or consume entry 0，and releases
 admission for the next successful append。The ordinary gate now explicitly selects the stock
 `PersistentTopicNereusAdmissionTest` rather than relying on its package placement。A production isolation gate rejects
 local-file object storage and BookKeeper client/stock-ledger routing from the Nereus facade/adapter。Finally local fork
 commit `f8efefa719` extends the real two-broker test to enumerate the broker's actual BookKeeper ledgers and prove the
-active Nereus virtual ledger ID is absent。Scenarios 1–18 and the aggregate ordinary/Docker gates now pass；F2-M6 and
-Future 2 are complete。
+active Nereus virtual ledger ID is absent。Commit `7efae25af3` then closes the narrow MessageId gate：saved ordinary
+and middle-batch coordinates are used as exclusive/inclusive Reader starts before and after unload、owner failover
+and runtime restart，with exact payload and full `MessageIdAdv` equality。Scenario 19's focused real-broker gate、
+`phase2Check` and `phase2FinalCheck --rerun-tasks` all pass against the exact clean fork；F2-M6 and Future 2 remain
+complete。
 
 Rollout is two-step: every broker that can own the namespace must first run the hybrid provider/binding guard while
 policies still select BookKeeper; only after that cluster-wide convergence may an operator enable `nereus` for new
@@ -1474,7 +1485,10 @@ In addition to `05`, the F2-M5/F2-M6 gates include and now pass:
     `MessageIdAdv` coordinates、BookKeeper coexistence and positive S3 object presence remain stable；
 33. a cross-layer Object-WAL upload failure emits one failure callback，leaves the ledger writable/unfenced and lets
     the next append succeed at entry 0；the storage-isolation gate rejects production local-file fallback and any
-    Nereus facade/adapter dependency that could route virtual ledger IDs through stock BookKeeper storage。
+    Nereus facade/adapter dependency that could route virtual ledger IDs through stock BookKeeper storage；
+34. saved ordinary-entry and middle-batch `MessageIdAdv` values start exclusive Readers at the next logical message
+    and inclusive Readers at the saved message，with identical full coordinates after unload、owner failover and
+    runtime restart。
 
 ## 9. Release Claim Boundary
 
