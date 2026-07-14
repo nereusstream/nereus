@@ -5,17 +5,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.metadata.oxia.records.CursorRecordLifecycle;
+import com.nereusstream.metadata.oxia.records.CursorStateRecord;
+import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.time.Clock;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 
 class ManagedLedgerCursorProtocolTest {
     private static final String CLUSTER = "cluster/a";
     private static final String NAME = "tenant/ns/persistent/f3-protocol";
+    private static final String OWNER = "00112233445566778899aabbccddeeff";
+    private static final String ATTEMPT = "ffeeddccbbaa99887766554433221100";
     private static final ProjectionPublishGuard ALLOW = () -> CompletableFuture.completedFuture(null);
 
     @Test
@@ -81,6 +90,122 @@ class ManagedLedgerCursorProtocolTest {
                     .containsEntry(ManagedLedgerCursorProtocol.PROPERTY, "1")
                     .containsEntry("owner", "one");
         }
+    }
+
+    @Test
+    void topicRecreationUsesANewCursorNamespaceThatCannotAliasTheOldIncarnation() {
+        var projectionState = new FakeManagedLedgerProjectionMetadataStore.DurableState();
+        try (var projectionStore = new FakeManagedLedgerProjectionMetadataStore(
+                        projectionState, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC());
+                var cursorStore = new FakeCursorMetadataStore()) {
+            TopicProjectionRecord original = projectionStore
+                    .createFirstProjection(CLUSTER, request(NAME, 3, 1), ALLOW)
+                    .join();
+            original = projectionStore
+                    .activateCursorProtocol(
+                            CLUSTER,
+                            NAME,
+                            original.projectionIdentity(),
+                            original.metadataVersion())
+                    .join();
+            cursorStore.createCursor(
+                            CLUSTER,
+                            cursor(original.projectionIdentity(), "subscription-a"))
+                    .join();
+
+            TopicProjectionRecord deleting = projectionStore
+                    .mirrorFacadeState(
+                            CLUSTER,
+                            NAME,
+                            original.projectionIdentity(),
+                            original.metadataVersion(),
+                            ManagedLedgerFacadeState.DELETING)
+                    .join();
+            TopicProjectionRecord deleted = projectionStore
+                    .mirrorFacadeState(
+                            CLUSTER,
+                            NAME,
+                            deleting.projectionIdentity(),
+                            deleting.metadataVersion(),
+                            ManagedLedgerFacadeState.DELETED)
+                    .join();
+            TopicProjectionRecord recreated = projectionStore
+                    .recreateDeletedProjection(
+                            CLUSTER,
+                            deleted.projectionIdentity(),
+                            deleted.metadataVersion(),
+                            request(NAME, 4, 2),
+                            ALLOW)
+                    .join();
+
+            assertThat(recreated.incarnation()).isEqualTo(2);
+            assertThat(recreated.projectionIdentity()).isNotEqualTo(original.projectionIdentity());
+            assertThat(recreated.streamId()).isNotEqualTo(original.streamId());
+            assertThat(recreated.virtualLedgerId()).isNotEqualTo(original.virtualLedgerId());
+            assertThat(cursorStore
+                            .getCursor(
+                                    CLUSTER,
+                                    new StreamId(original.streamId()),
+                                    "subscription-a")
+                            .join())
+                    .isPresent();
+            assertThat(cursorStore
+                            .getCursor(
+                                    CLUSTER,
+                                    new StreamId(recreated.streamId()),
+                                    "subscription-a")
+                            .join())
+                    .isEmpty();
+
+            cursorStore.createCursor(
+                            CLUSTER,
+                            cursor(recreated.projectionIdentity(), "subscription-a"))
+                    .join();
+            assertThat(cursorStore
+                            .getCursor(
+                                    CLUSTER,
+                                    new StreamId(original.streamId()),
+                                    "subscription-a")
+                            .join()
+                            .orElseThrow()
+                            .value()
+                            .projection())
+                    .isEqualTo(original.projectionIdentity());
+            assertThat(cursorStore
+                            .getCursor(
+                                    CLUSTER,
+                                    new StreamId(recreated.streamId()),
+                                    "subscription-a")
+                            .join()
+                            .orElseThrow()
+                            .value()
+                            .projection())
+                    .isEqualTo(recreated.projectionIdentity());
+        }
+    }
+
+    private static CursorStateRecord cursor(
+            ManagedLedgerProjectionIdentity projection, String name) {
+        return new CursorStateRecord(
+                0,
+                projection,
+                OWNER,
+                name,
+                CursorNames.cursorNameHash(name),
+                1,
+                CursorRecordLifecycle.ACTIVE,
+                1,
+                1,
+                ATTEMPT,
+                0,
+                Optional.empty(),
+                List.of(),
+                List.of(),
+                Map.of(),
+                Map.of(),
+                100,
+                100,
+                OptionalLong.empty());
     }
 
     private static ProjectionCreateRequest request(String name, long binding, long incarnation) {
