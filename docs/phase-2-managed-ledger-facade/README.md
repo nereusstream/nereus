@@ -63,6 +63,13 @@ saved ordinary and middle-batch MessageIds in exclusive/inclusive Reader modes a
 runtime restart。All 19 scenarios pass；F2-M6 and
 Future 2 are complete。
 
+2026-07-14 Phase 3 M0/M0R 已消费并复核本合同：F2 的 one-Entry/one-offset、stable virtual ledger、
+Position roles、durable-boundary cursor、single-key metadata primitive、ObjectStore immutability 和 L0 trim API
+足以承载 F3 single-root cursor/snapshot/retention protocol；无需修改 F2 MessageId 或 append correctness model。
+F3 additionally uses a fresh per-writable-open owner-session claim over retention and all ACTIVE cursor roots before
+topic publication；this is an F3 cursor fence and does not alter the locked F2 projection、MessageId or append model。
+F3 code-level target见 `../phase-3-cursor-subscription/README.md`，但尚未实现。
+
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。
 首个可执行版本只接受 `OBJECT_WAL_SYNC_OBJECT`；BookKeeper storage class 与 Nereus storage

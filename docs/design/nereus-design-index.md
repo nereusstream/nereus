@@ -1,8 +1,8 @@
 # Nereus Design Index
 
 > 状态：当前设计索引
-> 最近一次实现同步：2026-07-13
-> 当前交付阶段：Phase 1.5 P15-M0-M6 + F2-M1-M6 complete；Future 2 final-gated
+> 最近一次设计/实现同步：2026-07-14
+> 当前交付阶段：Future 2 final-gated；Phase 3 F3-M0/M0R design-gated，F3-M1-M6 not started
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -38,7 +38,8 @@ streamId + offset
 1. **已实现行为**：生产代码、可执行测试和 durable golden bytes；
 2. **当前代码级合同**：`docs/phase-1-core-stream-storage/` 的已实现 L0 合同、
    `docs/phase-1.5-core-storage-foundation/` 的 implemented L0 evolution contract，以及
-   `docs/phase-2-managed-ledger-facade/` 的 reviewed F2 design；
+   `docs/phase-2-managed-ledger-facade/` 的 implemented F2 contract；对于尚未实现的 F3，
+   `docs/phase-3-cursor-subscription/` 是 reviewed code-level target contract；
 3. **已接受决策**：`docs/decisions/`；
 4. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
 5. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
@@ -73,6 +74,7 @@ streamId + offset
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 complete） | projection metadata、factory、writable/get-only ledger、append/read/lifecycle/write-fence、admin/cache/stats and cursor boundary implemented/tested |
 | `nereus-pulsar-adapter` | `Implemented`（F2 complete） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle and real dual-broker restart/failover implemented/tested；all F2-M6 scenarios and aggregate gates pass |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
+| Future 3 cursor/subscription | `Designed`（F3-M0/M0R passed） | code-level API/key/record/snapshot/state-machine/fork/test contract exists；no F3 production/test code |
 | Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -132,6 +134,22 @@ fixtures。They are now the executable F2-M1 entry gate。
     Phase 1.5 public success remains strict and continues rejecting `WAL_DURABLE` before IO。
 18. F2-required append recovery、seal and logical delete must be implemented in L0 before F2 production code；logical
     delete never implies physical object deletion。
+19. F3 durable cursor correctness uses one Oxia root per cursor generation；normal dispatch read position is local
+    and cannot be restored after broker failure。
+20. F3 partial batch state stores Pulsar remaining bits and merges with AND；ack state is snapshotted, never
+    truncated。
+21. F3 reset/clear-backlog advances a durable `ackStateEpoch`；a non-subsumed monotonic ack may rebase only while that
+    epoch is unchanged。
+22. F3 new/recreated cursor and backward reset remain in a recoverable stream `PROTECTION_PENDING` lifecycle through
+    cursor CAS，lowering the floor when needed；logical trim uses separate `TRIM_PENDING` with exact persisted
+    offset/attempt/composed reason，while F4 owns physical GC。
+23. Before first F3 durable cursor，the topic projection is monotonically activated with internal
+    `nereus.cursor-protocol=1`；the locked F2 decoder rejects that reserved property and therefore fails before an
+    empty cursor view can be exposed。
+24. Every F3 writable ledger open creates one fresh owner session，claims retention first and every ACTIVE cursor root
+    before topic publication；Pulsar ownership/watch alone cannot fence a crash-delayed old cursor CAS。
+25. The broker-supplied ManagedLedger ownership checker is required before owner claim and final ledger/first-create
+    publication；it is an admission guard，while the durable root session/version remains the CAS fence。
 
 ADR 0004 and its 2026-07-12 addendum own the delivery-order、generic-target compatibility and support-boundary
 decision behind items 14 and 16-18。
@@ -149,6 +167,8 @@ decision behind items 14 and 16-18。
 | `nereus-storage-object-format.md` | 已实现 WAL v1 与未来 object families 的版本边界 | current |
 | `nereus-futures.md` | 能力轨道、依赖 DAG、交付状态 | current |
 | `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
+| `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
+| `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | M0/M0R design-gated；not implemented |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -161,7 +181,7 @@ decision behind items 14 and 16-18。
 | --- | --- | --- |
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
-| `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed` |
+| `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Designed`（M0/M0R gated，implementation-ready） |
 | `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
@@ -187,6 +207,15 @@ decision behind items 14 and 16-18。
 5. `../phase-2-managed-ledger-facade/spikes/PulsarManagedLedgerApiProbe.java` 与锁定的
    Pulsar fork commit；
 6. 当前里程碑对应的代码和可执行 gate。
+
+### 实现 Future 3
+
+1. `nereus-future3-cursor-subscription.md`；
+2. `../phase-3-cursor-subscription/README.md`；
+3. 依次评审该目录的 `01` 到 `06` code-level documents；
+4. 使用本地 Pulsar `master@7efae25af39a15407c1397d9e1f4ac4658d09daa` 重新验证 source/member lock；
+5. 从 F3-M1 metadata/snapshot 开始，按 M1-M6 gate 推进；
+6. 在 F3-M6 之前保持状态为 `Designed/In progress`，不得写成 `Implemented`。
 
 ### 评审 Phase 1.5
 

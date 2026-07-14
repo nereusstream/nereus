@@ -1,7 +1,7 @@
 # Nereus Terminology
 
 > 状态：Current
-> 适用范围：总体设计、Future 1-8、Phase 1/1.5 代码级设计和实现注释
+> 适用范围：总体设计、Future 1-8、Phase 1/1.5/2 实现合同、Phase 3 code-level target 和实现注释
 
 Nereus 以 stream 术语描述内部正确性。Pulsar ledger、Kafka log、对象和表都是投影或物理
 承载，不能取代逻辑 truth。
@@ -98,6 +98,20 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 | `MessageId(..., batchIndex)` | F2 映射为 persisted-entry offset + entry 内 sub-index；`batchIndex` 不消耗 L0 offset |
 | ManagedCursor | Oxia cursor state + optional immutable snapshot object 的 facade |
 | Mark-delete | first not cumulatively acknowledged persisted-entry offset；partial batch 由 entry-keyed ack set 表示 |
+| Cursor correctness root | 每个 stream/cursor-name hash 的单一 Oxia CAS record；同时拥有 generation、ack、properties 和 snapshot ref |
+| Cursor owner session | 每次 writable ledger open 新生成并写入 retention + 全部 ACTIVE cursor root 的 128-bit fence；全部 claim/stabilize 后才允许发布 topic，且不进入 MessageId/snapshot |
+| Cursor preactivation owner root | marker/cursor 尚不存在时也由 F3 writable open create/claim 的 ACTIVE/no-pending retention root；只 fence 旧 session，不代表 durable cursor 已激活 |
+| ManagedLedger ownership guard | Pulsar broker 传给 checked async open 的 namespace/topic ownership supplier；F3 在 claim 前、发布前及首次 cursor callback 边界复核，但它不是 durable CAS token |
+| Cursor generation | subscription name 每次 delete/recreate 单调递增的 stale-writer fence；不进入 MessageId |
+| Cursor ack-state epoch | 同一 cursor generation 内 reset/clear-backlog destructive replacement 的单调 epoch；普通 ack 只能在 epoch 不变时 rebase |
+| Local read offset | broker-local next-dispatch hint；正常读取会推进，永不持久化，重启从 first-unacked 重建 |
+| Whole ack range | mark-delete 之上的 fully acknowledged Entry half-open offset range；规范化为 sorted/disjoint/non-adjacent |
+| Partial batch ack | entry offset 对应的 Pulsar remaining-bit `long[]`；set bit 表示仍未 ack，合并为 bitwise AND |
+| Cursor snapshot reference | cursor root 中使一个 immutable `NCS1` full ack snapshot 可见的引用；object existence 本身不构成可见性 |
+| Cursor protection floor | stream-level conservative trim bound；new/recreated cursor 和 backward reset 必要时先降低它 |
+| Cursor `PROTECTION_PENDING` | complete create/recreate/backward-reset intent 已冻结 floor raise/trim，直到同 attempt cursor root 被证明并 finalize |
+| Cursor `TRIM_PENDING` | logical trim offset、attempt ID 与 exact composed L0 reason 已被冻结且必须恢复/验证完成的 retention 状态；不等于 physical GC completion |
+| Cursor protocol activation | topic projection 内部保留的 `nereus.cursor-protocol=1` minimum-reader fence；首个 durable cursor 前 CAS，用户 properties 不可见 |
 
 ### Kafka / KoP
 
@@ -133,6 +147,8 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F2-M0R2**：在 exact target Pulsar checkout 上完成的实现前闭环；锁定 metadata type、durable binding
   inspection、write-fence/ack broker handoff、S3 provider、capability rollout 与 namespace first-create race，
   仍不代表 facade 已实现。
+- **F3-M0 / F3-M0R**：Future 3 对 local Pulsar master API/call path 和 cursor/snapshot/owner-session/retention protocol 的
+  design-only code-level gate；passed 表示 implementation-ready，不表示 durable cursor code 已存在。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 
@@ -152,6 +168,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - “reserved profile 已经支持”。
 - “BookKeeper target value/codec 已存在，所以 BookKeeper profile 已支持”；
 - “logical delete 会立即删除对象”。
+- “durable read position 可以在 broker failover 后继续 dispatch” 作为 F3 correctness contract；
+- “扫描一次所有 cursor 的最小 mark-delete 就可以安全 trim”；
+- “cursor snapshot 上传成功就已经可见”。
+- “Pulsar topic ownership、watch 或 graceful drain 已足以 fence 旧 broker 的 cursor CAS”。
 
 建议使用：
 

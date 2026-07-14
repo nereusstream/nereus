@@ -123,6 +123,7 @@ Rules:
 
 - cursor ack truth remains Future 3 cursor state；
 - hash range assignment is broker/runtime coordination state with Oxia epoch；
+- assignment epoch is not the F3 writable-ledger owner session and cannot authorize cursor mutation；
 - rebalance must define drain boundary by stream offset；
 - messages for the same key must not be concurrently dispatched across consumers before drain completes；
 - broker failover recomputes assignment from Oxia state and cursor state。
@@ -200,9 +201,14 @@ Commit rules:
 
 1. CAS `OPEN -> COMMITTING` and persist an immutable commit decision/apply id；after this point abort is not
    allowed.
-2. Apply pending ack ranges to Future 3 cursor state with CAS，recording the apply id so retry is idempotent.
+2. Apply pending ack ranges through the current Future 3 cursor handle/owner session with CAS，recording the apply id
+   so retry is idempotent；a stale owner fails fenced rather than claiming the cursor.
 3. CAS transaction state `COMMITTING -> COMMITTED` after cursor state proves the apply id.
 4. Release pending-ack snapshot references only after terminal state and reader leases are safe.
+
+The `apply id` is an F8 schema/capability extension around the F3 one-root CAS；it is not a cursor property、owner
+session or transaction epoch and is not present in F3 V1 bytes。F8 must preserve current F3 owner-session fencing、
+cursor generation、`ackStateEpoch`、normalization、snapshot-reference and retention ordering。
 
 Recovery of `COMMITTING` always completes steps 2-3。A crash after cursor CAS but before terminal transaction
 CAS therefore cannot later choose abort or silently roll back acknowledged progress。

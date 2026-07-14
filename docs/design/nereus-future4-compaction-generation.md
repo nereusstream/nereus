@@ -1,7 +1,8 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
 > 状态：Designed；worker/task/higher-generation publish 尚未实现
-> 前置：Future 1 generation-0 contract、Phase 1.5 P15-M5 generic target/stable-commit split、cursor/reader reference hooks
+> 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
+> Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
 本文定义 Nereus L3 compaction 和 generation replacement 设计。Future 4 的核心目标是
 > 把 multi-stream WAL object 转换为 per-stream read-optimized object，并通过 Oxia offset
@@ -66,6 +67,17 @@ Phase 1.5 implements the tagged target/adapter、generic generation-zero record 
 stable-commit/materializer seam。It does not freeze this document's task/checkpoint/source-generation CAS schema and
 does not implement a worker。Phase 1.5 P15-M0-M6 has passed；F4 production still requires the remaining
 reference/publish entry gates。
+
+Phase 3 F3-M0/M0R 已冻结 F4 必须消费的边界：cursor ack truth 是单 Oxia root + immutable snapshot ref；
+new/recreated cursor 和 backward reset 在 cursor CAS 全窗口保持 `PROTECTION_PENDING`；logical trim 经过
+保存 exact offset/attempt/composed reason 的 recoverable `TRIM_PENDING`；normal
+dispatch read position 不参与 retention；`ackStateEpoch` 只围住 destructive cursor replacement，F4 不得
+重置、推导或复用它。每次 writable ledger open 必须先用 fresh owner session claim retention 和全部 ACTIVE
+cursor roots；topic-owned trim mutation 必须携带当前 session。只读 planner/GC worker 不 claim cursor
+ownership，而是通过 versioned `CursorMetadataStore` read/scan surface 读取并在执行边界重验 root
+version/session；任何 owner change 都使本轮 snapshot 失效重试。
+它们不能把 Pulsar ownership/watch 当作 cursor CAS fence。F3-M1-M6 尚未实现，因此 F4 不得先行启用 generation publish 或
+physical GC。
 
 ## 4. Layer Boundary
 
@@ -337,7 +349,7 @@ Source index and object retirement is a separate two-stage protocol:
 publish replacement in one view
   -> tombstone superseded source index keys with expected generation/checksum
   -> keep source object while any visible index, reachable-commit recovery root,
-     reader lease/cache pin, cursor/group/catalog reference or task protects it
+     reader lease/cache pin, logical trim/reference domain or task protects it
   -> mark GC candidate with the complete observed reference/version set
   -> wait for pre-existing bounded reader leases to release/expire
   -> re-read and CAS-validate every root
@@ -354,6 +366,27 @@ implemented, higher generation may be published but source bytes and source inde
 This retirement also bounds the F2 `O(committed append ranges)` offset-index count. Old incarnation projection mirrors
 may be removed only after current topic authority points elsewhere and no reader/task/audit/recovery reference needs
 the old stream; their absence never permits an old MessageId to address the new incarnation.
+
+Cursor integration is two distinct checks：
+
+- stream data eligibility starts from completed L0 trim produced through F3 `CursorRetentionRecord` pending protocol；
+  PROTECTION_PENDING or TRIM_PENDING blocks a newer decision，and a one-shot cursor minimum/projection hint is never
+  deletion proof；a topic-owned trim request must belong to the current writable-ledger owner session，while a
+  read-only GC snapshot must include and revalidate the observed root version/session before delete；
+- cursor snapshot object eligibility starts from the current generation's `CursorStateRecord.snapshotReference` and
+  F4 reader/reference grace；an old/CAS-lost snapshot is not deletable from age alone。
+
+F4 is also the first phase that may admit the F3-rejected `NereusAdminOperation.TRIM_TOPIC` and replace F3's no-op
+`ManagedLedger.trimConsumedLedgersInBackground(promise)`。Every broker housekeeping、policy or admin candidate must
+funnel through `CursorRetentionCoordinator.requestTrim` with the current owner session；the promise may complete after the recoverable logical trim
+reaches ACTIVE/completed truth，but physical source/object deletion remains a later GC-worker boundary。No F4 call
+site may invoke `StreamStorage.trim` directly。If the topic has no cursor marker yet，that coordinator first runs the
+F3 capability guard and activates the projection marker；the current F3 writable open must already have created or
+claimed the owner-only retention root at current L0 trim。“currently no cursor” is not permission to race a first
+cursor create with direct trim，and an absent/mismatched root forces a fresh writable open rather than direct trim。
+
+F4 may route a lagging cursor to a lossless higher `COMMITTED` generation because offsets/Entry bytes are unchanged；
+cursor lag protects the logical range from trim, not a particular old physical generation。
 
 ## 10. Topic Compaction Primitive
 
@@ -393,6 +426,8 @@ offset gap。
 - `PULSAR_ENTRY_V1` ordinary reads return the exact original Entry bytes and one offset remains one Entry across every
   physical generation.
 - ManagedCursor backlog and retention use offsets and cumulative size, not object identity.
+- Force reset below ordinary L0 trim remains unavailable until F4 defines an explicit compacted-view generation and
+  reference contract；it does not change F3's durable mark-delete coordinate.
 - Topic compaction uses only the separate compacted-read view and keeps Pulsar observable semantics.
 
 ### KoP / Kafka
@@ -421,7 +456,12 @@ Future 4 may enter implementation planning only after the following are reviewed
 - old generation reference and GC protection；
 - reader resolve/pin/read/release protocol、reachable-commit recovery root and source-index retirement；
 - AutoMQ-like materialization lag and primary WAL retention protection；
-- interactions with Future 3 cursor low-watermark and Future 6 catalog snapshots。
+- interactions with Future 3 completed logical trim/protection root/current snapshot references and Future 6 catalog
+  snapshots。
+
+Before F4 production starts, Phase 3 M1-M6 must provide executable owner-session claim/fencing、cursor-generation、
+snapshot-reference、protected create/backward-reset and pending-trim gates；the design-only M0R contract is necessary
+but not final implementation evidence。
 
 This is a design gate. It does not require benchmark, chaos, compatibility certification, CI, or
 real evidence.

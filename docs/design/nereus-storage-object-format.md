@@ -1,6 +1,7 @@
 # Nereus Storage Object Format
 
-> 状态：Object WAL v1 `Implemented`；其他 object families `Designed/Reserved`
+> 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M0/M0R code-level design gate 但未实现；
+> 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
 ## 1. Format families
@@ -12,7 +13,7 @@ Nereus shared data plane 需要多类 immutable objects：
 | Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
 | Index object | large entry/projection index | offset-index reference | Reserved |
 | Stream compacted object | per-stream higher-generation read target | generation publish | Designed |
-| Cursor snapshot | large ack state | cursor-state CAS ref | Designed |
+| Cursor snapshot | large ack state | cursor-state CAS ref | V1 code-level designed/M0R-gated；not implemented |
 | Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |
 | SBT/SDT table file | analytical/table projection | catalog snapshot/delivery lineage | Designed |
 
@@ -291,9 +292,9 @@ Default target is Parquet with row-group offset bounds。Before implementation F
 - exact opaque Entry checksum/round-trip rules for `PULSAR_ENTRY_V1`；
 - higher-generation publish and fallback validation。
 
-## 11. Designed snapshot objects
+## 11. Snapshot objects
 
-> Status: Designed
+> Status: Cursor snapshot V1 code-level designed/M0R-gated；transaction snapshot only Designed；none implemented
 
 Common snapshot rules：
 
@@ -304,8 +305,28 @@ Common snapshot rules：
 
 ### Cursor snapshot
 
-Contains normalized half-open ack ranges、base mark-delete、cursor/snapshot version and optional partial-batch
-projection data。
+F3 V1 is a full normalized ack-state base。The current cursor root may add bounded whole-range deltas and
+partial-entry overrides；root CAS remains visibility authority。
+
+Logical key：
+
+```text
+{clusterComponent}/cursor-snapshots/v1/{streamIdComponent}/
+  {cursorNameHash}/{cursorGeneration019}/{random128SnapshotId}.ncs
+```
+
+Wire layout uses big-endian `NCS1` header、exact stream/projection/cursor/generation/source-sequence identity、
+normalized half-open range section、partial-batch remaining-word section and `NCF1` footer。Header、sections and whole
+object have explicit CRC32C；all lengths/counts/UTF-8/canonical order/trailing bytes are strictly validated。Exact
+fields and checksum coverage are frozen in
+`../phase-3-cursor-subscription/03-oxia-metadata-and-snapshot-format.md`。
+
+The writable-ledger `ownerSessionId` is intentionally root-only and absent from immutable snapshot bytes。A new owner
+claims the root while preserving the same snapshot reference；root version/session fencing，not snapshot rewriting，
+prevents an old broker from publishing a later cursor mutation。
+
+Publish is immutable PUT-if-absent -> exact HEAD -> cursor-root CAS。Stable missing/corrupt reference fails cursor
+open；no older snapshot or inline-only fallback is allowed。CAS-lost/old objects remain F4 orphan/reference-GC input。
 
 ### Transaction snapshot
 
@@ -368,4 +389,5 @@ metadata and ownership。
 - Object WAL review：`../phase-1-core-stream-storage/11-m3-object-wal-review-2026-07-08.md`
 - Commit semantics：`nereus-commit-protocol.md`
 - F4 target：`nereus-future4-compaction-generation.md`
+- F3 cursor snapshot target：`../phase-3-cursor-subscription/03-oxia-metadata-and-snapshot-format.md`
 - F6 target：`nereus-future6-lakehouse-sbt-sdt.md`

@@ -2,7 +2,8 @@
 
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
-> final-gated；generation、cursor、txn、catalog 部分仍为 target design。
+> final-gated；F3 cursor protocol 已通过 design-only M0/M0R 并冻结到代码级但尚未实现；generation、txn、
+> catalog 部分仍为 target design。
 
 ## 1. Purpose
 
@@ -19,6 +20,7 @@
 `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md` 和
 `../phase-1-core-stream-storage/04-core-state-machines.md`。
 Phase 1.5 target records/state machines见 `../phase-1.5-core-storage-foundation/README.md`。
+F3 cursor exact contract见 `../phase-3-cursor-subscription/README.md`。
 
 ## 2. Commit domains
 
@@ -32,7 +34,8 @@ Nereus 不把所有状态塞进一个“commit”概念：
 | Stream seal | Oxia stream head | `ACTIVE -> SEALED` head CAS |
 | Logical stream delete | Oxia stream head | first `ACTIVE/SEALED -> DELETING` head CAS |
 | Higher-generation target | Oxia generation index | conditional generation entry publish |
-| Cursor progress | Oxia cursor state | cursor CAS |
+| Cursor progress | Oxia `CursorStateRecord` | one-root cursor version-CAS |
+| Cursor trim protection | Oxia `CursorRetentionRecord` + L0 trim truth | retention pending/completion CAS protocol |
 | Transaction result | transaction state + required stream markers | explicit state-machine terminal CAS |
 | SBT visibility | table catalog | catalog snapshot commit |
 | SDT visibility | target catalog | idempotent delivery commit |
@@ -369,22 +372,61 @@ retained。
 
 ## 12. Cursor commit protocol
 
-> Status: Designed
+> Status: F3-M0/M0R design-gated；not implemented
 
-Cursor small state uses a single CAS：
+One `CursorStateRecord` key owns exact projection/name、current writable-ledger `ownerSessionId`、cursor
+generation/lifecycle、`ackStateEpoch`、first-unacked `markDeleteOffset`、normalized whole ranges、partial-batch
+remaining bits、properties and snapshot reference。These fields are not split across keys。
+
+Every F3 writable ledger open first creates or claims an ACTIVE/no-pending `CursorRetentionRecord` owner root，even
+when no cursor exists and the topic projection is unactivated。That preactivation record is a session fence only；it
+does not make cursor semantics visible。Before the first PROTECTION_PENDING transition or `CursorStateRecord`，a
+separate monotonic CAS adds internal `nereus.cursor-protocol=1` to the F2 topic projection。This is a
+minimum-reader/downgrade fence，not cursor ack truth；the locked F2 decoder rejects the reserved property before it can
+expose an empty cursor collection。
+
+Every writable ledger open generates a fresh owner session，claims `CursorRetentionRecord` first，then CAS-claims
+every ACTIVE cursor root to that same session without changing cursor semantics。It recovers pending retention work and
+stabilizes the full ACTIVE-root scan before publishing the ledger/open callback。The exact broker-supplied ownership
+checker must pass before claim and again immediately before publication；a failed final check publishes no ledger and
+the next owner safely reclaims the unpublished session。Pulsar topic ownership decides who may
+start this protocol but does not replace it：an old broker CAS against an existing root that linearizes before the
+corresponding root claim is included when the new owner reloads；one that arrives after that claim loses the
+version/session fence。A CREATE/RECREATE whose pending retention intent was already durable may still race on its
+ABSENT/DELETED target key because no cross-key atomic condition is assumed，but the stale owner cannot finalize the
+claimed pending root or callback success；takeover recovery claims/rebuilds the winner before publication。Ordinary
+operations require the handle/root/retention owner to match and never steal a session through retry。
 
 ```text
-read cursor state/version
-  -> normalize mark-delete + ack ranges
-  -> optionally upload immutable snapshot
-  -> CAS cursor state to inline ranges/snapshot ref
+read root + Oxia version; require current owner session
+  -> strictly hydrate current immutable snapshot + bounded root delta
+  -> normalize ack/reset/property transition
+  -> optionally upload + HEAD a replacement full snapshot
+  -> CAS one root to new inline state/reference
+  -> only then complete the ManagedCursor callback
 ```
 
-The CAS is cursor progress linearization。Snapshot upload before a failed CAS creates an orphan；snapshot
-existence alone never advances acknowledgements。
+The CAS is cursor-progress linearization。Snapshot upload before a failed CAS creates an orphan；snapshot existence
+alone never advances acknowledgements。Ack retry may prove `ALREADY_APPLIED` or recompute monotonic union/AND against
+the latest same-generation root only while `ackStateEpoch` is unchanged。Reset and clear-backlog increment that epoch；
+a non-subsumed old ack cannot be recreated across destructive replacement。Reset/property replacement does not
+blindly rebase。
 
-Cursor and stream append are separate commit domains。Trim/GC uses committed cursor low-watermarks but does
-not require a global append+cursor transaction。
+Normal dispatch `readPosition` is broker-local and never committed。Restart/failover derives the next read from first
+unacked；redelivery is permitted, skipping delivered-but-unacked data is not。Delete keeps a generation tombstone；
+same-name recreate increments generation and fences stale handles。The owner-session claim independently fences
+crash-delayed mutations and stale dispatch state from the previous writable broker instance。
+
+Cursor and stream append are separate commit domains。All retention/cursor writes below carry the current claimed
+owner session。New/recreated cursor and backward reset order two CAS domains
+without a global transaction：each first CASes `CursorRetentionRecord` ACTIVE -> PROTECTION_PENDING with a complete
+intent and `protectedFloorOffset=min(currentFloor,target)`，then writes the same attempt ID into the cursor root，proves
+that root and finalizes retention back to ACTIVE before success。Floor raise and trim are blocked for the entire
+pending interval；a one-shot version bump is explicitly insufficient because a raise could start after the bump but
+before cursor CAS。Crash recovery completes/proves the durable intent and never guesses it away。Logical trim uses a
+separate `TRIM_PENDING` candidate with offset、attempt ID and exact bounded composed reason，invokes idempotent L0
+trim，verifies L0 truth，then records completion。Recovery reuses those exact persisted trim inputs；F4 consumes
+completed trim and current references for physical GC。
 
 ## 13. Transaction commit protocol
 
@@ -441,7 +483,7 @@ An object is deletable only when all relevant conditions are true：
 
 - no visible generation references it；
 - no reachable commit needs it as primary recovery source；
-- trim/retention and all cursor/group low-watermarks allow deletion；
+- completed L0 trim/retention protocols and all cursor/group/reference domains allow deletion；
 - no active reader/repair/materialization/compaction task protects it；
 - no catalog snapshot/delivery references it；
 - orphan TTL/audit/ownership/checksum state allows deletion。

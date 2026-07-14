@@ -304,7 +304,8 @@ F1 exposes references needed by future GC：
 - object manifest/reference state；
 - reader/repair/task hooks。
 
-Actual safe deletion requires F3 cursor low-watermarks and F4 generation/catalog/task references。
+Actual safe deletion requires F3 completed logical trim/protection protocol and F4 generation/catalog/task/reference
+checks；a one-shot cursor minimum is not deletion proof。
 
 ## 11. Failure model
 

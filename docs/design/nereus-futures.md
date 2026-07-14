@@ -30,7 +30,7 @@ protocol/table state = projection
 | --- | --- | --- | --- |
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
-| F3 Cursor/Subscription | later phase | Designed | F2 projection + F1 trim/read stable |
+| F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Designed；M0/M0R design-gated, implementation-ready | F3-M1 metadata/snapshot foundation |
 | F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
@@ -62,8 +62,9 @@ flowchart LR
 ```
 
 这不是所有设计工作的严格串行计划。F2-M0R2 新发现的 P15-M6 cumulative-result handoff 与 F2-M1-M6
-production milestones 已完成；Future 2 已 final-gated。F4 production
-仍不能越过它依赖的 cursor/reader/reference correctness contracts。
+production milestones 已完成；Future 2 已 final-gated。Phase 3 的 M0/M0R 已把 cursor/reference/trim
+handoff 冻结到代码级，下一实施顺序是 F3-M1-M6。F4 production 在 F3 durable cursor/retention gates 完成前
+不得启动会发布 generation 或删除 physical bytes 的路径。
 
 ## 4. F1 — Core Stream Storage
 
@@ -151,22 +152,32 @@ failure/lifecycle acceptance matrix：
 ## 6. F3 — Cursor and Subscription State
 
 Detailed design: `nereus-future3-cursor-subscription.md`
+Code-level design: `../phase-3-cursor-subscription/README.md`
+Current milestone: F3-M0/M0R complete（design-only）；F3-M1-M6 not started
 
 ### Owns
 
-- mark-delete/read-position offsets；
-- individual ack ranges and snapshot objects；
-- cursor CAS and failover recovery；
+- durable mark-delete；normal dispatch read position stays broker-local；
+- individual whole-ack ranges、partial-batch remaining bits and immutable snapshot objects；
+- one-root cursor CAS、per-writable-open owner-session claim/fence、generation/tombstone、destructive `ackStateEpoch`
+  and failover recovery；
 - Exclusive/Failover/Shared durable progress；
-- retention low-watermark contribution。
+- conservative retention floor and recoverable logical-trim barrier。
 
 ### Entry/exit gates
 
-- F2 can map Position to one persisted-entry offset and preserve MessageId batch indexes as in-entry
-  sub-indexes；
-- F1 resolver and trim contract is stable；
-- cursor snapshot ref is authoritative only through Oxia state；
-- ack/trim races and failover redelivery have deterministic tests；
+- M0 locks the exact local Pulsar master API/member/call paths；
+- F2 maps Position to one persisted-entry offset and preserves MessageId batch indexes as in-entry sub-indexes；
+- one Oxia root owns cursor correctness；snapshot ref is authoritative only through that root；
+- every writable open claims retention first and every ACTIVE cursor root under one fresh owner session before topic
+  publication；Pulsar ownership/watch alone is not the cursor fence；
+- broker-supplied ownership checker passes before root claim and final publication/first-create callback；it gates
+  authority but never replaces durable session/version fencing；
+- normal dispatch read position is never durable；restart begins at first unacked；
+- reset/clear-backlog advances `ackStateEpoch`，so monotonic ack cannot rebase across destructive replacement；
+- new/recreated cursor and backward reset remain in recoverable `PROTECTION_PENDING` through cursor CAS；trim uses
+  separate recoverable `TRIM_PENDING`；
+- M1-M6 must add deterministic/real two-broker ack、snapshot、restart、trim and compatibility gates；
 - Key_Shared/delayed/pending-ack remain F8。
 
 ## 7. F4 — Materialization, Compaction and Generation Replacement
