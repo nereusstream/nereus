@@ -49,6 +49,8 @@ require_literal "CursorSnapshotInventory" "docs/phase-3-cursor-subscription/03-o
 require_literal "read-only F4 snapshot inventory" "docs/phase-3-cursor-subscription/README.md"
 require_literal 'terminal `DELETED`' "docs/phase-2-managed-ledger-facade/README.md"
 require_literal "immediate same-name open" "docs/phase-2-managed-ledger-facade/06-code-level-interface-contract.md"
+require_literal "Cursor snapshot inventory" "docs/design/nereus-terminology.md"
+require_literal "never authorizes deletion" "docs/design/nereus-terminology.md"
 
 for gate in phase3M6Check phase3M6FinalCheck phase3Check phase3FinalCheck; do
     require_literal "$gate" "build.gradle.kts"
@@ -66,5 +68,38 @@ for stale in \
     "Status: F3-M0/M0R design-gated；not implemented"; do
     forbid_literal "$stale" "$repo_root/README.md" "$repo_root/docs"
 done
+
+link_docs=(
+    "$repo_root/README.md"
+    "$repo_root/docs/phase-3-cursor-subscription"
+    "$repo_root/docs/design/README.md"
+    "$repo_root/docs/design/nereus-design-index.md"
+    "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
+    "$repo_root/docs/design/nereus-future4-compaction-generation.md"
+    "$repo_root/docs/design/nereus-futures.md"
+    "$repo_root/docs/design/nereus-overall-architecture.md"
+    "$repo_root/docs/design/nereus-terminology.md"
+)
+
+while IFS=: read -r source match; do
+    target="${match#*](}"
+    target="${target%)}"
+    target="${target#<}"
+    target="${target%>}"
+    case "$target" in
+        ""|\#*|*://*|mailto:*|app://*) continue ;;
+    esac
+    target="${target%%#*}"
+    target="${target//%20/ }"
+    if [[ "$target" = /* ]]; then
+        resolved="$target"
+    else
+        resolved="$(dirname "$source")/$target"
+    fi
+    if [[ ! -e "$resolved" ]]; then
+        echo "broken local Markdown link in ${source#"$repo_root/"}: $target" >&2
+        exit 1
+    fi
+done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
 echo "Phase 3 documentation status, source lock, compatibility, and F4 handoff verified."

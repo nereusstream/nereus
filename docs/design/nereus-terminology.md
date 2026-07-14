@@ -108,6 +108,7 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 | Whole ack range | mark-delete 之上的 fully acknowledged Entry half-open offset range；规范化为 sorted/disjoint/non-adjacent |
 | Partial batch ack | entry offset 对应的 Pulsar remaining-bit `long[]`；set bit 表示仍未 ack，合并为 bitwise AND |
 | Cursor snapshot reference | cursor root 中使一个 immutable `NCS1` full ack snapshot 可见的引用；object existence 本身不构成可见性 |
+| Cursor snapshot inventory | F3 对一个 versioned retention/root scan 与同 stream snapshot-object listing 的只读分类；列出 live refs 和 unreferenced candidates，但自身 never authorizes deletion，F4 必须复核 captured versions/owner 并遵守 pending-lifecycle veto |
 | Cursor protection floor | stream-level conservative trim bound；new/recreated cursor 和 backward reset 必要时先降低它 |
 | Cursor `PROTECTION_PENDING` | complete create/recreate/backward-reset intent 已冻结 floor raise/trim，直到同 attempt cursor root 被证明并 finalize |
 | Cursor `TRIM_PENDING` | logical trim offset、attempt ID 与 exact composed L0 reason 已被冻结且必须恢复/验证完成的 retention 状态；不等于 physical GC completion |

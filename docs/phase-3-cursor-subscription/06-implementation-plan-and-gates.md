@@ -714,6 +714,12 @@ Code-level evidence mapping：
 | 25 static completeness | `scripts/check-phase3-pulsar-admin-routes.sh` and `checkPhase3PulsarAdminRoutes` |
 | 26 | `NereusManagedCursorCallbackSafetyTest.cancellationCloseAndReadCompletionSurviveCallbackExecutorRejectionWithoutLeaks` and `CallbackPrimitivesTest.executorRejectionDrainsEveryAdmittedTerminalCallbackExactlyOnce` |
 
+`checkPhase3ContractSurface` additionally locks every code-level M1-M4 production/test artifact named by this plan，
+both independent real-broker test methods，owner-claim-before-publication、checked `ackStateEpoch` replacement and F4
+inventory revalidation entry points。It also fails if a normal read/dispatch position appears in any durable cursor
+root、retention root or snapshot codec。`checkPhase3Documentation` validates current status/source lock、the F4 term，
+stale milestone language and every local Markdown link in the Phase 3 authority set。
+
 The real scenario exposed two compatibility defects and keeps their regressions in
 `NereusManagedLedgerFacadeTest.factoryLedgerAppendReadPropertiesLifecycleAndReopenUseL0Truth` and
 `closeTrimReopenTerminateDeleteAndRecreatePreservePositionAndObjectContracts`：a terminal `DELETED` projection is an

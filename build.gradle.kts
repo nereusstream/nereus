@@ -396,6 +396,18 @@ tasks.register<Exec>("checkPhase3PulsarAdminRoutes") {
     )
 }
 
+tasks.register<Exec>("checkPhase3ContractSurface") {
+    group = "verification"
+    description = "Audit the code-level Phase 3 production/test inventory and completion invariants."
+    dependsOn("checkPulsarSourceLock")
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase3-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
 tasks.register<Exec>("checkPhase3Documentation") {
     group = "verification"
     description = "Verify Phase 3 docs carry the implemented M6 contract, source lock, gates, and F4 handoff."
@@ -436,6 +448,7 @@ tasks.register("phase3M6Check") {
     description = "Verify F3-M6 compatibility, incarnation, rollout, F4 handoff, and admin-route boundaries."
     dependsOn("phase3M5Check")
     dependsOn("checkPhase2StorageIsolation")
+    dependsOn("checkPhase3ContractSurface")
     dependsOn("checkPhase3Documentation")
     dependsOn("checkPhase3PulsarAdminRoutes")
     dependsOn(":nereus-managed-ledger:check")
