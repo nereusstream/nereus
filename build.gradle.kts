@@ -329,3 +329,12 @@ tasks.register("phase3M2FinalCheck") {
     dependsOn("phase3M1FinalCheck")
     dependsOn(":nereus-managed-ledger:cursorM2IntegrationTest")
 }
+
+tasks.register("phase3M3Check") {
+    group = "verification"
+    description = "Verify the F3-M3 durable cursor facade, lifecycle, reads, callbacks, and locked Pulsar API compile."
+    dependsOn("phase3M2Check")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}

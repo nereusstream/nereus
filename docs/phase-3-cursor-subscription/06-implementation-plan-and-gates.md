@@ -19,8 +19,12 @@ terminal close behavior。Exact-name durable open/delete operations are locally 
 the M2 tombstone and recreate generation，while non-durable delete remains local-only。Reset/clear are ordered on the
 local read lane，property staging rebases concurrent deltas after destructive persistence，and cursor/ledger close uses
 one shared fully asynchronous drain。The locked ManagedCursor public surface now has an exhaustive classification
-test。The focused batch/concurrency/callback/failure suites and `phase3M3Check` are not complete。F3-M4-M6 and the F3
-Pulsar fork integration have not started。
+test。Dedicated durable、batch-ack、read/wait/replay、reset/seek、property and callback-safety suites now pass；ledger
+close also closes cursor admission and drains admitted open/delete flights without double-closing a deleting handle。
+`clearBacklog` and `skipEntries` use one refreshed committed snapshot，and `scan` honors the supplied batch size。The
+initial `phase3M3Check` is green against the locked Pulsar composite。Focused writable hydration、corrupt-root
+fail-closed and factory ownership-cut suites still need final closure。F3-M4-M6 and the F3 Pulsar fork integration have
+not started。
 
 A later milestone is complete only when：
 
@@ -457,8 +461,10 @@ No deployable artifact combines the marker-aware decoder with the old F2 empty-c
 Implementation status：the runtime/writable-open/hydration foundation and dual-mode cursor facade above are present。
 The lifecycle checkpoint now includes exact-name open/delete ordering、durable tombstone delete/recreate generation、
 non-durable local cleanup、reset/clear read-lane ordering、property-stage rebase、fully async close drain and exhaustive
-locked API surface classification。The dedicated batch/concurrency/callback/failure suites and the full exit conditions
-are not yet complete。Planned gate：`phase3M3Check` including the locked Pulsar composite API compile。
+locked API surface classification。The durable/batch/read-wait-replay/reset-seek/property/callback conformance suites
+pass，and the first `phase3M3Check` now includes `phase3M2Check`、the source lock、managed-ledger check and Pulsar-adapter
+check。Focused writable hydration、corrupt-root fail-closed and factory ownership-cut tests plus the remaining full exit
+conditions are not yet complete；those tests must extend the same `phase3M3Check` before M3 is marked complete。
 
 ## 7. F3-M4 — Pulsar Broker Integration
 

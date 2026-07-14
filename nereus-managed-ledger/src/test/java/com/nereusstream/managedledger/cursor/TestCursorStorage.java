@@ -5,6 +5,7 @@ import com.nereusstream.metadata.oxia.CursorNames;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +21,10 @@ public final class TestCursorStorage implements CursorStorage {
     private final AtomicReference<CompletableFuture<Void>> nextResetCompletionGate =
             new AtomicReference<>();
     private final AtomicReference<CompletableFuture<Void>> nextFlushCompletionGate =
+            new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextOpenCompletionGate =
+            new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextDeleteCompletionGate =
             new AtomicReference<>();
     private final CursorStateMachine stateMachine =
             new CursorStateMachine(CursorStorageConfig.defaults());
@@ -58,7 +63,10 @@ public final class TestCursorStorage implements CursorStorage {
                 }
                 return claim(current, owner);
             });
-            return CompletableFuture.completedFuture(handle);
+            CompletableFuture<Void> gate = nextOpenCompletionGate.getAndSet(null);
+            return gate == null
+                    ? CompletableFuture.completedFuture(handle)
+                    : gate.thenApply(ignored -> handle);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
@@ -166,19 +174,24 @@ public final class TestCursorStorage implements CursorStorage {
             String exactName = CursorNames.requireCursorName(cursorName);
             CursorKey key = new CursorKey(owner.ledger(), exactName);
             CursorHandle handle = handles.remove(key);
+            CompletableFuture<Void> deletion;
             if (handle == null) {
-                return CompletableFuture.completedFuture(null);
-            }
-            if (!handle.owner().equals(owner)) {
+                deletion = CompletableFuture.completedFuture(null);
+            } else if (!handle.owner().equals(owner)) {
                 handles.putIfAbsent(key, handle);
-                return CompletableFuture.failedFuture(
+                deletion = CompletableFuture.failedFuture(
                         new IllegalStateException("test cursor owner changed"));
+            } else {
+                CursorMutationResult deleted = stateMachine.delete(
+                        handle.state(), nextNow(handle.state()));
+                tombstones.put(key, deleted.state());
+                handle.publish(deleted.state());
+                deletion = handle.closeAsync();
             }
-            CursorMutationResult deleted = stateMachine.delete(
-                    handle.state(), nextNow(handle.state()));
-            tombstones.put(key, deleted.state());
-            handle.publish(deleted.state());
-            return handle.closeAsync();
+            CompletableFuture<Void> gate = nextDeleteCompletionGate.getAndSet(null);
+            return gate == null
+                    ? deletion
+                    : deletion.thenCompose(ignored -> gate);
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
@@ -211,14 +224,26 @@ public final class TestCursorStorage implements CursorStorage {
     }
 
     public void delayNextResetCompletionUntil(CompletableFuture<Void> gate) {
-        if (!nextResetCompletionGate.compareAndSet(null, gate)) {
+        if (!nextResetCompletionGate.compareAndSet(null, Objects.requireNonNull(gate, "gate"))) {
             throw new IllegalStateException("a reset completion gate is already installed");
         }
     }
 
     public void delayNextFlushCompletionUntil(CompletableFuture<Void> gate) {
-        if (!nextFlushCompletionGate.compareAndSet(null, gate)) {
+        if (!nextFlushCompletionGate.compareAndSet(null, Objects.requireNonNull(gate, "gate"))) {
             throw new IllegalStateException("a flush completion gate is already installed");
+        }
+    }
+
+    public void delayNextOpenCompletionUntil(CompletableFuture<Void> gate) {
+        if (!nextOpenCompletionGate.compareAndSet(null, Objects.requireNonNull(gate, "gate"))) {
+            throw new IllegalStateException("an open completion gate is already installed");
+        }
+    }
+
+    public void delayNextDeleteCompletionUntil(CompletableFuture<Void> gate) {
+        if (!nextDeleteCompletionGate.compareAndSet(null, Objects.requireNonNull(gate, "gate"))) {
+            throw new IllegalStateException("a delete completion gate is already installed");
         }
     }
 

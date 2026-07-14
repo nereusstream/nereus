@@ -44,9 +44,21 @@ final class ManagedLedgerRuntimeTestSupport {
             StreamStorage streamStorage,
             ManagedLedgerProjectionMetadataStore projectionStore,
             CursorStorage cursorStorage) {
+        return runtime(
+                streamStorage,
+                projectionStore,
+                cursorStorage,
+                Executors.newSingleThreadScheduledExecutor(),
+                Executors.newSingleThreadExecutor());
+    }
+
+    static NereusManagedLedgerRuntime runtime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            CursorStorage cursorStorage,
+            ScheduledExecutorService scheduler,
+            ExecutorService callbacks) {
         try {
-            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-            ExecutorService callbacks = Executors.newSingleThreadExecutor();
             CursorStorageConfig cursorConfig = CursorStorageConfig.defaults();
             CursorProtocolActivationGuard activationGuard = ledger ->
                     java.util.concurrent.CompletableFuture.completedFuture(null);

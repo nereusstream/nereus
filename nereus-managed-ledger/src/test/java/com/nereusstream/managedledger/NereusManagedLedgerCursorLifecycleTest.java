@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
@@ -103,6 +104,75 @@ class NereusManagedLedgerCursorLifecycleTest {
         }
     }
 
+    @Test
+    void ledgerCloseDrainsAdmittedDeleteAndOpenFlightsThenRejectsNewCursorWork() throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("flights"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        DefaultStreamStorage streamStorage = new DefaultStreamStorage(
+                StreamStorageConfig.defaults("cluster/a", "cursor-flight-test"),
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "cursor-flight-test", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        TestCursorStorage cursorStorage = new TestCursorStorage();
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections, cursorStorage)) {
+            NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
+                    runtime,
+                    fixedGuard(2),
+                    config(),
+                    new ManagedLedgerFactoryConfig(),
+                    false);
+
+            NereusManagedLedger deleting = (NereusManagedLedger) factory.open(
+                    NAME + "-delete-flight", config());
+            deleting.openCursor("durable");
+            CompletableFuture<Void> deleteGate = new CompletableFuture<>();
+            cursorStorage.delayNextDeleteCompletionUntil(deleteGate);
+            CompletableFuture<Void> delete = delete(deleting, "durable");
+            CompletableFuture<Void> deleteLedgerClose = close(deleting);
+            assertThat(delete).isNotDone();
+            assertThat(deleteLedgerClose).isNotDone();
+            deleteGate.complete(null);
+            CompletableFuture.allOf(delete, deleteLedgerClose).join();
+
+            NereusManagedLedger opening = (NereusManagedLedger) factory.open(
+                    NAME + "-open-flight", config());
+            CompletableFuture<Void> openGate = new CompletableFuture<>();
+            cursorStorage.delayNextOpenCompletionUntil(openGate);
+            CompletableFuture<ManagedCursor> open = open(opening, "durable");
+            CompletableFuture<Void> openLedgerClose = close(opening);
+            assertThat(open).isNotDone();
+            assertThat(openLedgerClose).isNotDone();
+            openGate.complete(null);
+            assertThatThrownBy(open::join)
+                    .isInstanceOf(CompletionException.class)
+                    .hasCauseInstanceOf(
+                            ManagedLedgerException.ManagedLedgerAlreadyClosedException.class);
+            openLedgerClose.join();
+
+            assertThatThrownBy(() -> opening.openCursor("late"))
+                    .isInstanceOf(
+                            ManagedLedgerException.ManagedLedgerAlreadyClosedException.class);
+            assertThatThrownBy(() -> opening.newNonDurableCursor(
+                    PositionFactory.EARLIEST, "late-local"))
+                    .isInstanceOf(
+                            ManagedLedgerException.ManagedLedgerAlreadyClosedException.class);
+            assertThatThrownBy(() -> opening.deleteCursor("late-delete"))
+                    .isInstanceOf(
+                            ManagedLedgerException.ManagedLedgerAlreadyClosedException.class);
+
+            factory.shutdown();
+        } finally {
+            metadata.close();
+            objectStore.close();
+        }
+    }
+
     private static ManagedLedgerConfig config() {
         ManagedLedgerConfig config = new ManagedLedgerConfig();
         config.setStorageClassName("nereus");
@@ -121,6 +191,42 @@ class NereusManagedLedgerCursorLifecycleTest {
 
             @Override
             public void closeFailed(ManagedLedgerException exception, Object ctx) {
+                result.completeExceptionally(exception);
+            }
+        }, null);
+        return result;
+    }
+
+    private static CompletableFuture<ManagedCursor> open(
+            NereusManagedLedger ledger,
+            String name) {
+        CompletableFuture<ManagedCursor> result = new CompletableFuture<>();
+        ledger.asyncOpenCursor(name, new AsyncCallbacks.OpenCursorCallback() {
+            @Override
+            public void openCursorComplete(ManagedCursor cursor, Object ctx) {
+                result.complete(cursor);
+            }
+
+            @Override
+            public void openCursorFailed(ManagedLedgerException exception, Object ctx) {
+                result.completeExceptionally(exception);
+            }
+        }, null);
+        return result;
+    }
+
+    private static CompletableFuture<Void> delete(
+            NereusManagedLedger ledger,
+            String name) {
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        ledger.asyncDeleteCursor(name, new AsyncCallbacks.DeleteCursorCallback() {
+            @Override
+            public void deleteCursorComplete(Object ctx) {
+                result.complete(null);
+            }
+
+            @Override
+            public void deleteCursorFailed(ManagedLedgerException exception, Object ctx) {
                 result.completeExceptionally(exception);
             }
         }, null);

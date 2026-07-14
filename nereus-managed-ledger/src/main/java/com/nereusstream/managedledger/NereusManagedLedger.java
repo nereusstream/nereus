@@ -35,6 +35,7 @@ import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -123,6 +124,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     private WriteFence currentFence;
     private WriteFence lastFence;
     private CompletableFuture<Void> ledgerCloseFuture;
+    private boolean cursorAdmissionClosed;
 
     public NereusManagedLedger(
             NereusManagedLedgerRuntime runtime,
@@ -317,6 +319,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             CursorOpenRequest request) {
         final CompletableFuture<NereusManagedCursor> candidate;
         synchronized (cursorRegistryLock) {
+            if (cursorAdmissionClosed) {
+                return CompletableFuture.failedFuture(cursorAdmissionClosed("openCursor"));
+            }
             CompletableFuture<Void> deleting = cursorDeleteFlights.get(name);
             if (deleting != null) {
                 return deleting.handle((ignored, error) -> null)
@@ -373,27 +378,59 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         try {
             NereusManagedCursor created = new NereusManagedCursor(this, handle);
             final NereusManagedCursor registered;
+            final ManagedLedgerException publicationFailure;
             synchronized (cursorRegistryLock) {
                 cursorOpenFlights.remove(name, candidate);
-                registered = cursors.putIfAbsent(name, created);
+                if (cursorAdmissionClosed) {
+                    publicationFailure = cursorAdmissionClosed("openCursor");
+                    registered = null;
+                } else {
+                    publicationFailure = null;
+                    registered = cursors.putIfAbsent(name, created);
+                }
+            }
+            if (publicationFailure != null) {
+                created.closeDetached();
+                closeHandleThenFail(handle, candidate, publicationFailure);
+                return;
             }
             if (registered != null && !registered.isDurable()) {
-                handle.closeAsync();
-                candidate.completeExceptionally(new ManagedLedgerException(
+                created.closeDetached();
+                closeHandleThenFail(handle, candidate, new ManagedLedgerException(
                         "a non-durable cursor already uses the exact name"));
                 return;
             }
             if (registered != null) {
                 created.closeDetached();
+                handle.closeAsync().whenComplete((ignored, closeError) -> {
+                    if (closeError == null) {
+                        candidate.complete(registered);
+                    } else {
+                        candidate.completeExceptionally(unwrap(closeError));
+                    }
+                });
+                return;
             }
-            candidate.complete(registered == null ? created : registered);
+            candidate.complete(created);
         } catch (Throwable constructionFailure) {
             synchronized (cursorRegistryLock) {
                 cursorOpenFlights.remove(name, candidate);
             }
-            handle.closeAsync();
-            candidate.completeExceptionally(constructionFailure);
+            closeHandleThenFail(handle, candidate, constructionFailure);
         }
+    }
+
+    private static void closeHandleThenFail(
+            CursorHandle handle,
+            CompletableFuture<NereusManagedCursor> candidate,
+            Throwable failure) {
+        handle.closeAsync().whenComplete((ignored, closeError) -> {
+            Throwable exactFailure = unwrap(failure);
+            if (closeError != null) {
+                exactFailure.addSuppressed(unwrap(closeError));
+            }
+            candidate.completeExceptionally(exactFailure);
+        });
     }
 
     @Override
@@ -459,6 +496,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         final CompletableFuture<Void> candidate;
         final CompletableFuture<Void> operation;
         synchronized (cursorRegistryLock) {
+            if (cursorAdmissionClosed) {
+                return CompletableFuture.failedFuture(cursorAdmissionClosed("deleteCursor"));
+            }
             CompletableFuture<Void> existing = cursorDeleteFlights.get(exactName);
             if (existing != null) {
                 return existing;
@@ -819,26 +859,44 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             state = LocalState.CLOSED;
             failFenceOnClose();
         }
+        final List<NereusManagedCursor> snapshot;
+        final List<CompletableFuture<?>> registryFlights;
+        synchronized (cursorRegistryLock) {
+            cursorAdmissionClosed = true;
+            snapshot = cursors.values().stream()
+                    .filter(cursor -> !cursorDeleteFlights.containsKey(cursor.getName()))
+                    .toList();
+            registryFlights = new ArrayList<>();
+            cursorOpenFlights.values().forEach(flight ->
+                    registryFlights.add(flight.handle((value, error) -> null)));
+            cursorDeleteFlights.forEach((name, flight) -> registryFlights.add(
+                    flight.handle((value, error) -> null).thenCompose(ignored -> {
+                        NereusManagedCursor remaining = cursors.get(name);
+                        return remaining == null
+                                ? CompletableFuture.completedFuture(null)
+                                : remaining.closeAsyncFuture();
+                    })));
+        }
         final long sequence;
         try {
             sequence = callbacks.admit();
         } catch (Throwable error) {
-            notifyClosed();
-            result.completeExceptionally(
-                    errorMapper.map(error, OperationContext.ledger("close")));
+            ManagedLedgerException failure = errorMapper.map(
+                    error, OperationContext.ledger("close"));
+            tailPoll.close();
+            cursorCloseDrain(snapshot, registryFlights).whenComplete((ignored, closeError) -> {
+                if (closeError != null) {
+                    failure.addSuppressed(unwrap(closeError));
+                }
+                notifyClosed();
+                result.completeExceptionally(failure);
+            });
             callbacks.closeAfterDrain();
             return result;
         }
 
         tailPoll.close();
-        final List<NereusManagedCursor> snapshot;
-        synchronized (cursorRegistryLock) {
-            snapshot = List.copyOf(cursors.values());
-        }
-        CompletableFuture<?>[] closes = snapshot.stream()
-                .map(NereusManagedCursor::closeAsyncFuture)
-                .toArray(CompletableFuture[]::new);
-        CompletableFuture.allOf(closes).whenComplete((ignored, closeError) -> {
+        cursorCloseDrain(snapshot, registryFlights).whenComplete((ignored, closeError) -> {
             ManagedLedgerException failure = closeError == null
                     ? null
                     : errorMapper.map(closeError, OperationContext.ledger("close"));
@@ -859,6 +917,16 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         });
         callbacks.closeAfterDrain();
         return result;
+    }
+
+    private static CompletableFuture<Void> cursorCloseDrain(
+            List<NereusManagedCursor> cursors,
+            List<CompletableFuture<?>> registryFlights) {
+        CompletableFuture<?>[] closes = java.util.stream.Stream.concat(
+                        cursors.stream().map(NereusManagedCursor::closeAsyncFuture),
+                        registryFlights.stream())
+                .toArray(CompletableFuture[]::new);
+        return CompletableFuture.allOf(closes);
     }
 
     @Override
@@ -1602,6 +1670,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                 properties,
                 cursorProperties);
         synchronized (cursorRegistryLock) {
+            if (cursorAdmissionClosed) {
+                cursor.closeDetached();
+                throw cursorAdmissionClosed("newNonDurableCursor");
+            }
             if (cursorOpenFlights.containsKey(exactName)
                     || cursorDeleteFlights.containsKey(exactName)) {
                 cursor.closeDetached();
@@ -1622,6 +1694,12 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         synchronized (cursorRegistryLock) {
             cursors.remove(cursor.getName(), cursor);
         }
+    }
+
+    private ManagedLedgerException.ManagedLedgerAlreadyClosedException cursorAdmissionClosed(
+            String operation) {
+        return new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
+                "managed ledger is closed for cursor operation " + operation);
     }
 
     TailPollCoordinator tailPoll() {

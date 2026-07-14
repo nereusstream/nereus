@@ -688,8 +688,10 @@ public final class NereusManagedCursor implements ManagedCursor {
                     Math.max(start, metadata.trimOffset()),
                     metadata,
                     condition,
+                    batchSize,
                     maxEntries,
                     deadline,
+                    0,
                     0);
         });
     }
@@ -1118,8 +1120,8 @@ public final class NereusManagedCursor implements ManagedCursor {
         } catch (Throwable error) {
             return mappedFailure(error, "clearBacklog");
         }
-        return enqueueRead(() -> {
-            long committedEnd = ledger.currentMetadata().committedEndOffset();
+        return enqueueRead(() -> ledger.refreshMetadata().thenCompose(metadata -> {
+            long committedEnd = metadata.committedEndOffset();
             cancelPendingRead(new ManagedLedgerException(
                     "clear backlog invalidated a pending cursor read"));
             CompletableFuture<CursorMutationResult> mutation = mode == Mode.DURABLE
@@ -1130,9 +1132,9 @@ public final class NereusManagedCursor implements ManagedCursor {
                 completePropertyCapture(capture, result.state());
                 moveReadOffset(Math.max(
                         firstUnackedOffset(result.state().acknowledgements()),
-                        ledger.currentMetadata().trimOffset()));
+                        metadata.trimOffset()));
             });
-        });
+        }));
     }
 
     private CompletableFuture<Void> skipEntriesFuture(
@@ -1146,21 +1148,31 @@ public final class NereusManagedCursor implements ManagedCursor {
         if (count == 0) {
             return CompletableFuture.completedFuture(null);
         }
-        Objects.requireNonNull(deletedEntries, "deletedEntries");
-        StreamMetadata metadata = ledger.currentMetadata();
-        CursorAckState ack = state().acknowledgements();
-        OptionalLong target = nthEligibleOffset(
-                ack,
-                Math.max(ack.markDeleteOffset(), metadata.trimOffset()),
-                metadata.committedEndOffset(),
-                count,
-                deletedEntries == IndividualDeletedEntries.Exclude);
-        long markThrough = target.orElse(metadata.committedEndOffset() - 1);
-        if (markThrough < metadata.trimOffset()) {
-            return CompletableFuture.completedFuture(null);
+        final PropertyCapture capture;
+        try {
+            Objects.requireNonNull(deletedEntries, "deletedEntries");
+            capture = capturePositionProperties(null, false);
+        } catch (Throwable error) {
+            return mappedFailure(error, "skipEntries");
         }
-        return markDeleteFuture(
-                PositionFactory.create(ledger.projection().virtualLedgerId(), markThrough), null);
+        return ledger.refreshMetadata().thenCompose(metadata -> {
+            CursorAckState ack = state().acknowledgements();
+            OptionalLong target = nthEligibleOffset(
+                    ack,
+                    Math.max(ack.markDeleteOffset(), metadata.trimOffset()),
+                    metadata.committedEndOffset(),
+                    count,
+                    deletedEntries == IndividualDeletedEntries.Exclude);
+            long markThrough = target.orElse(metadata.committedEndOffset() - 1);
+            if (markThrough < metadata.trimOffset()) {
+                return CompletableFuture.completedFuture(null);
+            }
+            Position position = PositionFactory.create(
+                    ledger.projection().virtualLedgerId(), markThrough);
+            return prepareAck(position, capture.values(), metadata)
+                    .thenCompose(prepared -> cumulativeAck(prepared.request(), metadata))
+                    .thenAccept(result -> completePropertyCapture(capture, result.state()));
+        });
     }
 
     private CompletableFuture<Position> resetFuture(Position position, boolean force) {
@@ -1667,14 +1679,28 @@ public final class NereusManagedCursor implements ManagedCursor {
             long offset,
             StreamMetadata metadata,
             Predicate<Entry> condition,
+            int batchSize,
             long maxEntries,
             long deadlineNanos,
-            long examined) {
+            long examined,
+            int examinedInBatch) {
         if (offset >= metadata.committedEndOffset()) {
             return CompletableFuture.completedFuture(ScanOutcome.COMPLETED);
         }
         if (examined >= maxEntries || System.nanoTime() >= deadlineNanos) {
             return CompletableFuture.completedFuture(ScanOutcome.ABORTED);
+        }
+        if (examinedInBatch >= batchSize) {
+            return CompletableFuture.runAsync(() -> { }, ledger.runtime().scheduler())
+                    .thenCompose(ignored -> scanNext(
+                            offset,
+                            metadata,
+                            condition,
+                            batchSize,
+                            maxEntries,
+                            deadlineNanos,
+                            examined,
+                            0));
         }
         return ledger.readAt(offset, metadata).thenCompose(entry -> {
             boolean proceed;
@@ -1688,9 +1714,11 @@ public final class NereusManagedCursor implements ManagedCursor {
                             Math.addExact(offset, 1),
                             metadata,
                             condition,
+                            batchSize,
                             maxEntries,
                             deadlineNanos,
-                            examined + 1)
+                            examined + 1,
+                            examinedInBatch + 1)
                     : CompletableFuture.completedFuture(ScanOutcome.USER_INTERRUPTED);
         });
     }
