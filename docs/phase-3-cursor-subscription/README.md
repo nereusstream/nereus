@@ -1,6 +1,7 @@
 # Phase 3 Cursor / Subscription Detailed Design
 
-> 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation complete/final-gated；F3-M2+ pending
+> 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation 与 F3-M2
+> CursorStorage/retention state machines complete/final-gated；F3-M3+ pending
 >
 > Gate 日期：2026-07-14
 
@@ -152,7 +153,7 @@ retention coordinator。
 | F3-M0 | locked local Pulsar API/source/call-path audit | complete, design-only |
 | F3-M0R | code-level protocol and narrow Future 4 compatibility gate | complete, design-only |
 | F3-M1 | metadata records/codecs/store + snapshot codec/store | complete/final-gated；真实 Oxia 与 LocalStack conditional-create/restart 证据通过 |
-| F3-M2 | CursorStorage ack/reset/property/retention state machines | not started |
+| F3-M2 | CursorStorage ack/reset/property/retention state machines | complete/final-gated；deterministic failure/concurrency models 与真实 Oxia + LocalStack S3 跨 runtime 恢复通过 |
 | F3-M3 | durable `NereusManagedCursor` and ledger hydration/enumeration | not started |
 | F3-M4 | Pulsar fork durable subscribe/ack/admin/capability integration | not started |
 | F3-M5 | two-broker/Oxia/ObjectStore recovery and retention barrier gates | not started |

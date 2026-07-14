@@ -40,8 +40,9 @@ commit authorities。
 12. Build effective CursorState and NereusManagedCursor with localReadOffset=firstUnacked.
 13. Repeat scan/hydration if invalidation epoch changed; require two equal key/version fingerprints when watch is
     unavailable.
-14. Re-read retention and require the same owner session；reconcile a conservative floor when the root exists。Raising
-    it is best-effort and never blocks safe open after the authoritative claimed scan has succeeded.
+14. Re-read retention and require the same owner session；reconcile a conservative floor when the root exists。A
+    reconciliation/read/CAS failure blocks handle publication，so an open never returns after silently losing its
+    final retention-owner validation.
 15. Invoke the ownership guard again；false/error fails fenced and publishes no ledger，although the claimed roots
     remain safe for the next owner to reclaim.
 16. Publish NereusWritableLedgerOpenResult wrapping the base projection/L0 result plus owner session、the immutable
@@ -101,6 +102,7 @@ P proves an uncoordinated trim and fails rather than being accepted as equivalen
 | key/name/hash/projection mismatch | fail topic open |
 | root points to missing/corrupt stable object | fail topic open |
 | object read fails but root ref/version changed | retry new root |
+| stable root hits object timeout/transport failure | fail this open with the original retriable object error；do not relabel it corruption |
 | ACTIVE cursor below current L0 trim | fail corruption; never clamp durable ack truth |
 | DELETED tombstone with old ref/properties | fail corruption |
 | stable pending protection intent cannot be proved/applied | keep pending and fail topic open |
@@ -689,6 +691,16 @@ already serializes policy trim with concurrent first-cursor activation；the mar
 fence before TRIM_PENDING。No F3 broker path calls this method，so F3 alone does not activate a cursorless topic merely
 because housekeeping runs。
 
+`DefaultCursorStorage` and `DefaultCursorRetentionCoordinator` both treat activation completion as uncertain。After
+an activation CAS/response error they reread the authoritative projection and continue only when the exact
+managed-ledger name/hash、projection identity and protocol-1 marker are present；otherwise they return the original
+failure。This is required when first cursor create and cursorless `requestTrim` both observed an absent marker：one
+CAS wins，the loser proves the same monotonic marker，and the retention lane still orders TRIM_PENDING against the
+later PROTECTION_PENDING transition。Within one `DefaultCursorStorage`，activation is single-flight by exact
+`CursorLedgerIdentity`；a successful flight remains a completed monotonic cache entry for that storage lifetime，so a
+delayed caller carrying the same pre-activation read cannot invoke the cluster guard a second time。Failed flights are
+removed and may be retried；a different projection incarnation never shares the entry。
+
 ### 14.4 Pending recovery
 
 On open or coordinator startup：
@@ -798,6 +810,7 @@ A client carrying another owner session fails fenced before any of these CAS-reb
 | ownership checker becomes false/errors after root claims | roots may carry unpublished session | ledger callback fails fenced | next legitimate open claims the roots under a fresh session |
 | new open crashes after retention claim or a subset of cursor claims | mixed owner IDs, no published ledger | topic open fails/absent | next fresh owner reclaims retention + every ACTIVE root and restabilizes |
 | stable referenced snapshot missing/corrupt | root references invalid bytes | topic/cursor open fails | restore exact object or operator repair; no fallback |
+| stable referenced snapshot read times out or hits a transport failure | root remains authoritative and unchanged | open fails with the original retriable object error | retry hydration; do not misclassify an operational failure as corruption |
 | close races accepted mutation | root determined by CAS | one terminal callback per op | late result cannot reopen handle |
 | protection pending CAS succeeds, crash before cursor CAS | lower floor + durable complete intent | create/reset response uncertain | startup applies exact intent; no raise/trim |
 | protected cursor CAS succeeds, crash before finalize | cursor root carries attempt ID + pending root | response uncertain | prove attempt, CAS pending -> ACTIVE |

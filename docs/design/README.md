@@ -27,7 +27,9 @@ cursor/reference/retention 合同作为 Future 4 production 的前置。
 2026-07-14 已完成 Phase 3 的 design-only M0/M0R：durable cursor 的 single-root CAS、snapshot bytes、
 generation/tombstone、destructive `ackStateEpoch`、local read-position、per-writable-open owner-session claim、
 broker ownership guard、retention barrier 和 Pulsar fork method mapping 已冻结。F3-M1 metadata/snapshot
-基础代码、golden/contract tests、真实 Oxia 和 LocalStack gate 已完成并 final-gated，M2-M6 尚未开始。实施顺序先完成 Phase 3，
+基础代码、golden/contract tests、真实 Oxia 和 LocalStack gate 已完成并 final-gated；F3-M2
+CursorStorage/retention state machines、failure injection、并发/property model 与真实 Oxia + LocalStack S3
+跨 runtime 恢复门禁也已完成并 final-gated。M3-M6 尚未开始。实施顺序先完成 Phase 3，
 再进入依赖 cursor/reference correctness 的 Phase 4 production。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

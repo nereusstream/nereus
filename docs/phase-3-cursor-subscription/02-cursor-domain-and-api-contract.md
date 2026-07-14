@@ -372,7 +372,8 @@ public DefaultCursorStorage(
         ScheduledExecutorService scheduler);
 ```
 
-All dependencies are non-null and caller-owned；these two close methods drain/cancel only their own lanes/tasks and do
+All dependencies are non-null and caller-owned；these two close methods initiate drain/cancel only for their own
+lanes/tasks and do
 not double-close shared `StreamStorage`、metadata、snapshot or scheduler instances。`cluster` must exactly equal the
 owning `NereusManagedLedgerRuntime.cluster()`。Tests inject deterministic clocks/ID sources through package-private
 constructors；the public production path uses cryptographically random 128-bit owner-session、attempt and snapshot
@@ -448,9 +449,10 @@ completed-exceptionally future。
 Every method carrying a `CursorOwnerSession` verifies exact ledger identity and owner ID。A cursor/retention root held
 by a different session is claimed only by the open-time protocol；ordinary operations fail fenced and never steal
 ownership。A handle mutation whose root session changed fails `ManagedLedgerFencedException` even if generation and
-Oxia version would otherwise permit a retry。The only no-mutation exception is idempotent durable delete：after exact
-key/name/projection validation，an absent key or an already-DELETED tombstone returns success even if the tombstone was
-written by another session；ACTIVE always requires the current owner before CAS。
+Oxia version would otherwise permit a retry。Durable delete first requires the current retention owner，so a stale
+broker cannot report an authoritative delete after takeover。Within that owner session，an absent key or an
+already-DELETED tombstone returns idempotent success after exact key/name/projection validation；ACTIVE additionally
+requires the cursor root to carry that same owner before CAS。
 
 `CursorStorage.retentionView(owner)` is an owner-scoped topic-runtime read and is not the F4 planner API。A read-only
 F4 planner/GC worker reads `VersionedCursorRetention` plus paged `VersionedCursorState` directly through
@@ -709,7 +711,9 @@ Rules：
   lock and a stale session cannot mutate a newly claimed root；
 - a successful result replaces handle state only if identity generation and mutation sequence match the submitted op；
 - stale completions cannot overwrite a newer local state；
-- close waits for or fails pending durable mutations according to the configured close deadline, then cancels waiters；
+- M2 `CursorHandle.closeAsync()` marks the handle terminal、rejects new and queued mutations，and completes only after
+  the already-running admitted mutation finishes；the later M3 ledger/managed-cursor shutdown owns the outer close
+  deadline and waiter/callback cancellation；
 - callback dispatch is on the ManagedLedger callback executor, outside the lane and exactly once。
 
 ## 6. Mutation Result and Retry Contract
@@ -1054,7 +1058,7 @@ CAS。
 | cursor-record or mutation-queue admission cap | `TooManyRequestsException` |
 | deleted generation used by stale handle | `CursorAlreadyClosedException` |
 | missing/corrupt referenced snapshot or invalid record | `ManagedLedgerException` with corruption cause; topic open fails |
-| metadata/object timeout | `ManagedLedgerException` with stable operation context |
+| metadata/object timeout or transient object read failure | `ManagedLedgerException` with the original retriable error and stable operation context |
 | mutation queue full | `ManagedLedgerException.TooManyRequestsException` |
 | cursor close | `CursorAlreadyClosedException` |
 | delete missing cursor | success |

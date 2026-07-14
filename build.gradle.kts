@@ -313,3 +313,19 @@ tasks.register("phase3M1FinalCheck") {
     dependsOn(":nereus-managed-ledger:cursorS3IntegrationTest")
     dependsOn(":nereus-object-store:s3IntegrationTest")
 }
+
+tasks.register("phase3M2Check") {
+    group = "verification"
+    description = "Verify the F3-M2 cursor storage, retention, recovery, and failure-injection state machines."
+    dependsOn("phase3M1Check")
+    dependsOn(":nereus-managed-ledger:test")
+    dependsOn(":nereus-managed-ledger:compileCursorM2IntegrationTestJava")
+}
+
+tasks.register("phase3M2FinalCheck") {
+    group = "verification"
+    description = "Run ordinary and Docker-backed real Oxia/ObjectStore F3-M2 recovery gates."
+    dependsOn("phase3M2Check")
+    dependsOn("phase3M1FinalCheck")
+    dependsOn(":nereus-managed-ledger:cursorM2IntegrationTest")
+}

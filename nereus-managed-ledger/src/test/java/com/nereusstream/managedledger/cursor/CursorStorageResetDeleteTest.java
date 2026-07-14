@@ -127,4 +127,50 @@ class CursorStorageResetDeleteTest {
                     .hasCauseInstanceOf(ManagedLedgerException.CursorAlreadyClosedException.class);
         }
     }
+
+    @Test
+    void competingProtectionIntentIsBusyAndIsNotReplayedAsThisReset() {
+        try (CursorStorageTestSupport.Context context =
+                new CursorStorageTestSupport.Context(0, 20)) {
+            CursorOwnerSession owner = context.owner(CursorStorageTestSupport.OWNER_1);
+            CursorHandle handle = context.storage.open(
+                            owner,
+                            "subscription-a",
+                            new CursorOpenRequest(
+                                    new InitialCursorPosition.Latest(),
+                                    Map.of(),
+                                    Map.of(),
+                                    0,
+                                    20))
+                    .join();
+            CursorRetentionCoordinator.ProtectionRequest otherReset =
+                    new CursorRetentionCoordinator.ProtectionRequest(
+                            CursorRetentionView.PendingProtection.Kind.BACKWARD_RESET,
+                            handle.identity().cursorName(),
+                            handle.identity().cursorNameHash(),
+                            handle.identity().cursorGeneration(),
+                            handle.identity().cursorGeneration(),
+                            8,
+                            Optional.empty(),
+                            Map.of(),
+                            Map.of());
+
+            CursorRetentionCoordinator.ProtectionLease lease = context.retention
+                    .beginProtection(owner, otherReset)
+                    .join();
+
+            assertThatThrownBy(() -> context.storage.reset(
+                            handle,
+                            new CursorResetRequest(7, Optional.empty(), true, 0, 20))
+                    .join())
+                    .hasCauseInstanceOf(
+                            ManagedLedgerException.ConcurrentFindCursorPositionException.class);
+            CursorRetentionView pending = context.storage.retentionView(owner).join();
+            assertThat(pending.lifecycle())
+                    .isEqualTo(CursorRetentionView.Lifecycle.PROTECTION_PENDING);
+            assertThat(pending.pendingProtection().orElseThrow().attemptId())
+                    .isEqualTo(lease.attemptId());
+            assertThat(handle.state().acknowledgements().markDeleteOffset()).isEqualTo(20);
+        }
+    }
 }

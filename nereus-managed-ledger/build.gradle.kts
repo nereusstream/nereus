@@ -37,10 +37,25 @@ val cursorS3IntegrationTest by sourceSets.creating {
     runtimeClasspath += output + compileClasspath
 }
 
+val cursorM2IntegrationTest by sourceSets.creating {
+    compileClasspath += files(
+        sourceSets.main.get().output,
+        sourceSets.test.get().output,
+        configurations.testRuntimeClasspath.get(),
+    )
+    runtimeClasspath += output + compileClasspath
+}
+
 configurations[cursorS3IntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
 )
 configurations[cursorS3IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+configurations[cursorM2IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[cursorM2IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
     configurations.testRuntimeOnly.get(),
 )
 
@@ -54,6 +69,17 @@ dependencies {
     add(cursorS3IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
     add(cursorS3IntegrationTest.implementationConfigurationName, libs.assertj)
     add(cursorS3IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+
+    add(cursorM2IntegrationTest.implementationConfigurationName, project())
+    add(cursorM2IntegrationTest.implementationConfigurationName, project(":nereus-object-store"))
+    add(cursorM2IntegrationTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
+    add(cursorM2IntegrationTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
+    add(cursorM2IntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(cursorM2IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(cursorM2IntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(cursorM2IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(cursorM2IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(cursorM2IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
 }
 
 tasks.register<Test>("cursorS3IntegrationTest") {
@@ -61,6 +87,15 @@ tasks.register<Test>("cursorS3IntegrationTest") {
     description = "Run the F3 cursor snapshot store against pinned LocalStack S3."
     testClassesDirs = cursorS3IntegrationTest.output.classesDirs
     classpath = cursorS3IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}
+
+tasks.register<Test>("cursorM2IntegrationTest") {
+    group = "verification"
+    description = "Run F3-M2 cursor CAS, fencing, snapshot, and restart recovery against real Oxia and S3."
+    testClassesDirs = cursorM2IntegrationTest.output.classesDirs
+    classpath = cursorM2IntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
 }

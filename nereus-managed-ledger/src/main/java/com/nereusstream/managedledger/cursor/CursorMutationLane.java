@@ -14,6 +14,7 @@ final class CursorMutationLane {
     private final int maximumPending;
     private final Executor executor;
     private final ArrayDeque<Pending<?>> queue = new ArrayDeque<>();
+    private final CompletableFuture<Void> drained = new CompletableFuture<>();
 
     private boolean running;
     private Throwable closeCause;
@@ -71,9 +72,14 @@ final class CursorMutationLane {
             }
             if (pendingOperations == 0) {
                 running = false;
+                drained.complete(null);
             }
         }
         rejected.forEach(item -> item.result.completeExceptionally(cause));
+    }
+
+    CompletableFuture<Void> whenDrained() {
+        return drained;
     }
 
     private void executeNext() {
@@ -109,6 +115,9 @@ final class CursorMutationLane {
                 hasNext = !queue.isEmpty();
                 if (!hasNext) {
                     running = false;
+                    if (closeCause != null && pendingOperations == 0) {
+                        drained.complete(null);
+                    }
                 }
             }
             if (hasNext) {
@@ -129,6 +138,7 @@ final class CursorMutationLane {
             }
             if (pendingOperations == 0) {
                 running = false;
+                drained.complete(null);
             }
         }
         rejected.forEach(item -> item.result.completeExceptionally(failure));

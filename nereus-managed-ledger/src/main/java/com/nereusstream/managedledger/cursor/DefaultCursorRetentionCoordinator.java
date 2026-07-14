@@ -34,16 +34,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -469,7 +465,7 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
                                         owner, intent.attemptId(), deadline, attempt + 1)),
                         () -> resumeProtection(owner, intent.attemptId(), deadline, attempt + 1));
             }
-            return finalizeProtection(owner, retention, intent, false, deadline, attempt);
+            return finalizeProtection(owner, retention, intent, deadline, attempt);
         }
 
         return switch (intent.kind()) {
@@ -577,7 +573,38 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
         }
         VersionedCursorState current = cursor.orElseThrow();
         if (current.value().lifecycle() == CursorRecordLifecycle.DELETED) {
-            return finalizeProtection(owner, retention, intent, true, deadline, attempt);
+            final CursorStateRecord provedDelete;
+            try {
+                provedDelete = new CursorStateRecord(
+                        0,
+                        current.value().projection(),
+                        owner.ownerSessionId(),
+                        current.value().cursorName(),
+                        current.value().cursorNameHash(),
+                        current.value().cursorGeneration(),
+                        CursorRecordLifecycle.DELETED,
+                        Math.addExact(current.value().mutationSequence(), 1),
+                        current.value().ackStateEpoch(),
+                        intent.attemptId(),
+                        current.value().markDeleteOffset(),
+                        current.value().snapshotReference(),
+                        current.value().inlineWholeAckDeltas(),
+                        current.value().inlinePartialAckOverrides(),
+                        current.value().positionProperties(),
+                        current.value().cursorProperties(),
+                        current.value().createdAtMillis(),
+                        Math.max(current.value().updatedAtMillis(), nowMillis()),
+                        current.value().deletedAtMillis());
+            } catch (Throwable error) {
+                return CompletableFuture.failedFuture(error);
+            }
+            return retryCondition(
+                    metadataStore.compareAndSetCursor(
+                                    cluster, provedDelete, current.metadataVersion())
+                            .thenCompose(ignored -> resumeProtection(
+                                    owner, intent.attemptId(), deadline, attempt + 1)),
+                    () -> resumeProtection(
+                            owner, intent.attemptId(), deadline, attempt + 1));
         }
         if (!current.value().ownerSessionId().equals(owner.ownerSessionId())) {
             CursorStateRecord claimed;
@@ -632,7 +659,6 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
             CursorOwnerSession owner,
             VersionedCursorRetention retention,
             CursorProtectionIntentRecord intent,
-            boolean deleteWinner,
             Deadline deadline,
             int attempt) {
         final CursorRetentionRecord candidate;
@@ -881,12 +907,7 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
                         return CompletableFuture.failedFuture(error);
                     }
                     if (!ManagedLedgerCursorProtocol.isActivated(projection)) {
-                        return activationGuard.acquireFirstActivationPermit(owner.ledger())
-                                .thenCompose(ignored -> projectionStore.activateCursorProtocol(
-                                        cluster,
-                                        owner.ledger().managedLedgerName(),
-                                        owner.ledger().projection(),
-                                        projection.metadataVersion()))
+                        return ensureActivated(owner, projection)
                                 .thenCompose(ignored -> requestTrimAttempt(
                                         owner, candidateOffset, reason, deadline, attempt + 1));
                     }
@@ -966,6 +987,52 @@ public final class DefaultCursorRetentionCoordinator implements CursorRetentionC
                                                 attempt + 1));
                             }));
                 }));
+    }
+
+    private CompletableFuture<TopicProjectionRecord> ensureActivated(
+            CursorOwnerSession owner, TopicProjectionRecord projection) {
+        if (ManagedLedgerCursorProtocol.isActivated(projection)) {
+            return CompletableFuture.completedFuture(requireActivatedProjection(owner, projection));
+        }
+        final CompletableFuture<TopicProjectionRecord> activation;
+        try {
+            activation = activationGuard.acquireFirstActivationPermit(owner.ledger())
+                    .thenCompose(ignored -> projectionStore.activateCursorProtocol(
+                            cluster,
+                            owner.ledger().managedLedgerName(),
+                            owner.ledger().projection(),
+                            projection.metadataVersion()))
+                    .handle((activated, error) -> {
+                        if (error == null) {
+                            return CompletableFuture.completedFuture(
+                                    requireActivatedProjection(owner, activated));
+                        }
+                        Throwable cause = unwrap(error);
+                        return loadProjection(owner).thenCompose(reloaded -> {
+                            if (ManagedLedgerCursorProtocol.isActivated(reloaded)) {
+                                return CompletableFuture.completedFuture(
+                                        requireActivatedProjection(owner, reloaded));
+                            }
+                            return CompletableFuture.failedFuture(cause);
+                        });
+                    })
+                    .thenCompose(future -> future);
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return activation;
+    }
+
+    private static TopicProjectionRecord requireActivatedProjection(
+            CursorOwnerSession owner, TopicProjectionRecord activated) {
+        if (!activated.managedLedgerName().equals(owner.ledger().managedLedgerName())
+                || !activated.managedLedgerNameHash()
+                        .equals(owner.ledger().managedLedgerNameHash())
+                || !activated.projectionIdentity().equals(owner.ledger().projection())
+                || !ManagedLedgerCursorProtocol.isActivated(activated)) {
+            throw invariant("cursor activation did not preserve the exact projection");
+        }
+        return activated;
     }
 
     private CompletableFuture<CursorRetentionView> recoverTrim(

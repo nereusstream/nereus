@@ -83,7 +83,12 @@ F3-M1 metadata/snapshot foundation 已于 2026-07-14 完成并通过普通与 Do
 records/codecs、single-key CursorMetadataStore/Oxia adapter、F2 activation-marker preservation、ack domain、
 immutable NCS1 snapshot codec/store、真实 Oxia restart/range/watch/CAS，以及 LocalStack conditional-create/
 restart round-trip 均有可执行证据。`phase3M1Check` 和 `phase3M1FinalCheck --rerun-tasks` 已通过。
-F3-M2-M6 尚未完成；因此仍不能描述为已支持 durable Nereus subscriptions。
+F3-M2 CursorStorage/retention state machines 也已完成并通过普通与 Docker-backed final gate：durable
+create/ack/reset/property/delete、owner claim/fencing、snapshot spill/hydration、recoverable protection/trim
+barrier、CAS/trim 响应丢失和并发模型均有确定性测试；新增真实 Oxia + LocalStack S3 组合门禁验证两个
+独立 runtime 接管、旧 owner fencing 与第三 runtime 重启 hydration。`phase3M2Check --rerun-tasks` 和
+`phase3M2FinalCheck --rerun-tasks` 已通过。F3-M3-M6 尚未完成；因此仍不能描述为已支持 durable
+Nereus subscriptions。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
 materialization and Future 4 workers remain designed/reserved.

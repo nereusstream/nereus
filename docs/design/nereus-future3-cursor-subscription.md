@@ -1,6 +1,7 @@
 # Nereus Future 3：Cursor / Subscription State
 
-> 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation complete/final-gated；F3-M2+ pending
+> 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation 与 F3-M2
+> CursorStorage/retention state machines complete/final-gated；F3-M3+ pending
 >
 > 代码级合同：[Phase 3 Cursor / Subscription Detailed Design](../phase-3-cursor-subscription/README.md)
 >
@@ -208,7 +209,8 @@ so a non-subsumed old ack fails conflict instead of reappearing after destructiv
 
 - clear snapshots committed end `E` and sets mark-delete to E；concurrent later append remains backlog；
 - skip is durable cumulative progress through the resolved Nth Entry, not a local seek；
-- delete CASes ACTIVE to DELETED, clears ref/state/properties, and succeeds for missing/deleted cursor。
+- delete requires the current retention owner，CASes ACTIVE to DELETED、clears ref/state/properties，and then succeeds
+  idempotently for a missing/deleted cursor within that owner session。
 
 Callback success is emitted exactly once, on the callback executor, only after the authoritative CAS covers the
 effect。No callback-before-persist throttling is allowed。
@@ -384,8 +386,9 @@ F3-M0 and the narrow M0R gate passed on 2026-07-14 against the locked local Puls
 ```text
 Future 2's compatibility model can carry Future 3 and Future 4.
 Future 3's durable protocol is implementation-ready.
-F3-M1 metadata/snapshot foundation and its ordinary/real-service gates pass; M2-M6 remain pending.
+F3-M1 metadata/snapshot foundation and F3-M2 CursorStorage/retention state machines pass ordinary and
+real Oxia/LocalStack gates; M3-M6 remain pending.
 ```
 
-Implementation continues through F3-M2 state machines、M3 facade、M4 broker integration、M5
+Implementation continues through F3-M3 facade、M4 broker integration、M5
 real recovery and M6 final compatibility gate。See the detailed [implementation plan](../phase-3-cursor-subscription/06-implementation-plan-and-gates.md)。

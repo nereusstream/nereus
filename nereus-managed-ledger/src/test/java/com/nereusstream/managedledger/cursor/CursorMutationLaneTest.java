@@ -74,9 +74,11 @@ class CursorMutationLaneTest {
         IllegalStateException closed = new IllegalStateException("closed");
 
         lane.close(closed);
+        CompletableFuture<Void> drained = lane.whenDrained();
 
         assertThatThrownBy(queued::join).hasCause(closed);
         assertThat(lane.pendingOperations()).isEqualTo(1);
+        assertThat(drained).isNotDone();
         CompletableFuture<String> afterClose = lane.submit(
                 () -> CompletableFuture.completedFuture("late"));
         assertThatThrownBy(afterClose::join).hasCause(closed);
@@ -84,6 +86,7 @@ class CursorMutationLaneTest {
         runningOperation.complete("done");
         assertThat(running).isCompletedWithValue("done");
         assertThat(lane.pendingOperations()).isZero();
+        assertThat(drained).isCompleted();
         lane.close(new IllegalArgumentException("ignored"));
     }
 

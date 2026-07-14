@@ -50,7 +50,7 @@ public final class CursorHandle {
             mutationLane.close(new ManagedLedgerException.CursorAlreadyClosedException(
                     "durable cursor handle is closed"));
         }
-        return CompletableFuture.completedFuture(null);
+        return mutationLane.whenDrained();
     }
 
     boolean isClosed() {

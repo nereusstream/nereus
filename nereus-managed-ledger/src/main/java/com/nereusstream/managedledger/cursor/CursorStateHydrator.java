@@ -102,7 +102,8 @@ final class CursorStateHydrator {
                                 return hydrateAttempt(ledger, current, attempt + 1);
                             }
                             if (read.error() != null) {
-                                return CompletableFuture.failedFuture(read.error());
+                                return CompletableFuture.failedFuture(
+                                        stableSnapshotReadFailure(read.error()));
                             }
                             try {
                                 return CompletableFuture.completedFuture(
@@ -127,6 +128,20 @@ final class CursorStateHydrator {
 
     private static NereusException invariant(String message) {
         return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+    }
+
+    private static Throwable stableSnapshotReadFailure(Throwable error) {
+        if (error instanceof CursorSnapshotCodecV1.CursorSnapshotCorruptionException
+                || (error instanceof NereusException nereus
+                        && (nereus.code() == ErrorCode.OBJECT_NOT_FOUND
+                                || nereus.code() == ErrorCode.OBJECT_CHECKSUM_MISMATCH))) {
+            return new NereusException(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "stable cursor root references a missing or corrupt snapshot",
+                    error);
+        }
+        return error;
     }
 
     private record SnapshotRead(CursorAckState snapshot, Throwable error) {

@@ -5,7 +5,10 @@
 F3-M0 and F3-M0R are complete as design gates。F3-M1 is complete and final-gated：cursor metadata records、canonical
 codecs、single-key store/core/Oxia adapter、F2 activation-marker preservation、cursor ack domain and immutable NCS1
 snapshot codec/store all exist；unit/golden/contract tests plus real Oxia and LocalStack integrations pass。
-F3-M2-M6 and the F3 Pulsar fork integration have not started。
+F3-M2 is also complete and final-gated：`CursorStorage`、retention/protection/trim recovery、owner claim/fencing、
+snapshot publication/hydration and bounded mutation lanes exist；deterministic state-machine/property/concurrency/
+failure-injection suites plus a real Oxia + LocalStack S3 multi-runtime recovery gate pass。F3-M3-M6 and the F3
+Pulsar fork integration have not started。
 
 A later milestone is complete only when：
 
@@ -239,7 +242,7 @@ non-retriable upload failures fail immediately while preserving the public `OBJE
 
 ## 5. F3-M2 — CursorStorage and Retention State Machines
 
-### 5.1 Production targets
+### 5.1 Implemented production targets
 
 ```text
 nereus-managed-ledger/.../cursor/
@@ -254,6 +257,7 @@ nereus-managed-ledger/.../cursor/
   CursorMutationOutcome.java
   CursorStateMachine.java
   CursorStatePersistencePlanner.java
+  CursorStateHydrator.java
   CursorMutationLane.java
   CursorRetentionCoordinator.java
   DefaultCursorRetentionCoordinator.java
@@ -271,9 +275,11 @@ CursorStorageAckTest
 CursorStorageResetDeleteTest
 CursorStorageSnapshotSpillTest
 CursorStorageConcurrencyTest
+CursorStoragePropertyTest
 CursorMutationLaneTest
 CursorRetentionCoordinatorTest
 CursorRetentionFailureInjectionTest
+CursorStorageOxiaS3IntegrationTest
 ```
 
 Required tests：
@@ -314,7 +320,31 @@ Retention floor plus protection/trim pending lifecycles survive every injected c
 Oversize state fails before mutation and never truncates acknowledged ranges.
 ```
 
-Planned gate：`phase3M2Check`；real Oxia/ObjectStore failure extension：`phase3M2FinalCheck`。
+**Result：PASS。** Implemented gates：`phase3M2Check` and the real Oxia/ObjectStore extension
+`phase3M2FinalCheck`。
+
+Completed on 2026-07-14 against local Pulsar
+`master@7efae25af39a15407c1397d9e1f4ac4658d09daa`：
+
+```text
+./gradlew phase3M2Check --rerun-tasks
+./gradlew phase3M2FinalCheck --rerun-tasks
+```
+
+The ordinary gate covers all M2 cursor tests，including a fixed-seed 10,000-transition
+independent ack model、100-way same-name create/recreate、exact record-cap contention、same-owner CAS union、
+different-owner fencing、snapshot replacement/orphans、stable missing/corrupt snapshot failure、transient snapshot
+read retry classification and every injected protection/trim response-loss cut。It also proves that a running admitted
+mutation drains on handle close while queued and later operations fail terminally。
+
+The final gate reruns the complete M1 real-service prerequisite plus
+`CursorStorageOxiaS3IntegrationTest`。That combined gate uses real projection/retention/cursor keys in Oxia and an
+immutable NCS1 object in pinned LocalStack Community S3 `4.14.0`；it injects a lost real-Oxia cursor-CAS response，
+proves the root/snapshot result idempotently，claims it from a second independent runtime，fences the delayed first
+owner and hydrates the exact ack state from a third restarted runtime。The concurrent cursorless-trim/first-create
+test additionally forces both callers to observe an absent marker：the activation CAS loser must reread and accept
+only the exact activated projection，while the owner root serializes TRIM_PENDING against PROTECTION_PENDING and no
+caller bypasses `CursorRetentionCoordinator` for L0 trim。
 
 ## 6. F3-M3 — ManagedLedger / ManagedCursor Facade
 
@@ -567,8 +597,8 @@ Every implementation milestone updates：
 - terminology when a durable term changes；
 - F4 design if the handoff contract changes。
 
-“Designed / M0R-passed” must not be changed to “Implemented” until M6 final gate。Partial milestones use exact
-`M1 complete; M2+ pending` language。M1/M2 outputs are repository/test milestones and must not be published or
+“Designed / M0R-passed” must not be changed to “Implemented” until M6 final gate。Current partial-milestone language is
+`M1-M2 complete/final-gated; M3+ pending`。M1/M2 outputs are repository/test milestones and must not be published or
 deployed as broker artifacts；the marker-aware decoder、M3 writable cursor runtime and M4 admission form one release
 boundary。
 
