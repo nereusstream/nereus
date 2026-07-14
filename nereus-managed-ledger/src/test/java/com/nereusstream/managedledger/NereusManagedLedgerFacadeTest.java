@@ -254,8 +254,8 @@ class NereusManagedLedgerFacadeTest {
             assertThat(factory.inspectStorageState(NAME).join().state())
                     .isEqualTo(NereusDurableStorageState.DELETED);
             assertThat(factory.asyncExists(NAME).join()).isFalse();
-            assertThatThrownBy(() -> factory.getManagedLedgerPropertiesAsync(NAME).join())
-                    .hasRootCauseInstanceOf(NereusException.class);
+            assertThat(factory.getManagedLedgerPropertiesAsync(NAME).join()).isEmpty();
+            assertThat(factory.getManagedLedgers()).isEmpty();
             ledger.close();
             assertThat(factory.getManagedLedgers()).isEmpty();
 
@@ -594,10 +594,11 @@ class NereusManagedLedgerFacadeTest {
                     .isInstanceOf(ManagedLedgerException.ManagedLedgerTerminatedException.class);
 
             reopened.delete();
+            assertThat(factory.getManagedLedgerPropertiesAsync(NAME).join()).isEmpty();
             assertThat(objectStore.headObject(
                     retainedTarget.objectKey(), new HeadObjectOptions(Duration.ofSeconds(5))).join().objectLength())
                     .isEqualTo(retainedObjectLength);
-            reopened.close();
+            assertThat(factory.getManagedLedgers()).isEmpty();
             bindingGeneration.incrementAndGet();
 
             NereusManagedLedger recreated = (NereusManagedLedger) factory.open(NAME, config(true));

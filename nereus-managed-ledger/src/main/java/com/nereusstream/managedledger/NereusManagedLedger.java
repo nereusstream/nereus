@@ -812,7 +812,12 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                         synchronized (this) {
                             state = LocalState.DELETED;
                         }
-                        finish(admission, () -> callback.deleteLedgerComplete(ctx));
+                        finish(admission, () -> {
+                            notifyClosed();
+                            callback.deleteLedgerComplete(ctx);
+                        });
+                        callbacks.closeAfterDrain();
+                        beginLedgerClose();
                     } else {
                         fail(admission, callback::deleteLedgerFailed, ctx, unwrap(error), "delete", false);
                     }
@@ -851,12 +856,14 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     private CompletableFuture<Void> beginLedgerClose() {
         final CompletableFuture<Void> result;
+        final LocalState closingFrom;
         synchronized (this) {
             if (ledgerCloseFuture != null) {
                 return ledgerCloseFuture;
             }
             result = new CompletableFuture<>();
             ledgerCloseFuture = result;
+            closingFrom = state;
             state = LocalState.CLOSED;
             failFenceOnClose();
         }
@@ -882,15 +889,23 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         try {
             sequence = callbacks.admit();
         } catch (Throwable error) {
-            ManagedLedgerException failure = errorMapper.map(
-                    error, OperationContext.ledger("close"));
+            ManagedLedgerException admissionFailure = closingFrom == LocalState.DELETED
+                    ? null
+                    : errorMapper.map(error, OperationContext.ledger("close"));
             tailPoll.close();
             cursorCloseDrain(snapshot, registryFlights).whenComplete((ignored, closeError) -> {
-                if (closeError != null) {
+                ManagedLedgerException failure = admissionFailure;
+                if (closeError != null && failure == null) {
+                    failure = errorMapper.map(closeError, OperationContext.ledger("close"));
+                } else if (closeError != null) {
                     failure.addSuppressed(unwrap(closeError));
                 }
                 notifyClosed();
-                result.completeExceptionally(failure);
+                if (failure == null) {
+                    result.complete(null);
+                } else {
+                    result.completeExceptionally(failure);
+                }
             });
             callbacks.closeAfterDrain();
             return result;

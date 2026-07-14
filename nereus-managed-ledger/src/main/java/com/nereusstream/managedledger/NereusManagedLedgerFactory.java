@@ -507,7 +507,8 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         return openCoordinator.inspectStorageState(name).thenCompose(snapshot -> {
-            if (snapshot.state() == NereusDurableStorageState.MISSING) {
+            if (snapshot.state() == NereusDurableStorageState.MISSING
+                    || snapshot.state() == NereusDurableStorageState.DELETED) {
                 return CompletableFuture.completedFuture(Map.of());
             }
             if (snapshot.state() != NereusDurableStorageState.ACTIVE
