@@ -1,9 +1,8 @@
 # Phase 3 Cursor / Subscription Detailed Design
 
 > 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation 与 F3-M2
-> CursorStorage/retention state machines complete/final-gated；F3-M3 writable-open/runtime/hydration foundation 与
-> dual-mode ManagedCursor facade conformance checkpoint implemented，initial `phase3M3Check` green；focused writable
-> hydration/factory ownership failure gates in progress；F3-M4+ pending
+> CursorStorage/retention state machines complete/final-gated；F3-M3 writable-open/runtime/hydration、dual-mode
+> ManagedCursor facade 与 conformance suite complete/gated；F3-M4+ pending
 >
 > Gate 日期：2026-07-14
 
@@ -156,7 +155,7 @@ retention coordinator。
 | F3-M0R | code-level protocol and narrow Future 4 compatibility gate | complete, design-only |
 | F3-M1 | metadata records/codecs/store + snapshot codec/store | complete/final-gated；真实 Oxia 与 LocalStack conditional-create/restart 证据通过 |
 | F3-M2 | CursorStorage ack/reset/property/retention state machines | complete/final-gated；deterministic failure/concurrency models 与真实 Oxia + LocalStack S3 跨 runtime 恢复通过 |
-| F3-M3 | durable `NereusManagedCursor` and ledger hydration/enumeration | in progress；runtime/provider cursor resources、checked/trusted ownership guard、writable claim/hydration publication boundary、storage-backed exact-name durable open，以及 durable/non-durable 共用 ack 模型、独立 local read position、ack/reset/property/read/replay/wait facade 已实现；exact-name open/delete single-flight、durable tombstone delete/recreate generation、non-durable local-only cleanup、reset/clear read-lane ordering、property staging rebase、fully async cursor/ledger close drain 与 locked API surface classification 已收口；durable/batch/read-wait-replay/reset-seek/property/callback 专项 suites 及首个 `phase3M3Check` 已通过；writable hydration、corrupt-root fail-closed 与 factory ownership cut 专项收口待完成 |
+| F3-M3 | durable `NereusManagedCursor` and ledger hydration/enumeration | complete/gated；runtime/provider cursor resources、checked/trusted ownership guard、writable claim/hydration publication boundary、storage-backed exact-name durable open、dual-mode ack/read facade、tombstone delete/recreate、registry/admission/async close drain、完整 public API classification 与全部 12 个计划专项 suites 已实现；`phase3M3Check` 通过 locked Pulsar source/API、managed-ledger 与 adapter gates |
 | F3-M4 | Pulsar fork durable subscribe/ack/admin/capability integration | not started |
 | F3-M5 | two-broker/Oxia/ObjectStore recovery and retention barrier gates | not started |
 | F3-M6 | compatibility/failure/final gate and F4 handoff | not started |

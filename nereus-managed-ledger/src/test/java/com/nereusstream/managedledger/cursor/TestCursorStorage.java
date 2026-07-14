@@ -17,7 +17,9 @@ public final class TestCursorStorage implements CursorStorage {
     private final Map<CursorKey, CursorHandle> handles = new ConcurrentHashMap<>();
     private final Map<CursorKey, CursorState> tombstones = new ConcurrentHashMap<>();
     private final AtomicLong ids = new AtomicLong();
+    private final AtomicLong openInvocations = new AtomicLong();
     private final AtomicLong deleteInvocations = new AtomicLong();
+    private final AtomicLong claimInvocations = new AtomicLong();
     private final AtomicReference<CompletableFuture<Void>> nextResetCompletionGate =
             new AtomicReference<>();
     private final AtomicReference<CompletableFuture<Void>> nextFlushCompletionGate =
@@ -26,6 +28,9 @@ public final class TestCursorStorage implements CursorStorage {
             new AtomicReference<>();
     private final AtomicReference<CompletableFuture<Void>> nextDeleteCompletionGate =
             new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextClaimCompletionGate =
+            new AtomicReference<>();
+    private final AtomicReference<Throwable> nextClaimFailure = new AtomicReference<>();
     private final CursorStateMachine stateMachine =
             new CursorStateMachine(CursorStorageConfig.defaults());
     private volatile boolean closed;
@@ -35,6 +40,7 @@ public final class TestCursorStorage implements CursorStorage {
             CursorOwnerSession owner,
             String cursorName,
             CursorOpenRequest request) {
+        openInvocations.incrementAndGet();
         if (closed) {
             return closedFuture();
         }
@@ -74,8 +80,13 @@ public final class TestCursorStorage implements CursorStorage {
 
     @Override
     public CompletableFuture<List<CursorHandle>> claimAndLoadActiveCursors(CursorOwnerSession owner) {
+        claimInvocations.incrementAndGet();
         if (closed) {
             return closedFuture();
+        }
+        Throwable failure = nextClaimFailure.getAndSet(null);
+        if (failure != null) {
+            return CompletableFuture.failedFuture(failure);
         }
         List<CursorHandle> claimed = new ArrayList<>();
         handles.forEach((key, current) -> {
@@ -88,7 +99,11 @@ public final class TestCursorStorage implements CursorStorage {
                 return replacement;
             });
         });
-        return CompletableFuture.completedFuture(List.copyOf(claimed));
+        List<CursorHandle> result = List.copyOf(claimed);
+        CompletableFuture<Void> gate = nextClaimCompletionGate.getAndSet(null);
+        return gate == null
+                ? CompletableFuture.completedFuture(result)
+                : gate.thenApply(ignored -> result);
     }
 
     @Override
@@ -223,6 +238,14 @@ public final class TestCursorStorage implements CursorStorage {
         return deleteInvocations.get();
     }
 
+    public long openInvocationCount() {
+        return openInvocations.get();
+    }
+
+    public long claimInvocationCount() {
+        return claimInvocations.get();
+    }
+
     public void delayNextResetCompletionUntil(CompletableFuture<Void> gate) {
         if (!nextResetCompletionGate.compareAndSet(null, Objects.requireNonNull(gate, "gate"))) {
             throw new IllegalStateException("a reset completion gate is already installed");
@@ -244,6 +267,18 @@ public final class TestCursorStorage implements CursorStorage {
     public void delayNextDeleteCompletionUntil(CompletableFuture<Void> gate) {
         if (!nextDeleteCompletionGate.compareAndSet(null, Objects.requireNonNull(gate, "gate"))) {
             throw new IllegalStateException("a delete completion gate is already installed");
+        }
+    }
+
+    public void delayNextClaimCompletionUntil(CompletableFuture<Void> gate) {
+        if (!nextClaimCompletionGate.compareAndSet(null, Objects.requireNonNull(gate, "gate"))) {
+            throw new IllegalStateException("a claim completion gate is already installed");
+        }
+    }
+
+    public void failNextClaim(Throwable failure) {
+        if (!nextClaimFailure.compareAndSet(null, Objects.requireNonNull(failure, "failure"))) {
+            throw new IllegalStateException("a claim failure is already installed");
         }
     }
 

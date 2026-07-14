@@ -85,7 +85,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     clock,
                     callbackExecutor);
             CursorStorageConfig cursorConfig = configuration.cursorStorage();
-            CursorProtocolActivationGuard activationGuard = context.cursorProtocolActivationGuard();
+            CursorProtocolActivationGuard activationGuard = cursorProtocolActivationGuard(context);
             cursorSnapshotStore = new DefaultCursorSnapshotStore(
                     streamConfig.cluster(),
                     objectStore,
@@ -169,7 +169,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                 Objects.requireNonNull(className, "className"), true,
                 Objects.requireNonNull(classLoader, "classLoader"));
         if (!ObjectStoreProvider.class.isAssignableFrom(providerClass)) {
-            throw new IllegalArgumentException("configured object-store provider does not implement ObjectStoreProvider");
+            throw new IllegalArgumentException(
+                    "configured object-store provider does not implement ObjectStoreProvider");
         }
         Constructor<?> constructor = providerClass.getConstructor();
         try {
@@ -184,6 +185,11 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             }
             throw exception;
         }
+    }
+
+    static CursorProtocolActivationGuard cursorProtocolActivationGuard(
+            NereusRuntimeContext context) {
+        return Objects.requireNonNull(context, "context").cursorProtocolActivationGuard();
     }
 
     private static void requireIdentity(StreamStorageConfig configuration) {
