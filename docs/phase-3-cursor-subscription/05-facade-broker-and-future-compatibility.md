@@ -176,11 +176,14 @@ Still rejected：
 
 ## 5. Pulsar Fork Changes
 
-The fork paths below are planned changes, not current implementation。
+The fork changes below are implemented at local Pulsar
+`master@12edc9381c147ceec8bedd530acb5be7db339707` and are locked by `phase3M4Check`。The gate runs the eight focused
+broker suites named in document 06 together with broker/broker-common spotless checks against an exact clean source
+checkout。
 
 ### 5.1 `NereusTopicFeatureValidator`
 
-`validateSubscribe` changes from the F2 blanket durable rejection to：
+`validateSubscribe` now replaces the F2 blanket durable rejection with：
 
 ```text
 allow:
@@ -237,7 +240,7 @@ facade/storage where authoritative state is available。
 
 ### 5.3 `Consumer.messageAcked` completion ordering
 
-Current F2 code admits only a narrow non-durable cumulative ack。F3 changes ordering：
+The implemented F3 broker path uses this ordering：
 
 ```text
 validate Nereus ack command
@@ -261,8 +264,9 @@ requirePersistedAck || (nereusTopic && cursor.isDurable())
 The code names the second term `nereusDurableAcknowledgement`；it is false for a Nereus non-durable cursor。Cumulative
 ack already completes through `asyncMarkDelete`'s callback and uses the same durable/non-durable error mapping。
 
-Moving `redeliveryTracker.removeBatch` and transaction/pending-ack-adjacent cleanup after persistence is required；
-current eager cleanup would make a failed CAS look acknowledged locally。
+For durable Nereus acknowledgements，`redeliveryTracker.removeBatch`、pending-state cleanup、timestamp/counter updates
+and end-of-topic effects now run only after cursor persistence succeeds。A failed cursor CAS leaves them unchanged；
+non-durable Nereus and BookKeeper paths retain their applicable stock timing。
 
 ### 5.4 PersistentSubscription call path
 
@@ -435,7 +439,7 @@ public record NereusRuntimeConfiguration(
 ```
 
 The five-argument configuration constructor is source compatibility for the locked F2 fork and uses only frozen F3
-defaults。M4 changes `NereusBrokerStorageConfiguration` to build the canonical seven-argument value from typed broker
+defaults。The M4 `NereusBrokerStorageConfiguration` now builds the canonical seven-argument value from typed broker
 settings；operator configuration never selects the compatibility overload。
 
 The borrowed broker context adds the activation guard explicitly：
@@ -465,9 +469,9 @@ public record NereusRuntimeContext(
 }
 ```
 
-The five-argument compatibility constructor exists so M3 still compiles against the locked F2 fork；it can never
-activate a cursor protocol or advertise cursor capability。M4 changes `NereusManagedLedgerStorage` to construct the
-cursor-capable coordinator before runtime creation and pass its fail-closed delegate through the canonical field；
+The five-argument compatibility constructor is retained only for locked F2 source compatibility；it can never
+activate a cursor protocol or advertise cursor capability。The M4 `NereusManagedLedgerStorage` now constructs the
+cursor-capable coordinator before runtime creation and passes its fail-closed delegate through the canonical field；
 before `BrokerRegistryImpl` attaches，the delegate fails rather than allowing activation。
 `DefaultNereusRuntimeProvider` wires that exact borrowed guard into `DefaultCursorStorage` and
 `DefaultCursorRetentionCoordinator`，and never creates an internal allow-all guard。The runtime does not close the

@@ -27,8 +27,15 @@ close also closes cursor admission and drains admitted open/delete flights witho
 fail-closed and factory ownership-cut suites prove that callback publication follows complete hydration，one corrupt
 claim fails the whole open，the checked broker ownership supplier gates pre-claim/final publication/cached return and
 first durable cursor creation，and the provider preserves the exact activation guard while its F2 compatibility bridge
-stays fail closed。All twelve planned M3 conformance classes pass under `phase3M3Check`。F3-M4-M6 and the F3 Pulsar fork
-integration have not started。
+stays fail closed。All twelve planned M3 conformance classes pass under `phase3M3Check`。
+
+F3-M4 is complete and gated against local Pulsar
+`master@12edc9381c147ceec8bedd530acb5be7db339707`。The fork publishes independent binding/cursor protocol properties，
+requires two stable all-persistent-broker snapshots before first activation，maps typed broker settings to the canonical
+seven-argument runtime configuration and six-argument context，admits only the F3 topic/subscription/ack/admin matrix，
+reconstructs subscriptions from hydrated durable cursors，and defers durable acknowledgement side effects until cursor
+persistence succeeds。The exact eight focused broker suites and broker/broker-common spotless checks pass through
+`phase3M4Check` together with the complete M1-M3 dependency chain。F3-M5-M6 have not started。
 
 A later milestone is complete only when：
 
@@ -536,8 +543,31 @@ Every persistent broker must advertise cursor protocol 1 before first cursor cre
 BookKeeper-backed topics retain stock behavior.
 ```
 
-Planned Nereus composite gate：`phase3M4Check`；Pulsar fork focused test selection is pinned by exact task names in the
-implementation commit。
+Implemented Nereus composite gate：`phase3M4Check`；the Pulsar fork focused test selection is pinned by exact task
+names in `build.gradle.kts` and the source lock requires an exact clean checkout。
+
+### 7.4 Completion Evidence
+
+F3-M4 completed on 2026-07-14 against Pulsar
+`master@12edc9381c147ceec8bedd530acb5be7db339707`。The implementation provides：
+
+- independent `nereus.storage-binding-protocol=1` and `nereus.cursor-protocol=1` publication with reserved-key spoof
+  rejection；F2 binding readiness remains independent，while cursor readiness/first activation requires both
+  capabilities on two consecutive stable persistent-broker snapshots and fails closed on downgrade；
+- complete typed `ServiceConfiguration` -> `CursorMetadataStoreConfig` / `CursorStorageConfig` mapping，canonical
+  seven-argument `NereusRuntimeConfiguration` construction and canonical six-argument `NereusRuntimeContext` wiring；
+- durable/non-durable Exclusive、Failover and Shared admission，with Key_Shared、transactions、replication、
+  read-compacted and unsupported F4 paths rejected before mutation；TTL and subscription expiration remain cursor-only；
+- exact durable/non-durable cumulative/individual/batch acknowledgement validation and immutable Position inputs；
+  durable client-visible completion、redelivery/pending cleanup、timestamps/counters and end-of-topic effects follow
+  cursor success，while failure leaves those effects unapplied；
+- hydrated durable cursor enumeration before `PersistentTopic` subscription reconstruction；
+- closed admin operation validation for analyze-backlog and topic trim before duplicate/scan or facade no-op；
+- unchanged stock acknowledgement behavior for BookKeeper-backed topics。
+
+`./gradlew phase3M4Check` passed the exact source lock、M1-M3 chain、development composite publication，the eight
+tests listed in section 7.2，and `:pulsar-broker:spotlessJavaCheck` /
+`:pulsar-broker-common:spotlessJavaCheck`。All M4 exit conditions above are satisfied。
 
 ## 8. F3-M5 — Real Recovery and Retention Gates
 
@@ -625,9 +655,9 @@ Every implementation milestone updates：
 - F4 design if the handoff contract changes。
 
 “Designed / M0R-passed” must not be changed to “Implemented” until M6 final gate。Current partial-milestone language is
-`M1-M2 complete/final-gated; M3+ pending`。M1/M2 outputs are repository/test milestones and must not be published or
-deployed as broker artifacts；the marker-aware decoder、M3 writable cursor runtime and M4 admission form one release
-boundary。
+`M1-M4 complete/gated; M5-M6 pending`。M1/M2 outputs are repository/test milestones and must not be published or
+deployed as broker artifacts by themselves；the marker-aware decoder、M3 writable cursor runtime and M4 admission form
+one release boundary。
 
 ## 11. Stop Conditions During Implementation
 

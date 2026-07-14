@@ -26,7 +26,7 @@ nereus/
   docs/phase-1-core-stream-storage/     implemented Phase 1 contracts and milestones
   docs/phase-1.5-core-storage-foundation/ implemented L0 evolution and gates
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
-  docs/phase-3-cursor-subscription/      F3 code-level design and M0/M0R gates
+  docs/phase-3-cursor-subscription/      F3 code-level contract and implemented M1-M4 gates
   docs/automq-like-stream-storage/      reserved async materialization profile design
 ```
 
@@ -87,12 +87,20 @@ F3-M2 CursorStorage/retention state machines 也已完成并通过普通与 Dock
 create/ack/reset/property/delete、owner claim/fencing、snapshot spill/hydration、recoverable protection/trim
 barrier、CAS/trim 响应丢失和并发模型均有确定性测试；新增真实 Oxia + LocalStack S3 组合门禁验证两个
 独立 runtime 接管、旧 owner fencing 与第三 runtime 重启 hydration。`phase3M2Check --rerun-tasks` 和
-`phase3M2FinalCheck --rerun-tasks` 已通过。F3-M3 已进入实现：runtime/provider 现已拥有并按依赖逆序关闭
-cursor metadata/snapshot/retention/storage 资源；broker ownership checker 已贯穿 writable open 的 claim 前与
-publication 前边界；writable open 会生成 fresh owner session、claim/hydrate 全部 ACTIVE durable roots 后再
-构造 ledger，且 durable `openCursor` 已不再创建 ledger-local-only 状态。完整 ManagedCursor mutation/read/
-property/close surface、M3 分类测试与 M3 gate 仍在实现中；F3-M3-M6 尚未完成，因此仍不能描述为已支持
-durable Nereus subscriptions。
+`phase3M2FinalCheck --rerun-tasks` 已通过。F3-M3 ManagedCursor facade 也已完成并通过
+`phase3M3Check`：runtime/provider 拥有并按依赖逆序关闭 cursor metadata/snapshot/retention/storage 资源；
+broker ownership checker 贯穿 writable open 的 claim 前与 publication 前边界；writable open 生成 fresh
+owner session、claim/hydrate 全部 ACTIVE durable roots 后才构造 ledger；durable `openCursor`、ack/reset、
+property、delete/recreate、read/wait/replay 和异步 close 均由完整分类及 conformance suites 覆盖。
+
+F3-M4 已在本地 Pulsar `master@12edc9381c147ceec8bedd530acb5be7db339707` 完成并由
+`phase3M4Check` 锁定：fork 独立发布 storage-binding/cursor 两项 capability，首个 durable cursor 要求两次
+稳定的全 persistent-broker 快照；broker typed configuration 使用 canonical cursor runtime/context；topic、
+subscribe、ack 与 admin admission 按 F3 allowlist/denylist fail closed；durable ack 的客户端成功、计数、
+redelivery 和 pending-state 副作用严格排在 cursor CAS 成功之后；topic recovery 在 subscription recreation
+前接收已 hydrate 的 durable cursors。BookKeeper-backed topic 保持 stock 行为。F3-M5 real recovery/retention
+和 F3-M6 final compatibility gate 尚未完成，因此 Future 3 仍是 `Designed / In progress`，不能描述为完整
+production support。
 
 Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
 materialization and Future 4 workers remain designed/reserved.
@@ -125,4 +133,8 @@ The Phase 2 broker gates require the clean implemented fork commit currently rec
 ./gradlew phase2FinalCheck --rerun-tasks
 ./gradlew phase3M1Check
 ./gradlew phase3M1FinalCheck --rerun-tasks
+./gradlew phase3M2Check
+./gradlew phase3M2FinalCheck --rerun-tasks
+./gradlew phase3M3Check
+./gradlew phase3M4Check
 ```

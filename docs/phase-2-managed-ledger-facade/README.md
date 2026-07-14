@@ -70,7 +70,7 @@ F3 additionally uses a fresh per-writable-open owner-session claim over retentio
 topic publication；this is an F3 cursor fence and does not alter the locked F2 projection、MessageId or append model。
 F3 code-level target见 `../phase-3-cursor-subscription/README.md`；其 M1 metadata/snapshot foundation 已
 final-gated，M2 CursorStorage/retention state machines 与真实 Oxia/S3 recovery gate 也已 final-gated；
-M3-M6 facade/broker/end-to-end runtime 仍待实现。
+M3 facade 与 M4 broker integration 已完成普通 gate，M5-M6 real recovery/final runtime 仍待实现。
 
 Future 2 的目标是在不改变 L0 storage truth 的前提下，为 Pulsar broker 提供
 `ManagedLedgerStorageClass(name=nereus) -> ManagedLedgerFactory -> ManagedLedger` 兼容路径。

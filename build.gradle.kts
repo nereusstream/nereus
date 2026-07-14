@@ -19,17 +19,18 @@ plugins {
 
 group = providers.gradleProperty("nereusGroup").get()
 val phase2DevelopmentVersion = "0.1.0-f2-dev"
-val phase2GateRequested = gradle.startParameter.taskNames.any { requested ->
+val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
     requested.substringAfterLast(':').startsWith("phase2")
+        || requested.substringAfterLast(':').startsWith("phase3")
         || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
 }
 version = gradle.startParameter.projectProperties["nereusVersion"]
-    ?: if (phase2GateRequested) {
+    ?: if (pulsarDevelopmentGateRequested) {
         phase2DevelopmentVersion
     } else {
         providers.gradleProperty("nereusVersion").getOrElse("0.1.0-SNAPSHOT")
     }
-if (phase2GateRequested) {
+if (pulsarDevelopmentGateRequested) {
     check(version.toString() == phase2DevelopmentVersion) {
         "Phase 2 development gates require version $phase2DevelopmentVersion, got $version"
     }
@@ -165,7 +166,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("7efae25af39a15407c1397d9e1f4ac4658d09daa")
+    .orElse("12edc9381c147ceec8bedd530acb5be7db339707")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -337,4 +338,36 @@ tasks.register("phase3M3Check") {
     dependsOn("checkPulsarSourceLock")
     dependsOn(":nereus-managed-ledger:check")
     dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("phase3M4PulsarCheck") {
+    group = "verification"
+    description = "Run the exact F3-M4 Pulsar broker capability, admission, recovery, ack, and admin suites."
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker-common:spotlessJavaCheck",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusTopicFeatureValidatorTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusAcknowledgeValidatorTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorProtocolCapabilityTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBrokerStorageConfigurationCursorTest",
+        "--tests", "org.apache.pulsar.broker.service.persistent.NereusPersistentTopicCursorRecoveryTest",
+        "--tests", "org.apache.pulsar.broker.service.persistent.NereusPersistentSubscriptionAckTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusConsumerAckOrderingTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusAdminOperationTest",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase3M4Check") {
+    group = "verification"
+    description = "Verify the complete F3-M4 Pulsar broker integration against the exact local fork."
+    dependsOn("phase3M3Check")
+    dependsOn("phase3M4PulsarCheck")
 }

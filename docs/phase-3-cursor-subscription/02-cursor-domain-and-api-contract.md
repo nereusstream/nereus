@@ -340,8 +340,9 @@ public interface CursorProtocolActivationGuard {
 }
 ```
 
-`unavailable()` is the named fail-closed F2 source-compatibility bridge，not a production activation permit；it is
-used only until the M4 fork supplies the real capability coordinator。
+`unavailable()` is the named fail-closed F2 source-compatibility bridge，not a production activation permit。The M4
+fork now supplies the real capability coordinator through the canonical runtime context；only legacy source bridges
+retain this sentinel。
 
 Production constructor ownership is explicit：
 
