@@ -14,6 +14,8 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class TestCursorStorage implements CursorStorage {
     private final Map<CursorKey, CursorHandle> handles = new ConcurrentHashMap<>();
     private final AtomicLong ids = new AtomicLong();
+    private final CursorStateMachine stateMachine =
+            new CursorStateMachine(CursorStorageConfig.defaults());
     private volatile boolean closed;
 
     @Override
@@ -79,42 +81,68 @@ public final class TestCursorStorage implements CursorStorage {
     public CompletableFuture<CursorMutationResult> cumulativeAck(
             CursorHandle handle,
             CursorAckRequest request) {
-        return unsupported("cumulativeAck");
+        return mutate(handle, state -> stateMachine.cumulativeAck(
+                state,
+                request,
+                0,
+                mutationEnd(state, List.of(request)),
+                nextNow(state)));
     }
 
     @Override
     public CompletableFuture<CursorMutationResult> individualAck(
             CursorHandle handle,
             List<CursorAckRequest> requests) {
-        return unsupported("individualAck");
+        final List<CursorAckRequest> copied;
+        try {
+            copied = List.copyOf(requests);
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return mutate(handle, state -> stateMachine.individualAck(
+                state,
+                copied,
+                0,
+                mutationEnd(state, copied),
+                nextNow(state)));
     }
 
     @Override
     public CompletableFuture<CursorMutationResult> reset(
             CursorHandle handle,
             CursorResetRequest request) {
-        return unsupported("reset");
+        return mutate(handle, state -> stateMachine.reset(
+                state, request, nextId(), nextNow(state)));
     }
 
     @Override
     public CompletableFuture<CursorMutationResult> clearBacklog(
             CursorHandle handle,
             long observedCommittedEndOffset) {
-        return unsupported("clearBacklog");
+        return mutate(handle, state -> stateMachine.clearBacklog(
+                state, observedCommittedEndOffset, nextNow(state)));
     }
 
     @Override
     public CompletableFuture<CursorMutationResult> mutateCursorProperties(
             CursorHandle handle,
             CursorPropertyMutation mutation) {
-        return unsupported("mutateCursorProperties");
+        return mutate(handle, state -> stateMachine.mutateCursorProperties(
+                state, mutation, nextNow(state)));
     }
 
     @Override
     public CompletableFuture<CursorMutationResult> flushPositionProperties(
             CursorHandle handle,
             Map<String, Long> stagedProperties) {
-        return unsupported("flushPositionProperties");
+        final Map<String, Long> copied;
+        try {
+            copied = Map.copyOf(stagedProperties);
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return mutate(handle, state -> stateMachine.flushPositionProperties(
+                state, copied, nextNow(state)));
     }
 
     @Override
@@ -174,8 +202,45 @@ public final class TestCursorStorage implements CursorStorage {
         return String.format("%032x", ids.incrementAndGet());
     }
 
-    private static <T> CompletableFuture<T> unsupported(String operation) {
-        return CompletableFuture.failedFuture(new UnsupportedOperationException(operation));
+    private CompletableFuture<CursorMutationResult> mutate(
+            CursorHandle handle,
+            Mutation mutation) {
+        if (closed) {
+            return closedFuture();
+        }
+        if (handle.isClosed()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("test cursor handle is closed"));
+        }
+        return handle.mutationLane().submit(() -> {
+            try {
+                CursorMutationResult result = mutation.apply(handle.state());
+                handle.publish(result.state());
+                return CompletableFuture.completedFuture(result);
+            } catch (Throwable error) {
+                return CompletableFuture.failedFuture(error);
+            }
+        });
+    }
+
+    private static long mutationEnd(
+            CursorState state,
+            List<CursorAckRequest> requests) {
+        long end = state.acknowledgements().markDeleteOffset();
+        for (OffsetRange range : state.acknowledgements().wholeAckRanges()) {
+            end = Math.max(end, range.endOffset());
+        }
+        for (long offset : state.acknowledgements().partialBatchAcks().keySet()) {
+            end = Math.max(end, Math.addExact(offset, 1));
+        }
+        for (CursorAckRequest request : requests) {
+            end = Math.max(end, Math.addExact(request.entryOffset(), 1));
+        }
+        return end;
+    }
+
+    private static long nextNow(CursorState state) {
+        return Math.addExact(state.updatedAtMillis(), 1);
     }
 
     private static <T> CompletableFuture<T> closedFuture() {
@@ -183,5 +248,10 @@ public final class TestCursorStorage implements CursorStorage {
     }
 
     private record CursorKey(CursorLedgerIdentity ledger, String cursorName) {
+    }
+
+    @FunctionalInterface
+    private interface Mutation {
+        CursorMutationResult apply(CursorState state) throws Exception;
     }
 }

@@ -12,6 +12,7 @@ import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.managedledger.callbacks.SerialCallbackLane;
 import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
+import com.nereusstream.managedledger.cursor.CursorAckState;
 import com.nereusstream.managedledger.cursor.CursorHandle;
 import com.nereusstream.managedledger.cursor.CursorOpenRequest;
 import com.nereusstream.managedledger.cursor.CursorOwnerSession;
@@ -390,9 +391,12 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                 startPosition,
                 Objects.requireNonNull(initialPosition, "initialPosition"),
                 metadata);
-        Position read = readPosition(offset, metadata);
-        Position markDelete = PositionFactory.create(projection.virtualLedgerId(), offset - 1);
-        return createLocalCursor(subscriptionName, false, markDelete, read, Map.of(), Map.of());
+        return createLocalCursor(
+                subscriptionName,
+                CursorAckState.empty(offset),
+                offset,
+                Map.of(),
+                Map.of());
     }
 
     @Override
@@ -705,7 +709,15 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         }
         callbacks.complete(sequence, () -> {
             tailPoll.close();
-            List.copyOf(cursors.values()).forEach(NereusManagedCursor::close);
+            try {
+                for (NereusManagedCursor cursor : List.copyOf(cursors.values())) {
+                    cursor.close();
+                }
+            } catch (ManagedLedgerException error) {
+                notifyClosed();
+                callback.closeFailed(error, ctx);
+                return;
+            }
             notifyClosed();
             callback.closeComplete(ctx);
         });
@@ -1451,16 +1463,22 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     NereusManagedCursor createLocalCursor(
             String name,
-            boolean durable,
-            Position markDelete,
-            Position read,
+            CursorAckState acknowledgements,
+            long initialReadOffset,
             Map<String, Long> properties,
-            Map<String, String> cursorProperties) {
+            Map<String, String> cursorProperties) throws ManagedLedgerException {
         NereusManagedCursor cursor = new NereusManagedCursor(
-                this, name, durable, markDelete, read, properties, cursorProperties);
-        if (name != null) {
-            NereusManagedCursor existing = cursors.putIfAbsent(name, cursor);
-            if (existing != null) return existing;
+                this,
+                name,
+                acknowledgements,
+                initialReadOffset,
+                properties,
+                cursorProperties);
+        NereusManagedCursor existing = cursors.putIfAbsent(name, cursor);
+        if (existing != null) {
+            cursor.closeDetached();
+            throw new ManagedLedgerException(
+                    "a cursor already uses the exact name: " + name);
         }
         return cursor;
     }
@@ -1483,6 +1501,10 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return positions.requireReadPositionOffset(projection, position, metadata);
     }
 
+    long requireCursorEntryOffset(Position position, StreamMetadata metadata) {
+        return positions.requireReadableEntryOffset(projection, position, metadata);
+    }
+
     long cursorReadOffsetAfter(Position position, StreamMetadata metadata) {
         return positions.cursorReadOffsetAfter(projection, position, metadata);
     }
@@ -1491,12 +1513,18 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return PositionFactory.create(projection.virtualLedgerId(), Math.subtractExact(nextReadOffset, 1));
     }
 
-    long normalizeCursorResetReadOffset(Position position, StreamMetadata metadata) {
+    long normalizeCursorResetReadOffset(
+            Position position,
+            boolean force,
+            StreamMetadata metadata) {
         if (samePosition(position, PositionFactory.EARLIEST)) {
             return metadata.trimOffset();
         }
         if (samePosition(position, PositionFactory.LATEST)) {
             return metadata.committedEndOffset();
+        }
+        if (force) {
+            return positions.requireReadPositionOffset(projection, position, metadata);
         }
         return positions.normalizeResetReadPositionOffset(projection, position, metadata);
     }

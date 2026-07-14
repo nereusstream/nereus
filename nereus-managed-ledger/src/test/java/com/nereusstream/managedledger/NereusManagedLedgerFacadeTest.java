@@ -181,9 +181,9 @@ class NereusManagedLedgerFacadeTest {
             List<Entry> durableRead = durableCursor.readEntries(1);
             assertThat(durableRead).hasSize(1);
             durableRead.forEach(Entry::release);
-            assertThatThrownBy(() -> durableCursor.markDelete(position))
-                    .isInstanceOf(ManagedLedgerException.class)
-                    .hasMessageStartingWith("NEREUS_UNSUPPORTED_OPERATION:");
+            durableCursor.markDelete(position);
+            assertThat(durableCursor.getMarkDeletedPosition()).isEqualTo(position);
+            assertThat(durableCursor.getNumberOfEntriesInBacklog(true)).isZero();
             ManagedCursor nonDurable = ledger.newNonDurableCursor(
                     PositionFactory.EARLIEST, "reader");
             assertThat(nonDurable.isDurable()).isFalse();
