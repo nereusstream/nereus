@@ -495,4 +495,4 @@ The executable API probe passed against interface blobs identical to the locked 
 contracts and F2-M1 through F2-M6 gates are in
 `../phase-2-managed-ledger-facade/README.md`。All F2 implementation/final-acceptance gates pass；Future 2 is
 complete。Future 3 已完成 design-only M0/M0R 并在不改变 F2 projection/MessageId 的前提下冻结 code-level
-cursor contract；F3-M1 foundation 正在实现，M1 gate/真实集成与 M2-M6 仍待完成。Future 4 remains a separate designed track。
+cursor contract；F3-M1 foundation 与真实集成 gate 已完成，M2-M6 仍待完成。Future 4 remains a separate designed track。

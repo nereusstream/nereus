@@ -30,8 +30,35 @@ class CursorStorageConfigTest {
                 .hasMessageContaining("protection intent");
     }
 
+    @Test
+    void admitsTheLargestBatchExactlyAtTheSnapshotPayloadBoundary() {
+        CursorStorageConfig defaults = CursorStorageConfig.defaults();
+        long largestPartialBytes = ((long) defaults.cursorBatchIndexesMax() + 63) / 64 * Long.BYTES;
+        long exactSnapshotBound = largestPartialBytes + 512;
+
+        assertThat(copy(defaults, exactSnapshotBound).cursorSnapshotMaxBytes())
+                .isEqualTo(exactSnapshotBound);
+        assertThatThrownBy(() -> copy(defaults, exactSnapshotBound - 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("admitted batch");
+    }
+
     private static CursorStorageConfig copy(
             CursorStorageConfig value, int metadataMax, int protectionMax) {
+        return copy(value, metadataMax, protectionMax, value.cursorSnapshotMaxBytes());
+    }
+
+    private static CursorStorageConfig copy(
+            CursorStorageConfig value, long snapshotMax) {
+        return copy(
+                value,
+                value.cursorMetadataValueMaxBytes(),
+                value.cursorProtectionIntentMaxBytes(),
+                snapshotMax);
+    }
+
+    private static CursorStorageConfig copy(
+            CursorStorageConfig value, int metadataMax, int protectionMax, long snapshotMax) {
         return new CursorStorageConfig(
                 metadataMax,
                 value.cursorMetadataSafetyMarginBytes(),
@@ -40,7 +67,7 @@ class CursorStorageConfigTest {
                 value.cursorNameMaxUtf8Bytes(),
                 value.cursorPositionPropertiesMaxBytes(),
                 value.cursorPropertiesMaxBytes(),
-                value.cursorSnapshotMaxBytes(),
+                snapshotMax,
                 value.cursorAckPositionsPerRequestMax(),
                 value.cursorBatchIndexesMax(),
                 protectionMax,

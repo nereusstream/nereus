@@ -72,7 +72,7 @@ public final class MetadataRecordCodecFactory {
             MetadataRecordEnvelope.DecodedEnvelope envelope, MetadataRecordCodec<?> codec) {
         if (!MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())
                 || envelope.schemaVersion() != codec.schemaVersion()
-                || envelope.minReaderSchemaVersion() > codec.schemaVersion()) {
+                || envelope.minReaderSchemaVersion() != codec.minReaderSchemaVersion()) {
             throw new MetadataCodecException("unsupported metadata envelope for " + codec.recordType());
         }
     }

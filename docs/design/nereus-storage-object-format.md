@@ -1,6 +1,6 @@
 # Nereus Storage Object Format
 
-> 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M0/M0R code-level design gate 但未实现；
+> 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -13,7 +13,7 @@ Nereus shared data plane 需要多类 immutable objects：
 | Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
 | Index object | large entry/projection index | offset-index reference | Reserved |
 | Stream compacted object | per-stream higher-generation read target | generation publish | Designed |
-| Cursor snapshot | large ack state | cursor-state CAS ref | V1 code-level designed/M0R-gated；not implemented |
+| Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated as F3-M1 storage primitive；root publication belongs to M2 |
 | Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |
 | SBT/SDT table file | analytical/table projection | catalog snapshot/delivery lineage | Designed |
 
@@ -294,7 +294,7 @@ Default target is Parquet with row-group offset bounds。Before implementation F
 
 ## 11. Snapshot objects
 
-> Status: Cursor snapshot V1 code-level designed/M0R-gated；transaction snapshot only Designed；none implemented
+> Status: Cursor snapshot V1 codec/store implemented and F3-M1 final-gated；transaction snapshot only Designed
 
 Common snapshot rules：
 

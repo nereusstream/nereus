@@ -24,9 +24,9 @@ class CursorKeyspaceTest {
 
         assertThat(keyspace.cursorStateKey(streamId, cursor))
                 .isEqualTo(prefix + "by-hash/" + CursorNames.cursorNameHash(cursor) + "/state");
-        assertThat(keyspace.cursorStateScanFrom(streamId)).isEqualTo(prefix + "by-hash/");
+        assertThat(keyspace.cursorStateScanFrom(streamId)).isEqualTo(prefix + "by-hash/0/");
         assertThat(keyspace.cursorStateScanToExclusive(streamId))
-                .isEqualTo(prefix + "by-hash0");
+                .isEqualTo(prefix + "by-hash/~/");
         assertThat(keyspace.retentionKey(streamId)).isEqualTo(prefix + "retention");
         assertThat(keyspace.cursorWatchPrefix(streamId)).isEqualTo(prefix);
         assertThat(keyspace.streamPartitionKey(streamId).value()).isEqualTo(streamId.value());

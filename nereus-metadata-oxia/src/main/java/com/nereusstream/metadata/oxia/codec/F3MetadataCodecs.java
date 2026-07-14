@@ -37,7 +37,7 @@ public final class F3MetadataCodecs {
         if (!codec.recordType().equals(envelope.recordType())
                 || !MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())
                 || envelope.schemaVersion() != codec.schemaVersion()
-                || envelope.minReaderSchemaVersion() > codec.schemaVersion()) {
+                || envelope.minReaderSchemaVersion() != codec.minReaderSchemaVersion()) {
             throw new MetadataCodecException("unsupported F3 metadata envelope for " + recordClass.getSimpleName());
         }
         return codec.decode(envelope.payload());

@@ -64,6 +64,9 @@ public record CursorStorageConfig(
         }
         requirePositive(cursorProtectionIntentMaxBytes, "cursorProtectionIntentMaxBytes");
         long largestPartialBytes = ((long) cursorBatchIndexesMax + 63) / 64 * Long.BYTES;
+        if (largestPartialBytes + 512 > cursorSnapshotMaxBytes) {
+            throw new IllegalArgumentException("an admitted batch cannot fit the cursor snapshot bound");
+        }
         if (largestPartialBytes + cursorNameMaxUtf8Bytes + 512 > cursorProtectionIntentMaxBytes) {
             throw new IllegalArgumentException("an admitted batch/name cannot fit the protection intent");
         }

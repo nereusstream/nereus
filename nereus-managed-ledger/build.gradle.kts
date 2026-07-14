@@ -31,3 +31,36 @@ dependencies {
     testImplementation(testFixtures(project(":nereus-object-store")))
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+val cursorS3IntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[cursorS3IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[cursorS3IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(cursorS3IntegrationTest.implementationConfigurationName, project())
+    add(cursorS3IntegrationTest.implementationConfigurationName, project(":nereus-object-store"))
+    add(cursorS3IntegrationTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
+    add(cursorS3IntegrationTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
+    add(cursorS3IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(cursorS3IntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(cursorS3IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(cursorS3IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(cursorS3IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+tasks.register<Test>("cursorS3IntegrationTest") {
+    group = "verification"
+    description = "Run the F3 cursor snapshot store against pinned LocalStack S3."
+    testClassesDirs = cursorS3IntegrationTest.output.classesDirs
+    classpath = cursorS3IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}

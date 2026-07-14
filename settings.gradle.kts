@@ -41,6 +41,7 @@ val pulsarSourceRequired = gradle.startParameter.taskNames.any { requested ->
     val task = requested.substringAfterLast(':')
     (!requested.contains(':') && task in setOf("assemble", "build", "check", "publish", "test"))
         || task.startsWith("phase2")
+        || task.startsWith("phase3")
         || requested.contains(":nereus-managed-ledger:")
         || requested.contains(":nereus-pulsar-adapter:")
 }

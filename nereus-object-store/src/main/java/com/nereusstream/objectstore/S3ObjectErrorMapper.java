@@ -71,7 +71,7 @@ final class S3ObjectErrorMapper {
                 return failure(ErrorCode.OBJECT_NOT_FOUND, true, operation, bucket, key, "HTTP 404");
             }
             if (status == 412 && operation == Operation.PUT) {
-                return failure(ErrorCode.OBJECT_UPLOAD_FAILED, false, operation, bucket, key, "HTTP 412");
+                return alreadyExists(operation, bucket, key);
             }
             if (status == 409 && operation == Operation.PUT) {
                 return failure(ErrorCode.OBJECT_UPLOAD_FAILED, true, operation, bucket, key, "HTTP 409");
@@ -105,8 +105,19 @@ final class S3ObjectErrorMapper {
                 ? "none"
                 : DeterministicIds.stableHashComponent("nereus-s3-key-log-v1\0" + key.value());
         return new NereusException(code, retriable,
-                "S3 " + operation.label + " failed; bucket=" + safeBucket(bucket)
-                        + "; keyHash=" + keyHash + "; detail=" + detail);
+                message(operation, bucket, keyHash, detail));
+    }
+
+    private static ObjectAlreadyExistsException alreadyExists(
+            Operation operation, String bucket, ObjectKey key) {
+        String keyHash = DeterministicIds.stableHashComponent("nereus-s3-key-log-v1\0" + key.value());
+        return new ObjectAlreadyExistsException(message(operation, bucket, keyHash, "HTTP 412"));
+    }
+
+    private static String message(
+            Operation operation, String bucket, String keyHash, String detail) {
+        return "S3 " + operation.label + " failed; bucket=" + safeBucket(bucket)
+                + "; keyHash=" + keyHash + "; detail=" + detail;
     }
 
     private static String safeBucket(String bucket) {

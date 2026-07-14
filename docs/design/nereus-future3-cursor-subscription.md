@@ -1,6 +1,6 @@
 # Nereus Future 3：Cursor / Subscription State
 
-> 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation 实现中
+> 状态：F3-M0 / F3-M0R design-gated；F3-M1 metadata/snapshot foundation complete/final-gated；F3-M2+ pending
 >
 > 代码级合同：[Phase 3 Cursor / Subscription Detailed Design](../phase-3-cursor-subscription/README.md)
 >
@@ -384,8 +384,8 @@ F3-M0 and the narrow M0R gate passed on 2026-07-14 against the locked local Puls
 ```text
 Future 2's compatibility model can carry Future 3 and Future 4.
 Future 3's durable protocol is implementation-ready.
-F3-M1 foundation code and focused tests exist; the M1 gate and real integration evidence remain pending.
+F3-M1 metadata/snapshot foundation and its ordinary/real-service gates pass; M2-M6 remain pending.
 ```
 
-Implementation proceeds through F3-M1 metadata/snapshot、M2 state machines、M3 facade、M4 broker integration、M5
+Implementation continues through F3-M2 state machines、M3 facade、M4 broker integration、M5
 real recovery and M6 final compatibility gate。See the detailed [implementation plan](../phase-3-cursor-subscription/06-implementation-plan-and-gates.md)。

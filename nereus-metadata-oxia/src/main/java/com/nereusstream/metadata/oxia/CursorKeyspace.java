@@ -20,11 +20,11 @@ public final class CursorKeyspace {
     }
 
     public String cursorStateScanFrom(StreamId streamId) {
-        return cursorStatePrefix(streamId);
+        return cursorStatePrefix(streamId) + "0/";
     }
 
     public String cursorStateScanToExclusive(StreamId streamId) {
-        return lexicalSuccessor(cursorStatePrefix(streamId));
+        return cursorStatePrefix(streamId) + "~/";
     }
 
     public String retentionKey(StreamId streamId) {
@@ -39,6 +39,10 @@ public final class CursorKeyspace {
         return l0.streamPartitionKey(Objects.requireNonNull(streamId, "streamId"));
     }
 
+    String cursorStateScopePrefix(StreamId streamId) {
+        return cursorStatePrefix(streamId);
+    }
+
     private String cursorStatePrefix(StreamId streamId) {
         return cursorRootPrefix(streamId) + "by-hash/";
     }
@@ -51,11 +55,4 @@ public final class CursorKeyspace {
                 + "/facade/managed-ledger/cursors/v1/";
     }
 
-    private static String lexicalSuccessor(String prefix) {
-        char last = prefix.charAt(prefix.length() - 1);
-        if (last == Character.MAX_VALUE) {
-            throw new IllegalArgumentException("cursor scan prefix has no lexical successor");
-        }
-        return prefix.substring(0, prefix.length() - 1) + (char) (last + 1);
-    }
 }

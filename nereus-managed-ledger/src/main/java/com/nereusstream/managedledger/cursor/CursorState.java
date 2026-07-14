@@ -46,6 +46,14 @@ public record CursorState(
         if (createdAtMillis < 0 || updatedAtMillis < createdAtMillis || metadataVersion < 0) {
             throw new IllegalArgumentException("cursor timestamps or metadataVersion are invalid");
         }
+        if (lifecycle == CursorLifecycle.DELETED
+                && (snapshotReference.isPresent()
+                        || !acknowledgements.wholeAckRanges().isEmpty()
+                        || !acknowledgements.partialBatchAcks().isEmpty()
+                        || !positionProperties.isEmpty()
+                        || !cursorProperties.isEmpty())) {
+            throw new IllegalArgumentException("a deleted cursor view cannot retain mutable cursor fields");
+        }
     }
 
     private static <K, V> Map<K, V> immutableMap(Map<K, V> value, String fieldName) {

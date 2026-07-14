@@ -4,8 +4,8 @@ package com.nereusstream.metadata.oxia;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.records.CursorRetentionRecord;
 import com.nereusstream.metadata.oxia.records.CursorStateRecord;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +48,7 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
 
         public synchronized List<StoredValue> storedValues() {
             return values.values().stream()
-                    .sorted(Comparator.comparing(StoredValue::key))
+                    .sorted((left, right) -> compareHierarchical(left.key(), right.key()))
                     .map(DurableState::copy)
                     .toList();
         }
@@ -93,8 +93,9 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
 
         private synchronized List<String> list(String fromInclusive, String toExclusive) {
             return values.keySet().stream()
-                    .filter(key -> key.compareTo(fromInclusive) >= 0 && key.compareTo(toExclusive) < 0)
-                    .sorted()
+                    .filter(key -> compareHierarchical(key, fromInclusive) >= 0
+                            && compareHierarchical(key, toExclusive) < 0)
+                    .sorted(DurableState::compareHierarchical)
                     .toList();
         }
 
@@ -102,9 +103,9 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
                 String fromInclusive, String toExclusive, int limit, PartitionKey partitionKey) {
             List<PartitionedOxiaClient.VersionedValue> result = new ArrayList<>();
             values.values().stream()
-                    .filter(value -> value.key().compareTo(fromInclusive) >= 0
-                            && value.key().compareTo(toExclusive) < 0)
-                    .sorted(Comparator.comparing(StoredValue::key))
+                    .filter(value -> compareHierarchical(value.key(), fromInclusive) >= 0
+                            && compareHierarchical(value.key(), toExclusive) < 0)
+                    .sorted((left, right) -> compareHierarchical(left.key(), right.key()))
                     .limit(limit)
                     .forEach(value -> {
                         requirePartition(value, partitionKey, value.key());
@@ -149,6 +150,34 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
 
         private static StoredValue copy(StoredValue value) {
             return new StoredValue(value.key(), value.partitionKey(), value.envelope(), value.version());
+        }
+
+        private static int compareHierarchical(String left, String right) {
+            int level = Integer.compare(hierarchyLevel(left), hierarchyLevel(right));
+            if (level != 0) {
+                return level;
+            }
+            byte[] leftBytes = left.getBytes(StandardCharsets.UTF_8);
+            byte[] rightBytes = right.getBytes(StandardCharsets.UTF_8);
+            int common = Math.min(leftBytes.length, rightBytes.length);
+            for (int index = 0; index < common; index++) {
+                int leftByte = leftBytes[index] == '/' ? 0xff : Byte.toUnsignedInt(leftBytes[index]);
+                int rightByte = rightBytes[index] == '/' ? 0xff : Byte.toUnsignedInt(rightBytes[index]);
+                if (leftByte != rightByte) {
+                    return Integer.compare(leftByte, rightByte);
+                }
+            }
+            return Integer.compare(leftBytes.length, rightBytes.length);
+        }
+
+        private static int hierarchyLevel(String key) {
+            int separators = 0;
+            for (int index = 0; index < key.length(); index++) {
+                if (key.charAt(index) == '/') {
+                    separators++;
+                }
+            }
+            return key.endsWith("//") ? separators - 1 : separators;
         }
     }
 

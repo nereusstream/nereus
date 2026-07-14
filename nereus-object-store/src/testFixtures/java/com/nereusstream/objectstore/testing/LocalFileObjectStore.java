@@ -21,6 +21,7 @@ import com.nereusstream.api.ObjectKey;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.HeadObjectOptions;
 import com.nereusstream.objectstore.HeadObjectResult;
+import com.nereusstream.objectstore.ObjectAlreadyExistsException;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.PutObjectResult;
@@ -79,7 +80,7 @@ public final class LocalFileObjectStore implements ObjectStore {
             try {
                 writeTemporary(temporary, bytes);
                 if (options.ifAbsent() && Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-                    throw failure(ErrorCode.OBJECT_UPLOAD_FAILED, false, "object already exists");
+                    throw new ObjectAlreadyExistsException("object already exists");
                 }
                 try {
                     Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);

@@ -2,10 +2,10 @@
 
 ## 1. Current Status
 
-F3-M0 and F3-M0R are complete as design gates。F3-M1 is now in progress：cursor metadata records、canonical
-codecs、single-key store/core/Oxia adapter contract、F2 activation-marker preservation、cursor ack domain、snapshot
-codec/store and focused unit/contract/golden tests exist。The M1 Gradle gates and real Oxia/ObjectStore integration
-evidence are not complete yet，so F3-M1 is not claimed complete；F3-M2-M6 and Pulsar fork integration have not started。
+F3-M0 and F3-M0R are complete as design gates。F3-M1 is complete and final-gated：cursor metadata records、canonical
+codecs、single-key store/core/Oxia adapter、F2 activation-marker preservation、cursor ack domain and immutable NCS1
+snapshot codec/store all exist；unit/golden/contract tests plus real Oxia and LocalStack integrations pass。
+F3-M2-M6 and the F3 Pulsar fork integration have not started。
 
 A later milestone is complete only when：
 
@@ -199,11 +199,12 @@ Required cases are the complete codec/store list in document 03, plus：
 - fake and real Oxia return identical decoded values/condition failures；
 - 32-way absent create and tombstone CAS races；
 - page continuation at 0/1/255/256/max records；
-- watch-disabled two-scan stabilization；
-- snapshot ifAbsent collision and upload-success/CAS-loss orphan observation；
+- watch-disabled authoritative reads；M2 owns the two-scan open stabilization algorithm；
+- snapshot ifAbsent collision；M2 owns upload-success/CAS-loss orphan observation at the root publication boundary；
 - object identity/hash/generation mismatch at every header/reference field。
-- `ackStateEpoch` create/reset/clear/preserve/overflow golden and decode invariants；
-- owner-session field/claim golden：claim changes only owner/sequence/updated time，snapshot bytes remain unchanged；
+- `ackStateEpoch` field golden and decode invariants；M2 owns create/reset/clear/preserve/overflow transitions；
+- owner-session field golden；M2 owns claim transitions that change only owner/sequence/updated time while preserving
+  snapshot bytes；
 - cursor and retention domain views carry the hydrated Oxia version while encoded metadataVersion remains exactly zero；
 - retention ACTIVE/protection-pending/trim-pending binary goldens，including exact persisted composed-reason replay；
 - codec goldens preserve negative/high-bit remaining words and the full signed position-property `long` domain；
@@ -217,7 +218,24 @@ A stable root reference hydrates exactly one full effective ack state.
 No cursor state machine or Pulsar callback is implemented yet.
 ```
 
-Planned gate：`phase3M1Check`；real Oxia/ObjectStore integration extension：`phase3M1FinalCheck`。
+Implemented gates：`phase3M1Check` and the real Oxia/ObjectStore extension `phase3M1FinalCheck`。
+
+### 4.4 Completion Evidence
+
+Completed on 2026-07-14 against local Pulsar
+`master@7efae25af39a15407c1397d9e1f4ac4658d09daa`：
+
+```text
+./gradlew phase3M1Check
+./gradlew phase3M1FinalCheck --rerun-tasks
+```
+
+Both pass。The final gate reruns Phase 1/1.5/F2 prerequisites，the complete F3 metadata/managed-ledger/object-store
+unit suites，real Oxia restart/range/watch/CAS parity，generic S3 integration and cursor-specific LocalStack
+conditional-create collision plus provider-restart hydration。Real Oxia also exposed that range ordering is
+hierarchical rather than flat Java string ordering；the production sentinels and fake comparator now match that
+behavior。Only the typed `ObjectAlreadyExistsException` conditional-create result rotates a snapshot ID；other
+non-retriable upload failures fail immediately while preserving the public `OBJECT_UPLOAD_FAILED` mapping。
 
 ## 5. F3-M2 — CursorStorage and Retention State Machines
 

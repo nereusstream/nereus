@@ -76,8 +76,12 @@ DeterministicIds.stableHashComponent("nereus-cursor-v1\0" + cursorName)
 Input is strict UTF-8 and must satisfy the configured byte cap。The exact cursor name is also stored in the record；a
 hash hit with a different exact name is corruption/collision and never aliases two subscriptions。
 
-All cursor and retention keys use `OxiaKeyspace.streamPartitionKey(streamId)`。Range scans start at the literal
-`.../by-hash/` prefix and end at its lexicographic successor；they are paged and reject any unexpected child shape。
+All cursor and retention keys use `OxiaKeyspace.streamPartitionKey(streamId)`。The production Oxia namespace uses
+hierarchical key ordering（depth first，then encoded path bytes），and each state key is two path components below
+`.../by-hash/`。Therefore scans use exact same-depth sentinels `.../by-hash/0/` inclusive and
+`.../by-hash/~/` exclusive；`0` sorts below the locked lowercase-base32 hash alphabet and `~` above it。Continuation
+starts immediately after the prior exact `/state` key。Scans are paged and reject any unexpected child shape；the
+fake uses the same hierarchical comparator rather than Java's flat `String` ordering。
 No code constructs a path from raw cursor name。
 
 ### 2.1 Topic-projection activation / downgrade fence
@@ -523,8 +527,10 @@ Rendered as one line：
 ```
 
 Components use `KeyComponentCodec`; generation uses `encodeNonNegativeLong`。The exact cursor name never appears in
-the key。Writes use `ObjectType.CURSOR_SNAPSHOT_OBJECT` and `PutObjectOptions.ifAbsent=true`。A collision/precondition
-failure creates a fresh random snapshot ID；bytes are never overwritten。
+the key。Writes use `ObjectType.CURSOR_SNAPSHOT_OBJECT` and `PutObjectOptions.ifAbsent=true`。The generic ObjectStore
+preserves Phase 1's public `OBJECT_UPLOAD_FAILED` mapping while exposing a typed `ObjectAlreadyExistsException` for
+the conditional-create precondition failure；only that typed collision creates a fresh random snapshot ID。Other
+non-retriable upload failures are not misclassified or retried，and bytes are never overwritten。
 
 Exact generic ObjectStore options，where `objectCallTimeout` is recomputed immediately before each call as
 `min(snapshotDeadline.remaining(), configuredObjectStoreRequestTimeout)`：
@@ -939,19 +945,23 @@ before deletion and honor its own reader/reference grace；it cannot infer liven
 
 ## 13. Codec and Store Test Contract
 
-M1 must include：
+M1 foundation includes：
 
 - canonical golden bytes for minimal ACTIVE、ACTIVE with every field、DELETED、ACTIVE with snapshot ref/deltas and
   all three retention lifecycles；
 - protection-intent goldens for CREATE、RECREATE、BACKWARD_RESET with/without target partial and exact cap failure；
-- `ackStateEpoch` starts at one，is preserved/incremented by the exact mutation classes and fails on checked overflow；
+- `ackStateEpoch` wire value is positive/canonical；M2 mutation tests own create/reset/clear preservation、increment and
+  checked overflow；
 - round-trip and encode-after-decode equality；
 - one mutation/fuzz test for every length/count/enum/CRC/trailing-byte failure；
 - name-hash collision mismatch and key/record identity mismatch；
 - fake and real Oxia absent-create、exact CAS、CAS loss、page scan、watch-disabled polling paths；
 - snapshot key golden values, ifAbsent collision, exact HEAD metadata, short/long/range/trailing bytes and all CRCs；
-- object upload success + CAS loss orphan behavior；
-- root-ref change during read retry and stable missing/corrupt ref fail-safe；
-- root value and snapshot cap boundary tests at limit-1/limit/limit+1。
+- snapshot cap boundary tests and strict result/reference validation。
+
+M2 adds the state-machine-dependent half of this contract：object upload success + root-CAS-loss orphan observation，
+root-ref change during hydration retry，stable missing/corrupt ref fail-safe，root spill/hard-cap boundaries，owner
+claim transitions and the complete `ackStateEpoch` mutation matrix。Keeping these in M2 is required by the M1 exit
+condition that no cursor state machine exists yet；it does not weaken the final Phase 3 gate。
 
 No test may accept noncanonical bytes and rewrite them silently。

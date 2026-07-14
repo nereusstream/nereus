@@ -16,8 +16,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class CursorMetadataStoreContractTest {
@@ -119,6 +121,78 @@ class CursorMetadataStoreContractTest {
     }
 
     @Test
+    void thirtyTwoWayAbsentCreateAndTombstoneCasHaveExactlyOneWinner() {
+        try (FakeCursorMetadataStore store = new FakeCursorMetadataStore()) {
+            CursorStateRecord initial = cursor("contended", 1, 1);
+            List<CompletableFuture<VersionedCursorState>> creates = IntStream.range(0, 32)
+                    .mapToObj(ignored -> store.createCursor(CLUSTER, initial))
+                    .toList();
+            awaitAll(creates);
+            assertThat(creates.stream().filter(future -> !future.isCompletedExceptionally()))
+                    .hasSize(1);
+            creates.stream()
+                    .filter(CompletableFuture::isCompletedExceptionally)
+                    .forEach(future -> assertConditionFailure(future::join));
+
+            VersionedCursorState active = creates.stream()
+                    .filter(future -> !future.isCompletedExceptionally())
+                    .findFirst()
+                    .orElseThrow()
+                    .join();
+            CursorStateRecord tombstone = tombstone(active.value());
+            List<CompletableFuture<VersionedCursorState>> deletes = IntStream.range(0, 32)
+                    .mapToObj(ignored -> store.compareAndSetCursor(
+                            CLUSTER, tombstone, active.metadataVersion()))
+                    .toList();
+            awaitAll(deletes);
+            assertThat(deletes.stream().filter(future -> !future.isCompletedExceptionally()))
+                    .hasSize(1);
+            deletes.stream()
+                    .filter(CompletableFuture::isCompletedExceptionally)
+                    .forEach(future -> assertConditionFailure(future::join));
+            assertThat(store.getCursor(CLUSTER, streamId(), "contended").join().orElseThrow().value())
+                    .isEqualTo(tombstone);
+        }
+    }
+
+    @Test
+    void pageContinuationCoversEmptySingleTwoHundredFiftyFiveAndMaximumPages() {
+        CursorMetadataStoreConfig config = config(256);
+        try (FakeCursorMetadataStore store = new FakeCursorMetadataStore(
+                new FakeCursorMetadataStore.DurableState(), config)) {
+            assertThat(store.scanCursors(CLUSTER, streamId(), Optional.empty(), 256).join())
+                    .isEqualTo(new CursorScanPage(List.of(), Optional.empty()));
+
+            IntStream.range(0, 256).forEach(index -> store.createCursor(
+                    CLUSTER, cursor("page-" + String.format("%03d", index), 1, 1)).join());
+
+            CursorScanPage first255 = store.scanCursors(
+                    CLUSTER, streamId(), Optional.empty(), 255).join();
+            assertThat(first255.records()).hasSize(255);
+            assertThat(first255.continuation()).isPresent();
+            CursorScanPage finalOne = store.scanCursors(
+                    CLUSTER, streamId(), first255.continuation(), 255).join();
+            assertThat(finalOne.records()).hasSize(1);
+            assertThat(finalOne.continuation()).isEmpty();
+
+            CursorScanPage maximum = store.scanCursors(
+                    CLUSTER, streamId(), Optional.empty(), 256).join();
+            assertThat(maximum.records()).hasSize(256);
+            assertThat(maximum.continuation()).isPresent();
+            CursorScanPage terminalEmpty = store.scanCursors(
+                    CLUSTER, streamId(), maximum.continuation(), 256).join();
+            assertThat(terminalEmpty.records()).isEmpty();
+            assertThat(terminalEmpty.continuation()).isEmpty();
+
+            assertThat(store.scanCursors(CLUSTER, streamId(), Optional.empty(), 1).join())
+                    .satisfies(page -> {
+                        assertThat(page.records()).hasSize(1);
+                        assertThat(page.continuation()).isPresent();
+                    });
+        }
+    }
+
+    @Test
     void injectedKeyRecordIdentityMismatchFailsClosed() {
         FakeCursorMetadataStore.DurableState state = new FakeCursorMetadataStore.DurableState();
         CursorStateRecord other = cursor("other", 1, 1);
@@ -188,6 +262,36 @@ class CursorMetadataStoreContractTest {
                 OptionalLong.empty(),
                 Optional.empty(),
                 100 + sequence);
+    }
+
+    private static CursorStateRecord tombstone(CursorStateRecord active) {
+        return new CursorStateRecord(
+                0,
+                active.projection(),
+                active.ownerSessionId(),
+                active.cursorName(),
+                active.cursorNameHash(),
+                active.cursorGeneration(),
+                CursorRecordLifecycle.DELETED,
+                active.mutationSequence() + 1,
+                active.ackStateEpoch(),
+                active.lastProtectionAttemptId(),
+                active.markDeleteOffset(),
+                Optional.empty(),
+                List.of(),
+                List.of(),
+                Map.of(),
+                Map.of(),
+                active.createdAtMillis(),
+                active.updatedAtMillis() + 1,
+                OptionalLong.of(active.updatedAtMillis() + 1));
+    }
+
+    private static void awaitAll(List<? extends CompletableFuture<?>> futures) {
+        CompletableFuture.allOf(futures.stream()
+                .map(future -> future.handle((value, error) -> null))
+                .toArray(CompletableFuture[]::new))
+                .join();
     }
 
     private static void assertConditionFailure(Runnable operation) {

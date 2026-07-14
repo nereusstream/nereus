@@ -18,6 +18,8 @@ class S3ObjectErrorMapperTest {
                 ErrorCode.OBJECT_NOT_FOUND, true);
         assertMapped(S3ObjectErrorMapper.put(service(412), "bucket", KEY),
                 ErrorCode.OBJECT_UPLOAD_FAILED, false);
+        assertThat(S3ObjectErrorMapper.put(service(412), "bucket", KEY))
+                .isInstanceOf(ObjectAlreadyExistsException.class);
         assertMapped(S3ObjectErrorMapper.put(service(409), "bucket", KEY),
                 ErrorCode.OBJECT_UPLOAD_FAILED, true);
         assertMapped(S3ObjectErrorMapper.read(service(403), "bucket", KEY),

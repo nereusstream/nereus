@@ -100,15 +100,15 @@ final class CursorMetadataStoreCore implements CursorMetadataStore {
         if (pageSize <= 0 || pageSize > config.maxScanPageSize()) {
             throw new IllegalArgumentException("cursor pageSize is outside the configured bound");
         }
-        String prefix = keyspace.cursorStateScanFrom(exactStream);
+        String prefix = keyspace.cursorStateScopePrefix(exactStream);
         String from = token.map(value -> {
             if (!value.matches(new OxiaKeyspace(cluster).cluster(), exactStream, prefix)) {
                 throw new IllegalArgumentException("cursor scan continuation belongs to another scope");
             }
             return value.exclusiveLastKey() + '\0';
-        }).orElse(prefix);
+        }).orElseGet(() -> keyspace.cursorStateScanFrom(exactStream));
         String to = keyspace.cursorStateScanToExclusive(exactStream);
-        if (from.compareTo(prefix) < 0 || from.compareTo(to) >= 0) {
+        if (!from.startsWith(prefix)) {
             throw new IllegalArgumentException("cursor scan continuation is outside the cursor-state prefix");
         }
         return submit(deadline -> {

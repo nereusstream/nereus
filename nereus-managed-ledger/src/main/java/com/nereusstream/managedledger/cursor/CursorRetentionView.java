@@ -2,7 +2,6 @@
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.metadata.oxia.CursorIds;
-import com.nereusstream.metadata.oxia.CursorNames;
 import java.util.Objects;
 import java.util.Optional;
 

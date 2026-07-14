@@ -9,6 +9,7 @@ import com.nereusstream.metadata.oxia.CursorIds;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
 import com.nereusstream.objectstore.HeadObjectOptions;
 import com.nereusstream.objectstore.HeadObjectResult;
+import com.nereusstream.objectstore.ObjectAlreadyExistsException;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.PutObjectResult;
@@ -268,9 +269,7 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
     }
 
     private static boolean isIfAbsentCollision(Throwable error) {
-        return error instanceof NereusException nereus
-                && nereus.code() == ErrorCode.OBJECT_UPLOAD_FAILED
-                && !nereus.retriable();
+        return error instanceof ObjectAlreadyExistsException;
     }
 
     private static Throwable unwrap(Throwable error) {

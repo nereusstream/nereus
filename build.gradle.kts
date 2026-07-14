@@ -293,3 +293,23 @@ tasks.register("phase2FinalCheck") {
     dependsOn(":nereus-object-store:s3IntegrationTest")
     dependsOn("phase2PulsarFinalCheck")
 }
+
+tasks.register("phase3M1Check") {
+    group = "verification"
+    description = "Verify the F3-M1 cursor metadata, activation marker, ack domain, and snapshot foundation."
+    dependsOn("phase2M2Check")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn(":nereus-metadata-oxia:test")
+    dependsOn(":nereus-metadata-oxia:compileOxiaIntegrationTestJava")
+    dependsOn(":nereus-managed-ledger:test")
+    dependsOn(":nereus-object-store:test")
+}
+
+tasks.register("phase3M1FinalCheck") {
+    group = "verification"
+    description = "Run ordinary and Docker-backed real Oxia/ObjectStore F3-M1 foundation gates."
+    dependsOn("phase3M1Check")
+    dependsOn(":nereus-metadata-oxia:oxiaIntegrationTest")
+    dependsOn(":nereus-managed-ledger:cursorS3IntegrationTest")
+    dependsOn(":nereus-object-store:s3IntegrationTest")
+}

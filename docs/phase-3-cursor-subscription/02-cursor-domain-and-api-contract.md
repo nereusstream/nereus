@@ -72,10 +72,11 @@ Every state accepted by constructors/codecs/mutations satisfies：
 9. a whole range beginning at mark-delete is folded into mark-delete repeatedly；
 10. state beyond the current committed end is corruption, not a future-position reservation。
 
-## 2. Planned Package and File Boundary
+## 2. Package and File Boundary
 
-No class in this section exists yet. Names and ownership are locked for M1 unless compilation exposes a literal Java
-name collision；semantic ownership must not change。
+The M1 value/domain/snapshot subset in this section now exists and is final-gated。The M2 storage/state-machine and
+M3 facade types remain planned under the same boundary；a literal Java name collision may change spelling，but
+semantic ownership must not change。
 
 ```text
 nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/cursor/

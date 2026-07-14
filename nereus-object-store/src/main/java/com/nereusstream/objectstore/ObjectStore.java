@@ -19,6 +19,10 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
 public interface ObjectStore extends AutoCloseable {
+    /**
+     * Stores one object. When {@link PutObjectOptions#ifAbsent()} is true and the key already
+     * exists, the future fails with {@link ObjectAlreadyExistsException}.
+     */
     CompletableFuture<PutObjectResult> putObject(
             ObjectKey key,
             ByteBuffer payload,

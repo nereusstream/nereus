@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
@@ -12,6 +13,7 @@ import com.nereusstream.api.keys.KeyComponentCodec;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.HeadObjectOptions;
 import com.nereusstream.objectstore.HeadObjectResult;
+import com.nereusstream.objectstore.ObjectAlreadyExistsException;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.PutObjectResult;
@@ -94,12 +96,94 @@ class CursorSnapshotStoreTest {
         DefaultCursorSnapshotStore store = store(
                 objectStore, new ArrayDeque<>(java.util.List.of(CursorTestSamples.SNAPSHOT)));
         CursorSnapshotReference reference = store.write(CursorTestSamples.request()).join();
-        objectStore.returnWrongMetadata = true;
+        objectStore.headMutation = HeadMutation.WRONG_METADATA;
 
         assertThatThrownBy(() -> store.read(reference, CursorTestSamples.identity()).join())
                 .satisfies(error -> assertThat(rootCause(error))
                         .isInstanceOfSatisfying(NereusException.class, failure ->
                                 assertThat(failure.code()).isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH)));
+        assertThat(objectStore.readCalls).isZero();
+    }
+
+    @Test
+    void everyHeadIdentityMismatchFailsBeforeReadingObjectBytes() {
+        for (HeadMutation mutation : java.util.List.of(
+                HeadMutation.WRONG_KEY,
+                HeadMutation.WRONG_LENGTH,
+                HeadMutation.WRONG_CHECKSUM)) {
+            RecordingObjectStore objectStore = new RecordingObjectStore();
+            DefaultCursorSnapshotStore store = store(
+                    objectStore, new ArrayDeque<>(java.util.List.of(CursorTestSamples.SNAPSHOT)));
+            CursorSnapshotReference reference = store.write(CursorTestSamples.request()).join();
+            objectStore.headMutation = mutation;
+
+            assertThatThrownBy(() -> store.read(reference, CursorTestSamples.identity()).join())
+                    .satisfies(error -> assertThat(rootCause(error))
+                            .isInstanceOfSatisfying(NereusException.class, failure ->
+                                    assertThat(failure.code())
+                                            .isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH)));
+            assertThat(objectStore.readCalls).isZero();
+        }
+    }
+
+    @Test
+    void everyRangeResultMismatchFailsBeforeSnapshotDecode() {
+        for (ReadMutation mutation : ReadMutation.values()) {
+            if (mutation == ReadMutation.NONE) {
+                continue;
+            }
+            RecordingObjectStore objectStore = new RecordingObjectStore();
+            DefaultCursorSnapshotStore store = store(
+                    objectStore, new ArrayDeque<>(java.util.List.of(CursorTestSamples.SNAPSHOT)));
+            CursorSnapshotReference reference = store.write(CursorTestSamples.request()).join();
+            objectStore.readMutation = mutation;
+
+            assertThatThrownBy(() -> store.read(reference, CursorTestSamples.identity()).join())
+                    .satisfies(error -> assertThat(rootCause(error))
+                            .isInstanceOfSatisfying(NereusException.class, failure ->
+                                    assertThat(failure.code())
+                                            .isEqualTo(ErrorCode.OBJECT_CHECKSUM_MISMATCH)));
+            assertThat(objectStore.readCalls).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void nonCollisionPutResultMismatchIsNotRetriedAsFreshSnapshotId() {
+        RecordingObjectStore objectStore = new RecordingObjectStore();
+        objectStore.returnWrongPutLength = true;
+        DefaultCursorSnapshotStore store = store(objectStore, new ArrayDeque<>(java.util.List.of(
+                CursorTestSamples.SNAPSHOT, SECOND_SNAPSHOT)));
+
+        assertThatThrownBy(() -> store.write(CursorTestSamples.request()).join())
+                .satisfies(error -> assertThat(rootCause(error))
+                        .isInstanceOfSatisfying(NereusException.class, failure ->
+                                assertThat(failure.code()).isEqualTo(ErrorCode.OBJECT_UPLOAD_FAILED)));
+        assertThat(objectStore.putCalls).isEqualTo(1);
+    }
+
+    @Test
+    void mismatchedLogicalObjectKeyFailsBeforeIssuingObjectStoreIo() {
+        RecordingObjectStore objectStore = new RecordingObjectStore();
+        DefaultCursorSnapshotStore store = store(
+                objectStore, new ArrayDeque<>(java.util.List.of(CursorTestSamples.SNAPSHOT)));
+        CursorSnapshotReference reference = store.write(CursorTestSamples.request()).join();
+        int headsAfterWrite = objectStore.headCalls;
+        CursorSnapshotReference wrongKey = new CursorSnapshotReference(
+                new ObjectKey("wrong/key"),
+                reference.snapshotId(),
+                reference.cursorGeneration(),
+                reference.sourceMutationSequence(),
+                reference.baseMarkDeleteOffset(),
+                reference.objectLength(),
+                reference.storageChecksum(),
+                reference.formatCrc32c(),
+                reference.formatVersion(),
+                reference.createdAtMillis());
+
+        assertThatThrownBy(() -> store.read(wrongKey, CursorTestSamples.identity()).join())
+                .satisfies(error -> assertThat(rootCause(error))
+                        .isInstanceOf(CursorSnapshotCodecV1.CursorSnapshotCorruptionException.class));
+        assertThat(objectStore.headCalls).isEqualTo(headsAfterWrite);
         assertThat(objectStore.readCalls).isZero();
     }
 
@@ -143,7 +227,9 @@ class CursorSnapshotStoreTest {
         private int putCalls;
         private int headCalls;
         private int readCalls;
-        private boolean returnWrongMetadata;
+        private boolean returnWrongPutLength;
+        private HeadMutation headMutation = HeadMutation.NONE;
+        private ReadMutation readMutation = ReadMutation.NONE;
         private boolean closed;
 
         @Override
@@ -158,12 +244,16 @@ class CursorSnapshotStoreTest {
                         ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "checksum mismatch"));
             }
             if (options.ifAbsent() && objects.containsKey(key)) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.OBJECT_UPLOAD_FAILED, false, "object already exists"));
+                return CompletableFuture.failedFuture(
+                        new ObjectAlreadyExistsException("object already exists"));
             }
             objects.put(key, new StoredObject(bytes, checksum, options.metadata()));
             return CompletableFuture.completedFuture(
-                    new PutObjectResult(key, bytes.length, checksum, checksum.value()));
+                    new PutObjectResult(
+                            key,
+                            returnWrongPutLength ? bytes.length + 1L : bytes.length,
+                            checksum,
+                            checksum.value()));
         }
 
         @Override
@@ -174,13 +264,37 @@ class CursorSnapshotStoreTest {
             byte[] range = Arrays.copyOfRange(
                     stored.bytes(), Math.toIntExact(offset), Math.toIntExact(offset + length));
             Checksum checksum = Crc32cChecksums.checksum(range);
-            if (options.expectedChecksum().isPresent()
+            if (readMutation == ReadMutation.NONE
+                    && options.expectedChecksum().isPresent()
                     && !options.expectedChecksum().orElseThrow().equals(checksum)) {
                 return CompletableFuture.failedFuture(new NereusException(
                         ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "range checksum mismatch"));
             }
+            ObjectKey resultKey = readMutation == ReadMutation.WRONG_KEY
+                    ? new ObjectKey("wrong/range-key")
+                    : key;
+            long resultOffset = readMutation == ReadMutation.WRONG_OFFSET ? offset + 1 : offset;
+            long resultLength = switch (readMutation) {
+                case SHORT_LENGTH -> length - 1;
+                case LONG_LENGTH -> length + 1;
+                default -> length;
+            };
+            byte[] resultBytes = switch (readMutation) {
+                case SHORT_LENGTH -> Arrays.copyOf(range, range.length - 1);
+                case LONG_LENGTH -> Arrays.copyOf(range, range.length + 1);
+                default -> range;
+            };
+            Optional<Checksum> resultChecksum = switch (readMutation) {
+                case MISSING_CHECKSUM -> Optional.empty();
+                case WRONG_CHECKSUM -> Optional.of(differentChecksum(checksum));
+                default -> Optional.of(checksum);
+            };
             return CompletableFuture.completedFuture(new RangeReadResult(
-                    key, offset, length, ByteBuffer.wrap(range), Optional.of(checksum)));
+                    resultKey,
+                    resultOffset,
+                    resultLength,
+                    ByteBuffer.wrap(resultBytes),
+                    resultChecksum));
         }
 
         @Override
@@ -188,11 +302,20 @@ class CursorSnapshotStoreTest {
                 ObjectKey key, HeadObjectOptions options) {
             headCalls++;
             StoredObject stored = require(key);
-            Map<String, String> metadata = returnWrongMetadata
+            Map<String, String> metadata = headMutation == HeadMutation.WRONG_METADATA
                     ? Map.of("nereus-format", "wrong")
                     : stored.metadata();
+            ObjectKey resultKey = headMutation == HeadMutation.WRONG_KEY
+                    ? new ObjectKey("wrong/head-key")
+                    : key;
+            long resultLength = headMutation == HeadMutation.WRONG_LENGTH
+                    ? stored.bytes().length + 1L
+                    : stored.bytes().length;
+            Checksum resultChecksum = headMutation == HeadMutation.WRONG_CHECKSUM
+                    ? differentChecksum(stored.checksum())
+                    : stored.checksum();
             return CompletableFuture.completedFuture(new HeadObjectResult(
-                    key, stored.bytes().length, stored.checksum(), metadata));
+                    resultKey, resultLength, resultChecksum, metadata));
         }
 
         @Override
@@ -214,6 +337,30 @@ class CursorSnapshotStoreTest {
             copy.get(bytes);
             return bytes;
         }
+
+        private static Checksum differentChecksum(Checksum checksum) {
+            return new Checksum(
+                    ChecksumType.CRC32C,
+                    checksum.value().equals("00000000") ? "ffffffff" : "00000000");
+        }
+    }
+
+    private enum HeadMutation {
+        NONE,
+        WRONG_KEY,
+        WRONG_LENGTH,
+        WRONG_CHECKSUM,
+        WRONG_METADATA
+    }
+
+    private enum ReadMutation {
+        NONE,
+        WRONG_KEY,
+        WRONG_OFFSET,
+        SHORT_LENGTH,
+        LONG_LENGTH,
+        MISSING_CHECKSUM,
+        WRONG_CHECKSUM
     }
 
     private record StoredObject(byte[] bytes, Checksum checksum, Map<String, String> metadata) {
