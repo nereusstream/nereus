@@ -6,6 +6,7 @@ import com.nereusstream.managedledger.cursor.CursorLedgerIdentity;
 import com.nereusstream.managedledger.cursor.CursorOwnerSession;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
+import com.nereusstream.managedledger.cursor.CursorStorage;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.cursor.TestCursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.TestCursorStorage;
@@ -36,6 +37,13 @@ final class ManagedLedgerRuntimeTestSupport {
     static NereusManagedLedgerRuntime runtime(
             StreamStorage streamStorage,
             ManagedLedgerProjectionMetadataStore projectionStore) {
+        return runtime(streamStorage, projectionStore, new TestCursorStorage());
+    }
+
+    static NereusManagedLedgerRuntime runtime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            CursorStorage cursorStorage) {
         try {
             ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
             ExecutorService callbacks = Executors.newSingleThreadExecutor();
@@ -48,7 +56,7 @@ final class ManagedLedgerRuntimeTestSupport {
                     proxy(CursorMetadataStore.class),
                     proxy(CursorSnapshotStore.class),
                     new TestCursorRetentionCoordinator(),
-                    new TestCursorStorage(),
+                    cursorStorage,
                     cursorConfig,
                     activationGuard,
                     proxy(OxiaMetadataStore.class),

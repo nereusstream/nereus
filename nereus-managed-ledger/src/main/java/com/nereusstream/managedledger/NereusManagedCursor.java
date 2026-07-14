@@ -76,7 +76,10 @@ public final class NereusManagedCursor implements ManagedCursor {
         CursorMutationResult apply(CursorState state) throws Exception;
     }
 
-    private record PropertyCapture(long revision, Map<String, Long> values) {
+    private record PropertyCapture(
+            long revision,
+            Map<String, Long> values,
+            Map<String, Long> baseline) {
     }
 
     private record PreparedAck(CursorAckRequest request, StreamMetadata metadata) {
@@ -178,6 +181,10 @@ public final class NereusManagedCursor implements ManagedCursor {
 
     long localReadOffset() {
         return localReadOffset.get();
+    }
+
+    boolean isOpenForRegistry() {
+        return lifecycle.get() == LocalLifecycle.OPEN;
     }
 
     void closeDetached() {
@@ -505,7 +512,13 @@ public final class NereusManagedCursor implements ManagedCursor {
 
     @Override
     public void delete(Position position) throws InterruptedException, ManagedLedgerException {
-        await(individualAckFuture(List.of(copyPosition(position))));
+        final Position copied;
+        try {
+            copied = copyPosition(position);
+        } catch (Throwable error) {
+            throw map(error, "individualAck");
+        }
+        await(individualAckFuture(List.of(copied)));
     }
 
     @Override
@@ -513,13 +526,27 @@ public final class NereusManagedCursor implements ManagedCursor {
             Position position,
             AsyncCallbacks.DeleteCallback callback,
             Object ctx) {
-        asyncDelete(List.of(copyPosition(position)), callback, ctx);
+        Objects.requireNonNull(callback, "callback");
+        final Position copied;
+        try {
+            copied = copyPosition(position);
+        } catch (Throwable error) {
+            executeCallback(() -> callback.deleteFailed(map(error, "individualAck"), ctx));
+            return;
+        }
+        asyncDelete(List.of(copied), callback, ctx);
     }
 
     @Override
     public void delete(Iterable<Position> positions)
             throws InterruptedException, ManagedLedgerException {
-        await(individualAckFuture(copyPositions(positions)));
+        final List<Position> copied;
+        try {
+            copied = copyPositions(positions);
+        } catch (Throwable error) {
+            throw map(error, "individualAck");
+        }
+        await(individualAckFuture(copied));
     }
 
     @Override
@@ -562,7 +589,9 @@ public final class NereusManagedCursor implements ManagedCursor {
 
     @Override
     public void rewind() {
-        moveReadOffset(firstUnackedOffset(state().acknowledgements()));
+        moveReadOffset(Math.max(
+                firstUnackedOffset(state().acknowledgements()),
+                ledger.currentMetadata().trimOffset()));
     }
 
     @Override
@@ -728,12 +757,13 @@ public final class NereusManagedCursor implements ManagedCursor {
             executeCallback(() -> callback.resetFailed(map(error, "resetCursor"), position));
             return;
         }
-        resetFuture(copied, force).whenComplete((canonicalPosition, error) ->
+        AtomicReference<Position> callbackPosition = new AtomicReference<>(copied);
+        resetFuture(copied, force, callbackPosition).whenComplete((canonicalPosition, error) ->
                 executeCallback(() -> {
                     if (error == null) {
                         callback.resetComplete(canonicalPosition);
                     } else {
-                        callback.resetFailed(map(error, "resetCursor"), canonicalPosition);
+                        callback.resetFailed(map(error, "resetCursor"), callbackPosition.get());
                     }
                 }));
     }
@@ -805,13 +835,13 @@ public final class NereusManagedCursor implements ManagedCursor {
 
     @Override
     public void close() throws ManagedLedgerException {
-        awaitUnchecked(closeFuture());
+        awaitUnchecked(closeAsyncFuture());
     }
 
     @Override
     public void asyncClose(AsyncCallbacks.CloseCallback callback, Object ctx) {
         Objects.requireNonNull(callback, "callback");
-        closeFuture().whenComplete((ignored, error) ->
+        closeAsyncFuture().whenComplete((ignored, error) ->
                 executeCallback(() -> {
                     if (error == null) {
                         callback.closeComplete(ctx);
@@ -1010,7 +1040,9 @@ public final class NereusManagedCursor implements ManagedCursor {
         return ledger.createLocalCursor(
                 duplicateName,
                 current.acknowledgements(),
-                firstUnackedOffset(current.acknowledgements()),
+                Math.max(
+                        current.acknowledgements().markDeleteOffset(),
+                        ledger.currentMetadata().trimOffset()),
                 getProperties(),
                 current.cursorProperties());
     }
@@ -1072,10 +1104,9 @@ public final class NereusManagedCursor implements ManagedCursor {
                     new IllegalArgumentException("individual ack positions cannot be empty"),
                     "individualAck");
         }
-        return prepareAcks(copied, 0, new ArrayList<>(), null)
-                .thenCompose(prepared -> individualAck(
-                        prepared,
-                        ledger.currentMetadata()))
+        return ledger.refreshMetadata().thenCompose(metadata ->
+                prepareAcks(copied, 0, new ArrayList<>(), metadata)
+                        .thenCompose(prepared -> individualAck(prepared, metadata)))
                 .thenApply(ignored -> null);
     }
 
@@ -1087,14 +1118,20 @@ public final class NereusManagedCursor implements ManagedCursor {
         } catch (Throwable error) {
             return mappedFailure(error, "clearBacklog");
         }
-        long committedEnd = ledger.currentMetadata().committedEndOffset();
-        CompletableFuture<CursorMutationResult> mutation = mode == Mode.DURABLE
-                ? ledger.runtime().cursorStorage().clearBacklog(durableHandle, committedEnd)
-                : submitLocalMutation(state -> stateMachine.clearBacklog(
-                        state, committedEnd, nonNegativeNow()), false);
-        return mutation.thenAccept(result -> {
-            completePropertyCapture(capture, result.state());
-            moveReadOffset(firstUnackedOffset(result.state().acknowledgements()));
+        return enqueueRead(() -> {
+            long committedEnd = ledger.currentMetadata().committedEndOffset();
+            cancelPendingRead(new ManagedLedgerException(
+                    "clear backlog invalidated a pending cursor read"));
+            CompletableFuture<CursorMutationResult> mutation = mode == Mode.DURABLE
+                    ? ledger.runtime().cursorStorage().clearBacklog(durableHandle, committedEnd)
+                    : submitLocalMutation(state -> stateMachine.clearBacklog(
+                            state, committedEnd, nonNegativeNow()), false);
+            return mutation.thenAccept(result -> {
+                completePropertyCapture(capture, result.state());
+                moveReadOffset(Math.max(
+                        firstUnackedOffset(result.state().acknowledgements()),
+                        ledger.currentMetadata().trimOffset()));
+            });
         });
     }
 
@@ -1114,7 +1151,7 @@ public final class NereusManagedCursor implements ManagedCursor {
         CursorAckState ack = state().acknowledgements();
         OptionalLong target = nthEligibleOffset(
                 ack,
-                ack.markDeleteOffset(),
+                Math.max(ack.markDeleteOffset(), metadata.trimOffset()),
                 metadata.committedEndOffset(),
                 count,
                 deletedEntries == IndividualDeletedEntries.Exclude);
@@ -1127,6 +1164,13 @@ public final class NereusManagedCursor implements ManagedCursor {
     }
 
     private CompletableFuture<Position> resetFuture(Position position, boolean force) {
+        return resetFuture(position, force, null);
+    }
+
+    private CompletableFuture<Position> resetFuture(
+            Position position,
+            boolean force,
+            AtomicReference<Position> callbackPosition) {
         final Position copied;
         final PropertyCapture capture;
         try {
@@ -1135,7 +1179,9 @@ public final class NereusManagedCursor implements ManagedCursor {
         } catch (Throwable error) {
             return mappedFailure(error, "resetCursor");
         }
-        return ledger.refreshMetadata().thenCompose(metadata -> {
+        return enqueueRead(() -> ledger.refreshMetadata().thenCompose(metadata -> {
+            cancelPendingRead(new ManagedLedgerException(
+                    "cursor reset invalidated a pending cursor read"));
             final long target;
             try {
                 target = ledger.normalizeCursorResetReadOffset(copied, force, metadata);
@@ -1163,13 +1209,18 @@ public final class NereusManagedCursor implements ManagedCursor {
                         : submitLocalMutation(state -> stateMachine.reset(
                                 state, request, randomId(), nonNegativeNow()), false);
                 Position canonical = ledger.readPosition(target, metadata);
+                if (callbackPosition != null) {
+                    callbackPosition.set(canonical);
+                }
                 return mutation.thenApply(result -> {
                     completePropertyCapture(capture, result.state());
-                    moveReadOffset(firstUnackedOffset(result.state().acknowledgements()));
+                    moveReadOffset(Math.max(
+                            firstUnackedOffset(result.state().acknowledgements()),
+                            metadata.trimOffset()));
                     return canonical;
                 });
             });
-        });
+        }));
     }
 
     private CompletableFuture<CursorMutationResult> cumulativeAck(
@@ -1202,7 +1253,11 @@ public final class NereusManagedCursor implements ManagedCursor {
 
     private CompletableFuture<CursorMutationResult> mutateCursorProperties(
             CursorPropertyMutation mutation) {
-        requireOpen();
+        try {
+            requireOpen();
+        } catch (Throwable error) {
+            return mappedFailure(error, "cursorProperties");
+        }
         return mode == Mode.DURABLE
                 ? ledger.runtime().cursorStorage().mutateCursorProperties(durableHandle, mutation)
                 : submitLocalMutation(state -> stateMachine.mutateCursorProperties(
@@ -1212,43 +1267,40 @@ public final class NereusManagedCursor implements ManagedCursor {
     private CompletableFuture<PreparedAck> prepareAck(
             Position position,
             Map<String, Long> properties) {
-        return ledger.refreshMetadata().thenCompose(metadata -> {
-            final long offset;
-            try {
-                offset = ledger.requireCursorEntryOffset(position, metadata);
-            } catch (Throwable error) {
-                return CompletableFuture.failedFuture(invalidPosition(error));
-            }
-            long[] words = AckSetStateUtil.getAckSetArrayOrNull(position);
-            if (words == null) {
-                return CompletableFuture.completedFuture(new PreparedAck(
-                        new CursorAckRequest(offset, Optional.empty(), properties), metadata));
-            }
-            return batchState(offset, words, metadata).thenApply(batch -> new PreparedAck(
-                    new CursorAckRequest(offset, Optional.of(batch), properties), metadata));
-        });
+        return ledger.refreshMetadata().thenCompose(metadata ->
+                prepareAck(position, properties, metadata));
+    }
+
+    private CompletableFuture<PreparedAck> prepareAck(
+            Position position,
+            Map<String, Long> properties,
+            StreamMetadata metadata) {
+        final long offset;
+        try {
+            offset = ledger.requireCursorEntryOffset(position, metadata);
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(invalidPosition(error));
+        }
+        long[] words = AckSetStateUtil.getAckSetArrayOrNull(position);
+        if (words == null) {
+            return CompletableFuture.completedFuture(new PreparedAck(
+                    new CursorAckRequest(offset, Optional.empty(), properties), metadata));
+        }
+        return batchState(offset, words, metadata).thenApply(batch -> new PreparedAck(
+                new CursorAckRequest(offset, Optional.of(batch), properties), metadata));
     }
 
     private CompletableFuture<List<CursorAckRequest>> prepareAcks(
             List<Position> positions,
             int index,
             List<CursorAckRequest> requests,
-            StreamMetadata capturedMetadata) {
+            StreamMetadata metadata) {
         if (index >= positions.size()) {
             return CompletableFuture.completedFuture(List.copyOf(requests));
         }
-        return prepareAck(positions.get(index), Map.of()).thenCompose(prepared -> {
-            if (capturedMetadata != null
-                    && !capturedMetadata.streamId().equals(prepared.metadata().streamId())) {
-                return CompletableFuture.failedFuture(new ManagedLedgerException(
-                        "individual ack metadata snapshot changed stream identity"));
-            }
+        return prepareAck(positions.get(index), Map.of(), metadata).thenCompose(prepared -> {
             requests.add(prepared.request());
-            return prepareAcks(
-                    positions,
-                    index + 1,
-                    requests,
-                    capturedMetadata == null ? prepared.metadata() : capturedMetadata);
+            return prepareAcks(positions, index + 1, requests, metadata);
         });
     }
 
@@ -1507,7 +1559,7 @@ public final class NereusManagedCursor implements ManagedCursor {
             CursorAckState ack = state().acknowledgements();
             OptionalLong offset = nthEligibleOffset(
                     ack,
-                    ack.markDeleteOffset(),
+                    Math.max(ack.markDeleteOffset(), metadata.trimOffset()),
                     metadata.committedEndOffset(),
                     n,
                     deletedEntries == IndividualDeletedEntries.Exclude);
@@ -1526,7 +1578,9 @@ public final class NereusManagedCursor implements ManagedCursor {
         Objects.requireNonNull(condition, "condition");
         return ledger.refreshMetadata().thenCompose(metadata -> {
             long lower = constraint == FindPositionConstraint.SearchActiveEntries
-                    ? firstUnackedOffset(state().acknowledgements())
+                    ? Math.max(
+                            firstUnackedOffset(state().acknowledgements()),
+                            metadata.trimOffset())
                     : metadata.trimOffset();
             long upper = metadata.committedEndOffset() - 1;
             try {
@@ -1661,7 +1715,7 @@ public final class NereusManagedCursor implements ManagedCursor {
                 });
     }
 
-    private CompletableFuture<Void> closeFuture() {
+    CompletableFuture<Void> closeAsyncFuture() {
         synchronized (closeLock) {
             if (closeFuture != null) {
                 return closeFuture;
@@ -1783,31 +1837,57 @@ public final class NereusManagedCursor implements ManagedCursor {
                     : explicitProperties == null
                             ? visible
                             : immutableLongMap(explicitProperties);
-            if (clear || explicitProperties != null) {
+            Map<String, Long> baseline = visible;
+            if (!clear && explicitProperties != null) {
                 if (!candidate.equals(visible)) {
                     positionPropertyStageRevision = Math.addExact(
                             positionPropertyStageRevision, 1);
                 }
                 stagedPositionProperties = candidate;
+                baseline = candidate;
             }
-            return new PropertyCapture(positionPropertyStageRevision, Map.copyOf(candidate));
+            return new PropertyCapture(
+                    positionPropertyStageRevision,
+                    Map.copyOf(candidate),
+                    Map.copyOf(baseline));
         }
     }
 
     private PropertyCapture captureVisibleProperties() {
         synchronized (propertyStageLock) {
+            Map<String, Long> visible = Map.copyOf(visiblePositionPropertiesLocked());
             return new PropertyCapture(
                     positionPropertyStageRevision,
-                    Map.copyOf(visiblePositionPropertiesLocked()));
+                    visible,
+                    visible);
         }
     }
 
     private void completePropertyCapture(PropertyCapture capture, CursorState persisted) {
         synchronized (propertyStageLock) {
-            if (positionPropertyStageRevision == capture.revision()
-                    && persisted.positionProperties().equals(capture.values())) {
-                stagedPositionProperties = null;
+            Map<String, Long> authoritative = persisted.positionProperties();
+            if (positionPropertyStageRevision == capture.revision()) {
+                if (authoritative.equals(capture.values())) {
+                    stagedPositionProperties = null;
+                }
+                return;
             }
+            Map<String, Long> visible = stagedPositionProperties == null
+                    ? authoritative
+                    : stagedPositionProperties;
+            LinkedHashMap<String, Long> rebased = new LinkedHashMap<>(authoritative);
+            capture.baseline().keySet().stream()
+                    .filter(key -> !visible.containsKey(key))
+                    .forEach(rebased::remove);
+            visible.forEach((key, value) -> {
+                if (!capture.baseline().containsKey(key)
+                        || !Objects.equals(capture.baseline().get(key), value)) {
+                    rebased.put(key, value);
+                }
+            });
+            stagedPositionProperties = rebased.equals(authoritative)
+                    ? null
+                    : Collections.unmodifiableMap(rebased);
         }
     }
 

@@ -15,9 +15,12 @@ validation before constructing the ledger；hydrated durable cursors are registe
 exact-name durable opens call `CursorStorage.open` through one local flight。The first dual-mode `ManagedCursor`
 checkpoint now routes durable ack/reset/property mutations to M2，uses the same state machine locally for non-durable
 cursors，keeps dispatch position broker-local，and implements retained reads、wait/replay/scan plus property staging and
-terminal close behavior；the existing managed-ledger module's 132 tests pass。Durable tombstone delete and fully async
-ledger-close drain still need to be closed out，and the focused batch/concurrency/callback/classification suites plus
-`phase3M3Check` are not complete。F3-M4-M6 and the F3 Pulsar fork integration have not started。
+terminal close behavior。Exact-name durable open/delete operations are locally single-flight；durable delete persists
+the M2 tombstone and recreate generation，while non-durable delete remains local-only。Reset/clear are ordered on the
+local read lane，property staging rebases concurrent deltas after destructive persistence，and cursor/ledger close uses
+one shared fully asynchronous drain。The locked ManagedCursor public surface now has an exhaustive classification
+test。The focused batch/concurrency/callback/failure suites and `phase3M3Check` are not complete。F3-M4-M6 and the F3
+Pulsar fork integration have not started。
 
 A later milestone is complete only when：
 
@@ -451,10 +454,11 @@ PersistentTopic can enumerate hydrated cursors without broker changes yet.
 No deployable artifact combines the marker-aware decoder with the old F2 empty-cursor writable open.
 ```
 
-Implementation status：the runtime/writable-open/hydration foundation and the first dual-mode cursor facade checkpoint
-above are present；`:nereus-managed-ledger:test` passes 132 tests。Durable tombstone delete、fully async close drain、
-the dedicated conformance/failure suites and the full exit conditions are not yet complete。Planned gate：
-`phase3M3Check` including the locked Pulsar composite API compile。
+Implementation status：the runtime/writable-open/hydration foundation and dual-mode cursor facade above are present。
+The lifecycle checkpoint now includes exact-name open/delete ordering、durable tombstone delete/recreate generation、
+non-durable local cleanup、reset/clear read-lane ordering、property-stage rebase、fully async close drain and exhaustive
+locked API surface classification。The dedicated batch/concurrency/callback/failure suites and the full exit conditions
+are not yet complete。Planned gate：`phase3M3Check` including the locked Pulsar composite API compile。
 
 ## 7. F3-M4 — Pulsar Broker Integration
 

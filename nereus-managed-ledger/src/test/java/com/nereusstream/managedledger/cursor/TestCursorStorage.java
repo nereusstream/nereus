@@ -9,11 +9,18 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Lightweight owner-aware cursor storage used by managed-ledger facade unit tests. */
 public final class TestCursorStorage implements CursorStorage {
     private final Map<CursorKey, CursorHandle> handles = new ConcurrentHashMap<>();
+    private final Map<CursorKey, CursorState> tombstones = new ConcurrentHashMap<>();
     private final AtomicLong ids = new AtomicLong();
+    private final AtomicLong deleteInvocations = new AtomicLong();
+    private final AtomicReference<CompletableFuture<Void>> nextResetCompletionGate =
+            new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<Void>> nextFlushCompletionGate =
+            new AtomicReference<>();
     private final CursorStateMachine stateMachine =
             new CursorStateMachine(CursorStorageConfig.defaults());
     private volatile boolean closed;
@@ -31,24 +38,23 @@ public final class TestCursorStorage implements CursorStorage {
             CursorKey key = new CursorKey(owner.ledger(), exactName);
             CursorHandle handle = handles.compute(key, (ignored, current) -> {
                 if (current == null) {
-                    return newHandle(new CursorState(
-                            new CursorIdentity(
-                                    owner.ledger(),
-                                    exactName,
-                                    CursorNames.cursorNameHash(exactName),
-                                    1),
-                            owner.ownerSessionId(),
-                            CursorLifecycle.ACTIVE,
-                            1,
-                            1,
+                    CursorState tombstone = tombstones.remove(key);
+                    long generation = tombstone == null
+                            ? 1
+                            : Math.addExact(tombstone.identity().cursorGeneration(), 1);
+                    long sequence = tombstone == null
+                            ? 1
+                            : Math.addExact(tombstone.mutationSequence(), 1);
+                    return newHandle(stateMachine.create(
+                            owner,
+                            exactName,
+                            generation,
+                            sequence,
                             nextId(),
-                            CursorAckState.empty(request.initialMarkDeleteOffset()),
+                            request.initialMarkDeleteOffset(),
                             request.initialPositionProperties(),
                             request.initialCursorProperties(),
-                            Optional.empty(),
-                            0,
-                            0,
-                            0), owner);
+                            tombstone == null ? 0 : nextNow(tombstone)), owner);
                 }
                 return claim(current, owner);
             });
@@ -111,8 +117,12 @@ public final class TestCursorStorage implements CursorStorage {
     public CompletableFuture<CursorMutationResult> reset(
             CursorHandle handle,
             CursorResetRequest request) {
-        return mutate(handle, state -> stateMachine.reset(
+        CompletableFuture<CursorMutationResult> mutation = mutate(handle, state -> stateMachine.reset(
                 state, request, nextId(), nextNow(state)));
+        CompletableFuture<Void> gate = nextResetCompletionGate.getAndSet(null);
+        return gate == null
+                ? mutation
+                : mutation.thenCompose(result -> gate.thenApply(ignored -> result));
     }
 
     @Override
@@ -141,14 +151,37 @@ public final class TestCursorStorage implements CursorStorage {
         } catch (Throwable error) {
             return CompletableFuture.failedFuture(error);
         }
-        return mutate(handle, state -> stateMachine.flushPositionProperties(
+        CompletableFuture<CursorMutationResult> mutation = mutate(handle, state -> stateMachine.flushPositionProperties(
                 state, copied, nextNow(state)));
+        CompletableFuture<Void> gate = nextFlushCompletionGate.getAndSet(null);
+        return gate == null
+                ? mutation
+                : mutation.thenCompose(result -> gate.thenApply(ignored -> result));
     }
 
     @Override
     public CompletableFuture<Void> delete(CursorOwnerSession owner, String cursorName) {
-        handles.remove(new CursorKey(owner.ledger(), cursorName));
-        return CompletableFuture.completedFuture(null);
+        deleteInvocations.incrementAndGet();
+        try {
+            String exactName = CursorNames.requireCursorName(cursorName);
+            CursorKey key = new CursorKey(owner.ledger(), exactName);
+            CursorHandle handle = handles.remove(key);
+            if (handle == null) {
+                return CompletableFuture.completedFuture(null);
+            }
+            if (!handle.owner().equals(owner)) {
+                handles.putIfAbsent(key, handle);
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("test cursor owner changed"));
+            }
+            CursorMutationResult deleted = stateMachine.delete(
+                    handle.state(), nextNow(handle.state()));
+            tombstones.put(key, deleted.state());
+            handle.publish(deleted.state());
+            return handle.closeAsync();
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
     }
 
     @Override
@@ -170,6 +203,29 @@ public final class TestCursorStorage implements CursorStorage {
         closed = true;
         handles.values().forEach(CursorHandle::closeAsync);
         handles.clear();
+        tombstones.clear();
+    }
+
+    public long deleteInvocationCount() {
+        return deleteInvocations.get();
+    }
+
+    public void delayNextResetCompletionUntil(CompletableFuture<Void> gate) {
+        if (!nextResetCompletionGate.compareAndSet(null, gate)) {
+            throw new IllegalStateException("a reset completion gate is already installed");
+        }
+    }
+
+    public void delayNextFlushCompletionUntil(CompletableFuture<Void> gate) {
+        if (!nextFlushCompletionGate.compareAndSet(null, gate)) {
+            throw new IllegalStateException("a flush completion gate is already installed");
+        }
+    }
+
+    public Optional<CursorState> tombstone(
+            CursorOwnerSession owner,
+            String cursorName) {
+        return Optional.ofNullable(tombstones.get(new CursorKey(owner.ledger(), cursorName)));
     }
 
     private CursorHandle claim(CursorHandle current, CursorOwnerSession owner) {
