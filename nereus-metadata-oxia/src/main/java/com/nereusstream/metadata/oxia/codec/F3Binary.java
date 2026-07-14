@@ -68,7 +68,8 @@ final class F3Binary {
         void writeRaw(byte[] bytes) {
             out.writeBytes(Objects.requireNonNull(bytes, "bytes"));
             if (out.size() > MAX_PAYLOAD_BYTES) {
-                throw new MetadataCodecException("F3 metadata payload exceeds the fixed value bound");
+                throw new MetadataValueTooLargeException(
+                        "F3 metadata payload exceeds the fixed value bound");
             }
         }
     }
@@ -79,7 +80,8 @@ final class F3Binary {
         Reader(byte[] bytes) {
             Objects.requireNonNull(bytes, "bytes");
             if (bytes.length > MAX_PAYLOAD_BYTES) {
-                throw new MetadataCodecException("F3 metadata payload exceeds the fixed value bound");
+                throw new MetadataValueTooLargeException(
+                        "F3 metadata payload exceeds the fixed value bound");
             }
             buffer = ByteBuffer.wrap(bytes);
         }
