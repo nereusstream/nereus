@@ -16,6 +16,7 @@ import com.nereusstream.managedledger.cursor.CursorResetRequest;
 import com.nereusstream.managedledger.cursor.CursorState;
 import com.nereusstream.managedledger.cursor.CursorStateMachine;
 import com.nereusstream.managedledger.cursor.OffsetRange;
+import com.nereusstream.managedledger.callbacks.CallbackDispatcher;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.managedledger.errors.OperationContext;
 import com.nereusstream.managedledger.snapshot.PendingReadWaiter;
@@ -1980,7 +1981,7 @@ public final class NereusManagedCursor implements ManagedCursor {
     }
 
     private void executeCallback(Runnable callback) {
-        ledger.runtime().callbackExecutor().execute(callback);
+        CallbackDispatcher.execute(ledger.runtime().callbackExecutor(), callback);
     }
 
     private void requireOpen() {

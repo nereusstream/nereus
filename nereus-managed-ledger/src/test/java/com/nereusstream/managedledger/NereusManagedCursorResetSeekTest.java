@@ -130,6 +130,79 @@ class NereusManagedCursorResetSeekTest {
         }
     }
 
+    @Test
+    void ordinaryResetNormalizesTrimmedAndFutureTargetsWhileForceCannotResurrectBytes()
+            throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("reset-bounds"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        DefaultStreamStorage streamStorage = new DefaultStreamStorage(
+                StreamStorageConfig.defaults("cluster/a", "cursor-reset-bounds-test"),
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "cursor-reset-bounds-test", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
+                streamStorage, projections, new TestCursorStorage())) {
+            NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
+                    runtime,
+                    fixedGuard(1),
+                    config(),
+                    new ManagedLedgerFactoryConfig(),
+                    false);
+            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(
+                    NAME + "-bounds", config());
+            Position first = ledger.addEntry(new byte[] {0});
+            ledger.addEntry(new byte[] {1});
+            Position retained = ledger.addEntry(new byte[] {2});
+            ledger.addEntry(new byte[] {3});
+            ManagedCursor cursor = ledger.openCursor("bounded");
+
+            streamStorage.trim(
+                    ledger.projection().streamId(),
+                    2,
+                    new TrimOptions(Duration.ofSeconds(5), "reset bound normalization"))
+                    .join();
+            ledger.refreshMetadata().join();
+            long virtualLedger = ledger.projection().virtualLedgerId();
+
+            Position normalizedTrim = reset(
+                    cursor, PositionFactory.create(virtualLedger, 0), false).join();
+            assertThat(normalizedTrim).isEqualTo(retained);
+            List<Entry> fromTrim = read(cursor, 1, false).join();
+            assertThat(fromTrim).singleElement().satisfies(entry -> {
+                assertThat(entry.getPosition()).isEqualTo(retained);
+                entry.release();
+            });
+
+            Position normalizedTail = reset(
+                    cursor, PositionFactory.create(virtualLedger, 99), false).join();
+            assertThat(normalizedTail.getEntryId()).isEqualTo(4);
+            assertThat(cursor.getReadPosition()).isEqualTo(normalizedTail);
+
+            assertThatThrownBy(() -> reset(cursor, first, true).join())
+                    .isInstanceOf(CompletionException.class)
+                    .hasCauseInstanceOf(ManagedLedgerException.InvalidCursorPositionException.class);
+            assertThatThrownBy(() -> reset(
+                            cursor, PositionFactory.create(virtualLedger, 99), true).join())
+                    .isInstanceOf(CompletionException.class)
+                    .hasCauseInstanceOf(ManagedLedgerException.InvalidCursorPositionException.class);
+            assertThat(cursor.getReadPosition()).isEqualTo(normalizedTail);
+
+            assertThat(reset(cursor, retained, true).join()).isEqualTo(retained);
+            assertThat(cursor.isCursorDataFullyPersistable()).isTrue();
+
+            ledger.close();
+            factory.shutdown();
+        } finally {
+            metadata.close();
+            objectStore.close();
+        }
+    }
+
     private static CompletableFuture<List<Entry>> read(
             ManagedCursor cursor,
             int count,

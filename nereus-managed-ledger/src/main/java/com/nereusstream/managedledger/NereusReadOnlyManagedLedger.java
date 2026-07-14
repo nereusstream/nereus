@@ -5,6 +5,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.managedledger.entry.PulsarEntryCodec;
+import com.nereusstream.managedledger.callbacks.CallbackDispatcher;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.managedledger.errors.OperationContext;
 import com.nereusstream.managedledger.projection.F2L0RequestFactory;
@@ -63,14 +64,14 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger,
     public void asyncReadEntry(Position position, ReadEntryCallback callback, Object ctx) {
         Objects.requireNonNull(callback, "callback");
         if (!runtime.tryAcquireCallbackPermit()) {
-            runtime.callbackExecutor().execute(() -> callback.readEntryFailed(
+            CallbackDispatcher.execute(runtime.callbackExecutor(), () -> callback.readEntryFailed(
                     new ManagedLedgerException.TooManyRequestsException(
                             "Nereus callback capacity is exhausted"), ctx));
             return;
         }
         if (closed.get()) {
             runtime.releaseCallbackPermit();
-            runtime.callbackExecutor().execute(() -> callback.readEntryFailed(
+            CallbackDispatcher.execute(runtime.callbackExecutor(), () -> callback.readEntryFailed(
                     new ManagedLedgerException.ManagedLedgerAlreadyClosedException(
                             "read-only managed ledger is closed"), ctx));
             return;
@@ -87,17 +88,22 @@ public final class NereusReadOnlyManagedLedger implements ReadOnlyManagedLedger,
                                     runtime.config().maxEntryBytes(), runtime.config().readTimeout()));
                 })
                 .thenApply(result -> codec.decode(position, result))
-                .whenCompleteAsync((entry, error) -> {
-                    try {
-                        if (error == null) {
-                            callback.readEntryComplete(entry, ctx);
-                        } else {
-                            callback.readEntryFailed(map(error), ctx);
-                        }
-                    } finally {
-                        runtime.releaseCallbackPermit();
-                    }
-                }, runtime.callbackExecutor());
+                .whenComplete((entry, error) -> CallbackDispatcher.execute(
+                        runtime.callbackExecutor(), () -> {
+                            try {
+                                if (error == null) {
+                                    try {
+                                        callback.readEntryComplete(entry, ctx);
+                                    } catch (Throwable callbackError) {
+                                        entry.release();
+                                    }
+                                } else {
+                                    callback.readEntryFailed(map(error), ctx);
+                                }
+                            } finally {
+                                runtime.releaseCallbackPermit();
+                            }
+                        }));
     }
 
     @Override

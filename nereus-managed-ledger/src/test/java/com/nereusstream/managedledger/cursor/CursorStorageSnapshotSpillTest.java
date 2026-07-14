@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.StreamId;
+import com.nereusstream.metadata.oxia.CursorNames;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -147,6 +149,58 @@ class CursorStorageSnapshotSpillTest {
                                 .acknowledgements()
                                 .isWholeEntryAcknowledged(request.entryOffset()))
                         .isTrue());
+
+                var roots = context.metadataStore.scanCursors(
+                                CursorStorageTestSupport.CLUSTER,
+                                new StreamId(context.ledger.projection().streamId()),
+                                Optional.empty(),
+                                context.config.cursorScanPageSize())
+                        .join()
+                        .records();
+                var retention = context.metadataStore.getRetention(
+                                CursorStorageTestSupport.CLUSTER,
+                                new StreamId(context.ledger.projection().streamId()))
+                        .join()
+                        .orElseThrow();
+                CursorSnapshotInventory active = CursorSnapshotInventory.classify(
+                        CursorStorageTestSupport.CLUSTER,
+                        context.ledger,
+                        retention,
+                        roots,
+                        context.snapshotStore.objectKeys());
+                assertThat(active.liveReferences()).hasSize(1);
+                assertThat(active.unreferencedCandidates())
+                        .contains(base.snapshotReference().orElseThrow().objectKey())
+                        .hasSizeGreaterThanOrEqualTo(2);
+                assertThat(active.deletionVetoed()).isFalse();
+                assertThat(active.stillMatches(retention, roots)).isTrue();
+
+                context.retention.beginProtection(
+                                owner,
+                                new CursorRetentionCoordinator.ProtectionRequest(
+                                        CursorRetentionView.PendingProtection.Kind.CREATE,
+                                        "pending-cursor",
+                                        CursorNames.cursorNameHash("pending-cursor"),
+                                        0,
+                                        1,
+                                        0,
+                                        Optional.empty(),
+                                        Map.of(),
+                                        Map.of()))
+                        .join();
+                var protectionPending = context.metadataStore.getRetention(
+                                CursorStorageTestSupport.CLUSTER,
+                                new StreamId(context.ledger.projection().streamId()))
+                        .join()
+                        .orElseThrow();
+                CursorSnapshotInventory pending = CursorSnapshotInventory.classify(
+                        CursorStorageTestSupport.CLUSTER,
+                        context.ledger,
+                        protectionPending,
+                        roots,
+                        context.snapshotStore.objectKeys());
+                assertThat(pending.deletionVetoed()).isTrue();
+                assertThat(active.stillMatches(protectionPending, roots)).isFalse();
             } finally {
                 executor.shutdownNow();
                 secondStorage.close();

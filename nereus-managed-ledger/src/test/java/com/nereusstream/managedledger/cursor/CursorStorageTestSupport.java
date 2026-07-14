@@ -598,7 +598,8 @@ final class CursorStorageTestSupport {
             String snapshotId = String.format("%032x", ids.incrementAndGet());
             CursorSnapshotCodecV1.EncodedSnapshot encoded = CursorSnapshotCodecV1.encode(
                     request, snapshotId, config);
-            ObjectKey key = new ObjectKey("cursor-test-snapshot/" + snapshotId + ".ncs");
+            ObjectKey key = CursorSnapshotKeys.objectKey(
+                    CLUSTER, request.identity(), snapshotId);
             byte[] bytes = new byte[encoded.payload().remaining()];
             encoded.payload().get(bytes);
             objects.put(key, bytes);
@@ -637,6 +638,10 @@ final class CursorStorageTestSupport {
 
         int objectCount() {
             return objects.size();
+        }
+
+        java.util.Set<ObjectKey> objectKeys() {
+            return java.util.Set.copyOf(objects.keySet());
         }
 
         void remove(ObjectKey key) {

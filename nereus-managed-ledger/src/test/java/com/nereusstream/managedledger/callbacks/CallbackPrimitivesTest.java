@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -91,5 +92,21 @@ class CallbackPrimitivesTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    void executorRejectionDrainsEveryAdmittedTerminalCallbackExactlyOnce() throws Exception {
+        AtomicInteger callbacks = new AtomicInteger();
+        SerialCallbackLane lane = new SerialCallbackLane(command -> {
+            throw new RejectedExecutionException("callback executor stopped");
+        }, 3);
+        long zero = lane.admit();
+        long one = lane.admit();
+
+        lane.complete(one, callbacks::incrementAndGet);
+        lane.complete(zero, callbacks::incrementAndGet);
+
+        lane.closeAfterDrain().get(5, TimeUnit.SECONDS);
+        assertThat(callbacks).hasValue(2);
     }
 }

@@ -62,7 +62,7 @@ public final class SerialCallbackLane implements AutoCloseable {
             }
         }
         if (schedule) {
-            executor.execute(this::drain);
+            CallbackDispatcher.execute(executor, this::drain);
         }
     }
 

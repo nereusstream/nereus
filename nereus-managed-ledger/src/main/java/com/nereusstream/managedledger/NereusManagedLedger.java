@@ -11,6 +11,7 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.managedledger.callbacks.SerialCallbackLane;
+import com.nereusstream.managedledger.callbacks.CallbackDispatcher;
 import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
 import com.nereusstream.managedledger.cursor.CursorAckState;
 import com.nereusstream.managedledger.cursor.CursorHandle;
@@ -1566,7 +1567,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         if (!runtime.tryAcquireCallbackPermit()) {
             ManagedLedgerException rejected = new ManagedLedgerException.TooManyRequestsException(
                     "Nereus callback capacity is exhausted");
-            runtime.callbackExecutor().execute(() -> failure.fail(rejected, ctx));
+            CallbackDispatcher.execute(runtime.callbackExecutor(), () -> failure.fail(rejected, ctx));
             return null;
         }
         try {
@@ -1574,7 +1575,7 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         } catch (Throwable error) {
             runtime.releaseCallbackPermit();
             ManagedLedgerException mapped = map(error, operation, false);
-            runtime.callbackExecutor().execute(() -> failure.fail(mapped, ctx));
+            CallbackDispatcher.execute(runtime.callbackExecutor(), () -> failure.fail(mapped, ctx));
             return null;
         }
     }

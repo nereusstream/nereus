@@ -220,6 +220,112 @@ class NereusManagedCursorCallbackSafetyTest {
         }
     }
 
+    @Test
+    void cancellationCloseAndReadCompletionSurviveCallbackExecutorRejectionWithoutLeaks()
+            throws Exception {
+        Clock clock = Clock.systemUTC();
+        LocalFileObjectStore objectStore = new LocalFileObjectStore(root.resolve("rejected-callbacks"));
+        FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(clock::millis);
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        DefaultStreamStorage streamStorage = new DefaultStreamStorage(
+                StreamStorageConfig.defaults("cluster/a", "cursor-rejected-callback-test"),
+                metadata,
+                new DefaultWalObjectWriter(objectStore, "cursor-rejected-callback-test", clock),
+                new DefaultWalObjectReader(objectStore),
+                clock,
+                Runnable::run);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        ExecutorService callbacks = Executors.newSingleThreadExecutor();
+        try (NereusManagedLedgerRuntime runtime = ManagedLedgerRuntimeTestSupport.runtime(
+                streamStorage,
+                projections,
+                new TestCursorStorage(),
+                scheduler,
+                callbacks)) {
+            NereusManagedLedgerFactory factory = new NereusManagedLedgerFactory(
+                    runtime,
+                    fixedGuard(1),
+                    config(),
+                    new ManagedLedgerFactoryConfig(),
+                    false);
+            NereusManagedLedger ledger = (NereusManagedLedger) factory.open(
+                    NAME + "-rejected", config());
+            ledger.addEntry(new byte[] {7});
+            ManagedCursor reader = ledger.openCursor("reader");
+            ManagedCursor waiter = ledger.openCursor("waiter", InitialPosition.Latest);
+            callbacks.shutdownNow();
+
+            AtomicInteger readCalls = new AtomicInteger();
+            AtomicReference<Entry> rejectedEntry = new AtomicReference<>();
+            CompletableFuture<Void> read = new CompletableFuture<>();
+            reader.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
+                @Override
+                public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                    readCalls.incrementAndGet();
+                    rejectedEntry.set(entries.getFirst());
+                    read.complete(null);
+                    throw new IllegalStateException("caller rejected-executor callback failure");
+                }
+
+                @Override
+                public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                    read.completeExceptionally(exception);
+                }
+            }, null, null);
+            read.get(5, TimeUnit.SECONDS);
+            scheduler.submit(() -> { }).get(5, TimeUnit.SECONDS);
+            assertThat(readCalls).hasValue(1);
+            assertThat(rejectedEntry.get().release()).isFalse();
+
+            AtomicInteger cancellationCalls = new AtomicInteger();
+            CompletableFuture<Void> cancelled = new CompletableFuture<>();
+            waiter.asyncReadEntriesOrWait(1, new AsyncCallbacks.ReadEntriesCallback() {
+                @Override
+                public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                    entries.forEach(Entry::release);
+                    cancelled.completeExceptionally(new AssertionError("unexpected waiter success"));
+                }
+
+                @Override
+                public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                    cancellationCalls.incrementAndGet();
+                    cancelled.complete(null);
+                }
+            }, null, null);
+            scheduler.submit(() -> { }).get(5, TimeUnit.SECONDS);
+            assertThat(waiter.cancelPendingReadRequest()).isTrue();
+            scheduler.submit(() -> { }).get(5, TimeUnit.SECONDS);
+            assertThat(cancelled).isNotDone();
+            assertThat(cancellationCalls).hasValue(0);
+            assertThat(waiter.cancelPendingReadRequest()).isFalse();
+
+            AtomicInteger closeCalls = new AtomicInteger();
+            CompletableFuture<Void> closed = new CompletableFuture<>();
+            waiter.asyncClose(new AsyncCallbacks.CloseCallback() {
+                @Override
+                public void closeComplete(Object ctx) {
+                    closeCalls.incrementAndGet();
+                    closed.complete(null);
+                }
+
+                @Override
+                public void closeFailed(ManagedLedgerException exception, Object ctx) {
+                    closeCalls.incrementAndGet();
+                    closed.completeExceptionally(exception);
+                }
+            }, null);
+            closed.get(5, TimeUnit.SECONDS);
+            assertThat(closeCalls).hasValue(1);
+
+            ledger.close();
+            factory.shutdown();
+        } finally {
+            metadata.close();
+            objectStore.close();
+        }
+    }
+
     private static ManagedLedgerConfig config() {
         ManagedLedgerConfig config = new ManagedLedgerConfig();
         config.setStorageClassName("nereus");

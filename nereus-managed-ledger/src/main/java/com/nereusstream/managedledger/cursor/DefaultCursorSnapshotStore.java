@@ -4,7 +4,6 @@ package com.nereusstream.managedledger.cursor;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
-import com.nereusstream.api.keys.KeyComponentCodec;
 import com.nereusstream.metadata.oxia.CursorIds;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
 import com.nereusstream.objectstore.HeadObjectOptions;
@@ -144,7 +143,7 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
                         "cursor snapshot ID collision retry bound is exhausted");
             }
             snapshotId = CursorIds.requireRandomId(snapshotIdSupplier.get(), "snapshotId");
-            objectKey = objectKey(request.identity(), snapshotId);
+            objectKey = CursorSnapshotKeys.objectKey(cluster, request.identity(), snapshotId);
             encoded = CursorSnapshotCodecV1.encode(request, snapshotId, cursorConfig);
             metadata = metadata(snapshotId);
         } catch (Throwable error) {
@@ -196,23 +195,10 @@ public final class DefaultCursorSnapshotStore implements CursorSnapshotStore {
         }).thenCompose(future -> future);
     }
 
-    private ObjectKey objectKey(CursorIdentity identity, String snapshotId) {
-        return new ObjectKey(
-                KeyComponentCodec.encodeComponent(cluster)
-                        + "/cursor-snapshots/v1/"
-                        + KeyComponentCodec.encodeComponent(identity.ledger().projection().streamId())
-                        + "/"
-                        + identity.cursorNameHash()
-                        + "/"
-                        + KeyComponentCodec.encodeNonNegativeLong(identity.cursorGeneration())
-                        + "/"
-                        + snapshotId
-                        + ".ncs");
-    }
-
     private void validateReferenceKey(
             CursorSnapshotReference reference, CursorIdentity expectedIdentity) {
-        ObjectKey expected = objectKey(expectedIdentity, reference.snapshotId());
+        ObjectKey expected = CursorSnapshotKeys.objectKey(
+                cluster, expectedIdentity, reference.snapshotId());
         if (!expected.equals(reference.objectKey())
                 || reference.cursorGeneration() != expectedIdentity.cursorGeneration()) {
             throw new CursorSnapshotCodecV1.CursorSnapshotCorruptionException(
