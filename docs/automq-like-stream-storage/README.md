@@ -1,7 +1,8 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Designed / API-reserved，尚未实现端到端执行路径
-> 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Future 4 generation publish
+> 状态：Designed / F4-M0 code-level contract frozen，尚未实现端到端执行路径
+> 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
+> 精确 target contract 见 `../phase-4-compaction-generation/`
 
 本文定义 Nereus 中的 AutoMQ-like 边界。它不是独立 engine，也不是“WAL 成功后跳过 Oxia”：
 
@@ -27,19 +28,25 @@ Already present：
 - canonical profile persistence in stream metadata；
 - Object WAL v1 bytes and Phase 1 head-CAS/commit-log primitives。
 - Phase 1.5 generic target/adapter and stable-commit/materialization separation（implemented and final-gated）。
+- F4-M0 task/generation/recovery/lease/GC/rollout code-level design and M1–M6 gates。
 
 Not present：
 
 - core branch implementing `WAL_DURABLE` success；
 - BookKeeper WAL writer/reader/location types；
-- materialization task/checkpoint store；
+- materialization stream-registry/task/checkpoint store；
 - background worker and generation committer；
 - primary-WAL retention gate、lag backpressure and recovery daemon；
 - mixed primary target resolver。
 
-Creating metadata with an async profile does not mean the current core can execute it。M4 must fail unsupported
+Creating metadata with an async profile does not mean the current core can execute it。The current runtime must fail unsupported
 profiles with `UNSUPPORTED_STORAGE_PROFILE` and non-strict durability with
 `UNSUPPORTED_DURABILITY_LEVEL` until these gates close。
+
+Phase 4 的首个执行范围只是 `OBJECT_WAL_ASYNC_OBJECT`。该 profile 仍在 success 前完成
+primary Object WAL upload 和 stable head commit；后台化的是 secondary/read-optimized generation。
+`BOOKKEEPER_WAL_ASYNC_OBJECT` 需要以后的 BookKeeper primary adapter，不能由 F4 的 worker
+名义推导为已支持。
 
 ## 3. Profile matrix
 
@@ -59,9 +66,11 @@ profiles with `UNSUPPORTED_STORAGE_PROFILE` and non-strict durability with
 
 1. primary WAL bytes and checksums durable；
 2. immutable commit intent written/reused；
-3. stream-head CAS succeeds or replay proves it already succeeded；
-4. stable offset range、commitVersion and projection identity are available；
-5. the commit record contains a recoverable primary read target。
+3. exact physical root is ACTIVE and commit-intent-owned `REACHABLE_APPEND` protection has completed its root/owner
+   post-check；
+4. stream-head CAS succeeds or replay proves it already succeeded；
+5. stable offset range、commitVersion and projection identity are available；
+6. the commit record contains a recoverable primary read target。
 
 It may return before：
 
@@ -115,8 +124,12 @@ interface Materializer {
 ```
 
 Phase 1.5 freezes the concrete `ReadTarget` union, generic metadata and adapter seam in
-`../phase-1.5-core-storage-foundation/`。P15-M1-M5 are implemented and final-gated；nevertheless,
-`WAL_DURABLE` and the async coordinator remain separate gates rather than implied support。
+`../phase-1.5-core-storage-foundation/`。P15-M0-M6 are implemented and final-gated；nevertheless,
+`WAL_DURABLE` and the async coordinator remain separate F4 gates rather than implied support。F4 replaces the
+reader registry's coarse target-type dispatch with an exact target/version/object-type/physical-format key before a
+compacted object can share `ObjectSliceReadTarget` safely。
+F4 also splits commit-intent preparation from the head CAS so the physical protection can be installed between them；
+historical root backfill alone cannot make concurrent new appends safe for GC。
 
 ## 6. State machine
 
@@ -125,11 +138,19 @@ ACCEPT
   -> SESSION_VALID
   -> PRIMARY_WAL_DURABLE
   -> COMMIT_INTENT_STORED
+  -> PHYSICAL_ROOT_ACTIVE
+  -> REACHABLE_APPEND_PROTECTED
   -> HEAD_COMMITTED
-  -> ACK_IF_REQUESTED_BOUNDARY_MET
+  -> ACK_IF_WAL_DURABLE
+  -> GENERATION_ZERO_INDEX_DURABLE
+  -> VISIBLE_GENERATION_PROTECTED
+  -> ACK_IF_INDEX_COMMITTED
   -> TASK_DURABLE
-  -> OUTPUT_UPLOADED
-  -> GENERATION_PUBLISHED
+  -> TASK_CLAIMED
+  -> OUTPUT_READY
+  -> INDEX_PREPARED
+  -> INDEX_COMMITTED
+  -> TASK_PUBLISHED
   -> CHECKPOINT_ADVANCED
   -> PRIMARY_WAL_RELEASED_WHEN_SAFE
 ```
@@ -137,31 +158,49 @@ ACCEPT
 Ordering rules：
 
 - materialization task identity derives from committed source range/commitVersion/checksum；
-- task enqueue can be repaired from committed ranges if crash happens after ack；
-- generation publish is idempotent and never changes offsets/projection；
+- no head CAS is sent before `REACHABLE_APPEND`; no strict success is returned before the exact generation-zero index
+  owns `VISIBLE_GENERATION`；async success skips the index wait only；
+- task enqueue can be repaired from committed ranges if crash happens after ack；a 64-shard durable stream registry
+  lets a fresh runtime find the stream without broker topic ownership, but head/index/task remain truth；
+- output key carries content SHA + durable output-attempt id and is generation-neutral；generation allocation happens
+  during publication and a deleted key is never reused；
+- every actual provider PUT/retry revalidates its durable owner and physical root；after dual HEAD-absence and owner/
+  domain proof, long-grace retirement may remove DELETED root/reference/manifest audit metadata without reopening key
+  reuse；
+- generation publish is the final index key's idempotent same-key `PREPARED -> COMMITTED` CAS and never changes
+  offsets/projection；
 - checkpoint lag cannot be used to conclude generation is unpublished；index is authoritative for publish；
 - WAL release waits for published generation plus readers/cursors/retention/catalog references。
 
 ## 7. Durable metadata
 
-Target records（key names remain design-level until F4 schema freeze）：
+F4-M0 target records（human-readable components shown；implementation uses `F4Keyspace` and encoded components）：
 
 ```text
-/streams/{streamId}/materialization/tasks/{taskId}
-/streams/{streamId}/materialization/checkpoints/{workerId}
-/streams/{streamId}/wal-ranges/{offsetEnd}/{commitVersion}
-/streams/{streamId}/offset-index/{offsetEnd}/{generation}
-/objects/{objectId}/references/materialization/{taskId}
+/nereus/clusters/{cluster}/streams/{streamId}/materialization/v1/tasks/{taskId}
+/nereus/clusters/{cluster}/streams/{streamId}/materialization/v1/checkpoints/{policyId}/{policyVersion019}
+/nereus/clusters/{cluster}/streams/{streamId}/materialization/v1/generation-sequences/{viewId02}
+/nereus/clusters/{cluster}/materialization/v1/stream-registry/{shard02}/{streamId}
+/nereus/clusters/{cluster}/streams/{streamId}/offset-index/{offsetEnd019}/{generation019}
+/nereus/clusters/{cluster}/streams/{streamId}/recovery/v1/root
+/nereus/clusters/{cluster}/physical-objects/v1/{shard03}/roots/{objectKeyHash}
+/nereus/clusters/{cluster}/physical-objects/v1/{shard03}/objects/{objectKeyHash}/readers/{processRunId}
+/nereus/clusters/{cluster}/physical-objects/v1/{shard03}/objects/{objectKeyHash}/protections/{typeId02}/{referenceId}
 ```
+
+The stream registry uses 64 shards for unloaded-stream work discovery. Physical roots use 256 first-hash-byte shards
+so a fresh GC runtime can recover `MARKED/DELETING` state even after object deletion made storage listing empty；
+listing remains orphan/audit discovery only.
 
 Task identity includes：
 
 - stream/range and source commitVersion；
 - primary target identity/checksum；
 - desired output kind/format/policy version；
-- deterministic target generation request or publish token。
+- deterministic publication id；generation is allocated and recorded later，not part of task/output identity。
 
-Task state is workflow state，not stream visibility truth。
+Task lifecycle is `PLANNED -> CLAIMED -> OUTPUT_READY -> PUBLISHING -> PUBLISHED`，with
+`RETRY_WAIT/CANCELLED/TERMINAL_FAILED` side states。Task state is workflow state，not stream visibility truth。
 
 ## 8. Read selection
 
@@ -211,7 +250,7 @@ acknowledged primary range merely because materialization lags。
 | --- | --- |
 | crash before head commit | no success；retry stable append |
 | head commit succeeds before response | replay returns same stable range |
-| ack succeeds before task record | task scanner reconstructs from committed source range |
+| ack succeeds before task record / topic unloads | registry scanner reloads projection/head and reconstructs from committed source range |
 | task exists before upload | worker retries idempotently |
 | upload succeeds before generation publish | reuse deterministic output or orphan GC |
 | generation publishes before checkpoint | checkpoint repair from index |
@@ -221,18 +260,20 @@ acknowledged primary range merely because materialization lags。
 
 ## 12. Implementation gate
 
-Before async profile can move from `Reserved` to `Implemented`：
+Before `OBJECT_WAL_ASYNC_OBJECT` can move from `Reserved` to `Implemented`：
 
-- generic primary read-target API and result model；
-- real BookKeeper adapter for BK profiles；
+- F4-M1–M4 metadata/object lifecycle、generation、worker、checkpoint and GC gates；
 - `WAL_DURABLE` success/replay/read-after-success contract tests；
-- durable task/checkpoint/idempotence schema；
-- higher-generation conditional publish tests；
-- task-loss scanner and all partial-failure recovery paths；
+- frozen durable task/checkpoint/idempotence codecs and higher-generation conditional-publish tests；
+- all-shard registry/task-loss scanner and all partial-failure recovery paths；
 - primary-WAL retention/reference integration；
-- profile migration and remote-offload compatibility policy；
+- Pulsar monotonic `nereus.generation-protocol=1` activation and async-profile admission；
 - metrics/backpressure/close behavior；
-- Phase 1 and overall docs updated in the same change。
+- F4-M5/M6 ordinary/final gates and all predecessor regressions；
+- Phase 1/1.5/2/3 and overall docs updated in the same change。
+
+BookKeeper async/sync profiles have an additional independent gate: a real BookKeeper writer/reader/location and
+ledger-retention implementation. They do not block completion of the explicitly scoped Object-WAL async path。
 
 ## 13. References
 
@@ -240,4 +281,5 @@ Before async profile can move from `Reserved` to `Implemented`：
 - `../design/nereus-commit-protocol.md`
 - `../design/nereus-future1-core-stream-storage.md`
 - `../design/nereus-future4-compaction-generation.md`
+- `../phase-4-compaction-generation/README.md`
 - `../phase-1-core-stream-storage/README.md`

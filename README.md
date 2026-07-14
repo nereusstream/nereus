@@ -27,7 +27,8 @@ nereus/
   docs/phase-1.5-core-storage-foundation/ implemented L0 evolution and gates
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
-  docs/automq-like-stream-storage/      reserved async materialization profile design
+  docs/phase-4-compaction-generation/    F4-M0-complete code-level target contract
+  docs/automq-like-stream-storage/       async materialization profile design
 ```
 
 ## Related Organization Repositories
@@ -117,14 +118,20 @@ F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unlo
 factory cache，避免新 broker topic 复用已删除 stream。`phase3M6Check`、`phase3M6FinalCheck`、
 `phase3Check` 和 `phase3FinalCheck` 构成完整 release gate；Future 3 已实现并 final-gated。
 
-Phase 1.5 does not expand executable storage profiles. BookKeeper WAL, `WAL_DURABLE` success, async
-materialization and Future 4 workers remain designed/reserved.
+Phase 4 F4-M0 已于 2026-07-14 完成代码级设计门禁。新的
+`docs/phase-4-compaction-generation/` 冻结了 API/module ownership、`NCP1/NTC1/NRC1` formats、
+Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader
+leases/protections、64-shard restart-safe stream discovery、retention/GC、guarded PUT 与可界的 DELETED-root audit
+retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录是 Designed
+target contract，不是已实现能力；下一里程碑是 F4-M1。Phase 4 只计划实现
+`OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use
 `docs/phase-1-core-stream-storage/README.md` for the implemented L0 contract and
 `docs/phase-1.5-core-storage-foundation/README.md` for the active L0 evolution contract. Use
 `docs/phase-2-managed-ledger-facade/README.md` for the implemented F2 contract，and
-`docs/phase-3-cursor-subscription/README.md` for the current F3 code-level target contract and M0/M0R decisions.
+`docs/phase-3-cursor-subscription/README.md` for the implemented F3 contract. Use
+`docs/phase-4-compaction-generation/README.md` for the current F4 code-level target contract and M0 outcome.
 
 ## Build
 

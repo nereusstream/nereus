@@ -3,7 +3,7 @@
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
 > final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；generation、
-> txn、catalog 部分仍为 target design。
+> async/GC 已完成 F4-M0 code-level target design，但尚未实现；txn、catalog 仍为 target design。
 
 ## 1. Purpose
 
@@ -21,6 +21,8 @@
 `../phase-1-core-stream-storage/04-core-state-machines.md`。
 Phase 1.5 target records/state machines见 `../phase-1.5-core-storage-foundation/README.md`。
 F3 cursor exact contract见 `../phase-3-cursor-subscription/README.md`。
+F4 generation/async/recovery/GC exact target contract见
+`../phase-4-compaction-generation/README.md`。
 
 ## 2. Commit domains
 
@@ -33,7 +35,7 @@ Nereus 不把所有状态塞进一个“commit”概念：
 | Generation-0 read/replay index | Oxia derived records | records materialized and validated |
 | Stream seal | Oxia stream head | `ACTIVE -> SEALED` head CAS |
 | Logical stream delete | Oxia stream head | first `ACTIVE/SEALED -> DELETING` head CAS |
-| Higher-generation target | Oxia generation index | conditional generation entry publish |
+| Higher-generation target | Oxia generation index | final index key same-key `PREPARED -> COMMITTED` CAS |
 | Cursor progress | Oxia `CursorStateRecord` | one-root cursor version-CAS |
 | Cursor trim protection | Oxia `CursorRetentionRecord` + L0 trim truth | retention pending/completion CAS protocol |
 | Transaction result | transaction state + required stream markers | explicit state-machine terminal CAS |
@@ -218,8 +220,8 @@ commit is repairable audit/GC state，not logical rollback。
 
 | Requested level | Success requires | Read-after-success |
 | --- | --- | --- |
-| `WAL_DURABLE` | WAL durable + reachable head commit | primary target recoverable from commit log；resolver may repair index |
-| `WAL_DURABLE_AND_INDEX_COMMITTED` | above + offset index and marker confirmed | normal generation-0 lookup immediately available |
+| `WAL_DURABLE` | WAL durable + F4 root/commit-owned `REACHABLE_APPEND` + reachable head commit | primary target protected/recoverable from commit log；resolver may repair index |
+| `WAL_DURABLE_AND_INDEX_COMMITTED` | above + offset index/marker + index-owned `VISIBLE_GENERATION` confirmed | normal protected generation-0 lookup immediately available |
 
 Current Phase 1 implements only strict success。The name `WAL_DURABLE` never authorizes success before the
 head CAS or with a temporary local offset。
@@ -227,6 +229,13 @@ head CAS or with a temporary local offset。
 Phase 1.5 P15-M2/M3 separate `commitStableAppend` from `materializeGenerationZero` internally while still executing only the
 strict second row。The split is a prerequisite for later completion policies, not implementation of
 `WAL_DURABLE` success。
+
+Phase 4's target protocol further splits commit-intent preparation from head CAS. After upload it stores/reloads the
+deterministic intent, registers the physical root, acquires `REACHABLE_APPEND` owned by that exact intent, and only
+then may CAS the head. Generation-zero materialization returns the exact index key/version/value digest and acquires
+`VISIBLE_GENERATION` before strict success. The head CAS remains logical linearization；the added records are physical
+retention fences, not alternate commit truth. Full interfaces and crash cuts are in
+`docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md` §10.
 
 ## 8. Retry and failure classification
 
@@ -297,23 +306,30 @@ lifecycle barrier waits for older exact append recovery, while remote races are 
 
 ## 9. AutoMQ-like async materialization
 
-> Status: Designed/Reserved
+> Status: Designed / F4-M0 code-level contract frozen；not implemented
 
 Async profile shares the entire stable append protocol。Only secondary publication is decoupled：
 
 ```text
 WAL_DURABLE
+  -> matching 64-shard stream registration + generation activation proved before primary IO
   -> COMMIT_INTENT
   -> HEAD_COMMITTED
   -> producer success at requested boundary
-  -> durable materialization task/checkpoint
+  -> registry scanner can reconstruct a missing materialization task from authoritative head/index
   -> upload object/read-optimized output
   -> publish higher generation
   -> release primary-WAL retention when safe
 ```
 
+F4 只为 `OBJECT_WAL_ASYNC_OBJECT` 定义这条首个可执行 async 路径。Object WAL 作为
+primary WAL 仍必须在 success 前完成自身 object upload、stable head commit 和 `WAL_DURABLE`
+所需证据；延后的是 read-optimized higher generation。BookKeeper-WAL-then-async-object
+需要独立的 BookKeeper adapter，不属于 F4。
+
 Required durable states：
 
+- a projection-resolvable stream registration for restart-safe work discovery（hint only）；
 - source commit/range and primary location；
 - deterministic task id and attempt state；
 - output object/checksum；
@@ -342,7 +358,7 @@ only Object WAL IO。A real BookKeeper adapter/client/retention implementation r
 
 ## 11. Generation publish protocol
 
-> Status: Designed
+> Status: Designed / F4-M0 code-level contract frozen；not implemented
 
 Generation 0 is append-derived。Generation > 0 is published by materialization/compaction：
 
@@ -350,8 +366,15 @@ Generation 0 is append-derived。Generation > 0 is published by materialization/
 plan source ranges and identities
   -> write immutable output object
   -> verify format/checksums/coverage
-  -> conditionally publish higher-generation index entry
-  -> record task/checkpoint
+  -> CAS task to PUBLISHING(stable publicationId, no generation)
+  -> allocate unique (streamId, view) generation
+  -> CAS that generation into the exact task
+  -> create task-owned output-object visible-generation protection
+  -> create the final generation-index key as PREPARED
+  -> revalidate task/head-or-recovery-root/source-index/object-root facts
+  -> CAS the same final index key PREPARED -> COMMITTED
+  -> CAS-transfer protection ownership to the exact committed index
+  -> record task/checkpoint progress
   -> protect source until GC-safe
 ```
 
@@ -363,9 +386,12 @@ Publish conditions include：
 - projection/transaction information is preserved；
 - the target carries a closed read-view identity; ordinary offset-index publication requires `COMMITTED` and the
   payload mapping's lossless observable-byte/entry-boundary proof；
-- target generation is monotonic and idempotent。
+- generation is allocated by one view-scoped per-stream CAS counter，is never reused and may contain gaps；
+- output identity contains exact content SHA-256 plus the durable worker claim/output-attempt id, is
+  generation-neutral and never reuses a deleted physical key。
 
-The generation entry publish is the physical-target switch point，not a new logical append。Reader picks
+The final generation-index key's successful `PREPARED -> COMMITTED` CAS is the sole physical-target switch point，
+not a new logical append。`PREPARED`、task/checkpoint state and object upload are never visible truth。Reader picks
 the highest valid visible generation within the requested view。`TOPIC_COMPACTED` uses a separate index namespace and
 cannot supersede or serve as fallback for `COMMITTED`。Lower-generation fallback is permitted only while explicitly
 retained。
@@ -477,7 +503,7 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 
 ## 15. GC protocol
 
-> Status: Designed beyond Phase 1 reference boundary
+> Status: Designed / F4-M0 code-level contract frozen beyond the implemented Phase 1 reference boundary
 
 An object is deletable only when all relevant conditions are true：
 
@@ -489,34 +515,47 @@ An object is deletable only when all relevant conditions are true：
 - orphan TTL/audit/ownership/checksum state allows deletion。
 
 Superseded offset-index keys are themselves retained metadata until the same root scan permits tombstone/removal;
-otherwise physical compaction would leave Oxia cardinality at `O(all historical appends)`. Resolve-to-read acquires a
-bounded authoritative pin on the exact view/generation/target/checksum before IO. GC waits for prior pins to expire or
-release and then revalidates every root. A process-local cache flag is insufficient.
+otherwise physical compaction would leave Oxia cardinality at `O(all historical appends)`. Resolve-to-read creates or
+renews a durable per-object/per-process lease, then revalidates the exact view/generation/index identity and
+`PhysicalObjectRootRecord.lifecycleEpoch` before IO. GC marks the physical root, denies new leases/protections, waits
+for prior leases to release/expire and then revalidates every registered reference domain. A process-local cache flag
+is insufficient.
 
 If the reachable commit chain still names the primary target needed for exact append recovery, that target remains a
-GC root even after a higher physical generation is visible. F4 must publish a recovery checkpoint/anchor that proves
-the older primary is no longer needed before source deletion; without it, generation publish is allowed but deletion
-is disabled.
+GC root even after a higher physical generation is visible. F4 publishes immutable `NRC1` recovery-checkpoint bytes
+and a versioned `RecoveryCheckpointRootRecord`; only the root CAS makes anchor-aware replay/index repair independent
+of the replaced prefix. Source/commit/index deletion remains disabled until that checkpoint and all reference roots
+are revalidated.
 
 Recommended sequence：
 
 ```text
-mark GC candidate with expected reference/version set
-  -> revalidate conditions
+ACTIVE physical root
+  -> CAS MARKED with expected reference-domain registry/version set
+  -> deny new leases/protections and drain bounded existing leases
+  -> revalidate generation/recovery/task/cursor/catalog roots
+  -> CAS DELETING
   -> delete physical object idempotently
-  -> record tombstone/result
+  -> CAS DELETED and retire eligible metadata
 ```
 
-Object list can discover audit candidates but cannot prove absence of references。
+The 256-shard Oxia root scan is authoritative for lifecycle recovery, including `DELETING` after bytes disappear。
+Object list can discover missing-root/audit candidates but cannot prove absence of references。
+
+`DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
+long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the
+Phase 1 object-reference record, manifest and finally the exact-version root. Every actual provider PUT/retry first
+revalidates its durable owner and requires an absent or same ACTIVE root；a stale attempt is rejected and a new attempt
+uses a fresh key. Therefore audit retirement bounds metadata without changing the no-reuse rule.
 
 ## 16. Linearization summary
 
 | Operation | Point |
 | --- | --- |
 | Append logical commit | stream-head CAS success |
-| Strict append success | logical commit + generation-0 index/marker confirmation |
-| Async append success | logical commit + requested primary durability boundary |
-| Generation replacement | higher-generation index publish |
+| Strict append success | logical commit + protected generation-0 index/marker confirmation |
+| Async append success | protected logical commit + requested primary durability boundary |
+| Generation replacement | final generation-index key `PREPARED -> COMMITTED` CAS |
 | Cursor update | cursor-state CAS |
 | Transaction terminal result | coordinator terminal CAS after required per-stream work |
 | SBT table visibility | catalog snapshot commit |
@@ -541,9 +580,7 @@ For cursor/transaction domains，their own authoritative CAS state joins the fir
 
 ## 18. Implementation gates
 
-M7 production Oxia adapter now passes the same manifest validation、single-key CAS、`AppendOutcome`、bounded
-replay/repair continuation and watch/partition contract as the fake，plus its independent Docker/Testcontainers
-gate. M8 must compose that adapter with core and Object WAL for final Phase 1 exit。
+M7 production Oxia adapter and M8 core/Object-WAL composition pass the Phase 1 ordinary and Docker-backed final gates。
 
 Phase 1.5 P15-M1-M6 implemented and verified：
 
@@ -554,15 +591,15 @@ Phase 1.5 P15-M1-M6 implemented and verified：
 - exact cumulative logical size in normal and recovered public append results；
 - unchanged Phase 1 ordinary/Docker gates and one-way rollout boundary。
 
-Before enabling async/BookKeeper/higher-generation execution after Phase 1.5：
+F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publication/overlap/read-view、
+64-shard restart-safe stream discovery、reader lease、recovery checkpoint、retention/GC and Object-WAL async error contracts in
+`../phase-4-compaction-generation/`。Before enabling execution：
 
-- implement the real primary adapter required by the profile；
-- define `WAL_DURABLE` read-after-success SLA and repair error mapping；
-- freeze async task/checkpoint/idempotence schema；
-- freeze higher-generation publish CAS and overlap rules；
-- freeze view-scoped index namespaces and lossless `COMMITTED` payload-mapping validation；
-- add retention protection across primary WAL、readers、cursor/group and catalogs；
-- implement reader pins、reachable-commit recovery checkpoints and superseded-index retirement before physical GC；
+- implement F4-M1–M6 in the specified order and pass their mandatory review stops；
+- enable only `OBJECT_WAL_ASYNC_OBJECT` in Phase 4；any BookKeeper profile still requires its real primary adapter；
+- add the designed retention protections across primary WAL、readers、cursor/group and future catalogs；
+- implement durable reader leases、recovery checkpoints and superseded-index retirement before physical GC；
+- create/verify the matching stream registration before marker/async admission and test fresh-process task recovery；
 - provide fault injection at every irreversible boundary；
 - keep code/docs/golden bytes updated together。
 

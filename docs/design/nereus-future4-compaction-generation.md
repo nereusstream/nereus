@@ -1,8 +1,13 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
-> 状态：Designed；worker/task/higher-generation publish 尚未实现
+> 状态：Designed / F4-M0 code-level design gate complete；F4 生产代码尚未实现
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
+
+Phase 4 的代码级实现合同以
+[`docs/phase-4-compaction-generation/`](../phase-4-compaction-generation/README.md) 及其 `01`–`07`
+编号文档为准。本文是 north-star 摘要；两者冲突时，在 Phase 4 生产代码出现之前，
+代码级合同优先。
 
 本文定义 Nereus L3 compaction 和 generation replacement 设计。Future 4 的核心目标是
 > 把 multi-stream WAL object 转换为 per-stream read-optimized object，并通过 Oxia offset
@@ -35,6 +40,7 @@ Future 4 覆盖：
 
 - compaction planner；
 - compaction task metadata；
+- 64-shard durable stream-work registration（discovery hint only）；
 - WAL object reader；
 - compacted object writer；
 - generation overlay；
@@ -60,13 +66,16 @@ Future 4 不解决：
 和后续验证阶段处理。
 
 当前实现边界：Phase 1 只有 generation 0 的 Object WAL records，且其 offset index 可从
-stream-head reachable commit repair。F4 实现前必须冻结 higher-generation conditional
-publish/overlap schema；compaction 不能改写 `StreamHeadRecord.committedEndOffset` 或 commit chain。
+stream-head reachable commit repair。F4-M0 已冻结 higher-generation conditional publish、overlap、
+reader lease、recovery checkpoint 和 physical-GC schema；compaction 不能改写
+`StreamHeadRecord.committedEndOffset` 或 append 线性化语义。
+Broker unload/restart 后的 work discovery 由代码级合同中的
+`MaterializationStreamRegistrationRecord` 完成；scanner 必须重新读取 projection、head、index 和 task，
+registration/watch 不能成为 correctness owner。
 
 Phase 1.5 implements the tagged target/adapter、generic generation-zero record compatibility and
-stable-commit/materializer seam。It does not freeze this document's task/checkpoint/source-generation CAS schema and
-does not implement a worker。Phase 1.5 P15-M0-M6 has passed；F4 production still requires the remaining
-reference/publish entry gates。
+stable-commit/materializer seam。It does not implement a worker。Phase 1.5 P15-M0-M6 has passed；the F4-M0
+design set now freezes the task/checkpoint/source-generation CAS schema that Phase 1.5 deliberately left open。
 
 Phase 3 F3-M0/M0R 已冻结 F4 必须消费的边界：cursor ack truth 是单 Oxia root + immutable snapshot ref；
 new/recreated cursor 和 backward reset 在 cursor CAS 全窗口保持 `PROTECTION_PENDING`；logical trim 经过
@@ -78,8 +87,9 @@ ownership，而是通过 versioned `CursorMetadataStore` read/scan surface 读�
 version/session；任何 owner change 都使本轮 snapshot 失效重试。
 它们不能把 Pulsar ownership/watch 当作 cursor CAS fence。F3-M1-M6 已完成 implementation/final gates，
 包括 real two-broker recovery/retention、10,000-root scale、stable MessageId/incarnation、read-only
-`CursorSnapshotInventory` 与 pending-lifecycle deletion veto。F4 可以开始实现，但在自己的 generation/
-reference-revalidation/physical-GC gates 完成前不得发布 higher generation 或删除 bytes。
+`CursorSnapshotInventory` 与 pending-lifecycle deletion veto。这些 Phase 3 前置已满足。F4 可以从 M1
+开始实现，但在自己的 generation/reference-revalidation/physical-GC gates 完成前，
+不得对 production topic 激活 higher-generation publish 或 physical deletion。
 
 ## 4. Layer Boundary
 
@@ -118,21 +128,21 @@ Future 4 不能做：
 ## 5. Internal API
 
 ```java
-interface CompactionPlanner {
-    CompletableFuture<List<CompactionTask>> plan(
+interface MaterializationPlanner {
+    CompletableFuture<List<MaterializationTask>> plan(
             StreamId streamId,
             OffsetRange range,
-            CompactionPolicy policy);
+            MaterializationPolicy policy);
 }
 
-interface CompactionWorker {
-    CompletableFuture<CompactionOutput> compact(CompactionTask task);
+interface MaterializationWorker {
+    CompletableFuture<MaterializationOutput> materialize(MaterializationTask task);
 }
 
 interface GenerationCommitter {
     CompletableFuture<GenerationCommitResult> publish(
-            CompactionTask task,
-            CompactionOutput output);
+            MaterializationTask task,
+            MaterializationOutput output);
 }
 
 enum ReadView {
@@ -148,53 +158,70 @@ interface GenerationReadResolver {
 }
 ```
 
-`CompactionTask` 必须包含 source index entries 的 identity 和 checksum，避免 worker 在旧
+`MaterializationTask` 必须包含 source index entries 的 identity 和 checksum，避免 worker 在旧
 输入变化后错误发布 replacement。
 
 ## 6. Oxia Metadata Schema
 
 ```text
-/nereus/clusters/{cluster}/streams/{streamId}/compaction/policies/default
-/nereus/clusters/{cluster}/streams/{streamId}/compaction/tasks/{taskId}
-/nereus/clusters/{cluster}/streams/{streamId}/compaction/checkpoints/{plannerId}
+/nereus/clusters/{cluster}/streams/{streamId}/materialization/v1/tasks/{taskId}
+/nereus/clusters/{cluster}/streams/{streamId}/materialization/v1/checkpoints/{policyId}/{policyVersion019}
+/nereus/clusters/{cluster}/streams/{streamId}/materialization/v1/generation-sequences/{viewId02}
+/nereus/clusters/{cluster}/materialization/v1/stream-registry/{shard02}/{streamId}
+/nereus/clusters/{cluster}/streams/{streamId}/recovery/v1/root
 /nereus/clusters/{cluster}/streams/{streamId}/offset-index/{offsetEnd}/{generation}
-/nereus/clusters/{cluster}/streams/{streamId}/views/topic-compacted/index/{offsetEnd}/{generation}
-/nereus/clusters/{cluster}/objects/{objectId}/manifest
-/nereus/clusters/{cluster}/objects/{objectId}/references/{refType}/{refId}
+/nereus/clusters/{cluster}/streams/{streamId}/views/v1/topic-compacted/offset-index/{offsetEnd}/{generation}
+/nereus/clusters/{cluster}/physical-objects/v1/{shard03}/roots/{objectKeyHash}
+/nereus/clusters/{cluster}/physical-objects/v1/{shard03}/objects/{objectKeyHash}/readers/{processRunId}
+/nereus/clusters/{cluster}/physical-objects/v1/{shard03}/objects/{objectKeyHash}/protections/{typeId02}/{referenceId}
 ```
 
-### 6.1 CompactionTask
+上述是人类可读形式；实现必须经 `F4Keyspace`/`KeyComponentCodec` 生成。完整键空间、
+partition key 和扫描边界见
+[`03-oxia-metadata-and-publication.md`](../phase-4-compaction-generation/03-oxia-metadata-and-publication.md)。
+Registry 固定为 64 个 SHA-256 shard，只负责让无 topic ownership 的 runtime 找到 stream；
+`lastHintCommitVersion` 不能跳过 authoritative head/task/index scan。
+Physical roots 固定为 256 个 object-hash-first-byte shard；root scan 是 MARKED/DELETING restart recovery 的
+权威发现路径，对象存储 listing 只补充发现尚未建立 root 的 orphan bytes。
+
+### 6.1 Materialization task
 
 ```json
 {
-  "taskId": "cmp-s-123-1048576-1114112",
+  "taskId": "mt1-<canonical-source-policy-sha256>",
+  "taskSequence": 92,
   "streamId": "s-123",
   "offsetStart": 1048576,
   "offsetEnd": 1114112,
-  "readView": "COMMITTED",
-  "sourceEntries": [
+  "readViewId": 1,
+  "taskKindId": 1,
+  "sources": [
     {
+      "offsetStart": 1048576,
       "offsetEnd": 1064960,
       "generation": 17,
-      "objectId": "wo-1",
-      "checksum": "crc32c:..."
+      "indexKey": "<encoded-index-key>",
+      "indexMetadataVersion": 41,
+      "targetIdentitySha256": "<sha256>"
     }
   ],
-  "targetGeneration": 18,
-  "targetFormat": "PARQUET",
-  "state": "PLANNED",
-  "plannerEpoch": 7,
-  "createdAt": 1783036800000
+  "sourceSetSha256": "<sha256>",
+  "policyId": "committed-default-v1",
+  "policyVersion": 1,
+  "policySha256": "<sha256>",
+  "lifecycle": "PLANNED",
+  "createdAtMillis": 1783036800000,
+  "metadataVersion": 0
 }
 ```
 
 Task state：
 
 ```text
-PLANNED -> RUNNING -> OUTPUT_UPLOADED -> PUBLISHED -> GC_READY
-PLANNED -> CANCELLED
-RUNNING -> FAILED -> PLANNED
-OUTPUT_UPLOADED -> FAILED -> PLANNED
+PLANNED -> CLAIMED -> OUTPUT_READY -> PUBLISHING -> PUBLISHED
+PLANNED/CLAIMED/OUTPUT_READY/PUBLISHING -> RETRY_WAIT -> CLAIMED
+PLANNED/RETRY_WAIT -> CANCELLED
+PLANNED/CLAIMED/OUTPUT_READY/PUBLISHING/RETRY_WAIT -> TERMINAL_FAILED
 ```
 
 Task state 只是 compaction workflow state，不决定 logical append visibility。Offset index
@@ -208,16 +235,17 @@ mapping 共同约束；“包含可重建字段”不能替代 observable bytes 
 
 ```json
 {
-  "objectId": "co-s-123-1048576-1114112-g18",
+  "objectId": "co1-<sha256-of-canonical-object-key>",
+  "objectKey": "<cluster>/compacted/v1/committed/.../<contentHash>-<outputAttemptId>.parquet",
+  "outputAttemptId": "<worker-claim-id>",
   "streamId": "s-123",
   "offsetStart": 1048576,
   "offsetEnd": 1114112,
-  "generation": 18,
   "readView": "COMMITTED",
   "recordCount": 65536,
   "entryCount": 4096,
-  "physicalFormat": "PARQUET",
-  "logicalFormat": "NEREUS_STREAM_RECORD",
+  "physicalFormat": "NEREUS_COMPACTED_PARQUET_V1",
+  "logicalFormat": "PULSAR_ENTRY_V1",
   "sourceIndexEntries": ["1064960/17", "1114112/17"],
   "rowGroups": [
     {
@@ -230,9 +258,18 @@ mapping 共同约束；“包含可重建字段”不能替代 observable bytes 
       "maxEventTime": 1783036805000
     }
   ],
+  "sourceSetHash": "sha256:...",
+  "policyHash": "sha256:...",
+  "contentSha256": "sha256:...",
   "checksum": "crc32c:..."
 }
 ```
+
+Output object 由 content SHA 与 durable output-attempt id 定址，且 generation-neutral。Generation 只属于后续的 index
+publication；同一个已验证 output 可在丢失/中止发布后以新分配的 generation 重用，
+不得因 generation 改变 object bytes 或 identity。精确 `NCP1`、`NTC1`、`NRC1`
+格式见
+[`02-domain-api-and-object-format.md`](../phase-4-compaction-generation/02-domain-api-and-object-format.md)。
 
 所有 view 的 object 必须保留：
 
@@ -274,7 +311,7 @@ Generation replacement 发布一个更高 generation 的 index entry：
   "generation": 18,
   "readView": "COMMITTED",
   "objectType": "STREAM_COMPACTED_OBJECT",
-  "objectId": "co-s-123-1048576-1114112-g18",
+  "objectId": "co1-<sha256-of-canonical-object-key>",
   "supersedes": ["1064960/17", "1114112/17"],
   "commitVersion": 92
 }
@@ -310,32 +347,60 @@ OFFSET_INDEX_READY
 Planner 必须保证 source entries 覆盖连续 offset range。可以跨多个 WAL objects，但不能跨
 stream 改写 logical ordering。
 
-### 9.2 Worker output
+### 9.2 Generation-zero append publication
+
+F4 physical deletion requires the current combined stable append call to become a two-stage protocol：
+
+```text
+upload + manifest/HEAD
+  -> prepare/reload exact generic commit intent; head unchanged
+  -> create/revalidate PhysicalObjectRoot
+  -> create commit-intent-owned REACHABLE_APPEND protection
+  -> stream-head CAS/replay proof
+  -> WAL_DURABLE may complete
+  -> materialize exact generation-zero index
+  -> create index-owned VISIBLE_GENERATION protection
+  -> WAL_DURABLE_AND_INDEX_COMMITTED may complete
+```
+
+The first protection remains until an NRC1 recovery root replaces live commit replay；the second remains until the
+exact generation-zero index retires. An abandoned pre-head intent is removed only after orphan grace plus unchanged
+head/recovery/index/domain proof. Backfill covers pre-F4 objects, but cannot replace this new-write hook.
+
+### 9.3 Worker output
 
 ```text
 PLANNED
-  -> RUNNING
+  -> CLAIMED
   -> read source entries
   -> write compacted object
   -> verify checksum and row group index
-  -> OUTPUT_UPLOADED
+  -> OUTPUT_READY
 ```
 
 Worker 输出 object 后，它还不是 active read target。必须等到 generation replacement publish。
 
-### 9.3 Publish
+### 9.4 Higher-generation publish
 
 ```text
-OUTPUT_UPLOADED
-  -> CAS source entries still active
-  -> put higher generation offset index entry
-  -> mark task PUBLISHED
+OUTPUT_READY
+  -> CAS task to PUBLISHING(stable publicationId, no generation)
+  -> allocate a unique generation for (streamId, readView)
+  -> CAS the allocated generation into that exact task
+  -> create task-owned visible-generation object protection
+  -> put final index key as PREPARED
+  -> re-read task, stream head/recovery root, sources and physical-object root
+  -> CAS the same final index key PREPARED -> COMMITTED
+  -> CAS-transfer protection owner from task to exact committed index
+  -> mark task PUBLISHED and advance advisory checkpoint
 ```
 
-发布线性化点是更高 generation offset index entry 可见；这是 physical-target switch，不是新的
+发布线性化点是最终 generation-index 键的同键、同版本
+`PREPARED -> COMMITTED` CAS。`PREPARED`、task state、object upload 和 advisory checkpoint
+都不可见且不是 correctness owner。该 CAS 只是 physical-target switch，不是新的
 logical append commit。
 
-### 9.4 GC readiness
+### 9.5 GC readiness
 
 ```text
 PUBLISHED
@@ -349,15 +414,25 @@ Source index and object retirement is a separate two-stage protocol:
 
 ```text
 publish replacement in one view
-  -> tombstone superseded source index keys with expected generation/checksum
-  -> keep source object while any visible index, reachable-commit recovery root,
+  -> publish/verify NRC1 recovery root before deleting any replaced live-commit evidence
+  -> transition superseded generation index COMMITTED -> DRAINING
+  -> keep source object while any visible/admitted index, reachable-commit recovery root,
      reader lease/cache pin, logical trim/reference domain or task protects it
-  -> mark GC candidate with the complete observed reference/version set
+  -> mark the PhysicalObjectRoot with the complete observed reference/version set
   -> wait for pre-existing bounded reader leases to release/expire
-  -> re-read and CAS-validate every root
-  -> delete object idempotently
-  -> delete/tombstone retired metadata keys and record audit result
+  -> re-read and CAS-validate every authoritative root/domain
+  -> CAS object root MARKED -> DELETING; delete object idempotently
+  -> CAS object root -> DELETED and generation index DRAINING -> RETIRED
+  -> conditionally delete replaceable commit/index metadata only after checkpoint proof
+  -> after tombstoneAuditGrace, two exact HEAD-absence windows and unchanged owner/domain proofs,
+     conditionally delete Phase 1 object references, manifest and finally the DELETED root
 ```
+
+Legacy generation-zero indexes have no F4 lifecycle field；they are conditionally deleted only after the same
+recovery-root、trim and reference proof. A task/checkpoint/registration scan never authorizes retirement by itself.
+Every first/retried provider PUT is guarded by the exact durable owner and physical-root state；a stale attempt sends
+no bytes, and a later attempt uses a fresh key. Thus DELETED-root audit retirement bounds metadata without making key
+reuse or late resurrection legal.
 
 Resolve-to-read must close the deletion race: before object IO, the reader acquires a bounded lease/pin conditioned on
 the selected `(streamId, range, view, generation, target identity, checksum)` still being visible; GC snapshots these
@@ -398,7 +473,7 @@ the separate `TOPIC_COMPACTED` view：
 1. Planner 选择 compactable offset range。
 2. Worker 根据 key 保留最高 offset record。
 3. Worker 写 compacted object，并保留 offset coverage。
-4. Committer publishes a higher generation under `views/topic-compacted/index`。
+4. Committer publishes a higher generation under `views/v1/topic-compacted/offset-index`。
 5. Only a reader that explicitly requests `TOPIC_COMPACTED` selects that generation and applies topic-compaction
    visibility；ordinary readers continue to resolve the lossless `COMMITTED` view。
 
@@ -409,6 +484,8 @@ offset gap。
 
 | Failure | Expected behavior |
 | --- | --- |
+| Topic unload/process loss before task create | 64-shard registration scan reloads projection/head/index and recreates deterministic work |
+| Registration stale/missing/mismatched | Hint cannot activate a stream；mutation/async admission fails closed or open repairs exact identity |
 | Planner crash after task write | Other planner resumes from Oxia task state |
 | Worker crash before object upload | Task retries |
 | Worker crash after object upload before publish | Object is orphan until task retry or GC |
@@ -428,8 +505,9 @@ offset gap。
 - `PULSAR_ENTRY_V1` ordinary reads return the exact original Entry bytes and one offset remains one Entry across every
   physical generation.
 - ManagedCursor backlog and retention use offsets and cumulative size, not object identity.
-- Force reset below ordinary L0 trim remains unavailable until F4 defines an explicit compacted-view generation and
-  reference contract；it does not change F3's durable mark-delete coordinate.
+- Force reset below ordinary L0 trim remains unavailable in Phase 4 even though F4-M0 now defines an explicit
+  compacted-view/reference contract；admission and user-visible semantics remain a later Pulsar track and do not
+  change F3's durable mark-delete coordinate.
 - Topic compaction uses only the separate compacted-read view and keeps Pulsar observable semantics.
 
 ### KoP / Kafka
@@ -443,12 +521,14 @@ offset gap。
 - Future 6 SBT can point table snapshots at compacted objects.
 - Catalog snapshots must include index generation so repair can trace back to Oxia truth.
 
-## 13. Future Gate
+## 13. F4-M0 Gate Outcome
 
-Future 4 may enter implementation planning only after the following are reviewed:
+F4-M0 已完成以下代码级评审并冻结合同：
 
 - compaction task schema；
+- 64-shard registered-stream discovery、resolvable projection ref and registration-before-marker recovery；
 - generation replacement CAS conditions；
+- two-stage generation-zero intent/protection/head ordering and protected sync/async acknowledgement boundaries；
 - highest-generation read resolver；
 - compacted object required fields；
 - exact opaque-entry preservation for `COMMITTED + PULSAR_ENTRY_V1` and equivalent mapping-specific lossless rules；
@@ -456,14 +536,15 @@ Future 4 may enter implementation planning only after the following are reviewed
 - fallback and checksum behavior；
 - topic compaction primitive；
 - old generation reference and GC protection；
-- reader resolve/pin/read/release protocol、reachable-commit recovery root and source-index retirement；
+- reader resolve/lease/revalidate/read/release protocol、reachable-commit recovery root and source-index retirement；
 - AutoMQ-like materialization lag and primary WAL retention protection；
 - interactions with Future 3 completed logical trim/protection root/current snapshot references and Future 6 catalog
   snapshots。
 
-Before F4 production starts, Phase 3 M1-M6 must provide executable owner-session claim/fencing、cursor-generation、
-snapshot-reference、protected create/backward-reset and pending-trim gates；the design-only M0R contract is necessary
-but not final implementation evidence。
+Phase 3 M1-M6 所需的 owner-session claim/fencing、cursor-generation、snapshot-reference、protected
+create/backward-reset 和 pending-trim gates 已实现并 final-gated。Phase 4 的下一步是
+[`F4-M1`](../phase-4-compaction-generation/07-implementation-plan-and-gates.md)，不是继续补协议选型。
 
-This is a design gate. It does not require benchmark, chaos, compatibility certification, CI, or
-real evidence.
+F4-M0 只是 design gate；它不声称 production capability、benchmark、chaos、compatibility
+certification 或 CI evidence。F4-M1–M6 的确切文件、测试、故障点和 release gates 见代码级
+实施计划。

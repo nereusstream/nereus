@@ -2,7 +2,7 @@
 
 > 状态：当前设计索引
 > 最近一次设计/实现同步：2026-07-14
-> 当前交付阶段：Future 2 与 Future 3 complete/final-gated；下一 production track 是 Future 4
+> 当前交付阶段：Future 2 与 Future 3 complete/final-gated；Future 4 M0 代码级设计完成，下一里程碑是 F4-M1
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -40,10 +40,12 @@ streamId + offset
    `docs/phase-1.5-core-storage-foundation/` 的 implemented L0 evolution contract，以及
    `docs/phase-2-managed-ledger-facade/` 的 implemented F2 contract，以及
    `docs/phase-3-cursor-subscription/` 的 implemented/final-gated F3 contract；
-3. **已接受决策**：`docs/decisions/`；
-4. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
-5. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
-6. **历史材料**：dated review、legacy design 和 Phase 0 文档。
+3. **当前 target 代码级合同**：`docs/phase-4-compaction-generation/` 的 Designed / F4-M0-complete
+   Phase 4 实现合同；它优先于 F4 north-star 摘要，但不优先于未来已实现代码/测试；
+4. **已接受决策**：`docs/decisions/`；
+5. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
+6. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
+7. **历史材料**：dated review、legacy design 和 Phase 0 文档。
 
 如果 1 与 2 不一致，不能只改其中一边：实现和代码级合同必须在同一变更中对齐。如果未来设计
 与当前实现不同，文档必须明确标注 `Designed` 或 `Reserved`，不能写成已经支持。
@@ -75,7 +77,8 @@ streamId + offset
 | `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle、canonical cursor context、unloaded binding-aware admin validation and real dual-broker M6 compatibility cuts are implemented/tested |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Compaction、routing、lakehouse、高级语义 | `Designed` | design docs only |
+| Future 4 materialization/compaction | `Designed / F4-M0 complete` | 代码级 API、metadata、format、state machine、rollout 与 M1-M6 gates 已冻结；生产代码未开始 |
+| Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
 
@@ -228,6 +231,7 @@ decision behind items 14 and 16-18。
 | `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
+| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | designed / F4-M0 code-level gate complete |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -241,7 +245,7 @@ decision behind items 14 and 16-18。
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Implemented / final-gated`（M0/M0R + M1-M6） |
-| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed` |
+| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `Designed / F4-M0 code-level gate complete`；精确合同见 `../phase-4-compaction-generation/` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
 | `nereus-future7-routing-brownout-elasticity.md` | F7 routing/brown-out/elasticity | `Designed` |
@@ -275,6 +279,17 @@ decision behind items 14 and 16-18。
 4. 使用本地 Pulsar `master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d` 重新验证当前 implementation/source lock；M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
 5. 执行 `phase3Check` 和 `phase3FinalCheck --rerun-tasks`；
 6. 后续 F4/F5/F8 必须消费 F3 已冻结的 cursor/reference/MessageId contract，不得另建 correctness owner。
+
+### 实现/评审 Phase 4
+
+1. 确认 `../phase-1.5-core-storage-foundation/README.md`、
+   `../phase-2-managed-ledger-facade/README.md` 与 `../phase-3-cursor-subscription/README.md` 的已实现输入合同；
+2. 阅读 `nereus-future4-compaction-generation.md` 的 north-star 边界；
+3. 以 `../phase-4-compaction-generation/README.md` 为入口，依次评审 `01` 到 `07` 代码级文档；
+4. 实现必须按 `07-implementation-plan-and-gates.md` 的 M1–M6 顺序和 mandatory review stops 推进；
+5. 重新审计时使用本地 Pulsar
+   `master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`，不把未发布的 Maven snapshot 当作权威源；
+6. 在 F4-M6 之前不得将 Designed 的 generation/async/GC 路径写成 Implemented。
 
 ### 评审 Phase 1.5
 

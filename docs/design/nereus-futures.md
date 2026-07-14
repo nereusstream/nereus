@@ -31,7 +31,7 @@ protocol/table state = projection
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
-| F4 Materialization/Compaction | later phase | Designed | generation schema + generic read target |
+| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | Designed / F4-M0 code-level gate complete | F4-M1 metadata/object lifecycle primitives |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
@@ -65,8 +65,10 @@ flowchart LR
 production milestones 已完成；Future 2 已 final-gated。Phase 3 的 M0/M0R 已把 cursor/reference/trim
 handoff 冻结到代码级，F3-M1 metadata/snapshot foundation 与 F3-M2 CursorStorage/retention state machines
 已 final-gated；F3-M3 facade、F3-M4 Pulsar broker integration、F3-M5 real recovery/retention 与 F3-M6
-compatibility/incarnation/F4-handoff 已完成并通过对应 gate。F4 production 现在可以消费 F3 的稳定
-cursor/reference/trim boundary，但仍必须通过自己的 generation/GC gates 才能发布或删除 physical bytes。
+compatibility/incarnation/F4-handoff 已完成并通过对应 gate。F4-M0 已用本地 Nereus/Pulsar
+source 完成代码级设计门禁；F4 production 现在可以从 M1 开始消费 F3 的稳定
+cursor/reference/trim boundary，但仍必须通过自己的 generation/GC gates 才能对 production
+topic 发布或删除 physical bytes。
 
 ## 4. F1 — Core Stream Storage
 
@@ -185,10 +187,12 @@ Current milestone: F3-M0/M0R design-gated；F3-M1-M6 implemented/final-gated
 ## 7. F4 — Materialization, Compaction and Generation Replacement
 
 Detailed design: `nereus-future4-compaction-generation.md`
+Code-level target contract: `../phase-4-compaction-generation/README.md`
+Current milestone: F4-M0 source audit/design gate complete；F4-M1 planned；no Phase 4 production code yet
 
 ### Owns
 
-- async materialization task/checkpoint/lag；
+- async materialization stream discovery/task/checkpoint/lag；
 - primary-WAL retention gate；
 - compaction planner/worker；
 - higher-generation publish and reader selection；
@@ -199,7 +203,13 @@ Detailed design: `nereus-future4-compaction-generation.md`
 
 - F1 generation-0 index and commitVersion contracts stable；
 - Phase 1.5 generic read target/dispatcher and stable-commit split implemented；
-- conditional higher-generation publish schema is frozen；
+- Phase 3 cursor owner/protection/pending-trim/snapshot-reference boundary implemented and final-gated；
+- conditional higher-generation publish、reader lease、recovery checkpoint and physical-GC schemas are frozen by F4-M0；
+- guarded provider PUT and long-grace DELETED-root/reference/manifest retirement bound physical audit metadata without
+  allowing a stale writer to reuse a deleted key；
+- registered-stream discovery is 64-shard、restart-safe and hint-only；projection/head/index remain authoritative；
+- generation-zero new writes prepare intent, acquire `REACHABLE_APPEND`, then CAS head；strict success additionally
+  acquires index-owned `VISIBLE_GENERATION`；
 - source ranges and checksums form deterministic task identity。
 
 ### Exit gate
@@ -207,7 +217,10 @@ Detailed design: `nereus-future4-compaction-generation.md`
 - publish changes physical target only；
 - repair handles upload/publish/checkpoint partial states；
 - lag blocks unsafe primary-WAL GC；
-- old generations are retained until all reader/cursor/task/catalog references are safe。
+- old generations are retained until all reader/cursor/task/catalog references are safe；
+- DELETED-root audit metadata retires only after dual absence/owner/domain proof and late-PUT race gates；
+- `OBJECT_WAL_ASYNC_OBJECT` is executable without implying any BookKeeper profile；
+- all M1–M6 gates in the code-level contract pass。
 
 ## 8. F5 — KoP / Kafka Projection
 

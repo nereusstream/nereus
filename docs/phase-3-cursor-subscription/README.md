@@ -135,6 +135,11 @@ F3 中 `trimConsumedLedgersInBackground` 对 Broker 周期 housekeeping 仍是 n
 之前明确拒绝，不能返回误导性的 no-op success。只有 F4 才能放开该操作并把 policy/admin trim 接到
 retention coordinator。
 
+Phase 4 F4-M0 已在
+[`../phase-4-compaction-generation/`](../phase-4-compaction-generation/README.md) 把上述 handoff 消费为
+代码级 target contract；F3 的当前已实现行为仍保持 no-op/reject，直到对应 F4 里程碑的生产
+代码和 rollout gate 完成。
+
 ## 5. Document Map
 
 | Document | Purpose |

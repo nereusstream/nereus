@@ -4,7 +4,9 @@
 自 2026-07-10 起，这里与 `docs/phase-1-core-stream-storage/`、
 `docs/phase-1.5-core-storage-foundation/`、
 `docs/phase-2-managed-ledger-facade/`、
-`docs/phase-3-cursor-subscription/` 共同构成仓库内设计基线。
+`docs/phase-3-cursor-subscription/` 与
+`docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
+测试优先；Phase 4 目录当前是已通过 M0 的代码级 target contract，不表示代码已实现。
 
 建议阅读顺序：
 
@@ -31,11 +33,15 @@ broker ownership guard、retention barrier 和 Pulsar fork method mapping 已冻
 CursorStorage/retention state machines、failure injection、并发/property model 与真实 Oxia + LocalStack S3
 跨 runtime 恢复门禁也已完成并 final-gated。F3-M3 ManagedCursor facade/runtime/hydration、F3-M4 Pulsar
 capability/admission/durable-ack integration、F3-M5 deterministic/10k/two-broker real recovery 及 F3-M6
-MessageId/property/reset/limit/rollout/incarnation/F4-handoff gates 均已完成；Phase 3 已 final-gated。下一实施
-阶段可进入依赖 cursor/reference correctness 的 Phase 4 production。
+MessageId/property/reset/limit/rollout/incarnation/F4-handoff gates 均已完成；Phase 3 已 final-gated。
+2026-07-14 已完成 Phase 4 F4-M0 本地 Nereus/Pulsar source audit 和代码级设计门禁，冻结
+generation publish、object format、task/recovery、reader lease、retention/GC、Object-WAL async 和
+Pulsar rollout 合同。下一实施里程碑是 F4-M1；Phase 4 生产代码尚未开始。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以
 `../phase-2-managed-ledger-facade/README.md` 及该目录下的编号文档为准。
 F3 target contract、M0/M0R 结论和 M1-M6 计划以
 `../phase-3-cursor-subscription/README.md` 及该目录下的 `01` 到 `06` 为准。
+F4 target contract、M0 结论和 M1-M6 实施计划以
+`../phase-4-compaction-generation/README.md` 及该目录下的 `01` 到 `07` 为准。

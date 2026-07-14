@@ -1,6 +1,7 @@
 # Nereus Storage Object Format
 
 > 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate；
+> F4 compacted/topic-compacted/recovery-checkpoint families 已通过 M0 code-level design gate；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -12,8 +13,10 @@ Nereus shared data plane 需要多类 immutable objects：
 | --- | --- | --- | --- |
 | Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
 | Index object | large entry/projection index | offset-index reference | Reserved |
-| Stream compacted object | per-stream higher-generation read target | generation publish | Designed |
-| Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated as F3-M1 storage primitive；root publication belongs to M2 |
+| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | Designed / F4-M0 frozen |
+| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | Designed / F4-M0 frozen；broker admission remains F8 |
+| Recovery checkpoint (`NRC1` + `NRF1`) | replace append-replay/index-repair role of a committed prefix | recovery-root CAS | Designed / F4-M0 frozen |
+| Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated through F3-M6 |
 | Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |
 | SBT/SDT table file | analytical/table projection | catalog snapshot/delivery lineage | Designed |
 
@@ -257,14 +260,14 @@ projection identity
 commitVersion
 ```
 
-Generation 0 is repairable from reachable append commit。Higher generations are conditionally published by
-F4。Phase 1.5 implements the tagged target union and dual-read/new-write generic metadata while retaining the
+Generation 0 is repairable from reachable append commit。F4 higher generations become visible only through a
+final generation-index key's same-key `PREPARED -> COMMITTED` CAS。Phase 1.5 implements the tagged target union and dual-read/new-write generic metadata while retaining the
 object-specific legacy decoder/adapter boundary。This does not alter Object WAL bytes or
 implement BookKeeper IO。
 
-## 10. Designed compacted object
+## 10. F4 code-level designed object families
 
-> Status: Designed
+> Status: Designed / F4-M0 code-level formats frozen；not implemented
 
 A read-optimized object is per-stream and covers a declared half-open offset range. Its durable header includes a
 closed read-view value (`COMMITTED` or `TOPIC_COMPACTED`); view-specific indexes and generation ordering never cross.
@@ -283,14 +286,20 @@ cannot be the reconstruction authority. Container-level lossless compression is 
 re-encoding is forbidden. A lossy keyed-compaction result is stored only as `TOPIC_COMPACTED` and is never referenced
 by the ordinary offset-index namespace.
 
-Default target is Parquet with row-group offset bounds。Before implementation F4 must freeze：
+F4-M0 freezes three distinct formats：
 
-- projection-preserving schema；
-- row-group index/checksum semantics；
-- topic-compaction tombstone/coverage behavior；
-- closed read-view encoding and separate view index references；
-- exact opaque Entry checksum/round-trip rules for `PULSAR_ENTRY_V1`；
-- higher-generation publish and fallback validation。
+- `NEREUS_COMPACTED_PARQUET_V1` (`NCP1`)：dense per-stream Parquet，with canonical writer options、
+  row-group bounds、full payload CRC/SHA and an `NCP1` metadata envelope；for `PULSAR_ENTRY_V1` the payload column
+  contains one exact full Entry per offset；
+- `NEREUS_TOPIC_COMPACTED_V1` (`NTC1`)：sparse keyed records plus explicit logical coverage/tombstone sections；
+  it is legal only in `TOPIC_COMPACTED` and never ordinary fallback；
+- `NEREUS_RECOVERY_CHECKPOINT_V1` (`NRC1` body + `NRF1` footer)：an immutable, checksummed stream-prefix
+  recovery/index-repair checkpoint referenced by a versioned recovery root。
+
+Output keys contain exact content SHA-256 plus a durable worker output-attempt id；generation is deliberately absent
+from object bytes and object identity, and a deleted key is never reused。Exact columns、field order、limits、checksum coverage、reader
+validation and golden tests are in
+`../phase-4-compaction-generation/02-domain-api-and-object-format.md`。
 
 ## 11. Snapshot objects
 
@@ -367,14 +376,22 @@ An object can be protected by：
 
 - reachable primary append；
 - visible offset-index generation；
-- reader lease/cache pin；
+- durable per-object/per-process reader lease；
 - cursor/transaction snapshot ref；
 - materialization/compaction/repair task；
 - SBT/SDT catalog snapshot/delivery；
 - retention/orphan grace policy。
 
 Physical generation replacement also retains superseded offset-index metadata until the same reference scan permits
-retirement. Reader protection is an authoritative resolve/pin/read/release lease, not merely an in-process cache hit.
+retirement. Reader protection is an authoritative resolve/lease/root-and-index-revalidate/read/release protocol, not
+merely an in-process cache hit. A `PhysicalObjectRootRecord` moves through
+`ACTIVE -> MARKED -> DELETING -> DELETED`；protection creation and GC both use create-then-root-revalidate to close
+cross-key races. Primary append bytes additionally remain protected until an `NRC1` checkpoint and recovery-root CAS
+replace their replay/index-repair role.
+`DELETED` is logically terminal, but after the long tombstone-audit grace its Phase 1 references/manifest and physical
+root are conditionally removed in that order only after two exact HEAD-absence windows and unchanged complete owner/
+domain proofs. Every actual PUT transmission revalidates its durable owner/root, and a later write attempt uses a
+fresh attempt-addressed key, so this metadata bound never permits deleted-key reuse.
 Old incarnation projection mirrors are separately collectible only after current topic authority and every recovery/
 task/audit reference have moved away from their stream.
 
@@ -388,6 +405,9 @@ metadata and ownership。
 - Phase 1.5 generic target metadata：`../phase-1.5-core-storage-foundation/02-metadata-schema-and-compatibility.md`
 - Object WAL review：`../phase-1-core-stream-storage/11-m3-object-wal-review-2026-07-08.md`
 - Commit semantics：`nereus-commit-protocol.md`
+- Phase 4 exact object/API contract：`../phase-4-compaction-generation/02-domain-api-and-object-format.md`
+- Phase 4 publication/GC contract：`../phase-4-compaction-generation/03-oxia-metadata-and-publication.md` and
+  `../phase-4-compaction-generation/05-reader-retention-and-gc.md`
 - F4 target：`nereus-future4-compaction-generation.md`
 - F3 cursor snapshot target：`../phase-3-cursor-subscription/03-oxia-metadata-and-snapshot-format.md`
 - F6 target：`nereus-future6-lakehouse-sbt-sdt.md`
