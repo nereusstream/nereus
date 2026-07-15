@@ -120,6 +120,16 @@ envelope SHA are deliberately separate facts and are both verified. Focused test
 post-CAS/pre-permanent process death. Checkpoint-aware replay/index repair and all retirement/GC work remain target
 code；root publication alone still authorizes no deletion.
 
+F4-M4 checkpoint E implements the append-replay half of §8.5. `RecoveryCheckpointCodecV1` now locates the unique
+commit entry covering an offset using one bounded sparse-directory block. `CheckpointAppendReplayReader` performs
+root-stable live-tail search、current-root reference selection、durable read-pin admission、strict NRC1 lookup and a
+final exact root reload, restarting the whole proof when the root changes. Live and checkpoint records share
+`AppendReplayRecords` validation；the coordinator distinguishes the evidence source so checkpoint replay never
+recreates a retired historical primary target. `DefaultStreamStorage` exposes the explicit injection seam while its
+legacy constructors remain live-only. Focused tests cover missing live commit keys、root change during pin、ID
+non-aliasing and lease cleanup. Checkpoint-derived index repair、runtime enablement、retirement and GC remain target
+code, so checkpoint E authorizes no deletion.
+
 Full M4–M6 target construction：
 
 ```java

@@ -35,6 +35,11 @@ public interface RecoveryCheckpointCodecV1 {
             int limit,
             Duration timeout);
 
+    CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommitCoveringOffset(
+            RecoveryCheckpointObject object,
+            long offset,
+            Duration timeout);
+
     CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommit(
             RecoveryCheckpointObject object,
             long commitVersion,

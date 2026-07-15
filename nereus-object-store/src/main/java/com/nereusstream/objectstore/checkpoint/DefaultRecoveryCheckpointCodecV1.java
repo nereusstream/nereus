@@ -311,6 +311,62 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
     }
 
     @Override
+    public CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommitCoveringOffset(
+            RecoveryCheckpointObject object,
+            long offset,
+            Duration timeout) {
+        try {
+            Objects.requireNonNull(object, "object");
+            if (offset < 0) {
+                throw new IllegalArgumentException("offset must be non-negative");
+            }
+            requireTimeout(timeout);
+        } catch (RuntimeException failure) {
+            return failedRead("invalid recovery checkpoint offset lookup", failure);
+        }
+        if (!object.header().coverage().contains(offset)) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        CheckpointReadDeadline deadline = new CheckpointReadDeadline(timeout);
+        CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
+                object.objectKey(), object.directory(), deadline);
+        CompletableFuture<CommitOffsets> commits = readCommitDirectory(
+                object.objectKey(), object.directory(), deadline);
+        return publications.thenCombine(commits, DirectoryState::new)
+                .thenCompose(state -> {
+                    int block = floorIndex(state.commits().offsetStarts(), offset);
+                    if (block < 0) {
+                        throw corrupt("NRC1 commit directory does not cover the checkpoint start");
+                    }
+                    long start = state.commits().fileOffsets()[block];
+                    long end = block + 1 < state.commits().fileOffsets().length
+                            ? state.commits().fileOffsets()[block + 1]
+                            : object.directory().publicationDirectoryOffset();
+                    long length = end - start;
+                    long maximumBlock = (long) RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE
+                            * RecoveryCheckpointFormatV1.MAX_RECORD_BYTES;
+                    if (length <= 0 || length > maximumBlock) {
+                        throw corrupt("NRC1 commit directory points to an invalid block length");
+                    }
+                    return readExact(object.objectKey(), start, length, deadline)
+                            .thenCompose(bytes -> findCommitCoveringOffsetInBlock(
+                                    object,
+                                    state.publications(),
+                                    state.commits().fileOffsets()[0],
+                                    bytes,
+                                    offset,
+                                    deadline));
+                })
+                .handle((value, failure) -> {
+                    if (failure != null) {
+                        throw new CompletionException(mapReadFailure(
+                                "find recovery checkpoint commit by offset", failure));
+                    }
+                    return value;
+                });
+    }
+
+    @Override
     public CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommit(
             RecoveryCheckpointObject object,
             long commitVersion,
@@ -461,6 +517,37 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                         .thenApply(ignored -> Optional.of(entry));
             }
             if (entry.commitVersion() > commitVersion) {
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+        }
+        return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    private CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommitCoveringOffsetInBlock(
+            RecoveryCheckpointObject object,
+            PublicationOffsets publicationOffsets,
+            long publicationRecordsEnd,
+            ByteBuffer bytes,
+            long offset,
+            CheckpointReadDeadline deadline) {
+        ByteBuffer cursor = bytes.asReadOnlyBuffer();
+        while (cursor.hasRemaining()) {
+            RecoveryCheckpointBinary.Decoded<RecoveryCheckpointEntry> decoded =
+                    RecoveryCheckpointBinary.decodeEntry(cursor);
+            RecoveryCheckpointEntry entry = decoded.value();
+            cursor.position(cursor.position() + decoded.bytesConsumed());
+            validateEntryBounds(object.header(), entry);
+            verifier.verifyEntry(object.header(), entry);
+            if (entry.range().contains(offset)) {
+                return verifyPublicationReferences(
+                                object,
+                                publicationOffsets,
+                                publicationRecordsEnd,
+                                entry,
+                                deadline)
+                        .thenApply(ignored -> Optional.of(entry));
+            }
+            if (entry.range().startOffset() > offset) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
         }
@@ -745,6 +832,22 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
         return generationComparison != 0
                 ? generationComparison
                 : actual.publicationId().value().compareTo(publicationId.value());
+    }
+
+    private static int floorIndex(long[] values, long target) {
+        int low = 0;
+        int high = values.length - 1;
+        int result = -1;
+        while (low <= high) {
+            int midpoint = low + ((high - low) >>> 1);
+            if (values[midpoint] <= target) {
+                result = midpoint;
+                low = midpoint + 1;
+            } else {
+                high = midpoint - 1;
+            }
+        }
+        return result;
     }
 
     private static void requireObjectLength(long value) {

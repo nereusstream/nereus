@@ -57,6 +57,7 @@ import com.nereusstream.metadata.oxia.ReachableCommittedAppend;
 import com.nereusstream.metadata.oxia.ReaderLeaseScanPage;
 import com.nereusstream.metadata.oxia.StableAppendResult;
 import com.nereusstream.metadata.oxia.AppendReplayCursor;
+import com.nereusstream.metadata.oxia.AppendReplayRecords;
 import com.nereusstream.metadata.oxia.AppendReplaySearchResult;
 import com.nereusstream.metadata.oxia.AppendReplayStatus;
 import com.nereusstream.metadata.oxia.StreamStateTransitionRequest;
@@ -1400,22 +1401,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
 
     private void validateTargetReplay(
             CommitAppendRequest request, StreamCommitTargetRecord commit, AppendOutcome outcome) {
-        if (!commit.commitId().equals(request.commitId()) || !commit.streamId().equals(request.streamId().value())
-                || !commit.writerId().equals(request.writerId())
-                || !commit.writerRunIdHash().equals(request.writerRunIdHash())
-                || commit.writerEpoch() != request.epoch() || !commit.fencingTokenHash().equals(request.fencingTokenHash())
-                || commit.offsetStart() != request.expectedStartOffset()
-                || commit.offsetEnd() != Math.addExact(request.expectedStartOffset(), request.recordCount())
-                || !commit.readTarget().equals(request.readTargetRecord())
-                || !commit.payloadFormat().equals(request.payloadFormat().name())
-                || commit.recordCount() != request.recordCount() || commit.entryCount() != request.entryCount()
-                || commit.logicalBytes() != request.logicalBytes() || !commit.schemaRefs().equals(request.schemaRefs())
-                || !commit.projectionRef().equals(request.projectionIdentity())
-                || commit.minEventTimeMillis() != request.minEventTimeMillis()
-                || commit.maxEventTimeMillis() != request.maxEventTimeMillis()) {
-            throw appendFailure(ErrorCode.METADATA_INVARIANT_VIOLATION, false, outcome,
-                    "replayed generic commit does not match request");
-        }
+        AppendReplayRecords.requireMatches(request, commit, outcome);
     }
 
     private void validateTargetAgainstHead(
@@ -1438,12 +1424,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
 
     private CommittedAppend targetCommitted(
             StreamCommitTargetRecord commit, Optional<ProjectionRef> projection) {
-        return new CommittedAppend(new StreamId(commit.streamId()), commit.commitId(), commit.previousCommitId(),
-                ReadTargetCodecRegistry.phase15().decode(commit.readTarget()),
-                new OffsetRange(commit.offsetStart(), commit.offsetEnd()), 0, commit.cumulativeSize(),
-                commit.commitVersion(), PayloadFormat.valueOf(commit.payloadFormat()), commit.recordCount(),
-                commit.entryCount(), commit.logicalBytes(), commit.schemaRefs(), projection,
-                commit.minEventTimeMillis(), commit.maxEventTimeMillis());
+        return AppendReplayRecords.hydrate(commit, projection);
     }
 
     private AppendReplaySearchResult searchTargetReplaySync(

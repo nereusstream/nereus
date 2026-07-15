@@ -31,6 +31,9 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.recovery.AppendRecoverySearcher;
+import com.nereusstream.core.recovery.AppendReplayEvidenceSource;
+import com.nereusstream.core.recovery.AppendReplayResolution;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
@@ -44,7 +47,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -83,7 +88,51 @@ class AppendCoordinatorLaneLifecycleTest {
         assertThat(context.coordinator().retainedLaneCount()).isZero();
     }
 
+    @Test
+    void checkpointReplayProofDoesNotRecreateHistoricalGenerationZeroIndex() {
+        AtomicInteger searches = new AtomicInteger();
+        TestContext context = context("checkpoint-replay", metadata ->
+                (request, maximumLiveCommits, pageSize, timeout) -> {
+                    searches.incrementAndGet();
+                    return metadata.searchAppendReplay(
+                                    "cluster/a",
+                                    request,
+                                    Optional.empty(),
+                                    maximumLiveCommits)
+                            .thenApply(result -> AppendReplayResolution.found(
+                                    result.committedAppend().orElseThrow(),
+                                    AppendReplayEvidenceSource.RECOVERY_CHECKPOINT,
+                                    result.scannedRecords()));
+                });
+        context.metadata().failNext(
+                FakeOxiaMetadataStore.FailurePoint.AFTER_HEAD_CAS_BEFORE_DERIVED_INDEX);
+
+        AtomicReference<NereusException> captured = new AtomicReference<>();
+        assertThatThrownBy(() -> context.coordinator()
+                        .append(context.streamId(), batch(), options()).join())
+                .isInstanceOfSatisfying(CompletionException.class, error ->
+                        captured.set((NereusException) error.getCause()));
+
+        context.coordinator().recoverAppend(
+                context.streamId(),
+                captured.get().appendAttemptId().orElseThrow(),
+                new AppendRecoveryOptions(Duration.ofSeconds(1))).join();
+
+        assertThat(searches).hasValue(1);
+        assertThat(context.metadata().scanOffsetIndex(
+                        "cluster/a", context.streamId(), 0, 10).join())
+                .isEmpty();
+        assertThat(context.coordinator().retainedLaneCount()).isZero();
+    }
+
     private TestContext context(String name) {
+        return context(name, null);
+    }
+
+    private TestContext context(
+            String name,
+            Function<FakeOxiaMetadataStore, AppendRecoverySearcher>
+                    recoverySearcherFactory) {
         StreamStorageConfig config = StreamStorageConfig.defaults("cluster/a", "writer-a");
         FakeOxiaMetadataStore metadata = new FakeOxiaMetadataStore(CLOCK::millis);
         StreamId streamId = new StreamId(metadata.createOrGetStream(
@@ -100,15 +149,29 @@ class AppendCoordinatorLaneLifecycleTest {
                 Duration.ZERO,
                 Duration.ofHours(24),
                 CLOCK);
-        AppendCoordinator coordinator = new AppendCoordinator(
-                config,
-                metadata,
-                new DefaultWalObjectWriter(objectStore, "test-writer", CLOCK),
-                sessions,
+        DefaultWalObjectWriter writer = new DefaultWalObjectWriter(
+                objectStore, "test-writer", CLOCK);
+        DefaultGenerationZeroPhysicalReferencePublisher physicalReferences =
                 new DefaultGenerationZeroPhysicalReferencePublisher(
-                        config.cluster(), metadata, metadata, protections),
-                CLOCK,
-                Runnable::run);
+                        config.cluster(), metadata, metadata, protections);
+        AppendCoordinator coordinator = recoverySearcherFactory == null
+                ? new AppendCoordinator(
+                        config,
+                        metadata,
+                        writer,
+                        sessions,
+                        physicalReferences,
+                        CLOCK,
+                        Runnable::run)
+                : new AppendCoordinator(
+                        config,
+                        metadata,
+                        writer,
+                        sessions,
+                        physicalReferences,
+                        recoverySearcherFactory.apply(metadata),
+                        CLOCK,
+                        Runnable::run);
         return new TestContext(metadata, coordinator, streamId);
     }
 

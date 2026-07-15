@@ -1723,24 +1723,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     private void validateReplay(
             CommitAppendRequest request, StreamCommitTargetRecord replay, AppendOutcome outcome) {
-        if (!replay.commitId().equals(request.commitId()) || !replay.streamId().equals(request.streamId().value())
-                || !replay.writerId().equals(request.writerId())
-                || !replay.writerRunIdHash().equals(request.writerRunIdHash())
-                || replay.writerEpoch() != request.epoch()
-                || !replay.fencingTokenHash().equals(request.fencingTokenHash())
-                || replay.offsetStart() != request.expectedStartOffset()
-                || replay.offsetEnd() != Math.addExact(request.expectedStartOffset(), request.recordCount())
-                || replay.generation() != 0 || replay.recordCount() != request.recordCount()
-                || replay.entryCount() != request.entryCount() || replay.logicalBytes() != request.logicalBytes()
-                || !replay.readTarget().equals(request.readTargetRecord())
-                || !replay.payloadFormat().equals(request.payloadFormat().name())
-                || !replay.schemaRefs().equals(request.schemaRefs())
-                || !replay.projectionRef().equals(request.projectionIdentity())
-                || replay.minEventTimeMillis() != request.minEventTimeMillis()
-                || replay.maxEventTimeMillis() != request.maxEventTimeMillis()) {
-            throw appendFailure(ErrorCode.METADATA_INVARIANT_VIOLATION, false, outcome,
-                    "replayed generic commit does not match request");
-        }
+        AppendReplayRecords.requireMatches(request, replay, outcome);
     }
 
     private void validateCommitAgainstHead(
@@ -1797,12 +1780,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
 
     private CommittedAppend toCommitted(
             StreamCommitTargetRecord commit, Optional<ProjectionRef> projectionRef) {
-        return new CommittedAppend(new StreamId(commit.streamId()), commit.commitId(), commit.previousCommitId(),
-                ReadTargetCodecRegistry.phase15().decode(commit.readTarget()),
-                new OffsetRange(commit.offsetStart(), commit.offsetEnd()), commit.generation(), commit.cumulativeSize(),
-                commit.commitVersion(), PayloadFormat.valueOf(commit.payloadFormat()), commit.recordCount(),
-                commit.entryCount(), commit.logicalBytes(), commit.schemaRefs(), projectionRef,
-                commit.minEventTimeMillis(), commit.maxEventTimeMillis());
+        return AppendReplayRecords.hydrate(commit, projectionRef);
     }
 
     private Optional<Object> getCommitValue(OxiaKeyspace keyspace, StreamId streamId, String commitId) {

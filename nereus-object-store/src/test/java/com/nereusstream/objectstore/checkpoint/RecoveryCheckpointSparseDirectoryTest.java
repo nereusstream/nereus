@@ -22,17 +22,18 @@ class RecoveryCheckpointSparseDirectoryTest {
     @Test
     void findsFirstMiddleAndLastCommitAcrossThreeSparseBlocks() throws Exception {
         int count = 513;
+        int coveredRecords = count * 2;
         long firstVersion = 10;
         RecoveryCheckpointWriteRequest request = new RecoveryCheckpointWriteRequest(
                 "test-cluster",
                 new StreamId("s-recovery-test"),
                 9,
                 "a".repeat(26),
-                new OffsetRange(0, count),
+                new OffsetRange(0, coveredRecords),
                 firstVersion,
                 firstVersion + count - 1,
                 0,
-                count,
+                coveredRecords,
                 "commit-10",
                 "commit-522",
                 "commit-600",
@@ -41,16 +42,16 @@ class RecoveryCheckpointSparseDirectoryTest {
                 count,
                 2);
         List<RecoveryCheckpointPublication> publications = List.of(
-                RecoveryCheckpointTestSupport.publication(1, "a".repeat(26), 0, count),
-                RecoveryCheckpointTestSupport.publication(2, "b".repeat(26), 256, count));
+                RecoveryCheckpointTestSupport.publication(1, "a".repeat(26), 0, coveredRecords),
+                RecoveryCheckpointTestSupport.publication(2, "b".repeat(26), count, coveredRecords));
         List<RecoveryCheckpointEntry> entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             long version = firstVersion + index;
             entries.add(RecoveryCheckpointTestSupport.entry(
                     version,
-                    index,
-                    index + 1L,
-                    index + 1L,
+                    index * 2L,
+                    index * 2L + 2,
+                    index * 2L + 2,
                     "commit-" + version,
                     index == 0 ? "commit-9" : "commit-" + (version - 1),
                     List.of(0)));
@@ -84,6 +85,27 @@ class RecoveryCheckpointSparseDirectoryTest {
                     .contains(entries.get(256));
             assertThat(codec.findCommit(opened, 522, "commit-522", RecoveryCheckpointTestSupport.TIMEOUT).join())
                     .contains(entries.get(512));
+            assertThat(codec.findCommitCoveringOffset(
+                            opened, 0, RecoveryCheckpointTestSupport.TIMEOUT).join())
+                    .contains(entries.get(0));
+            assertThat(codec.findCommitCoveringOffset(
+                            opened, 1, RecoveryCheckpointTestSupport.TIMEOUT).join())
+                    .contains(entries.get(0));
+            assertThat(codec.findCommitCoveringOffset(
+                            opened, 512, RecoveryCheckpointTestSupport.TIMEOUT).join())
+                    .contains(entries.get(256));
+            assertThat(codec.findCommitCoveringOffset(
+                            opened, 513, RecoveryCheckpointTestSupport.TIMEOUT).join())
+                    .contains(entries.get(256));
+            assertThat(codec.findCommitCoveringOffset(
+                            opened, 1024, RecoveryCheckpointTestSupport.TIMEOUT).join())
+                    .contains(entries.get(512));
+            assertThat(codec.findCommitCoveringOffset(
+                            opened, 1025, RecoveryCheckpointTestSupport.TIMEOUT).join())
+                    .contains(entries.get(512));
+            assertThat(codec.findCommitCoveringOffset(
+                            opened, 1026, RecoveryCheckpointTestSupport.TIMEOUT).join())
+                    .isEmpty();
             assertThat(codec.findPublication(
                             opened,
                             1,

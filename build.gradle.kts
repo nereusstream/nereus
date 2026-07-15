@@ -679,3 +679,23 @@ tasks.register("phase4M4RecoveryRootCheck") {
     dependsOn(":nereus-metadata-oxia:check")
     dependsOn(":nereus-object-store:check")
 }
+
+tasks.register<Exec>("checkPhase4M4CheckpointReplayContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 checkpoint-aware append replay adapter."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-checkpoint-replay-contract-surface.sh")
+}
+
+tasks.register("phase4M4CheckpointReplayCheck") {
+    group = "verification"
+    description = "Verify root-stable pinned append replay across live commits and NRC1 checkpoint entries."
+    dependsOn("phase4M4RecoveryRootCheck")
+    dependsOn("checkPhase4M4CheckpointReplayContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+}

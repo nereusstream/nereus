@@ -1017,8 +1017,9 @@ The recovery checkpoint replaces a prefix of live Oxia commit nodes as append-re
 not a data generation and never serves `StreamStorage.read` directly.
 
 > Implementation status (2026-07-15)：the object protocol and bounded publication-table scan in this section are
-> implemented and the guarded coordinator/root-CAS path consumes them. This is not an M4 completion claim；
-> checkpoint-aware replay/repair and retirement/GC paths in documents 03–05 are still required.
+> implemented and the guarded coordinator/root-CAS path consumes them. Checkpoint E additionally implements bounded
+> offset-to-entry lookup for append replay. This is not an M4 completion claim；checkpoint-derived index repair and
+> retirement/GC paths in documents 03–05 are still required.
 
 ### 9.1 Streaming codec surface
 
@@ -1108,6 +1109,9 @@ public interface RecoveryCheckpointCodecV1 {
     CompletableFuture<RecoveryCheckpointPublicationPage> scanPublications(
             RecoveryCheckpointObject object, OptionalInt continuation, int limit,
             Duration timeout);
+
+    CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommitCoveringOffset(
+            RecoveryCheckpointObject object, long offset, Duration timeout);
 
     CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommit(
             RecoveryCheckpointObject object, long commitVersion, String commitId,
@@ -1257,6 +1261,11 @@ Exact lookup then validates the selected record CRC、embedded digest、metadata
 `scanPublications` uses an integer table-index continuation, caps one page at 1,000 rows, and strictly decodes each
 row；it exists so post-root-CAS restart reconciliation can rebuild target protections without retaining the full
 publication table in heap.
+
+`findCommitCoveringOffset` binary-searches the sparse directory's canonical offset-start column, reads at most one
+stride-256 commit block, strictly decodes entries in that block and verifies the selected entry's publication
+coverage. It returns the unique half-open entry containing the offset；a covered checkpoint offset with no entry is a
+corrupt/invariant condition at the consumer, not a negative append-replay proof.
 
 Larger history is split across checkpoint objects referenced by a bounded root chain. The active Oxia root stores at
 most 32 checkpoint references；before the 33rd, a merge checkpoint replaces older checkpoint objects. Root publication

@@ -6,8 +6,8 @@
 > Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry、terminal workflow-metadata retirement、
 > COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
 > isolated publication；F4-M4 正在实现，NRC1 object-protocol、protected generation-zero append、anchor-aware
-> planning，以及 guarded recovery-root publication/restart protection reconciliation 已落地；checkpoint-aware
-> replay/repair、retirement/GC 与 F4-M5–M6 尚未实现
+> planning、guarded recovery-root publication/restart protection reconciliation，以及 checkpoint-aware append
+> replay adapter 已落地；checkpoint index repair/runtime enablement、retirement/GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -423,6 +423,24 @@ fake physical store 和 local object store tests 已覆盖 root CAS 成功响应
 repair、live commit/index/source retirement、physical/cursor GC 或 Docker-backed M4 final scenarios。上述路径和
 所有 delete enablement 继续关闭，F4-M4 仍为 `in progress`。
 
+### 6.8 F4-M4 checkpoint-aware append replay checkpoint
+
+Checkpoint E 已实现 `CheckpointAppendReplayReader`。reader 先通过 `AnchorAwareCommitWalker` 验证 bounded live
+tail；若目标位于已发布 prefix，则从 root 选择唯一覆盖 reference，取得 recovery-checkpoint durable read pin，
+严格 `openAndVerify` NRC1，并用新增的 `findCommitCoveringOffset` 在 stride-256 sparse directory 中定位 entry。
+读完后再次精确重读 root；pin/replay 期间 root 改变会放弃旧证明并整次重启，绝不从旧 object existence 推断
+当前 recovery truth。
+
+live 与 checkpoint bytes 现在共同调用 `AppendReplayRecords` 的 exact request-vs-record validation 和 hydration。
+`AppendCoordinator` 通过 `AppendRecoverySearcher` seam 区分 live commit 与 current-root checkpoint evidence：live
+命中继续执行 generation-zero repair/protection，checkpoint 命中直接返回原 append identity，避免重新依赖可能在
+后续退休的历史 primary target。`DefaultStreamStorage` 已提供显式 checkpoint-aware searcher 注入口；旧构造器
+仍选择 genesis/live-only adapter，因此在 M5 runtime composition 明确注入前不会静默改变现有执行路径。
+
+`phase4M4CheckpointReplayCheck` 覆盖 513-entry/three-block offset lookup、batch 内 offset、live commit key 缺失、
+root-at-pin change restart、commit-id non-aliasing 与 read-pin cleanup。该 checkpoint 不包含 checkpoint-derived
+index repair、source/index retirement 或任何 GC/delete enablement，F4-M4 仍为 `in progress`。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -431,7 +449,7 @@ repair、live commit/index/source retirement、physical/cursor GC 或 Docker-bac
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 protocol、protected generation-zero append、anchor-aware planning、guarded root publication/restart protection reconciliation implemented/tested；checkpoint-aware replay/repair、retirement/GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 protocol、protected generation-zero append、anchor-aware planning、guarded root publication/restart protection reconciliation、checkpoint append replay adapter implemented/tested；index repair/runtime enablement、retirement/GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

@@ -46,6 +46,8 @@ import com.nereusstream.core.lifecycle.StreamLifecycleCoordinator;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.ReadResolver;
+import com.nereusstream.core.recovery.AppendRecoverySearcher;
+import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimCoordinator;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -161,11 +163,36 @@ public final class DefaultStreamStorage implements StreamStorage {
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver,
             TrimMetricsObserver trimMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                new MetadataAppendRecoverySearcher(config.cluster(), metadataStore),
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
         Objects.requireNonNull(walObjectReader, "walObjectReader");
         Objects.requireNonNull(physicalReferences, "physicalReferences");
+        Objects.requireNonNull(recoverySearcher, "recoverySearcher");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
@@ -177,6 +204,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 walObjectWriter,
                 appendSessionManager,
                 physicalReferences,
+                recoverySearcher,
                 clock,
                 callbackExecutor);
         ReadResolver readResolver = new ReadResolver(

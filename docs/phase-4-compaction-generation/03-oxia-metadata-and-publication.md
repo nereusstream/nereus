@@ -134,6 +134,21 @@ same reconciliation runs before the next build, so restart converges when a proc
 the protection writes. Checkpoint-aware replay/index repair、source retirement and GC are deliberately not enabled by
 this checkpoint.
 
+### 1.6 F4-M4 checkpoint-aware append replay checkpoint
+
+`CheckpointAppendReplayReader` now consumes the root/head protocol in §13. It searches the exact bounded live tail
+first, then selects the one current-root NRC1 reference covering `CommitAppendRequest.expectedStartOffset`, acquires a
+durable read pin, validates the complete reference/header/object identity and resolves the canonical entry through
+the sparse offset directory. `AppendReplayRecords` is the single request-vs-record validator/hydrator used by both
+live Oxia replay and checkpoint replay, preventing the two paths from drifting.
+
+The reader revalidates the exact versioned root during pin admission and after the object lookup；a changed root
+restarts the complete proof at most eight times. `AppendCoordinator` receives the terminal search through an explicit
+`AppendRecoverySearcher` seam. A checkpoint hit is already a current-root reachability proof and does not recreate
+the historical generation-zero target；a live hit retains the existing protected recovery sequence. The existing
+default storage constructors still select the live-only adapter until F4 runtime composition explicitly injects the
+checkpoint reader, and no metadata retirement is enabled by this checkpoint.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

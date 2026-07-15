@@ -33,6 +33,9 @@ import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.profile.Phase15StorageProfileResolver;
 import com.nereusstream.core.profile.StorageProfileResolver;
+import com.nereusstream.core.recovery.AppendRecoverySearcher;
+import com.nereusstream.core.recovery.AppendReplayEvidenceSource;
+import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
 import com.nereusstream.core.wal.PrimaryAppendRequest;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
@@ -88,6 +91,7 @@ public final class AppendCoordinator implements AutoCloseable {
     private final StableAppendCommitter stableCommitter;
     private final GenerationZeroIndexMaterializer indexMaterializer;
     private final GenerationZeroPhysicalReferencePublisher physicalReferences;
+    private final AppendRecoverySearcher recoverySearcher;
     private final StorageProfileResolver profileResolver = new Phase15StorageProfileResolver();
     private final ConcurrentHashMap<StreamId, StreamLane> lanes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<AppendAttemptId, Attempt> retainedAttempts = new ConcurrentHashMap<>();
@@ -107,11 +111,32 @@ public final class AppendCoordinator implements AutoCloseable {
             GenerationZeroPhysicalReferencePublisher physicalReferences,
             Clock clock,
             Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                sessionManager,
+                physicalReferences,
+                new MetadataAppendRecoverySearcher(config.cluster(), metadataStore),
+                clock,
+                callbackExecutor);
+    }
+
+    public AppendCoordinator(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            AppendSessionManager sessionManager,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            Clock clock,
+            Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
+        this.recoverySearcher = Objects.requireNonNull(recoverySearcher, "recoverySearcher");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.writerRunIdHash = DeterministicIds.stableHashComponent(config.processRunId());
@@ -338,27 +363,40 @@ public final class AppendCoordinator implements AutoCloseable {
                     if (head.committedEndOffset() == expected) {
                         return recoverProtectedAppend(attempt);
                     }
-                    return searchRecoveryPage(attempt, Optional.empty());
+                    return searchRecovery(attempt);
                 })
                 .thenApply(commit -> toAppendResult(commit, attempt.slice()))
                 .handle((result, error) -> finishRecovery(attempt, result, error)));
     }
 
-    private CompletableFuture<CommittedAppend> searchRecoveryPage(
-            Attempt attempt, Optional<com.nereusstream.metadata.oxia.AppendReplayCursor> cursor) {
-        return metadataStore.searchAppendReplay(
-                        config.cluster(), attempt.commitRequest(), cursor,
-                        config.maxDerivedIndexRepairCommitsPerCall())
+    private CompletableFuture<CommittedAppend> searchRecovery(Attempt attempt) {
+        int pageSize = Math.min(
+                config.maxDerivedIndexRepairCommitsPerCall(),
+                config.maxCommitChainScan());
+        return recoverySearcher.search(
+                        attempt.commitRequest(),
+                        config.maxCommitChainScan(),
+                        pageSize,
+                        config.appendRecoveryAttemptTimeout())
                 .thenCompose(search -> switch (search.status()) {
-                    case FOUND -> recoverProtectedAppend(attempt);
+                    case FOUND -> {
+                        if (search.evidenceSource().orElseThrow()
+                                == AppendReplayEvidenceSource.RECOVERY_CHECKPOINT) {
+                            attempt.markHeadKnownCommitted();
+                            yield CompletableFuture.completedFuture(
+                                    search.committedAppend().orElseThrow().committedAppend());
+                        }
+                        yield recoverProtectedAppend(attempt);
+                    }
                     case PROVEN_NOT_COMMITTED -> CompletableFuture.failedFuture(new NereusException(
                             ErrorCode.OFFSET_CONFLICT, false,
                             "exact append recovery proved the attempt was not committed",
                             AppendOutcome.KNOWN_NOT_COMMITTED));
-                    case CONTINUE -> {
-                        attempt.updateReplayCursor(search.continuation().orElseThrow());
-                        yield searchRecoveryPage(attempt, search.continuation());
-                    }
+                    case CONTINUE -> CompletableFuture.failedFuture(new NereusException(
+                            ErrorCode.METADATA_INVARIANT_VIOLATION,
+                            false,
+                            "terminal append recovery search returned a continuation",
+                            AppendOutcome.MAY_HAVE_COMMITTED));
                 });
     }
 

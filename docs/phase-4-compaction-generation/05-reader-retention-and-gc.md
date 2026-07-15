@@ -79,7 +79,8 @@ object codec and canonical metadata verifier. M4 checkpoint B adds permanent com
 head visibility and exact-index-owned `VISIBLE_GENERATION` before strict success for every new/recovered
 generation-zero append. Checkpoint D now publishes verified NRC1 bytes only through the recovery-root CAS and repairs
 checkpoint-object/target protections after CAS or restart before releasing the bounded pending protection. M4 GC
-coordinators、cursor integration and checkpoint-aware replay/repair and retirement remain planned；
+checkpoint E adds the root-stable pinned append-replay consumer, but runtime enablement、checkpoint-derived index
+repair、coordinators、cursor integration and retirement remain planned；
 therefore no object deletion is enabled by this checkpoint.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
