@@ -50,7 +50,8 @@ fallback、同对象全引用 quarantine、bounded transient retry 和 restart-s
 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、core adapter，以及 deterministic
 policy/planner/task-store/recovery/64-shard registry scanner、exact-source reader/claim-to-output-ready worker、
 protection owner crash-cut reconciliation、advisory checkpoint reconciliation 与 bounded service lifecycle
-checkpoints 已落地；Pulsar opaque round trip 与 M3 gates 仍 pending，
+checkpoints 以及 Pulsar Entry/NCP1 exact-byte round trip 已落地；topic-compaction worker、terminal metadata
+retirement 与 M3 gates 仍 pending，
 retention/GC 和 async profile 仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

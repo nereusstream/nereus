@@ -73,8 +73,9 @@ As of F4-M2 on 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain va
 durable protection manager are implemented with deterministic handshake/response-loss tests. The committed-generation
 resolver、exact reader dispatch、pin lifetime、fallback/quarantine and publication state machine are integrated and
 final-gated. The M3 storage-level compacted-format strict reader、exact core NCP1 adapter、exact-source worker、
-protection/checkpoint reconciliation and bounded service lifecycle are implemented, but the Pulsar evidence/M3 gates
-plus the M4 GC coordinators、cursor integration and anchor-aware reachability remain planned；
+protection/checkpoint reconciliation、bounded service lifecycle and Pulsar Entry/NCP1 byte round trip are implemented,
+but M3 terminal workflow-metadata retirement/final gates plus the M4 GC coordinators、cursor integration and
+anchor-aware reachability remain planned；
 therefore no object deletion is enabled by this checkpoint.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct

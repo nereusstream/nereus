@@ -9,6 +9,8 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.ProjectionRef;
+import com.nereusstream.api.ProjectionType;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ReadView;
@@ -93,7 +95,8 @@ class ParquetCompactedTargetReaderTest {
                     4,
                     logicalBytes,
                     List.of(),
-                    Optional.empty(),
+                    Optional.of(new ProjectionRef(
+                            ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.core-test")),
                     9);
             ParquetCompactedTargetReader reader = new ParquetCompactedTargetReader(
                     new ParquetCompactedObjectReader(store, Runnable::run));
@@ -117,6 +120,7 @@ class ParquetCompactedTargetReaderTest {
                 assertThat(batch.sourceObjectId()).isEqualTo(written.objectId());
                 assertThat(batch.sourceObjectOffset()).isZero();
                 assertThat(batch.sourceObjectLength()).isEqualTo(written.objectLength());
+                assertThat(batch.projectionRef()).isEmpty();
             });
             assertThat(read.sliceStats()).singleElement().satisfies(stats -> {
                 assertThat(stats.fullSlicePayloadBytes()).isEqualTo(written.objectLength());
@@ -167,7 +171,8 @@ class ParquetCompactedTargetReaderTest {
                         com.nereusstream.api.ChecksumType.SHA256, "2".repeat(64)),
                 PayloadFormat.PULSAR_ENTRY_BATCH,
                 PayloadFormat.PULSAR_ENTRY_BATCH.name(),
-                Optional.empty(),
+                Optional.of(new com.nereusstream.api.Checksum(
+                        com.nereusstream.api.ChecksumType.SHA256, "3".repeat(64))),
                 4,
                 4,
                 4,

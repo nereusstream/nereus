@@ -145,8 +145,11 @@ exact-source reader/claim-to-output-ready worker checkpoints 已落地并通过 
 crash-cut reconciliation 也已接入 recovery/publication 并通过重复 CAS/response-loss 测试。随后落地的
 advisory checkpoint reconciler 只从 current-policy `COMMITTED` generation 的连续覆盖推进，并在 CAS
 response loss 后精确 reload；有界 dispatcher/service 则实施全局/单流 worker 上限、非重叠 64-shard full
-pass、hint coalescing 和 deadline close。Pulsar opaque round trip 和 M3 gates 尚未完成，retention/GC 与 async
-profile 仍不可用。Phase 4 只计划实现
+pass、hint coalescing 和 deadline close。随后新增的 managed-ledger cross-layer test 已证明 unbatched、
+compressed batched Entry 的 exact bytes/properties/ordering-key 与 middle-batch MessageId 经 NCP1 往返不变，
+且 generation-level projection identity 不泄漏成 per-entry metadata。M3 的 topic-compaction worker、terminal
+workflow-metadata retirement、完整 crash-cut/final gates 尚未完成，retention/GC 与 async profile 仍不可用。
+Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use

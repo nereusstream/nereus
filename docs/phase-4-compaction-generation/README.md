@@ -3,8 +3,8 @@
 > 状态：Implementation in progress；F4-M1–M2 已完成并通过 ordinary/Docker-backed final gates；F4-M3
 > compacted Parquet read/write/verifier 与 deterministic policy/planner/task-store/recovery/registry-scanner
 > checkpoints、exact-source reader/worker、protection crash-cut reconciliation、advisory checkpoint
-> reconciliation 以及 bounded service lifecycle checkpoints 已落地；Pulsar opaque-entry round trip 和 M3
-> gates 尚未完成；F4-M4–M6 未实现
+> reconciliation、bounded service lifecycle 以及 Pulsar Entry/NCP1 exact-byte round trip checkpoints 已落地；
+> topic-compaction worker、terminal workflow-metadata retirement 和 M3 gates 尚未完成；F4-M4–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -74,7 +74,10 @@ crash cut 和 protection CAS response loss 测试已通过。第五个 M3 checkp
 `MaterializationConfig`、从 authoritative committed indexes 单调推进的 advisory checkpoint reconciler、
 全局/per-stream 有界且公平的 dispatcher，以及支持 non-overlap、hint coalescing、deadline cancellation 和
 draining close 的 service lifecycle；配置关系、checkpoint CAS response loss、调度公平性与 close race 均有
-聚焦测试。Pulsar opaque-entry round trip 和 M3 ordinary/final gates 仍未完成，因此
+聚焦测试。第六个 M3 checkpoint 又以 managed-ledger cross-layer test 证明 unbatched、compressed batched
+Pulsar Entry 的 exact bytes/properties/ordering key 和 middle-batch MessageId 经 NCP1 往返不变，并保持
+generation-level projection identity 不进入原有 per-entry `ReadBatch` surface。topic-compaction worker、terminal
+workflow-metadata retirement 和 M3 ordinary/final gates 仍未完成，因此
 higher-generation materialization 仍未开放。M4
 还需将 source reachability 扩展为
 recovery-root/anchor-aware proof。Phase 4 整体仍为
@@ -317,7 +320,7 @@ M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physi
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
-| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner、exact-source reader/worker、protection/checkpoint reconciliation and bounded service lifecycle checkpoints landed；Pulsar opaque round trip and milestone gates pending |
+| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner、exact-source reader/worker、protection/checkpoint reconciliation、bounded service lifecycle and Pulsar Entry/NCP1 exact-byte round trip checkpoints landed；topic worker、terminal metadata retirement and milestone gates pending |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |

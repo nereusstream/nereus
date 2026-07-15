@@ -33,7 +33,9 @@ F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has five implementa
 format/read path, the deterministic policy/planner/task-store/recovery/registered-stream-scan path, and the
 exact-source reader plus claim-to-output-ready worker path, followed by task-protection owner crash-cut reconciliation
 across recovery/publication, then monotonic advisory checkpoint reconstruction plus bounded dispatcher/service
-lifecycle. This is not a Phase 4 completion claim：Pulsar opaque round trip and the M3 gates remain open；full
+lifecycle. A sixth checkpoint proves Pulsar Entry/NCP1 exact-byte and middle-batch MessageId round trip while keeping
+the generation projection ref out of per-entry metadata. This is not a Phase 4 completion claim：topic-compaction
+worker、terminal workflow-metadata retirement and the M3 gates remain open；full
 recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
 
 A later milestone is complete only when：
@@ -279,7 +281,8 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > generation-zero fallback。该 fixture 同时暴露并修复 inline `EntryIndexRef` durable round-trip 的内容相等性。
 > F4-M2 is complete/final-gated。M3 已接入真实 compacted format、worker-owned source/output protections、
 > 跨 key crash-cut 恢复、advisory checkpoint reconciliation 与 bounded service lifecycle checkpoints；Pulsar
-> opaque-entry evidence 和 gates 仍需完成；M4 仍需补齐
+> opaque-entry round trip 已完成；topic-compaction worker、terminal workflow-metadata retirement 和 gates 仍需
+> 完成；M4 仍需补齐
 > recovery-root/anchor-aware source reachability，physical delete 继续禁用。
 
 ### 4.1 Production artifacts
@@ -378,8 +381,10 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 > `acquireOrTransfer`, exact task-protection reconstruction, recovery/publication integration, duplicate expired-claim
 > CAS convergence and `PUBLISHED` repair. A fifth checkpoint adds strict `MaterializationConfig` validation、bounded
 > full-proof advisory checkpoint reconciliation with exact CAS-response-loss reload、global/per-stream fair task
-> dispatch and the non-overlapping/coalesced/deadline-close `MaterializationService` loop. This is not M3 completion：
-> Pulsar opaque-entry round trip and both M3 gates below remain pending,
+> dispatch and the non-overlapping/coalesced/deadline-close `MaterializationService` loop. A sixth checkpoint adds
+> the managed-ledger cross-layer `PulsarEntryOpaqueRoundTripTest` and keeps the generation-level projection identity
+> out of the original logical `ReadBatch` surface. This is not M3 completion：topic-compaction worker、terminal
+> workflow-metadata retirement and both M3 gates below remain pending,
 > and production activation stays disabled.
 
 ### 5.1 Production artifacts

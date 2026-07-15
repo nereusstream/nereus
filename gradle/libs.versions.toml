@@ -35,6 +35,7 @@ assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 pulsar-broker = { module = "org.apache.pulsar:pulsar-broker", version.ref = "pulsar" }
 pulsar-managed-ledger = { module = "org.apache.pulsar:managed-ledger", version.ref = "pulsar" }
 pulsar-common = { module = "org.apache.pulsar:pulsar-common", version.ref = "pulsar" }
+pulsar-client-original = { module = "org.apache.pulsar:pulsar-client-original", version.ref = "pulsar" }
 pulsar-client-admin-api = { module = "org.apache.pulsar:pulsar-client-admin-api", version.ref = "pulsar" }
 oxia-client = { module = "io.github.oxia-db:oxia-client", version.ref = "oxia" }
 oxia-testcontainers = { module = "io.github.oxia-db:oxia-testcontainers", version.ref = "oxia-testcontainers" }

@@ -6,7 +6,8 @@ Java below is the normative Phase 4 target surface. The F4 API/metadata/object-s
 physical-reference/reader-pin/activation-proof values and the F4-M3 compacted-Parquet writer/strict-reader、policy、
 whole-index planner、task-store、task-recovery and registered-stream-scanner checkpoints identified in document 07
 are implemented. The exact-source reader/lossless-row/claim-to-output-ready worker、task-protection crash-cut
-reconciliation、advisory checkpoint reconciler and bounded M3 service lifecycle are also implemented；M4–M6 surfaces
+reconciliation、advisory checkpoint reconciler、bounded M3 service lifecycle and Pulsar Entry/NCP1 exact-byte round
+trip are also implemented；topic worker、terminal metadata retirement and M4–M6 surfaces
 remain target code until their milestone lands. Package、class and method names are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
@@ -808,6 +809,12 @@ For source projection mapping `PULSAR_ENTRY_V1`：
 - compression is container-level only；decrypt/re-encrypt、metadata parse/re-serialize and checksum regeneration are
   forbidden；
 - entries with a mapping the verifier cannot prove are not publishable to `COMMITTED`。
+
+The selected generation/index keeps the effective projection ref as an admission and compatibility identity, but
+`ParquetCompactedTargetReader` does not copy that generation-level value into each returned `ReadBatch`.
+`PULSAR_ENTRY_V1` therefore preserves the locked empty per-entry schema/projection-ref surface while the resolver and
+file metadata still prove the exact virtual-ledger projection. `PulsarEntryOpaqueRoundTripTest` covers unbatched and
+ZSTD-compressed batched entries with properties、ordering keys and a serialized middle-batch MessageId.
 
 ### 7.4 Footer/index reference
 

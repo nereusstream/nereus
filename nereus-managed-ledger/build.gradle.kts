@@ -22,6 +22,7 @@ dependencies {
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
+    testImplementation(libs.pulsar.client.original)
     testImplementation(platform(libs.grpc.bom))
     testImplementation(platform(libs.opentelemetry.bom))
     testImplementation(platform(libs.opentelemetry.bom.alpha))

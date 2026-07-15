@@ -152,7 +152,10 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                         payload,
                         range.schemaRefs(),
                         target.entryIndexRef(),
-                        range.projectionRef(),
+                        // The generation-level projection reference is an admission/compatibility identity. It is
+                        // not per-entry payload metadata and the locked PULSAR_ENTRY_V1 codec requires logical
+                        // batches to keep the original empty projection-ref surface.
+                        Optional.empty(),
                         target.objectId(),
                         target.objectOffset(),
                         target.objectLength()));

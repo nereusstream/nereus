@@ -3,8 +3,9 @@
 > 状态：当前设计索引
 > 最近一次设计/实现同步：2026-07-15
 > 当前交付阶段：Future 2、Future 3 与 Future 4 F4-M1–M2 complete/final-gated；Future 4 M3 format、
-> planner/worker、protection/checkpoint reconciliation 与 bounded service lifecycle checkpoints implemented，
-> F4 milestone 3 Pulsar/gates remainder and milestones 4–6 pending
+> planner/worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 exact-byte
+> round trip checkpoints implemented，F4 milestone 3 topic worker/terminal metadata retirement/gates remainder and
+> milestones 4–6 pending
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -73,7 +74,7 @@ streamId + offset
 | `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1–M2 final-gated；F4-M3 task snapshot） | existing metadata plus F4 keys、records、43-vector codec golden、generation allocation/index publication、full immutable task-policy snapshot、closed CAS guards、conditional delete、Oxia slash-aware fixed-depth scans、all-shard fixtures and shared physical-root transition validation；real-service M1/M2 gates passed |
 | `nereus-object-store` | `Implemented`（L0 M3 + F4-M1 final-gated；F4-M3 format in progress） | WAL v1 IO plus replayable private staging/guarded object IO；F4-M3 adds pinned real Parquet NCP1/NTC1 writer、strict bounded reader、whole-file CRC/SHA/key verifier and format/corruption/streaming evidence；full M3 gates pending |
 | `nereus-core` | `Implemented`（P15 + F4-M1–M2 final-gated；F4-M3 adapter in progress） | stable L0 core plus F4 resolver/pin/fallback；exact NCP1 adapter maps dense rows with caller StreamId cross-check，and durable protections support same-logical-owner monotonic recovery transfer；M4 GC remains |
-| `nereus-materialization` | `Implemented`（F4-M1–M2 final-gated；F4-M3 in progress） | strict domain/publication and format verification plus deterministic policy/planner、exact-revalidated task store、claim/publication recovery、all-64-shard registered-stream scanner、stream-scoped exact-source reader、claim-to-output-ready worker、task-protection crash-cut reconciliation、monotonic checkpoint reconciliation and bounded dispatcher/service lifecycle；Pulsar evidence/M3 gates remain |
+| `nereus-materialization` | `Implemented`（F4-M1–M2 final-gated；F4-M3 in progress） | strict domain/publication and format verification plus deterministic policy/planner、exact-revalidated task store、claim/publication recovery、all-64-shard registered-stream scanner、stream-scoped exact-source reader、claim-to-output-ready worker、task-protection crash-cut reconciliation、monotonic checkpoint reconciliation and bounded dispatcher/service lifecycle；Pulsar Entry/NCP1 exact-byte evidence passes，while topic worker、terminal metadata retirement/M3 gates remain |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names and M2 publication plus M3 planning/recovery/exact-source worker/checkpoint/service building blocks exist；profile admission、retention and execution gates do not |
@@ -81,7 +82,7 @@ streamId + offset
 | `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle、canonical cursor context、unloaded binding-aware admin validation and real dual-broker M6 compatibility cuts are implemented/tested |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Future 4 materialization/compaction | `In progress / F4-M1–M2 final-gated；M3 checkpoints` | M1/M2 gates passed；M3 format/read、deterministic policy/planner/task/recovery/registry-scan、exact-source claim-to-output-ready worker、protection/checkpoint reconciliation and bounded service lifecycle are implemented/tested, while Pulsar opaque round trip、M3 gates and M4–M6 remain |
+| Future 4 materialization/compaction | `In progress / F4-M1–M2 final-gated；M3 checkpoints` | M1/M2 gates passed；M3 format/read、deterministic policy/planner/task/recovery/registry-scan、exact-source claim-to-output-ready worker、protection/checkpoint reconciliation、bounded service lifecycle and Pulsar Entry/NCP1 exact-byte round trip are implemented/tested, while topic worker、terminal metadata retirement、M3 gates and M4–M6 remain |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
