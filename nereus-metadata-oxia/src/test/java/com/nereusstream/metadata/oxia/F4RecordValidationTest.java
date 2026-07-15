@@ -1,0 +1,140 @@
+/* Licensed under the Apache License, Version 2.0 */
+package com.nereusstream.metadata.oxia;
+
+import static com.nereusstream.metadata.oxia.F4MetadataTestValues.HASH_A;
+import static com.nereusstream.metadata.oxia.F4MetadataTestValues.HASH_B;
+import static com.nereusstream.metadata.oxia.F4MetadataTestValues.STREAM;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.nereusstream.api.ReadView;
+import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
+import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
+import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
+import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
+import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
+import com.nereusstream.metadata.oxia.records.TaskLifecycle;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+class F4RecordValidationTest {
+    @Test
+    void rejectsGenerationAllocatorPublicationAndLifecycleContradictions() {
+        assertThatThrownBy(() -> new GenerationSequenceRecord(
+                        1, STREAM, ReadView.COMMITTED.wireId(), 2, 1, "p".repeat(26), 100, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        GenerationIndexRecord prepared = F4MetadataTestValues.generation(GenerationLifecycle.PREPARED);
+        assertThatThrownBy(() -> generationLifecycle(prepared, GenerationLifecycle.COMMITTED, 0, ""))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> generationLifecycle(prepared, GenerationLifecycle.ABORTED, 0, ""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsTaskCheckpointStatsAndRecoveryStateContradictions() {
+        MaterializationTaskRecord planned = F4MetadataTestValues.task(TaskLifecycle.PLANNED);
+        assertThatThrownBy(() -> taskAttempt(planned, 1))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new MaterializationCheckpointRecord(
+                        1, STREAM, "policy", 1, HASH_A, 0, 0, 1, "", 100, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new RangeRetentionStatsRecord(
+                        1, STREAM, 0, 2, 1, 0, 10, 200, 100,
+                        "/index", HASH_A, 1, "build", 300, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new RecoveryCheckpointRootRecord(
+                        1, STREAM, 1, 0, 0, 0, 0, 0, 0,
+                        "", "", List.of(), "", "", 0, 0, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsPhysicalRootLeaseAndProtectionSafetyContradictions() {
+        PhysicalObjectRootRecord active = F4MetadataTestValues.physicalRoot(PhysicalObjectLifecycle.ACTIVE);
+        assertThatThrownBy(() -> activeWithTombstone(active))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ObjectReaderLeaseRecord(
+                        1,
+                        active.objectKeyHash(),
+                        F4MetadataTestValues.PROCESS,
+                        F4MetadataTestValues.LEASE,
+                        1,
+                        100,
+                        200,
+                        201,
+                        0,
+                        0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ObjectProtectionRecord(
+                        1,
+                        active.objectKeyHash(),
+                        ObjectProtectionType.CURSOR_SNAPSHOT_PENDING.wireId(),
+                        "pending",
+                        "/owner",
+                        1,
+                        HASH_B,
+                        1,
+                        100,
+                        100,
+                        0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ObjectProtectionRecord(
+                        1,
+                        active.objectKeyHash(),
+                        ObjectProtectionType.VISIBLE_GENERATION.wireId(),
+                        "permanent",
+                        "/owner",
+                        1,
+                        HASH_B,
+                        1,
+                        100,
+                        200,
+                        0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static GenerationIndexRecord generationLifecycle(
+            GenerationIndexRecord value,
+            GenerationLifecycle lifecycle,
+            long committedAt,
+            String reason) {
+        return new GenerationIndexRecord(
+                value.schemaVersion(), value.streamId(), value.readViewId(), value.offsetStart(), value.offsetEnd(),
+                value.generation(), value.publicationId(), value.taskId(), lifecycle, value.sourceSetSha256(),
+                value.policySha256(), value.readTarget(), value.targetIdentitySha256(),
+                value.materializationPolicySha256(), value.payloadFormat(), value.sourceRecordCount(),
+                value.outputRecordCount(), value.entryCount(), value.logicalBytes(), value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(), value.firstCommitVersion(), value.lastCommitVersion(),
+                value.schemaRefs(), value.projectionRef(), value.createdAtMillis(), committedAt, reason,
+                value.stateChangedAtMillis(), 0);
+    }
+
+    private static MaterializationTaskRecord taskAttempt(
+            MaterializationTaskRecord value,
+            long attempt) {
+        return new MaterializationTaskRecord(
+                value.schemaVersion(), value.taskId(), value.taskSequence(), value.streamId(), value.readViewId(),
+                value.taskKindId(), value.offsetStart(), value.offsetEnd(), value.sources(), value.sourceSetSha256(),
+                value.policyId(), value.policyVersion(), value.policySha256(), value.lifecycle(), attempt,
+                value.workerClaim(), value.output(), value.allocatedGeneration(), value.publicationId(),
+                value.failureClassId(), value.failureMessage(), value.retryNotBeforeMillis(), value.createdAtMillis(),
+                value.updatedAtMillis(), 0);
+    }
+
+    private static PhysicalObjectRootRecord activeWithTombstone(PhysicalObjectRootRecord value) {
+        return new PhysicalObjectRootRecord(
+                value.schemaVersion(), value.objectKeyHash(), value.objectKey(), value.objectId(),
+                value.objectKindId(), value.objectLength(), value.storageChecksumType(), value.storageChecksumValue(),
+                value.contentSha256(), value.etag(), value.lifecycle(), value.lifecycleEpoch(),
+                value.createdAtMillis(), value.orphanNotBeforeMillis(), value.gcAttemptId(),
+                value.referenceSetSha256(), value.markedAtMillis(), value.deleteNotBeforeMillis(),
+                value.deleteStartedAtMillis(), value.deletedAtMillis(), 300, HASH_A, value.stateReason(), 0);
+    }
+}

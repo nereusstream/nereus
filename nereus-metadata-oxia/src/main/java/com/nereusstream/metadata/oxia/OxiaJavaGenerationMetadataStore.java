@@ -160,10 +160,24 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         }
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
+        ReadView view = ReadView.fromWireId(value.readViewId());
         String key = keys.generationIndexKey(
-                stream, ReadView.fromWireId(value.readViewId()), value.offsetEnd(), value.generation());
-        return support.create(key, keys.streamPartitionKey(stream), value, GenerationIndexRecord.class)
+                stream, view, value.offsetEnd(), value.generation());
+        CompletableFuture<VersionedGenerationIndex> create = support.create(
+                        key, keys.streamPartitionKey(stream), value, GenerationIndexRecord.class)
                 .thenApply(item -> index(keys, item));
+        GenerationIndexIdentity identity = new GenerationIndexIdentity(
+                stream, view, value.offsetEnd(), value.generation());
+        return recoverCreate(create, () -> getIndex(cluster, identity).thenApply(existing -> {
+            VersionedGenerationIndex result = existing.orElseThrow(
+                    () -> F4MetadataStoreSupport.invariant(
+                            "generation index disappeared after create conflict"));
+            if (!sameGenerationPublicationIdentity(value, result.value())) {
+                throw F4MetadataStoreSupport.invariant(
+                        "generation index key collided with another publication identity");
+            }
+            return result;
+        }));
     }
 
     @Override
@@ -243,11 +257,25 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
     public CompletableFuture<VersionedMaterializationTask> createTask(
             String cluster, MaterializationTaskRecord task) {
         MaterializationTaskRecord value = Objects.requireNonNull(task, "task");
+        if (value.lifecycle() != com.nereusstream.metadata.oxia.records.TaskLifecycle.PLANNED
+                || value.metadataVersion() != 0) {
+            throw new IllegalArgumentException("createTask requires an unhydrated PLANNED task");
+        }
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
         String key = keys.taskKey(stream, value.taskId());
-        return support.create(key, keys.streamPartitionKey(stream), value, MaterializationTaskRecord.class)
+        CompletableFuture<VersionedMaterializationTask> create = support.create(
+                        key, keys.streamPartitionKey(stream), value, MaterializationTaskRecord.class)
                 .thenApply(item -> task(keys, item));
+        return recoverCreate(create, () -> getTask(cluster, stream, value.taskId()).thenApply(existing -> {
+            VersionedMaterializationTask result = existing.orElseThrow(
+                    () -> F4MetadataStoreSupport.invariant("task disappeared after create conflict"));
+            if (!sameTaskPlanningIdentity(value, result.value())) {
+                throw F4MetadataStoreSupport.invariant(
+                        "task key collided with another planning identity");
+            }
+            return result;
+        }));
     }
 
     @Override
@@ -336,8 +364,16 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
                     .thenApply(item -> checkpoint(keys, item));
             return recoverCreate(create, () -> getMaterializationCheckpoint(
                             cluster, streamId, policyId, policyVersion)
-                    .thenApply(value -> value.orElseThrow(
-                            () -> F4MetadataStoreSupport.invariant("checkpoint disappeared after create conflict"))));
+                    .thenApply(value -> {
+                        VersionedMaterializationCheckpoint result = value.orElseThrow(
+                                () -> F4MetadataStoreSupport.invariant(
+                                        "checkpoint disappeared after create conflict"));
+                        if (!result.value().policySha256().equals(policySha256.value())) {
+                            throw F4MetadataStoreSupport.invariant(
+                                    "checkpoint policy version collided with another digest");
+                        }
+                        return result;
+                    }));
         });
     }
 
@@ -772,6 +808,55 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
             throw F4MetadataStoreSupport.invariant("recovery root key/value identity mismatch");
         }
         return new VersionedRecoveryCheckpointRoot(item.key(), value, item.version(), item.durableSha256());
+    }
+
+    private static boolean sameGenerationPublicationIdentity(
+            GenerationIndexRecord expected,
+            GenerationIndexRecord actual) {
+        return expected.schemaVersion() == actual.schemaVersion()
+                && expected.streamId().equals(actual.streamId())
+                && expected.readViewId() == actual.readViewId()
+                && expected.offsetStart() == actual.offsetStart()
+                && expected.offsetEnd() == actual.offsetEnd()
+                && expected.generation() == actual.generation()
+                && expected.publicationId().equals(actual.publicationId())
+                && expected.taskId().equals(actual.taskId())
+                && expected.sourceSetSha256().equals(actual.sourceSetSha256())
+                && expected.policySha256().equals(actual.policySha256())
+                && expected.readTarget().equals(actual.readTarget())
+                && expected.targetIdentitySha256().equals(actual.targetIdentitySha256())
+                && expected.materializationPolicySha256().equals(actual.materializationPolicySha256())
+                && expected.payloadFormat().equals(actual.payloadFormat())
+                && expected.sourceRecordCount() == actual.sourceRecordCount()
+                && expected.outputRecordCount() == actual.outputRecordCount()
+                && expected.entryCount() == actual.entryCount()
+                && expected.logicalBytes() == actual.logicalBytes()
+                && expected.cumulativeSizeAtStart() == actual.cumulativeSizeAtStart()
+                && expected.cumulativeSizeAtEnd() == actual.cumulativeSizeAtEnd()
+                && expected.firstCommitVersion() == actual.firstCommitVersion()
+                && expected.lastCommitVersion() == actual.lastCommitVersion()
+                && expected.schemaRefs().equals(actual.schemaRefs())
+                && expected.projectionRef().equals(actual.projectionRef())
+                && expected.createdAtMillis() == actual.createdAtMillis();
+    }
+
+    private static boolean sameTaskPlanningIdentity(
+            MaterializationTaskRecord expected,
+            MaterializationTaskRecord actual) {
+        return expected.schemaVersion() == actual.schemaVersion()
+                && expected.taskId().equals(actual.taskId())
+                && expected.taskSequence() == actual.taskSequence()
+                && expected.streamId().equals(actual.streamId())
+                && expected.readViewId() == actual.readViewId()
+                && expected.taskKindId() == actual.taskKindId()
+                && expected.offsetStart() == actual.offsetStart()
+                && expected.offsetEnd() == actual.offsetEnd()
+                && expected.sources().equals(actual.sources())
+                && expected.sourceSetSha256().equals(actual.sourceSetSha256())
+                && expected.policyId().equals(actual.policyId())
+                && expected.policyVersion() == actual.policyVersion()
+                && expected.policySha256().equals(actual.policySha256())
+                && expected.createdAtMillis() == actual.createdAtMillis();
     }
 
     private static AllocatedGeneration allocation(

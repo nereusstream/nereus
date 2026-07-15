@@ -16,7 +16,10 @@ identity、GC reference-domain proof value、generation activation proof contrac
 reader pin 通过同一 `(processRunId, object)` durable lease 复用本地并发读，并在每次 admission 后重新验证
 ACTIVE root 与调用方 selection；失败会条件清理刚写入的 lease。durable protection manager 也已实现
 create/root/owner post-check、same-key owner transfer、owner-authorized release 和 response-loss fail-safe veto。
-该状态尚未完成 M1 全部 golden/store contract、Gradle milestone gate 或真实 Oxia/LocalStack final evidence，因此仍标记为
+metadata checkpoint 还新增了全分片内存 Oxia backend、generation/registration/physical-root/conditional-delete
+store contract tests、record contradiction tests，以及 production/fake 共用的 physical-root lifecycle transition validator；
+generation index/task 的 create-response-loss recovery 会核对 immutable identity，checkpoint 同版本则核对 policy digest。
+该状态尚未完成 frozen codec golden、Gradle milestone gate 或真实 Oxia/LocalStack final evidence，因此仍标记为
 `Implementation in progress`，不开放 higher-generation read 或 physical delete。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
@@ -200,7 +203,7 @@ the same change.
 
 ### 6.1 Current implementation checkpoint
 
-The first F4-M1 checkpoint now contains the view/generation/publication/object-key-hash API values, the
+The current F4-M1 checkpoint contains the view/generation/publication/object-key-hash API values, the
 `nereus-materialization` module boundary, F4 Oxia keyspace/scan tokens, all ten M1 record families and binary-v1
 codecs, production generation/physical-object metadata-store surfaces, version-conditional delete, and guarded
 replayable PUT/list/delete. The object-store checkpoint now also includes owner-only bounded staging files,
@@ -214,8 +217,14 @@ activation-proof contract、durable reader leases and durable protections. Prote
 version whose successful response proves local creation；response-loss recovery and failed transfer post-checks leave
 a safe deletion veto. Same-key owner transfer and owner-authorized conditional release have deterministic race tests.
 
+The metadata checkpoint now also runs the generation、64-shard stream-registry、256-shard physical-root and exact
+conditional-delete contracts against a deterministic partition-aware backend. It verifies response-loss-safe
+generation/task create recovery, policy-digest collisions, pagination/token scope, exact version/digest deletion and
+legal physical-root lifecycle/epoch transitions. Production and fake physical stores use the same transition
+validator, so test doubles cannot admit a state change rejected by the Oxia adapter.
+
 This checkpoint is deliberately not an F4-M1 completion claim. Product capability guards/integrations、remaining
-metadata-store contracts、frozen codec vectors、real-service evidence and the aggregate M1 gate remain outstanding.
+ordinary-CAS invariant guards、frozen codec vectors、real-service evidence and the aggregate M1 gate remain outstanding.
 No generation publication, resolver, materialization worker, retention or GC behavior is enabled by this checkpoint.
 
 ## 7. Milestones

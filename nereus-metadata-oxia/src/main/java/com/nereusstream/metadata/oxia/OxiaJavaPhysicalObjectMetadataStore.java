@@ -68,7 +68,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
             return getRoot(cluster, object).thenApply(existing -> {
                 VersionedPhysicalObjectRoot result = existing.orElseThrow(
                         () -> F4MetadataStoreSupport.invariant("physical root disappeared after create conflict"));
-                if (!sameImmutableIdentity(value, result.value())) {
+                if (!PhysicalObjectRootTransitions.sameImmutableIdentity(value, result.value())) {
                     throw F4MetadataStoreSupport.invariant("physical root immutable identity conflict");
                 }
                 return result;
@@ -82,13 +82,22 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
         PhysicalObjectRootRecord value = Objects.requireNonNull(root, "root");
         ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
         F4Keyspace keys = new F4Keyspace(cluster);
-        return support.compareAndSet(
-                        keys.physicalRootKey(object),
-                        keys.physicalObjectPartitionKey(object),
-                        value,
-                        PhysicalObjectRootRecord.class,
-                        expectedVersion)
-                .thenApply(item -> root(keys, item));
+        return getRoot(cluster, object).thenCompose(currentOptional -> {
+            VersionedPhysicalObjectRoot current = currentOptional.orElseThrow(
+                    () -> new F4MetadataConditionFailedException("physical root is absent"));
+            if (current.metadataVersion() != expectedVersion) {
+                return F4MetadataStoreSupport.failed(
+                        new F4MetadataConditionFailedException("physical root version mismatch"));
+            }
+            PhysicalObjectRootTransitions.requireValidReplacement(current.value(), value);
+            return support.compareAndSet(
+                            keys.physicalRootKey(object),
+                            keys.physicalObjectPartitionKey(object),
+                            value,
+                            PhysicalObjectRootRecord.class,
+                            expectedVersion)
+                    .thenApply(item -> root(keys, item));
+        });
     }
 
     @Override
@@ -379,19 +388,6 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
             throw F4MetadataStoreSupport.invariant("protection key/value identity mismatch");
         }
         return new VersionedObjectProtection(item.key(), value, item.version(), item.durableSha256());
-    }
-
-    private static boolean sameImmutableIdentity(
-            PhysicalObjectRootRecord expected, PhysicalObjectRootRecord actual) {
-        return expected.objectKeyHash().equals(actual.objectKeyHash())
-                && expected.objectKey().equals(actual.objectKey())
-                && expected.objectId().equals(actual.objectId())
-                && expected.objectKindId() == actual.objectKindId()
-                && expected.objectLength() == actual.objectLength()
-                && expected.storageChecksumType().equals(actual.storageChecksumType())
-                && expected.storageChecksumValue().equals(actual.storageChecksumValue())
-                && expected.contentSha256().equals(actual.contentSha256())
-                && expected.etag().equals(actual.etag());
     }
 
     private static ObjectKeyHash hashForShard(int shard) {

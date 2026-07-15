@@ -46,7 +46,7 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         String key = keys.physicalRootKey(object);
         VersionedPhysicalObjectRoot existing = roots.get(key);
         if (existing != null) {
-            if (!sameImmutableIdentity(root, existing.value())) {
+            if (!PhysicalObjectRootTransitions.sameImmutableIdentity(root, existing.value())) {
                 return failed(new F4MetadataConditionFailedException("physical root immutable identity conflict"));
             }
             return completed(existing);
@@ -69,6 +69,11 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         VersionedPhysicalObjectRoot current = roots.get(key);
         if (current == null || current.metadataVersion() != expectedVersion) {
             return failed(new F4MetadataConditionFailedException("physical root version mismatch"));
+        }
+        try {
+            PhysicalObjectRootTransitions.requireValidReplacement(current.value(), root);
+        } catch (RuntimeException failure) {
+            return failed(failure);
         }
         long version = nextVersion++;
         PhysicalObjectRootRecord value = root.withMetadataVersion(version);
@@ -337,19 +342,6 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
             }
         });
         return supplied;
-    }
-
-    private static boolean sameImmutableIdentity(
-            PhysicalObjectRootRecord expected, PhysicalObjectRootRecord actual) {
-        return expected.objectKeyHash().equals(actual.objectKeyHash())
-                && expected.objectKey().equals(actual.objectKey())
-                && expected.objectId().equals(actual.objectId())
-                && expected.objectKindId() == actual.objectKindId()
-                && expected.objectLength() == actual.objectLength()
-                && expected.storageChecksumType().equals(actual.storageChecksumType())
-                && expected.storageChecksumValue().equals(actual.storageChecksumValue())
-                && expected.contentSha256().equals(actual.contentSha256())
-                && expected.etag().equals(actual.etag());
     }
 
     private static <T> Checksum durable(T value, Class<T> type) {

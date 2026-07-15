@@ -14,10 +14,15 @@ parts are implemented and covered by focused tests：
   the durable create/revalidate/release reader-pin handshake backed by one process/object lease；
 - durable protection acquire/revalidate/same-key owner-transfer/owner-authorized-release handshakes, including
   response-loss cleanup ownership and fail-safe deletion-veto behavior；
-- deterministic fake physical metadata storage used by the reader/reference handshake tests。
+- deterministic fake physical metadata storage used by the reader/reference handshake tests；
+- partition-aware in-memory Oxia backend plus generation、64-shard stream-registration、256-shard physical-root and
+  exact conditional-delete store contracts；
+- production/fake shared physical-root lifecycle/epoch validation, record contradiction tests and response-loss-safe
+  generation-index/task create recovery with immutable identity checks。
 
-This is an implementation checkpoint, not an F4-M1 completion claim. The remaining metadata golden/store contracts、
-the `phase4M1Check`/`phase4M1FinalCheck` tasks and real Oxia/LocalStack evidence are still required. Core activation
+This is an implementation checkpoint, not an F4-M1 completion claim. Frozen metadata codec vectors、remaining
+ordinary-CAS invariant guards、the `phase4M1Check`/`phase4M1FinalCheck` tasks and real Oxia/LocalStack evidence are
+still required. Core activation
 and protection values are contracts/primitives only；the product activation adapter and every mutation-boundary
 integration arrive in later M1/M2-M6 work.
 

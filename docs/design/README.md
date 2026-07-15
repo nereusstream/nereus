@@ -37,7 +37,8 @@ MessageId/property/reset/limit/rollout/incarnation/F4-handoff gates 均已完成
 2026-07-14 已完成 Phase 4 F4-M0 本地 Nereus/Pulsar source audit 和代码级设计门禁，冻结
 generation publish、object format、task/recovery、reader lease、retention/GC、Object-WAL async 和
 Pulsar rollout 合同。2026-07-15 F4-M1 已开始实现 API/metadata/codecs、guarded object IO、physical
-reference values、durable reader pin 与 durable protection handshakes；M1 aggregate/final gate 尚未完成，
+reference values、durable reader pin 与 durable protection handshakes，并增加全分片 metadata store contracts、
+conditional delete 及 production/fake 共用 physical-root transition validation；M1 aggregate/final gate 尚未完成，
 generation publication、materialization、retention/GC 和 async profile 仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

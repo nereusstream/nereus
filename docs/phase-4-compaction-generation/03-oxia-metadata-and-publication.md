@@ -20,6 +20,19 @@ Phase 4 metadata is split deliberately：
 No task、checkpoint、watch、cache or object listing can substitute for an authoritative record named for another
 domain. The stream registration owns enumeration only；it never proves work、visibility or deletion eligibility.
 
+### 1.1 Current F4-M1 implementation checkpoint
+
+The production Oxia adapter and deterministic partition-aware test backend now execute generation allocation/index、
+task、checkpoint、range-stat、recovery-root、64-shard stream-registration、256-shard physical-root and exact
+conditional-delete contracts. A repeated generation-index or task create is accepted after response loss only when
+its immutable publication/planning identity matches the existing value；a checkpoint policy-version collision also
+requires the same policy digest. `PhysicalObjectRootTransitions` is shared by production and fake stores and rejects
+identity mutation、illegal lifecycle edges、non-unit epoch changes and invalid DELETED audit replacement.
+
+This is partial M1 evidence only. Frozen codec vectors、the remaining ordinary-CAS monotonicity guards、real Oxia
+evidence and the aggregate M1 gates are still outstanding；nothing in this checkpoint enables generation publication
+or physical deletion.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples
