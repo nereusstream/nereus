@@ -2,8 +2,10 @@
 
 ## 1. Design Rules
 
-All Java below is the Phase 4 target surface. It is not current implementation. Package、class and method names are
-normative unless a review replaces them together with every caller/test listed in document 07.
+Java below is the normative Phase 4 target surface. The F4 API/metadata/object-store foundations and the core
+physical-reference、reader-pin and activation-proof values identified in document 07 are now implemented；the rest
+remains target code until its milestone lands. Package、class and method names are normative unless a review replaces
+them together with every caller/test listed in document 07.
 
 The domain model obeys these rules：
 
@@ -185,8 +187,9 @@ single metadata version；the guard recomputes the exact projection-domain diges
 proof and is mandatory immediately before every index/root/trim CAS.
 The proof is ephemeral and never becomes visibility or deletion truth.
 
-Construction is strict：`LiveProjectionSubject` requires a non-empty ref whose decoded stream equals `streamId` and
-a lowercase SHA-256 identity. `DomainValidatedDeletionSubject.referenceQuery` is the exact core query defined in
+Construction is strict：`LiveProjectionSubject` requires a valid ref and SHA-256 identity；the product guard must
+resolve that opaque ref and prove its decoded stream equals `streamId` before issuing a proof.
+`DomainValidatedDeletionSubject.referenceQuery` is the exact core query defined in
 document 05, including physical object、query kind、candidate evidence and canonical affected-stream set；its digest
 must be the complete `projection-generation-v1` snapshot for that same query identity. Referenced/snapshot candidates
 require a non-empty stream set；only `OWNERLESS_ORPHAN_CANDIDATE` may carry an empty set, and its domain proof must
@@ -194,6 +197,12 @@ establish cluster binding/projection absence rather than treating emptiness as p
 `GenerationActivationProof.subjectSha256` hashes the canonical subject fields and `subjectValidationVersion` is the
 current projection version for a live subject or exactly zero for a deletion subject. Unknown subject/operation
 combinations fail before any metadata mutation.
+
+The implemented V1 proof-value digests are domain-tagged SHA-256 over big-endian、length-delimited UTF-8 fields；
+optional fields carry an explicit presence byte and checksums include both algorithm name and canonical value.
+`LiveProjectionSubject` hashes stream id、projection-ref type/value and projection identity；the deletion subject
+hashes the complete query identity and projection-domain snapshot identity. These encodings are input to ephemeral
+proof comparison only and do not replace the authoritative metadata versions reloaded by `revalidate`.
 
 ### 3.2 Strong identities
 

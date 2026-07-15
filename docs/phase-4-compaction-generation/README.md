@@ -11,6 +11,13 @@
 
 > 实现状态日期：2026-07-15
 
+当前 F4-M1 检查点已经落地 API/metadata/object-store 基础、guarded/replayable object IO，以及 core 的物理对象
+identity、GC reference-domain proof value、generation activation proof contract 和 durable reader pin handshake。
+reader pin 通过同一 `(processRunId, object)` durable lease 复用本地并发读，并在每次 admission 后重新验证
+ACTIVE root 与调用方 selection；失败会条件清理刚写入的 lease。该状态尚未实现 protection manager、M1 完整
+golden/store contract、Gradle milestone gate 或真实 Oxia/LocalStack final evidence，因此仍标记为
+`Implementation in progress`，不开放 higher-generation read 或 physical delete。
+
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
 per-stream、read-optimized 的 higher generation，并补齐 reader pin、source retirement、recovery checkpoint、
 physical object GC、Object-WAL async materialization 和 Pulsar retention 接线。它不改变

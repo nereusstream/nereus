@@ -118,12 +118,16 @@ F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unlo
 factory cache，避免新 broker topic 复用已删除 stream。`phase3M6Check`、`phase3M6FinalCheck`、
 `phase3Check` 和 `phase3FinalCheck` 构成完整 release gate；Future 3 已实现并 final-gated。
 
-Phase 4 F4-M0 已于 2026-07-14 完成代码级设计门禁。新的
+Phase 4 F4-M0 已于 2026-07-14 完成代码级设计门禁，F4-M1 正在实现。当前检查点已经落地
+F4 API/metadata/Oxia 基础、materialization 模块边界、guarded/replayable object-store IO、物理对象与 GC
+reference-domain 强类型、generation activation proof contract，以及 create/revalidate/release durable reader
+pin handshake；但 protection manager、剩余 golden/store contract、M1 Gradle gate 和真实服务证据尚未完成。
+新的
 `docs/phase-4-compaction-generation/` 冻结了 API/module ownership、`NCP1/NTC1/NRC1` formats、
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader
 leases/protections、64-shard restart-safe stream discovery、retention/GC、guarded PUT 与可界的 DELETED-root audit
-retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录是 Designed
-target contract，不是已实现能力；下一里程碑是 F4-M1。Phase 4 只计划实现
+retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录同时记录 normative target 与已落地检查点；
+F4-M1 尚未完成。Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use

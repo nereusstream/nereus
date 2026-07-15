@@ -2,10 +2,22 @@
 
 ## 1. Current Status
 
-F4-M0 is complete as a design-only gate against Nereus
-`e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. No Phase 4 production code or executable Phase 4 gate is claimed by
-this status.
+F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
+`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1 implementation is in progress as of 2026-07-15；the following
+parts are implemented and covered by focused tests：
+
+- F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
+  delete surface；
+- replayable private staging、guarded/retried S3 PUT、exact logical-prefix LIST、HEAD-before-DELETE and the safe local
+  object-store fixture；
+- strict physical-object/reference-domain proof values、the protocol-neutral generation activation proof surface and
+  the durable create/revalidate/release reader-pin handshake backed by one process/object lease；
+- deterministic fake physical metadata storage used by the reader/reference handshake tests。
+
+This is an implementation checkpoint, not an F4-M1 completion claim. The durable protection manager/model tests、
+remaining metadata golden/store contracts、the `phase4M1Check`/`phase4M1FinalCheck` tasks and real Oxia/LocalStack
+evidence are still required. Core activation values are contracts only；the product activation adapter and every
+mutation-boundary integration arrive in later M1/M2-M6 work.
 
 A later milestone is complete only when：
 

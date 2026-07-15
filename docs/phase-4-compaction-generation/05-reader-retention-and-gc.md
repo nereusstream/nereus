@@ -22,13 +22,16 @@ AND the complete authoritative version set is unchanged after the drain wait
 Failure to prove any clause delays deletion. Age、list absence、task completion、higher generation、cursor floor or a
 local reference count alone is never sufficient.
 
-## 2. Planned Source Layout
+## 2. Source Layout and Implementation State
 
 ```text
 nereus-core/src/main/java/com/nereusstream/core/physical/
   PhysicalObjectIdentity.java
   ObjectReadPinManager.java
+  DefaultObjectReadPinManager.java
   ObjectReadLease.java
+  PhysicalObjectRecords.java
+  PhysicalValueDigests.java
   ObjectProtectionManager.java
   ObjectProtection.java
   GcReferenceDomain.java
@@ -62,6 +65,11 @@ nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention/
   CursorSnapshotReferenceDomain.java
   CursorSnapshotGcScanner.java
 ```
+
+As of 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain values、`ObjectReadPinManager`/
+`DefaultObjectReadPinManager` and their deterministic fake-store tests are implemented. The protection manager、GC
+coordinators and product reader/cursor integrations in this layout remain planned work；therefore no object deletion
+or higher-generation read is enabled by this checkpoint.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -289,6 +297,12 @@ One process has at most one durable lease key per object. A local ref count mult
 new after process restart or after a fully released lease.
 `maximumReadDeadlineMillis <= expiresAtMillis - maximumClockSkew.toMillis()`；a read cannot outlive its durable
 protection.
+
+The implemented manager serializes operations per object hash、re-scans the durable process lease before every local
+reuse and records a larger `maximumReadDeadlineMillis` with CAS even when the existing expiry already covers it.
+When the deadline no longer fits, it extends the same lease id and increments `renewalSequence` before the root and
+selection post-check. `close()` rejects new acquisitions；each returned handle owns an idempotent asynchronous
+`release()` so the actual read completion path can await durable cleanup.
 
 ### 3.4 Durable protection
 
