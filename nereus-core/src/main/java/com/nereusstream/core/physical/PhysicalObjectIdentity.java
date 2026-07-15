@@ -6,6 +6,7 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -65,6 +66,23 @@ public record PhysicalObjectIdentity(
                 storageChecksum,
                 contentSha256,
                 etag);
+    }
+
+    public static PhysicalObjectIdentity from(PhysicalObjectRootRecord root) {
+        Objects.requireNonNull(root, "root");
+        return new PhysicalObjectIdentity(
+                new ObjectKey(root.objectKey()),
+                new ObjectKeyHash(root.objectKeyHash()),
+                root.objectId().isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(new ObjectId(root.objectId())),
+                PhysicalObjectKind.fromWireId(root.objectKindId()),
+                root.objectLength(),
+                new Checksum(ChecksumType.valueOf(root.storageChecksumType()), root.storageChecksumValue()),
+                root.contentSha256().isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(new Checksum(ChecksumType.SHA256, root.contentSha256())),
+                root.etag().isEmpty() ? Optional.empty() : Optional.of(root.etag()));
     }
 
     public Checksum identitySha256() {

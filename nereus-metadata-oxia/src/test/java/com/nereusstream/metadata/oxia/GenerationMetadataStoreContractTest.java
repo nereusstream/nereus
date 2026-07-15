@@ -80,6 +80,10 @@ class GenerationMetadataStoreContractTest {
         assertThat(committed.value().lifecycle()).isEqualTo(GenerationLifecycle.COMMITTED);
         assertThat(store.createPrepared(CLUSTER, prepared).join()).isEqualTo(committed);
         assertThat(store.getIndex(CLUSTER, identity).join()).contains(committed);
+        assertThat(store.getCandidate(
+                        CLUSTER, STREAM_ID, ReadView.COMMITTED,
+                        committed.value().offsetEnd(), committed.value().generation()).join())
+                .contains(committed);
 
         assertThatThrownBy(() -> store.createPrepared(
                         CLUSTER, generationWithTask(prepared, "other-task")).join())

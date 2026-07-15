@@ -217,6 +217,22 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
     }
 
     @Override
+    public CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidate(
+            String cluster,
+            StreamId streamId,
+            ReadView view,
+            long offsetEnd,
+            long generation) {
+        if (offsetEnd <= 0 || generation < 0 || (view != ReadView.COMMITTED && generation == 0)) {
+            throw new IllegalArgumentException("generation candidate identity is invalid");
+        }
+        F4Keyspace keys = new F4Keyspace(cluster);
+        String key = keys.generationIndexKey(streamId, view, offsetEnd, generation);
+        return support.client().get(key, keys.streamPartitionKey(streamId))
+                .thenApply(value -> value.map(item -> generationCandidate(keys, streamId, view, item)));
+    }
+
+    @Override
     public CompletableFuture<GenerationScanPage> scanIndex(
             String cluster,
             StreamId streamId,

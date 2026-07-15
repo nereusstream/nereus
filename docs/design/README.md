@@ -43,7 +43,10 @@ conditional delete、43 个 codec golden、stream-scoped CAS guards 及 producti
 validation。真实 Oxia gate 验证 slash-aware fixed-depth range scan；pinned LocalStack gate 验证 SDK response/
 exact-byte upload completion 与 exact HEAD 后的受限 conditional-delete fallback；`phase4M1Check` 和
 `phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M1 已 final-gated，但 M2–M6 的 generation
-publication/read、materialization、retention/GC 和 async profile 仍不可用。
+publication/read、materialization、retention/GC 和 async profile 仍不可用。F4-M2 已进入实现：exact
+target-reader dispatch、generation allocator/index compatibility、physical identity resolution 与 authoritative
+scan + durable pin + exact revalidation resolver 基础已经落地；publication、完整 coordinator fallback、
+quarantine 和 M2 gates 尚未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

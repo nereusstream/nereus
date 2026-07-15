@@ -9,11 +9,11 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
+import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.target.BookKeeperEntryMapping;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
-import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.wal.PrimaryWalReader;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.objectstore.wal.WalReadResult;
@@ -28,7 +28,11 @@ class ReadTargetDispatcherTest {
     void missingTargetAdapterFailsBeforeAnyRegisteredReaderIsInvoked() {
         AtomicInteger calls = new AtomicInteger();
         PrimaryWalReader object = new PrimaryWalReader() {
-            @Override public ReadTargetType targetType() { return ReadTargetType.OBJECT_SLICE; }
+            @Override public ReadTargetReaderKey key() { return new ReadTargetReaderKey(
+                    com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
+                    1,
+                    Optional.of(ObjectType.MULTI_STREAM_WAL_OBJECT),
+                    Optional.of("WAL_OBJECT_V1")); }
             @Override public long reservationBytes(ResolvedRange range) { calls.incrementAndGet(); return 1; }
             @Override public CompletableFuture<WalReadResult> readWithStats(
                     long startOffset, List<ResolvedRange> ranges, com.nereusstream.api.ReadOptions options) {

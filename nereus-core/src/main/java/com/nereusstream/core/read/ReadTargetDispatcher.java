@@ -3,8 +3,6 @@ package com.nereusstream.core.read;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
-import com.nereusstream.api.target.ReadTargetType;
-import com.nereusstream.core.wal.PrimaryWalReader;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import com.nereusstream.objectstore.wal.WalSliceReadStats;
@@ -13,15 +11,22 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-/** Validates and dispatches maximal adjacent target-type runs without provider fall-through. */
+/** Validates and dispatches maximal adjacent exact-reader-key runs without provider fall-through. */
 public final class ReadTargetDispatcher {
-    private final PrimaryWalRegistry registry;
-    public ReadTargetDispatcher(PrimaryWalRegistry registry) { this.registry = Objects.requireNonNull(registry); }
+    private final ReadTargetReaderRegistry registry;
+
+    public ReadTargetDispatcher(ReadTargetReaderRegistry registry) {
+        this.registry = Objects.requireNonNull(registry);
+    }
+
+    public ReadTargetDispatcher(PrimaryWalRegistry registry) {
+        this(Objects.requireNonNull(registry, "registry").readerRegistry());
+    }
 
     public long reservationBytes(List<ResolvedRange> ranges) {
         validateAdapters(ranges);
         return ranges.stream().mapToLong(range ->
-                registry.requireReader(range.readTarget().type()).reservationBytes(range)).max().orElseThrow();
+                registry.require(range.readTarget()).reservationBytes(range)).max().orElseThrow();
     }
 
     public CompletableFuture<WalReadResult> read(
@@ -41,7 +46,7 @@ public final class ReadTargetDispatcher {
         ReadOptions remaining = new ReadOptions(
                 Math.toIntExact(options.maxRecords() - records), Math.toIntExact(options.maxBytes() - bytes),
                 options.isolation(), options.timeout());
-        PrimaryWalReader reader = registry.requireReader(run.type());
+        ReadTargetReader reader = registry.require(run.key());
         return reader.readWithStats(startOffset, run.ranges(), remaining).thenCompose(result -> {
             batches.addAll(result.batches()); stats.addAll(result.sliceStats());
             long next = startOffset;
@@ -61,20 +66,20 @@ public final class ReadTargetDispatcher {
     }
 
     private void validateAdapters(List<ResolvedRange> ranges) {
-        ranges.forEach(range -> registry.requireReader(range.readTarget().type()));
+        ranges.forEach(range -> registry.require(range.readTarget()));
     }
 
     private static List<Run> runs(List<ResolvedRange> ranges) {
         List<Run> result = new ArrayList<>();
         for (ResolvedRange range : ranges) {
-            ReadTargetType type = range.readTarget().type();
-            if (result.isEmpty() || result.get(result.size() - 1).type() != type) {
-                result.add(new Run(type, new ArrayList<>()));
+            ReadTargetReaderKey key = ReadTargetReaderKey.from(range.readTarget());
+            if (result.isEmpty() || !result.get(result.size() - 1).key().equals(key)) {
+                result.add(new Run(key, new ArrayList<>()));
             }
             result.get(result.size() - 1).ranges().add(range);
         }
         return result;
     }
 
-    private record Run(ReadTargetType type, List<ResolvedRange> ranges) { }
+    private record Run(ReadTargetReaderKey key, List<ResolvedRange> ranges) { }
 }

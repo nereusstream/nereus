@@ -254,6 +254,13 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 
 ## 4. F4-M2 — Generation Publication and Committed Read
 
+> 当前实现检查点（2026-07-15）：`StreamViewReader`/`ViewReadResult`、exact
+> `ReadTargetReaderKey` registry/dispatch、`GenerationAllocator`、strict `GenerationIndexValidator`、old/new
+> generation exact lookup、physical identity resolver、durable pin-owned `GenerationReadResolver` 及其
+> candidate-limit/view-isolation/stale-selection tests 已落地。`ReadCoordinator` 完整 pin/IO/fallback 接线、
+> publication committer/reconciler、quarantine、M2 aggregate gates 和 real-service final gate 尚未完成；本检查点
+> 不构成 F4-M2 completion claim。
+
 ### 4.1 Production artifacts
 
 `nereus-core`：

@@ -127,13 +127,16 @@ handshake，以及无保护空窗的 durable protection acquire/owner-transfer/r
 校验。43 个 lifecycle/optional codec golden、stream-scoped CAS transition guards、Oxia slash-aware fixed-depth
 range bounds、SDK response 与 exact-byte upload 双完成条件，以及 exact HEAD 后受限于 HTTP 405/501 的
 conditional-DELETE compatibility fallback 均已由 focused real Oxia 与 pinned LocalStack 验证；
-`phase4M1Check` 和 `phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。
+`phase4M1Check` 和 `phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M2 当前已实现
+view-aware read contract、exact target-reader registry/dispatch、generation allocator、strict index hydration、
+exact candidate lookup、physical identity resolution 和 fresh-scan/pin/revalidation resolver 基础；publication、
+完整 `ReadCoordinator` IO fallback、quarantine 与 M2 gates 仍在进行中。
 新的
 `docs/phase-4-compaction-generation/` 冻结了 API/module ownership、`NCP1/NTC1/NRC1` formats、
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader
 leases/protections、64-shard restart-safe stream discovery、retention/GC、guarded PUT 与可界的 DELETED-root audit
 retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录同时记录 normative target 与已落地检查点；
-F4-M2–M6 尚未完成，higher-generation read、materialization、retention/GC 与 async profile 仍不可用。Phase 4 只计划实现
+F4-M2 尚未完成，M3–M6 亦未开始；higher-generation production read、materialization、retention/GC 与 async profile 仍不可用。Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use

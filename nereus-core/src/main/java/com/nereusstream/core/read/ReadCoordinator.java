@@ -61,7 +61,7 @@ public final class ReadCoordinator implements AutoCloseable {
         ObjectWalReaderAdapter objectReader = new ObjectWalReaderAdapter(
                 Objects.requireNonNull(walObjectReader, "walObjectReader"));
         PrimaryWalRegistry registry = new PrimaryWalRegistry(List.of(), List.of(objectReader));
-        registry.requireReader(com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE);
+        registry.readerRegistry().require(ObjectWalReaderAdapter.KEY);
         this.targetDispatcher = new ReadTargetDispatcher(registry);
         this.observer = Objects.requireNonNull(observer, "observer");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");

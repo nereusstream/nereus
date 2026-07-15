@@ -36,6 +36,22 @@ frozen codec vectors cover every lifecycle/optional branch, and the real Oxia re
 runs with slash-aware fixed-depth bounds. `phase4M1Check` and `phase4M1FinalCheck --rerun-tasks` passed on
 2026-07-15. Nothing in M1 enables generation publication or physical deletion；those paths remain M2–M4 work.
 
+### 1.2 F4-M2 implementation checkpoint
+
+`GenerationAllocator` now exposes the view-scoped sequence allocation contract without creating a second counter
+owner. `GenerationMetadataStore.getCandidate` and the production Oxia adapter provide an exact
+`(streamId, readView, offsetEnd, generation)` lookup while preserving old generation-zero and F4 union decoding.
+`GenerationIndexValidator` admits only strict `COMMITTED` higher-generation records, verifies stream/view/head
+bounds, target identity, codec checksum and canonical projection decoding, and keeps generation-zero compatibility
+separate.
+
+The matching core resolver performs a fresh authoritative view-scoped scan for every resolve, enforces a 4096-entry
+hard bound, ignores non-COMMITTED lifecycle records, selects the highest covering generation, resolves physical
+identity from the root (or the narrowly allowed generation-zero manifest bootstrap), acquires the durable reader
+lease and then reloads both the exact candidate and stream head before returning it. This is an intermediate M2
+checkpoint only：`PREPARED -> COMMITTED` publication orchestration、task reconciliation、quarantine and full
+read-coordinator IO fallback are still pending, so no higher-generation production path is enabled yet.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

@@ -36,6 +36,13 @@ public interface GenerationMetadataStore extends AutoCloseable {
     CompletableFuture<Optional<VersionedGenerationIndex>> getIndex(
             String cluster, GenerationIndexIdentity identity);
 
+    CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidate(
+            String cluster,
+            StreamId streamId,
+            ReadView view,
+            long offsetEnd,
+            long generation);
+
     CompletableFuture<GenerationScanPage> scanIndex(
             String cluster,
             StreamId streamId,

@@ -1,6 +1,6 @@
 # Phase 4 Materialization / Compaction / Generation / GC Detailed Design
 
-> 状态：Implementation in progress；F4-M1 已完成并通过 ordinary/Docker-backed final gates，F4-M2–M6 未实现
+> 状态：Implementation in progress；F4-M1 已完成并通过 ordinary/Docker-backed final gates，F4-M2 读取侧基础正在实现，F4-M3–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -25,8 +25,15 @@ guards 接入 production adapter。真实 Oxia gate 进一步验证了 slash-awa
 pagination 和 conditional metadata delete；pinned LocalStack gate 验证了 guarded upload 必须同时等待 SDK response
 和 exact declared bytes、精确 HEAD，以及仅在 conditional DELETE 返回 HTTP 405/501 时于同一 deadline 内降级为
 无 `If-Match` DELETE。`phase4M1Check` 与 `phase4M1FinalCheck --rerun-tasks` 已于 2026-07-15 通过，
-因此 F4-M1 已 final-gated。Phase 4 整体仍为 `Implementation in progress`；M2–M6 尚未开放
-higher-generation read、physical delete、materialization 或 async profile。
+因此 F4-M1 已 final-gated。F4-M2 当前已落地 view-aware reader/result contract、exact target-key registry 与
+maximal-run dispatch、view-scoped generation allocator、严格 higher-generation index hydration、old/new exact
+candidate lookup、physical identity root/manifest resolution，以及每次请求都执行 authoritative scan 的
+`GenerationReadResolver`。resolver 已实现 4096 candidate hard limit、最高 COMMITTED generation 选择、PREPARED
+不可见、COMMITTED/TOPIC_COMPACTED view 隔离、unknown format fail-closed、exact index/head post-pin revalidation 和
+仅限同一 view 的 admission fallback；generation-zero repair seam 与 durable reader lease ownership 继续复用
+F4-M1 contract。该检查点还没有把 resolver 接入 `ReadCoordinator` 的完整 IO/fallback 生命周期，也没有实现
+generation publication/reconciler、invalid-object quarantine 或 M2 ordinary/final gates，因此不能标记 F4-M2
+完成。Phase 4 整体仍为 `Implementation in progress`；physical delete、materialization 和 async profile 均未开放。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
 per-stream、read-optimized 的 higher generation，并补齐 reader pin、source retirement、recovery checkpoint、
@@ -248,7 +255,7 @@ or GC behavior is enabled by M1；those execution paths remain F4-M2–M6 work.
 | --- | --- | --- |
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
-| F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | planned |
+| F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | in progress；resolver/allocator/exact dispatch foundation implemented，publication/coordinator/gates pending |
 | F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | planned |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
