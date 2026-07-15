@@ -3,8 +3,8 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1 and F4-M2 completed their ordinary and Docker-backed final
-gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
+`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
   delete surface；
@@ -26,10 +26,10 @@ gates on 2026-07-15；the following foundation parts are implemented and covered
   fixed-depth ranges、restart、CAS、pagination and conditional metadata delete；
 - M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
-`phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check` and
-`phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
+`phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check`、
+`phase4M2FinalCheck --rerun-tasks`、`phase4M3Check` and `phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
 restart-safe publication, pin-owned fallback/quarantine and a real Oxia/LocalStack independent-runtime fixture.
-F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has nine implementation checkpoints：the real compacted
+F4-M1、F4-M2 and F4-M3 are complete/final-gated. F4-M3 has nine implementation checkpoints：the real compacted
 format/read path, the deterministic policy/planner/task-store/recovery/registered-stream-scan path, and the
 exact-source reader plus claim-to-output-ready worker path, followed by task-protection owner crash-cut reconciliation
 across recovery/publication, then monotonic advisory checkpoint reconstruction plus bounded dispatcher/service
@@ -39,9 +39,10 @@ topic-compaction decoder/strategy SPI, closed disposition wire ids, immutable co
 frozen-identity registry. An eighth checkpoint implements proof-driven terminal task/protection/stats/old-checkpoint
 retirement with exact reload and response-loss convergence. A ninth checkpoint implements COMMITTED-source topic
 bootstrap、tagged-v1 keyed/unkeyed encoding、shared-budget checksum-verified sorted spills、bounded two-pass exact
-replay and the NTC1 worker/view-isolated publication path. This is not a Phase 4 completion claim：the M3 aggregate
-and real-service gates remain open；full
-recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
+replay and the NTC1 worker/view-isolated publication path. M3's deterministic and real-service gates additionally
+prove two-worker claim convergence、restart/output reuse、lost `OUTPUT_READY` response recovery、full output bytes and
+all-64-shard pagination without watch/process-local hints. F4-M3 is complete/final-gated. This is not a Phase 4
+completion claim：full recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
 
 A later milestone is complete only when：
 
@@ -289,7 +290,7 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > 跨 key crash-cut 恢复、advisory checkpoint reconciliation 与 bounded service lifecycle checkpoints；Pulsar
 > opaque-entry round trip、topic-compaction neutral SPI/registry 与 terminal workflow-metadata retirement 已完成；
 > COMMITTED-source topic bootstrap、tagged-v1 NTC1 key、sorted-spill two-pass engine、worker 与 isolated
-> publication tests 也已完成；M3 aggregate/final gates 仍需完成；M4 仍需补齐
+> publication tests 也已完成；M3 ordinary/final gates 已通过；M4 仍需补齐
 > recovery-root/anchor-aware source reachability，physical delete 继续禁用。
 
 ### 4.1 Production artifacts
@@ -400,8 +401,8 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 > the COMMITTED-source/TOPIC-target planner split、`TAGGED_V1` keyed/unkeyed namespace、shared-budget SHA-verified
 > sorted spills、bounded survivor bitmap、two-pass exact replay and NTC1 worker/publication integration. Focused tests
 > force spills, prove latest-key/unkeyed/tombstone behavior, fail on decoder drift, write/verify real Parquet NTC1 and
-> publish only to the TOPIC_COMPACTED namespace. This is not M3 completion；both M3 gates below remain pending,
-> and production activation stays disabled.
+> publish only to the TOPIC_COMPACTED namespace. The ordinary and real-service final gates below passed on
+> 2026-07-15, so F4-M3 is complete/final-gated；production activation stays disabled until M4–M6 complete.
 
 ### 5.1 Production artifacts
 
@@ -533,6 +534,13 @@ Final runs real Oxia task claims and LocalStack full upload/footer/range read, t
 upload/output/publish crash cut, all-shard registry pagination/watch loss, fresh-process recovery of an unloaded
 stream whose committed head has no task, and full output byte comparison. It may publish higher generations only
 with the test activation guard；production rollout remains disabled by default.
+
+Both gates passed on 2026-07-15；the final gate was run with `--rerun-tasks`. `MaterializationWorkerOxiaS3IntegrationTest`
+proves two independent worker runtimes converge on one durable attempt/output、a fresh process reuses the exact
+published Parquet bytes, and a lost `OUTPUT_READY` CAS response reloads the frozen output. Deterministic failure/model
+tests cover the remaining crash cuts, and `RegisteredMaterializationStreamScannerTest` forces page-size-one scans over
+two registrations in every shard, repeats with a fresh scanner, and separately converges an unowned committed head
+with no durable task. F4-M3 is complete/final-gated；M4 is the next implementation milestone.
 
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 

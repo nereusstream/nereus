@@ -79,8 +79,9 @@ cuts, including a hung scan、deadline-forced cancellation and borrowed-executor
 This is still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip now passes. The
 protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity registry、COMMITTED-source bootstrap、
 shared-budget sorted-spill two-pass engine and NTC1 worker/publication path are implemented. The proof-driven terminal
-workflow-metadata retirer is also wired after checkpoint reconciliation. Aggregate/real-service M3 gates remain open；
-higher-generation production activation therefore remains disabled.
+workflow-metadata retirer is also wired after checkpoint reconciliation. `phase4M3Check` and the real Oxia/LocalStack
+`phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15；higher-generation production activation remains disabled
+until the M4–M6 recovery/GC、async/Pulsar and compatibility gates complete.
 
 Full M4–M6 target construction：
 

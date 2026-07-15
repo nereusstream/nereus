@@ -28,7 +28,8 @@ require_literal "publication id before allocating a generation" \
     "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
 require_literal "GenerationMetadataTransitions" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "F4-M1 is complete" "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "F4-M1、F4-M2 and F4-M3 are complete/final-gated" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "slash-aware fixed-depth" "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
 require_literal "SDK response succeeds" "docs/phase-4-compaction-generation/02-domain-api-and-object-format.md"
 require_literal "HTTP 405 or 501" "docs/phase-4-compaction-generation/02-domain-api-and-object-format.md"
@@ -66,4 +67,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1 documentation status, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 documentation status, source lock, gates, and local links verified."

@@ -78,7 +78,7 @@ task-protection creation/crash-cut owner reconciliation、monotonic advisory che
 lifecycle；the Pulsar Entry/NCP1 opaque-byte round trip passes and the topic-compaction neutral SPI/registry is
 implemented. Terminal workflow-metadata retirement now uses exact task/index/checkpoint/root/protection proofs and
 conditional deletes. COMMITTED-source topic bootstrap、tagged-v1 NTC1 keys、the sorted-spill two-pass engine、worker
-and isolated TOPIC_COMPACTED publication path are now implemented；the M3 aggregate/final gates remain. M4 owns full
+and isolated TOPIC_COMPACTED publication path are now implemented and M3 ordinary/final-gated. M4 owns full
 recovery-root/anchor-aware source reachability before retirement or physical deletion can be enabled.
 
 ### 1.3 F4-M3 planning/recovery checkpoint
@@ -97,8 +97,8 @@ truth, task creation revalidates every exact source plus activation proof, and o
 publish output. Exact-source worker IO、checkpoint/service orchestration and Pulsar exact-byte evidence are now
 implemented；the topic-compaction neutral SPI/registry and proof-driven terminal workflow-metadata retirement are
 also implemented. Topic tasks now persist exact COMMITTED source indexes, execute the bounded two-pass engine and
-publish sparse NTC1 output only through a TOPIC_COMPACTED index；focused worker/publication tests pass, while the M3
-aggregate/final gates remain pending.
+publish sparse NTC1 output only through a TOPIC_COMPACTED index. Focused worker/publication tests and the real
+Oxia/LocalStack two-worker/restart/response-loss gate pass；F4-M3 is complete/final-gated.
 
 ## 2. Keyspace
 

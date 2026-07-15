@@ -6,8 +6,7 @@
 `docs/phase-2-managed-ledger-facade/`、
 `docs/phase-3-cursor-subscription/` 与
 `docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
-测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1–M2 实现、正在进行的
-M3 format/planner/recovery/exact-source worker checkpoints 和后续目标。
+测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1–M3 实现和后续目标。
 
 建议阅读顺序：
 
@@ -52,8 +51,9 @@ policy/planner/task-store/recovery/64-shard registry scanner、exact-source read
 protection owner crash-cut reconciliation、advisory checkpoint reconciliation 与 bounded service lifecycle
 checkpoints、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 与 terminal
 workflow-metadata retirement，以及 topic-compaction COMMITTED-source bootstrap、tagged-v1 key encoding、
-sorted-spill two-pass engine/worker/publication focused tests 已落地；M3 aggregate/final gates 仍 pending，
-retention/GC 和 async profile 仍不可用。
+sorted-spill two-pass engine/worker/publication focused tests 已落地。`phase4M3Check` 与真实
+Oxia/LocalStack-backed `phase4M3FinalCheck --rerun-tasks` 已于 2026-07-15 通过；
+F4-M3 已 final-gated。M4–M6 的 retention/GC、async profile 与最终兼容门禁仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

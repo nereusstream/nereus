@@ -1,12 +1,11 @@
 # Phase 4 Materialization / Compaction / Generation / GC Detailed Design
 
-> 状态：Implementation in progress；F4-M1–M2 已完成并通过 ordinary/Docker-backed final gates；F4-M3
-> compacted Parquet read/write/verifier 与 deterministic policy/planner/task-store/recovery/registry-scanner
-> checkpoints、exact-source reader/worker、protection crash-cut reconciliation、advisory checkpoint
-> reconciliation、bounded service lifecycle 以及 Pulsar Entry/NCP1 exact-byte round trip checkpoints 已落地；
-> topic-compaction neutral SPI/registry、terminal workflow-metadata retirement、COMMITTED-source bootstrap、
-> tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与 isolated publication tests 已落地；
-> M3 aggregate/final gates 尚未完成；F4-M4–M6 未实现
+> 状态：Implementation in progress；F4-M1–M3 已完成并通过 ordinary/Docker-backed final gates。F4-M3 已交付
+> compacted Parquet read/write/verifier、deterministic policy/planner/task-store/recovery/registry-scanner、exact-source
+> reader/worker、protection crash-cut reconciliation、advisory checkpoint reconciliation、bounded service lifecycle、
+> Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry、terminal workflow-metadata retirement、
+> COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
+> isolated publication；F4-M4–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -91,11 +90,12 @@ pass one 在共享 `StagingFileManager` byte budget 下产生 SHA-verified sorte
 pass two 重读 exact sources、重证 decoder fact digest 并按 offset 写出 sparse NTC1。worker 复用既有
 claim/protection/heartbeat/guarded upload/strict verification/OUTPUT_READY 协议，publication 只进入
 TOPIC_COMPACTED view。forced-spill、decoder drift、real Parquet NTC1 worker 和 view-isolation tests 已通过。
-M3 ordinary/final gates 仍未完成，因此
-higher-generation materialization 仍未开放。M4
-还需将 source reachability 扩展为
-recovery-root/anchor-aware proof。Phase 4 整体仍为
-`Implementation in progress`；physical delete、production-wired end-to-end materialization 和 async profile 均未开放。
+`phase4M3Check` 与 `phase4M3FinalCheck --rerun-tasks` 已于 2026-07-15 通过。最终门禁以真实 Oxia 与
+LocalStack 验证两个独立 worker 的 durable-claim 收敛、完整 NCP1 upload/read/verification、进程重启复用、
+`OUTPUT_READY` CAS 成功响应丢失恢复，并以 deterministic tests 验证 failure classification、全 64 分片逐页扫描、
+watch/process-local hint 丢失和无 task 的 committed head 重建。F4-M3 已 final-gated；production rollout 仍保持
+disabled，直到 M4–M6 完成 recovery-root/anchor-aware reachability、physical GC、async/Pulsar wiring 与最终兼容门禁。
+Phase 4 整体仍为 `Implementation in progress`；physical delete 和 async profile 均未开放。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
 per-stream、read-optimized 的 higher generation，并补齐 reader pin、source retirement、recovery checkpoint、
@@ -327,6 +327,21 @@ quarantine, and same-view generation-zero fallback. F4-M2 is complete/final-gate
 not a Phase 4 completion claim：M3 owns compacted object format/planner/worker and task source/output protections；
 M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physical deletion remains disabled.
 
+### 6.3 F4-M3 implemented checkpoint
+
+F4-M3 is complete/final-gated. Its ordinary gate covers the frozen NCP1/NTC1 format、planner fixed point、durable
+task/claim/recovery model、exact-source worker、task protections、checkpoint/service lifecycle、topic-compaction engine
+and isolated publication contracts. `phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15 and adds real Oxia plus
+LocalStack evidence for two independent workers、claim ownership、full output bytes、restart reuse and lost
+`OUTPUT_READY` response convergence. The deterministic registry suite forces page size one over two registrations in
+every one of the 64 shards, then repeats the pass with a fresh scanner and no watch/process-local hints. The final gate
+also corrected its M2 prerequisite assertion to the protocol fact that a terminal task may retain a temporary output
+veto owned by an earlier non-terminal version of the same task key until proof-driven retirement removes it.
+
+This is not a Phase 4 completion claim. Higher-generation production activation and physical deletion remain off；M4
+must first deliver recovery checkpoints、anchor-aware retirement and GC, followed by M5 async/Pulsar wiring and M6
+compatibility/scale closure.
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -334,7 +349,7 @@ M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physi
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
-| F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner、exact-source reader/worker、protection/checkpoint reconciliation、bounded service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic SPI/registry、terminal workflow-metadata retirement、COMMITTED-source bootstrap、tagged-v1/sorted-spill two-pass engine and isolated worker/publication checkpoints landed；milestone aggregate/final gates pending |
+| F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |

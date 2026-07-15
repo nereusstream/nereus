@@ -31,7 +31,7 @@ protocol/table state = projection
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
-| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1–M2 final-gated；M3 format + planner/recovery + exact-source worker + protection/checkpoint reconciliation + bounded service lifecycle + Pulsar exact-byte round trip + topic SPI/registry + terminal workflow retirement + COMMITTED-source/tagged-v1/sorted-spill topic engine/worker/publication checkpoints landed | Complete F4-M3 aggregate/final gates |
+| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1–M3 final-gated；format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar exact-byte round trip + topic SPI/registry + terminal workflow retirement + COMMITTED-source/tagged-v1/sorted-spill topic engine/worker/publication landed | Implement F4-M4 recovery checkpoint、retirement and GC |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
@@ -188,14 +188,14 @@ Current milestone: F3-M0/M0R design-gated；F3-M1-M6 implemented/final-gated
 
 Detailed design: `nereus-future4-compaction-generation.md`
 Code-level target contract: `../phase-4-compaction-generation/README.md`
-Current milestone: F4-M0 source audit/design gate complete；F4-M1 API/metadata/object IO and F4-M2 committed
-generation publication/read/pin/fallback paths implemented/final-gated；F4-M3 is in progress with the real Parquet
+Current milestone: F4-M0 source audit/design gate complete；F4-M1 API/metadata/object IO、F4-M2 committed
+generation publication/read/pin/fallback and F4-M3 materialization paths implemented/final-gated. M3 includes the real Parquet
 writer/strict-reader/full verifier、NTC1 facade、core adapter and deterministic policy/planner/task/recovery/registry
 scanner landed. The exact-source claim-to-output-ready worker、task-protection crash-cut recovery、advisory checkpoint
 reconciliation、bounded service lifecycle and Pulsar Entry/NCP1 exact-byte round trip checkpoints are also implemented,
 as are the topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source bootstrap、
-tagged-v1 key encoding、shared-budget sorted-spill two-pass engine and isolated NTC1 worker/publication path. The M3
-aggregate/final gates、GC and async path do not exist yet.
+tagged-v1 key encoding、shared-budget sorted-spill two-pass engine and isolated NTC1 worker/publication path.
+`phase4M3Check` and the real Oxia/LocalStack-backed final gate pass；M4 GC and the M5 async path do not exist yet.
 
 ### Owns
 

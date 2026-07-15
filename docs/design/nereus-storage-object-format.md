@@ -5,7 +5,8 @@
 > NCP1/NTC1 writer/strict-reader/whole-file verifier、NCP1 core adapter、M3 planner/recovery、exact-source
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
 > checkpoints、topic-compaction neutral SPI/registry、COMMITTED-source bootstrap、tagged-v1 key encoding、
-> sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；完整 M3 gate 尚未完成；
+> sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；F4-M3 ordinary/real-service
+> final gates 已于 2026-07-15 通过；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -17,8 +18,8 @@ Nereus shared data plane 需要多类 immutable objects：
 | --- | --- | --- | --- |
 | Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
 | Index object | large entry/projection index | offset-index reference | Reserved |
-| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter + planner/recovery + exact-source worker + protection/checkpoint reconciliation + bounded service lifecycle + Pulsar exact-byte round trip + terminal metadata retirement checkpoints implemented/tested；M3 gates pending |
-| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader/full verifier + neutral SPI/registry + COMMITTED-source planner bootstrap + tagged-v1 key encoding + sorted-spill two-pass engine/worker/publication focused tests implemented；aggregate/final gates pending，broker admission remains F8 |
+| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar exact-byte round trip + terminal metadata retirement implemented/final-gated；real Oxia/LocalStack two-worker/restart/full-byte evidence passed |
+| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader/full verifier + neutral SPI/registry + COMMITTED-source planner bootstrap + tagged-v1 key encoding + sorted-spill two-pass engine/worker/publication implemented/final-gated；broker admission remains F8 |
 | Recovery checkpoint (`NRC1` + `NRF1`) | replace append-replay/index-repair role of a committed prefix | recovery-root CAS | Designed / F4-M0 frozen |
 | Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated through F3-M6 |
 | Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |

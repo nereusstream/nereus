@@ -118,8 +118,8 @@ F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unlo
 factory cache，避免新 broker topic 复用已删除 stream。`phase3M6Check`、`phase3M6FinalCheck`、
 `phase3Check` 和 `phase3FinalCheck` 构成完整 release gate；Future 3 已实现并 final-gated。
 
-Phase 4 F4-M0 已于 2026-07-14 完成代码级设计门禁，F4-M1–M2 已于 2026-07-15 完成并通过普通与
-Docker-backed final gate。M1 已落地
+Phase 4 F4-M0 已于 2026-07-14 完成代码级设计门禁，F4-M1–M3 已于 2026-07-15 完成并通过普通与
+Docker-backed final gates。M1 已落地
 F4 API/metadata/Oxia 基础、materialization 模块边界、guarded/replayable object-store IO、物理对象与 GC
 reference-domain 强类型、generation activation proof contract、create/revalidate/release durable reader pin
 handshake，以及无保护空窗的 durable protection acquire/owner-transfer/release handshake。metadata checkpoint
@@ -139,7 +139,7 @@ publication state machine、re-entry reconciler、canonical task/output identity
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader
 leases/protections、64-shard restart-safe stream discovery、retention/GC、guarded PUT 与可界的 DELETED-root audit
 retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录同时记录 normative target 与已落地检查点；
-F4-M1–M2 已 final-gated；M3 真实 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、
+F4-M1–M3 已 final-gated；M3 真实 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、
 core exact adapter，deterministic policy/planner/task-store/recovery/64-shard registry scanner，以及 stream-scoped
 exact-source reader/claim-to-output-ready worker checkpoints 已落地并通过 focused tests；protection owner
 crash-cut reconciliation 也已接入 recovery/publication 并通过重复 CAS/response-loss 测试。随后落地的
@@ -154,7 +154,9 @@ delete 与 response-loss reload 收敛 terminal tasks、stale stats 与 old-poli
 topic-compaction checkpoint 固定 `COMMITTED` source bootstrap 与独立 `TOPIC_COMPACTED` publication，使用
 collision-free tagged-v1 key 表示 unkeyed retain-exact records，并以共享 staging budget 下的 checksum-
 verified sorted spills 执行两遍 key selection/source replay；NTC1 worker/strict verification/publication focused
-tests 已通过。M3 aggregate/final gates 尚未完成，retention/GC 与 async profile 仍不可用。
+tests 已通过。`phase4M3Check` 与真实 Oxia/LocalStack-backed `phase4M3FinalCheck --rerun-tasks` 已于
+2026-07-15 通过，覆盖双 worker、claim/response-loss/restart、完整 Parquet bytes 与全 64 分片分页/watch-loss；
+F4-M3 已 final-gated。F4-M4–M6 的 recovery checkpoint、retention/GC、async profile 与最终兼容接线仍不可用。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

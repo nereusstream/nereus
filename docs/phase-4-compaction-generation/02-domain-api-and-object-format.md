@@ -10,7 +10,7 @@ reconciliation、advisory checkpoint reconciler、bounded M3 service lifecycle a
 trip are also implemented. The protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity
 registry、COMMITTED-source planner bootstrap、collision-free tagged-v1 key namespace、checksum-verified sorted-spill
 two-pass engine、NTC1 worker/publication path and proof-driven terminal workflow-metadata retirement are implemented
-and covered by focused tests. The M3 aggregate/final gates and M4–M6 surfaces remain target work. Package、class and method names are normative unless a review replaces them together with
+and covered by focused tests. The M3 ordinary/final gates passed on 2026-07-15；only M4–M6 surfaces remain target work. Package、class and method names are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
 The domain model obeys these rules：

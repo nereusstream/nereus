@@ -264,9 +264,10 @@ class GenerationPublicationOxiaS3IntegrationTest {
             assertThat(protection.value().protectionTypeId())
                     .isEqualTo(ObjectProtectionType.MATERIALIZATION_OUTPUT.wireId());
             assertThat(protection.value().ownerKey()).isEqualTo(task.key());
-            assertThat(protection.value().ownerMetadataVersion()).isEqualTo(task.metadataVersion());
-            assertThat(protection.value().ownerIdentitySha256())
-                    .isEqualTo(task.durableValueSha256().value());
+            // The temporary output veto is owned by the exact non-terminal task snapshot that created it.
+            // Publication advances the task afterward; PUBLISHED recovery must not recreate the protection
+            // because that would race terminal metadata retirement.
+            assertThat(protection.value().ownerMetadataVersion()).isLessThan(task.metadataVersion());
         });
     }
 

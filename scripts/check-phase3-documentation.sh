@@ -57,9 +57,18 @@ for gate in phase3M6Check phase3M6FinalCheck phase3Check phase3FinalCheck; do
     require_literal "$gate" "docs/phase-3-cursor-subscription/06-implementation-plan-and-gates.md"
 done
 
+for stale in "M6 pending" "M6 next"; do
+    forbid_literal \
+        "$stale" \
+        "$repo_root/docs/phase-3-cursor-subscription" \
+        "$repo_root/docs/design/nereus-future3-cursor-subscription.md"
+done
+
 for stale in \
-    "M6 pending" \
-    "M6 next" \
+    "F3-M6 pending" \
+    "F3-M6 next" \
+    "Phase 3 M6 pending" \
+    "Phase 3 M6 next" \
     "Designed / In progress" \
     "Designed/In progress" \
     "M1-M5 complete/gated" \

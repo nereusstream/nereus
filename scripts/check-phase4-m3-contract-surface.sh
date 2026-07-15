@@ -101,6 +101,8 @@ require_literal "lostOutputReadyCasResponseReloadsTheExactFrozenOutput" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/MaterializationWorkerFailureInjectionTest.java"
 require_literal "twoIndependentWorkersCannotExecuteTheSameDurableClaimConcurrently" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/MaterializationWorkerClaimModelTest.java"
+require_literal "fullScanPaginatesEveryShardAndFreshProcessRecoversWithoutWatchHints" \
+    "nereus-materialization/src/test/java/com/nereusstream/materialization/RegisteredMaterializationStreamScannerTest.java"
 require_literal "failsClosedWhenDecoderFactsChangeBetweenPasses" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/TopicCompactionEngineTest.java"
 require_literal "publishesTopicCompactionOnlyIntoTheIsolatedTargetView" \
