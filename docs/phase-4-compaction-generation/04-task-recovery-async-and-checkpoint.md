@@ -149,6 +149,14 @@ on absence or response uncertainty. No runtime node invokes them yet：the futur
 revalidate the recovery-root、generation、activation、reference-domain and physical-root lifecycle proof from document
 05, so checkpoint G still authorizes no physical deletion.
 
+F4-M4 checkpoint H implements the process-local inputs for the future GC nodes without instantiating those nodes.
+`PhysicalGcConfig` is cross-validated with materialization/storage lifetimes and defaults to observation-only；
+`GcCandidate` freezes one exact ACTIVE root/query/evidence tuple；`GcPlan` commits complete non-veto domain facts and
+planned keys/protections into a canonical digest, then binds that digest to the exact successful MARK wrapper. The
+plan has deliberately no durable codec. Crash recovery must rerun discovery and obtain the same digest from
+authoritative metadata before drain or deletion can continue. Reference-domain implementations、root transitions and
+all metadata/object delete calls are still absent from runtime composition.
+
 Full M4–M6 target construction：
 
 ```java

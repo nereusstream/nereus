@@ -16,8 +16,9 @@ authoritative F4 metadata-record verifier described in section 9 are implemented
 §10 generation-zero protocol is also implemented for ordinary and recovery append paths：exact prepared intent、
 physical root/protection proof、protected head CAS、exact index identity and strict visible protection are now the
 production sequence. Recovery-root publication、checkpoint append replay and checkpoint-derived index repair are now
-implemented checkpoints. Exact source/object-audit retirement metadata adapters are also implemented, while runtime
-composition、retirement planning/root lifecycle coordinators and physical/cursor GC remain target work. Package、class and method names
+implemented checkpoints. Exact source/object-audit retirement metadata adapters and bounded/reconstructable GC
+config/candidate/plan values are also implemented, while runtime composition、reference-domain implementations、root
+lifecycle coordinators and physical/cursor GC remain target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 

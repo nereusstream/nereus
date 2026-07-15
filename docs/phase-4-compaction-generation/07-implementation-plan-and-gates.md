@@ -65,7 +65,9 @@ raw/envelope digest separation、root-stable pinned NRC1 repair、highest health
 target protection and the `GenerationReadResolver` terminal repair seam. Runtime composition、retirement and GC
 remain. Checkpoint G now adds exact read-before-delete generation-zero source and Phase 1 object-audit metadata
 adapters、committed-marker capture、legacy/generic encoding separation and a borrowed get/delete-only shared-Oxia
-bridge. No coordinator or physical delete path is enabled by checkpoint G.
+bridge. Checkpoint H adds strict GC configuration、ACTIVE-root candidates and bounded canonical plans whose complete
+domain/protection/metadata-key facts can be recomputed after restart. No coordinator or physical delete path is
+enabled by checkpoints G/H.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -574,8 +576,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Current status：in progress. Checkpoint A (NRC1 object protocol)、checkpoint B (protected generation-zero
 > append/recovery)、checkpoint C (anchor-aware tail/planning foundation), and checkpoint D (guarded root publication
 > plus restart protection reconciliation), checkpoint E (checkpoint-aware append replay adapter), and checkpoint F
-> (checkpoint-derived committed-index repair), and checkpoint G (exact retirement metadata adapters) are implemented；
-> runtime composition、retirement coordinators and
+> (checkpoint-derived committed-index repair), checkpoint G (exact retirement metadata adapters), and checkpoint H
+> (bounded/reconstructable GC config/candidate/plan values) are implemented；runtime composition、reference-domain
+> implementations、retirement coordinators and
 > physical/cursor GC remain before F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
@@ -659,8 +662,10 @@ recovery/RecoveryCheckpointMerger.java
 recovery/RecoveryCheckpointProtectionManager.java implemented checkpoint C foundation
 recovery/RecoveryCheckpointRootReconciler.java            implemented checkpoint D
 recovery/MetadataRecoveryCheckpointVerifier.java
-gc/GcCandidate.java
-gc/GcPlan.java
+gc/GcCandidate.java                                      implemented checkpoint H
+gc/GcPlan.java                                           implemented checkpoint H
+gc/GcIdGenerator.java                                    implemented checkpoint H
+gc/SecureGcIdGenerator.java                              implemented checkpoint H
 gc/GenerationReferenceDomain.java
 gc/AppendRecoveryReferenceDomain.java
 gc/MaterializationReferenceDomain.java
@@ -678,7 +683,7 @@ gc/PhysicalRootBackfillReport.java
 gc/PhysicalRootBackfillFailure.java
 gc/PhysicalRootBackfillStage.java
 gc/ObjectInventoryScanner.java
-gc/PhysicalGcConfig.java
+gc/PhysicalGcConfig.java                                 implemented checkpoint H
 gc/GcMetricsObserver.java
 ```
 
@@ -718,7 +723,8 @@ ProtectedStableAppendFailureInjectionTest
 GenerationZeroVisibleProtectionRepairTest
 PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
-PhysicalGcConfigTest
+PhysicalGcConfigTest                                      implemented checkpoint H
+GcPlanTest                                                implemented checkpoint H
 PhysicalObjectRootScannerTest
 PhysicalRootTombstoneRetirementTest
 LatePutAfterTombstoneTest
@@ -748,6 +754,7 @@ retirement.
 ./gradlew phase4M4CheckpointReplayCheck
 ./gradlew phase4M4CheckpointIndexRepairCheck
 ./gradlew phase4M4RetirementMetadataCheck
+./gradlew phase4M4GcPlanCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -785,6 +792,12 @@ encoded version、captured Oxia version and exact stored-envelope SHA checks；h
 references-before-manifest ordering；and fail-closed missing/response-loss behavior. It deliberately provides no
 source-retirement plan、root MARK/DRAIN/DELETING transition、domain proof、object-store delete or runtime composition,
 so it is checkpoint-G evidence only.
+
+`phase4M4GcPlanCheck` extends checkpoint G with exact-millisecond/cross-lifetime configuration validation、safe
+deadline overflow、ACTIVE-root candidate construction、secure non-authorizing ids and canonical complete-domain plan
+digests. It proves configured bounds cannot be implemented by truncation, unrelated-object protections cannot enter a
+MARK digest, and a response-loss reload must match exact root object/attempt/digest/version/epoch. `GcPlan` has no
+durable codec and this gate invokes no root CAS or delete primitive；it is checkpoint-H evidence only.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

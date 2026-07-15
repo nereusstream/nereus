@@ -98,7 +98,10 @@ checkpoint E adds the root-stable pinned append-replay consumer. Checkpoint F ad
 generation-index repair, exact raw/envelope digest separation, ACTIVE-target selection and current-root-owned target
 protection before committed-index restoration. Checkpoint G adds the read-before-delete source/object-audit metadata
 adapters with exact key、encoding、Oxia version and stored-envelope digest checks, including explicit committed-marker
-capture and response-loss fail-closed behavior. Runtime composition、source retirement planning/root state machine、GC
+capture and response-loss fail-closed behavior. Checkpoint H adds strict GC config、ACTIVE-root candidate and bounded
+canonical restart-reconstructable plan values；the plan digest commits every complete domain fact and planned
+key/protection while excluding ephemeral candidate identity/time. Runtime composition、reference-domain
+implementations、source retirement planning/root state machine、GC
 coordinators、cursor integration and physical deletion remain planned；therefore no object deletion is enabled by
 these checkpoints.
 
@@ -669,6 +672,13 @@ set. Plan lists are canonical sorted/unique and bounded by `PhysicalGcConfig`; `
 domain authority/reference sets plus every planned key/protection, not merely the retained Java lists. The marked
 root version/epoch are filled only from the successful `ACTIVE -> MARKED` CAS. A plan is process-local and is always
 reconstructed from the root digest after restart；serializing it would create a second correctness owner.
+
+Checkpoint H implements these three values and `SecureGcIdGenerator`. `GcPlan.computeReferenceSetSha256` is the
+pre-MARK digest operation；`GcPlan.fromMarkedRoot` accepts only the exact MARK response/reload carrying that digest and
+attempt id, an Oxia version newer than the candidate and lifecycle `epoch + 1`. Construction rejects incomplete or
+vetoing snapshots、query mismatch、configured count overflow、non-canonical lists and protections for another object.
+This is a value/proof boundary only：no reference domain or lifecycle coordinator calls it yet, and config defaults
+keep both enablement off and dry-run on.
 
 The query is a core value；materialization's `GcCandidate` wraps it with retry/plan timestamps and never appears in
 the SPI. Affected streams are sorted/unique and capped at 4,096；`REFERENCED_OBJECT` and

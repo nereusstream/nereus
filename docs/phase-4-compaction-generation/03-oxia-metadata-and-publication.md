@@ -187,6 +187,15 @@ hydrated manifest/reference wrappers while retaining the pre-hydration stored-en
 absence or response uncertainty as success；the future coordinator must prove idempotence under the same unchanged
 recovery/physical-root attempt. This checkpoint enables no caller or physical delete by itself.
 
+### 1.9 F4-M4 GC plan checkpoint
+
+Checkpoint H adds no Oxia mutation. Materialization's `GcCandidate.fromActiveRoot` consumes the exact versioned root
+returned by this module and freezes its ACTIVE metadata version/lifecycle epoch. `GcPlan.fromMarkedRoot` later accepts
+only a successful MARK wrapper carrying the exact candidate object、attempt id、canonical reference-set SHA、newer
+metadata version and unit-incremented lifecycle epoch. The plan remains process-local；after response loss or restart,
+the coordinator must reload authoritative roots/domains/protections/source keys and recompute the same digest. No
+codec/keyspace/store for `GcPlan` exists intentionally, because persisting it would create a second correctness owner.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

@@ -7,7 +7,8 @@
 > COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
 > isolated publication；F4-M4 正在实现，NRC1 object-protocol、protected generation-zero append、anchor-aware
 > planning、guarded recovery-root publication/restart protection reconciliation，以及 checkpoint-aware append
-> replay adapter、checkpoint-derived index repair 和 exact source/object-audit retirement metadata adapters 已落地；
+> replay adapter、checkpoint-derived index repair、exact source/object-audit retirement metadata adapters，以及
+> bounded/reconstructable GC config/candidate/plan values 已落地；
 > runtime composition、retirement coordinator/physical GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
@@ -484,6 +485,25 @@ contradiction、references-before-manifest、missing、response loss 和 close a
 coordinator 的 destructive primitive；physical root MARK/DRAIN/DELETING、reference-domain proof、metadata plan
 revalidation 和 object delete 尚未实现，因此 physical deletion 仍完全关闭。
 
+### 6.11 F4-M4 bounded GC plan checkpoint
+
+Checkpoint H 已实现 `PhysicalGcConfig`、`GcCandidate`、`GcPlan` 与 secure GC id generator。配置严格验证 page、
+并发、stream/domain 数量、精确毫秒 duration、lease renewal/drain/operation safety，并可与
+`MaterializationConfig`、`StreamStorageConfig` 交叉验证 orphan/tombstone grace。默认值是
+`enabled=false, dryRun=true`；只有同时 `enabled && !dryRun` 才允许未来 coordinator 进入 mutation，配置本身
+不覆盖 cluster deletion capability。deadline 使用 `Math.addExact`；溢出返回 ineligible，而不产生环绕时间。
+
+Candidate 只能从 exact `ACTIVE` root wrapper 建立，并冻结 root version/epoch、query/evidence 与 root 的最早
+eligibility。Plan 只接受 canonical sorted/unique、配置有界、同 query 的 complete/non-veto domain snapshots，
+且 protection 必须属于 candidate object。`referenceSetSha256` 直接提交每个 domain 的完整 authority/reference
+事实以及每个 planned protection/metadata key；它不包含随机 candidate id 或进程时间。MARK 前可计算同一
+digest，MARK 后 `fromMarkedRoot` 只接受 exact attempt/digest/object、递增 metadata version 和 `epoch + 1`，所以
+进程重启只能从 authoritative facts 重建，而不能反序列化第二份 correctness state。
+
+`phase4M4GcPlanCheck` 覆盖配置关系、毫秒/overflow、128-bit entropy、canonical order、domain truncation/veto、
+跨对象 protection、root attempt/digest mismatch 和重建稳定性。该 checkpoint 仍没有 domain 实现、root CAS、
+metadata retirement 调用或 object delete；physical deletion 继续完全关闭。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -492,7 +512,7 @@ revalidation 和 object delete 尚未实现，因此 physical deletion 仍完全
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 protocol、protected generation-zero append、anchor-aware planning、guarded root publication/restart protection reconciliation、checkpoint append replay、checkpoint-derived index repair and exact retirement metadata adapters implemented/tested；runtime composition、retirement coordinators/physical GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 protocol、protected generation-zero append、anchor-aware planning、guarded root publication/restart protection reconciliation、checkpoint append replay、checkpoint-derived index repair、exact retirement metadata adapters and bounded/reconstructable GC plans implemented/tested；runtime composition、reference domains、retirement coordinators/physical GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

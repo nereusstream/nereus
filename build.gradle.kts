@@ -736,3 +736,20 @@ tasks.register("phase4M4RetirementMetadataCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-metadata-oxia:check")
 }
+
+tasks.register<Exec>("checkPhase4M4GcPlanContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 bounded reconstructable GC plan checkpoint."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-gc-plan-contract-surface.sh")
+}
+
+tasks.register("phase4M4GcPlanCheck") {
+    group = "verification"
+    description = "Verify GC configuration, candidate identity, and canonical restart-rebuild plan facts."
+    dependsOn("phase4M4RetirementMetadataCheck")
+    dependsOn("checkPhase4M4GcPlanContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-materialization:check")
+}
