@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -97,7 +98,8 @@ public final class GenerationReadResolver {
                 offset,
                 Objects.requireNonNull(view, "view"),
                 new ReadOperationDeadline(timeout),
-                true);
+                true,
+                Set.of());
     }
 
     CompletableFuture<Optional<PinnedResolvedRange>> resolve(
@@ -106,6 +108,18 @@ public final class GenerationReadResolver {
             ReadView view,
             ReadOperationDeadline deadline,
             boolean allowRepair) {
+        return resolve(streamId, offset, view, deadline, allowRepair, Set.of());
+    }
+
+    CompletableFuture<Optional<PinnedResolvedRange>> resolve(
+            StreamId streamId,
+            long offset,
+            ReadView view,
+            ReadOperationDeadline deadline,
+            boolean allowRepair,
+            Set<GenerationReadCandidate> excludedCandidates) {
+        Set<GenerationReadCandidate> exclusions = Set.copyOf(
+                Objects.requireNonNull(excludedCandidates, "excludedCandidates"));
         if (offset < 0) {
             return NereusException.failedFuture(
                     ErrorCode.INVALID_ARGUMENT, false, "read offset must be non-negative");
@@ -129,21 +143,30 @@ public final class GenerationReadResolver {
                     .thenCompose(wrappers -> candidates(
                             streamId, offset, view, snapshot, wrappers))
                     .thenCompose(candidates -> {
-                        if (!candidates.isEmpty()) {
+                        List<GenerationReadCandidate> admitted = candidates.stream()
+                                .filter(candidate -> !exclusions.contains(candidate))
+                                .toList();
+                        if (!admitted.isEmpty()) {
                             long maximumReadDeadlineMillis = maximumReadDeadlineMillis(deadline);
                             return pinNext(
                                     streamId,
                                     offset,
                                     view,
-                                    candidates,
+                                    admitted,
                                     0,
                                     maximumReadDeadlineMillis,
                                     deadline,
                                     null);
                         }
+                        if (!candidates.isEmpty() && !exclusions.isEmpty()) {
+                            return CompletableFuture.failedFuture(new NereusException(
+                                    ErrorCode.READ_RESOLUTION_FAILED,
+                                    true,
+                                    "all same-view generation candidates failed during this read"));
+                        }
                         if (allowRepair && view == ReadView.COMMITTED) {
                             return repair(streamId, offset, deadline).thenCompose(ignored -> resolve(
-                                    streamId, offset, view, deadline, false));
+                                    streamId, offset, view, deadline, false, exclusions));
                         }
                         return CompletableFuture.failedFuture(new NereusException(
                                 ErrorCode.READ_RESOLUTION_FAILED,

@@ -20,6 +20,7 @@ import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ReadResult;
+import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
 import com.nereusstream.api.ResolvedObjectRange;
@@ -33,6 +34,7 @@ import com.nereusstream.objectstore.wal.WalReadResult;
 import com.nereusstream.objectstore.wal.WalSliceReadStats;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -41,10 +43,12 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public final class ReadCoordinator implements AutoCloseable {
+public final class ReadCoordinator implements StreamViewReader {
     private final StreamStorageConfig config;
     private final ReadResolver resolver;
+    private final PinnedGenerationResolver generationResolver;
     private final ReadTargetDispatcher targetDispatcher;
+    private final GenerationReadFailureHandler generationFailureHandler;
     private final ReadResourceLimiter resourceLimiter;
     private final ReadMetricsObserver observer;
     private final Executor callbackExecutor;
@@ -62,7 +66,49 @@ public final class ReadCoordinator implements AutoCloseable {
                 Objects.requireNonNull(walObjectReader, "walObjectReader"));
         PrimaryWalRegistry registry = new PrimaryWalRegistry(List.of(), List.of(objectReader));
         registry.readerRegistry().require(ObjectWalReaderAdapter.KEY);
+        this.generationResolver = null;
         this.targetDispatcher = new ReadTargetDispatcher(registry);
+        this.generationFailureHandler = GenerationReadFailureHandler.noOp();
+        this.observer = Objects.requireNonNull(observer, "observer");
+        this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
+        this.resourceLimiter = new ReadResourceLimiter(
+                config.maxConcurrentObjectReads(), config.maxReadBufferBytes());
+    }
+
+    /** F4 constructor using authoritative generation resolution and exact target readers. */
+    public ReadCoordinator(
+            StreamStorageConfig config,
+            ReadResolver resolver,
+            GenerationReadResolver generationResolver,
+            ReadTargetReaderRegistry readers,
+            GenerationReadFailureHandler generationFailureHandler,
+            ReadMetricsObserver observer,
+            Executor callbackExecutor) {
+        this(
+                config,
+                resolver,
+                Objects.requireNonNull(generationResolver, "generationResolver")::resolve,
+                readers,
+                generationFailureHandler,
+                observer,
+                callbackExecutor);
+    }
+
+    ReadCoordinator(
+            StreamStorageConfig config,
+            ReadResolver resolver,
+            PinnedGenerationResolver generationResolver,
+            ReadTargetReaderRegistry readers,
+            GenerationReadFailureHandler generationFailureHandler,
+            ReadMetricsObserver observer,
+            Executor callbackExecutor) {
+        this.config = Objects.requireNonNull(config, "config");
+        this.resolver = Objects.requireNonNull(resolver, "resolver");
+        this.generationResolver = Objects.requireNonNull(generationResolver, "generationResolver");
+        this.targetDispatcher = new ReadTargetDispatcher(
+                Objects.requireNonNull(readers, "readers"));
+        this.generationFailureHandler = Objects.requireNonNull(
+                generationFailureHandler, "generationFailureHandler");
         this.observer = Objects.requireNonNull(observer, "observer");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.resourceLimiter = new ReadResourceLimiter(
@@ -101,6 +147,14 @@ public final class ReadCoordinator implements AutoCloseable {
             StreamId streamId,
             long startOffset,
             ReadOptions options) {
+        if (generationResolver != null) {
+            CancelAwareFuture<ReadResult> result = new CancelAwareFuture<>();
+            CompletableFuture<ViewReadResult> viewRead = read(
+                    streamId, startOffset, ReadView.COMMITTED, options);
+            result.onCancel(() -> viewRead.cancel(true));
+            completeFrom(result, viewRead.thenApply(ViewReadResult::result));
+            return result;
+        }
         CancelAwareFuture<ReadResult> result = new CancelAwareFuture<>();
         if (closed.get()) {
             result.completeExceptionally(
@@ -135,6 +189,140 @@ public final class ReadCoordinator implements AutoCloseable {
                         streamId, startOffset, options, resolution, deadline, true), callbackExecutor);
         completeFrom(result, pipeline);
         return result;
+    }
+
+    @Override
+    public CompletableFuture<ViewReadResult> read(
+            StreamId streamId,
+            long startOffset,
+            ReadView view,
+            ReadOptions options) {
+        CancelAwareFuture<ViewReadResult> result = new CancelAwareFuture<>();
+        if (generationResolver == null) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.UNSUPPORTED_READ_TARGET,
+                    false,
+                    "semantic-view reads require the F4 generation resolver"));
+            return result;
+        }
+        if (closed.get()) {
+            result.completeExceptionally(
+                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "stream storage is closed"));
+            return result;
+        }
+        if (streamId == null || view == null || options == null || startOffset < 0) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "streamId, view, valid startOffset and read options are required"));
+            return result;
+        }
+        if (options.isolation() != ReadIsolation.COMMITTED) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "semantic-view reads require committed isolation"));
+            return result;
+        }
+        Duration effectiveTimeout = options.timeout().compareTo(config.readTimeout()) <= 0
+                ? options.timeout()
+                : config.readTimeout();
+        ReadOperationDeadline deadline = new ReadOperationDeadline(effectiveTimeout);
+        result.onCancel(deadline::cancel);
+        CompletableFuture<ViewReadResult> pipeline = readGeneration(
+                streamId,
+                startOffset,
+                view,
+                options,
+                deadline,
+                new LinkedHashSet<>());
+        completeFrom(result, pipeline);
+        return result;
+    }
+
+    private CompletableFuture<ViewReadResult> readGeneration(
+            StreamId streamId,
+            long startOffset,
+            ReadView view,
+            ReadOptions options,
+            ReadOperationDeadline deadline,
+            Set<GenerationReadCandidate> excludedCandidates) {
+        return generationResolver.resolve(
+                        streamId,
+                        startOffset,
+                        view,
+                        deadline,
+                        true,
+                        excludedCandidates)
+                .thenCompose(optional -> optional
+                        .map(pinned -> readPinned(
+                                streamId,
+                                startOffset,
+                                view,
+                                options,
+                                deadline,
+                                pinned,
+                                excludedCandidates))
+                        .orElseGet(() -> CompletableFuture.completedFuture(new ViewReadResult(
+                                view,
+                                new ReadResult(streamId, startOffset, startOffset, List.of(), true),
+                                startOffset))));
+    }
+
+    private CompletableFuture<ViewReadResult> readPinned(
+            StreamId streamId,
+            long startOffset,
+            ReadView view,
+            ReadOptions options,
+            ReadOperationDeadline deadline,
+            PinnedResolvedRange pinned,
+            Set<GenerationReadCandidate> excludedCandidates) {
+        CompletableFuture<ReadResult> read = readRanges(
+                streamId,
+                startOffset,
+                options,
+                List.of(pinned.resolvedRange()),
+                deadline);
+        return releaseAfter(read, pinned).handle((value, failure) -> {
+            if (failure == null) {
+                return CompletableFuture.completedFuture(new ViewReadResult(
+                        view,
+                        value,
+                        view == ReadView.COMMITTED
+                                ? value.nextOffset()
+                                : pinned.resolvedRange().offsetRange().endOffset()));
+            }
+            Throwable cause = unwrap(failure);
+            if (!isObjectReadFailure(cause)) {
+                return CompletableFuture.<ViewReadResult>failedFuture(cause);
+            }
+            Set<GenerationReadCandidate> nextExclusions = new LinkedHashSet<>(excludedCandidates);
+            nextExclusions.add(pinned.candidate());
+            return generationFailureHandler.handle(streamId, pinned.candidate(), cause)
+                    .exceptionally(ignored -> null)
+                    .thenCompose(ignored -> readGeneration(
+                            streamId,
+                            startOffset,
+                            view,
+                            options,
+                            deadline,
+                            nextExclusions));
+        }).thenCompose(value -> value);
+    }
+
+    private static <T> CompletableFuture<T> releaseAfter(
+            CompletableFuture<T> operation,
+            PinnedResolvedRange pinned) {
+        return operation.handle((value, failure) -> pinned.release().handle((ignored, releaseFailure) -> {
+            if (failure == null && releaseFailure == null) {
+                return value;
+            }
+            Throwable cause = failure == null ? unwrap(releaseFailure) : unwrap(failure);
+            if (failure != null && releaseFailure != null) {
+                cause.addSuppressed(unwrap(releaseFailure));
+            }
+            throw new CompletionException(cause);
+        })).thenCompose(value -> value);
     }
 
     /** Invalidates every cached offset-index range for one stream. */
@@ -391,5 +579,16 @@ public final class ReadCoordinator implements AutoCloseable {
             long objectOffset,
             long objectLength,
             long entryIndexLength) {
+    }
+
+    @FunctionalInterface
+    interface PinnedGenerationResolver {
+        CompletableFuture<java.util.Optional<PinnedResolvedRange>> resolve(
+                StreamId streamId,
+                long offset,
+                ReadView view,
+                ReadOperationDeadline deadline,
+                boolean allowRepair,
+                Set<GenerationReadCandidate> excludedCandidates);
     }
 }

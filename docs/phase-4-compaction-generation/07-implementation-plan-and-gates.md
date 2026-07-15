@@ -257,9 +257,11 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > 当前实现检查点（2026-07-15）：`StreamViewReader`/`ViewReadResult`、exact
 > `ReadTargetReaderKey` registry/dispatch、`GenerationAllocator`、strict `GenerationIndexValidator`、old/new
 > generation exact lookup、physical identity resolver、durable pin-owned `GenerationReadResolver` 及其
-> candidate-limit/view-isolation/stale-selection tests 已落地。`ReadCoordinator` 完整 pin/IO/fallback 接线、
-> publication committer/reconciler、quarantine、M2 aggregate gates 和 real-service final gate 尚未完成；本检查点
-> 不构成 F4-M2 completion claim。
+> candidate-limit/view-isolation/stale-selection tests 已落地。`ReadCoordinator` 已持有 pin 贯穿 exact-reader IO
+> 和 terminal cleanup，并以 per-operation candidate exclusion 实现 same-view fallback；永久 missing/checksum
+> corruption 会 quarantine exact root 与选中的 higher index，临时 IO failure 不写健康状态。publication
+> committer/reconciler、同对象全引用域 quarantine repair、瞬态重试阈值、M2 aggregate gates 和 real-service
+> final gate 尚未完成；本检查点不构成 F4-M2 completion claim。
 
 ### 4.1 Production artifacts
 

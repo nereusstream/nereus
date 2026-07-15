@@ -45,8 +45,9 @@ exact-byte upload completion 与 exact HEAD 后的受限 conditional-delete fall
 `phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M1 已 final-gated，但 M2–M6 的 generation
 publication/read、materialization、retention/GC 和 async profile 仍不可用。F4-M2 已进入实现：exact
 target-reader dispatch、generation allocator/index compatibility、physical identity resolution 与 authoritative
-scan + durable pin + exact revalidation resolver 基础已经落地；publication、完整 coordinator fallback、
-quarantine 和 M2 gates 尚未完成。
+scan + durable pin + exact revalidation resolver 基础已经落地；coordinator 现持有 pin 贯穿 IO/cleanup，并完成
+same-view candidate exclusion fallback 与永久对象损坏的 selected-candidate quarantine。publication、同对象
+全引用域 quarantine repair、瞬态重试阈值和 M2 gates 尚未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

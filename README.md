@@ -129,8 +129,9 @@ range bounds、SDK response 与 exact-byte upload 双完成条件，以及 exact
 conditional-DELETE compatibility fallback 均已由 focused real Oxia 与 pinned LocalStack 验证；
 `phase4M1Check` 和 `phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M2 当前已实现
 view-aware read contract、exact target-reader registry/dispatch、generation allocator、strict index hydration、
-exact candidate lookup、physical identity resolution 和 fresh-scan/pin/revalidation resolver 基础；publication、
-完整 `ReadCoordinator` IO fallback、quarantine 与 M2 gates 仍在进行中。
+exact candidate lookup、physical identity resolution、fresh-scan/pin/revalidation resolver，以及 pin-through-IO 的
+`ReadCoordinator` same-view fallback 与 selected-candidate quarantine；publication、全引用域 quarantine repair、
+瞬态重试阈值与 M2 gates 仍在进行中。
 新的
 `docs/phase-4-compaction-generation/` 冻结了 API/module ownership、`NCP1/NTC1/NRC1` formats、
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader

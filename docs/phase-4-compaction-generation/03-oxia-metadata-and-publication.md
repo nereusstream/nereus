@@ -49,8 +49,12 @@ The matching core resolver performs a fresh authoritative view-scoped scan for e
 hard bound, ignores non-COMMITTED lifecycle records, selects the highest covering generation, resolves physical
 identity from the root (or the narrowly allowed generation-zero manifest bootstrap), acquires the durable reader
 lease and then reloads both the exact candidate and stream head before returning it. This is an intermediate M2
-checkpoint only：`PREPARED -> COMMITTED` publication orchestration、task reconciliation、quarantine and full
-read-coordinator IO fallback are still pending, so no higher-generation production path is enabled yet.
+checkpoint only。`ReadCoordinator` now retains the lease through exact-reader IO and terminal cleanup, excludes a
+failed exact candidate only inside the current operation/view, and performs a fresh resolve for fallback. Missing or
+checksum-corrupt immutable objects best-effort CAS the exact root and selected higher index to `QUARANTINED`；transient
+object-read failures do not alter health metadata. `PREPARED -> COMMITTED` publication orchestration、task
+reconciliation、same-object reference-domain quarantine repair、retry threshold and M2 gates are still pending, so no
+higher-generation production path is enabled yet.
 
 ## 2. Keyspace
 
