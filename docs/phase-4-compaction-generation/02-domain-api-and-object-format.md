@@ -2,10 +2,11 @@
 
 ## 1. Design Rules
 
-Java below is the normative Phase 4 target surface. The F4 API/metadata/object-store foundations and the core
-physical-reference、reader-pin and activation-proof values identified in document 07 are now implemented；the rest
-remains target code until its milestone lands. Package、class and method names are normative unless a review replaces
-them together with every caller/test listed in document 07.
+Java below is the normative Phase 4 target surface. The F4 API/metadata/object-store foundations、core
+physical-reference/reader-pin/activation-proof values and the first F4-M3 compacted-Parquet writer/strict-reader
+checkpoint identified in document 07 are implemented；the remaining M3 planner/worker and M4–M6 surfaces remain
+target code until their milestone lands. Package、class and method names are normative unless a review replaces them
+together with every caller/test listed in document 07.
 
 The domain model obeys these rules：
 
@@ -57,12 +58,19 @@ nereus-object-store/src/main/java/com/nereusstream/objectstore/staging/
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/compacted/
   CompactedObjectFormatV1.java
+  CompactedObjectFormatException.java
+  CompactedObjectMetadata.java
+  CompactedObjectRow.java
   CompactedObjectWriteRequest.java
   CompactedObjectWriteResult.java
   CompactedObjectWriter.java
+  TopicCompactionFormatSpec.java
+  CompactedObjectReadRequest.java
+  CompactedObjectReadResult.java
   CompactedObjectReader.java
   ParquetCompactedObjectWriter.java
   ParquetCompactedObjectReader.java
+  TopicCompactedObjectReader.java
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/checkpoint/
   RecoveryCheckpointCodecV1.java
@@ -571,7 +579,13 @@ public record CompactedObjectWriteRequest(
         long cumulativeSizeAtEnd,
         int targetRowGroupRecords,
         String compression,
-        String writerBuild) { }
+        String writerBuild,
+        Optional<TopicCompactionFormatSpec> topicCompaction) { }
+
+public record TopicCompactionFormatSpec(
+        String strategyId,
+        long strategyVersion,
+        String keyCodecId) { }
 
 public record CompactedObjectWriteResult(
         StagedObjectFile stagingFile,
@@ -612,6 +626,11 @@ close-owned result exposing that file as `ReplayableObjectUpload`. The worker pe
 verification, builds `MaterializationOutput`, then closes the result on every path. `write` failure closes/deletes its
 partial file itself. The result's `outputRecordCount` must equal the request expectation；its key components and
 footer reference are recomputed on construction.
+
+`TopicCompactionFormatSpec` is the protocol-neutral object-format copy of the materialization-layer
+`TopicCompactionSpec`. This explicit field is required because an NTC1 file must persist strategy id/version and key
+codec in its immutable footer metadata, while `nereus-object-store` must not import `nereus-materialization`.
+The worker must copy all three values exactly；neither layer may infer defaults during write or recovery.
 
 ## 7. `NEREUS_COMPACTED_PARQUET_V1`
 

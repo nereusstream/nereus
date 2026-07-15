@@ -1,6 +1,7 @@
 # Phase 4 Materialization / Compaction / Generation / GC Detailed Design
 
-> 状态：Implementation in progress；F4-M1–M2 已完成并通过 ordinary/Docker-backed final gates，F4-M3–M6 未实现
+> 状态：Implementation in progress；F4-M1–M2 已完成并通过 ordinary/Docker-backed final gates；F4-M3
+> compacted Parquet object-format/strict-reader checkpoint 已落地，planner/worker 与 M3 gates 尚未完成；F4-M4–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -49,8 +50,12 @@ COMMITTED CAS 成功响应丢失后的进程重启与同一 publication/generati
 exact root/index quarantine、lease 清理和同 view generation-zero fallback。该门禁同时暴露并修复了 inline
 `EntryIndexRef` 在 durable codec round-trip 后按数组引用而非内容比较的问题。`phase4M2Check` 与
 `phase4M2FinalCheck --rerun-tasks` 已于 2026-07-15 通过，因此 F4-M2 已 final-gated。M3 还需将
-source/output task protection 接入 worker，并实现真实 compacted object format；M4 还需将 source
-reachability 扩展为 recovery-root/anchor-aware proof。Phase 4 整体仍为
+source/output task protection 接入 worker。F4-M3 的首个实现 checkpoint 已加入 pinned Parquet/Hadoop/ZSTD
+依赖、真实 `PAR1` NCP1/NTC1 schema/metadata writer、close-owned replayable staging result、footer reference，
+以及基于 bounded exact object-store ranges 的严格 reader 和独立 NTC1 facade。NCP1 golden 与 LocalFileObjectStore
+ZSTD exact-range round trip 已通过；format verifier、property/corruption/NTC1 suites、core exact-reader adapter、
+planner/task/worker/recovery/service 和 M3 ordinary/final gates 仍未完成，因此 higher-generation materialization
+仍未开放。M4 还需将 source reachability 扩展为 recovery-root/anchor-aware proof。Phase 4 整体仍为
 `Implementation in progress`；physical delete、materialization worker 和 async profile 均未开放。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
@@ -290,7 +295,7 @@ M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physi
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
-| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | planned |
+| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/strict reader foundation + NCP1 golden/ZSTD round trip landed；verifier、adapter、planner/worker and gates pending |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |

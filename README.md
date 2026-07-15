@@ -139,7 +139,8 @@ publication state machine、re-entry reconciler、canonical task/output identity
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader
 leases/protections、64-shard restart-safe stream discovery、retention/GC、guarded PUT 与可界的 DELETED-root audit
 retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录同时记录 normative target 与已落地检查点；
-F4-M1–M2 已 final-gated，M3–M6 尚未实现；真实 compacted object format/worker、retention/GC 与 async
+F4-M1–M2 已 final-gated；M3 首个真实 Parquet writer/strict-reader checkpoint 已落地并通过 NCP1 golden 与
+LocalFileObjectStore ZSTD round trip，但 verifier、planner/worker 和 M3 gates 尚未完成；retention/GC 与 async
 profile 仍不可用。Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

@@ -355,6 +355,14 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 
 ## 5. F4-M3 — Object Format, Planner, and Worker
 
+> Implementation checkpoint (2026-07-15)：the pinned Apache Parquet/Hadoop/ZSTD dependencies、frozen NCP1/NTC1
+> schemas/metadata parser、streaming private-staging writer、content-addressed identity/footer reference、bounded
+> exact-range strict reader and NTC1-only facade are implemented. `CompactedParquetGoldenTest` and
+> `CompactedParquetStrictReaderTest` prove standard `PAR1` bytes、exact row-group/footer identity and a ZSTD
+> LocalFileObjectStore round trip. This is not M3 completion：the verifier、remaining format/corruption/streaming
+> suites、core adapter、planner/task/worker/recovery/service and both M3 gates below remain pending, and production
+> activation stays disabled.
+
 ### 5.1 Production artifacts
 
 `nereus-object-store`：

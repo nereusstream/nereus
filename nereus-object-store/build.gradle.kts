@@ -24,6 +24,11 @@ dependencies {
         exclude(group = "software.amazon.awssdk", module = "aws-crt-core")
     }
     implementation(libs.aws.sdk.v2.netty.client)
+    implementation(libs.parquet.hadoop)
+    implementation(libs.parquet.column)
+    implementation(libs.hadoop.common)
+    implementation(libs.hadoop.mapreduce.client.core)
+    runtimeOnly(libs.zstd.jni)
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)

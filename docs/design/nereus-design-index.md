@@ -2,7 +2,8 @@
 
 > 状态：当前设计索引
 > 最近一次设计/实现同步：2026-07-15
-> 当前交付阶段：Future 2、Future 3 与 Future 4 F4-M1–M2 complete/final-gated；Future 4 M3–M6 未实现
+> 当前交付阶段：Future 2、Future 3 与 Future 4 F4-M1–M2 complete/final-gated；Future 4 M3 object-format
+> checkpoint implemented，M3 remainder/M4–M6 pending
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -41,7 +42,7 @@ streamId + offset
    `docs/phase-2-managed-ledger-facade/` 的 implemented F2 contract，以及
    `docs/phase-3-cursor-subscription/` 的 implemented/final-gated F3 contract；
 3. **当前 Phase 4 代码级合同**：`docs/phase-4-compaction-generation/` 的 F4-M0 target、已 final-gated 的
-   F4-M1–M2 implementation checkpoint 与 M3–M6 target；它优先于 F4 north-star 摘要，但已实现部分仍以
+   F4-M1–M2 implementation checkpoint、M3 object-format implementation checkpoint 与后续 target；它优先于 F4 north-star 摘要，但已实现部分仍以
    代码/测试为最高权威；
 4. **已接受决策**：`docs/decisions/`；
 5. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
@@ -69,7 +70,7 @@ streamId + offset
 | --- | --- | --- |
 | `nereus-api` | `Implemented`（P15-M1/M4/M6 + F4-M1–M2） | generic target/result、exact cumulative append snapshot、append recovery/lifecycle API plus F4 view/generation/publication/object-hash values and content-aware inline entry-index identity |
 | `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1–M2 final-gated） | existing metadata plus F4 keys、records、43-vector codec golden、generation allocation/index publication、closed CAS guards、conditional delete、Oxia slash-aware fixed-depth scans、all-shard fixtures and shared physical-root transition validation；real-service final gates passed |
-| `nereus-object-store` | `Implemented`（M3 + F4-M1 final-gated） | WAL v1 IO plus replayable private staging、guarded retry PUT、SDK-response/exact-byte completion、bounded logical-prefix LIST、HEAD-before-DELETE、405/501 conditional-delete compatibility fallback and safe local fixture |
+| `nereus-object-store` | `Implemented`（L0 M3 + F4-M1 final-gated；F4-M3 format in progress） | WAL v1 IO plus replayable private staging/guarded object IO；F4-M3 adds pinned real Parquet NCP1/NTC1 writer、strict bounded range reader、footer/content identity and golden/ZSTD LocalFile round-trip evidence；full M3 verifier/gates pending |
 | `nereus-core` | `Implemented`（P15 + F4-M1–M2 final-gated） | stable L0 core plus F4 physical/reference proofs、durable pins/protections、authoritative committed-generation resolver、exact dispatch and same-view fallback/quarantine；not yet integrated into M3 compacted format or M4 GC |
 | `nereus-materialization` | `Implemented`（F4-M1–M2 final-gated） | strict materialization domain values plus restart-safe publication/re-entry、exact output verification and real Oxia/LocalStack concurrency/restart evidence；planner/worker begins in M3 |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
@@ -79,7 +80,7 @@ streamId + offset
 | `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle、canonical cursor context、unloaded binding-aware admin validation and real dual-broker M6 compatibility cuts are implemented/tested |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Future 4 materialization/compaction | `In progress / F4-M1–M2 final-gated` | M1 metadata/object primitives plus M2 generation publication、authoritative resolve/read、pin/fallback/quarantine passed ordinary and real Oxia/LocalStack final gates；M3-M6 execution paths remain |
+| Future 4 materialization/compaction | `In progress / F4-M1–M2 final-gated；M3 format checkpoint` | M1/M2 gates passed；M3 real Parquet writer/strict reader foundation is implemented/tested, while verifier、core adapter、planner/worker and M3 gates plus M4–M6 remain |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -233,7 +234,7 @@ decision behind items 14 and 16-18。
 | `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
-| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M2 final-gated |
+| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M2 final-gated；M3 format checkpoint landed |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -247,7 +248,7 @@ decision behind items 14 and 16-18。
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Implemented / final-gated`（M0/M0R + M1-M6） |
-| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M2 final-gated`；精确合同见 `../phase-4-compaction-generation/` |
+| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M2 final-gated；M3 format checkpoint`；精确合同见 `../phase-4-compaction-generation/` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
 | `nereus-future7-routing-brownout-elasticity.md` | F7 routing/brown-out/elasticity | `Designed` |
