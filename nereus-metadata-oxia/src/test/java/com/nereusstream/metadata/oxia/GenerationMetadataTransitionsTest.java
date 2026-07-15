@@ -9,6 +9,7 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
+import com.nereusstream.metadata.oxia.records.MaterializationPolicyRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
@@ -113,10 +114,21 @@ class GenerationMetadataTransitionsTest {
         return new MaterializationTaskRecord(
                 value.schemaVersion(), value.taskId(), value.taskSequence(), value.streamId(), value.readViewId(),
                 value.taskKindId(), value.offsetStart(), value.offsetEnd(), value.sources(), value.sourceSetSha256(),
-                policyId, value.policyVersion(), value.policySha256(), value.lifecycle(), value.attempt(),
+                policyId, value.policyVersion(), value.policySha256(), policyWithId(value.policy(), policyId),
+                value.lifecycle(), value.attempt(),
                 value.workerClaim(), value.output(), value.allocatedGeneration(), value.publicationId(),
                 value.failureClassId(), value.failureMessage(), value.retryNotBeforeMillis(), value.createdAtMillis(),
                 value.updatedAtMillis(), 0);
+    }
+
+    private static MaterializationPolicyRecord policyWithId(
+            MaterializationPolicyRecord value,
+            String policyId) {
+        return new MaterializationPolicyRecord(
+                policyId, value.policyVersion(), value.readViewId(), value.taskKindId(),
+                value.targetPhysicalFormat(), value.minMergeSourceRanges(), value.maxSourceRanges(),
+                value.maxRangeRecords(), value.targetObjectBytes(), value.targetRowGroupRecords(),
+                value.compression(), value.topicStrategyId(), value.topicStrategyVersion(), value.topicKeyCodecId());
     }
 
     private static RangeRetentionStatsRecord statsWithVerification(

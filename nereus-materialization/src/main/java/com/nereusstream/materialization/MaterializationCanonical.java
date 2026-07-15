@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -59,6 +60,26 @@ final class MaterializationCanonical {
             writer.text(spec.keyCodecId());
         });
         return sha256(writer.bytes());
+    }
+
+    static long operatorPolicyVersion(
+            int minMergeSourceRanges,
+            int maxSourceRanges,
+            long maxRangeRecords,
+            long targetObjectBytes,
+            int targetRowGroupRecords,
+            String compression) {
+        CanonicalWriter writer = new CanonicalWriter();
+        writer.text("nereus-lossless-committed-operator-policy-v1");
+        writer.intValue(minMergeSourceRanges);
+        writer.intValue(maxSourceRanges);
+        writer.longValue(maxRangeRecords);
+        writer.longValue(targetObjectBytes);
+        writer.intValue(targetRowGroupRecords);
+        writer.text(compression);
+        byte[] digest = sha256Bytes(writer.bytes());
+        long version = ByteBuffer.wrap(digest, 0, Long.BYTES).getLong() & Long.MAX_VALUE;
+        return version == 0 ? 1 : version;
     }
 
     static Checksum sourceSetDigest(List<SourceGeneration> sources) {
@@ -134,11 +155,13 @@ final class MaterializationCanonical {
     }
 
     private static Checksum sha256(byte[] bytes) {
+        return new Checksum(ChecksumType.SHA256, HexFormat.of().formatHex(sha256Bytes(bytes)));
+    }
+
+    private static byte[] sha256Bytes(byte[] bytes) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return new Checksum(
-                    ChecksumType.SHA256,
-                    HexFormat.of().formatHex(digest.digest(bytes)));
+            return digest.digest(bytes);
         } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException("SHA-256 is unavailable", failure);
         }

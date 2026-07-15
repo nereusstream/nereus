@@ -27,8 +27,8 @@ import java.util.Objects;
 
 /** Durable key and partition builder for the Phase 4 protocol. */
 public final class F4Keyspace {
-    private static final int MATERIALIZATION_REGISTRY_SHARDS = 64;
-    private static final int PHYSICAL_OBJECT_SHARDS = 256;
+    public static final int MATERIALIZATION_REGISTRY_SHARDS = 64;
+    public static final int PHYSICAL_OBJECT_SHARDS = 256;
     private static final String BASE32_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567";
 
     private final OxiaKeyspace oxia;

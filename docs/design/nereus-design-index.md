@@ -69,18 +69,18 @@ streamId + offset
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
 | `nereus-api` | `Implemented`（P15-M1/M4/M6 + F4-M1–M2） | generic target/result、exact cumulative append snapshot、append recovery/lifecycle API plus F4 view/generation/publication/object-hash values and content-aware inline entry-index identity |
-| `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1–M2 final-gated） | existing metadata plus F4 keys、records、43-vector codec golden、generation allocation/index publication、closed CAS guards、conditional delete、Oxia slash-aware fixed-depth scans、all-shard fixtures and shared physical-root transition validation；real-service final gates passed |
+| `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1–M2 final-gated；F4-M3 task snapshot） | existing metadata plus F4 keys、records、43-vector codec golden、generation allocation/index publication、full immutable task-policy snapshot、closed CAS guards、conditional delete、Oxia slash-aware fixed-depth scans、all-shard fixtures and shared physical-root transition validation；real-service M1/M2 gates passed |
 | `nereus-object-store` | `Implemented`（L0 M3 + F4-M1 final-gated；F4-M3 format in progress） | WAL v1 IO plus replayable private staging/guarded object IO；F4-M3 adds pinned real Parquet NCP1/NTC1 writer、strict bounded reader、whole-file CRC/SHA/key verifier and format/corruption/streaming evidence；full M3 gates pending |
 | `nereus-core` | `Implemented`（P15 + F4-M1–M2 final-gated；F4-M3 adapter in progress） | stable L0 core plus F4 resolver/pin/fallback；exact NCP1 adapter now maps dense rows with explicit caller StreamId cross-check，while M3 worker composition and M4 GC remain |
-| `nereus-materialization` | `Implemented`（F4-M1–M2 final-gated；F4-M3 verifier bridge） | strict domain/publication state machine plus task-aware full compacted-format verification；planner/worker begins in the remaining M3 work |
+| `nereus-materialization` | `Implemented`（F4-M1–M2 final-gated；F4-M3 in progress） | strict domain/publication and format verification plus deterministic policy/planner、exact-revalidated task store、claim/publication recovery and all-64-shard registered-stream scanner；exact-source worker/service remain |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
-| Async object materialization | `Reserved` | profile/durability names and M2 task/publication primitives exist；planner/worker/checkpoint/retention execution gates do not |
+| Async object materialization | `Reserved` | profile/durability names and M2 publication plus M3 planning/recovery primitives exist；worker/checkpoint/retention execution gates do not |
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6） | F2 ledger facade/cursor boundary plus F3 ack domain、immutable NCS1 snapshot codec/store、durable CursorStorage、retention/protection/trim state machines、dual-mode ManagedCursor facade/hydration/lifecycle、exact 10,000-root boundary、reset/limit/rollout and F4 snapshot inventory are implemented/tested |
 | `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle、canonical cursor context、unloaded binding-aware admin validation and real dual-broker M6 compatibility cuts are implemented/tested |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Future 4 materialization/compaction | `In progress / F4-M1–M2 final-gated；M3 format checkpoint` | M1/M2 gates passed；M3 real Parquet writer/strict reader/full verifier、NTC1 facade and core adapter are implemented/tested, while Pulsar opaque round trip、planner/worker and M3 gates plus M4–M6 remain |
+| Future 4 materialization/compaction | `In progress / F4-M1–M2 final-gated；M3 checkpoints` | M1/M2 gates passed；M3 format/read and deterministic policy/planner/task/recovery/registry-scan checkpoints are implemented/tested, while Pulsar opaque round trip、exact-source worker/service and M3 gates plus M4–M6 remain |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -234,7 +234,7 @@ decision behind items 14 and 16-18。
 | `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
-| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M2 final-gated；M3 format checkpoint landed |
+| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M2 final-gated；M3 format + planner/recovery checkpoints landed |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -248,7 +248,7 @@ decision behind items 14 and 16-18。
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Implemented / final-gated`（M0/M0R + M1-M6） |
-| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M2 final-gated；M3 format checkpoint`；精确合同见 `../phase-4-compaction-generation/` |
+| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M2 final-gated；M3 format + planner/recovery checkpoints`；精确合同见 `../phase-4-compaction-generation/` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
 | `nereus-future7-routing-brownout-elasticity.md` | F7 routing/brown-out/elasticity | `Designed` |

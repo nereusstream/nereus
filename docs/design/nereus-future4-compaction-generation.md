@@ -1,7 +1,8 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
 > 状态：Implementation in progress；F4-M0 complete，F4-M1–M2 implemented/final-gated；F4-M3 real Parquet
-> writer/strict-reader checkpoint implemented，remaining M3/M4–M6 pending
+> read/write and deterministic planner/task/recovery checkpoints implemented，exact-source worker/gates and
+> M4–M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -546,8 +547,9 @@ create/backward-reset 和 pending-trim gates 已实现并 final-gated。Phase 4
 [`F4-M1–M2`](../phase-4-compaction-generation/07-implementation-plan-and-gates.md) 的 API/metadata/object IO、
 physical reference values、durable reader pin/protection、authoritative generation resolve/read 和 restart-safe
 publication 已落地，并通过 ordinary/Docker-backed final gates；F4-M3 当前已落地 real compacted Parquet
-writer/strict-reader/full verifier、NTC1 storage facade 和 core adapter，下一步继续 Pulsar opaque round trip、
-planner/worker，不重新打开协议选型。
+writer/strict-reader/full verifier、NTC1 storage facade、core adapter，以及 deterministic policy/planner、durable
+task policy snapshot、claim/publication recovery 和 64-shard registered-stream scanner。下一步继续 Pulsar opaque
+round trip、exact-source worker/protection 和 service composition，不重新打开协议选型。
 
 F4-M0 只是 design gate；F4-M1–M2 final gates 也不声称 end-to-end materialization、benchmark、chaos 或
 Phase 4 compatibility certification。F4-M3–M6 的确切文件、测试、故障点和 release gates 见代码级实施计划。

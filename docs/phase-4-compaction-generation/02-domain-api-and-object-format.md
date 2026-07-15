@@ -3,10 +3,11 @@
 ## 1. Design Rules
 
 Java below is the normative Phase 4 target surface. The F4 API/metadata/object-store foundations、core
-physical-reference/reader-pin/activation-proof values and the first F4-M3 compacted-Parquet writer/strict-reader
-checkpoint identified in document 07 are implemented；the remaining M3 planner/worker and M4–M6 surfaces remain
-target code until their milestone lands. Package、class and method names are normative unless a review replaces them
-together with every caller/test listed in document 07.
+physical-reference/reader-pin/activation-proof values and the F4-M3 compacted-Parquet writer/strict-reader、policy、
+whole-index planner、task-store、task-recovery and registered-stream-scanner checkpoints identified in document 07
+are implemented；the remaining M3 exact-source worker/service composition and M4–M6 surfaces remain target code until
+their milestone lands. Package、class and method names are normative unless a review replaces them together with
+every caller/test listed in document 07.
 
 The domain model obeys these rules：
 
@@ -83,6 +84,12 @@ nereus-object-store/src/main/java/com/nereusstream/objectstore/checkpoint/
 
 nereus-materialization/src/main/java/com/nereusstream/materialization/
   MaterializationPlanner.java
+  DefaultMaterializationPlanner.java
+  MaterializationPolicyFactory.java
+  MaterializationTaskStore.java
+  MaterializationTaskRecovery.java
+  TaskRecoveryScanner.java
+  RegisteredMaterializationStreamScanner.java
   MaterializationWorker.java
   GenerationCommitter.java
   MaterializationService.java
@@ -412,6 +419,13 @@ Configuration may choose smaller values but cannot raise a durable hard limit wi
 
 `policyDigestSha256` is computed from every field above. A policy version change creates a new task identity；it does
 not mutate an existing task's meaning.
+
+The implemented lossless factory uses the stable id `nereus-committed-default`. It derives a positive low-63-bit
+`policyVersion` from SHA-256 over the canonical operator-controlled limits、row-group size and compression；the full
+policy digest still covers every policy field. A durable task embeds the complete immutable policy snapshot in
+addition to `(policyId, policyVersion, policyDigestSha256)`. Recovery reconstructs the task from that snapshot and
+never consults current process configuration, so changing operator defaults cannot reinterpret or strand old
+`CLAIMED`/`OUTPUT_READY`/`PUBLISHING` tasks.
 
 ### 5.3 Task and output
 

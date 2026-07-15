@@ -2,17 +2,25 @@
 package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.ObjectId;
+import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
+import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
+import com.nereusstream.metadata.oxia.records.MaterializationPolicyRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.SourceGenerationRecord;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
@@ -57,6 +65,143 @@ final class MaterializationRecordMapper {
             throw new IllegalArgumentException(
                     "durable materialization task/output does not match the requested publication");
         }
+    }
+
+    static MaterializationTaskRecord plannedTask(MaterializationTask task, long nowMillis) {
+        Objects.requireNonNull(task, "task");
+        if (nowMillis < 0) {
+            throw new IllegalArgumentException("nowMillis must be non-negative");
+        }
+        return new MaterializationTaskRecord(
+                1,
+                task.taskId(),
+                task.taskSequence(),
+                task.streamId().value(),
+                task.view().wireId(),
+                task.taskKind().wireId(),
+                task.coverage().startOffset(),
+                task.coverage().endOffset(),
+                task.sources().stream().map(MaterializationRecordMapper::sourceRecord).toList(),
+                task.sourceSetSha256().value(),
+                task.policy().policyId(),
+                task.policy().policyVersion(),
+                task.policyDigestSha256().value(),
+                policyRecord(task.policy()),
+                TaskLifecycle.PLANNED,
+                0,
+                Optional.empty(),
+                Optional.empty(),
+                OptionalLong.empty(),
+                "",
+                TaskFailureClass.NONE.wireId(),
+                "",
+                0,
+                nowMillis,
+                nowMillis,
+                0);
+    }
+
+    static MaterializationTask domainTask(
+            VersionedMaterializationTask durable) {
+        Objects.requireNonNull(durable, "durable");
+        return domainTask(durable, domainPolicy(durable.value().policy()));
+    }
+
+    static MaterializationTask domainTask(
+            VersionedMaterializationTask durable,
+            MaterializationPolicy policy) {
+        Objects.requireNonNull(durable, "durable");
+        Objects.requireNonNull(policy, "policy");
+        MaterializationTaskRecord value = durable.value();
+        List<SourceGeneration> sources = value.sources().stream()
+                .map(MaterializationRecordMapper::sourceGeneration)
+                .toList();
+        MaterializationTask task = new MaterializationTask(
+                value.taskId(),
+                new com.nereusstream.api.StreamId(value.streamId()),
+                com.nereusstream.api.ReadView.fromWireId(value.readViewId()),
+                TaskKind.fromWireId(value.taskKindId()),
+                new OffsetRange(value.offsetStart(), value.offsetEnd()),
+                sources,
+                new Checksum(ChecksumType.SHA256, value.sourceSetSha256()),
+                policy,
+                new Checksum(ChecksumType.SHA256, value.policySha256()));
+        if (value.taskSequence() != task.taskSequence()
+                || !value.policyId().equals(policy.policyId())
+                || value.policyVersion() != policy.policyVersion()
+                || !value.policySha256().equals(policy.digestSha256().value())) {
+            throw new IllegalArgumentException("durable task does not match the supplied policy/sequence");
+        }
+        return task;
+    }
+
+    static MaterializationPolicyRecord policyRecord(MaterializationPolicy policy) {
+        Objects.requireNonNull(policy, "policy");
+        Optional<TopicCompactionSpec> topic = policy.topicCompaction();
+        return new MaterializationPolicyRecord(
+                policy.policyId(),
+                policy.policyVersion(),
+                policy.view().wireId(),
+                policy.taskKind().wireId(),
+                policy.targetPhysicalFormat(),
+                policy.minMergeSourceRanges(),
+                policy.maxSourceRanges(),
+                policy.maxRangeRecords(),
+                policy.targetObjectBytes(),
+                policy.targetRowGroupRecords(),
+                policy.compression(),
+                topic.map(TopicCompactionSpec::strategyId).orElse(""),
+                topic.map(TopicCompactionSpec::strategyVersion).orElse(0L),
+                topic.map(TopicCompactionSpec::keyCodecId).orElse(""));
+    }
+
+    static MaterializationPolicy domainPolicy(MaterializationPolicyRecord policy) {
+        Objects.requireNonNull(policy, "policy");
+        Optional<TopicCompactionSpec> topic = policy.topicStrategyId().isEmpty()
+                ? Optional.empty()
+                : Optional.of(new TopicCompactionSpec(
+                        policy.topicStrategyId(),
+                        policy.topicStrategyVersion(),
+                        policy.topicKeyCodecId()));
+        return new MaterializationPolicy(
+                policy.policyId(),
+                policy.policyVersion(),
+                com.nereusstream.api.ReadView.fromWireId(policy.readViewId()),
+                TaskKind.fromWireId(policy.taskKindId()),
+                policy.targetPhysicalFormat(),
+                policy.minMergeSourceRanges(),
+                policy.maxSourceRanges(),
+                policy.maxRangeRecords(),
+                policy.targetObjectBytes(),
+                policy.targetRowGroupRecords(),
+                policy.compression(),
+                topic);
+    }
+
+    static SourceGeneration sourceGeneration(SourceGenerationRecord source) {
+        Objects.requireNonNull(source, "source");
+        return new SourceGeneration(
+                com.nereusstream.api.ReadView.fromWireId(source.readViewId()),
+                new OffsetRange(source.offsetStart(), source.offsetEnd()),
+                source.generation(),
+                source.commitVersion(),
+                source.indexKey(),
+                source.indexMetadataVersion(),
+                new Checksum(ChecksumType.SHA256, source.indexRecordSha256()),
+                ReadTargetCodecRegistry.phase15().decode(source.readTarget()),
+                new Checksum(ChecksumType.SHA256, source.targetIdentitySha256()),
+                source.materializationPolicySha256().isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(new Checksum(
+                                ChecksumType.SHA256, source.materializationPolicySha256())),
+                PayloadFormat.valueOf(source.payloadFormat()),
+                ProjectionIdentity.decode(source.projectionRef()),
+                source.recordCount(),
+                source.entryCount(),
+                source.logicalBytes(),
+                source.schemaRefs(),
+                source.cumulativeSizeAtStart(),
+                source.cumulativeSizeAtEnd());
     }
 
     static SourceGenerationRecord sourceRecord(SourceGeneration source) {
@@ -105,6 +250,44 @@ final class MaterializationRecordMapper {
                 output.cumulativeSizeAtEnd(),
                 output.sourceSetSha256().value(),
                 projectionIdentity(output.projectionRef()));
+    }
+
+    static MaterializationOutput domainOutput(
+            MaterializationTask task,
+            MaterializationOutputRecord output) {
+        Objects.requireNonNull(task, "task");
+        Objects.requireNonNull(output, "output");
+        var decoded = ReadTargetCodecRegistry.phase15().decode(output.readTarget());
+        if (!(decoded instanceof ObjectSliceReadTarget target)) {
+            throw new IllegalArgumentException("materialization output target is not an object slice");
+        }
+        return new MaterializationOutput(
+                task.taskId(),
+                task.streamId(),
+                task.view(),
+                task.coverage(),
+                output.outputAttemptId(),
+                new ObjectId(output.objectId()),
+                new ObjectKey(output.objectKey()),
+                new ObjectKeyHash(output.objectKeyHash()),
+                output.objectLength(),
+                new Checksum(ChecksumType.CRC32C, output.storageCrc32c()),
+                new Checksum(ChecksumType.SHA256, output.contentSha256()),
+                output.etag(),
+                output.physicalFormat(),
+                output.logicalFormat(),
+                target,
+                new Checksum(ChecksumType.SHA256, output.targetIdentitySha256()),
+                target.entryIndexRef(),
+                output.sourceRecordCount(),
+                output.outputRecordCount(),
+                output.entryCount(),
+                output.logicalBytes(),
+                output.schemaRefs(),
+                output.cumulativeSizeAtStart(),
+                output.cumulativeSizeAtEnd(),
+                new Checksum(ChecksumType.SHA256, output.sourceSetSha256()),
+                ProjectionIdentity.decode(output.projectionRef()));
     }
 
     static GenerationIndexRecord preparedIndex(
@@ -375,6 +558,7 @@ final class MaterializationRecordMapper {
                 current.policyId(),
                 current.policyVersion(),
                 current.policySha256(),
+                current.policy(),
                 lifecycle,
                 current.attempt(),
                 current.workerClaim(),

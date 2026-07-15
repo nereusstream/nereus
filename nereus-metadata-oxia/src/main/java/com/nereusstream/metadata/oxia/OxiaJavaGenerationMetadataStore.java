@@ -298,7 +298,7 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         return recoverCreate(create, () -> getTask(cluster, stream, value.taskId()).thenApply(existing -> {
             VersionedMaterializationTask result = existing.orElseThrow(
                     () -> F4MetadataStoreSupport.invariant("task disappeared after create conflict"));
-            if (!GenerationMetadataTransitions.sameTaskPlanningIdentity(value, result.value())) {
+            if (!GenerationMetadataTransitions.sameTaskCreateIdentity(value, result.value())) {
                 throw F4MetadataStoreSupport.invariant(
                         "task key collided with another planning identity");
             }

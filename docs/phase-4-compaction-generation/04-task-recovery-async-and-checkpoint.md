@@ -26,6 +26,17 @@ MaterializationService
 `MaterializationService` is process-shared and multi-stream. It has no broker/topic ownership assumption. Duplicate
 planners/workers on multiple brokers are expected；deterministic task ids and Oxia CAS converge them.
 
+### 1.1 Implemented F4-M3 orchestration checkpoint
+
+The current implementation includes `MaterializationPolicyFactory`、`DefaultMaterializationPlanner`、
+`MaterializationTaskStore`、`MaterializationTaskRecovery`、`TaskRecoveryScanner` and
+`RegisteredMaterializationStreamScanner`. Focused tests cover deterministic policy versioning、whole-index overlap
+tiling independent of scan order、fixed-point termination、exact-source revalidation before create、different-clock
+duplicate create convergence、claim expiry with clock-skew margin、publication re-entry from durable task/output and
+all-64-shard registered-stream discovery. `MaterializationWorkerPool`、exact-source IO/protection、checkpoint
+reconciliation and `MaterializationService` lifecycle composition remain target code, so this checkpoint does not
+enable production materialization.
+
 Target construction：
 
 ```java
@@ -118,7 +129,9 @@ Validation：
 - checkpoint entry/byte limits do not exceed NRC1 hard limits；
 - close timeout is positive。
 
-Configuration changes do not alter an existing task. Policy/format inputs are copied into its immutable identity.
+Configuration changes do not alter an existing task. Policy/format inputs are copied into a complete immutable
+durable policy snapshot plus its canonical digest. Recovery uses that snapshot rather than rebuilding a policy from
+current operator configuration.
 
 ## 3. Task Lifecycle
 
@@ -247,6 +260,13 @@ keys/CAS.
 and pages `scanTasks(cluster, streamId, continuation, taskScanPageSize)` until completion. A task watch may enqueue the
 same stream for lower latency but never substitutes for the registry pass.
 
+The implemented scanner visits all 64 shards and every returned page on each complete pass. It validates canonical
+registry key/value identity, reloads L0 state/profile/head and effective projection, calls activation `requireReady`,
+recovers the stream's durable tasks, plans authoritative `[trim, head)` coverage, and revalidates the captured
+activation proof immediately before task mutation. The advisory materialization checkpoint is intentionally not yet
+used as a skip boundary；this is slower but prevents a stale/ahead checkpoint from hiding committed work until the
+checkpoint repair/reconciler lands.
+
 ### 4.2 Candidate discovery
 
 For `(stream, policy)`：
@@ -311,6 +331,10 @@ The planner calculates source/policy digests and deterministic task id from docu
 
 `taskSequence` equals the final source `lastCommitVersion`; it is a deterministic scheduling key, not a uniqueness or
 visibility field.
+
+The first create identity excludes `createdAtMillis`, because independently planning brokers have different clocks.
+An existing task with the same deterministic planning identity is reused; after creation its original timestamp and
+embedded full policy snapshot are immutable inputs to every later lifecycle CAS.
 
 Task create is allowed before source protections exist. A worker that cannot acquire a protection because GC marked a
 source cancels/replans. GC also scans task records as defense-in-depth but correctness relies on explicit protections

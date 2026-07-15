@@ -77,6 +77,21 @@ codec round-trips. F4-M2 is complete/final-gated. M3 still owns source/output ta
 object worker；M4 owns full recovery-root/anchor-aware source reachability before retirement or physical deletion
 can be enabled.
 
+### 1.3 F4-M3 planning/recovery checkpoint
+
+The production task codec now embeds `MaterializationPolicyRecord`, a complete immutable policy snapshot whose
+id/version/view/task-kind fields must match the task root. `MaterializationRecordMapper` reconstructs historical
+tasks and outputs from durable bytes without the current configuration. The task create response-loss identity
+intentionally excludes `createdAtMillis`: two brokers planning the same deterministic task with different clocks
+converge on the existing record, while all later task CAS transitions retain and compare the original creation time.
+The frozen task vectors were regenerated for this still-unreleased V1 shape.
+
+The M3 checkpoint also implements and tests the bounded whole-index planner、source mapper、task-store revalidation、
+per-stream task recovery and all-64-shard registered-stream scanner. These are orchestration building blocks, not a
+new visibility owner：registration remains a liveness trigger, the planner reloads L0 head/trim and generation-index
+truth, task creation revalidates every exact source plus activation proof, and only the M2 generation-index CAS may
+publish output. Exact-source worker IO、service lifecycle and the M3 aggregate/final gates remain pending.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples
@@ -840,6 +855,22 @@ public record MaterializationOutputRecord(
         String sourceSetSha256,
         String projectionRef) { }
 
+public record MaterializationPolicyRecord(
+        String policyId,
+        long policyVersion,
+        int readViewId,
+        int taskKindId,
+        String targetPhysicalFormat,
+        int minMergeSourceRanges,
+        int maxSourceRanges,
+        long maxRangeRecords,
+        long targetObjectBytes,
+        int targetRowGroupRecords,
+        String compression,
+        String topicStrategyId,
+        long topicStrategyVersion,
+        String topicKeyCodecId) { }
+
 public record MaterializationTaskRecord(
         int schemaVersion,
         String taskId,
@@ -854,6 +885,7 @@ public record MaterializationTaskRecord(
         String policyId,
         long policyVersion,
         String policySha256,
+        MaterializationPolicyRecord policy,
         TaskLifecycle lifecycle,
         long attempt,
         Optional<WorkerClaimRecord> workerClaim,
@@ -868,9 +900,10 @@ public record MaterializationTaskRecord(
         long metadataVersion) { }
 ```
 
-Sources/policy are immutable after create. Worker claim、output、generation/publication and failure fields must match
-their lifecycle exactly. Failure message is bounded and never used for retry classification；`failureClassId` is the
-closed machine field.
+Sources/policy are immutable after create. The embedded policy is the recovery source of truth and must reproduce
+the task's id/version/view/kind and canonical digest；current process configuration is not an input to recovery.
+Worker claim、output、generation/publication and failure fields must match their lifecycle exactly. Failure message
+is bounded and never used for retry classification；`failureClassId` is the closed machine field.
 
 `PUBLISHING` deliberately freezes the publication id before allocating a generation. Its first durable value has a
 non-empty `publicationId` and an empty `allocatedGeneration`；one same-state CAS may attach the first positive
@@ -890,6 +923,11 @@ cumulative facts and view-specific format. `etag` may be empty only when the pro
 fields are lowercase 64-hex and `storageCrc32c` is the canonical existing checksum encoding. For `COMMITTED`, source
 and output record counts are equal and `cumulativeSizeAtEnd - cumulativeSizeAtStart == logicalBytes`. The task codec
 caps sources at 128 and the entire enveloped task at 64 KiB before list allocation.
+
+`createTask` compares the deterministic planning identity but deliberately ignores the caller-local
+`createdAtMillis`; this makes same-task response-loss/concurrent-create recovery independent of broker clocks. Once
+created, `createdAtMillis` is immutable and participates in every ordinary task CAS identity check together with the
+embedded policy snapshot.
 
 ## 9. Binary Codec Contract
 

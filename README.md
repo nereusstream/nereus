@@ -139,9 +139,10 @@ publication state machine、re-entry reconciler、canonical task/output identity
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader
 leases/protections、64-shard restart-safe stream discovery、retention/GC、guarded PUT 与可界的 DELETED-root audit
 retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录同时记录 normative target 与已落地检查点；
-F4-M1–M2 已 final-gated；M3 真实 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade 和
-core exact adapter 已落地并通过 focused format/corruption/cross-stream/task-policy tests，但 Pulsar opaque
-round trip、planner/worker 和 M3 gates 尚未完成；retention/GC 与 async profile 仍不可用。Phase 4 只计划实现
+F4-M1–M2 已 final-gated；M3 真实 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、
+core exact adapter，以及 deterministic policy/planner/task-store/recovery/64-shard registry scanner 已落地并通过
+focused format/corruption/cross-stream/task-policy/planning/recovery tests，但 Pulsar opaque round trip、exact-source
+worker/service 和 M3 gates 尚未完成；retention/GC 与 async profile 仍不可用。Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use

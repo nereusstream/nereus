@@ -2,6 +2,7 @@
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
+import com.nereusstream.metadata.oxia.records.MaterializationPolicyRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.SourceGenerationRecord;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
@@ -34,6 +35,7 @@ public final class MaterializationTaskRecordCodecV1
             writer.writeString(value.policyId());
             writer.writeLong(value.policyVersion());
             writer.writeString(value.policySha256());
+            writePolicy(writer, value.policy());
             writer.writeUnsignedShort(value.lifecycle().wireId());
             writer.writeLong(value.attempt());
             writer.writeOptional(value.workerClaim().isPresent());
@@ -75,6 +77,7 @@ public final class MaterializationTaskRecordCodecV1
             String policyId = reader.readString("policyId");
             long policyVersion = reader.readLong("policyVersion");
             String policySha256 = reader.readString("policySha256");
+            MaterializationPolicyRecord policy = readPolicy(reader);
             TaskLifecycle lifecycle = TaskLifecycle.fromWireId(reader.readUnsignedShort("lifecycle"));
             long attempt = reader.readLong("attempt");
             Optional<WorkerClaimRecord> claim = reader.readOptional("workerClaimPresent")
@@ -97,6 +100,7 @@ public final class MaterializationTaskRecordCodecV1
                     policyId,
                     policyVersion,
                     policySha256,
+                    policy,
                     lifecycle,
                     attempt,
                     claim,
@@ -114,6 +118,41 @@ public final class MaterializationTaskRecordCodecV1
         } catch (RuntimeException failure) {
             throw malformed(failure);
         }
+    }
+
+    private static void writePolicy(F4Binary.Writer writer, MaterializationPolicyRecord value) {
+        writer.writeString(value.policyId());
+        writer.writeLong(value.policyVersion());
+        writer.writeUnsignedShort(value.readViewId());
+        writer.writeUnsignedShort(value.taskKindId());
+        writer.writeString(value.targetPhysicalFormat());
+        writer.writeInt(value.minMergeSourceRanges());
+        writer.writeInt(value.maxSourceRanges());
+        writer.writeLong(value.maxRangeRecords());
+        writer.writeLong(value.targetObjectBytes());
+        writer.writeInt(value.targetRowGroupRecords());
+        writer.writeString(value.compression());
+        writer.writeString(value.topicStrategyId());
+        writer.writeLong(value.topicStrategyVersion());
+        writer.writeString(value.topicKeyCodecId());
+    }
+
+    private static MaterializationPolicyRecord readPolicy(F4Binary.Reader reader) {
+        return new MaterializationPolicyRecord(
+                reader.readString("policySnapshotId"),
+                reader.readLong("policySnapshotVersion"),
+                reader.readUnsignedShort("policySnapshotReadViewId"),
+                reader.readUnsignedShort("policySnapshotTaskKindId"),
+                reader.readString("policySnapshotTargetPhysicalFormat"),
+                reader.readInt("policySnapshotMinMergeSourceRanges"),
+                reader.readInt("policySnapshotMaxSourceRanges"),
+                reader.readLong("policySnapshotMaxRangeRecords"),
+                reader.readLong("policySnapshotTargetObjectBytes"),
+                reader.readInt("policySnapshotTargetRowGroupRecords"),
+                reader.readString("policySnapshotCompression"),
+                reader.readString("policySnapshotTopicStrategyId"),
+                reader.readLong("policySnapshotTopicStrategyVersion"),
+                reader.readString("policySnapshotTopicKeyCodecId"));
     }
 
     private static void writeSource(F4Binary.Writer writer, SourceGenerationRecord value) {

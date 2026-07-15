@@ -125,7 +125,7 @@ class F4RecordValidationTest {
         return new MaterializationTaskRecord(
                 value.schemaVersion(), value.taskId(), value.taskSequence(), value.streamId(), value.readViewId(),
                 value.taskKindId(), value.offsetStart(), value.offsetEnd(), value.sources(), value.sourceSetSha256(),
-                value.policyId(), value.policyVersion(), value.policySha256(), value.lifecycle(), attempt,
+                value.policyId(), value.policyVersion(), value.policySha256(), value.policy(), value.lifecycle(), attempt,
                 value.workerClaim(), value.output(), value.allocatedGeneration(), value.publicationId(),
                 value.failureClassId(), value.failureMessage(), value.retryNotBeforeMillis(), value.createdAtMillis(),
                 value.updatedAtMillis(), 0);

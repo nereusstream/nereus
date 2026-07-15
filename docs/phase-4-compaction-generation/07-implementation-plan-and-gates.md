@@ -29,8 +29,10 @@ gates on 2026-07-15；the following foundation parts are implemented and covered
 `phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check` and
 `phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
 restart-safe publication, pin-owned fallback/quarantine and a real Oxia/LocalStack independent-runtime fixture.
-F4-M1 is complete；F4-M2 is complete/final-gated. This is not a Phase 4 completion claim：the compacted object format/worker、full
-recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M3–M6.
+F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has two implementation checkpoints：the real compacted
+format/read path and the deterministic policy/planner/task-store/recovery/registered-stream-scan path. This is not a
+Phase 4 completion claim：exact-source worker/service composition and the M3 gates remain open；full
+recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
 
 A later milestone is complete only when：
 
@@ -119,6 +121,7 @@ records/
   GenerationIndexRecord.java
   GenerationLifecycle.java
   MaterializationStreamRegistrationRecord.java
+  MaterializationPolicyRecord.java
   MaterializationTaskRecord.java
   TaskLifecycle.java
   SourceGenerationRecord.java
@@ -355,14 +358,18 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 
 ## 5. F4-M3 — Object Format, Planner, and Worker
 
-> Implementation checkpoint (2026-07-15)：the pinned Apache Parquet/Hadoop/ZSTD dependencies、frozen NCP1/NTC1
+> Implementation checkpoints (2026-07-15)：the pinned Apache Parquet/Hadoop/ZSTD dependencies、frozen NCP1/NTC1
 > schemas/metadata parser、streaming private-staging writer、content-addressed identity/footer reference、bounded
 > exact-range strict reader、NTC1-only facade、whole-file verifier、task-aware materialization verifier and core NCP1
 > adapter are implemented. The seven object-format suites plus `ParquetCompactedTargetReaderTest` and
 > `CompactedMaterializationFormatVerifierTest` prove standard `PAR1` bytes、random dense/ZSTD+uncompressed files、
 > sparse NTC1、backpressure/cancellation cleanup、footer/page corruption classification、whole-file CRC/SHA/key
-> identity、cross-stream rejection and task-policy binding. This is not M3 completion：Pulsar opaque-entry round trip、
-> planner/task/worker/recovery/service and both M3 gates below remain pending, and production activation stays disabled.
+> identity、cross-stream rejection and task-policy binding. The next checkpoint implements deterministic policy
+> versioning、the bounded whole-index DAG planner/fixed-point rule、exact-source task-create revalidation、complete
+> durable policy snapshots、different-clock duplicate-create convergence、claim-expiry/publication recovery、per-stream
+> task pagination and all-64-shard registered-stream discovery with activation revalidation. This is not M3
+> completion：Pulsar opaque-entry round trip、exact-source worker/protections、service lifecycle and both M3 gates below
+> remain pending, and production activation stays disabled.
 
 ### 5.1 Production artifacts
 
@@ -439,6 +446,7 @@ MaterializationOutputAttemptIdentityTest
 MaterializationPlannerTest
 MaterializationPlannerFixedPointTest
 MaterializationPlannerOverlapTilingTest
+MaterializationTaskStoreTest
 MaterializationWorkerTest
 MaterializationWorkerFailureInjectionTest
 MaterializationWorkerClaimModelTest

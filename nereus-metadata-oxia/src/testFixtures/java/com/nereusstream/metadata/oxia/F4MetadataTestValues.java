@@ -20,6 +20,7 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
+import com.nereusstream.metadata.oxia.records.MaterializationPolicyRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
@@ -237,6 +238,7 @@ public final class F4MetadataTestValues {
                 "policy-f4",
                 1,
                 HASH_B,
+                policy(),
                 lifecycle,
                 attempt,
                 claimed
@@ -259,10 +261,28 @@ public final class F4MetadataTestValues {
                 allocated.schemaVersion(), allocated.taskId(), allocated.taskSequence(), allocated.streamId(),
                 allocated.readViewId(), allocated.taskKindId(), allocated.offsetStart(), allocated.offsetEnd(),
                 allocated.sources(), allocated.sourceSetSha256(), allocated.policyId(), allocated.policyVersion(),
-                allocated.policySha256(), allocated.lifecycle(), allocated.attempt(), allocated.workerClaim(),
+                allocated.policySha256(), allocated.policy(), allocated.lifecycle(), allocated.attempt(), allocated.workerClaim(),
                 allocated.output(), OptionalLong.empty(), allocated.publicationId(), allocated.failureClassId(),
                 allocated.failureMessage(), allocated.retryNotBeforeMillis(), allocated.createdAtMillis(),
                 allocated.updatedAtMillis(), 0);
+    }
+
+    public static MaterializationPolicyRecord policy() {
+        return new MaterializationPolicyRecord(
+                "policy-f4",
+                1,
+                ReadView.COMMITTED.wireId(),
+                1,
+                "NEREUS_COMPACTED_PARQUET_V1",
+                2,
+                128,
+                1_048_576,
+                1L << 30,
+                65_536,
+                "ZSTD",
+                "",
+                0,
+                "");
     }
 
     public static MaterializationCheckpointRecord emptyMaterializationCheckpoint() {

@@ -15,6 +15,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
+import com.nereusstream.metadata.oxia.records.MaterializationPolicyRecord;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import java.time.Clock;
 import java.time.Instant;
@@ -122,6 +123,9 @@ class GenerationMetadataStoreContractTest {
         MaterializationTaskRecord planned = F4MetadataTestValues.task(TaskLifecycle.PLANNED);
         VersionedMaterializationTask task = store.createTask(CLUSTER, planned).join();
         assertThat(store.createTask(CLUSTER, planned).join()).isEqualTo(task);
+        assertThat(store.createTask(CLUSTER, taskWithCreatedAt(planned, planned.createdAtMillis() + 37)).join())
+                .as("deterministic task create must converge across planner wall clocks")
+                .isEqualTo(task);
         VersionedMaterializationTask claimed = store.compareAndSetTask(
                 CLUSTER,
                 F4MetadataTestValues.task(TaskLifecycle.CLAIMED),
@@ -211,10 +215,34 @@ class GenerationMetadataStoreContractTest {
         return new MaterializationTaskRecord(
                 value.schemaVersion(), value.taskId(), value.taskSequence(), value.streamId(), value.readViewId(),
                 value.taskKindId(), value.offsetStart(), value.offsetEnd(), value.sources(), value.sourceSetSha256(),
-                policyId, value.policyVersion(), value.policySha256(), value.lifecycle(), value.attempt(),
+                policyId, value.policyVersion(), value.policySha256(), policyWithId(value.policy(), policyId),
+                value.lifecycle(), value.attempt(),
                 value.workerClaim(), value.output(), value.allocatedGeneration(), value.publicationId(),
                 value.failureClassId(), value.failureMessage(), value.retryNotBeforeMillis(), value.createdAtMillis(),
                 value.updatedAtMillis(), 0);
+    }
+
+    private static MaterializationTaskRecord taskWithCreatedAt(
+            MaterializationTaskRecord value,
+            long createdAtMillis) {
+        return new MaterializationTaskRecord(
+                value.schemaVersion(), value.taskId(), value.taskSequence(), value.streamId(), value.readViewId(),
+                value.taskKindId(), value.offsetStart(), value.offsetEnd(), value.sources(), value.sourceSetSha256(),
+                value.policyId(), value.policyVersion(), value.policySha256(), value.policy(),
+                value.lifecycle(), value.attempt(),
+                value.workerClaim(), value.output(), value.allocatedGeneration(), value.publicationId(),
+                value.failureClassId(), value.failureMessage(), value.retryNotBeforeMillis(), createdAtMillis,
+                Math.max(createdAtMillis, value.updatedAtMillis()), 0);
+    }
+
+    private static MaterializationPolicyRecord policyWithId(
+            MaterializationPolicyRecord value,
+            String policyId) {
+        return new MaterializationPolicyRecord(
+                policyId, value.policyVersion(), value.readViewId(), value.taskKindId(),
+                value.targetPhysicalFormat(), value.minMergeSourceRanges(), value.maxSourceRanges(),
+                value.maxRangeRecords(), value.targetObjectBytes(), value.targetRowGroupRecords(),
+                value.compression(), value.topicStrategyId(), value.topicStrategyVersion(), value.topicKeyCodecId());
     }
 
     private static Throwable unwrap(Throwable supplied) {

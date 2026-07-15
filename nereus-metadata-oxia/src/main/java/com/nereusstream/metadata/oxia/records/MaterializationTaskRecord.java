@@ -21,6 +21,7 @@ public record MaterializationTaskRecord(
         String policyId,
         long policyVersion,
         String policySha256,
+        MaterializationPolicyRecord policy,
         TaskLifecycle lifecycle,
         long attempt,
         Optional<WorkerClaimRecord> workerClaim,
@@ -64,6 +65,13 @@ public record MaterializationTaskRecord(
         policyId = F4RecordValidation.requireText(policyId, "policyId");
         F4RecordValidation.requirePositive(policyVersion, "policyVersion");
         policySha256 = F4RecordValidation.requireSha256(policySha256, "policySha256");
+        Objects.requireNonNull(policy, "policy");
+        if (!policy.policyId().equals(policyId)
+                || policy.policyVersion() != policyVersion
+                || policy.readViewId() != readViewId
+                || policy.taskKindId() != taskKindId) {
+            throw new IllegalArgumentException("task policy snapshot does not match task identity");
+        }
         Objects.requireNonNull(lifecycle, "lifecycle");
         F4RecordValidation.requireNonNegative(attempt, "attempt");
         workerClaim = Objects.requireNonNull(workerClaim, "workerClaim");
@@ -147,7 +155,7 @@ public record MaterializationTaskRecord(
         return new MaterializationTaskRecord(
                 schemaVersion, taskId, taskSequence, streamId, readViewId, taskKindId,
                 offsetStart, offsetEnd, sources, sourceSetSha256, policyId, policyVersion, policySha256,
-                lifecycle, attempt, workerClaim, output, allocatedGeneration, publicationId,
+                policy, lifecycle, attempt, workerClaim, output, allocatedGeneration, publicationId,
                 failureClassId, failureMessage, retryNotBeforeMillis, createdAtMillis, updatedAtMillis, version);
     }
 }

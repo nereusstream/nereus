@@ -238,6 +238,19 @@ final class GenerationMetadataTransitions {
     static boolean sameTaskPlanningIdentity(
             MaterializationTaskRecord left,
             MaterializationTaskRecord right) {
+        return sameTaskCreateIdentity(left, right)
+                && left.createdAtMillis() == right.createdAtMillis();
+    }
+
+    /**
+     * Identity used to converge deterministic put-if-absent task creation across processes.
+     *
+     * <p>The creation timestamp is deliberately excluded: it is frozen after one value wins the create, but it is
+     * not an input to the deterministic task id and two planners need not observe the same wall-clock millisecond.
+     */
+    static boolean sameTaskCreateIdentity(
+            MaterializationTaskRecord left,
+            MaterializationTaskRecord right) {
         return left.schemaVersion() == right.schemaVersion()
                 && left.taskId().equals(right.taskId())
                 && left.taskSequence() == right.taskSequence()
@@ -251,7 +264,7 @@ final class GenerationMetadataTransitions {
                 && left.policyId().equals(right.policyId())
                 && left.policyVersion() == right.policyVersion()
                 && left.policySha256().equals(right.policySha256())
-                && left.createdAtMillis() == right.createdAtMillis();
+                && left.policy().equals(right.policy());
     }
 
     private static void requireNewClaim(
