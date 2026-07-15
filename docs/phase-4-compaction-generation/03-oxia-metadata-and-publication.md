@@ -52,7 +52,11 @@ lease and then reloads both the exact candidate and stream head before returning
 checkpoint only。`ReadCoordinator` now retains the lease through exact-reader IO and terminal cleanup, excludes a
 failed exact candidate only inside the current operation/view, and performs a fresh resolve for fallback. Missing or
 checksum-corrupt immutable objects best-effort CAS the exact root and selected higher index to `QUARANTINED`；transient
-object-read failures do not alter health metadata. `PREPARED -> COMMITTED` publication orchestration、task
+object-read failures do not alter health metadata. `nereus-materialization` now also contains strict
+policy/source/task/output values、canonical source/policy/task identity、secure publication-id generation、durable
+task/output/index mapping、exact HEAD plus delegated full-format verification and a shared monotonic operation
+deadline. These classes freeze publication inputs and record construction；they do not yet perform the visibility
+CAS. `PREPARED -> COMMITTED` publication orchestration、task
 reconciliation、same-object reference-domain quarantine repair、retry threshold and M2 gates are still pending, so no
 higher-generation production path is enabled yet.
 

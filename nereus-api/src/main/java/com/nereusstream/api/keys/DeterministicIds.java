@@ -40,6 +40,12 @@ public final class DeterministicIds {
         return sha256Base32(value.getBytes(StandardCharsets.UTF_8));
     }
 
+    /** Stable base32lower-no-pad SHA-256 of exact caller-supplied canonical bytes. */
+    public static String stableHashBytes(byte[] value) {
+        Objects.requireNonNull(value, "value");
+        return sha256Base32(value.clone());
+    }
+
     public static String randomRunIdHash(byte[] randomBytes) {
         Objects.requireNonNull(randomBytes, "randomBytes");
         if (randomBytes.length < 16) {
