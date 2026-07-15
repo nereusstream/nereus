@@ -2,6 +2,7 @@
 
 > 状态：Implemented；P15-M2/P15-M3 dual-read/new-write contract final-gated on 2026-07-11
 > Compatibility rule：legacy Phase 1 golden bytes stay frozen；new commits use generic target records
+> F4 evolution：2026-07-15 checkpoint B replaced the combined raw stable-commit call with protected two-stage commit
 
 本文定义 physical target 如何进入 commit identity、generation-zero index 和 replay marker，同时允许同一
 stream head 链接 Phase 1 legacy object records 与 Phase 1.5 generic-target records。
@@ -324,11 +325,23 @@ public record StableAppendResult(
 }
 
 public interface OxiaMetadataStore extends AutoCloseable {
-    CompletableFuture<StableAppendResult> commitStableAppend(
+    CompletableFuture<PreparedStableAppend> prepareStableAppend(
             String cluster, CommitAppendRequest request);
 
-    CompletableFuture<CommittedAppend> materializeGenerationZero(
+    CompletableFuture<StableAppendResult> commitPreparedStableAppend(
+            String cluster,
+            PreparedStableAppend prepared,
+            ObjectProtectionIdentity protectionIdentity,
+            long rootMetadataVersion,
+            long rootLifecycleEpoch,
+            long protectionMetadataVersion,
+            Checksum protectionRecordSha256);
+
+    CompletableFuture<MaterializedGenerationZero> materializeGenerationZero(
             String cluster, ReachableCommittedAppend reachableAppend);
+
+    CompletableFuture<Void> revalidateMaterializedGenerationZero(
+            String cluster, MaterializedGenerationZero materialized);
 
     CompletableFuture<AppendReplaySearchResult> searchAppendReplay(
             String cluster,
@@ -345,15 +358,19 @@ public interface OxiaMetadataStore extends AutoCloseable {
 }
 ```
 
-`commitStableAppend` writes/reuses the intent and performs the single head CAS only。It does not write generation-zero
-index/marker/reference records。`materializeGenerationZero` accepts only the adapter-produced reachable wrapper,
-revalidates immutable commit/proof identity, then idempotently creates/validates the derived records and performs
-target-specific audit/reference repair。It never starts an unbounded reachability scan from a bare commit ID。This split is observable
-inside core tests but Phase 1.5 public append still calls both before success。
+Phase 1.5 originally exposed one combined stable-commit operation. F4-M4 checkpoint B replaced that raw surface with
+`prepareStableAppend` plus `commitPreparedStableAppend` so a permanent physical-object protection can be established
+before the head CAS. Prepare writes/reuses the intent and returns its exact key/version/value SHA while leaving the
+head unchanged；commit reloads that intent and the exact ACTIVE root/`REACHABLE_APPEND` proof before CAS or replay.
+`materializeGenerationZero` accepts only the adapter-produced reachable wrapper and now returns the exact durable
+index identity；`revalidateMaterializedGenerationZero` is the owner check used while acquiring index-owned
+`VISIBLE_GENERATION`. Neither method starts an unbounded reachability scan from a bare commit ID. The public strict
+append path executes all cuts before success；the head remains the only logical append linearization point.
 
 The legacy `commitStreamSlice` method remains deprecated compatibility surface for Phase 1 contract/integration
-fixtures。No production core caller uses it；all new `DefaultStreamStorage` appends use `commitStableAppend` plus
-`materializeGenerationZero`。Removing the legacy method is deferred to a separately announced compatibility break。
+fixtures。No production core caller uses it；all new `DefaultStreamStorage` appends use intent preparation、protected
+head commit、exact generation-zero materialization and visible-index protection. Removing the legacy method is
+deferred to a separately announced compatibility break。
 
 ## 8. Dual-read / New-write Rules
 

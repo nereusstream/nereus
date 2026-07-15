@@ -24,6 +24,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
@@ -38,7 +39,16 @@ import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.CommitSliceResult;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
 import com.nereusstream.metadata.oxia.CommittedAppend;
+import com.nereusstream.metadata.oxia.F4ScanToken;
+import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
+import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
+import com.nereusstream.metadata.oxia.ObjectProtectionScanPage;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalObjectRootScanPage;
+import com.nereusstream.metadata.oxia.PreparedStableAppend;
 import com.nereusstream.metadata.oxia.ReachableCommittedAppend;
+import com.nereusstream.metadata.oxia.ReaderLeaseScanPage;
 import com.nereusstream.metadata.oxia.StableAppendResult;
 import com.nereusstream.metadata.oxia.AppendReplayCursor;
 import com.nereusstream.metadata.oxia.AppendReplaySearchResult;
@@ -52,6 +62,9 @@ import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
+import com.nereusstream.metadata.oxia.VersionedObjectProtection;
+import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
+import com.nereusstream.metadata.oxia.VersionedReaderLease;
 import com.nereusstream.metadata.oxia.Phase1ObjectManifestValidator;
 import com.nereusstream.metadata.oxia.WatchRegistration;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
@@ -63,9 +76,14 @@ import com.nereusstream.metadata.oxia.records.CommittedAppendRecord;
 import com.nereusstream.metadata.oxia.records.CommittedSliceRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
+import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.ObjectReferenceRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexTargetRecord;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
 import com.nereusstream.metadata.oxia.records.StreamHeadRecord;
@@ -75,10 +93,13 @@ import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.metadata.oxia.records.VisibleSliceReferenceRecord;
 import java.time.Duration;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -88,7 +109,7 @@ import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
 /** In-memory metadata store with the same single-key stream-head CAS semantics required for Phase 1. */
-public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
+public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalObjectMetadataStore {
     public enum FailurePoint {
         BEFORE_COMMIT_LOG_PUT,
         AFTER_COMMIT_LOG_PUT,
@@ -230,6 +251,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
             new CodecBackedRecordMap<>(ObjectManifestRecord.class);
     private final CodecBackedRecordMap<ObjectReferenceRecord> objectReferences =
             new CodecBackedRecordMap<>(ObjectReferenceRecord.class);
+    private final FakePhysicalObjectMetadataStore physicalObjects = new FakePhysicalObjectMetadataStore();
     private final List<PartitionedAccess> accessLog = new ArrayList<>();
     private final List<RegisteredWatcher> watchers = new ArrayList<>();
 
@@ -654,7 +676,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
-    public CompletableFuture<StableAppendResult> commitStableAppend(
+    public CompletableFuture<PreparedStableAppend> prepareStableAppend(
             String cluster, CommitAppendRequest request) {
         AppendAttemptState attemptState = new AppendAttemptState();
         return completeAppend(attemptState, () -> {
@@ -668,14 +690,18 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
                 if (commit == null) throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
                         "generic marker has no commit");
                 validateTargetReplay(request, commit, AppendOutcome.KNOWN_COMMITTED);
-                attemptState.markCommitted();
-                return new StableAppendResult(targetReachable(commit, request.projectionRef(), head), false);
+                return preparedStableAppend(cluster, request, commit, true);
             }
             if (head.committedEndOffset() > request.expectedStartOffset()) {
                 AppendReplaySearchResult replay = searchTargetReplaySync(cluster, request, Optional.empty(), maxCommitChainScan);
                 if (replay.status() == AppendReplayStatus.FOUND) {
-                    attemptState.markCommitted();
-                    return new StableAppendResult(replay.committedAppend().orElseThrow(), false);
+                    StreamCommitTargetRecord commit = targetCommitById.get(
+                            commitIdentityMapKey(cluster, request.streamId(), commitId));
+                    if (commit == null) {
+                        throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                                "reachable generic commit intent is absent");
+                    }
+                    return preparedStableAppend(cluster, request, commit, true);
                 }
                 if (replay.status() == AppendReplayStatus.CONTINUE) {
                     throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
@@ -695,8 +721,86 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
                 commit = existing;
             }
             maybeFail(FailurePoint.AFTER_COMMIT_LOG_PUT);
-            maybeFail(FailurePoint.BEFORE_HEAD_CAS);
             StreamHeadRecord current = headOrThrow(cluster, request.streamId());
+            if (!sameCommitAnchor(head, current)) {
+                AppendReplaySearchResult replay = searchTargetReplaySync(
+                        cluster,
+                        request,
+                        Optional.empty(),
+                        maxCommitChainScan);
+                if (replay.status() == AppendReplayStatus.FOUND) {
+                    return preparedStableAppend(cluster, request, commit, true);
+                }
+                if (replay.status() == AppendReplayStatus.CONTINUE) {
+                    throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
+                            AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires continuation");
+                }
+            }
+            validateTargetPreconditions(current, request);
+            validateTargetAgainstHead(request, commit, current);
+            return preparedStableAppend(cluster, request, commit, false);
+        });
+    }
+
+    @Override
+    public CompletableFuture<StableAppendResult> commitPreparedStableAppend(
+            String cluster,
+            PreparedStableAppend prepared,
+            ObjectProtectionIdentity protectionIdentity,
+            long rootMetadataVersion,
+            long rootLifecycleEpoch,
+            long protectionMetadataVersion,
+            Checksum protectionRecordSha256) {
+        AppendAttemptState attemptState = new AppendAttemptState();
+        return completeAppend(attemptState, () -> {
+            CommitAppendRequest request = prepared.request();
+            StreamCommitTargetRecord commit = requireExactPreparedIntent(cluster, prepared);
+            validateStableProtection(
+                    cluster,
+                    prepared,
+                    protectionIdentity,
+                    rootMetadataVersion,
+                    rootLifecycleEpoch,
+                    protectionMetadataVersion,
+                    protectionRecordSha256);
+            String markerKey = new OxiaKeyspace(cluster).committedAppendKey(
+                    request.streamId(),
+                    request.commitId());
+            if (committedAppends.get(markerKey) != null) {
+                StreamHeadRecord head = headOrThrow(cluster, request.streamId());
+                validateTargetReplay(request, commit, AppendOutcome.KNOWN_COMMITTED);
+                attemptState.markCommitted();
+                return new StableAppendResult(targetReachable(commit, request.projectionRef(), head), false);
+            }
+            StreamHeadRecord head = headOrThrow(cluster, request.streamId());
+            if (head.committedEndOffset() > request.expectedStartOffset()) {
+                AppendReplaySearchResult replay = searchTargetReplaySync(
+                        cluster,
+                        request,
+                        Optional.empty(),
+                        maxCommitChainScan);
+                if (replay.status() == AppendReplayStatus.FOUND) {
+                    attemptState.markCommitted();
+                    return new StableAppendResult(replay.committedAppend().orElseThrow(), false);
+                }
+                if (replay.status() == AppendReplayStatus.CONTINUE) {
+                    throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
+                            AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires continuation");
+                }
+            }
+            validateTargetPreconditions(head, request);
+            maybeFail(FailurePoint.BEFORE_HEAD_CAS);
+            applyBeforeHeadCasInterleaving(cluster, request.streamId());
+            StreamHeadRecord current = headOrThrow(cluster, request.streamId());
+            commit = requireExactPreparedIntent(cluster, prepared);
+            validateStableProtection(
+                    cluster,
+                    prepared,
+                    protectionIdentity,
+                    rootMetadataVersion,
+                    rootLifecycleEpoch,
+                    protectionMetadataVersion,
+                    protectionRecordSha256);
             validateTargetPreconditions(current, request);
             validateTargetAgainstHead(request, commit, current);
             StreamHeadRecord updated = withTargetCommit(current, commit, nextVersion());
@@ -709,7 +813,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
-    public CompletableFuture<CommittedAppend> materializeGenerationZero(
+    public CompletableFuture<MaterializedGenerationZero> materializeGenerationZero(
             String cluster, ReachableCommittedAppend reachableAppend) {
         AppendAttemptState state = new AppendAttemptState();
         state.markCommitted();
@@ -743,8 +847,206 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
             }
             committedAppends.putIfAbsent(markerKey, marker);
             maybeFail(FailurePoint.AFTER_DERIVED_INDEX_BEFORE_RESPONSE);
-            return append;
+            OffsetIndexTargetRecord durableIndex = targetOffsetIndexes.get(indexKey);
+            return new MaterializedGenerationZero(
+                    append,
+                    indexKey,
+                    durableIndex.metadataVersion(),
+                    sha256(targetOffsetIndexes.envelope(indexKey)));
         });
+    }
+
+    @Override
+    public CompletableFuture<Void> revalidateMaterializedGenerationZero(
+            String cluster, MaterializedGenerationZero materialized) {
+        AppendAttemptState state = new AppendAttemptState();
+        state.markCommitted();
+        return completeAppend(state, () -> {
+            CommittedAppend append = materialized.committedAppend();
+            StreamCommitTargetRecord commit = targetCommitById.get(
+                    commitIdentityMapKey(cluster, append.streamId(), append.commitId()));
+            if (commit == null || !targetCommitted(commit, append.projectionRef()).equals(append)) {
+                throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                        "materialized generation-zero proof conflicts with its commit");
+            }
+            requireTargetReachable(cluster, append);
+            String indexKey = offsetMapKey(cluster, append.streamId(), append.range().endOffset(), 0);
+            OffsetIndexTargetRecord index = targetOffsetIndexes.get(indexKey);
+            if (!materialized.indexKey().equals(indexKey)
+                    || index == null
+                    || index.metadataVersion() != materialized.indexMetadataVersion()
+                    || !sha256(targetOffsetIndexes.envelope(indexKey)).equals(materialized.indexRecordSha256())
+                    || !withoutVersion(index).equals(withoutVersion(generationZeroIndex(commit, 0)))) {
+                throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                        "generation-zero index changed during protection");
+            }
+            return null;
+        });
+    }
+
+    private PreparedStableAppend preparedStableAppend(
+            String cluster,
+            CommitAppendRequest request,
+            StreamCommitTargetRecord commit,
+            boolean replayWasReachable) {
+        String key = commitMapKey(cluster, request.streamId(), request.commitId());
+        validateTargetReplay(request, commit, AppendOutcome.KNOWN_NOT_COMMITTED);
+        if (!(request.readTarget() instanceof ObjectSliceReadTarget target)
+                || target.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "stable append intent does not reference an Object WAL slice");
+        }
+        return new PreparedStableAppend(
+                request,
+                request.commitId(),
+                key,
+                commit.metadataVersion(),
+                sha256(targetCommitByKey.envelope(key)),
+                ObjectKeyHash.from(target.objectKey()),
+                replayWasReachable);
+    }
+
+    private StreamCommitTargetRecord requireExactPreparedIntent(
+            String cluster,
+            PreparedStableAppend prepared) {
+        String key = commitMapKey(
+                cluster,
+                prepared.request().streamId(),
+                prepared.request().commitId());
+        StreamCommitTargetRecord commit = targetCommitByKey.get(key);
+        if (!prepared.commitKey().equals(key)
+                || !prepared.commitId().equals(prepared.request().commitId())
+                || commit == null) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "prepared stable append intent is absent or non-canonical");
+        }
+        validateTargetReplay(
+                prepared.request(),
+                commit,
+                AppendOutcome.KNOWN_NOT_COMMITTED);
+        if (commit.metadataVersion() != prepared.commitMetadataVersion()
+                || !sha256(targetCommitByKey.envelope(key)).equals(prepared.commitRecordSha256())) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "prepared stable append intent changed before head commit");
+        }
+        return commit;
+    }
+
+    private void validateStableProtection(
+            String cluster,
+            PreparedStableAppend prepared,
+            ObjectProtectionIdentity identity,
+            long rootMetadataVersion,
+            long rootLifecycleEpoch,
+            long protectionMetadataVersion,
+            Checksum protectionRecordSha256) {
+        String expectedReferenceId = reachableAppendReferenceId(prepared);
+        if (identity == null
+                || !identity.object().equals(prepared.objectKeyHash())
+                || identity.type() != ObjectProtectionType.REACHABLE_APPEND
+                || !identity.referenceId().equals(expectedReferenceId)) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "stable append protection identity is non-canonical");
+        }
+        VersionedPhysicalObjectRoot root = physicalObjects.getRoot(
+                        cluster,
+                        prepared.objectKeyHash())
+                .join()
+                .orElseThrow(() -> failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                        "physical Object WAL root is absent before head commit"));
+        if (root.metadataVersion() != rootMetadataVersion
+                || root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                || root.value().lifecycleEpoch() != rootLifecycleEpoch) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "physical Object WAL root changed before head commit");
+        }
+        requireRootMatchesPreparedTarget(cluster, prepared, root.value());
+        VersionedObjectProtection protection = physicalObjects.protection(cluster, identity)
+                .orElseThrow(() -> failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                        "REACHABLE_APPEND protection is absent before head commit"));
+        ObjectProtectionRecord value = protection.value();
+        if (protection.metadataVersion() != protectionMetadataVersion
+                || !protection.durableValueSha256().equals(protectionRecordSha256)
+                || value.protectionTypeId() != ObjectProtectionType.REACHABLE_APPEND.wireId()
+                || !value.objectKeyHash().equals(prepared.objectKeyHash().value())
+                || !value.referenceId().equals(expectedReferenceId)
+                || !value.ownerKey().equals(prepared.commitKey())
+                || value.ownerMetadataVersion() != prepared.commitMetadataVersion()
+                || !value.ownerIdentitySha256().equals(prepared.commitRecordSha256().value())
+                || value.rootLifecycleEpoch() != rootLifecycleEpoch
+                || value.expiresAtMillis() != 0) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "REACHABLE_APPEND protection changed before head commit");
+        }
+    }
+
+    private void requireRootMatchesPreparedTarget(
+            String cluster,
+            PreparedStableAppend prepared,
+            PhysicalObjectRootRecord root) {
+        ObjectSliceReadTarget target = (ObjectSliceReadTarget) prepared.request().readTarget();
+        ObjectManifestRecord manifest = objectManifests.get(
+                objectMapKey(cluster, target.objectId()));
+        if (manifest == null) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "Object WAL manifest is absent before head commit");
+        }
+        long targetEnd = Math.addExact(target.objectOffset(), target.objectLength());
+        String expectedContentSha = "SHA256".equals(manifest.objectChecksumType())
+                ? manifest.objectChecksumValue()
+                : "";
+        if (!root.objectKeyHash().equals(prepared.objectKeyHash().value())
+                || !root.objectKey().equals(target.objectKey().value())
+                || !root.objectId().equals(target.objectId().value())
+                || root.objectKindId() != 1
+                || root.objectLength() != manifest.objectLength()
+                || targetEnd > root.objectLength()
+                || !root.storageChecksumType().equals(manifest.storageChecksumType())
+                || !root.storageChecksumValue().equals(manifest.storageChecksumValue())
+                || !root.contentSha256().equals(expectedContentSha)) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "physical Object WAL root conflicts with manifest/target identity");
+        }
+    }
+
+    private static String reachableAppendReferenceId(PreparedStableAppend prepared) {
+        return "ra1-" + DeterministicIds.stableHashComponent(
+                prepared.request().streamId().value()
+                        + prepared.commitId()
+                        + prepared.objectKeyHash().value());
+    }
+
+    private static OffsetIndexTargetRecord generationZeroIndex(
+            StreamCommitTargetRecord commit,
+            long metadataVersion) {
+        return new OffsetIndexTargetRecord(
+                commit.streamId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                0,
+                commit.cumulativeSize(),
+                commit.readTarget(),
+                commit.payloadFormat(),
+                commit.recordCount(),
+                commit.entryCount(),
+                commit.logicalBytes(),
+                commit.schemaRefs(),
+                commit.projectionRef(),
+                commit.minEventTimeMillis(),
+                commit.maxEventTimeMillis(),
+                commit.commitVersion(),
+                false,
+                metadataVersion);
+    }
+
+    private static Checksum sha256(byte[] bytes) {
+        try {
+            return new Checksum(
+                    ChecksumType.SHA256,
+                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("SHA-256 is unavailable", failure);
+        }
     }
 
     private void requireTargetReachable(String cluster, CommittedAppend expected) {
@@ -1241,8 +1543,114 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
+    public CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(
+            String cluster,
+            ObjectKeyHash object) {
+        return physicalObjects.getRoot(cluster, object);
+    }
+
+    @Override
+    public CompletableFuture<VersionedPhysicalObjectRoot> createRoot(
+            String cluster,
+            PhysicalObjectRootRecord root) {
+        return physicalObjects.createRoot(cluster, root);
+    }
+
+    @Override
+    public CompletableFuture<VersionedPhysicalObjectRoot> compareAndSetRoot(
+            String cluster,
+            PhysicalObjectRootRecord root,
+            long expectedVersion) {
+        return physicalObjects.compareAndSetRoot(cluster, root, expectedVersion);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteRoot(
+            String cluster,
+            ObjectKeyHash object,
+            long expectedVersion,
+            Checksum expectedRootSha256) {
+        return physicalObjects.deleteRoot(cluster, object, expectedVersion, expectedRootSha256);
+    }
+
+    @Override
+    public CompletableFuture<PhysicalObjectRootScanPage> scanRoots(
+            String cluster,
+            int shard,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        return physicalObjects.scanRoots(cluster, shard, continuation, limit);
+    }
+
+    @Override
+    public CompletableFuture<VersionedReaderLease> createOrCompareReaderLease(
+            String cluster,
+            ObjectReaderLeaseRecord lease) {
+        return physicalObjects.createOrCompareReaderLease(cluster, lease);
+    }
+
+    @Override
+    public CompletableFuture<VersionedReaderLease> compareAndSetReaderLease(
+            String cluster,
+            ObjectReaderLeaseRecord lease,
+            long expectedVersion) {
+        return physicalObjects.compareAndSetReaderLease(cluster, lease, expectedVersion);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteReaderLease(
+            String cluster,
+            ObjectKeyHash object,
+            String processRunId,
+            long expectedVersion) {
+        return physicalObjects.deleteReaderLease(cluster, object, processRunId, expectedVersion);
+    }
+
+    @Override
+    public CompletableFuture<ReaderLeaseScanPage> scanReaderLeases(
+            String cluster,
+            ObjectKeyHash object,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        return physicalObjects.scanReaderLeases(cluster, object, continuation, limit);
+    }
+
+    @Override
+    public CompletableFuture<VersionedObjectProtection> createProtection(
+            String cluster,
+            ObjectProtectionRecord protection) {
+        return physicalObjects.createProtection(cluster, protection);
+    }
+
+    @Override
+    public CompletableFuture<VersionedObjectProtection> compareAndSetProtection(
+            String cluster,
+            ObjectProtectionRecord protection,
+            long expectedVersion) {
+        return physicalObjects.compareAndSetProtection(cluster, protection, expectedVersion);
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteProtection(
+            String cluster,
+            ObjectProtectionIdentity protection,
+            long expectedVersion) {
+        return physicalObjects.deleteProtection(cluster, protection, expectedVersion);
+    }
+
+    @Override
+    public CompletableFuture<ObjectProtectionScanPage> scanProtections(
+            String cluster,
+            ObjectKeyHash object,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        return physicalObjects.scanProtections(cluster, object, continuation, limit);
+    }
+
+    @Override
     public synchronized void close() {
         closed = true;
+        physicalObjects.close();
     }
 
     private StreamHeadRecord headOrThrow(String cluster, StreamId streamId) {
@@ -2242,7 +2650,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
     }
 
     private String commitMapKey(String cluster, StreamId streamId, String commitId) {
-        return cluster + "|commit|" + streamId.value() + "|" + commitId;
+        return new OxiaKeyspace(cluster).streamCommitKey(streamId, commitId);
     }
 
     private String commitIdentityMapKey(String cluster, StreamId streamId, String commitId) {
@@ -2353,6 +2761,14 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore {
         T get(String key) {
             byte[] encoded = values.get(Objects.requireNonNull(key, "key"));
             return encoded == null ? null : decode(encoded);
+        }
+
+        byte[] envelope(String key) {
+            byte[] encoded = values.get(Objects.requireNonNull(key, "key"));
+            if (encoded == null) {
+                throw new IllegalStateException("fake metadata value is absent");
+            }
+            return encoded.clone();
         }
 
         void put(String key, T record) {

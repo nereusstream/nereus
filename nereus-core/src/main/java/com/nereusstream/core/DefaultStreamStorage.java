@@ -39,6 +39,9 @@ import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.TrimOptions;
 import com.nereusstream.core.append.AppendCoordinator;
 import com.nereusstream.core.append.AppendSessionManager;
+import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.lifecycle.StreamLifecycleCoordinator;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
@@ -46,6 +49,7 @@ import com.nereusstream.core.read.ReadResolver;
 import com.nereusstream.core.trim.TrimCoordinator;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.objectstore.wal.WalObjectReader;
 import com.nereusstream.objectstore.wal.WalObjectWriter;
@@ -79,6 +83,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 metadataStore,
                 walObjectWriter,
                 walObjectReader,
+                inferredPhysicalReferences(config, metadataStore, clock),
                 clock,
                 callbackExecutor,
                 ReadMetricsObserver.noop(),
@@ -98,9 +103,30 @@ public final class DefaultStreamStorage implements StreamStorage {
                 metadataStore,
                 walObjectWriter,
                 walObjectReader,
+                inferredPhysicalReferences(config, metadataStore, clock),
                 clock,
                 callbackExecutor,
                 readMetricsObserver,
+                TrimMetricsObserver.noop());
+    }
+
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Clock clock,
+            Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                clock,
+                callbackExecutor,
+                ReadMetricsObserver.noop(),
                 TrimMetricsObserver.noop());
     }
 
@@ -113,10 +139,33 @@ public final class DefaultStreamStorage implements StreamStorage {
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver,
             TrimMetricsObserver trimMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                inferredPhysicalReferences(config, metadataStore, clock),
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
         Objects.requireNonNull(walObjectReader, "walObjectReader");
+        Objects.requireNonNull(physicalReferences, "physicalReferences");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
@@ -127,6 +176,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 metadataStore,
                 walObjectWriter,
                 appendSessionManager,
+                physicalReferences,
                 clock,
                 callbackExecutor);
         ReadResolver readResolver = new ReadResolver(
@@ -290,5 +340,27 @@ public final class DefaultStreamStorage implements StreamStorage {
 
     private static Duration remainingShutdownGrace(long deadlineNanos) {
         return Duration.ofNanos(Math.max(0, deadlineNanos - System.nanoTime()));
+    }
+
+    private static GenerationZeroPhysicalReferencePublisher inferredPhysicalReferences(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            Clock clock) {
+        if (!(metadataStore instanceof PhysicalObjectMetadataStore physicalStore)) {
+            throw new IllegalArgumentException(
+                    "GenerationZeroPhysicalReferencePublisher is required for this metadata-store composition");
+        }
+        DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                config.cluster(),
+                physicalStore,
+                Duration.ofMinutes(10),
+                Duration.ZERO,
+                Duration.ofHours(24),
+                clock);
+        return new DefaultGenerationZeroPhysicalReferencePublisher(
+                config.cluster(),
+                metadataStore,
+                physicalStore,
+                protections);
     }
 }

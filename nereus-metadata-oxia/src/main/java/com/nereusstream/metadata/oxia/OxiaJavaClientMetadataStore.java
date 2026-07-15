@@ -24,6 +24,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
@@ -45,8 +46,12 @@ import com.nereusstream.metadata.oxia.records.CommittedSliceRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
 import com.nereusstream.metadata.oxia.records.ObjectReferenceRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexTargetRecord;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.ReadTargetRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
@@ -61,8 +66,11 @@ import io.oxia.client.api.exceptions.KeyAlreadyExistsException;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
 import java.time.Clock;
 import java.time.Duration;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -88,6 +96,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private final SharedOxiaClientRuntime runtime;
     private final boolean ownsRuntime;
     private final PartitionedOxiaClient client;
+    private final F4MetadataStoreSupport f4Support;
     private final Clock clock;
     private final ExecutorService operationExecutor;
     private final CopyOnWriteArrayList<WatchRegistration> watches = new CopyOnWriteArrayList<>();
@@ -126,6 +135,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         this.ownsRuntime = ownsRuntime;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.client = runtime.client();
+        this.f4Support = new F4MetadataStoreSupport(client, clock);
         this.operationExecutor = boundedExecutor(
                 4, configuration.maxPendingOperations(), "nereus-oxia-operation");
     }
@@ -325,17 +335,46 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
-    public CompletableFuture<StableAppendResult> commitStableAppend(
+    public CompletableFuture<PreparedStableAppend> prepareStableAppend(
             String cluster,
             CommitAppendRequest request) {
-        return completeAppend(() -> commitStableAppendSync(new OxiaKeyspace(cluster), request));
+        return completeAppend(() -> prepareStableAppendSync(new OxiaKeyspace(cluster), request));
     }
 
     @Override
-    public CompletableFuture<CommittedAppend> materializeGenerationZero(
+    public CompletableFuture<StableAppendResult> commitPreparedStableAppend(
+            String cluster,
+            PreparedStableAppend prepared,
+            ObjectProtectionIdentity protectionIdentity,
+            long rootMetadataVersion,
+            long rootLifecycleEpoch,
+            long protectionMetadataVersion,
+            Checksum protectionRecordSha256) {
+        return completeAppend(() -> commitPreparedStableAppendSync(
+                new OxiaKeyspace(cluster),
+                prepared,
+                protectionIdentity,
+                rootMetadataVersion,
+                rootLifecycleEpoch,
+                protectionMetadataVersion,
+                protectionRecordSha256));
+    }
+
+    @Override
+    public CompletableFuture<MaterializedGenerationZero> materializeGenerationZero(
             String cluster,
             ReachableCommittedAppend reachableAppend) {
         return completeAppend(() -> materializeGenerationZeroSync(new OxiaKeyspace(cluster), reachableAppend));
+    }
+
+    @Override
+    public CompletableFuture<Void> revalidateMaterializedGenerationZero(
+            String cluster,
+            MaterializedGenerationZero materialized) {
+        return completeAppend(() -> {
+            revalidateMaterializedGenerationZeroSync(new OxiaKeyspace(cluster), materialized);
+            return null;
+        });
     }
 
     @Override
@@ -506,6 +545,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
+        f4Support.close();
         watches.forEach(WatchRegistration::close);
         watches.clear();
         operationExecutor.shutdown();
@@ -514,17 +554,103 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         }
     }
 
-    private StableAppendResult commitStableAppendSync(OxiaKeyspace keyspace, CommitAppendRequest request) {
+    private PreparedStableAppend prepareStableAppendSync(
+            OxiaKeyspace keyspace,
+            CommitAppendRequest request) {
         Objects.requireNonNull(request, "request");
         String commitId = request.commitId();
+        ReachableCommittedAppend markerReplay = findGenericMarkerReplay(keyspace, request);
+        if (markerReplay != null) {
+            return preparedFromDurable(
+                    keyspace,
+                    request,
+                    requireDurableTargetCommit(keyspace, request.streamId(), commitId),
+                    true);
+        }
+        StreamHeadRecord initialHead = headOrThrow(keyspace, request.streamId());
+        if (initialHead.committedEndOffset() > request.expectedStartOffset()) {
+            AppendReplaySearchResult replay = searchAppendReplaySync(keyspace, request, Optional.empty(),
+                    configuration.maxCommitChainScan());
+            if (replay.status() == AppendReplayStatus.FOUND) {
+                return preparedFromDurable(
+                        keyspace,
+                        request,
+                        requireDurableTargetCommit(keyspace, request.streamId(), commitId),
+                        true);
+            }
+            if (replay.status() == AppendReplayStatus.CONTINUE) {
+                throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
+                        AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires paged recovery");
+            }
+        }
+        validateCommitPreconditions(initialHead, request);
+        StreamCommitTargetRecord candidate = buildTargetCommit(request, initialHead);
+        String key = keyspace.streamCommitKey(request.streamId(), commitId);
+        DurableRecord<StreamCommitTargetRecord> durable;
+        try {
+            durable = putIfAbsentDurable(
+                    key,
+                    keyspace.streamPartitionKey(request.streamId()),
+                    candidate,
+                    StreamCommitTargetRecord.class);
+        } catch (BackendConditionException e) {
+            requireCause(e, KeyAlreadyExistsException.class);
+            durable = requireDurableTargetCommit(keyspace, request.streamId(), commitId);
+        }
+        validateReplay(request, durable.value(), AppendOutcome.KNOWN_NOT_COMMITTED);
+        StreamHeadRecord currentHead = headOrThrow(keyspace, request.streamId());
+        if (!sameCommitAnchor(initialHead, currentHead)) {
+            AppendReplaySearchResult replay = searchAppendReplaySync(
+                    keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
+            if (replay.status() == AppendReplayStatus.FOUND) {
+                return preparedFromDurable(keyspace, request, durable, true);
+            }
+            if (replay.status() == AppendReplayStatus.CONTINUE) {
+                throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true,
+                        AppendOutcome.MAY_HAVE_COMMITTED, "append replay requires paged recovery");
+            }
+        }
+        validateCommitPreconditions(currentHead, request);
+        validateCommitAgainstHead(
+                request,
+                durable.value(),
+                currentHead,
+                AppendOutcome.KNOWN_NOT_COMMITTED);
+        return preparedFromDurable(keyspace, request, durable, false);
+    }
+
+    private StableAppendResult commitPreparedStableAppendSync(
+            OxiaKeyspace keyspace,
+            PreparedStableAppend prepared,
+            ObjectProtectionIdentity protectionIdentity,
+            long rootMetadataVersion,
+            long rootLifecycleEpoch,
+            long protectionMetadataVersion,
+            Checksum protectionRecordSha256) {
+        PreparedStableAppend exact = Objects.requireNonNull(prepared, "prepared");
+        CommitAppendRequest request = exact.request();
+        DurableRecord<StreamCommitTargetRecord> initialIntent = requireExactPreparedIntent(
+                keyspace,
+                exact);
+        validateStableAppendProtection(
+                keyspace,
+                exact,
+                protectionIdentity,
+                rootMetadataVersion,
+                rootLifecycleEpoch,
+                protectionMetadataVersion,
+                protectionRecordSha256);
         ReachableCommittedAppend markerReplay = findGenericMarkerReplay(keyspace, request);
         if (markerReplay != null) {
             return new StableAppendResult(markerReplay, false);
         }
         StreamHeadRecord initialHead = headOrThrow(keyspace, request.streamId());
         if (initialHead.committedEndOffset() > request.expectedStartOffset()) {
-            AppendReplaySearchResult replay = searchAppendReplaySync(keyspace, request, Optional.empty(),
-                    Math.max(MAX_CAS_RETRIES, 1024));
+            AppendReplaySearchResult replay = searchAppendReplaySync(
+                    keyspace,
+                    request,
+                    Optional.empty(),
+                    configuration.maxCommitChainScan());
             if (replay.status() == AppendReplayStatus.FOUND) {
                 return new StableAppendResult(replay.committedAppend().orElseThrow(), false);
             }
@@ -534,26 +660,27 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             }
         }
         validateCommitPreconditions(initialHead, request);
-        StreamCommitTargetRecord commit = buildTargetCommit(request, initialHead);
-        String key = keyspace.streamCommitKey(request.streamId(), commitId);
-        try {
-            commit = putIfAbsent(key, keyspace.streamPartitionKey(request.streamId()),
-                    commit, StreamCommitTargetRecord.class);
-        } catch (BackendConditionException e) {
-            requireCause(e, KeyAlreadyExistsException.class);
-            Object existing = getCommitValue(keyspace, request.streamId(), commitId)
-                    .orElseThrow(() -> invariant("generic commit disappeared after put conflict"));
-            if (!(existing instanceof StreamCommitTargetRecord target)) {
-                throw invariant("generic commit ID conflicts with a legacy record");
-            }
-            validateReplay(request, target, AppendOutcome.KNOWN_NOT_COMMITTED);
-            commit = target;
-        }
+        validateCommitAgainstHead(
+                request,
+                initialIntent.value(),
+                initialHead,
+                AppendOutcome.KNOWN_NOT_COMMITTED);
         for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
+            DurableRecord<StreamCommitTargetRecord> intent = requireExactPreparedIntent(
+                    keyspace,
+                    exact);
+            validateStableAppendProtection(
+                    keyspace,
+                    exact,
+                    protectionIdentity,
+                    rootMetadataVersion,
+                    rootLifecycleEpoch,
+                    protectionMetadataVersion,
+                    protectionRecordSha256);
             StreamHeadRecord head = headOrThrow(keyspace, request.streamId());
             if (!sameCommitAnchor(initialHead, head)) {
                 AppendReplaySearchResult replay = searchAppendReplaySync(
-                        keyspace, request, Optional.empty(), Math.max(MAX_CAS_RETRIES, 1024));
+                        keyspace, request, Optional.empty(), configuration.maxCommitChainScan());
                 if (replay.status() == AppendReplayStatus.FOUND) {
                     return new StableAppendResult(replay.committedAppend().orElseThrow(), false);
                 }
@@ -563,19 +690,24 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 }
             }
             validateCommitPreconditions(head, request);
-            validateCommitAgainstHead(request, commit, head, AppendOutcome.KNOWN_NOT_COMMITTED);
+            validateCommitAgainstHead(request, intent.value(), head, AppendOutcome.KNOWN_NOT_COMMITTED);
             Optional<StreamHeadRecord> updated = casHeadForCommit(
-                    keyspace, request.streamId(), head, withCommit(head, commit));
+                    keyspace,
+                    request.streamId(),
+                    head,
+                    withCommit(head, intent.value()));
             if (updated.isPresent()) {
                 StreamHeadRecord anchored = updated.orElseThrow();
-                return new StableAppendResult(reachable(commit, request.projectionRef(), anchored), true);
+                return new StableAppendResult(
+                        reachable(intent.value(), request.projectionRef(), anchored),
+                        true);
             }
         }
         throw appendFailure(ErrorCode.METADATA_CONDITION_FAILED, true, AppendOutcome.MAY_HAVE_COMMITTED,
                 "generic stream-head CAS retry budget exhausted");
     }
 
-    private CommittedAppend materializeGenerationZeroSync(
+    private MaterializedGenerationZero materializeGenerationZeroSync(
             OxiaKeyspace keyspace, ReachableCommittedAppend reachableAppend) {
         Objects.requireNonNull(reachableAppend, "reachableAppend");
         CommittedAppend append = reachableAppend.committedAppend();
@@ -593,14 +725,243 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 commit.cumulativeSize(), commit.readTarget(), commit.payloadFormat(), commit.recordCount(),
                 commit.entryCount(), commit.logicalBytes(), commit.schemaRefs(), commit.projectionRef(),
                 commit.minEventTimeMillis(), commit.maxEventTimeMillis(), commit.commitVersion(), false, 0);
-        putOrCompare(keyspace.offsetIndexKey(append.streamId(), append.range().endOffset(), 0),
-                keyspace.streamPartitionKey(append.streamId()), index, OffsetIndexTargetRecord.class);
+        String indexKey = keyspace.offsetIndexKey(append.streamId(), append.range().endOffset(), 0);
+        DurableRecord<OffsetIndexTargetRecord> durableIndex = putOrCompareDurable(
+                indexKey,
+                keyspace.streamPartitionKey(append.streamId()),
+                index,
+                OffsetIndexTargetRecord.class);
         CommittedAppendRecord marker = new CommittedAppendRecord(
                 commit.streamId(), commit.commitId(), commit.offsetStart(), commit.offsetEnd(), commit.generation(),
                 commit.commitVersion(), commit.readTarget().identityChecksumValue(), 0);
         putOrCompare(keyspace.committedAppendKey(append.streamId(), append.commitId()),
                 keyspace.streamPartitionKey(append.streamId()), marker, CommittedAppendRecord.class);
-        return append;
+        return new MaterializedGenerationZero(
+                append,
+                indexKey,
+                durableIndex.metadataVersion(),
+                durableIndex.durableValueSha256());
+    }
+
+    private void revalidateMaterializedGenerationZeroSync(
+            OxiaKeyspace keyspace,
+            MaterializedGenerationZero materialized) {
+        MaterializedGenerationZero exact = Objects.requireNonNull(materialized, "materialized");
+        CommittedAppend append = exact.committedAppend();
+        String expectedIndexKey = keyspace.offsetIndexKey(
+                append.streamId(),
+                append.range().endOffset(),
+                0);
+        if (!exact.indexKey().equals(expectedIndexKey)) {
+            throw invariant("generation-zero proof contains a non-canonical index key");
+        }
+        DurableRecord<StreamCommitTargetRecord> durableCommit = requireDurableTargetCommit(
+                keyspace,
+                append.streamId(),
+                append.commitId());
+        StreamCommitTargetRecord commit = durableCommit.value();
+        if (!toCommitted(commit, append.projectionRef()).equals(append)) {
+            throw invariant("generation-zero proof no longer matches its commit intent");
+        }
+        requireReachable(keyspace, append);
+        DurableRecord<OffsetIndexTargetRecord> durableIndex = getDurableRecord(
+                        expectedIndexKey,
+                        keyspace.streamPartitionKey(append.streamId()),
+                        OffsetIndexTargetRecord.class)
+                .orElseThrow(() -> invariant("generation-zero index disappeared during protection"));
+        if (durableIndex.metadataVersion() != exact.indexMetadataVersion()
+                || !durableIndex.durableValueSha256().equals(exact.indexRecordSha256())
+                || !hydrate(durableIndex.value(), 0, OffsetIndexTargetRecord.class)
+                        .equals(generationZeroIndex(commit))) {
+            throw invariant("generation-zero index changed during protection");
+        }
+    }
+
+    private PreparedStableAppend preparedFromDurable(
+            OxiaKeyspace keyspace,
+            CommitAppendRequest request,
+            DurableRecord<StreamCommitTargetRecord> durable,
+            boolean replayWasReachable) {
+        String expectedKey = keyspace.streamCommitKey(request.streamId(), request.commitId());
+        if (!durable.key().equals(expectedKey)) {
+            throw invariant("prepared generic commit key is non-canonical");
+        }
+        validateReplay(request, durable.value(), AppendOutcome.KNOWN_NOT_COMMITTED);
+        if (!(request.readTarget() instanceof ObjectSliceReadTarget target)
+                || target.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT) {
+            throw invariant("stable append intent does not reference an Object WAL slice");
+        }
+        return new PreparedStableAppend(
+                request,
+                request.commitId(),
+                durable.key(),
+                durable.metadataVersion(),
+                durable.durableValueSha256(),
+                ObjectKeyHash.from(target.objectKey()),
+                replayWasReachable);
+    }
+
+    private DurableRecord<StreamCommitTargetRecord> requireDurableTargetCommit(
+            OxiaKeyspace keyspace,
+            StreamId streamId,
+            String commitId) {
+        String key = keyspace.streamCommitKey(streamId, commitId);
+        Optional<DurableRecord<StreamCommitTargetRecord>> target = getDurableRecord(
+                key,
+                keyspace.streamPartitionKey(streamId),
+                StreamCommitTargetRecord.class);
+        if (target.isPresent()) {
+            return target.orElseThrow();
+        }
+        Optional<PartitionedOxiaClient.VersionedValue> raw = join(
+                client.get(key, keyspace.streamPartitionKey(streamId)));
+        if (raw.isPresent()) {
+            throw invariant("generic commit ID conflicts with a legacy record");
+        }
+        throw invariant("generic commit intent is absent");
+    }
+
+    private DurableRecord<StreamCommitTargetRecord> requireExactPreparedIntent(
+            OxiaKeyspace keyspace,
+            PreparedStableAppend prepared) {
+        if (!prepared.commitId().equals(prepared.request().commitId())
+                || !prepared.commitKey().equals(keyspace.streamCommitKey(
+                        prepared.request().streamId(),
+                        prepared.commitId()))) {
+            throw invariant("prepared stable append identity is non-canonical");
+        }
+        DurableRecord<StreamCommitTargetRecord> durable = requireDurableTargetCommit(
+                keyspace,
+                prepared.request().streamId(),
+                prepared.commitId());
+        validateReplay(
+                prepared.request(),
+                durable.value(),
+                AppendOutcome.KNOWN_NOT_COMMITTED);
+        if (durable.metadataVersion() != prepared.commitMetadataVersion()
+                || !durable.durableValueSha256().equals(prepared.commitRecordSha256())) {
+            throw invariant("prepared stable append intent changed before head commit");
+        }
+        return durable;
+    }
+
+    private void validateStableAppendProtection(
+            OxiaKeyspace keyspace,
+            PreparedStableAppend prepared,
+            ObjectProtectionIdentity protectionIdentity,
+            long rootMetadataVersion,
+            long rootLifecycleEpoch,
+            long protectionMetadataVersion,
+            Checksum protectionRecordSha256) {
+        ObjectProtectionIdentity identity = Objects.requireNonNull(
+                protectionIdentity,
+                "protectionIdentity");
+        Checksum protectionSha = F4ValueValidation.sha256(
+                protectionRecordSha256,
+                "protectionRecordSha256");
+        if (rootMetadataVersion < 0 || rootLifecycleEpoch <= 0 || protectionMetadataVersion < 0) {
+            throw new IllegalArgumentException("stable append protection versions are invalid");
+        }
+        String expectedReferenceId = reachableAppendReferenceId(prepared);
+        if (!identity.object().equals(prepared.objectKeyHash())
+                || identity.type() != ObjectProtectionType.REACHABLE_APPEND
+                || !identity.referenceId().equals(expectedReferenceId)) {
+            throw invariant("stable append protection identity is non-canonical");
+        }
+        F4Keyspace f4Keys = new F4Keyspace(keyspace.cluster());
+        F4MetadataStoreSupport.Decoded<PhysicalObjectRootRecord> root = join(f4Support.get(
+                        f4Keys.physicalRootKey(prepared.objectKeyHash()),
+                        f4Keys.physicalObjectPartitionKey(prepared.objectKeyHash()),
+                        PhysicalObjectRootRecord.class))
+                .orElseThrow(() -> invariant("physical Object WAL root is absent before head commit"));
+        PhysicalObjectRootRecord rootValue = root.value();
+        if (root.version() != rootMetadataVersion
+                || rootValue.lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                || rootValue.lifecycleEpoch() != rootLifecycleEpoch
+                || !rootValue.objectKeyHash().equals(prepared.objectKeyHash().value())) {
+            throw invariant("physical Object WAL root changed before head commit");
+        }
+        requireRootMatchesPreparedTarget(keyspace, prepared, rootValue);
+        F4MetadataStoreSupport.Decoded<ObjectProtectionRecord> protection = join(f4Support.get(
+                        f4Keys.protectionKey(
+                                identity.object(),
+                                identity.type(),
+                                identity.referenceId()),
+                        f4Keys.physicalObjectPartitionKey(identity.object()),
+                        ObjectProtectionRecord.class))
+                .orElseThrow(() -> invariant("REACHABLE_APPEND protection is absent before head commit"));
+        ObjectProtectionRecord protectionValue = protection.value();
+        if (protection.version() != protectionMetadataVersion
+                || !protection.durableSha256().equals(protectionSha)
+                || protectionValue.protectionTypeId() != ObjectProtectionType.REACHABLE_APPEND.wireId()
+                || !protectionValue.objectKeyHash().equals(prepared.objectKeyHash().value())
+                || !protectionValue.referenceId().equals(expectedReferenceId)
+                || !protectionValue.ownerKey().equals(prepared.commitKey())
+                || protectionValue.ownerMetadataVersion() != prepared.commitMetadataVersion()
+                || !protectionValue.ownerIdentitySha256().equals(prepared.commitRecordSha256().value())
+                || protectionValue.rootLifecycleEpoch() != rootLifecycleEpoch
+                || protectionValue.expiresAtMillis() != 0) {
+            throw invariant("REACHABLE_APPEND protection changed before head commit");
+        }
+    }
+
+    private void requireRootMatchesPreparedTarget(
+            OxiaKeyspace keyspace,
+            PreparedStableAppend prepared,
+            PhysicalObjectRootRecord root) {
+        if (!(prepared.request().readTarget() instanceof ObjectSliceReadTarget target)) {
+            throw invariant("prepared stable append target is not an object slice");
+        }
+        ObjectManifestRecord manifest = getObjectManifestSync(keyspace, target.objectId())
+                .orElseThrow(() -> invariant("Object WAL manifest is absent before head commit"));
+        Phase1ObjectManifestValidator.validateStoredManifest(manifest);
+        long targetEnd;
+        try {
+            targetEnd = Math.addExact(target.objectOffset(), target.objectLength());
+        } catch (ArithmeticException overflow) {
+            throw invariant("Object WAL target range overflows", overflow);
+        }
+        String expectedContentSha = "SHA256".equals(manifest.objectChecksumType())
+                ? manifest.objectChecksumValue()
+                : "";
+        if (!root.objectKey().equals(target.objectKey().value())
+                || !root.objectId().equals(target.objectId().value())
+                || root.objectKindId() != 1
+                || root.objectLength() != manifest.objectLength()
+                || targetEnd > root.objectLength()
+                || !root.storageChecksumType().equals(manifest.storageChecksumType())
+                || !root.storageChecksumValue().equals(manifest.storageChecksumValue())
+                || !root.contentSha256().equals(expectedContentSha)) {
+            throw invariant("physical Object WAL root conflicts with manifest/target identity");
+        }
+    }
+
+    private static String reachableAppendReferenceId(PreparedStableAppend prepared) {
+        return "ra1-" + DeterministicIds.stableHashComponent(
+                prepared.request().streamId().value()
+                        + prepared.commitId()
+                        + prepared.objectKeyHash().value());
+    }
+
+    private static OffsetIndexTargetRecord generationZeroIndex(StreamCommitTargetRecord commit) {
+        return new OffsetIndexTargetRecord(
+                commit.streamId(),
+                commit.offsetStart(),
+                commit.offsetEnd(),
+                commit.generation(),
+                commit.cumulativeSize(),
+                commit.readTarget(),
+                commit.payloadFormat(),
+                commit.recordCount(),
+                commit.entryCount(),
+                commit.logicalBytes(),
+                commit.schemaRefs(),
+                commit.projectionRef(),
+                commit.minEventTimeMillis(),
+                commit.maxEventTimeMillis(),
+                commit.commitVersion(),
+                false,
+                0);
     }
 
     private void requireReachable(OxiaKeyspace keyspace, CommittedAppend expected) {
@@ -608,7 +969,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         String commitId = head.lastCommitId();
         ChainExpectation expectation = expectationFromHead(head);
         int scanned = 0;
-        while (!commitId.isEmpty() && scanned++ < 10_000) {
+        while (!commitId.isEmpty() && scanned++ < configuration.maxCommitChainScan()) {
             Object durable = getCommitValue(keyspace, expected.streamId(), commitId)
                     .orElseThrow(() -> invariant("reachability proof found a broken chain"));
             AnyCommit view = anyCommit(durable);
@@ -1552,7 +1913,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         String commitId = head.lastCommitId();
         ChainExpectation expectation = expectationFromHead(head);
         int scanned = 0;
-        while (!commitId.isEmpty() && scanned++ < 10_000) {
+        while (!commitId.isEmpty() && scanned++ < configuration.maxCommitChainScan()) {
             Object durable = getCommitValue(keyspace, streamId, commitId)
                     .orElseThrow(() -> invariant("object repair found a broken mixed commit chain"));
             AnyCommit view = anyCommit(durable);
@@ -1856,6 +2217,17 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         return join(client.get(key, partitionKey)).map(value -> decode(value, recordClass));
     }
 
+    private <T> Optional<DurableRecord<T>> getDurableRecord(
+            String key,
+            PartitionKey partitionKey,
+            Class<T> recordClass) {
+        return join(client.get(key, partitionKey)).map(value -> new DurableRecord<>(
+                value.key(),
+                decode(value, recordClass),
+                value.version(),
+                sha256(value.value())));
+    }
+
     private <T> T putIfAbsent(
             String key,
             PartitionKey partitionKey,
@@ -1864,6 +2236,38 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         PartitionedOxiaClient.WriteResult result = join(client.putIfAbsent(
                 key, encode(record, recordClass), partitionKey));
         return hydrate(record, result.version(), recordClass);
+    }
+
+    private <T> DurableRecord<T> putIfAbsentDurable(
+            String key,
+            PartitionKey partitionKey,
+            T record,
+            Class<T> recordClass) {
+        byte[] bytes = encode(record, recordClass);
+        PartitionedOxiaClient.WriteResult result = join(client.putIfAbsent(key, bytes, partitionKey));
+        return new DurableRecord<>(
+                key,
+                hydrate(record, result.version(), recordClass),
+                result.version(),
+                sha256(bytes));
+    }
+
+    private <T> DurableRecord<T> putOrCompareDurable(
+            String key,
+            PartitionKey partitionKey,
+            T candidate,
+            Class<T> type) {
+        try {
+            return putIfAbsentDurable(key, partitionKey, candidate, type);
+        } catch (BackendConditionException e) {
+            requireCause(e, KeyAlreadyExistsException.class);
+            DurableRecord<T> existing = getDurableRecord(key, partitionKey, type)
+                    .orElseThrow(() -> invariant("derived record disappeared after put conflict"));
+            if (!hydrate(existing.value(), 0, type).equals(hydrate(candidate, 0, type))) {
+                throw invariant("derived generic record conflicts with durable bytes");
+            }
+            return existing;
+        }
     }
 
     private <T> T putIfVersion(
@@ -2114,6 +2518,20 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         return failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 
+    private static NereusException invariant(String message, Throwable cause) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+    }
+
+    private static Checksum sha256(byte[] bytes) {
+        try {
+            return new Checksum(
+                    ChecksumType.SHA256,
+                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("SHA-256 is unavailable", failure);
+        }
+    }
+
     private static NereusException condition(String message) {
         return failure(ErrorCode.METADATA_CONDITION_FAILED, true, message);
     }
@@ -2226,6 +2644,21 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             long cumulativeSize,
             long commitVersion,
             long logicalBytes) {
+    }
+
+    private record DurableRecord<T>(
+            String key,
+            T value,
+            long metadataVersion,
+            Checksum durableValueSha256) {
+        private DurableRecord {
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(value, "value");
+            if (metadataVersion < 0) {
+                throw new IllegalArgumentException("metadataVersion must be non-negative");
+            }
+            F4ValueValidation.sha256(durableValueSha256, "durableValueSha256");
+        }
     }
 
     private enum SearchStatus {

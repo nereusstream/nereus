@@ -159,7 +159,12 @@ tests 已通过。`phase4M3Check` 与真实 Oxia/LocalStack-backed `phase4M3Fina
 F4-M3 已 final-gated。F4-M4 的首个 NRC1 object-protocol checkpoint 已实现 spill-backed one-at-a-time writer、
 strict header/footer/directory/range reader、attempt/key identity、body/content 双 SHA 和 authoritative metadata
 verifier，并由 golden/corruption/sparse-directory tests 覆盖；`phase4M4CheckpointCheck --rerun-tasks` 已于
-2026-07-15 通过。recovery-root publication、retention/GC 以及
+2026-07-15 通过。第二个 checkpoint 已把 generation-zero append/recovery 切换为 exact intent preparation、
+ACTIVE physical root、commit-owned permanent `REACHABLE_APPEND`、protected head CAS、exact index materialization 与
+index-owned permanent `VISIBLE_GENERATION`，并完成 production shared-Oxia runtime 接线。普通 unit tests 及
+real-Oxia/F4-M2/M3 integration source compilation 已通过；`phase4M4ProtectedAppendCheck` 已于 2026-07-15
+通过完整前置回归链与本地 Pulsar M4 check，Docker-backed M4 execution gate 尚未运行。
+recovery-root publication、retention/GC 以及
 F4-M5–M6 的 async profile 与最终兼容接线仍不可用。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。

@@ -40,6 +40,7 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.HeadObjectOptions;
@@ -280,7 +281,7 @@ class DefaultStreamStorageTrimTest {
             CompletableFuture<TrimRecord> pending) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
-                new Class<?>[] {OxiaMetadataStore.class},
+                new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
                 (proxy, method, args) -> {
                     if (method.getName().equals("updateTrim")) {
                         return pending;

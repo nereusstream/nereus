@@ -26,6 +26,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StorageProfile;
@@ -35,9 +36,14 @@ import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import com.nereusstream.metadata.oxia.testing.OxiaMetadataStoreContractScenario;
@@ -193,7 +199,12 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
         OxiaClientConfiguration config = configuration();
         StreamId streamId;
         CommitAppendRequest generic;
-        try (OxiaJavaClientMetadataStore store = OxiaJavaClientMetadataStore.connect(config, Clock.systemUTC())) {
+        Clock clock = Clock.systemUTC();
+        try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(config, clock);
+                OxiaJavaClientMetadataStore store =
+                        OxiaJavaClientMetadataStore.usingSharedRuntime(config, runtime, clock);
+                OxiaJavaPhysicalObjectMetadataStore physical =
+                        OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(config, runtime, clock)) {
             streamId = new StreamId(store.createOrGetStream(cluster, new StreamName("mixed"),
                     new StreamCreateOptions(StorageProfile.OBJECT_WAL_SYNC_OBJECT, Map.of())).join().streamId());
             AppendSessionRecord session = store.acquireAppendSession(cluster, streamId,
@@ -201,11 +212,13 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
             CommitSliceRequest legacy = request(streamId, session, "legacy", "slice-legacy", 0);
             store.putObjectManifest(cluster, manifest(legacy)).join();
             store.commitStreamSlice(cluster, legacy).join();
-            CommitSliceRequest physical = request(streamId, session, "generic", "slice-generic", 1);
-            store.putObjectManifest(cluster, manifest(physical)).join();
-            generic = genericRequest(physical);
+            CommitSliceRequest genericSlice = request(
+                    streamId, session, "generic", "slice-generic", 1);
+            store.putObjectManifest(cluster, manifest(genericSlice)).join();
+            generic = genericRequest(genericSlice);
 
-            StableAppendResult stable = store.commitStableAppend(cluster, generic).join();
+            StableAppendResult stable = commitProtected(
+                    store, physical, cluster, generic, clock.millis());
             assertThat(stable.headAdvancedByThisCall()).isTrue();
             assertThat(store.scanOffsetIndex(cluster, streamId, 0, 10).join()).hasSize(1);
             store.materializeGenerationZero(cluster, stable.reachableAppend()).join();
@@ -523,6 +536,70 @@ class OxiaJavaClientMetadataStoreIntegrationTest {
                 request.epoch(), request.fencingToken(), request.expectedStartOffset(), target,
                 request.payloadFormat(), request.recordCount(), request.entryCount(), request.logicalBytes(),
                 request.schemaRefs(), request.minEventTimeMillis(), request.maxEventTimeMillis(), request.projectionRef());
+    }
+
+    private static StableAppendResult commitProtected(
+            OxiaJavaClientMetadataStore metadata,
+            OxiaJavaPhysicalObjectMetadataStore physical,
+            String cluster,
+            CommitAppendRequest request,
+            long now) {
+        ObjectSliceReadTarget target = (ObjectSliceReadTarget) request.readTarget();
+        PreparedStableAppend prepared = metadata.prepareStableAppend(cluster, request).join();
+        var root = physical.createRoot(cluster, new PhysicalObjectRootRecord(
+                1,
+                ObjectKeyHash.from(target.objectKey()).value(),
+                target.objectKey().value(),
+                target.objectId().value(),
+                1,
+                128,
+                ChecksumType.CRC32C.name(),
+                "44444444",
+                "",
+                "",
+                PhysicalObjectLifecycle.ACTIVE,
+                1,
+                now,
+                now + Duration.ofDays(1).toMillis(),
+                "",
+                "",
+                0,
+                0,
+                0,
+                0,
+                0,
+                "",
+                "",
+                0)).join();
+        String referenceId = "ra1-" + DeterministicIds.stableHashComponent(
+                request.streamId().value()
+                        + prepared.commitId()
+                        + prepared.objectKeyHash().value());
+        ObjectProtectionIdentity identity = new ObjectProtectionIdentity(
+                prepared.objectKeyHash(),
+                ObjectProtectionType.REACHABLE_APPEND,
+                referenceId);
+        var protection = physical.createProtection(cluster, new ObjectProtectionRecord(
+                1,
+                prepared.objectKeyHash().value(),
+                ObjectProtectionType.REACHABLE_APPEND.wireId(),
+                referenceId,
+                prepared.commitKey(),
+                prepared.commitMetadataVersion(),
+                prepared.commitRecordSha256().value(),
+                root.value().lifecycleEpoch(),
+                now,
+                0,
+                0)).join();
+        return metadata.commitPreparedStableAppend(
+                        cluster,
+                        prepared,
+                        identity,
+                        root.metadataVersion(),
+                        root.value().lifecycleEpoch(),
+                        protection.metadataVersion(),
+                        protection.durableValueSha256())
+                .join();
     }
 
     private static Checksum checksum(String value) {

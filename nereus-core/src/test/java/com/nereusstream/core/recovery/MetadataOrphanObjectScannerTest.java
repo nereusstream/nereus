@@ -35,6 +35,7 @@ import com.nereusstream.api.StreamName;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.HeadObjectOptions;
@@ -217,7 +218,7 @@ class MetadataOrphanObjectScannerTest {
             AtomicReference<ObjectManifestRecord> capture) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
-                new Class<?>[] {OxiaMetadataStore.class},
+                new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
                 (proxy, method, args) -> {
                     if (method.getName().equals("putObjectManifest")) {
                         capture.set((ObjectManifestRecord) args[1]);

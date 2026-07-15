@@ -6,6 +6,10 @@ This is the F4-M0 read-only audit. It records the exact current seams that Phase
 implementation from inventing a second append truth、cursor truth or broker policy path. No production source change
 is part of M0.
 
+> Post-audit status (2026-07-15)：F4-M4 checkpoint B has closed the generation-zero gap identified in §3.1 with
+> prepare/protect/head/materialize/protect sequencing. The hashes and call path below intentionally remain the M0
+> baseline；current implementation status is authoritative in this directory's README and documents 03/07.
+
 ## 2. Source Locks
 
 ### 2.1 Nereus
@@ -72,12 +76,12 @@ The async profile enum and `WAL_DURABLE` name exist, but `Phase15StorageProfileR
 F4 must reuse the same stable head commit and may only move generation-zero/index-confirmation and higher-generation
 work after the requested acknowledgement boundary.
 
-The locked implementation still creates/reloads the generic commit intent and performs the head CAS inside one
-`commitStableAppend` call. It has no interposed F4 physical-root/protection handshake. This is safe only while product
-physical deletion is absent. F4-M4 must implement document 03 §10's two-stage prepare/protect/head sequence before
-enabling deletion or async acknowledgement：`REACHABLE_APPEND` precedes head visibility and generation-zero
-`VISIBLE_GENERATION` precedes strict success. Merely backfilling old objects without changing this new-write path is
-an implementation-blocking design violation.
+At the M0 source lock, the implementation still created/reloaded the generic commit intent and performed the head CAS
+inside one `commitStableAppend` call. It had no interposed F4 physical-root/protection handshake and was safe only
+while product physical deletion was absent. Checkpoint B now implements document 03 §10's two-stage
+prepare/protect/head sequence：`REACHABLE_APPEND` precedes head visibility and generation-zero
+`VISIBLE_GENERATION` precedes strict success. Physical deletion remains disabled because the separate recovery-root、
+retirement and GC gates are not complete.
 
 ### 3.2 Ordinary resolve/read
 

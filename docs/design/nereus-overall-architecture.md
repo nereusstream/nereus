@@ -104,8 +104,8 @@ workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
 Oxia/LocalStack final gates。M4 的 NRC1 object protocol 已开始实现：spill-backed streaming writer、strict
 directory/range reader、attempt/key identity、body/content SHA 与 canonical metadata verifier 已有 focused
-evidence；recovery-root、protected append、anchor-aware retirement/GC 及 M5-M6 async/Pulsar execution path
-仍是 target。
+evidence。其后的 M4 checkpoint B 已实现 protected generation-zero append/recovery 与 production
+shared-Oxia physical-protection wiring；recovery-root、anchor-aware retirement/GC 及 M5-M6 仍是 target。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -117,7 +117,7 @@ alias。
   exact-source worker、checkpoint/service building blocks 已实现，但 profile 尚未启用）；
 - KoP、routing、production topic-compaction admission、lakehouse、advanced Pulsar semantics；
 - Future 4 physical retirement/GC and async materialization remain unavailable until F4-M4–M6 are implemented；
-  the M4 NRC1 object codec alone does not enable them. Later tracks remain north-star designs；Future 3 and
+  the M4 NRC1/protected-append checkpoints alone do not enable them. Later tracks remain north-star designs；Future 3 and
   F4-M1–M3 are implemented/final-gated。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
@@ -317,8 +317,8 @@ flowchart TB
 | Module | Target responsibility | Current status (2026-07-15) |
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented |
-| `nereus-core` | coordinators and state machines | primary-WAL adapters、split commit/materialize、exact recovery、seal/delete and F4 physical lease/protection/reference SPI implemented；M4 GC coordination planned |
-| `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay and F4-M1–M3 metadata/publication gates implemented |
+| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete and F4 physical lease/protection/reference SPI implemented；M4 recovery-root/GC coordination planned |
+| `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay、F4-M1–M3 metadata/publication gates and M4 exact protected-append proof adapter implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
 | `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated including format/planner/task recovery/exact-source worker/protection/checkpoint/service、Pulsar exact-byte round trip、topic SPI/registry、terminal workflow retirement and COMMITTED-source/tagged-v1/sorted-spill topic engine/publication；M4 GC pending；depends on core, never the reverse |
 | `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；projection、ledger/factory、append/read/lifecycle、durable cursor/retention、10k scale、rollout/limit/reset and F4 snapshot inventory boundaries complete |

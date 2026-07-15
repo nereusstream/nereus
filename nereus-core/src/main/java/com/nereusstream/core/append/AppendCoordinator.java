@@ -87,6 +87,7 @@ public final class AppendCoordinator implements AutoCloseable {
     private final AppendResourceLimiter resourceLimiter;
     private final StableAppendCommitter stableCommitter;
     private final GenerationZeroIndexMaterializer indexMaterializer;
+    private final GenerationZeroPhysicalReferencePublisher physicalReferences;
     private final StorageProfileResolver profileResolver = new Phase15StorageProfileResolver();
     private final ConcurrentHashMap<StreamId, StreamLane> lanes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<AppendAttemptId, Attempt> retainedAttempts = new ConcurrentHashMap<>();
@@ -103,12 +104,14 @@ public final class AppendCoordinator implements AutoCloseable {
             OxiaMetadataStore metadataStore,
             WalObjectWriter walObjectWriter,
             AppendSessionManager sessionManager,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
             Clock clock,
             Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
+        this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.writerRunIdHash = DeterministicIds.stableHashComponent(config.processRunId());
@@ -333,8 +336,7 @@ public final class AppendCoordinator implements AutoCloseable {
                                 "stream head moved behind the retained append start"));
                     }
                     if (head.committedEndOffset() == expected) {
-                        return stableCommitter.commit(attempt.commitRequest())
-                                .thenCompose(stable -> indexMaterializer.materialize(stable.reachableAppend()));
+                        return recoverProtectedAppend(attempt);
                     }
                     return searchRecoveryPage(attempt, Optional.empty());
                 })
@@ -348,7 +350,7 @@ public final class AppendCoordinator implements AutoCloseable {
                         config.cluster(), attempt.commitRequest(), cursor,
                         config.maxDerivedIndexRepairCommitsPerCall())
                 .thenCompose(search -> switch (search.status()) {
-                    case FOUND -> indexMaterializer.materialize(search.committedAppend().orElseThrow());
+                    case FOUND -> recoverProtectedAppend(attempt);
                     case PROVEN_NOT_COMMITTED -> CompletableFuture.failedFuture(new NereusException(
                             ErrorCode.OFFSET_CONFLICT, false,
                             "exact append recovery proved the attempt was not committed",
@@ -358,6 +360,44 @@ public final class AppendCoordinator implements AutoCloseable {
                         yield searchRecoveryPage(attempt, search.continuation());
                     }
                 });
+    }
+
+    private CompletableFuture<CommittedAppend> recoverProtectedAppend(Attempt attempt) {
+        AppendDeadline deadline = new AppendDeadline(config.appendRecoveryAttemptTimeout());
+        return deadline.bound(
+                        () -> stableCommitter.prepare(attempt.commitRequest()),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "prepare stable append recovery intent")
+                .thenCompose(prepared -> deadline.bound(
+                        () -> physicalReferences.protectBeforeHead(
+                                prepared,
+                                deadline.remaining()),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "protect recovered append before head"))
+                .thenCompose(protectedAppend -> {
+                    attempt.markHeadSent();
+                    CompletableFuture<StableAppendResult> head = stableCommitter.commit(protectedAppend);
+                    attempt.trackHeadSource(head);
+                    return deadline.bound(
+                            () -> head,
+                            AppendOutcome.KNOWN_NOT_COMMITTED,
+                            AppendOutcome.MAY_HAVE_COMMITTED,
+                            "commit recovered protected stream head");
+                })
+                .thenCompose(stable -> {
+                    attempt.markHeadKnownCommitted();
+                    return deadline.bound(
+                            () -> indexMaterializer.materialize(stable.reachableAppend()),
+                            AppendOutcome.KNOWN_COMMITTED,
+                            "materialize recovered generation-zero index");
+                })
+                .thenCompose(materialized -> deadline.bound(
+                        () -> physicalReferences.protectVisibleIndex(
+                                materialized,
+                                deadline.remaining()),
+                        AppendOutcome.KNOWN_COMMITTED,
+                        "protect recovered visible generation-zero index"))
+                .thenApply(protectedIndex -> protectedIndex.materialized().committedAppend());
     }
 
     private AppendResult finishRecovery(Attempt attempt, AppendResult result, Throwable error) {
@@ -638,21 +678,41 @@ public final class AppendCoordinator implements AutoCloseable {
                 slice.maxEventTimeMillis(),
                 Optional.empty());
         attempt.retainPhysical(request, uploaded.writeResult(), slice);
-        attempt.markHeadSent();
-        CompletableFuture<StableAppendResult> rawCommit = stableCommitter.commit(request);
-        attempt.trackHeadSource(rawCommit);
         CompletableFuture<StableAppendResult> commitFuture = attempt.deadline().bound(
-                () -> rawCommit,
-                AppendOutcome.KNOWN_NOT_COMMITTED,
-                AppendOutcome.MAY_HAVE_COMMITTED,
-                "commit stream head");
-        CompletableFuture<CommittedAppend> strictCommit = commitFuture.thenCompose(stable -> {
-            attempt.markHeadKnownCommitted();
-            return attempt.deadline().bound(
-                    () -> indexMaterializer.materialize(stable.reachableAppend()),
-                    AppendOutcome.KNOWN_COMMITTED,
-                    "materialize generation-zero index");
-        });
+                        () -> stableCommitter.prepare(request),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "prepare stable append intent")
+                .thenCompose(prepared -> attempt.deadline().bound(
+                        () -> physicalReferences.protectBeforeHead(
+                                prepared,
+                                attempt.deadline().remaining()),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "protect stable append before head"))
+                .thenCompose(protectedAppend -> {
+                    attempt.markHeadSent();
+                    CompletableFuture<StableAppendResult> rawCommit = stableCommitter.commit(protectedAppend);
+                    attempt.trackHeadSource(rawCommit);
+                    return attempt.deadline().bound(
+                            () -> rawCommit,
+                            AppendOutcome.KNOWN_NOT_COMMITTED,
+                            AppendOutcome.MAY_HAVE_COMMITTED,
+                            "commit protected stream head");
+                });
+        CompletableFuture<CommittedAppend> strictCommit = commitFuture
+                .thenCompose(stable -> {
+                    attempt.markHeadKnownCommitted();
+                    return attempt.deadline().bound(
+                            () -> indexMaterializer.materialize(stable.reachableAppend()),
+                            AppendOutcome.KNOWN_COMMITTED,
+                            "materialize generation-zero index");
+                })
+                .thenCompose(materialized -> attempt.deadline().bound(
+                        () -> physicalReferences.protectVisibleIndex(
+                                materialized,
+                                attempt.deadline().remaining()),
+                        AppendOutcome.KNOWN_COMMITTED,
+                        "protect visible generation-zero index"))
+                .thenApply(protectedIndex -> protectedIndex.materialized().committedAppend());
         return strictCommit.handleAsync((commitResult, error) -> {
             if (error != null) {
                 NereusException failure = normalizeAppendFailure(error, attempt.outcome());

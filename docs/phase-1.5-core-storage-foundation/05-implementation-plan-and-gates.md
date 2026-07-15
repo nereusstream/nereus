@@ -144,7 +144,8 @@ Implement：
 - generic commit ID v2；
 - commit-log/index dual decode into canonical models；
 - generic marker key/value；
-- `commitStableAppend` and separate `materializeGenerationZero`；
+- protected `prepareStableAppend` / `commitPreparedStableAppend` and exact-identity
+  `materializeGenerationZero`（the F4-M4 evolution of the original P15 split）；
 - lossless legacy index-to-target hydration without manifest/list IO, while append/audit manifest validation remains；
 - fake/real `searchAppendReplay` surface with continuation values, even though core scheduling completes in M4。
 

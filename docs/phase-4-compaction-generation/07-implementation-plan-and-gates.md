@@ -45,8 +45,16 @@ all-64-shard pagination without watch/process-local hints. F4-M3 is complete/fin
 completion claim. F4-M4 implementation checkpoint A now provides the NRC1 domain/format、spill-backed one-at-a-time
 writer、strict bounded open/lookup path、attempt/key identity and authoritative metadata verifier. Its focused object-
 store/materialization tests and `phase4M4CheckpointCheck --rerun-tasks` passed on 2026-07-15 (114 tasks) and are the
-current evidence boundary；full recovery-root/
+object-protocol evidence boundary. Checkpoint B now provides exact intent preparation、ACTIVE root and permanent
+commit-owned protection before head CAS、exact generation-zero materialization and permanent index-owned protection
+before strict success, with the same sequence used by recovery and wired into production shared-Oxia assembly.
+Metadata/core/pulsar unit tests and affected real-service source-set compilation pass；a Docker-backed checkpoint-B
+execution gate has not yet run. Full recovery-root/
 anchor-aware retirement/GC and async/Pulsar execution paths still arrive in the remainder of F4-M4–M6.
+
+`phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
+checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
+the Docker-backed M4 final scenarios or any delete path are available.
 
 A later milestone is complete only when：
 
@@ -548,9 +556,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 
-> Current status：in progress. Checkpoint A (NRC1 object protocol) is implemented；checkpoint coordinator/root CAS、
-> protected append、anchor-aware replay/repair、retirement and physical/cursor GC remain before F4-M4 can be called
-> complete or final-gated.
+> Current status：in progress. Checkpoint A (NRC1 object protocol) and checkpoint B (protected generation-zero
+> append/recovery) are implemented；checkpoint coordinator/root CAS、anchor-aware replay/repair、retirement and
+> physical/cursor GC remain before F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
 
@@ -578,12 +586,14 @@ checkpoint/RecoveryCheckpointValidation.java             package-private value g
 append/StableAppendCommitter.java                 split prepare/protected commit
 append/GenerationZeroIndexMaterializer.java       return exact versioned index
 append/GenerationZeroPhysicalReferencePublisher.java
+append/DefaultGenerationZeroPhysicalReferencePublisher.java
+append/GenerationZeroProtectionIdentities.java
 append/ProtectedStableAppend.java
+append/ProtectedGenerationZero.java
 append/AppendCoordinator.java                     protected sync path
 DefaultStreamStorage.java                        required publisher injection
 PreparedStableAppend.java
 MaterializedGenerationZero.java
-ProtectedGenerationZero.java
 OxiaMetadataStore                                prepare/commit prepared append
 OxiaJavaClientMetadataStore                      exact two-stage stable append
 recovery/AnchorAwareCommitWalker.java
@@ -690,6 +700,7 @@ retirement.
 
 ```text
 ./gradlew phase4M4CheckpointCheck
+./gradlew phase4M4ProtectedAppendCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -697,6 +708,11 @@ retirement.
 `phase4M4CheckpointCheck` is deliberately narrower than the milestone gates：it verifies the implemented NRC1
 streaming/strict-read/canonical-metadata boundary and all earlier M3 prerequisites. It must not be cited as evidence
 that recovery-root publication、source retirement or any physical deletion path is enabled.
+
+`phase4M4ProtectedAppendCheck` extends that checkpoint chain with the exact two-stage metadata surface、the one raw
+core caller rule、ordinary/recovery ordering、production shared-Oxia composition、unit checks and compilation of every
+affected real-service source set. It is checkpoint-B evidence only；it does not run or imply the later recovery-root、
+retirement、GC or M4 final-service scenarios.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

@@ -638,3 +638,25 @@ tasks.register("phase4M4CheckpointCheck") {
     dependsOn(":nereus-materialization:check")
     dependsOn(":nereus-object-store:check")
 }
+
+tasks.register<Exec>("checkPhase4M4ProtectedAppendContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 protected generation-zero append checkpoint."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-protected-append-contract-surface.sh")
+}
+
+tasks.register("phase4M4ProtectedAppendCheck") {
+    group = "verification"
+    description = "Verify exact intent/root/protection ordering for generation-zero append and recovery."
+    dependsOn("phase4M4CheckpointCheck")
+    dependsOn("checkPhase4M4ProtectedAppendContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-core:compilePhase1IntegrationTestJava")
+    dependsOn(":nereus-materialization:compileF4M2IntegrationTestJava")
+    dependsOn(":nereus-materialization:compileF4M3IntegrationTestJava")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-metadata-oxia:compileOxiaIntegrationTestJava")
+    dependsOn(":nereus-pulsar-adapter:check")
+}

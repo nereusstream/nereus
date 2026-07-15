@@ -39,6 +39,8 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private final CursorStorage cursorStorage;
     private final CursorStorageConfig cursorStorageConfig;
     private final CursorProtocolActivationGuard cursorProtocolActivationGuard;
+    private final AutoCloseable objectProtectionManager;
+    private final AutoCloseable physicalMetadataStore;
     private final OxiaMetadataStore l0MetadataStore;
     private final SharedOxiaClientRuntime sharedOxiaRuntime;
     private final ObjectStore objectStore;
@@ -71,6 +73,50 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             String cluster,
             String processRunId,
             String writerId) {
+        this(
+                streamStorage,
+                projectionStore,
+                cursorMetadataStore,
+                cursorSnapshotStore,
+                cursorRetentionCoordinator,
+                cursorStorage,
+                cursorStorageConfig,
+                cursorProtocolActivationGuard,
+                null,
+                null,
+                l0MetadataStore,
+                sharedOxiaRuntime,
+                objectStore,
+                objectStoreProvider,
+                scheduler,
+                callbackExecutor,
+                config,
+                cluster,
+                processRunId,
+                writerId);
+    }
+
+    public NereusManagedLedgerRuntime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            CursorMetadataStore cursorMetadataStore,
+            CursorSnapshotStore cursorSnapshotStore,
+            CursorRetentionCoordinator cursorRetentionCoordinator,
+            CursorStorage cursorStorage,
+            CursorStorageConfig cursorStorageConfig,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            AutoCloseable objectProtectionManager,
+            AutoCloseable physicalMetadataStore,
+            OxiaMetadataStore l0MetadataStore,
+            SharedOxiaClientRuntime sharedOxiaRuntime,
+            ObjectStore objectStore,
+            ObjectStoreProvider objectStoreProvider,
+            ScheduledExecutorService scheduler,
+            ExecutorService callbackExecutor,
+            NereusManagedLedgerFactoryConfig config,
+            String cluster,
+            String processRunId,
+            String writerId) {
         this.streamStorage = Objects.requireNonNull(streamStorage, "streamStorage");
         this.projectionStore = Objects.requireNonNull(projectionStore, "projectionStore");
         this.cursorMetadataStore = Objects.requireNonNull(cursorMetadataStore, "cursorMetadataStore");
@@ -81,6 +127,12 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         this.cursorStorageConfig = Objects.requireNonNull(cursorStorageConfig, "cursorStorageConfig");
         this.cursorProtocolActivationGuard = Objects.requireNonNull(
                 cursorProtocolActivationGuard, "cursorProtocolActivationGuard");
+        if ((objectProtectionManager == null) != (physicalMetadataStore == null)) {
+            throw new IllegalArgumentException(
+                    "objectProtectionManager and physicalMetadataStore must be supplied together");
+        }
+        this.objectProtectionManager = objectProtectionManager;
+        this.physicalMetadataStore = physicalMetadataStore;
         this.l0MetadataStore = Objects.requireNonNull(l0MetadataStore, "l0MetadataStore");
         this.sharedOxiaRuntime = Objects.requireNonNull(sharedOxiaRuntime, "sharedOxiaRuntime");
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
@@ -94,7 +146,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         if (!writerId.equals("pulsar-f2/" + processRunId)) {
             throw new IllegalArgumentException("writerId must equal pulsar-f2/{processRunId}");
         }
-        requireIdentityDistinct(List.of(
+        List<Object> ownedResources = new ArrayList<>(List.of(
                 streamStorage,
                 projectionStore,
                 cursorMetadataStore,
@@ -107,6 +159,13 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                 objectStoreProvider,
                 scheduler,
                 callbackExecutor));
+        if (objectProtectionManager != null) {
+            ownedResources.add(objectProtectionManager);
+        }
+        if (physicalMetadataStore != null) {
+            ownedResources.add(physicalMetadataStore);
+        }
+        requireIdentityDistinct(ownedResources);
         this.callbackPermits = new Semaphore(config.maxPendingCallbacks());
     }
 
@@ -183,6 +242,8 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         closeOne(cursorMetadataStore, failures);
         closeOne(projectionStore, failures);
         closeOne(streamStorage, failures);
+        closeOneIfPresent(objectProtectionManager, failures);
+        closeOneIfPresent(physicalMetadataStore, failures);
         closeOne(l0MetadataStore, failures);
         closeOne(objectStore, failures);
         closeOne(objectStoreProvider, failures);
@@ -226,6 +287,14 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             resource.close();
         } catch (Throwable error) {
             failures.add(error);
+        }
+    }
+
+    private static void closeOneIfPresent(
+            AutoCloseable resource,
+            List<Throwable> failures) {
+        if (resource != null) {
+            closeOne(resource, failures);
         }
     }
 

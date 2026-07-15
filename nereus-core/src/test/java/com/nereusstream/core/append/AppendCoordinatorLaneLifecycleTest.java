@@ -30,6 +30,7 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
@@ -92,11 +93,20 @@ class AppendCoordinatorLaneLifecycleTest {
                 .join().streamId());
         AppendSessionManager sessions = new AppendSessionManager(config, metadata, CLOCK);
         LocalFileObjectStore objectStore = new LocalFileObjectStore(temporaryDirectory.resolve(name));
+        DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                config.cluster(),
+                metadata,
+                Duration.ofMinutes(10),
+                Duration.ZERO,
+                Duration.ofHours(24),
+                CLOCK);
         AppendCoordinator coordinator = new AppendCoordinator(
                 config,
                 metadata,
                 new DefaultWalObjectWriter(objectStore, "test-writer", CLOCK),
                 sessions,
+                new DefaultGenerationZeroPhysicalReferencePublisher(
+                        config.cluster(), metadata, metadata, protections),
                 CLOCK,
                 Runnable::run);
         return new TestContext(metadata, coordinator, streamId);

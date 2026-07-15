@@ -12,8 +12,11 @@ registry、COMMITTED-source planner bootstrap、collision-free tagged-v1 key nam
 two-pass engine、NTC1 worker/publication path and proof-driven terminal workflow-metadata retirement are implemented
 and covered by focused tests. The M3 ordinary/final gates passed on 2026-07-15. F4-M4 is now in progress：the NRC1
 domain values、private-staging streaming writer、strict header/footer/directory/range reader、attempt/key identity and
-authoritative F4 metadata-record verifier described in section 9 are implemented and focused-tested；recovery-root
-publication、retirement and GC remain target work. Package、class and method names are normative unless a review replaces them together with
+authoritative F4 metadata-record verifier described in section 9 are implemented and focused-tested. The document 03
+§10 generation-zero protocol is also implemented for ordinary and recovery append paths：exact prepared intent、
+physical root/protection proof、protected head CAS、exact index identity and strict visible protection are now the
+production sequence. Recovery-root publication、retirement and GC remain target work. Package、class and method names
+are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
 The domain model obeys these rules：

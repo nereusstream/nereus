@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1 primitives final-gated，尚未实现端到端 async 执行路径
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 checkpoints A–B landed，尚未实现端到端 async 执行路径
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
 
@@ -31,14 +31,19 @@ Already present：
 - F4-M0 task/generation/recovery/lease/GC/rollout code-level design and M1–M6 gates。
 - F4-M1 API/metadata records/codecs/store surface、guarded object IO、physical reference values and durable
   reader/protection handshakes（implemented and ordinary/Docker-backed final-gated）。
+- F4-M2 committed-generation resolver/read path and restart-safe publication, plus F4-M3 planner/task/worker/service、
+  exact-source protection、Parquet/NTC1 formats and terminal workflow-metadata retirement（final-gated）。
+- F4-M4 checkpoint A NRC1 object protocol and checkpoint B protected generation-zero append/recovery. New strict
+  appends now establish `REACHABLE_APPEND` before head CAS and `VISIBLE_GENERATION` before success；the async
+  acknowledgement branch remains disabled。
 
 Not present：
 
 - core branch implementing `WAL_DURABLE` success；
 - BookKeeper WAL writer/reader/location types；
-- materialization stream-registry/task/checkpoint orchestration and production workflow contracts/gates；
-- background worker and generation committer；
-- primary-WAL retention gate、lag backpressure and recovery daemon；
+- NRC1 recovery-root coordinator/publication、anchor-aware live-tail retirement and physical/cursor GC；
+- primary-WAL retention gate、lag backpressure and recovery daemon/runtime composition；
+- async-profile broker admission、`WAL_DURABLE` completion branch and task-loss/read-repair production wiring；
 - mixed primary target resolver。
 
 Creating metadata with an async profile does not mean the current core can execute it。The current runtime must fail unsupported

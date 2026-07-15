@@ -25,6 +25,9 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.ProtectedStableAppend;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
@@ -54,11 +57,14 @@ import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.StableAppendResult;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
+import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
+import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
+import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.ObjectStore;
@@ -273,7 +279,18 @@ class MaterializationWorkerOxiaS3IntegrationTest {
                                     oxiaConfiguration(), runtime, CLOCK);
                     OxiaJavaPhysicalObjectMetadataStore physical =
                             OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
-                                    oxiaConfiguration(), runtime, CLOCK)) {
+                                    oxiaConfiguration(), runtime, CLOCK);
+                    DefaultObjectProtectionManager appendProtections =
+                            new DefaultObjectProtectionManager(
+                                    cluster,
+                                    physical,
+                                    Duration.ofMinutes(2),
+                                    Duration.ofSeconds(1),
+                                    Duration.ofMinutes(5),
+                                    CLOCK)) {
+                GenerationZeroPhysicalReferencePublisher appendReferences =
+                        new DefaultGenerationZeroPhysicalReferencePublisher(
+                                cluster, l0, physical, appendProtections);
                 ProjectionRef projection = new ProjectionRef(
                         ProjectionType.VIRTUAL_LEDGER, "projection-" + suffix);
                 StreamId stream = new StreamId(l0.createOrGetStream(
@@ -303,29 +320,6 @@ class MaterializationWorkerOxiaS3IntegrationTest {
                     ObjectSliceReadTarget target = target(
                             objectId, objectKey, "source-slice-" + index, payload);
                     targets.add(target);
-                    StableAppendResult stable = l0.commitStableAppend(
-                                    cluster,
-                                    new CommitAppendRequest(
-                                            stream,
-                                            "writer-m3",
-                                            "writer-run-m3",
-                                            session.epoch(),
-                                            session.fencingToken(),
-                                            index,
-                                            target,
-                                            PayloadFormat.PULSAR_ENTRY_BATCH,
-                                            1,
-                                            1,
-                                            payload.length,
-                                            List.of(),
-                                            index + 1L,
-                                            index + 1L,
-                                            Optional.of(projection)))
-                            .join();
-                    l0.materializeGenerationZero(cluster, stable.reachableAppend()).join();
-                    lastCommitVersion = stable.reachableAppend()
-                            .committedAppend()
-                            .commitVersion();
                     PhysicalObjectIdentity identity = PhysicalObjectIdentity.create(
                             objectKey,
                             Optional.of(objectId),
@@ -335,6 +329,31 @@ class MaterializationWorkerOxiaS3IntegrationTest {
                             Optional.of(sha256(payload)),
                             Optional.of(put.etag()));
                     physical.createRoot(cluster, activeRoot(identity)).join();
+                    CommitAppendRequest appendRequest = new CommitAppendRequest(
+                            stream,
+                            "writer-m3",
+                            "writer-run-m3",
+                            session.epoch(),
+                            session.fencingToken(),
+                            index,
+                            target,
+                            PayloadFormat.PULSAR_ENTRY_BATCH,
+                            1,
+                            1,
+                            payload.length,
+                            List.of(),
+                            index + 1L,
+                            index + 1L,
+                            Optional.of(projection));
+                    l0.putObjectManifest(
+                            cluster,
+                            appendManifest(appendRequest, target, identity))
+                            .join();
+                    StableAppendResult stable = commitProtectedGenerationZero(
+                            cluster, l0, appendReferences, appendRequest);
+                    lastCommitVersion = stable.reachableAppend()
+                            .committedAppend()
+                            .commitVersion();
                 }
                 String projectionValue = MaterializationRecordMapper.projectionIdentity(
                         Optional.of(projection));
@@ -756,6 +775,73 @@ class MaterializationWorkerOxiaS3IntegrationTest {
                 payload.length,
                 Crc32cChecksums.checksum(payload),
                 entryIndex);
+    }
+
+    private static StableAppendResult commitProtectedGenerationZero(
+            String cluster,
+            OxiaJavaClientMetadataStore metadata,
+            GenerationZeroPhysicalReferencePublisher references,
+            CommitAppendRequest request) {
+        var prepared = metadata.prepareStableAppend(cluster, request).join();
+        ProtectedStableAppend protectedAppend = references.protectBeforeHead(prepared, TIMEOUT).join();
+        StableAppendResult stable = metadata.commitPreparedStableAppend(
+                        cluster,
+                        prepared,
+                        protectedAppend.protectionIdentity(),
+                        protectedAppend.rootMetadataVersion(),
+                        protectedAppend.rootLifecycleEpoch(),
+                        protectedAppend.protectionMetadataVersion(),
+                        protectedAppend.protectionRecordSha256())
+                .join();
+        var materialized = metadata.materializeGenerationZero(
+                        cluster, stable.reachableAppend())
+                .join();
+        references.protectVisibleIndex(materialized, TIMEOUT).join();
+        return stable;
+    }
+
+    private static ObjectManifestRecord appendManifest(
+            CommitAppendRequest request,
+            ObjectSliceReadTarget target,
+            PhysicalObjectIdentity identity) {
+        long now = CLOCK.millis();
+        Checksum contentSha256 = identity.contentSha256().orElseThrow();
+        return new ObjectManifestRecord(
+                target.objectId().value(),
+                target.objectKey().value(),
+                ObjectType.MULTI_STREAM_WAL_OBJECT.name(),
+                "UPLOADED",
+                1,
+                0,
+                "f4-m3-integration",
+                request.writerId(),
+                request.writerRunIdHash(),
+                request.epoch(),
+                now,
+                now,
+                identity.objectLength(),
+                contentSha256.type().name(),
+                contentSha256.value(),
+                identity.storageChecksum().type().name(),
+                identity.storageChecksum().value(),
+                List.of(new StreamSliceManifestRecord(
+                        0,
+                        request.streamId().value(),
+                        target.sliceId(),
+                        request.epoch(),
+                        target.objectOffset(),
+                        target.objectLength(),
+                        request.recordCount(),
+                        request.entryCount(),
+                        request.logicalBytes(),
+                        request.schemaRefs(),
+                        EntryIndexReferenceRecord.fromApi(target.entryIndexRef()),
+                        target.sliceChecksum().type().name(),
+                        target.sliceChecksum().value(),
+                        request.payloadFormat().name(),
+                        "UPLOADED")),
+                now + Duration.ofDays(1).toMillis(),
+                0);
     }
 
     private static PhysicalObjectRootRecord activeRoot(PhysicalObjectIdentity identity) {

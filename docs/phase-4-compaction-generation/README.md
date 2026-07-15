@@ -5,8 +5,8 @@
 > reader/worker、protection crash-cut reconciliation、advisory checkpoint reconciliation、bounded service lifecycle、
 > Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry、terminal workflow-metadata retirement、
 > COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
-> isolated publication；F4-M4 正在实现，首个 NRC1 object-protocol checkpoint 已落地，recovery-root/
-> retirement/GC 与 F4-M5–M6 尚未实现
+> isolated publication；F4-M4 正在实现，NRC1 object-protocol 与 protected generation-zero append 两个
+> checkpoints 已落地，recovery-root/retirement/GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -361,9 +361,29 @@ self-consistent corruption、one-at-a-time/cancellation、513-entry three-block 
 tests 已加入；`phase4M4CheckpointCheck --rerun-tasks` 已于 2026-07-15 通过 114 个 tasks，是该中间边界的
 ordinary gate。
 
-这仍不是 F4-M4 完成声明：root CAS/coordinator、protected append、anchor-aware replay/repair、source/index
-retirement、physical/cursor GC 与真实 Oxia/LocalStack M4 final gate 尚未落地，任何删除与 higher-generation
-production activation 继续关闭。
+这仍不是 F4-M4 完成声明：recovery-root coordinator/CAS、anchor-aware replay/repair、source/index retirement、
+physical/cursor GC 与真实 Oxia/LocalStack M4 final gate 尚未落地，任何删除与 higher-generation production
+activation 继续关闭。
+
+### 6.5 F4-M4 protected generation-zero append checkpoint
+
+F4-M4 的第二个实现 checkpoint 已把 strict Object-WAL append 从原先的一步 metadata commit 改为
+`prepareStableAppend -> REACHABLE_APPEND -> commitPreparedStableAppend -> materializeGenerationZero ->
+VISIBLE_GENERATION`。`PreparedStableAppend` 和 `MaterializedGenerationZero` 分别携带 exact durable key/version/
+value SHA；raw head CAS 会重新读取 intent、ACTIVE physical root 与 permanent protection 后才允许更新
+`StreamHeadRecord`。`AppendCoordinator` 的普通 append 与 `recoverAppend` 都执行同一序列，head 响应丢失后保留
+commit-owned protection，strict success 则必须重新证明 exact index-owned protection。
+
+生产 runtime 现在通过同一 `SharedOxiaClientRuntime` 装配独立的
+`OxiaJavaPhysicalObjectMetadataStore`、`DefaultObjectProtectionManager` 与
+`DefaultGenerationZeroPhysicalReferencePublisher`，并在 stream-storage drain 后按依赖顺序关闭。fake store 同时
+实现 L0 与 physical metadata 契约；旧 metadata-only 动态代理测试显式暴露 physical interface，避免测试绕过
+production handshake。普通 metadata/core/pulsar unit tests 已通过，real-Oxia 与 F4-M2/M3 integration source
+sets 已完成新协议编译迁移；`phase4M4ProtectedAppendCheck` 已于 2026-07-15 通过完整前置回归链和本地
+Pulsar M4 check。Docker-backed M4 execution evidence 仍属于后续 checkpoint/final gate。
+
+这个 checkpoint 只闭合新写入的 physical-reference 空窗。它不发布 NRC1 recovery root、不退休旧 commit/index
+证据，也不授权任何 physical delete；因此 F4-M4 仍为 `in progress`。
 
 ## 7. Milestones
 
@@ -373,7 +393,7 @@ production activation 继续关闭。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 object-protocol checkpoint implemented/focused-tested，root publication/retirement/GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 object protocol + protected generation-zero append implemented/tested，root publication/retirement/GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

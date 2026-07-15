@@ -47,8 +47,10 @@ ack after WAL durability while returning only a broker-local temporary offset.
 - Documentation must distinguish logical visibility from physical read-target selection。
 - BookKeeper profiles require a generic physical read-target model before implementation；fake object keys are
   not an acceptable adapter。
-- Phase 1.5 maps this separation to implemented `commitStableAppend` / `materializeGenerationZero` operations and a
-  tagged target model；P15-M1-M5 final-gated the result while retaining strict Object-WAL-only public execution。
+- Phase 1.5 first mapped this separation to a combined stable-commit call plus `materializeGenerationZero` and a
+  tagged target model；P15-M1-M5 final-gated that result while retaining strict Object-WAL-only public execution.
+  F4-M4 checkpoint B further splits intent preparation from the protected head CAS and makes generation-zero
+  materialization return the exact index identity required for `VISIBLE_GENERATION` ownership。
 
 ## Rejected alternatives
 

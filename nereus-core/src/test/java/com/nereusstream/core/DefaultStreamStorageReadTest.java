@@ -41,6 +41,7 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
@@ -674,7 +675,7 @@ class DefaultStreamStorageReadTest {
             List<OffsetIndexEntry> records) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
-                new Class<?>[] {OxiaMetadataStore.class},
+                new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
                 (proxy, method, args) -> {
                     if (method.getName().equals("scanOffsetIndex")) {
                         return CompletableFuture.completedFuture(records);
@@ -690,9 +691,9 @@ class DefaultStreamStorageReadTest {
     private static OxiaMetadataStore delayCommit(OxiaMetadataStore delegate) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
-                new Class<?>[] {OxiaMetadataStore.class},
+                new Class<?>[] {OxiaMetadataStore.class, PhysicalObjectMetadataStore.class},
                 (proxy, method, args) -> {
-                    if (method.getName().equals("commitStableAppend")) {
+                    if (method.getName().equals("commitPreparedStableAppend")) {
                         return new CompletableFuture<>();
                     }
                     try {

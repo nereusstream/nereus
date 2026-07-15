@@ -15,6 +15,7 @@
 package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
@@ -78,13 +79,26 @@ public interface OxiaMetadataStore extends AutoCloseable {
             String cluster,
             CommitSliceRequest request);
 
-    CompletableFuture<StableAppendResult> commitStableAppend(
+    CompletableFuture<PreparedStableAppend> prepareStableAppend(
             String cluster,
             CommitAppendRequest request);
 
-    CompletableFuture<CommittedAppend> materializeGenerationZero(
+    CompletableFuture<StableAppendResult> commitPreparedStableAppend(
+            String cluster,
+            PreparedStableAppend prepared,
+            ObjectProtectionIdentity protectionIdentity,
+            long rootMetadataVersion,
+            long rootLifecycleEpoch,
+            long protectionMetadataVersion,
+            Checksum protectionRecordSha256);
+
+    CompletableFuture<MaterializedGenerationZero> materializeGenerationZero(
             String cluster,
             ReachableCommittedAppend reachableAppend);
+
+    CompletableFuture<Void> revalidateMaterializedGenerationZero(
+            String cluster,
+            MaterializedGenerationZero materialized);
 
     CompletableFuture<AppendReplaySearchResult> searchAppendReplay(
             String cluster,

@@ -89,6 +89,14 @@ object-store -> metadata dependency. The runtime graph's `RecoveryCheckpointCoor
 anchor-aware consumers and retirement/GC nodes below remain target code；the object codec alone does not shorten the
 live commit tail or release any source protection.
 
+F4-M4 checkpoint B implements the section 9 generation-zero entry sequence for the currently executable strict
+Object-WAL profile. `AppendCoordinator` prepares an exact immutable intent, establishes the physical root and
+commit-owned `REACHABLE_APPEND`, submits the protected head CAS, materializes the exact generation-zero index and then
+establishes index-owned `VISIBLE_GENERATION` before success. `recoverAppend` runs the same idempotent sequence, so a
+lost head or index response cannot return an unprotected result. Production assembly uses the shared Oxia runtime for
+the separate L0 and physical adapters and drains storage before closing protection resources. This checkpoint does
+not yet build/publish NRC1 roots or retire the live tail；those runtime graph nodes remain target code.
+
 Full M4–M6 target construction：
 
 ```java

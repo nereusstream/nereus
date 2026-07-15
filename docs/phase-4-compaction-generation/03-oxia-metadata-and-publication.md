@@ -100,6 +100,24 @@ also implemented. Topic tasks now persist exact COMMITTED source indexes, execut
 publish sparse NTC1 output only through a TOPIC_COMPACTED index. Focused worker/publication tests and the real
 Oxia/LocalStack two-worker/restart/response-loss gate pass；F4-M3 is complete/final-gated.
 
+### 1.4 F4-M4 protected generation-zero append checkpoint
+
+Section 10 is now implemented in `OxiaMetadataStore`、`OxiaJavaClientMetadataStore` and
+`FakeOxiaMetadataStore`. `prepareStableAppend` writes/reloads only the deterministic generic intent and returns its
+exact key/version/durable SHA without changing the head. `commitPreparedStableAppend` accepts the primitive root and
+protection proof carried by `ProtectedStableAppend`, then reloads the intent、ACTIVE root and canonical permanent
+`REACHABLE_APPEND` owner before every head CAS/replay decision. Missing or changed proof fails before a head mutation.
+
+`materializeGenerationZero` now returns `MaterializedGenerationZero` with the exact index key/version/durable SHA；
+`revalidateMaterializedGenerationZero` re-proves index bytes、commit bytes and current head reachability for the
+`VISIBLE_GENERATION` owner handshake. `DefaultGenerationZeroPhysicalReferencePublisher` creates/reloads both
+permanent protections through `DefaultObjectProtectionManager` and revalidates the owner/root after the no-gap
+handshake. Ordinary append and exact append recovery use the same sequence. The production Pulsar runtime constructs
+the physical store/manager/publisher over its shared Oxia client and owns their close order.
+
+This checkpoint closes the new-write physical-reference gap only. Recovery-root CAS、anchor-aware consumers、source/
+index retirement and physical GC remain unimplemented, so deletion stays disabled and F4-M4 remains in progress.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples
@@ -986,7 +1004,11 @@ Old binaries see an unknown record type and fail closed；they never reinterpret
 
 ## 10. Generation-zero Root and Protection Protocol
 
-Phase 4 deletion cannot coexist safely with the current combined `commitStableAppend` call：that call creates a
+> Implementation status (2026-07-15)：the two-stage metadata API、production/fake proof validation、ordinary append
+> and exact recovery sequencing、both permanent protection handshakes and production runtime wiring are implemented.
+> Recovery-root retirement/GC consumers are outside this checkpoint and remain unavailable.
+
+Phase 4 deletion cannot coexist safely with the former combined `commitStableAppend` call：that call created a
 `StreamCommitTargetRecord` and advances the stream head without giving the object-lifecycle layer a cut at which to
 protect the uploaded object. M4 therefore splits preparation from the existing head CAS and changes generation-zero
 materialization to return the exact durable index identity：

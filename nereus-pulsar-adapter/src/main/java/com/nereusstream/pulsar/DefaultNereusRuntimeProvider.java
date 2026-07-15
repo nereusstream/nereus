@@ -4,6 +4,9 @@ package com.nereusstream.pulsar;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.managedledger.NereusManagedLedgerRuntime;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
@@ -18,7 +21,9 @@ import com.nereusstream.managedledger.cursor.DefaultCursorStorage;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreProvider;
@@ -27,6 +32,7 @@ import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +45,9 @@ import java.util.concurrent.atomic.AtomicLong;
 /** Production Object-WAL/Oxia runtime assembly used by the hybrid broker storage provider. */
 public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider {
     private static final String WRITER_VERSION = "nereus-pulsar-f2";
+    private static final Duration PENDING_PROTECTION_DURATION = Duration.ofMinutes(5);
+    private static final Duration MAXIMUM_CLOCK_SKEW = Duration.ofSeconds(5);
+    private static final Duration ORPHAN_GRACE = Duration.ofDays(1);
 
     @Override
     public NereusManagedLedgerRuntime create(
@@ -53,6 +62,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         ObjectStore objectStore = null;
         SharedOxiaClientRuntime sharedOxiaRuntime = null;
         OxiaMetadataStore l0MetadataStore = null;
+        PhysicalObjectMetadataStore physicalMetadataStore = null;
+        ObjectProtectionManager objectProtectionManager = null;
         ManagedLedgerProjectionMetadataStore projectionStore = null;
         CursorMetadataStore cursorMetadataStore = null;
         ScheduledExecutorService scheduler = null;
@@ -69,6 +80,15 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             sharedOxiaRuntime = SharedOxiaClientRuntime.connect(configuration.oxia(), clock);
             l0MetadataStore = OxiaJavaClientMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, clock);
+            physicalMetadataStore = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
+                    configuration.oxia(), sharedOxiaRuntime, clock);
+            objectProtectionManager = new DefaultObjectProtectionManager(
+                    streamConfig.cluster(),
+                    physicalMetadataStore,
+                    PENDING_PROTECTION_DURATION,
+                    MAXIMUM_CLOCK_SKEW,
+                    ORPHAN_GRACE,
+                    clock);
             projectionStore = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, configuration.projectionMetadata(), clock);
             cursorMetadataStore = CursorMetadataStore.usingSharedRuntime(
@@ -82,6 +102,11 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     l0MetadataStore,
                     new DefaultWalObjectWriter(objectStore, WRITER_VERSION, clock),
                     new DefaultWalObjectReader(objectStore),
+                    new DefaultGenerationZeroPhysicalReferencePublisher(
+                            streamConfig.cluster(),
+                            l0MetadataStore,
+                            physicalMetadataStore,
+                            objectProtectionManager),
                     clock,
                     callbackExecutor);
             CursorStorageConfig cursorConfig = configuration.cursorStorage();
@@ -128,6 +153,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorStorage,
                     cursorConfig,
                     activationGuard,
+                    objectProtectionManager,
+                    physicalMetadataStore,
                     l0MetadataStore,
                     sharedOxiaRuntime,
                     objectStore,
@@ -147,6 +174,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorMetadataStore,
                     projectionStore,
                     streamStorage,
+                    objectProtectionManager,
+                    physicalMetadataStore,
                     l0MetadataStore,
                     objectStore,
                     objectStoreProvider,

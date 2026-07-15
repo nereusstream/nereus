@@ -36,6 +36,9 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
@@ -191,7 +194,7 @@ class DefaultStreamStorageAppendTest {
     @Test
     void unconfirmedCommitResponseIsMayHaveCommittedAndSuspendsLane() {
         FakeOxiaMetadataStore fake = new FakeOxiaMetadataStore(CLOCK::millis);
-        OxiaMetadataStore delayedCommit = delayMethod(fake, "commitStableAppend");
+        OxiaMetadataStore delayedCommit = delayMethod(fake, "commitPreparedStableAppend");
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         try (TestContext context = context(
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
@@ -261,11 +264,14 @@ class DefaultStreamStorageAppendTest {
                         throw e.getCause();
                     }
                 });
+        StreamStorageConfig storageConfig = recoveryConfig(
+                "writer-a", "process-terminal", Duration.ofMillis(100));
         try (DefaultStreamStorage storage = new DefaultStreamStorage(
-                recoveryConfig("writer-a", "process-terminal", Duration.ofMillis(100)),
+                storageConfig,
                 transientHeadRead,
                 newWriter(objectStore),
                 new DefaultWalObjectReader(objectStore),
+                physicalReferences(storageConfig, metadata),
                 CLOCK,
                 Runnable::run)) {
             StreamId streamId = storage.createOrGetStream(
@@ -527,14 +533,30 @@ class DefaultStreamStorageAppendTest {
             FakeOxiaMetadataStore metadata,
             OxiaMetadataStore storageMetadata,
             LocalFileObjectStore objectStore) {
+        StreamStorageConfig storageConfig = config(1 << 20, 4L << 20, 4L << 20);
         DefaultStreamStorage storage = new DefaultStreamStorage(
-                config(1 << 20, 4L << 20, 4L << 20),
+                storageConfig,
                 storageMetadata,
                 writer,
                 new DefaultWalObjectReader(objectStore),
+                physicalReferences(storageConfig, metadata),
                 CLOCK,
                 executor);
         return new TestContext(storage, metadata, objectStore, profile);
+    }
+
+    private static GenerationZeroPhysicalReferencePublisher physicalReferences(
+            StreamStorageConfig config,
+            FakeOxiaMetadataStore metadata) {
+        DefaultObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                config.cluster(),
+                metadata,
+                Duration.ofMinutes(10),
+                Duration.ZERO,
+                Duration.ofHours(24),
+                CLOCK);
+        return new DefaultGenerationZeroPhysicalReferencePublisher(
+                config.cluster(), metadata, metadata, protections);
     }
 
     private static StreamStorageConfig config(

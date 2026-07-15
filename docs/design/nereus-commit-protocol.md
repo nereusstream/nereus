@@ -226,11 +226,12 @@ commit is repairable audit/GC state，not logical rollback。
 Current Phase 1 implements only strict success。The name `WAL_DURABLE` never authorizes success before the
 head CAS or with a temporary local offset。
 
-Phase 1.5 P15-M2/M3 separate `commitStableAppend` from `materializeGenerationZero` internally while still executing only the
-strict second row。The split is a prerequisite for later completion policies, not implementation of
-`WAL_DURABLE` success。
+Phase 1.5 P15-M2/M3 first separated stable head commit from generation-zero materialization while still executing only
+the strict second row. F4-M4 checkpoint B has now split the former stable-commit operation again into exact intent
+preparation and a protected head CAS, and changed materialization to return its exact durable index identity. This is
+still not implementation of `WAL_DURABLE` success。
 
-Phase 4's target protocol further splits commit-intent preparation from head CAS. After upload it stores/reloads the
+Phase 4's implemented checkpoint-B protocol splits commit-intent preparation from head CAS. After upload it stores/reloads the
 deterministic intent, registers the physical root, acquires `REACHABLE_APPEND` owned by that exact intent, and only
 then may CAS the head. Generation-zero materialization returns the exact index key/version/value digest and acquires
 `VISIBLE_GENERATION` before strict success. The head CAS remains logical linearization；the added records are physical
