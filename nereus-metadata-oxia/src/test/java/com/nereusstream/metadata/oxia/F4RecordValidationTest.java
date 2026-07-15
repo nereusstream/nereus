@@ -40,6 +40,9 @@ class F4RecordValidationTest {
     @Test
     void rejectsTaskCheckpointStatsAndRecoveryStateContradictions() {
         MaterializationTaskRecord planned = F4MetadataTestValues.task(TaskLifecycle.PLANNED);
+        org.assertj.core.api.Assertions.assertThatCode(
+                        F4MetadataTestValues::publishingTaskWithoutGeneration)
+                .doesNotThrowAnyException();
         assertThatThrownBy(() -> taskAttempt(planned, 1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new MaterializationCheckpointRecord(

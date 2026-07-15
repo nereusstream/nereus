@@ -22,6 +22,9 @@ val phase2DevelopmentVersion = "0.1.0-f2-dev"
 val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
     requested.substringAfterLast(':').startsWith("phase2")
         || requested.substringAfterLast(':').startsWith("phase3")
+        // M1 consumes the final-gated F3 source composite. The Pulsar fork remains on the
+        // frozen F2 development coordinate until the F4 broker rollout milestone changes both repos.
+        || requested.substringAfterLast(':').startsWith("phase4")
         || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
 }
 version = gradle.startParameter.projectProperties["nereusVersion"]
@@ -497,4 +500,70 @@ tasks.register("phase3FinalCheck") {
     dependsOn("phase3Check")
     dependsOn("phase2FinalCheck")
     dependsOn("phase3M6FinalCheck")
+}
+
+tasks.register<Exec>("checkPhase4ContractSurface") {
+    group = "verification"
+    description = "Audit the implemented F4-M1 production, test, transition, and golden surfaces."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-contract-surface.sh")
+}
+
+tasks.register<Exec>("checkPhase4Documentation") {
+    group = "verification"
+    description = "Verify current F4 implementation status, source lock, gates, and documentation links."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-documentation.sh")
+}
+
+tasks.register<Exec>("checkPhase4ModuleBoundaries") {
+    group = "verification"
+    description = "Verify the acyclic protocol-neutral F4 module dependency direction."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-module-boundaries.sh")
+}
+
+tasks.register<Exec>("checkPhase4PulsarSourceLock") {
+    group = "verification"
+    description = "Verify the exact clean local Pulsar source consumed by Phase 4."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-pulsar-source-lock.sh",
+        pulsarCheckoutPath.get(),
+        pulsarExpectedHead.get(),
+    )
+}
+
+tasks.register<Exec>("checkPhase4GuardedObjectPut") {
+    group = "verification"
+    description = "Audit authorization immediately before every F4 provider PUT attempt."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-guarded-object-put.sh")
+}
+
+tasks.register("phase4M1Check") {
+    group = "verification"
+    description = "Verify F4-M1 metadata, object lifecycle/IO, durable pins/protections, and module boundaries."
+    dependsOn("phase3M6Check")
+    dependsOn("checkPhase4ContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("checkPhase4GuardedObjectPut")
+    dependsOn(":nereus-api:check")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-metadata-oxia:compileOxiaIntegrationTestJava")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-object-store:compileS3IntegrationTestJava")
+}
+
+tasks.register("phase4M1FinalCheck") {
+    group = "verification"
+    description = "Run the ordinary and Docker-backed real Oxia/LocalStack F4-M1 gates."
+    dependsOn("phase4M1Check")
+    dependsOn(":nereus-metadata-oxia:f4OxiaIntegrationTest")
+    dependsOn(":nereus-object-store:s3IntegrationTest")
 }

@@ -172,7 +172,7 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
             VersionedGenerationIndex result = existing.orElseThrow(
                     () -> F4MetadataStoreSupport.invariant(
                             "generation index disappeared after create conflict"));
-            if (!sameGenerationPublicationIdentity(value, result.value())) {
+            if (!GenerationMetadataTransitions.sameGenerationPublicationIdentity(value, result.value())) {
                 throw F4MetadataStoreSupport.invariant(
                         "generation index key collided with another publication identity");
             }
@@ -186,11 +186,23 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         GenerationIndexRecord value = Objects.requireNonNull(replacement, "replacement");
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
-        String key = keys.generationIndexKey(
-                stream, ReadView.fromWireId(value.readViewId()), value.offsetEnd(), value.generation());
-        return support.compareAndSet(
-                        key, keys.streamPartitionKey(stream), value, GenerationIndexRecord.class, expectedVersion)
-                .thenApply(item -> index(keys, item));
+        ReadView view = ReadView.fromWireId(value.readViewId());
+        GenerationIndexIdentity identity = new GenerationIndexIdentity(
+                stream, view, value.offsetEnd(), value.generation());
+        String key = keys.generationIndexKey(stream, view, value.offsetEnd(), value.generation());
+        return getIndex(cluster, identity).thenCompose(currentOptional -> {
+            VersionedGenerationIndex current = currentOptional.orElseThrow(
+                    () -> new F4MetadataConditionFailedException("generation index is absent"));
+            if (current.metadataVersion() != expectedVersion) {
+                return F4MetadataStoreSupport.failed(
+                        new F4MetadataConditionFailedException("generation index version mismatch"));
+            }
+            GenerationMetadataTransitions.requireValidIndexReplacement(current.value(), value);
+            return support.compareAndSet(
+                            key, keys.streamPartitionKey(stream), value,
+                            GenerationIndexRecord.class, expectedVersion)
+                    .thenApply(item -> index(keys, item));
+        });
     }
 
     @Override
@@ -270,7 +282,7 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         return recoverCreate(create, () -> getTask(cluster, stream, value.taskId()).thenApply(existing -> {
             VersionedMaterializationTask result = existing.orElseThrow(
                     () -> F4MetadataStoreSupport.invariant("task disappeared after create conflict"));
-            if (!sameTaskPlanningIdentity(value, result.value())) {
+            if (!GenerationMetadataTransitions.sameTaskPlanningIdentity(value, result.value())) {
                 throw F4MetadataStoreSupport.invariant(
                         "task key collided with another planning identity");
             }
@@ -293,10 +305,19 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         MaterializationTaskRecord value = Objects.requireNonNull(task, "task");
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
-        return support.compareAndSet(
-                        keys.taskKey(stream, value.taskId()), keys.streamPartitionKey(stream), value,
-                        MaterializationTaskRecord.class, expectedVersion)
-                .thenApply(item -> task(keys, item));
+        return getTask(cluster, stream, value.taskId()).thenCompose(currentOptional -> {
+            VersionedMaterializationTask current = currentOptional.orElseThrow(
+                    () -> new F4MetadataConditionFailedException("materialization task is absent"));
+            if (current.metadataVersion() != expectedVersion) {
+                return F4MetadataStoreSupport.failed(
+                        new F4MetadataConditionFailedException("materialization task version mismatch"));
+            }
+            GenerationMetadataTransitions.requireValidTaskReplacement(current.value(), value, support.now());
+            return support.compareAndSet(
+                            keys.taskKey(stream, value.taskId()), keys.streamPartitionKey(stream), value,
+                            MaterializationTaskRecord.class, expectedVersion)
+                    .thenApply(item -> task(keys, item));
+        });
     }
 
     @Override
@@ -383,10 +404,24 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         MaterializationCheckpointRecord value = Objects.requireNonNull(checkpoint, "checkpoint");
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
-        return support.compareAndSet(
-                        keys.checkpointKey(stream, value.policyId(), value.policyVersion()),
-                        keys.streamPartitionKey(stream), value, MaterializationCheckpointRecord.class, expectedVersion)
-                .thenApply(item -> checkpoint(keys, item));
+        return getMaterializationCheckpoint(
+                        cluster, stream, value.policyId(), value.policyVersion())
+                .thenCompose(currentOptional -> {
+                    VersionedMaterializationCheckpoint current = currentOptional.orElseThrow(
+                            () -> new F4MetadataConditionFailedException(
+                                    "materialization checkpoint is absent"));
+                    if (current.metadataVersion() != expectedVersion) {
+                        return F4MetadataStoreSupport.failed(
+                                new F4MetadataConditionFailedException(
+                                        "materialization checkpoint version mismatch"));
+                    }
+                    GenerationMetadataTransitions.requireValidCheckpointReplacement(current.value(), value);
+                    return support.compareAndSet(
+                                    keys.checkpointKey(stream, value.policyId(), value.policyVersion()),
+                                    keys.streamPartitionKey(stream), value,
+                                    MaterializationCheckpointRecord.class, expectedVersion)
+                            .thenApply(item -> checkpoint(keys, item));
+                });
     }
 
     @Override
@@ -436,10 +471,21 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         RangeRetentionStatsRecord value = Objects.requireNonNull(stats, "stats");
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
-        return support.compareAndSet(
-                        keys.retentionStatsKey(stream, value.offsetEnd(), value.commitVersion()),
-                        keys.streamPartitionKey(stream), value, RangeRetentionStatsRecord.class, expectedVersion)
-                .thenApply(item -> stats(keys, item));
+        return getRangeRetentionStats(cluster, stream, value.offsetEnd(), value.commitVersion())
+                .thenCompose(currentOptional -> {
+                    VersionedRangeRetentionStats current = currentOptional.orElseThrow(
+                            () -> new F4MetadataConditionFailedException("retention stats are absent"));
+                    if (current.metadataVersion() != expectedVersion) {
+                        return F4MetadataStoreSupport.failed(
+                                new F4MetadataConditionFailedException("retention stats version mismatch"));
+                    }
+                    GenerationMetadataTransitions.requireValidRetentionStatsReplacement(current.value(), value);
+                    return support.compareAndSet(
+                                    keys.retentionStatsKey(stream, value.offsetEnd(), value.commitVersion()),
+                                    keys.streamPartitionKey(stream), value,
+                                    RangeRetentionStatsRecord.class, expectedVersion)
+                            .thenApply(item -> stats(keys, item));
+                });
     }
 
     @Override
@@ -531,13 +577,22 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
         int shard = keys.materializationRegistryShard(stream);
-        return support.compareAndSet(
-                        keys.materializationRegistryKey(stream),
-                        keys.materializationRegistryPartitionKey(shard),
-                        value,
-                        MaterializationStreamRegistrationRecord.class,
-                        expectedVersion)
-                .thenApply(item -> registration(keys, item));
+        return getStreamRegistration(cluster, stream).thenCompose(currentOptional -> {
+            VersionedMaterializationStreamRegistration current = currentOptional.orElseThrow(
+                    () -> new F4MetadataConditionFailedException("stream registration is absent"));
+            if (current.metadataVersion() != expectedVersion) {
+                return F4MetadataStoreSupport.failed(
+                        new F4MetadataConditionFailedException("stream registration version mismatch"));
+            }
+            GenerationMetadataTransitions.requireValidRegistrationReplacement(current.value(), value);
+            return support.compareAndSet(
+                            keys.materializationRegistryKey(stream),
+                            keys.materializationRegistryPartitionKey(shard),
+                            value,
+                            MaterializationStreamRegistrationRecord.class,
+                            expectedVersion)
+                    .thenApply(item -> registration(keys, item));
+        });
     }
 
     @Override
@@ -613,10 +668,19 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
         RecoveryCheckpointRootRecord value = Objects.requireNonNull(root, "root");
         F4Keyspace keys = new F4Keyspace(cluster);
         StreamId stream = new StreamId(value.streamId());
-        return support.compareAndSet(
-                        keys.recoveryRootKey(stream), keys.streamPartitionKey(stream), value,
-                        RecoveryCheckpointRootRecord.class, expectedVersion)
-                .thenApply(item -> recovery(keys, item));
+        return getRecoveryRoot(cluster, stream).thenCompose(currentOptional -> {
+            VersionedRecoveryCheckpointRoot current = currentOptional.orElseThrow(
+                    () -> new F4MetadataConditionFailedException("recovery root is absent"));
+            if (current.metadataVersion() != expectedVersion) {
+                return F4MetadataStoreSupport.failed(
+                        new F4MetadataConditionFailedException("recovery root version mismatch"));
+            }
+            GenerationMetadataTransitions.requireValidRecoveryRootReplacement(current.value(), value);
+            return support.compareAndSet(
+                            keys.recoveryRootKey(stream), keys.streamPartitionKey(stream), value,
+                            RecoveryCheckpointRootRecord.class, expectedVersion)
+                    .thenApply(item -> recovery(keys, item));
+        });
     }
 
     @Override
@@ -808,55 +872,6 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
             throw F4MetadataStoreSupport.invariant("recovery root key/value identity mismatch");
         }
         return new VersionedRecoveryCheckpointRoot(item.key(), value, item.version(), item.durableSha256());
-    }
-
-    private static boolean sameGenerationPublicationIdentity(
-            GenerationIndexRecord expected,
-            GenerationIndexRecord actual) {
-        return expected.schemaVersion() == actual.schemaVersion()
-                && expected.streamId().equals(actual.streamId())
-                && expected.readViewId() == actual.readViewId()
-                && expected.offsetStart() == actual.offsetStart()
-                && expected.offsetEnd() == actual.offsetEnd()
-                && expected.generation() == actual.generation()
-                && expected.publicationId().equals(actual.publicationId())
-                && expected.taskId().equals(actual.taskId())
-                && expected.sourceSetSha256().equals(actual.sourceSetSha256())
-                && expected.policySha256().equals(actual.policySha256())
-                && expected.readTarget().equals(actual.readTarget())
-                && expected.targetIdentitySha256().equals(actual.targetIdentitySha256())
-                && expected.materializationPolicySha256().equals(actual.materializationPolicySha256())
-                && expected.payloadFormat().equals(actual.payloadFormat())
-                && expected.sourceRecordCount() == actual.sourceRecordCount()
-                && expected.outputRecordCount() == actual.outputRecordCount()
-                && expected.entryCount() == actual.entryCount()
-                && expected.logicalBytes() == actual.logicalBytes()
-                && expected.cumulativeSizeAtStart() == actual.cumulativeSizeAtStart()
-                && expected.cumulativeSizeAtEnd() == actual.cumulativeSizeAtEnd()
-                && expected.firstCommitVersion() == actual.firstCommitVersion()
-                && expected.lastCommitVersion() == actual.lastCommitVersion()
-                && expected.schemaRefs().equals(actual.schemaRefs())
-                && expected.projectionRef().equals(actual.projectionRef())
-                && expected.createdAtMillis() == actual.createdAtMillis();
-    }
-
-    private static boolean sameTaskPlanningIdentity(
-            MaterializationTaskRecord expected,
-            MaterializationTaskRecord actual) {
-        return expected.schemaVersion() == actual.schemaVersion()
-                && expected.taskId().equals(actual.taskId())
-                && expected.taskSequence() == actual.taskSequence()
-                && expected.streamId().equals(actual.streamId())
-                && expected.readViewId() == actual.readViewId()
-                && expected.taskKindId() == actual.taskKindId()
-                && expected.offsetStart() == actual.offsetStart()
-                && expected.offsetEnd() == actual.offsetEnd()
-                && expected.sources().equals(actual.sources())
-                && expected.sourceSetSha256().equals(actual.sourceSetSha256())
-                && expected.policyId().equals(actual.policyId())
-                && expected.policyVersion() == actual.policyVersion()
-                && expected.policySha256().equals(actual.policySha256())
-                && expected.createdAtMillis() == actual.createdAtMillis();
     }
 
     private static AllocatedGeneration allocation(

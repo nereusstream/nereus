@@ -1,6 +1,6 @@
 # Phase 4 Materialization / Compaction / Generation / GC Detailed Design
 
-> 状态：Implementation in progress；F4-M1 基础协议、metadata codec/store 与 object-store IO 正在落地，尚未通过完整 M1 gate
+> 状态：Implementation in progress；F4-M1 ordinary gate 已通过，Docker-backed final gate 尚未通过
 >
 > 设计基线日期：2026-07-14
 >
@@ -19,7 +19,11 @@ create/root/owner post-check、same-key owner transfer、owner-authorized releas
 metadata checkpoint 还新增了全分片内存 Oxia backend、generation/registration/physical-root/conditional-delete
 store contract tests、record contradiction tests，以及 production/fake 共用的 physical-root lifecycle transition validator；
 generation index/task 的 create-response-loss recovery 会核对 immutable identity，checkpoint 同版本则核对 policy digest。
-该状态尚未完成 frozen codec golden、Gradle milestone gate 或真实 Oxia/LocalStack final evidence，因此仍标记为
+当前又冻结了覆盖全部 lifecycle/optional branch 的 43 frozen envelope vectors，并把 generation index、task、
+checkpoint、retention stats、stream registration 和 recovery root 的 ordinary CAS identity/monotonic transition
+guards 接入 production adapter。真实 Oxia restart/CAS/pagination/conditional-delete source 已编译；
+`phase4M1Check`/`phase4M1FinalCheck` 与 M1 audit scripts 已存在；`phase4M1Check` 已于 2026-07-15
+通过。由于本机 Docker daemon 不可用，真实 Oxia/LocalStack final evidence 尚未通过，因此仍标记为
 `Implementation in progress`，不开放 higher-generation read 或 physical delete。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
@@ -223,8 +227,16 @@ generation/task create recovery, policy-digest collisions, pagination/token scop
 legal physical-root lifecycle/epoch transitions. Production and fake physical stores use the same transition
 validator, so test doubles cannot admit a state change rejected by the Oxia adapter.
 
+All ten F4 record families now have 43 frozen envelope vectors covering every lifecycle and optional branch. The
+stream-scoped production adapter reloads the exact expected version before applying closed index/task transitions、
+monotonic checkpoint/registration progress、immutable retention boundaries and monotonic recovery-root publication.
+The task durable shape explicitly represents `PUBLISHING(publicationId, generation=empty)` before the same-state CAS
+attaches the first allocation. A focused real-Oxia test source covers restart、CAS、pagination and conditional delete；
+it compiles locally, while Docker-backed execution remains required before M1 may be final-gated.
+
 This checkpoint is deliberately not an F4-M1 completion claim. Product capability guards/integrations、remaining
-ordinary-CAS invariant guards、frozen codec vectors、real-service evidence and the aggregate M1 gate remain outstanding.
+real-service evidence and a green final M1 gate remain outstanding. The ordinary `phase4M1Check` gate passed on
+2026-07-15.
 No generation publication, resolver, materialization worker, retention or GC behavior is enabled by this checkpoint.
 
 ## 7. Milestones
@@ -232,7 +244,7 @@ No generation publication, resolver, materialization worker, retention or GC beh
 | Milestone | Deliverable | Current status |
 | --- | --- | --- |
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
-| F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | in progress；API/metadata/codecs/object-store foundation implemented，M1 gate not yet complete |
+| F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | in progress；ordinary gate passed，Docker-backed final gate remains |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | planned |
 | F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | planned |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |

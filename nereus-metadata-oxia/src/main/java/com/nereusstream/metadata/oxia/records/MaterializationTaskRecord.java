@@ -91,9 +91,16 @@ public record MaterializationTaskRecord(
                 throw new IllegalArgumentException("task output source identity does not match task");
             }
         }
-        boolean publishing = lifecycle == TaskLifecycle.PUBLISHING || lifecycle == TaskLifecycle.PUBLISHED;
-        if (publishing != (allocatedGeneration.isPresent() && !publicationId.isEmpty())) {
-            throw new IllegalArgumentException("publication fields do not match task lifecycle");
+        boolean publicationLifecycle = lifecycle == TaskLifecycle.PUBLISHING
+                || lifecycle == TaskLifecycle.PUBLISHED;
+        if (publicationLifecycle != !publicationId.isEmpty()) {
+            throw new IllegalArgumentException("publication id does not match task lifecycle");
+        }
+        if (lifecycle == TaskLifecycle.PUBLISHED && allocatedGeneration.isEmpty()) {
+            throw new IllegalArgumentException("PUBLISHED task requires an allocated generation");
+        }
+        if (!publicationLifecycle && allocatedGeneration.isPresent()) {
+            throw new IllegalArgumentException("non-publication task carries an allocated generation");
         }
         if (!publicationId.isEmpty()) {
             F4RecordValidation.requireBase32Id(publicationId, "publicationId");

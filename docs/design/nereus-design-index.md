@@ -67,7 +67,7 @@ streamId + offset
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
 | `nereus-api` | `Implemented`（P15-M1/M4/M6 + F4-M1 partial） | generic target/result、exact cumulative append snapshot、append recovery/lifecycle API plus F4 view/generation/publication/object-hash values |
-| `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1 partial） | existing metadata plus F4 keys、records、binary codecs、generation/physical stores、conditional delete、all-shard contract fixtures and shared physical-root transition validation；codec golden/real-service/final gate incomplete |
+| `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1 partial） | existing metadata plus F4 keys、records、43-vector codec golden、generation/physical stores、closed CAS guards、conditional delete、all-shard fixtures and shared physical-root transition validation；ordinary gate passed，real-service/final gate incomplete |
 | `nereus-object-store` | `Implemented`（M3 + F4-M1 partial） | WAL v1 IO plus replayable private staging、guarded retry PUT、bounded logical-prefix LIST、HEAD-before-DELETE and safe local fixture |
 | `nereus-core` | `Implemented`（P15 + F4-M1 partial） | stable L0 core plus F4 physical/reference proof values、activation proof contract、durable reader-pin and protection handshakes；not yet integrated into higher-generation reads/GC |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
@@ -77,7 +77,7 @@ streamId + offset
 | `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete） | typed runtime/S3 provider plus fork binding、admission、capability convergence、namespace/topic policy serialization、generation-safe write-fence bridge、shared-store peer lifecycle、canonical cursor context、unloaded binding-aware admin validation and real dual-broker M6 compatibility cuts are implemented/tested |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Future 4 materialization/compaction | `In progress / F4-M1 partial` | API/metadata/codecs/object IO、metadata store contracts and core reader/protection primitives implemented/tested；M1 aggregate/final gate and M2-M6 execution paths remain |
+| Future 4 materialization/compaction | `In progress / F4-M1 partial` | API/metadata/codecs/object IO、metadata store contracts/CAS guards、M1 Gradle audits and core reader/protection primitives implemented/tested；ordinary M1 gate passed，Docker-backed final evidence and M2-M6 execution paths remain |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：

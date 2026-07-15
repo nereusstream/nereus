@@ -123,7 +123,9 @@ F4 API/metadata/Oxia 基础、materialization 模块边界、guarded/replayable 
 reference-domain 强类型、generation activation proof contract、create/revalidate/release durable reader pin
 handshake，以及无保护空窗的 durable protection acquire/owner-transfer/release handshake。metadata checkpoint
 还覆盖 generation、64-shard registration、256-shard physical root、conditional delete 契约和共用 root 状态机
-校验；但 frozen codec golden、剩余 CAS invariant、M1 Gradle gate 和真实服务证据尚未完成。
+校验。当前已增加 43 个 lifecycle/optional codec golden、stream-scoped CAS transition guards、focused real-Oxia
+source 及 M1 Gradle/audit tasks；`phase4M1Check` 已于 2026-07-15 通过，真实 Oxia/LocalStack final
+evidence 因本机 Docker 不可用尚未完成。
 新的
 `docs/phase-4-compaction-generation/` 冻结了 API/module ownership、`NCP1/NTC1/NRC1` formats、
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader

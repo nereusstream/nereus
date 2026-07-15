@@ -81,6 +81,18 @@ tasks.register<Test>("oxiaIntegrationTest") {
     useJUnitPlatform()
 }
 
+tasks.register<Test>("f4OxiaIntegrationTest") {
+    group = "verification"
+    description = "Run the F4-M1 metadata CAS, pagination, restart, and conditional-delete gate against real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.metadata.oxia.F4MetadataStoreOxiaIntegrationTest")
+    }
+}
+
 val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")
 
 tasks.register<Test>("oxiaCapabilitySpike") {

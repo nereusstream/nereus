@@ -188,7 +188,7 @@ public final class F4MetadataTestValues {
     public static MaterializationOutputRecord output() {
         ReadTargetRecord target = readTarget();
         return new MaterializationOutputRecord(
-                ATTEMPT,
+                CLAIM,
                 OBJECT_ID.value(),
                 OBJECT_KEY.value(),
                 ObjectKeyHash.from(OBJECT_KEY).value(),
@@ -253,6 +253,18 @@ public final class F4MetadataTestValues {
                 0);
     }
 
+    public static MaterializationTaskRecord publishingTaskWithoutGeneration() {
+        MaterializationTaskRecord allocated = task(TaskLifecycle.PUBLISHING);
+        return new MaterializationTaskRecord(
+                allocated.schemaVersion(), allocated.taskId(), allocated.taskSequence(), allocated.streamId(),
+                allocated.readViewId(), allocated.taskKindId(), allocated.offsetStart(), allocated.offsetEnd(),
+                allocated.sources(), allocated.sourceSetSha256(), allocated.policyId(), allocated.policyVersion(),
+                allocated.policySha256(), allocated.lifecycle(), allocated.attempt(), allocated.workerClaim(),
+                allocated.output(), OptionalLong.empty(), allocated.publicationId(), allocated.failureClassId(),
+                allocated.failureMessage(), allocated.retryNotBeforeMillis(), allocated.createdAtMillis(),
+                allocated.updatedAtMillis(), 0);
+    }
+
     public static MaterializationCheckpointRecord emptyMaterializationCheckpoint() {
         return new MaterializationCheckpointRecord(
                 1, STREAM, "policy-f4", 1, HASH_B, 0, 0, 0, "", 100, 0);
@@ -260,7 +272,7 @@ public final class F4MetadataTestValues {
 
     public static MaterializationCheckpointRecord advancedMaterializationCheckpoint() {
         return new MaterializationCheckpointRecord(
-                1, STREAM, "policy-f4", 1, HASH_B, 20, 7, 4, "task-f4", 120, 0);
+                1, STREAM, "policy-f4", 1, HASH_B, 20, 7, 4, "task-f4", 1_200, 0);
     }
 
     public static RangeRetentionStatsRecord retentionStats(long offsetStart, long offsetEnd, long commitVersion) {

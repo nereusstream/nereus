@@ -18,11 +18,16 @@ parts are implemented and covered by focused tests：
 - partition-aware in-memory Oxia backend plus generation、64-shard stream-registration、256-shard physical-root and
   exact conditional-delete store contracts；
 - production/fake shared physical-root lifecycle/epoch validation, record contradiction tests and response-loss-safe
-  generation-index/task create recovery with immutable identity checks。
+  generation-index/task create recovery with immutable identity checks；
+- `GenerationMetadataTransitions` guards closed index/task lifecycles、the publication-before-allocation task shape、
+  monotonic checkpoint/registration/recovery progress and immutable retention boundaries；
+- 43 frozen F4 metadata envelope vectors cover every lifecycle/optional branch；the focused real Oxia source compiles
+  and covers restart、CAS、pagination and conditional delete；
+- M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
-This is an implementation checkpoint, not an F4-M1 completion claim. Frozen metadata codec vectors、remaining
-ordinary-CAS invariant guards、the `phase4M1Check`/`phase4M1FinalCheck` tasks and real Oxia/LocalStack evidence are
-still required. Core activation
+This is an implementation checkpoint, not an F4-M1 completion claim. `phase4M1Check` passed on 2026-07-15；real
+Oxia/LocalStack execution is still required, and the current machine has no available Docker daemon.
+Core activation
 and protection values are contracts/primitives only；the product activation adapter and every mutation-boundary
 integration arrive in later M1/M2-M6 work.
 
@@ -105,6 +110,8 @@ ReaderLeaseScanPage.java
 ObjectProtectionScanPage.java
 OxiaJavaGenerationMetadataStore.java
 OxiaJavaPhysicalObjectMetadataStore.java
+GenerationMetadataTransitions.java
+PhysicalObjectRootTransitions.java
 
 records/
   GenerationSequenceRecord.java
@@ -209,10 +216,12 @@ nereus-metadata-oxia/.../F4KeyspaceTest
 nereus-metadata-oxia/.../F4ScanTokenTest
 nereus-metadata-oxia/.../F4RecordValidationTest
 nereus-metadata-oxia/.../F4MetadataCodecGoldenTest
+nereus-metadata-oxia/.../GenerationMetadataTransitionsTest
 nereus-metadata-oxia/.../GenerationMetadataStoreContractTest
 nereus-metadata-oxia/.../MaterializationStreamRegistryContractTest
 nereus-metadata-oxia/.../PhysicalObjectMetadataStoreContractTest
 nereus-metadata-oxia/.../ConditionalDeleteContractTest
+nereus-metadata-oxia/.../F4MetadataStoreOxiaIntegrationTest
 nereus-object-store/.../ObjectStoreListDeleteContractTest
 nereus-object-store/.../ReplayableObjectUploadContractTest
 nereus-object-store/.../GuardedPutObjectAttemptContractTest
@@ -238,7 +247,8 @@ root-only pagination and same-object root/lease/protection partition equality.
 ./gradlew phase4M1FinalCheck --rerun-tasks
 ```
 
-Ordinary gate compiles/tests M1 modules and runs namespace/dependency/doc surface checks. Final gate adds real Oxia
+Ordinary gate compiles/tests M1 modules、both integration source sets and contract/dependency/doc/source-lock/guarded-
+PUT audits. Final gate adds focused real Oxia
 conditional delete/CAS/range pagination and pinned LocalStack list/delete/HEAD identity tests. M1 does not publish a
 higher generation or delete a product object.
 
@@ -783,23 +793,30 @@ Root changes during implementation：
 - `settings.gradle.kts` includes `nereus-materialization` and treats `phase4*`/affected modules as requiring the local
   Pulsar source composite where broker/facade tests need it；
 - `nereus-bom` constrains the new artifact；
-- version selection adds an explicit F4 development selector (target `0.1.0-f4-dev`) for local fork gates；it is not
-  resolved as a published Pulsar snapshot；
+- through M1 the Phase 4 gate deliberately reuses the fork's frozen `0.1.0-f2-dev` source-composite coordinate so the
+  already-final-gated F3 broker tests remain reproducible. F4-M5 changes Nereus and the local Pulsar version catalog
+  atomically to the explicit F4 development coordinate before any broker-side F4 code is compiled；neither coordinate
+  is treated as a published Pulsar snapshot；
 - `gradle/libs.versions.toml` pins Parquet/ZSTD dependencies；
 - each integration source set has its own task and Docker requirement；ordinary unit gates stay usable without Docker；
 - root M1-M6 tasks depend only on the code/tests available by that milestone；
 - final gates use `--rerun-tasks` evidence and do not pass from stale test outputs。
 
-Planned scripts：
+Implemented M1 scripts：
 
 ```text
 scripts/check-phase4-contract-surface.sh
 scripts/check-phase4-documentation.sh
 scripts/check-phase4-module-boundaries.sh
 scripts/check-phase4-pulsar-source-lock.sh
+scripts/check-phase4-guarded-object-put.sh
+```
+
+Later-milestone scripts：
+
+```text
 scripts/check-phase4-no-direct-trim.sh
 scripts/check-phase4-view-isolation.sh
-scripts/check-phase4-guarded-object-put.sh
 ```
 
 Audits fail on missing planned production/test artifacts once their milestone status becomes complete, stale source

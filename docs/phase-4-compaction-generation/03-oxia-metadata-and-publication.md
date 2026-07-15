@@ -29,9 +29,12 @@ its immutable publication/planning identity matches the existing value；a check
 requires the same policy digest. `PhysicalObjectRootTransitions` is shared by production and fake stores and rejects
 identity mutation、illegal lifecycle edges、non-unit epoch changes and invalid DELETED audit replacement.
 
-This is partial M1 evidence only. Frozen codec vectors、the remaining ordinary-CAS monotonicity guards、real Oxia
-evidence and the aggregate M1 gates are still outstanding；nothing in this checkpoint enables generation publication
-or physical deletion.
+The adapter now also reloads the exact expected version before every ordinary CAS. `GenerationMetadataTransitions`
+enforces closed index/task edges、immutable planning/publication identity、monotonic checkpoint and registration
+progress、immutable retention boundaries and monotonic one-sequence-at-a-time recovery-root publication. The 43
+frozen codec vectors cover every lifecycle/optional branch, and the real Oxia restart/CAS/pagination/delete source
+compiles. The ordinary `phase4M1Check` gate passed on 2026-07-15；Docker-backed evidence and the final M1 gate are
+still outstanding. Nothing in this checkpoint enables generation publication or physical deletion.
 
 ## 2. Keyspace
 
@@ -823,6 +826,11 @@ public record MaterializationTaskRecord(
 Sources/policy are immutable after create. Worker claim、output、generation/publication and failure fields must match
 their lifecycle exactly. Failure message is bounded and never used for retry classification；`failureClassId` is the
 closed machine field.
+
+`PUBLISHING` deliberately freezes the publication id before allocating a generation. Its first durable value has a
+non-empty `publicationId` and an empty `allocatedGeneration`；one same-state CAS may attach the first positive
+generation, and `PUBLISHED` requires that exact pair. No other lifecycle may carry either field. This two-step shape
+is required for allocation response-loss recovery and is frozen by record-validation、transition and golden tests.
 
 `SourceGenerationRecord` is the field-for-field durable form of document 02's `SourceGeneration`；empty
 `projectionRef`/`materializationPolicySha256` encode `Optional.empty()` and every non-empty value must decode
