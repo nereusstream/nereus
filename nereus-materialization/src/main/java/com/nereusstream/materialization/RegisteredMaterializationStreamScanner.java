@@ -39,6 +39,7 @@ public final class RegisteredMaterializationStreamScanner {
     private final MaterializationTaskStore tasks;
     private final MaterializationTaskRecovery recovery;
     private final TaskRecoveryScanner recoveryScanner;
+    private final MaterializationCheckpointReconciler checkpoints;
     private final MaterializationPolicy policy;
     private final int registryPageSize;
     private final int maxTasksPerPlan;
@@ -53,6 +54,7 @@ public final class RegisteredMaterializationStreamScanner {
             MaterializationTaskStore tasks,
             MaterializationTaskRecovery recovery,
             TaskRecoveryScanner recoveryScanner,
+            MaterializationCheckpointReconciler checkpoints,
             MaterializationPolicy policy,
             int registryPageSize,
             int maxTasksPerPlan) {
@@ -64,6 +66,7 @@ public final class RegisteredMaterializationStreamScanner {
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.recovery = Objects.requireNonNull(recovery, "recovery");
         this.recoveryScanner = Objects.requireNonNull(recoveryScanner, "recoveryScanner");
+        this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.policy = Objects.requireNonNull(policy, "policy");
         if (registryPageSize <= 0 || registryPageSize > 1_000) {
             throw new IllegalArgumentException("registryPageSize must be in [1, 1000]");
@@ -191,18 +194,23 @@ public final class RegisteredMaterializationStreamScanner {
                     accumulator.existingTasksRecovered, recovered.scannedTasks());
             long trim = snapshot.trim().trimOffset();
             long head = snapshot.committedEnd().committedEndOffset();
+            CompletableFuture<Void> planned;
             if (trim >= head) {
-                return CompletableFuture.completedFuture(null);
+                planned = CompletableFuture.completedFuture(null);
+            } else {
+                // The advisory checkpoint is intentionally not a skip boundary. Scanning authoritative trim..head
+                // keeps a stale/ahead checkpoint incapable of hiding a missing task or committed index.
+                planned = planner.plan(
+                                streamId,
+                                new OffsetRange(trim, head),
+                                policy,
+                                maxTasksPerPlan)
+                        .thenCompose(tasks -> createAndRecover(
+                                tasks, 0, mutationGuard, accumulator));
             }
-            // The advisory checkpoint is intentionally not a skip boundary. Scanning authoritative trim..head keeps
-            // a stale/ahead checkpoint incapable of hiding a missing task or committed index.
-            return planner.plan(
-                            streamId,
-                            new OffsetRange(trim, head),
-                            policy,
-                            maxTasksPerPlan)
-                    .thenCompose(planned -> createAndRecover(
-                            planned, 0, mutationGuard, accumulator));
+            return planned.thenCompose(ignored -> checkpoints.reconcile(
+                            streamId, policy, mutationGuard)
+                    .thenApply(checkpoint -> null));
         });
     }
 

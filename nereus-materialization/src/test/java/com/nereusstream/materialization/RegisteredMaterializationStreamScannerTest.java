@@ -70,6 +70,13 @@ class RegisteredMaterializationStreamScannerTest {
                 taskStore,
                 recovery,
                 recoveryScanner,
+                (streamId, exactPolicy, mutationGuard) -> mutationGuard.revalidate()
+                        .thenCompose(ignored -> durable.getOrCreateMaterializationCheckpoint(
+                                CLUSTER,
+                                streamId,
+                                exactPolicy.policyId(),
+                                exactPolicy.policyVersion(),
+                                exactPolicy.digestSha256())),
                 policy,
                 1,
                 10);

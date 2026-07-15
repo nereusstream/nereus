@@ -48,8 +48,9 @@ fallback、同对象全引用 quarantine、bounded transient retry 和 restart-s
 `phase4M2Check` 与 `phase4M2FinalCheck --rerun-tasks` 已通过；真实 Oxia/LocalStack fixture 覆盖独立 runtime
 并发、response loss 后重启、pin/quarantine/fallback。F4-M1–M2 已 final-gated；M3 的真实 compacted
 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、core adapter，以及 deterministic
-policy/planner/task-store/recovery/64-shard registry scanner、exact-source reader/claim-to-output-ready worker 与
-protection owner crash-cut reconciliation checkpoints 已落地；Pulsar opaque round trip、service 与 M3 gates 仍 pending，
+policy/planner/task-store/recovery/64-shard registry scanner、exact-source reader/claim-to-output-ready worker、
+protection owner crash-cut reconciliation、advisory checkpoint reconciliation 与 bounded service lifecycle
+checkpoints 已落地；Pulsar opaque round trip 与 M3 gates 仍 pending，
 retention/GC 和 async profile 仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

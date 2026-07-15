@@ -59,10 +59,22 @@ invoked before publication plus after `PUBLISHED`. Duplicate expired-claim scann
 wins. Focused tests cover `OUTPUT_READY -> PUBLISHING(attached generation)` owner repair, stale rollback rejection,
 idempotent replay, publication ordering and `PUBLISHED` repair.
 
-This is still not the production materialization gate. Checkpoint reconciliation, Pulsar opaque-entry evidence and
-`MaterializationService` lifecycle composition remain open.
+The fifth checkpoint implements `MaterializationConfig`、`DefaultMaterializationCheckpointReconciler`、the bounded
+`DefaultMaterializationTaskDispatcher` and `DefaultMaterializationService`. Configuration now validates the complete
+cross-field worker/claim/staging/lag/grace/checkpoint envelope. The checkpoint reconciler performs a bounded full
+authoritative index scan from trim, accepts only current-policy/current-projection `COMMITTED` NCP1 generations,
+stops at the first gap or unhealthy/wrong-policy range, revalidates activation before create/CAS and reloads the exact
+durable replacement after a lost CAS response. An ahead checkpoint fails closed and is never used to hide planner
+work. The dispatcher coalesces duplicate local task ids, enforces both global and per-stream active limits, skips a
+saturated stream without blocking other streams and rejects/cancels queued work during close. The service runs
+non-overlapping 64-shard full passes, coalesces hints into one immediate following pass, keeps injected stores and
+executors borrowed, and drains or locally cancels admitted work by `closeTimeout`. Focused tests cover all of these
+cuts, including a hung scan、deadline-forced cancellation and borrowed-executor ownership.
 
-Target construction：
+This is still not the production materialization gate. Pulsar opaque-entry evidence and the aggregate/real-service M3
+gates remain open；higher-generation production activation therefore remains disabled.
+
+Full M4–M6 target construction：
 
 ```java
 public final class MaterializationRuntime implements AutoCloseable {
@@ -94,6 +106,35 @@ not close stores or shut down injected executors. `DefaultNereusRuntimeProvider`
 after this runtime drains, in the order fixed by document 06. Unit tests use deterministic clocks/executors；
 production never uses common fork-join pools.
 
+The implemented M3 lifecycle surface is：
+
+```java
+public interface MaterializationService extends AutoCloseable {
+    CompletableFuture<Void> start();
+    CompletableFuture<RegisteredMaterializationScanResult> scanNow();
+    CompletableFuture<Void> closeAsync();
+    boolean isRunning();
+    @Override void close();
+}
+
+public final class DefaultMaterializationService implements MaterializationService {
+    public DefaultMaterializationService(
+            RegisteredMaterializationStreamScanner scanner,
+            MaterializationTaskDispatcher dispatcher,
+            MaterializationConfig config,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            MaterializationMetricsObserver observer);
+}
+```
+
+`start` is idempotent only while running and schedules an immediate full pass. `scanNow` requires RUNNING state；an
+in-flight call returns the current pass and sets one coalesced immediate rescan. A completed pass schedules the next
+fixed-delay pass, including after a failed pass. `closeAsync` is idempotent, first rejects new dispatcher work and
+cancels scheduled scans, then waits for the current pass and dispatcher drain. At the configured deadline it cancels
+the exposed pass/active local workers and completes close without shutting down the borrowed scheduler/callback/worker
+executors. Metrics callbacks are best-effort and can never own or block lifecycle correctness.
+
 `GenerationProtocolActivationGuard` is a protocol-neutral core interface. The managed-ledger implementation proves
 cluster readiness and the exact projection marker through product metadata；materialization receives only a typed
 `GenerationActivationProof` and never imports or decodes Pulsar records.
@@ -117,6 +158,7 @@ public record MaterializationConfig(
         int uploadChunkBytes,
         Duration workerClaimDuration,
         Duration workerClaimRenewInterval,
+        Duration maximumClockSkew,
         Duration operationTimeout,
         Duration closeTimeout,
         Duration retryMinBackoff,
@@ -146,7 +188,8 @@ Validation：
   `max(committedPolicy.targetObjectBytes(), recoveryCheckpointMaxBytes)` and upload chunks are in
   `[64 KiB, 8 MiB]`；the global staging semaphore is acquired before writing and released exactly once on cleanup；
 - renew interval is at most one third of claim duration；
-- operation timeout plus maximum clock skew is less than claim duration；
+- maximum clock skew is non-negative and millisecond-representable；operation timeout plus maximum clock skew is
+  strictly less than claim duration；
 - retry backoff is positive and bounded；
 - throttle thresholds are strictly below corresponding reject thresholds；
 - source-retirement、append-replay and metadata-audit grace are positive；metadata audit grace is not shorter than
@@ -525,8 +568,29 @@ record, never inferred from an exception type.
 
 ### 7.1 Reconciliation
 
-The reconciler scans from the current checkpoint and advances `contiguousCoveredOffset` while every offset is covered
-by a healthy `COMMITTED` generation satisfying the policy. It stores the highest source commit version observed.
+The reconciler rebuilds the candidate cover from authoritative trim and advances `contiguousCoveredOffset` while
+every offset is covered by a healthy `COMMITTED` generation satisfying the policy. It stores the highest source
+commit version observed.
+
+The implemented surface deliberately returns the exact durable wrapper so callers/tests can distinguish idempotent
+replay from a successful CAS without treating either as visibility：
+
+```java
+public interface MaterializationCheckpointReconciler {
+    CompletableFuture<VersionedMaterializationCheckpoint> reconcile(
+            StreamId streamId,
+            MaterializationPolicy policy,
+            MaterializationTaskMutationGuard mutationGuard);
+}
+```
+
+`DefaultMaterializationCheckpointReconciler` reloads L0 stream bounds、the exact registration/projection and the
+policy checkpoint under one operation deadline. It scans at most 4,096 candidates with configured pages, rebuilds
+coverage from authoritative trim rather than trusting the stored offset, and greedily chooses the farthest covering
+whole committed range with generation/key tie-breaks. Existing progress ahead of the freshly verified cover is an
+invariant failure until the later explicit corrupt-record repair path exists. Ordinary CAS is monotonic；a condition
+conflict restarts the full proof (at most eight attempts), while any failed response whose reload equals the exact
+desired value is converged success.
 
 Rules：
 

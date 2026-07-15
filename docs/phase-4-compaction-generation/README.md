@@ -2,8 +2,9 @@
 
 > 状态：Implementation in progress；F4-M1–M2 已完成并通过 ordinary/Docker-backed final gates；F4-M3
 > compacted Parquet read/write/verifier 与 deterministic policy/planner/task-store/recovery/registry-scanner
-> checkpoints、exact-source reader/worker 以及 protection crash-cut reconciliation checkpoints 已落地；
-> service lifecycle 和 M3 gates 尚未完成；F4-M4–M6 未实现
+> checkpoints、exact-source reader/worker、protection crash-cut reconciliation、advisory checkpoint
+> reconciliation 以及 bounded service lifecycle checkpoints 已落地；Pulsar opaque-entry round trip 和 M3
+> gates 尚未完成；F4-M4–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -69,12 +70,15 @@ OUTPUT_READY` 聚焦测试。第四个 M3 checkpoint 又为 durable protection m
 logical owner key、拒绝版本回滚的 `acquireOrTransfer`，并通过
 `DefaultMaterializationTaskProtectionReconciler` 在 recovery/publication 中从 durable task 重建 source/output
 identity/reference id，收敛 `OUTPUT_READY/PUBLISHING/PUBLISHED` owner。重复 expired-claim CAS、跨状态
-crash cut 和 protection CAS response loss 测试已通过。Pulsar opaque-entry round trip、service lifecycle 和
-M3 ordinary/final gates 仍未完成，因此
+crash cut 和 protection CAS response loss 测试已通过。第五个 M3 checkpoint 又实现了严格
+`MaterializationConfig`、从 authoritative committed indexes 单调推进的 advisory checkpoint reconciler、
+全局/per-stream 有界且公平的 dispatcher，以及支持 non-overlap、hint coalescing、deadline cancellation 和
+draining close 的 service lifecycle；配置关系、checkpoint CAS response loss、调度公平性与 close race 均有
+聚焦测试。Pulsar opaque-entry round trip 和 M3 ordinary/final gates 仍未完成，因此
 higher-generation materialization 仍未开放。M4
 还需将 source reachability 扩展为
 recovery-root/anchor-aware proof。Phase 4 整体仍为
-`Implementation in progress`；physical delete、end-to-end materialization service 和 async profile 均未开放。
+`Implementation in progress`；physical delete、production-wired end-to-end materialization 和 async profile 均未开放。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
 per-stream、read-optimized 的 higher generation，并补齐 reader pin、source retirement、recovery checkpoint、
@@ -313,7 +317,7 @@ M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physi
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
-| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner、exact-source reader/worker and protection-recovery checkpoints landed；Pulsar opaque round trip、service lifecycle and milestone gates pending |
+| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner、exact-source reader/worker、protection/checkpoint reconciliation and bounded service lifecycle checkpoints landed；Pulsar opaque round trip and milestone gates pending |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |

@@ -45,11 +45,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Lossless F4-M3 worker from durable claim through verified OUTPUT_READY.
@@ -83,6 +86,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final Executor callbackExecutor;
     private final Clock clock;
     private final F4Keyspace keyspace;
+    private final ConcurrentMap<String, Operation> activeOperations = new ConcurrentHashMap<>();
 
     public DefaultMaterializationWorker(
             String cluster,
@@ -199,9 +203,28 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     @Override
     public CompletableFuture<MaterializationOutput> execute(MaterializationTask task) {
         try {
-            return new Operation(Objects.requireNonNull(task, "task")).run();
+            MaterializationTask exactTask = Objects.requireNonNull(task, "task");
+            Operation operation = new Operation(exactTask);
+            Operation existing = activeOperations.putIfAbsent(exactTask.taskId(), operation);
+            if (existing != null) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.BACKPRESSURE_REJECTED,
+                        true,
+                        "materialization task is already executing in this process"));
+            }
+            return operation.run().whenComplete((ignored, failure) ->
+                    activeOperations.remove(exactTask.taskId(), operation));
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    @Override
+    public void cancel(MaterializationTask task) {
+        Objects.requireNonNull(task, "task");
+        Operation operation = activeOperations.get(task.taskId());
+        if (operation != null) {
+            operation.cancel();
         }
     }
 
@@ -217,6 +240,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private ScheduledFuture<?> heartbeatSchedule;
         private CompletableFuture<Void> heartbeatTail = CompletableFuture.completedFuture(null);
         private boolean heartbeatStopped;
+        private final AtomicBoolean cancelled = new AtomicBoolean();
+        private final AtomicBoolean cleaned = new AtomicBoolean();
 
         private Operation(MaterializationTask task) {
             this.task = task;
@@ -630,6 +655,13 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
 
         private CompletableFuture<MaterializationOutput> failClaim(Throwable failure) {
             Throwable exact = unwrap(failure);
+            if (cancelled.get()) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.STORAGE_CLOSED,
+                        false,
+                        "materialization worker operation was cancelled during close",
+                        exact));
+            }
             if (claimed == null || claimed.value().lifecycle() != TaskLifecycle.CLAIMED) {
                 return CompletableFuture.failedFuture(exact);
             }
@@ -884,6 +916,10 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         }
 
         private void cleanupLocal() {
+            if (!cleaned.compareAndSet(false, true)) {
+                return;
+            }
+            deadline.close();
             synchronized (heartbeatLock) {
                 heartbeatStopped = true;
                 if (heartbeatSchedule != null) {
@@ -897,6 +933,13 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             if (written != null) {
                 written.close();
             }
+        }
+
+        private void cancel() {
+            if (!cancelled.compareAndSet(false, true)) {
+                return;
+            }
+            cleanupLocal();
         }
 
     }

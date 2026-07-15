@@ -73,8 +73,9 @@ surface for an already recovered durable task/output pair; task discovery remain
 uses independent client runtimes to prove concurrent-publisher convergence and COMMITTED-response-loss recovery
 across restart, then proves exact pin release、root/index quarantine and same-view generation-zero fallback after a
 higher object disappears. The fixture also exposed and fixed inline `EntryIndexRef` value equality across durable
-codec round-trips. F4-M2 is complete/final-gated. M3 now implements the compacted-object worker plus source/output
-task-protection creation and crash-cut owner reconciliation；service lifecycle and M3 gates remain. M4 owns full
+codec round-trips. F4-M2 is complete/final-gated. M3 now implements the compacted-object worker、source/output
+task-protection creation/crash-cut owner reconciliation、monotonic advisory checkpoint CAS and bounded service
+lifecycle；Pulsar opaque-entry evidence and M3 gates remain. M4 owns full
 recovery-root/anchor-aware source reachability before retirement or physical deletion can be enabled.
 
 ### 1.3 F4-M3 planning/recovery checkpoint
@@ -90,7 +91,8 @@ The M3 checkpoint also implements and tests the bounded whole-index planner、so
 per-stream task recovery and all-64-shard registered-stream scanner. These are orchestration building blocks, not a
 new visibility owner：registration remains a liveness trigger, the planner reloads L0 head/trim and generation-index
 truth, task creation revalidates every exact source plus activation proof, and only the M2 generation-index CAS may
-publish output. Exact-source worker IO、service lifecycle and the M3 aggregate/final gates remain pending.
+publish output. Exact-source worker IO、checkpoint/service orchestration are now implemented；Pulsar opaque-entry
+evidence and the M3 aggregate/final gates remain pending.
 
 ## 2. Keyspace
 
