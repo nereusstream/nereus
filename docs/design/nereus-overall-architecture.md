@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M2 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker checkpoints implemented，protection recovery/gates and M4–M6 pending
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M2 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker/protection-recovery checkpoints implemented，service/gates and F4 milestones 4–6 pending
 > 最近设计/实现同步：2026-07-15
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -97,8 +97,8 @@ guarded object PUT 与双 HEAD/owner proof 的 DELETED-root audit retirement、
 `OBJECT_WAL_ASYNC_OBJECT` 与 Pulsar rollout 边界。F4-M1–M2 已完成 API/metadata/object IO、core
 reader/protection、authoritative generation resolve/read 和 restart-safe publication，并于 2026-07-15 通过
 ordinary/Docker-backed final gates；M3 的 Parquet writer/strict-reader/full verifier、NTC1 facade、core adapter、
-planner/recovery 以及 exact-source claim-to-output-ready worker checkpoint 已实现，但 protection crash-cut
-reconciliation/service/gates 未完成，M4-M6 的 recovery/GC、async/Pulsar execution path 仍是 Designed target。
+planner/recovery、exact-source claim-to-output-ready worker 以及 protection crash-cut reconciliation checkpoints
+已实现，但 service/gates 未完成，M4-M6 的 recovery/GC、async/Pulsar execution path 仍是 Designed target。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -313,7 +313,7 @@ flowchart TB
 | `nereus-core` | coordinators and state machines | primary-WAL adapters、split commit/materialize、exact recovery、seal/delete implemented；F4 physical lease/protection/reference SPI designed |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay and Docker gates implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
-| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1/M2 publication final-gated and M3 format/planner/task recovery/exact-source worker checkpoints implemented；protection crash-cut recovery/service and M4 GC pending；depends on core, never the reverse |
+| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1/M2 publication final-gated and M3 format/planner/task recovery/exact-source worker/protection-recovery checkpoints implemented；service and M4 GC pending；depends on core, never the reverse |
 | `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；projection、ledger/factory、append/read/lifecycle、durable cursor/retention、10k scale、rollout/limit/reset and F4 snapshot inventory boundaries complete |
 | `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider implemented；fork binding/admission/capability/policy guards、unloaded binding-aware admin validation and M6 real two-broker acceptance complete |
 | `nereus-kop-adapter` | Kafka projection | marker only |
@@ -561,7 +561,7 @@ and secondary materialization lag；这些故障的 correctness 和恢复路径�
 | F1 | L0 API、Object WAL、Oxia commit、resolve/read/trim | Phase 1 + Phase 1.5 implemented/final-gated |
 | F2 | ManagedLedger facade and virtual positions | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6） |
 | F3 | Cursor/subscription durable state | Implemented/final-gated（M0/M0R + M1-M6） |
-| F4 | Materialization/compaction/generation/GC | In progress；F4-M1–M2 final-gated；F4-M3 Parquet read/write + planner/recovery + exact-source worker checkpoints implemented，protection recovery/gates and M4–M6 pending |
+| F4 | Materialization/compaction/generation/GC | In progress；F4-M1–M2 final-gated；F4-M3 Parquet read/write + planner/recovery + exact-source worker/protection-recovery checkpoints implemented，service/gates and F4 milestones 4–6 pending |
 | F5 | KoP/Kafka projection | Designed |
 | F6 | SBT/SDT lakehouse | Designed |
 | F7 | Routing/brown-out/elasticity | Designed |

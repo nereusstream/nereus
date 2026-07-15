@@ -15,6 +15,7 @@ MaterializationService
   |    `- CompactedObjectWriter
   |- GenerationCommitter
   |- TaskRecoveryScanner
+  |- MaterializationTaskProtectionReconciler
   |- MaterializationCheckpointReconciler
   |- RecoveryCheckpointCoordinator
   |- SourceRetirementCoordinator
@@ -49,9 +50,17 @@ acquisition and the `CLAIMED -> OUTPUT_READY` CAS. Typed failure classes drive d
 `TERMINAL_FAILED` transitions without parsing exception text. Focused tests cover exact multi-page reads and pin
 cleanup, missing-frozen-index rejection, real Parquet/local-object-store success and retryable writer failure.
 
-This is still not the production materialization gate. Owner convergence for source/output protections across every
-cross-key heartbeat/output crash cut, recovery-time protection reconstruction before publication, checkpoint
-reconciliation, Pulsar opaque-entry evidence and `MaterializationService` lifecycle composition remain open.
+The following checkpoint closes the source/output protection owner gap. `ObjectProtectionManager.acquireOrTransfer`
+may create or monotonically converge an existing protection only when its complete protection identity and logical
+owner key are unchanged；it rejects owner-version rollback and unrelated-owner takeover and recovers an exact lost CAS
+response. `DefaultMaterializationTaskProtectionReconciler` reconstructs deterministic source/output reference ids and
+physical identities from an exact durable task, revalidates every source and task after the no-gap handshake, and is
+invoked before publication plus after `PUBLISHED`. Duplicate expired-claim scanners reload and converge after one CAS
+wins. Focused tests cover `OUTPUT_READY -> PUBLISHING(attached generation)` owner repair, stale rollback rejection,
+idempotent replay, publication ordering and `PUBLISHED` repair.
+
+This is still not the production materialization gate. Checkpoint reconciliation, Pulsar opaque-entry evidence and
+`MaterializationService` lifecycle composition remain open.
 
 Target construction：
 

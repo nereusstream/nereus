@@ -46,7 +46,8 @@ class GenerationIndexPublicationTest {
                     context.output().objectKeyHash(),
                     Optional.empty(),
                     1_000).join().values();
-            assertThat(protections).singleElement().satisfies(protection -> {
+            assertThat(protections).hasSize(2);
+            assertThat(protections).anySatisfy(protection -> {
                 assertThat(protection.value().protectionTypeId())
                         .isEqualTo(ObjectProtectionType.VISIBLE_GENERATION.wireId());
                 assertThat(protection.value().ownerKey()).isEqualTo(index.key());
@@ -54,6 +55,15 @@ class GenerationIndexPublicationTest {
                         .isEqualTo(index.metadataVersion());
                 assertThat(protection.value().ownerIdentitySha256())
                         .isEqualTo(index.durableValueSha256().value());
+            });
+            assertThat(protections).anySatisfy(protection -> {
+                assertThat(protection.value().protectionTypeId())
+                        .isEqualTo(ObjectProtectionType.MATERIALIZATION_OUTPUT.wireId());
+                assertThat(protection.value().ownerKey()).isEqualTo(task.key());
+                assertThat(protection.value().ownerMetadataVersion())
+                        .isEqualTo(task.metadataVersion());
+                assertThat(protection.value().ownerIdentitySha256())
+                        .isEqualTo(task.durableValueSha256().value());
             });
         }
     }

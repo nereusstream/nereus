@@ -1,8 +1,8 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
 > 状态：Implementation in progress；F4-M0 complete，F4-M1–M2 implemented/final-gated；F4-M3 real Parquet
-> read/write, deterministic planner/task/recovery and exact-source worker checkpoints implemented，protection
-> crash-cut reconciliation/gates and M4–M6 pending
+> read/write, deterministic planner/task/recovery, exact-source worker and protection-recovery checkpoints
+> implemented，service/gates and F4 milestones 4–6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -551,8 +551,9 @@ writer/strict-reader/full verifier、NTC1 storage facade、core adapter，以及
 task policy snapshot、claim/publication recovery 和 64-shard registered-stream scanner。下一步继续 Pulsar opaque
 round trip 之前，已新增 stream-scoped exact-source reader、无损 single-source row stream，以及包含
 claim heartbeat、source/output protection、guarded upload、strict output verification 和 typed durable failure
-transition 的 worker checkpoint。下一步是 protection owner 跨 key crash-cut 收敛、Pulsar opaque round
-trip、service composition 和 M3 gates，不重新打开协议选型。
+transition 的 worker checkpoint。随后又实现同 logical task owner 的单调 acquire-or-transfer、
+source/output protection 恢复重建、publication 前后 owner 收敛和重复 expired-claim CAS
+恢复。下一步是 Pulsar opaque round trip、service composition 和 M3 gates，不重新打开协议选型。
 
 F4-M0 只是 design gate；F4-M1–M2 final gates 也不声称 end-to-end materialization、benchmark、chaos 或
 Phase 4 compatibility certification。F4-M3–M6 的确切文件、测试、故障点和 release gates 见代码级实施计划。

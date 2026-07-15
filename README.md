@@ -141,8 +141,9 @@ leases/protections、64-shard restart-safe stream discovery、retention/GC、gua
 retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录同时记录 normative target 与已落地检查点；
 F4-M1–M2 已 final-gated；M3 真实 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、
 core exact adapter，deterministic policy/planner/task-store/recovery/64-shard registry scanner，以及 stream-scoped
-exact-source reader/claim-to-output-ready worker checkpoints 已落地并通过 focused tests，但 protection
-crash-cut reconciliation、Pulsar opaque round trip、service 和 M3 gates 尚未完成；retention/GC 与 async
+exact-source reader/claim-to-output-ready worker checkpoints 已落地并通过 focused tests；protection owner
+crash-cut reconciliation 也已接入 recovery/publication 并通过重复 CAS/response-loss 测试。Pulsar
+opaque round trip、service 和 M3 gates 尚未完成，retention/GC 与 async
 profile 仍不可用。Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

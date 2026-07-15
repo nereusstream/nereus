@@ -383,6 +383,8 @@ public interface ObjectProtectionManager extends AutoCloseable {
 
     CompletableFuture<ObjectProtection> acquire(
             ObjectProtectionRequest request, OwnerRevalidator ownerRevalidator);
+    CompletableFuture<ObjectProtection> acquireOrTransfer(
+            ObjectProtectionRequest request, OwnerRevalidator ownerRevalidator);
     CompletableFuture<ObjectProtection> revalidate(
             ObjectProtection protection, OwnerRevalidator ownerRevalidator);
     CompletableFuture<ObjectProtection> transfer(
@@ -415,6 +417,13 @@ clock skew、orphan grace and clock. It uses 256 bounded process-local serializa
 requires `now + maximumClockSkew < expiresAt <= now + pendingProtectionDuration` and every later revalidation also
 requires `expiresAt <= createdAt + pendingProtectionDuration`. `close()` rejects acquire/revalidate/transfer but
 continues to admit authenticated release so shutdown cannot strand cleanup.
+
+`acquireOrTransfer` is the restart-recovery primitive for a workflow whose exact metadata record advanced before all
+of its protection-owner CASes. It accepts only the same complete protection identity, object/root epoch, expiry and
+`ownerKey`, requires a non-decreasing owner metadata version, rejects a same-version/different-digest contradiction,
+revalidates the requested owner before and after CAS, and resolves response loss only from the exact desired durable
+record. Arbitrary owner changes still require an explicit `transfer` handle；recovery cannot use this method to seize
+another logical owner's veto.
 
 ## 4. Physical-object Store API
 
@@ -537,7 +546,9 @@ Owner transfer prevalidates the new owner, uses the same-key protection CAS whil
 then revalidates the unchanged ACTIVE root and new owner. It preserves reference id、creation time and expiry；only
 owner fields、root epoch and metadata version may change. If either post-check fails, the new durable value is not
 rolled back or deleted because it remains the safe GC veto. An idempotent retry recognizes the exact new owner and
-same immutable protection fields. Generation publication
+same immutable protection fields. `acquireOrTransfer` applies the stricter same-logical-owner monotonic rule used by
+materialization task recovery, while this explicit handle transfer remains the only path between different owner
+keys. Generation publication
 transfers `VISIBLE_GENERATION` from the exact `PUBLISHING` task to the exact `COMMITTED` index. Recovery checkpoint
 and cursor snapshot publication replace a bounded pending protection with a permanent root-owned protection before
 removing the pending key. Response loss always reloads and compares both owner identities.

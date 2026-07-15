@@ -242,22 +242,31 @@ class GenerationPublicationOxiaS3IntegrationTest {
                                 committed.generation().value()))
                 .join().orElseThrow();
         assertThat(index.value().lifecycle()).isEqualTo(GenerationLifecycle.COMMITTED);
-        assertThat(process.generations.getTask(
+        VersionedMaterializationTask task = process.generations.getTask(
                         fixture.cluster, fixture.stream, fixture.task.taskId())
-                .join().orElseThrow().value().lifecycle())
-                .isEqualTo(TaskLifecycle.PUBLISHED);
+                .join().orElseThrow();
+        assertThat(task.value().lifecycle()).isEqualTo(TaskLifecycle.PUBLISHED);
         ObjectProtectionScanPage protections = process.physical.scanProtections(
                         fixture.cluster,
                         fixture.output.objectKeyHash(),
                         Optional.empty(),
                         10).join();
-        assertThat(protections.values()).singleElement().satisfies(protection -> {
+        assertThat(protections.values()).hasSize(2);
+        assertThat(protections.values()).anySatisfy(protection -> {
             assertThat(protection.value().protectionTypeId())
                     .isEqualTo(ObjectProtectionType.VISIBLE_GENERATION.wireId());
             assertThat(protection.value().ownerKey()).isEqualTo(index.key());
             assertThat(protection.value().ownerMetadataVersion()).isEqualTo(index.metadataVersion());
             assertThat(protection.value().ownerIdentitySha256())
                     .isEqualTo(index.durableValueSha256().value());
+        });
+        assertThat(protections.values()).anySatisfy(protection -> {
+            assertThat(protection.value().protectionTypeId())
+                    .isEqualTo(ObjectProtectionType.MATERIALIZATION_OUTPUT.wireId());
+            assertThat(protection.value().ownerKey()).isEqualTo(task.key());
+            assertThat(protection.value().ownerMetadataVersion()).isEqualTo(task.metadataVersion());
+            assertThat(protection.value().ownerIdentitySha256())
+                    .isEqualTo(task.durableValueSha256().value());
         });
     }
 

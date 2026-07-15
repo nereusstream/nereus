@@ -95,7 +95,7 @@ class GenerationPublicationFailureInjectionTest {
     }
 
     @Test
-    void sourceIdentityLossCannotCrossThePublicationCas() {
+    void sourceIdentityLossCannotCreateOrCommitTheGenerationIndex() {
         try (GenerationPublicationTestSupport.Context context =
                 GenerationPublicationTestSupport.context()) {
             GenerationMetadataStore hiddenSources =
@@ -108,15 +108,15 @@ class GenerationPublicationFailureInjectionTest {
 
             var publishingTask = context.generations().getTask(
                     CLUSTER, STREAM, context.task().taskId()).join().orElseThrow();
-            var index = context.generations().getIndex(
+            assertThat(publishingTask.value().allocatedGeneration()).isPresent();
+            assertThat(context.generations().getIndex(
                     CLUSTER,
                     new GenerationIndexIdentity(
                             STREAM,
                             context.task().view(),
                             context.task().coverage().endOffset(),
                             publishingTask.value().allocatedGeneration().orElseThrow()))
-                    .join().orElseThrow();
-            assertThat(index.value().lifecycle()).isEqualTo(GenerationLifecycle.PREPARED);
+                    .join()).isEmpty();
         }
     }
 }

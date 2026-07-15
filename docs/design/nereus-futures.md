@@ -31,7 +31,7 @@ protocol/table state = projection
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
-| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1–M2 final-gated；M3 format + planner/recovery + exact-source worker checkpoints landed | Complete F4-M3 protection crash-cut reconciliation、Pulsar opaque round trip、service and gates |
+| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1–M2 final-gated；M3 format + planner/recovery + exact-source worker/protection-recovery checkpoints landed | Complete F4-M3 Pulsar opaque round trip、service and gates |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
@@ -191,8 +191,8 @@ Code-level target contract: `../phase-4-compaction-generation/README.md`
 Current milestone: F4-M0 source audit/design gate complete；F4-M1 API/metadata/object IO and F4-M2 committed
 generation publication/read/pin/fallback paths implemented/final-gated；F4-M3 is in progress with the real Parquet
 writer/strict-reader/full verifier、NTC1 facade、core adapter and deterministic policy/planner/task/recovery/registry
-scanner landed. The exact-source claim-to-output-ready worker checkpoint is also implemented, but protection
-crash-cut reconciliation、service/gates、GC and the async path do not exist yet
+scanner landed. The exact-source claim-to-output-ready worker and task-protection crash-cut recovery checkpoints are
+also implemented, but service/gates、GC and the async path do not exist yet
 
 ### Owns
 

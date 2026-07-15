@@ -29,10 +29,11 @@ gates on 2026-07-15；the following foundation parts are implemented and covered
 `phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check` and
 `phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
 restart-safe publication, pin-owned fallback/quarantine and a real Oxia/LocalStack independent-runtime fixture.
-F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has three implementation checkpoints：the real compacted
+F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has four implementation checkpoints：the real compacted
 format/read path, the deterministic policy/planner/task-store/recovery/registered-stream-scan path, and the
-exact-source reader plus claim-to-output-ready worker path. This is not a Phase 4 completion claim：protection-owner
-crash-cut reconciliation, Pulsar opaque round trip, service composition and the M3 gates remain open；full
+exact-source reader plus claim-to-output-ready worker path, followed by task-protection owner crash-cut reconciliation
+across recovery/publication. This is not a Phase 4 completion claim：Pulsar opaque round trip, service composition and
+the M3 gates remain open；full
 recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
 
 A later milestone is complete only when：
@@ -372,8 +373,10 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 > task pagination and all-64-shard registered-stream discovery with activation revalidation. A third checkpoint adds
 > the stream-scoped exact-source reader, durable pin/revalidation, lossless single-source row stream, deterministic
 > claim/heartbeat worker, guarded upload, strict full-output verification, source/output task protections and typed
-> durable failure transitions through `OUTPUT_READY`. This is not M3 completion：protection-owner convergence across
-> all cross-key crash cuts, Pulsar opaque-entry round trip, service lifecycle and both M3 gates below remain pending,
+> durable failure transitions through `OUTPUT_READY`. A fourth checkpoint adds same-logical-owner monotonic
+> `acquireOrTransfer`, exact task-protection reconstruction, recovery/publication integration, duplicate expired-claim
+> CAS convergence and `PUBLISHED` repair. This is not M3 completion：Pulsar opaque-entry round trip, service lifecycle
+> and both M3 gates below remain pending,
 > and production activation stays disabled.
 
 ### 5.1 Production artifacts
@@ -415,6 +418,9 @@ ExactSourceRead.java
 ExactSourceReadSummary.java
 MaterializationTaskStore.java
 MaterializationTaskRecovery.java
+MaterializationTaskProtectionReconciler.java
+DefaultMaterializationTaskProtectionReconciler.java
+MaterializationTaskProtections.java
 RegisteredMaterializationStreamScanner.java
 MaterializationCheckpointReconciler.java
 TopicCompactionDecoder.java
@@ -457,6 +463,7 @@ MaterializationWorkerFailureInjectionTest
 MaterializationWorkerClaimModelTest
 ExactSourceRangeReaderTest
 MaterializationTaskRecoveryTest
+MaterializationTaskProtectionReconcilerTest
 RegisteredMaterializationStreamScannerTest
 MaterializationCheckpointReconcilerTest
 TerminalWorkflowMetadataRetirementTest

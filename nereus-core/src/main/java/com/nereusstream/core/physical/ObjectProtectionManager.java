@@ -19,6 +19,14 @@ public interface ObjectProtectionManager extends AutoCloseable {
             ObjectProtectionRequest request,
             OwnerRevalidator ownerRevalidator);
 
+    /**
+     * Acquires an absent protection or monotonically reconciles an existing protection owned by the same logical
+     * owner key to the requested durable owner version.
+     */
+    CompletableFuture<ObjectProtection> acquireOrTransfer(
+            ObjectProtectionRequest request,
+            OwnerRevalidator ownerRevalidator);
+
     CompletableFuture<ObjectProtection> revalidate(
             ObjectProtection protection,
             OwnerRevalidator ownerRevalidator);

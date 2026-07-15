@@ -11,7 +11,6 @@ import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.SchemaRef;
-import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -362,12 +361,13 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                             () -> identities.resolve(target, source.view()),
                             "resolve materialization source identity")
                     .thenCompose(identity -> deadline.bound(
-                            () -> protections.acquire(
+                            () -> protections.acquireOrTransfer(
                                     new ObjectProtectionRequest(
                                             identity,
                                             ObjectProtectionType.MATERIALIZATION_SOURCE,
-                                            sourceReferenceId(source),
-                                            taskOwner(claimed),
+                                            MaterializationProtectionIdentities.sourceReferenceId(
+                                                    cluster, task, source),
+                                            MaterializationProtectionIdentities.taskOwner(claimed),
                                             0),
                                     this::revalidateClaimOwner),
                             "acquire materialization source protection"))
@@ -559,12 +559,13 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private CompletableFuture<MaterializationOutput> protectOutput(MaterializationOutput output) {
             PhysicalObjectIdentity identity = MaterializationRecordMapper.physicalIdentity(output);
             return deadline.bound(
-                            () -> protections.acquire(
+                            () -> protections.acquireOrTransfer(
                                     new ObjectProtectionRequest(
                                             identity,
                                             ObjectProtectionType.MATERIALIZATION_OUTPUT,
-                                            outputReferenceId(output),
-                                            taskOwner(claimed),
+                                            MaterializationProtectionIdentities.outputReferenceId(
+                                                    cluster, task, output),
+                                            MaterializationProtectionIdentities.taskOwner(claimed),
                                             0),
                                     this::revalidateClaimOwner),
                             "acquire materialization output protection")
@@ -613,7 +614,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             return deadline.bound(
                             () -> protections.transfer(
                                     current,
-                                    taskOwner(outputReady),
+                                    MaterializationProtectionIdentities.taskOwner(outputReady),
                                     expected -> revalidateOutputOwner(
                                             expected, outputReady, output)),
                             "transfer materialization protection to OUTPUT_READY")
@@ -700,7 +701,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         }
 
         private CompletableFuture<Void> revalidateClaimOwner(ObjectProtectionOwner expected) {
-            if (!expected.equals(taskOwner(claimed))) {
+            if (!expected.equals(MaterializationProtectionIdentities.taskOwner(claimed))) {
                 return CompletableFuture.failedFuture(condition(
                         "materialization protection owner differs from the active claim"));
             }
@@ -788,7 +789,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             return deadline.bound(
                             () -> protections.transfer(
                                     current,
-                                    taskOwner(updated),
+                                    MaterializationProtectionIdentities.taskOwner(updated),
                                     expectedOwner -> revalidateHeartbeatOwner(
                                             expectedOwner, updated)),
                             "transfer source protection to renewed claim")
@@ -801,7 +802,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private CompletableFuture<Void> revalidateHeartbeatOwner(
                 ObjectProtectionOwner expectedOwner,
                 VersionedMaterializationTask updated) {
-            if (!expectedOwner.equals(taskOwner(updated))) {
+            if (!expectedOwner.equals(MaterializationProtectionIdentities.taskOwner(updated))) {
                 return CompletableFuture.failedFuture(condition(
                         "renewed source protection owner is inconsistent"));
             }
@@ -812,7 +813,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 ObjectProtectionOwner expected,
                 VersionedMaterializationTask outputReady,
                 MaterializationOutput output) {
-            if (!expected.equals(taskOwner(outputReady))) {
+            if (!expected.equals(MaterializationProtectionIdentities.taskOwner(outputReady))) {
                 return CompletableFuture.failedFuture(condition(
                         "materialization protection owner differs from OUTPUT_READY task"));
             }
@@ -898,23 +899,6 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             }
         }
 
-        private String sourceReferenceId(SourceGeneration source) {
-            String canonical = cluster + '\0' + task.streamId().value() + '\0'
-                    + task.taskId() + '\0' + source.indexKey();
-            return "ms1-" + DeterministicIds.stableHashComponent(canonical);
-        }
-
-        private String outputReferenceId(MaterializationOutput output) {
-            String canonical = cluster + '\0' + task.streamId().value() + '\0'
-                    + task.taskId() + '\0' + output.outputAttemptId() + '\0'
-                    + output.objectKeyHash().value();
-            return "mo1-" + DeterministicIds.stableHashComponent(canonical);
-        }
-    }
-
-    private static ObjectProtectionOwner taskOwner(VersionedMaterializationTask value) {
-        return new ObjectProtectionOwner(
-                value.key(), value.metadataVersion(), value.durableValueSha256());
     }
 
     private static boolean sameVersioned(

@@ -25,6 +25,7 @@ import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.core.read.MetadataPhysicalObjectIdentityResolver;
 import com.nereusstream.metadata.oxia.AllocatedGeneration;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
@@ -73,6 +74,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
     private final GenerationAllocator allocator;
     private final PhysicalObjectMetadataStore physicalStore;
     private final ObjectProtectionManager protectionManager;
+    private final MaterializationTaskProtectionReconciler taskProtectionReconciler;
     private final GenerationProtocolActivationGuard activationGuard;
     private final MaterializationOutputVerifier outputVerifier;
     private final PublicationIdGenerator publicationIds;
@@ -129,6 +131,15 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         this.operationTimeout = requirePositive(operationTimeout, "operationTimeout");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.taskProtectionReconciler = new DefaultMaterializationTaskProtectionReconciler(
+                this.cluster,
+                new MaterializationTaskStore(this.cluster, this.generationStore, this.clock),
+                this.generationStore,
+                new MetadataPhysicalObjectIdentityResolver(
+                        this.cluster, this.l0Store, this.physicalStore),
+                this.protectionManager,
+                this.operationTimeout,
+                this.scheduler);
     }
 
     @Override
@@ -294,7 +305,9 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 VersionedMaterializationTask publishingTask,
                 Admission admission) {
             requireFrozenAllocation(publishingTask);
-            return loadIndex(publishingTask).thenCompose(optional -> {
+            return reconcileTaskProtections(publishingTask)
+                    .thenCompose(ignored -> loadIndex(publishingTask))
+                    .thenCompose(optional -> {
                 if (optional.isPresent()) {
                     VersionedGenerationIndex current = optional.orElseThrow();
                     requireIndexIdentity(publishingTask, current);
@@ -331,7 +344,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                                     return CompletableFuture.failedFuture(
                                             unwrap(protectionFailure));
                                 }));
-            });
+                    });
         }
 
         private CompletableFuture<GenerationCommitResult> createOrLoadPrepared(
@@ -573,6 +586,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             requireCommittedExact(publishingTask, committed);
             return ensureIndexProtection(publishingTask, committed, taskProtection)
                     .thenCompose(protection -> markPublished(publishingTask, committed, 0)
+                            .thenCompose(this::reconcileTaskProtections)
                             .thenCompose(ignored -> deadline.bound(
                                     () -> protectionManager.revalidate(
                                             protection,
@@ -580,6 +594,13 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                                     "revalidate committed-index-owned protection")))
                     .thenCompose(ignored -> loadExactCommitted(committed))
                     .thenApply(exact -> commitResult(exact, committedByThisCall));
+        }
+
+        private CompletableFuture<MaterializationTaskProtections> reconcileTaskProtections(
+                VersionedMaterializationTask durable) {
+            return deadline.bound(
+                    () -> taskProtectionReconciler.reconcile(durable),
+                    "reconcile source/output task protections");
         }
 
         private CompletableFuture<ObjectProtection> ensureIndexProtection(

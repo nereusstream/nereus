@@ -6,5 +6,6 @@ public enum MaterializationTaskRecoveryAction {
     NONE,
     DISPATCHED,
     EXPIRED_CLAIM_REQUEUED,
+    PROTECTIONS_RECONCILED,
     PUBLICATION_RECONCILED
 }

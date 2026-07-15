@@ -331,6 +331,13 @@ class MaterializationWorkerTest {
         }
 
         @Override
+        public CompletableFuture<ObjectProtection> acquireOrTransfer(
+                ObjectProtectionRequest request,
+                OwnerRevalidator ownerRevalidator) {
+            return acquire(request, ownerRevalidator);
+        }
+
+        @Override
         public CompletableFuture<ObjectProtection> revalidate(
                 ObjectProtection protection,
                 OwnerRevalidator ownerRevalidator) {

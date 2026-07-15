@@ -73,9 +73,9 @@ surface for an already recovered durable task/output pair; task discovery remain
 uses independent client runtimes to prove concurrent-publisher convergence and COMMITTED-response-loss recovery
 across restart, then proves exact pin release、root/index quarantine and same-view generation-zero fallback after a
 higher object disappears. The fixture also exposed and fixed inline `EntryIndexRef` value equality across durable
-codec round-trips. F4-M2 is complete/final-gated. M3 still owns source/output task protections and the compacted
-object worker；M4 owns full recovery-root/anchor-aware source reachability before retirement or physical deletion
-can be enabled.
+codec round-trips. F4-M2 is complete/final-gated. M3 now implements the compacted-object worker plus source/output
+task-protection creation and crash-cut owner reconciliation；service lifecycle and M3 gates remain. M4 owns full
+recovery-root/anchor-aware source reachability before retirement or physical deletion can be enabled.
 
 ### 1.3 F4-M3 planning/recovery checkpoint
 

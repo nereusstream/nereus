@@ -1,6 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.materialization;
 
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
+import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
@@ -17,6 +20,7 @@ public final class MaterializationTaskRecovery {
     private static final String EXPIRED_CLAIM_MESSAGE = "worker claim expired during task recovery";
 
     private final MaterializationTaskStore tasks;
+    private final MaterializationTaskProtectionReconciler protections;
     private final GenerationPublicationReconciler publications;
     private final MaterializationTaskDispatcher dispatcher;
     private final Clock clock;
@@ -25,12 +29,14 @@ public final class MaterializationTaskRecovery {
 
     public MaterializationTaskRecovery(
             MaterializationTaskStore tasks,
+            MaterializationTaskProtectionReconciler protections,
             GenerationPublicationReconciler publications,
             MaterializationTaskDispatcher dispatcher,
             Clock clock,
             Duration maximumClockSkew,
             Duration retryDelay) {
         this.tasks = Objects.requireNonNull(tasks, "tasks");
+        this.protections = Objects.requireNonNull(protections, "protections");
         this.publications = Objects.requireNonNull(publications, "publications");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -59,8 +65,9 @@ public final class MaterializationTaskRecovery {
                         ? dispatch(durable, task, exactGuard)
                         : completed(MaterializationTaskRecoveryAction.NONE);
                 case CLAIMED -> recoverClaim(durable, exactGuard);
-                case OUTPUT_READY, PUBLISHING -> reconcilePublication(task, record);
-                case PUBLISHED, CANCELLED, TERMINAL_FAILED ->
+                case OUTPUT_READY, PUBLISHING -> reconcilePublication(durable, task, record);
+                case PUBLISHED -> reconcileProtections(durable);
+                case CANCELLED, TERMINAL_FAILED ->
                         completed(MaterializationTaskRecoveryAction.NONE);
             };
         } catch (RuntimeException failure) {
@@ -71,6 +78,13 @@ public final class MaterializationTaskRecovery {
     private CompletableFuture<MaterializationTaskRecoveryAction> recoverClaim(
             VersionedMaterializationTask durable,
             MaterializationTaskMutationGuard mutationGuard) {
+        return recoverClaim(durable, mutationGuard, false);
+    }
+
+    private CompletableFuture<MaterializationTaskRecoveryAction> recoverClaim(
+            VersionedMaterializationTask durable,
+            MaterializationTaskMutationGuard mutationGuard,
+            boolean reloadedAfterConflict) {
         MaterializationTaskRecord current = durable.value();
         long safeExpiry = saturatingAdd(
                 current.workerClaim().orElseThrow().expiresAtMillis(),
@@ -114,16 +128,51 @@ public final class MaterializationTaskRecovery {
                 0);
         return mutationGuard.revalidate()
                 .thenCompose(ignored -> tasks.compareAndSet(retry, durable.metadataVersion()))
-                .thenApply(ignored -> MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
+                .handle((updated, failure) -> {
+                    if (failure == null) {
+                        return completed(MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
+                    }
+                    Throwable exact = unwrap(failure);
+                    if (!isConditionFailure(exact) || reloadedAfterConflict) {
+                        return CompletableFuture.<MaterializationTaskRecoveryAction>failedFuture(exact);
+                    }
+                    return tasks.get(
+                                    new com.nereusstream.api.StreamId(current.streamId()),
+                                    current.taskId())
+                            .thenCompose(optional -> {
+                                if (optional.isEmpty()) {
+                                    return CompletableFuture.failedFuture(exact);
+                                }
+                                VersionedMaterializationTask reloaded = optional.orElseThrow();
+                                tasks.requireTask(reloaded);
+                                if (isSameExpiredRetry(retry, reloaded.value())) {
+                                    return completed(
+                                            MaterializationTaskRecoveryAction.EXPIRED_CLAIM_REQUEUED);
+                                }
+                                if (reloaded.value().lifecycle() == TaskLifecycle.CLAIMED) {
+                                    return recoverClaim(reloaded, mutationGuard, true);
+                                }
+                                return recover(reloaded, mutationGuard);
+                            });
+                })
+                .thenCompose(value -> value);
     }
 
     private CompletableFuture<MaterializationTaskRecoveryAction> reconcilePublication(
+            VersionedMaterializationTask durable,
             MaterializationTask task,
             MaterializationTaskRecord record) {
         MaterializationOutput output = MaterializationRecordMapper.domainOutput(
                 task, record.output().orElseThrow());
-        return publications.reconcile(task, output)
+        return protections.reconcile(durable)
+                .thenCompose(ignored -> publications.reconcile(task, output))
                 .thenApply(ignored -> MaterializationTaskRecoveryAction.PUBLICATION_RECONCILED);
+    }
+
+    private CompletableFuture<MaterializationTaskRecoveryAction> reconcileProtections(
+            VersionedMaterializationTask durable) {
+        return protections.reconcile(durable)
+                .thenApply(ignored -> MaterializationTaskRecoveryAction.PROTECTIONS_RECONCILED);
     }
 
     private CompletableFuture<MaterializationTaskRecoveryAction> dispatch(
@@ -172,5 +221,35 @@ public final class MaterializationTaskRecovery {
         } catch (ArithmeticException failure) {
             throw new IllegalArgumentException(field + " is too large", failure);
         }
+    }
+
+    private static boolean isSameExpiredRetry(
+            MaterializationTaskRecord expected,
+            MaterializationTaskRecord actual) {
+        return actual.lifecycle() == TaskLifecycle.RETRY_WAIT
+                && actual.taskId().equals(expected.taskId())
+                && actual.sourceSetSha256().equals(expected.sourceSetSha256())
+                && actual.policySha256().equals(expected.policySha256())
+                && actual.attempt() == expected.attempt()
+                && actual.workerClaim().isEmpty()
+                && actual.failureClassId() == TaskFailureClass.CLOSED.wireId()
+                && actual.failureMessage().equals(EXPIRED_CLAIM_MESSAGE)
+                && actual.retryNotBeforeMillis() == expected.retryNotBeforeMillis();
+    }
+
+    private static boolean isConditionFailure(Throwable failure) {
+        return failure instanceof F4MetadataConditionFailedException
+                || failure instanceof NereusException nereus
+                        && nereus.code() == ErrorCode.METADATA_CONDITION_FAILED;
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof java.util.concurrent.CompletionException
+                        || current instanceof java.util.concurrent.ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 }

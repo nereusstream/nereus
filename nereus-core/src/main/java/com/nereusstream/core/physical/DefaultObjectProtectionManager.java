@@ -72,6 +72,19 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
     }
 
     @Override
+    public CompletableFuture<ObjectProtection> acquireOrTransfer(
+            ObjectProtectionRequest request,
+            OwnerRevalidator ownerRevalidator) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(ownerRevalidator, "ownerRevalidator");
+        if (closed.get()) {
+            return failed(closedFailure());
+        }
+        return serialized(request.identity(), () -> acquireOrTransferSerialized(
+                request, ownerRevalidator));
+    }
+
+    @Override
     public CompletableFuture<ObjectProtection> revalidate(
             ObjectProtection protection,
             OwnerRevalidator ownerRevalidator) {
@@ -152,6 +165,96 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
                         })));
     }
 
+    private CompletableFuture<ObjectProtection> acquireOrTransferSerialized(
+            ObjectProtectionRequest request,
+            OwnerRevalidator ownerRevalidator) {
+        if (closed.get()) {
+            return failed(closedFailure());
+        }
+        long now = clock.millis();
+        try {
+            validateRequestedExpiry(request.type(), request.expiresAtMillis(), now);
+        } catch (RuntimeException failure) {
+            return failed(failure);
+        }
+        return ensureActiveRoot(request.object(), now).thenCompose(root ->
+                findProtection(request.identity(), Optional.empty()).thenCompose(existing ->
+                        existing.isPresent()
+                                ? reconcileExisting(
+                                        request, root, existing.orElseThrow(), ownerRevalidator)
+                                : createForReconciliation(
+                                        request, root, ownerRevalidator, now)));
+    }
+
+    private CompletableFuture<ObjectProtection> createForReconciliation(
+            ObjectProtectionRequest request,
+            VersionedPhysicalObjectRoot root,
+            OwnerRevalidator ownerRevalidator,
+            long now) {
+        ObjectProtectionRecord record = requestedRecord(request, root, now);
+        return store.createProtection(cluster, record).handle((created, failure) -> {
+            if (failure == null) {
+                ObjectProtection protection = fromVersioned(request.object(), created);
+                CompletableFuture<ObjectProtection> checked = postCheck(
+                        protection, root, ownerRevalidator);
+                CompletableFuture<ObjectProtection> result = new CompletableFuture<>();
+                checked.whenComplete((value, checkFailure) -> {
+                    if (checkFailure == null) {
+                        result.complete(value);
+                        return;
+                    }
+                    Throwable exact = unwrap(checkFailure);
+                    deleteExact(created).whenComplete((ignored, cleanupFailure) -> {
+                        if (cleanupFailure != null) {
+                            exact.addSuppressed(unwrap(cleanupFailure));
+                        }
+                        result.completeExceptionally(exact);
+                    });
+                });
+                return result;
+            }
+            Throwable original = unwrap(failure);
+            return findProtection(request.identity(), Optional.empty()).thenCompose(recovered -> {
+                if (recovered.isEmpty()) {
+                    return failed(original);
+                }
+                return reconcileExisting(
+                                request,
+                                root,
+                                recovered.orElseThrow(),
+                                ownerRevalidator)
+                        .exceptionallyCompose(reconciliationFailure -> {
+                            Throwable exact = unwrap(reconciliationFailure);
+                            exact.addSuppressed(original);
+                            return failed(exact);
+                        });
+            });
+        }).thenCompose(value -> value);
+    }
+
+    private CompletableFuture<ObjectProtection> reconcileExisting(
+            ObjectProtectionRequest request,
+            VersionedPhysicalObjectRoot root,
+            VersionedObjectProtection current,
+            OwnerRevalidator ownerRevalidator) {
+        try {
+            requireReconciliationIdentity(request, root, current);
+        } catch (RuntimeException failure) {
+            return failed(failure);
+        }
+        ObjectProtection existing = fromVersioned(request.object(), current);
+        if (existing.owner().equals(request.owner())) {
+            return postCheck(existing, root, ownerRevalidator);
+        }
+        return invokeOwnerRevalidator(ownerRevalidator, request.owner()).thenCompose(ignored -> {
+            ObjectProtectionRecord desired = transferRecord(
+                    current.value(), request.owner(), root.value().lifecycleEpoch());
+            return compareAndSetOrRecover(existing, current, desired)
+                    .thenCompose(updated -> postCheck(
+                            fromVersioned(request.object(), updated), root, ownerRevalidator));
+        });
+    }
+
     private CompletableFuture<ObjectProtection> revalidateSerialized(
             ObjectProtection expected,
             OwnerRevalidator ownerRevalidator) {
@@ -191,8 +294,7 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
                         if (sameRecordIgnoringMetadataVersion(current.value(), desired)) {
                             write = CompletableFuture.completedFuture(current);
                         } else {
-                            write = compareAndSetOrRecover(
-                                    expected, newOwner, current, desired);
+                            write = compareAndSetOrRecover(expected, current, desired);
                         }
                         return write.thenCompose(updated -> postCheck(
                                 fromVersioned(expected.object(), updated), root, newOwnerRevalidator));
@@ -235,18 +337,7 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
             requireReusable(request, root, current);
             return CompletableFuture.completedFuture(new Acquisition(current, false));
         }
-        ObjectProtectionRecord record = new ObjectProtectionRecord(
-                1,
-                request.object().objectKeyHash().value(),
-                request.type().wireId(),
-                request.referenceId(),
-                request.owner().ownerKey(),
-                request.owner().metadataVersion(),
-                request.owner().identitySha256().value(),
-                root.value().lifecycleEpoch(),
-                now,
-                request.expiresAtMillis(),
-                0);
+        ObjectProtectionRecord record = requestedRecord(request, root, now);
         return store.createProtection(cluster, record).handle((created, failure) -> {
             if (failure == null) {
                 return CompletableFuture.completedFuture(new Acquisition(created, true));
@@ -271,7 +362,6 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
 
     private CompletableFuture<VersionedObjectProtection> compareAndSetOrRecover(
             ObjectProtection expected,
-            ObjectProtectionOwner newOwner,
             VersionedObjectProtection current,
             ObjectProtectionRecord desired) {
         return store.compareAndSetProtection(cluster, desired, current.metadataVersion())
@@ -282,8 +372,8 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
                     Throwable exact = unwrap(failure);
                     return findProtection(expected.identity(), Optional.empty()).thenCompose(recovered -> {
                         if (recovered.isPresent()
-                                && matchesTransferredOutcome(
-                                        expected, newOwner, recovered.orElseThrow().value())) {
+                                && sameRecordIgnoringMetadataVersion(
+                                        recovered.orElseThrow().value(), desired)) {
                             return CompletableFuture.completedFuture(recovered.orElseThrow());
                         }
                         return failed(exact);
@@ -405,6 +495,29 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
         }
     }
 
+    private void requireReconciliationIdentity(
+            ObjectProtectionRequest request,
+            VersionedPhysicalObjectRoot root,
+            VersionedObjectProtection current) {
+        requireRecordIdentity(request.identity(), current.value());
+        ObjectProtectionRecord value = current.value();
+        ObjectProtectionOwner currentOwner = owner(value);
+        if (!currentOwner.ownerKey().equals(request.owner().ownerKey())) {
+            throw condition("existing protection belongs to a different logical owner");
+        }
+        if (value.expiresAtMillis() != request.expiresAtMillis()
+                || value.rootLifecycleEpoch() != root.value().lifecycleEpoch()) {
+            throw condition("existing protection expiry/root cannot be reconciled");
+        }
+        if (request.owner().metadataVersion() < currentOwner.metadataVersion()) {
+            throw condition("object protection owner reconciliation cannot roll back");
+        }
+        if (request.owner().metadataVersion() == currentOwner.metadataVersion()
+                && !request.owner().equals(currentOwner)) {
+            throw invariant("one logical owner version has conflicting durable identities");
+        }
+    }
+
     private void validateRequestedExpiry(
             com.nereusstream.metadata.oxia.records.ObjectProtectionType type,
             long expiresAtMillis,
@@ -451,6 +564,24 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
                 rootLifecycleEpoch,
                 current.createdAtMillis(),
                 current.expiresAtMillis(),
+                0);
+    }
+
+    private static ObjectProtectionRecord requestedRecord(
+            ObjectProtectionRequest request,
+            VersionedPhysicalObjectRoot root,
+            long now) {
+        return new ObjectProtectionRecord(
+                1,
+                request.object().objectKeyHash().value(),
+                request.type().wireId(),
+                request.referenceId(),
+                request.owner().ownerKey(),
+                request.owner().metadataVersion(),
+                request.owner().identitySha256().value(),
+                root.value().lifecycleEpoch(),
+                now,
+                request.expiresAtMillis(),
                 0);
     }
 

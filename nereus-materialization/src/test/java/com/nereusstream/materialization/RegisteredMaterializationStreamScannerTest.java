@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ class RegisteredMaterializationStreamScannerTest {
         List<MaterializationTask> dispatched = new ArrayList<>();
         MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                 taskStore,
+                durableTask -> CompletableFuture.completedFuture(
+                        new MaterializationTaskProtections(
+                                durableTask, List.of(), Optional.empty())),
                 new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
                         CompletableFuture.completedFuture(null)),
                 (ignoredDurable, task) -> {

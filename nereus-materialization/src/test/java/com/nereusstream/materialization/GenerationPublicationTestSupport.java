@@ -614,6 +614,14 @@ final class GenerationPublicationTestSupport {
             return physical;
         }
 
+        ObjectProtectionManager protections() {
+            return protections;
+        }
+
+        ScheduledExecutorService scheduler() {
+            return scheduler;
+        }
+
         MaterializationTask task() {
             return task;
         }
