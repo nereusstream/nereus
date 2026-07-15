@@ -65,8 +65,21 @@ nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/retirement/
 nereus-materialization/src/main/java/com/nereusstream/materialization/gc/
   GcCandidate.java
   GcPlan.java
+  GcPlannedProtectionRemoval.java
+  GcPlannedMetadataRemoval.java
   PhysicalGcConfig.java
+  GcReferenceDomainVersion.java
+  GcReferenceCollectionStatus.java
+  GcReferenceCollection.java
+  GcReferenceDomainRegistry.java
+  GcPlanMetadataRevalidator.java
+  PhysicalGcMarkStatus.java
+  PhysicalGcMarkResult.java
+  PhysicalGcAdvanceStatus.java
+  PhysicalGcAdvanceResult.java
   PhysicalObjectGarbageCollector.java
+  PhysicalObjectRootVisitor.java
+  PhysicalObjectRootScanResult.java
   PhysicalObjectRootScanner.java
   PhysicalRootTombstoneRetirementCoordinator.java
   TombstoneRetirementResult.java
@@ -100,10 +113,11 @@ protection before committed-index restoration. Checkpoint G adds the read-before
 adapters with exact key、encoding、Oxia version and stored-envelope digest checks, including explicit committed-marker
 capture and response-loss fail-closed behavior. Checkpoint H adds strict GC config、ACTIVE-root candidate and bounded
 canonical restart-reconstructable plan values；the plan digest commits every complete domain fact and planned
-key/protection while excluding ephemeral candidate identity/time. Runtime composition、reference-domain
-implementations、source retirement planning/root state machine、GC
-coordinators、cursor integration and physical deletion remain planned；therefore no object deletion is enabled by
-these checkpoints.
+key/protection while excluding ephemeral candidate identity/time. Checkpoint I adds the exact bounded domain registry、
+mandatory planned-metadata revalidation、recoverable `ACTIVE -> MARKED -> DELETING` root fence and complete 256-shard
+root scan. It stops before every source/protection/audit/object delete and is not production-composed. Concrete
+reference-domain implementations、source retirement planning、DELETING recovery/destructive coordinators、cursor
+integration and physical deletion remain planned；therefore no object deletion is enabled by these checkpoints.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -694,8 +708,41 @@ pre-MARK digest operation；`GcPlan.fromMarkedRoot` accepts only the exact MARK 
 attempt id, an Oxia version newer than the candidate and lifecycle `epoch + 1`. Construction rejects incomplete or
 vetoing snapshots、query mismatch、configured count overflow、non-canonical lists、duplicate protection identities、
 protections for another object/root epoch and any exact removal-fact drift.
-This is a value/proof boundary only：no reference domain or lifecycle coordinator calls it yet, and config defaults
-keep both enablement off and dry-run on.
+Checkpoint I now consumes this value/proof boundary through these implemented seams：
+
+```java
+public enum GcReferenceCollectionStatus {
+    CLEAR, VETOED, INCOMPLETE, LIMIT_EXCEEDED
+}
+
+public final class GcReferenceDomainRegistry {
+    public List<GcReferenceDomainVersion> requiredDomains();
+    public boolean contains(String domainId, int protocolVersion);
+    public CompletableFuture<GcReferenceCollection> snapshotForDeletion(GcReferenceQuery query);
+    public CompletableFuture<Boolean> stillMatches(GcReferenceCollection clearCollection);
+}
+
+@FunctionalInterface
+public interface GcPlanMetadataRevalidator {
+    CompletableFuture<List<GcPlannedMetadataRemoval>> reload(
+        GcCandidate candidate,
+        List<GcPlannedMetadataRemoval> expectedRemovals);
+}
+```
+
+The registry constructor rejects an empty set、more than 32 domains and duplicate domain ids, then canonical-sorts by
+`(domainId, protocolVersion)`. Collection is sequential under one absolute operation deadline. Every returned
+snapshot must repeat the registered id/version and the exact query digest. An authority/reference count over config
+is `LIMIT_EXCEEDED` even if the domain incorrectly reports complete/non-veto；incomplete and veto are distinct blockers,
+and collection stops at the first blocker without turning a prefix into permission. `stillMatches` accepts only a
+`CLEAR` collection containing the complete exact registered set and short-circuits on the first `false`; `null` is an
+invariant violation. `PhysicalObjectGarbageCollector` uses package-private overloads so domain calls share its one
+operation deadline rather than acquiring independent timeout budgets.
+
+`GcPlanMetadataRevalidator` is mandatory, not a permissive default. It reloads the authoritative typed metadata facts
+selected by the future source/orphan/cursor planner；the collector canonicalizes and compares the entire returned list
+before MARK and twice during DRAIN. The generic registry and root fence are implemented, but the concrete F4 domain
+classes in the table below are still pending. Config defaults continue to keep mutation disabled and dry-run on.
 
 The query is a core value；materialization's `GcCandidate` wraps it with retry/plan timestamps and never appears in
 the SPI. Affected streams are sorted/unique and capped at 4,096；`REFERENCED_OBJECT` and
@@ -869,7 +916,10 @@ requirement to activate a non-existent topic.
 ```text
 DISCOVER
   exact HEAD/root identity
+  compute candidate.notBefore from durable root eligibility and the candidate-specific grace
+    (source retirement includes sourceRetirementGrace here, before MARK)
   collect index refs + protection scan + reference-domain snapshots
+  reload every typed planned metadata removal from its authoritative store
   requireReady(PHYSICAL_DELETE,
       DomainValidatedDeletionSubject(exactGcReferenceQuery,
           projectionDomainSnapshotSha256), false)
@@ -877,16 +927,18 @@ DISCOVER
   compute canonical referenceSetSha256 from keys/versions/owner tokens
 
 MARK
+  require now >= candidate.notBefore
   revalidate activation proof
   CAS root ACTIVE -> MARKED(
       new epoch, attemptId, digest,
-      markedAt, deleteNotBefore = now + sourceRetirementGrace)
+      markedAt, deleteNotBefore = markedAt + drainGrace)
   no new reader/protection handshake can complete
 
 DRAIN
   wait until deleteNotBefore
   scan leases; wait through every expiresAt + maxClockSkew
-  rescan protections and all domains
+  rescan protections, typed metadata facts and all domains
+  immediately before intent CAS, rescan leases/protections/metadata and reload exact MARKED root
   require the exact digest/authority set or:
       if no destructive side effect yet, CAS MARKED -> ACTIVE(new epoch)
       otherwise quarantine
@@ -914,12 +966,30 @@ PHYSICAL DELETE
 
 The root stores only the canonical digest, not an unbounded reference list. Recovery recomputes the set from
 authoritative metadata and requires the same digest before continuing. Conditional metadata deletion makes partial
-progress discoverable.
+progress discoverable. `sourceRetirementGrace` and `drainGrace` are intentionally not interchangeable：the former is
+part of candidate eligibility and preserves fallback/recovery policy before MARK；the latter starts at the successful
+MARK and gives pre-existing readers/protection handshakes time to drain after new admissions are fenced.
 
-Checkpoint G implements only the metadata-retirement calls used inside `METADATA RETIREMENT`. It does not expose a
-standalone delete entry point: no production coordinator currently reaches those calls, and the preceding
-DISCOVER/MARK/DRAIN/DELETE INTENT proof remains mandatory future M4 work. A missing key or a lost delete response is
-reported to that future coordinator rather than being accepted from absence alone.
+Checkpoint G implements only the metadata-retirement calls used inside `METADATA RETIREMENT`. Checkpoint H implements
+the bounded candidate/plan/digest values. Checkpoint I implements registry collection plus the `MARK`、`DRAIN` and
+`DELETE INTENT` portions in `PhysicalObjectGarbageCollector`：
+
+- the constructor requires exact `projection-generation-v1@1` registration and a non-null
+  `GcPlanMetadataRevalidator`；
+- `mark` refuses disabled、dry-run、premature and overflowed candidates without mutation, shares one deadline across
+  domain/protection/metadata/root/activation calls, and converges a lost MARK CAS only by exact root reload；
+- `advanceToDeleteIntent` waits through the maximum skew-safe reader expiry, performs the domain revalidation and a
+  second final lease/protection/metadata scan, then reloads root and activation proof before the intent CAS；
+- protection、metadata or domain drift before a destructive side effect conditionally unmarks to a fresh ACTIVE epoch；
+  lost unmark and lost DELETING responses require an exact replacement reload；
+- the class has no dependency on `SourceRetirementMetadataStore`、`ObjectAuditRetirementStore`、protection deletion or
+  `ObjectStore.deleteObject`, so `DELETE_INTENT` is the terminal result of this checkpoint.
+
+Candidate discovery and typed metadata-plan construction remain owned by later source/orphan/cursor coordinators.
+Concrete reference-domain implementations、DELETING restart/metadata retirement、physical delete and
+`DELETING -> DELETED` are also still pending；no production coordinator currently reaches the checkpoint-G delete
+primitives. A missing key or lost metadata-delete response must eventually be resolved under the unchanged DELETING
+root, never accepted from absence alone.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.
@@ -1080,12 +1150,20 @@ incarnation deletion without old-stream lifecycle/reference proof.
 
 ## 11. Orphan Discovery
 
-`PhysicalObjectRootScanner` is the authoritative lifecycle work scanner. It visits shards `000..255` round-robin with
-one in-memory continuation per shard and pages `scanRoots`. `ACTIVE` roots are evaluated as candidates；`MARKED` and
-`DELETING` roots are always handed to exact recovery even when object-store listing is empty；`DELETED` roots are
-handed to the bounded tombstone-retirement coordinator and never held in an in-memory delay queue. End-of-shard clears the
-continuation, a full pass restarts at every prefix, and watch events only accelerate a pass. Thus delete-response loss
-after bytes are already absent still converges to `DELETED` from Oxia truth.
+`PhysicalObjectRootScanner` is the authoritative lifecycle work scanner. A complete pass visits shards `000..255` in
+order and pages `scanRoots`; end-of-shard clears the continuation and a later pass restarts from every prefix. Runtime
+composition must route `ACTIVE` roots to candidate evaluation、`MARKED/DELETING` roots to exact recovery even when
+object-store listing is empty, and `DELETED` roots to the bounded tombstone-retirement coordinator rather than an
+in-memory delay queue. Watch events may only accelerate a complete pass. This metadata-first design lets a later
+coordinator converge delete-response loss from Oxia truth after bytes are already absent.
+
+Checkpoint I implements the complete-pass scanner primitive. One `scan(visitor)` call traverses all 256 shards in
+ascending order with `metadataScanPageSize`, validates that the first key of every continuation page is strictly after
+the prior page, invokes only one visitor future at a time, and returns exact ACTIVE/MARKED/DELETING/DELETED/QUARANTINED
+counts. Per-page and per-visitor calls each receive a bounded operation deadline. An overlapping scan fails, visitor or
+metadata failure releases the admission flag for a later pass, and `close()` rejects new scans without closing the
+borrowed metadata store/scheduler. Lifecycle-specific routing、periodic scheduling and recovery coordinators are not
+yet runtime-composed；the scanner itself never consults object-store listing.
 
 `ObjectInventoryScanner` pages only known product prefixes and registers exact HEAD identity. Candidate classes：
 

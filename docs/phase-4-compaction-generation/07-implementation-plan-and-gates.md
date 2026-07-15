@@ -66,8 +66,10 @@ target protection and the `GenerationReadResolver` terminal repair seam. Runtime
 remain. Checkpoint G now adds exact read-before-delete generation-zero source and Phase 1 object-audit metadata
 adapters、committed-marker capture、legacy/generic encoding separation and a borrowed get/delete-only shared-Oxia
 bridge. Checkpoint H adds strict GC configuration、ACTIVE-root candidates and bounded canonical plans whose complete
-domain/protection/metadata-key facts can be recomputed after restart. No coordinator or physical delete path is
-enabled by checkpoints G/H.
+domain/protection/metadata-key facts can be recomputed after restart. Checkpoint I adds canonical exact-domain
+aggregation、mandatory metadata-fact reload、recoverable ACTIVE/MARKED/DELETING fencing and full 256-shard metadata
+root enumeration. It stops at durable delete intent；no source/protection/audit/object delete path is enabled by
+checkpoints G–I.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -576,10 +578,11 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Current status：in progress. Checkpoint A (NRC1 object protocol)、checkpoint B (protected generation-zero
 > append/recovery)、checkpoint C (anchor-aware tail/planning foundation), and checkpoint D (guarded root publication
 > plus restart protection reconciliation), checkpoint E (checkpoint-aware append replay adapter), and checkpoint F
-> (checkpoint-derived committed-index repair), checkpoint G (exact retirement metadata adapters), and checkpoint H
-> (bounded/reconstructable GC config/candidate/plan values) are implemented；runtime composition、reference-domain
-> implementations、retirement coordinators and
-> physical/cursor GC remain before F4-M4 can be called complete or final-gated.
+> (checkpoint-derived committed-index repair), checkpoint G (exact retirement metadata adapters), checkpoint H
+> (bounded/reconstructable GC config/candidate/plan values), and checkpoint I (exact domain aggregation、recoverable
+> root MARK/DRAIN/DELETING fence and 256-shard scanner) are implemented；runtime composition、concrete
+> reference-domain implementations、retirement/delete coordinators and physical/cursor GC completion remain before
+> F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
 
@@ -669,14 +672,25 @@ gc/GcPlannedProtectionRemoval.java                       implemented checkpoint 
 gc/GcPlannedMetadataRemoval.java                         implemented checkpoint H
 gc/GcIdGenerator.java                                    implemented checkpoint H
 gc/SecureGcIdGenerator.java                              implemented checkpoint H
+gc/GcReferenceDomainVersion.java                         implemented checkpoint I
+gc/GcReferenceCollectionStatus.java                      implemented checkpoint I
+gc/GcReferenceCollection.java                            implemented checkpoint I
+gc/GcReferenceDomainRegistry.java                        implemented checkpoint I
+gc/GcPlanMetadataRevalidator.java                        implemented checkpoint I
 gc/GenerationReferenceDomain.java
 gc/AppendRecoveryReferenceDomain.java
 gc/MaterializationReferenceDomain.java
 gc/FutureCatalogSentinelDomain.java
 gc/SourceRetirementCoordinator.java
 gc/StreamRegistrationRetirementCoordinator.java
-gc/PhysicalObjectGarbageCollector.java
-gc/PhysicalObjectRootScanner.java
+gc/PhysicalGcMarkStatus.java                              implemented checkpoint I
+gc/PhysicalGcMarkResult.java                              implemented checkpoint I
+gc/PhysicalGcAdvanceStatus.java                           implemented checkpoint I
+gc/PhysicalGcAdvanceResult.java                           implemented checkpoint I
+gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint I fence only
+gc/PhysicalObjectRootVisitor.java                         implemented checkpoint I
+gc/PhysicalObjectRootScanResult.java                      implemented checkpoint I
+gc/PhysicalObjectRootScanner.java                         implemented checkpoint I
 gc/PhysicalRootTombstoneRetirementCoordinator.java
 gc/TombstoneRetirementResult.java
 gc/TombstoneRetirementStatus.java
@@ -724,11 +738,13 @@ PreparedStableAppendContractTest
 GenerationZeroPhysicalReferencePublisherTest
 ProtectedStableAppendFailureInjectionTest
 GenerationZeroVisibleProtectionRepairTest
+GcReferenceDomainRegistryTest                              implemented checkpoint I
+PhysicalObjectGarbageCollectorTest                         implemented checkpoint I fence/lost-response tests
 PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
 PhysicalGcConfigTest                                      implemented checkpoint H
 GcPlanTest                                                implemented checkpoint H
-PhysicalObjectRootScannerTest
+PhysicalObjectRootScannerTest                              implemented checkpoint I
 PhysicalRootTombstoneRetirementTest
 LatePutAfterTombstoneTest
 PhysicalRootBackfillCoordinatorTest
@@ -758,6 +774,7 @@ retirement.
 ./gradlew phase4M4CheckpointIndexRepairCheck
 ./gradlew phase4M4RetirementMetadataCheck
 ./gradlew phase4M4GcPlanCheck
+./gradlew phase4M4RootFenceCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -803,6 +820,17 @@ MARK digest, protection owner/value/version/envelope drift changes that digest, 
 exact root object/attempt/digest/version/epoch. Restart recovery uses the current MARKED version and does not invent a
 previous or adjacent Oxia version. `GcPlan` has no
 durable codec and this gate invokes no root CAS or delete primitive；it is checkpoint-H evidence only.
+
+`phase4M4RootFenceCheck` extends checkpoint H with the canonical unique domain registry、explicit
+veto/incomplete/limit blockers、shared-deadline collection/revalidation、mandatory typed metadata reload and exact
+root CAS recovery. It proves premature/disabled/dry-run paths do not mutate；MARK binds domain/protection/metadata
+facts；drain waits through grace and paged reader leases；protection owner/version、metadata version/envelope or domain
+authority drift unmarks before any destructive side effect；lost MARK/unmark/DELETING responses and a fresh MARKED
+recovery candidate converge only by exact root reload. The scanner test forces page size one across all 256 shards and
+checks exact lifecycle counts、visitor-failure re-entry and borrowed-resource close semantics. A contract-surface
+check rejects any source/audit/protection/object delete dependency in the collector. This is checkpoint-I evidence
+only：the terminal result is durable `DELETING` intent, concrete domains/runtime composition and every destructive
+side effect remain absent.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

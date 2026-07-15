@@ -115,9 +115,10 @@ permanent protections through `DefaultObjectProtectionManager` and revalidates t
 handshake. Ordinary append and exact append recovery use the same sequence. The production Pulsar runtime constructs
 the physical store/manager/publisher over its shared Oxia client and owns their close order.
 
-This checkpoint closes the new-write physical-reference gap only. Recovery-root publication is implemented by the
-following checkpoint D；anchor-aware replay/repair、source/index retirement and physical GC remain unimplemented, so
-deletion stays disabled and F4-M4 remains in progress.
+This checkpoint closes the new-write physical-reference gap only. Later checkpoints D–F implement recovery-root
+publication and anchor-aware replay/repair, and checkpoint I implements the recoverable root fence through DELETING
+intent. Source/index retirement、physical delete and runtime composition remain unimplemented, so deletion stays
+disabled and F4-M4 remains in progress.
 
 ### 1.5 F4-M4 guarded recovery-root publication checkpoint
 
@@ -198,6 +199,30 @@ metadata version and unit-incremented lifecycle epoch. The plan remains process-
 the coordinator must reload authoritative roots/domains and exact protection/source-key values including their Oxia
 versions and stored-envelope digests, then recompute the same digest. No
 codec/keyspace/store for `GcPlan` exists intentionally, because persisting it would create a second correctness owner.
+
+### 1.10 F4-M4 physical-root fence checkpoint
+
+Checkpoint I is the first M4 GC checkpoint that mutates `PhysicalObjectRootRecord`, but its mutation authority is
+strictly limited to the already-defined lifecycle CAS surface. `PhysicalObjectGarbageCollector.mark` starts from an
+`ACTIVE_DISCOVERY` candidate carrying the exact ACTIVE metadata version and lifecycle epoch. It re-reads the same root
+after collecting domain/protection/metadata facts and accepts it only when object identity、lifecycle、epoch and Oxia
+version still match. The replacement preserves the immutable object fields, sets `MARKED`、`epoch + 1`、the generated
+attempt id、canonical reference-set digest、`markedAtMillis` and `deleteNotBeforeMillis = markedAtMillis + drainGrace`.
+An uncertain CAS is successful only when `getRoot` returns that exact replacement, including attempt/digest/times；an
+unchanged ACTIVE root rethrows the original failure and any other value returns `ROOT_CHANGED`.
+
+`advanceToDeleteIntent` accepts only a plan reconstructed from the exact MARKED wrapper. After the complete drain
+proof it reloads that same wrapper and performs `MARKED -> DELETING(epoch + 1)` while preserving attempt and digest and
+setting the delete-start time. Lost response recovery likewise requires the exact DELETING replacement. Before any
+destructive side effect, a changed protection、metadata fact or domain authority causes a conditional
+`MARKED -> ACTIVE(epoch + 1)` that clears GC attempt/digest/timestamps；its response-loss path converges only on the
+exact ACTIVE replacement. Root drift never authorizes progress.
+
+The checkpoint also implements `PhysicalObjectRootScanner` as a complete metadata scan over shards `000..255`, with
+bounded pages、strict cross-page key progression、serialized visitor calls and exact lifecycle counts. This makes
+MARKED/DELETING restart discovery independent of object-store listing. It is not runtime-composed yet and it does not
+perform `DELETING -> DELETED`、conditional source/protection/audit deletion or object-store deletion；those remain a
+single later coordinator/recovery path rather than new metadata truth.
 
 ## 2. Keyspace
 

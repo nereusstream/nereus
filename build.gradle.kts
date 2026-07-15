@@ -753,3 +753,20 @@ tasks.register("phase4M4GcPlanCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M4RootFenceContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 reference-domain and physical-root fence checkpoint."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-root-fence-contract-surface.sh")
+}
+
+tasks.register("phase4M4RootFenceCheck") {
+    group = "verification"
+    description = "Verify reference-domain collection and recoverable MARK/DRAIN/DELETING root fencing."
+    dependsOn("phase4M4GcPlanCheck")
+    dependsOn("checkPhase4M4RootFenceContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-materialization:check")
+}

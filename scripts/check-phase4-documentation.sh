@@ -46,6 +46,8 @@ require_literal "phase4M4RetirementMetadataCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M4GcPlanCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M4RootFenceCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "F4-M4 NRC1 object-protocol checkpoint" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "F4-M4 protected generation-zero append checkpoint" \

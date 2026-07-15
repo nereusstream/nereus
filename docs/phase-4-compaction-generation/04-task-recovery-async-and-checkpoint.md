@@ -159,6 +159,22 @@ plan has deliberately no durable codec. Crash recovery must rerun discovery and 
 authoritative metadata before drain or deletion can continue. Reference-domain implementations、root transitions and
 all metadata/object delete calls are still absent from runtime composition.
 
+F4-M4 checkpoint I implements the bounded generic aggregation and root-fence nodes but still does not instantiate the
+target runtime graph. `GcReferenceDomainRegistry` freezes one canonical unique local `(domainId, protocolVersion)` set,
+collects snapshots sequentially under the collector's one operation deadline and distinguishes veto、incomplete and
+configured-limit blockers. Its drain revalidation requires the exact same complete set and calls each domain's
+`stillMatches` in order. `PhysicalObjectGarbageCollector` additionally requires
+`projection-generation-v1@1`、an injected `GcPlanMetadataRevalidator` and the existing physical metadata/activation
+contracts. It can recoverably execute `ACTIVE -> MARKED`, wait through drain grace and every reader lease's skew-safe
+expiry, unmark on domain/protection/metadata drift, and execute only the durable `MARKED -> DELETING` intent. It has no
+reference to the retirement adapters or object-store delete API, so a later composition checkpoint must provide one
+coordinator for DELETING recovery and destructive work rather than treating this fence as completion.
+
+`PhysicalObjectRootScanner` now provides the restart discovery side of that graph: each pass scans all 256 metadata
+shards with bounded sequential pages/visitor calls, validates key progression and reports exact lifecycle counts.
+Overlapping passes and post-close admission fail；the injected metadata store and scheduler remain borrowed. Production
+runtime composition、concrete reference-domain implementations and all DELETING side effects remain target code.
+
 Full M4–M6 target construction：
 
 ```java
