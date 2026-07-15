@@ -42,7 +42,11 @@ bootstrap、tagged-v1 keyed/unkeyed encoding、shared-budget checksum-verified s
 replay and the NTC1 worker/view-isolated publication path. M3's deterministic and real-service gates additionally
 prove two-worker claim convergence、restart/output reuse、lost `OUTPUT_READY` response recovery、full output bytes and
 all-64-shard pagination without watch/process-local hints. F4-M3 is complete/final-gated. This is not a Phase 4
-completion claim：full recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
+completion claim. F4-M4 implementation checkpoint A now provides the NRC1 domain/format、spill-backed one-at-a-time
+writer、strict bounded open/lookup path、attempt/key identity and authoritative metadata verifier. Its focused object-
+store/materialization tests and `phase4M4CheckpointCheck --rerun-tasks` passed on 2026-07-15 (114 tasks) and are the
+current evidence boundary；full recovery-root/
+anchor-aware retirement/GC and async/Pulsar execution paths still arrive in the remainder of F4-M4–M6.
 
 A later milestone is complete only when：
 
@@ -544,12 +548,19 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 
+> Current status：in progress. Checkpoint A (NRC1 object protocol) is implemented；checkpoint coordinator/root CAS、
+> protected append、anchor-aware replay/repair、retirement and physical/cursor GC remain before F4-M4 can be called
+> complete or final-gated.
+
 ### 6.1 Production artifacts
 
 `nereus-object-store`：
 
 ```text
 checkpoint/RecoveryCheckpointCodecV1.java
+checkpoint/DefaultRecoveryCheckpointCodecV1.java
+checkpoint/RecoveryCheckpointFormatV1.java
+checkpoint/RecoveryCheckpointFormatException.java
 checkpoint/RecoveryCheckpointObject.java
 checkpoint/RecoveryCheckpointEntry.java
 checkpoint/RecoveryCheckpointPublication.java
@@ -557,6 +568,8 @@ checkpoint/RecoveryCheckpointWriteRequest.java
 checkpoint/RecoveryCheckpointWriteResult.java
 checkpoint/RecoveryCheckpointDirectory.java
 checkpoint/RecoveryCheckpointVerifier.java
+checkpoint/RecoveryCheckpointBinary.java                 package-private strict codec
+checkpoint/RecoveryCheckpointValidation.java             package-private value guard
 ```
 
 `nereus-core` / `nereus-metadata-oxia`：
@@ -594,6 +607,7 @@ recovery/RecoveryCheckpointCoordinator.java
 recovery/RecoveryCheckpointBuilder.java
 recovery/RecoveryCheckpointMerger.java
 recovery/RecoveryCheckpointProtectionManager.java
+recovery/MetadataRecoveryCheckpointVerifier.java
 gc/GcCandidate.java
 gc/GcPlan.java
 gc/GenerationReferenceDomain.java
@@ -633,6 +647,10 @@ cursor/CursorSnapshotInventory.java             unchanged authority semantics
 RecoveryCheckpointGoldenTest
 RecoveryCheckpointAttemptIdentityTest
 RecoveryCheckpointStrictDecodeTest
+RecoveryCheckpointStreamingTest
+RecoveryCheckpointSparseDirectoryTest
+RecoveryCheckpointDomainValidationTest
+MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
 RecoveryCheckpointMergeTest
 AnchorAwareCommitWalkerTest
@@ -671,9 +689,14 @@ retirement.
 ### 6.3 Gates
 
 ```text
+./gradlew phase4M4CheckpointCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
+
+`phase4M4CheckpointCheck` is deliberately narrower than the milestone gates：it verifies the implemented NRC1
+streaming/strict-read/canonical-metadata boundary and all earlier M3 prerequisites. It must not be cited as evidence
+that recovery-root publication、source retirement or any physical deletion path is enabled.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

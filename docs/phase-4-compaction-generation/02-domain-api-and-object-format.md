@@ -10,7 +10,10 @@ reconciliation、advisory checkpoint reconciler、bounded M3 service lifecycle a
 trip are also implemented. The protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity
 registry、COMMITTED-source planner bootstrap、collision-free tagged-v1 key namespace、checksum-verified sorted-spill
 two-pass engine、NTC1 worker/publication path and proof-driven terminal workflow-metadata retirement are implemented
-and covered by focused tests. The M3 ordinary/final gates passed on 2026-07-15；only M4–M6 surfaces remain target work. Package、class and method names are normative unless a review replaces them together with
+and covered by focused tests. The M3 ordinary/final gates passed on 2026-07-15. F4-M4 is now in progress：the NRC1
+domain values、private-staging streaming writer、strict header/footer/directory/range reader、attempt/key identity and
+authoritative F4 metadata-record verifier described in section 9 are implemented and focused-tested；recovery-root
+publication、retirement and GC remain target work. Package、class and method names are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
 The domain model obeys these rules：
@@ -85,9 +88,19 @@ nereus-object-store/src/main/java/com/nereusstream/objectstore/compacted/
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/checkpoint/
   RecoveryCheckpointCodecV1.java
+  DefaultRecoveryCheckpointCodecV1.java
+  RecoveryCheckpointFormatV1.java
+  RecoveryCheckpointFormatException.java
   RecoveryCheckpointObject.java
   RecoveryCheckpointEntry.java
   RecoveryCheckpointPublication.java
+  RecoveryCheckpointWriteRequest.java
+  RecoveryCheckpointWriteResult.java
+  RecoveryCheckpointDirectory.java
+  RecoveryCheckpointVerifier.java
+
+nereus-materialization/src/main/java/com/nereusstream/materialization/recovery/
+  MetadataRecoveryCheckpointVerifier.java
 
 nereus-materialization/src/main/java/com/nereusstream/materialization/
   MaterializationPlanner.java
@@ -1000,6 +1013,10 @@ fails the writer before upload/publication.
 The recovery checkpoint replaces a prefix of live Oxia commit nodes as append-replay/index-repair evidence. It is
 not a data generation and never serves `StreamStorage.read` directly.
 
+> Implementation status (2026-07-15)：the object protocol in this section is implemented. This is an F4-M4
+> implementation checkpoint, not an M4 completion claim；the coordinator/root CAS、anchor-aware consumers and
+> retirement/GC paths in documents 03–05 are still required.
+
 ### 9.1 Streaming codec surface
 
 ```java
@@ -1087,6 +1104,12 @@ public interface RecoveryCheckpointCodecV1 {
 }
 ```
 
+The production implementation is `DefaultRecoveryCheckpointCodecV1(ObjectStore, StagingFileManager, Executor,
+RecoveryCheckpointVerifier)`. `RecoveryCheckpointVerifier` keeps `nereus-object-store` protocol-neutral while the
+materialization implementation decodes embedded records through `GenerationIndexRecordCodecV1` and
+`MetadataRecordCodecFactory`/`StreamCommitTargetRecord`. It rejects non-canonical bytes、non-zero embedded
+`metadataVersion`、non-COMMITTED generation evidence and any duplicated identity/range/version drift.
+
 Both publishers are cold、single-subscription、strictly ordered and bounded to one outstanding item. The codec writes
 publications first, then commits, while incrementally building spillable directory runs in the same owner-only
 staging area；it never retains all million entries or publications in heap. Input buffers are read-only and capped at
@@ -1100,11 +1123,16 @@ strictly decodes one bounded record; absence means exact directory miss, never a
 All integers are big-endian. Strings are strict UTF-8 prefixed by unsigned 32-bit length. Counts/lengths are checked
 before allocation.
 
+The request contains `cluster`, and V1 therefore encodes `cluster` in the header. Omitting it would make
+`openAndVerify` unable to reconstruct and validate the canonical object key from decoded bytes；the code-level layout
+below is the authoritative correction to the earlier pre-implementation sketch.
+
 ```text
 Header
   4 bytes  magic "NRC1"
   u16      majorVersion = 1
   u16      flags = 0
+  string   cluster
   string   streamId
   i64      checkpointSequence >= 1
   string   checkpointAttemptId             // random 128-bit lowercase base32
@@ -1185,9 +1213,10 @@ target、payload、counts、schema refs、projection ref、event times and prepa
 append replay validation. Unknown envelope/target versions fail closed.
 
 Entries are contiguous in commit version、offset and cumulative size. The first entry bridges the previous active
-checkpoint (or genesis)；the final entry exactly matches the root's covered end. Each untrimmed entry has at least one
-valid publication-table reference whose union covers its range. Entries wholly below completed logical trim may
-carry an empty publication list because no read/index repair is legal below trim.
+checkpoint (or genesis)；the final entry exactly matches the root's covered end. The implemented builder contract
+anchors checkpoint coverage at the authoritative logical-trim offset (genesis is trim offset zero), so every encoded
+entry is still legal repair evidence and carries 1–8 valid publication-table references whose union covers its exact
+range. V1 does not infer "already trimmed" from process-local state and does not encode an empty-reference shortcut.
 
 ### 9.3 Limits
 
@@ -1207,6 +1236,13 @@ Readers range-read `NRF1` and both directories first. Commit lookup uses the spa
 commit entry；its publication indexes are resolved through the exact publication directory without loading the full
 table/object. Directory indexes/offsets must be sorted, unique, in bounds and point to records whose decoded identity
 matches the directory entry.
+
+The implemented writer requests exactly one publisher item at a time and retains only the current bounded record.
+Publication and sparse-commit directory runs plus fixed-width publication coverage facts use owner-only spill files
+under the shared staging budget；entry validation reuses one identity-checked random-read handle rather than opening a
+file per reference. `openAndVerify` uses one monotonic deadline, hashes the object in at most 1 MiB ranges, and checks
+HEAD length、header/footer CRC32C、directory bounds、body SHA-256、complete-object SHA-256 and reproduced key identity.
+Exact lookup then validates the selected record CRC、embedded digest、metadata semantics and referenced coverage.
 
 Larger history is split across checkpoint objects referenced by a bounded root chain. The active Oxia root stores at
 most 32 checkpoint references；before the 33rd, a merge checkpoint replaces older checkpoint objects. Root publication

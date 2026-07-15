@@ -270,9 +270,10 @@ final generation-index key's same-key `PREPARED -> COMMITTED` CAS。Phase 1.5 im
 object-specific legacy decoder/adapter boundary。This does not alter Object WAL bytes or
 implement BookKeeper IO。
 
-## 10. F4 code-level designed object families
+## 10. F4 code-level object families
 
-> Status: Designed / F4-M0 code-level formats frozen；not implemented
+> Status: In progress. NCP1/NTC1 are implemented and F4-M3 final-gated；the NRC1 object codec/strict reader is
+> implemented as F4-M4 checkpoint A. Recovery-root publication、retirement and GC remain unavailable.
 
 A read-optimized object is per-stream and covers a declared half-open offset range. Its durable header includes a
 closed read-view value (`COMMITTED` or `TOPIC_COMPACTED`); view-specific indexes and generation ordering never cross.
@@ -303,6 +304,13 @@ F4-M0 freezes three distinct formats：
   it is legal only in `TOPIC_COMPACTED` and never ordinary fallback；
 - `NEREUS_RECOVERY_CHECKPOINT_V1` (`NRC1` body + `NRF1` footer)：an immutable, checksummed stream-prefix
   recovery/index-repair checkpoint referenced by a versioned recovery root。
+
+The implemented NRC1 header includes cluster、stream、checkpoint sequence/attempt、coverage、commit/cumulative
+boundaries、source-head identity、projection SHA and exact counts. Publications precede commits；directory runs are
+spill-backed and the commit directory has fixed stride 256. Per-record CRC32C、body SHA-256 and complete-object
+SHA-256 are distinct checks. `openAndVerify` recomputes the deterministic key and hashes bounded object-store ranges；
+lookup strictly decodes the selected canonical generation-index or generic commit envelope. This object implementation
+does not publish a recovery root and therefore does not yet authorize source/index retirement.
 
 Output keys contain exact content SHA-256 plus a durable worker output-attempt id；generation is deliberately absent
 from object bytes and object identity, and a deleted key is never reused。Exact columns、field order、limits、checksum coverage、reader

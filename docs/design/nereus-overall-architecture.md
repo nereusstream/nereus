@@ -102,8 +102,10 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4-M6 的 recovery/GC、async/Pulsar
-execution path 仍是 Designed target。
+Oxia/LocalStack final gates。M4 的 NRC1 object protocol 已开始实现：spill-backed streaming writer、strict
+directory/range reader、attempt/key identity、body/content SHA 与 canonical metadata verifier 已有 focused
+evidence；recovery-root、protected append、anchor-aware retirement/GC 及 M5-M6 async/Pulsar execution path
+仍是 target。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -115,7 +117,8 @@ alias。
   exact-source worker、checkpoint/service building blocks 已实现，但 profile 尚未启用）；
 - KoP、routing、production topic-compaction admission、lakehouse、advanced Pulsar semantics；
 - Future 4 physical retirement/GC and async materialization remain unavailable until F4-M4–M6 are implemented；
-  later tracks remain north-star designs；Future 3 and F4-M1–M3 are implemented/final-gated。
+  the M4 NRC1 object codec alone does not enable them. Later tracks remain north-star designs；Future 3 and
+  F4-M1–M3 are implemented/final-gated。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
 

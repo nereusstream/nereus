@@ -822,7 +822,7 @@ checksums and object-key `(checkpointSequence, contentSha256, checkpointAttemptI
 and within document 02 limits；attempt ids are random 128-bit lowercase base32 and have no sequence meaning. Nested
 references have no independent `metadataVersion` or lifecycle；the enclosing root version owns their visibility.
 
-Root coverage is a prefix whose start is either genesis or the current logical trim checkpoint. Any untrimmed covered
+Root coverage is a prefix whose start is the current logical trim checkpoint (genesis is logical trim offset zero). Any covered
 commit must reference a committed lossless generation in NRC1. The root CAS is the point at which anchor-aware append
 replay/index repair may stop consulting the replaced live commit nodes. It does not itself delete any key/object.
 

@@ -83,6 +83,12 @@ workflow-metadata retirer is also wired after checkpoint reconciliation. `phase4
 `phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15；higher-generation production activation remains disabled
 until the M4–M6 recovery/GC、async/Pulsar and compatibility gates complete.
 
+F4-M4 checkpoint A now implements the NRC1 values、spill-backed one-at-a-time codec、strict bounded open/lookup path
+and `MetadataRecoveryCheckpointVerifier`. It proves canonical recovery bytes can be built and consumed without an
+object-store -> metadata dependency. The runtime graph's `RecoveryCheckpointCoordinator`、root CAS/protection manager、
+anchor-aware consumers and retirement/GC nodes below remain target code；the object codec alone does not shorten the
+live commit tail or release any source protection.
+
 Full M4–M6 target construction：
 
 ```java

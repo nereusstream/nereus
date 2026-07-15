@@ -5,7 +5,8 @@
 > reader/worker、protection crash-cut reconciliation、advisory checkpoint reconciliation、bounded service lifecycle、
 > Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry、terminal workflow-metadata retirement、
 > COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
-> isolated publication；F4-M4–M6 未实现
+> isolated publication；F4-M4 正在实现，首个 NRC1 object-protocol checkpoint 已落地，recovery-root/
+> retirement/GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -342,6 +343,28 @@ This is not a Phase 4 completion claim. Higher-generation production activation 
 must first deliver recovery checkpoints、anchor-aware retirement and GC, followed by M5 async/Pulsar wiring and M6
 compatibility/scale closure.
 
+### 6.4 F4-M4 NRC1 object-protocol checkpoint
+
+F4-M4 的首个实现 checkpoint 已落地 `RecoveryCheckpointWriteRequest/Publication/Entry/Directory/Object/WriteResult`
+领域值、`RecoveryCheckpointCodecV1` 与 `DefaultRecoveryCheckpointCodecV1`。NRC1 使用 big-endian `NRC1/NRF1`
+header/footer、逐 record CRC32C、body SHA-256 和 complete-object SHA-256；canonical key 同时绑定 cluster、stream、
+sequence、content SHA 与随机 attempt id。writer 对 publications/entries 各只保留一个 outstanding item，目录和
+publication coverage facts 写入共享 staging budget 下的 owner-only spill；百万级路径不会将全部 metadata rows
+聚合进 heap，entry reference 校验复用单个受控随机读句柄。
+
+`openAndVerify` 以同一 monotonic deadline 执行 HEAD、footer/header/directory bounded reads 和 1 MiB 分块的
+whole-object hash；publication lookup 使用目录二分，commit lookup 使用 stride 256 的 sparse block，并严格校验
+record CRC、embedded digest、coverage refs。`MetadataRecoveryCheckpointVerifier` 通过 authoritative F4 codec
+解码 canonical `GenerationIndexRecordCodecV1` bytes 与 generic `StreamCommitTargetRecord` envelope，强制
+`metadataVersion=0`、COMMITTED view/lifecycle 和所有 duplicated identity facts 相等。golden/attempt identity、
+self-consistent corruption、one-at-a-time/cancellation、513-entry three-block sparse lookup 及 metadata semantic
+tests 已加入；`phase4M4CheckpointCheck --rerun-tasks` 已于 2026-07-15 通过 114 个 tasks，是该中间边界的
+ordinary gate。
+
+这仍不是 F4-M4 完成声明：root CAS/coordinator、protected append、anchor-aware replay/repair、source/index
+retirement、physical/cursor GC 与真实 Oxia/LocalStack M4 final gate 尚未落地，任何删除与 higher-generation
+production activation 继续关闭。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -350,7 +373,7 @@ compatibility/scale closure.
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 object-protocol checkpoint implemented/focused-tested，root publication/retirement/GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

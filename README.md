@@ -156,7 +156,11 @@ collision-free tagged-v1 key 表示 unkeyed retain-exact records，并以共享 
 verified sorted spills 执行两遍 key selection/source replay；NTC1 worker/strict verification/publication focused
 tests 已通过。`phase4M3Check` 与真实 Oxia/LocalStack-backed `phase4M3FinalCheck --rerun-tasks` 已于
 2026-07-15 通过，覆盖双 worker、claim/response-loss/restart、完整 Parquet bytes 与全 64 分片分页/watch-loss；
-F4-M3 已 final-gated。F4-M4–M6 的 recovery checkpoint、retention/GC、async profile 与最终兼容接线仍不可用。
+F4-M3 已 final-gated。F4-M4 的首个 NRC1 object-protocol checkpoint 已实现 spill-backed one-at-a-time writer、
+strict header/footer/directory/range reader、attempt/key identity、body/content 双 SHA 和 authoritative metadata
+verifier，并由 golden/corruption/sparse-directory tests 覆盖；`phase4M4CheckpointCheck --rerun-tasks` 已于
+2026-07-15 通过。recovery-root publication、retention/GC 以及
+F4-M5–M6 的 async profile 与最终兼容接线仍不可用。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

@@ -620,3 +620,21 @@ tasks.register("phase4M3FinalCheck") {
     dependsOn("phase4M2FinalCheck")
     dependsOn(":nereus-materialization:f4M3IntegrationTest")
 }
+
+tasks.register<Exec>("checkPhase4M4CheckpointContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 NRC1 object-protocol implementation checkpoint."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-checkpoint-contract-surface.sh")
+}
+
+tasks.register("phase4M4CheckpointCheck") {
+    group = "verification"
+    description = "Verify the in-progress F4-M4 NRC1 streaming codec, strict reader, and metadata verifier."
+    dependsOn("phase4M3Check")
+    dependsOn("checkPhase4M4CheckpointContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-object-store:check")
+}

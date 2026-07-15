@@ -306,7 +306,8 @@ lifecycle barrier waits for older exact append recovery, while remote races are 
 
 ## 9. AutoMQ-like async materialization
 
-> Status: Designed / F4-M0 code-level contract frozen；not implemented
+> Status: In progress. M2/M3 publication、planner/worker/recovery/service building blocks are implemented/final-gated
+> and M4 NRC1 object bytes are implemented；the async profile admission/retention/Pulsar path remains disabled.
 
 Async profile shares the entire stable append protocol。Only secondary publication is decoupled：
 
@@ -358,7 +359,8 @@ only Object WAL IO。A real BookKeeper adapter/client/retention implementation r
 
 ## 11. Generation publish protocol
 
-> Status: Designed / F4-M0 code-level contract frozen；not implemented
+> Status: Implemented/final-gated at the M2/M3 materialization boundary；production profile activation remains off
+> until M4 recovery/GC and later rollout gates complete.
 
 Generation 0 is append-derived。Generation > 0 is published by materialization/compaction：
 
@@ -503,7 +505,8 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 
 ## 15. GC protocol
 
-> Status: Designed / F4-M0 code-level contract frozen beyond the implemented Phase 1 reference boundary
+> Status: In progress. Physical reference values/leases/protections and NRC1 object bytes are implemented；recovery-root
+> publication、anchor-aware retirement and physical/cursor deletion remain designed and disabled.
 
 An object is deletable only when all relevant conditions are true：
 

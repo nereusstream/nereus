@@ -562,8 +562,12 @@ workflow-metadata retirement 已用 exact task/index/checkpoint/root/protection 
 发布，并实现 tagged-v1 keyed/unkeyed namespace、共享 staging budget 的 checksum-verified sorted spills、
 survivor bitmap、两遍 exact-source replay 及 NTC1 worker/isolated publication tests。`phase4M3Check` 与真实
 Oxia/LocalStack-backed `phase4M3FinalCheck --rerun-tasks` 已于 2026-07-15 通过，覆盖双 worker claim 收敛、
-重启/response-loss、完整 Parquet bytes 与全 64 分片 pagination/watch-loss。下一步是 F4-M4
-recovery checkpoint、anchor-aware retirement 与 physical GC，不重新打开协议选型。
+重启/response-loss、完整 Parquet bytes 与全 64 分片 pagination/watch-loss。F4-M4 的第一个 checkpoint 又已
+实现 NRC1 spill-backed one-at-a-time writer、strict header/footer/directory/range reader、attempt/key identity、
+body/content 双 SHA，以及 authoritative generation-index/generic-commit metadata verifier；golden、self-consistent
+corruption、cancellation 和跨 3 个 sparse blocks 的 focused tests 已加入。下一步是 protected append、
+recovery-root publication、anchor-aware replay/repair、retirement 与 physical/cursor GC，不重新打开协议选型。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates 也不声称 physical GC、async/Pulsar rollout、benchmark、chaos 或
-Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、故障点和 release gates 见代码级实施计划。
+F4-M0 只是 design gate；F4-M1–M3 final gates 和 M4 NRC1 中间 checkpoint 也不声称 physical GC、
+async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
+故障点和 release gates 见代码级实施计划。

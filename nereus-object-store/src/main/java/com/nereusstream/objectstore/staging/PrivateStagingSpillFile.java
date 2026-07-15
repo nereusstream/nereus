@@ -42,6 +42,7 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
     private Object sealedFileKey;
     private Checksum sealedSha256;
     private VerifiedInputStream activeReader;
+    private RandomAccessReader activeRandomReader;
 
     PrivateStagingSpillFile(StagingFileManager manager, Path path) throws IOException {
         this.manager = Objects.requireNonNull(manager, "manager");
@@ -97,7 +98,7 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
 
     public synchronized InputStream openVerifiedInputStream() {
         requireState(State.SEALED, "spill file is not sealed");
-        if (activeReader != null) {
+        if (activeReader != null || activeRandomReader != null) {
             throw new IllegalStateException("spill file already has an active reader");
         }
         validateSealedFile();
@@ -111,9 +112,28 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
         }
     }
 
+    /** Opens one identity-checked random reader for fixed-width checksum-protected run records. */
+    public synchronized RandomAccessReader openRandomAccessReader() {
+        requireState(State.SEALED, "spill file is not sealed");
+        if (activeReader != null || activeRandomReader != null) {
+            throw new IllegalStateException("spill file already has an active reader");
+        }
+        validateSealedFile();
+        try {
+            activeRandomReader = new RandomAccessReader(
+                    FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS),
+                    writtenBytes);
+            return activeRandomReader;
+        } catch (IOException failure) {
+            throw new NereusException(
+                    ErrorCode.OBJECT_READ_FAILED, true, "failed to open private spill random reader", failure);
+        }
+    }
+
     @Override
     public void close() {
         VerifiedInputStream reader;
+        RandomAccessReader randomReader;
         long release;
         synchronized (this) {
             if (state == State.CLOSED) {
@@ -122,6 +142,8 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
             state = State.CLOSED;
             reader = activeReader;
             activeReader = null;
+            randomReader = activeRandomReader;
+            activeRandomReader = null;
             release = writtenBytes;
             try {
                 writer.close();
@@ -133,6 +155,9 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
                 reader.close();
             } catch (IOException ignored) {
             }
+        }
+        if (randomReader != null) {
+            randomReader.closeFromOwner();
         }
         deleteQuietly();
         manager.release(release);
@@ -204,6 +229,12 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
     private synchronized void readerClosed(VerifiedInputStream reader) {
         if (activeReader == reader) {
             activeReader = null;
+        }
+    }
+
+    private synchronized void randomReaderClosed(RandomAccessReader reader) {
+        if (activeRandomReader == reader) {
+            activeRandomReader = null;
         }
     }
 
@@ -332,6 +363,67 @@ public final class PrivateStagingSpillFile implements ManagedStagingFile {
                 super.close();
             } finally {
                 readerClosed(this);
+            }
+        }
+    }
+
+    /** Single-owner bounded random reader. Each caller-owned record must carry its own checksum. */
+    public final class RandomAccessReader implements AutoCloseable {
+        private final FileChannel channel;
+        private final long length;
+        private boolean closed;
+
+        private RandomAccessReader(FileChannel channel, long length) {
+            this.channel = channel;
+            this.length = length;
+        }
+
+        public synchronized ByteBuffer readRange(long offset, int length) {
+            if (closed) {
+                throw new IllegalStateException("spill random reader is closed");
+            }
+            if (offset < 0 || length < 0 || offset > this.length || length > this.length - offset) {
+                throw new IllegalArgumentException("spill read range is outside the sealed file");
+            }
+            ByteBuffer result = ByteBuffer.allocate(length);
+            try {
+                while (result.hasRemaining()) {
+                    int read = channel.read(result, offset + result.position());
+                    if (read < 0) {
+                        throw new IOException("unexpected EOF in sealed spill file");
+                    }
+                    if (read == 0) {
+                        Thread.onSpinWait();
+                    }
+                }
+                result.flip();
+                return result.asReadOnlyBuffer();
+            } catch (IOException failure) {
+                throw new NereusException(
+                        ErrorCode.OBJECT_READ_FAILED, true, "failed to read private spill range", failure);
+            }
+        }
+
+        @Override
+        public void close() {
+            closeInternal(true);
+        }
+
+        private void closeFromOwner() {
+            closeInternal(false);
+        }
+
+        private synchronized void closeInternal(boolean notifyOwner) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                channel.close();
+            } catch (IOException ignored) {
+            }
+            if (notifyOwner) {
+                randomReaderClosed(this);
             }
         }
     }
