@@ -6,6 +6,7 @@ import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.PublicationId;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 
@@ -26,6 +27,12 @@ public interface RecoveryCheckpointCodecV1 {
             RecoveryCheckpointObject object,
             long generation,
             PublicationId publicationId,
+            Duration timeout);
+
+    CompletableFuture<RecoveryCheckpointPublicationPage> scanPublications(
+            RecoveryCheckpointObject object,
+            OptionalInt continuation,
+            int limit,
             Duration timeout);
 
     CompletableFuture<Optional<RecoveryCheckpointEntry>> findCommit(

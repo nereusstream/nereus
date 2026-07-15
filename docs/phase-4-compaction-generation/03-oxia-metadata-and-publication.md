@@ -115,8 +115,24 @@ permanent protections through `DefaultObjectProtectionManager` and revalidates t
 handshake. Ordinary append and exact append recovery use the same sequence. The production Pulsar runtime constructs
 the physical store/manager/publisher over its shared Oxia client and owns their close order.
 
-This checkpoint closes the new-write physical-reference gap only. Recovery-root CAS、anchor-aware consumers、source/
-index retirement and physical GC remain unimplemented, so deletion stays disabled and F4-M4 remains in progress.
+This checkpoint closes the new-write physical-reference gap only. Recovery-root publication is implemented by the
+following checkpoint D；anchor-aware replay/repair、source/index retirement and physical GC remain unimplemented, so
+deletion stays disabled and F4-M4 remains in progress.
+
+### 1.5 F4-M4 guarded recovery-root publication checkpoint
+
+`RecoveryCheckpointCoordinator` now executes the bounded checkpoint plan through guarded if-absent object upload、
+exact HEAD and full NRC1 verification、root-owned pending protection and the recovery-root CAS. Activation、current
+root、every exact committed target and the builder plan are revalidated before each provider attempt and publication
+mutation. A lost CAS response is accepted only after an exact root reload proves that the desired replacement is
+already authoritative；uploaded bytes and workflow state never substitute for root truth.
+
+After publication, `RecoveryCheckpointRootReconciler` pages the immutable NRC1 publication table, reloads every
+embedded generation index from Oxia, distinguishes the raw record SHA from the durable Oxia-envelope SHA, and repairs
+both checkpoint-object and target permanent protections before deleting the deterministic pending protection. The
+same reconciliation runs before the next build, so restart converges when a process exits after root CAS but before
+the protection writes. Checkpoint-aware replay/index repair、source retirement and GC are deliberately not enabled by
+this checkpoint.
 
 ## 2. Keyspace
 

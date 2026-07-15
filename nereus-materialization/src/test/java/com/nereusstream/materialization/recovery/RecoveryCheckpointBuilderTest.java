@@ -34,7 +34,6 @@ import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
-import com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
@@ -301,7 +300,8 @@ class RecoveryCheckpointBuilderTest {
                 "",
                 2,
                 0);
-        Checksum digest = sha(new GenerationIndexRecordCodecV1().encode(canonical));
+        Checksum digest = sha(MetadataRecordCodecFactory.encodeEnvelope(
+                canonical, GenerationIndexRecord.class));
         return new VersionedGenerationIndex(
                 new F4Keyspace(CLUSTER).generationIndexKey(
                         STREAM, ReadView.COMMITTED, 2, 1),

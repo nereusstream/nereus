@@ -108,6 +108,18 @@ revalidates exact target key/id/kind/range. The guarded object upload、full NRC
 reconciliation and pending-to-permanent orchestration remain in `RecoveryCheckpointCoordinator` target code；this
 foundation does not retire metadata or authorize deletion.
 
+F4-M4 checkpoint D now implements the guarded publication sequence in §8.3 through permanent-protection
+reconciliation. `RecoveryCheckpointCoordinator` uses one operation deadline, revalidates activation and the exact
+builder plan before every provider attempt and publication mutation, treats only the recovery-root CAS as visibility,
+and resolves a lost CAS response only by reloading the exact desired root. `RecoveryCheckpointRootReconciler` then
+opens every current-root NRC1 reference, pages its publication table without aggregating it in heap, reloads each
+exact `COMMITTED` generation index/ACTIVE target root, establishes current-root-owned object/target protections, and
+only then removes the deterministic pending protection. The same reconciler runs before the next build, so a process
+death immediately after root CAS converges after restart. Raw embedded generation-record SHA and the durable Oxia
+envelope SHA are deliberately separate facts and are both verified. Focused tests cover lost root-CAS response and
+post-CAS/pre-permanent process death. Checkpoint-aware replay/index repair and all retirement/GC work remain target
+code；root publication alone still authorizes no deletion.
+
 Full M4–M6 target construction：
 
 ```java

@@ -54,7 +54,11 @@ anchor-aware retirement/GC and async/Pulsar execution paths still arrive in the 
 current foundation adds the exact paged append-recovery tail in production/fake metadata stores, the root-stable
 `AnchorAwareCommitWalker`, the bounded whole-commit `RecoveryCheckpointBuilder`, and root-owned pending/permanent
 protection handshakes. Metadata contracts and focused walker/builder tests pass；guarded upload、full verification、
-root CAS/reconciliation、retirement and GC are not implemented by this foundation.
+root CAS/reconciliation、retirement and GC were not implemented by that foundation. Checkpoint D now adds guarded
+if-absent NRC1 upload、exact HEAD/full verification、pending protection、root CAS with exact response-loss reload, and
+bounded restart reconciliation of current-root object/target protections from the NRC1 publication table. Focused
+tests use the real in-memory Oxia adapter plus fake physical/local object storage to prove lost root-CAS response and
+process death after CAS but before permanent protection. Replay/repair、retirement and GC remain.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -561,9 +565,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 
 > Current status：in progress. Checkpoint A (NRC1 object protocol)、checkpoint B (protected generation-zero
-> append/recovery), and checkpoint C's anchor-aware tail/checkpoint-planning foundation are implemented；guarded
-> coordinator upload/root CAS/reconciliation、anchor-aware replay/repair、retirement and physical/cursor GC remain
-> before F4-M4 can be called complete or final-gated.
+> append/recovery)、checkpoint C (anchor-aware tail/planning foundation), and checkpoint D (guarded root publication
+> plus restart protection reconciliation) are implemented；checkpoint-aware replay/repair、retirement and
+> physical/cursor GC remain before F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
 
@@ -577,6 +581,7 @@ checkpoint/RecoveryCheckpointFormatException.java
 checkpoint/RecoveryCheckpointObject.java
 checkpoint/RecoveryCheckpointEntry.java
 checkpoint/RecoveryCheckpointPublication.java
+checkpoint/RecoveryCheckpointPublicationPage.java        implemented checkpoint D
 checkpoint/RecoveryCheckpointWriteRequest.java
 checkpoint/RecoveryCheckpointWriteResult.java
 checkpoint/RecoveryCheckpointDirectory.java
@@ -623,10 +628,11 @@ testing/FakeOxiaMetadataStore                  exact parity
 `nereus-materialization`：
 
 ```text
-recovery/RecoveryCheckpointCoordinator.java
+recovery/RecoveryCheckpointCoordinator.java               implemented checkpoint D
 recovery/RecoveryCheckpointBuilder.java           implemented checkpoint C foundation
 recovery/RecoveryCheckpointMerger.java
 recovery/RecoveryCheckpointProtectionManager.java implemented checkpoint C foundation
+recovery/RecoveryCheckpointRootReconciler.java            implemented checkpoint D
 recovery/MetadataRecoveryCheckpointVerifier.java
 gc/GcCandidate.java
 gc/GcPlan.java
@@ -712,6 +718,7 @@ retirement.
 ```text
 ./gradlew phase4M4CheckpointCheck
 ./gradlew phase4M4ProtectedAppendCheck
+./gradlew phase4M4RecoveryRootCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -724,6 +731,12 @@ that recovery-root publication、source retirement or any physical deletion path
 core caller rule、ordinary/recovery ordering、production shared-Oxia composition、unit checks and compilation of every
 affected real-service source set. It is checkpoint-B evidence only；it does not run or imply the later recovery-root、
 retirement、GC or M4 final-service scenarios.
+
+`phase4M4RecoveryRootCheck` extends checkpoint B with anchor-aware tail/planning contracts, bounded NRC1 publication
+enumeration, guarded upload/root-CAS sequencing, digest-role separation and restart-safe permanent-protection repair.
+It includes focused lost-response/process-death tests and the affected module checks. It is checkpoint-D evidence；it
+does not imply that checkpoint-aware append replay/index repair、source retirement、physical/cursor GC or the
+Docker-backed M4 final gate is available.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

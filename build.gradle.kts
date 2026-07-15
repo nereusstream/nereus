@@ -660,3 +660,22 @@ tasks.register("phase4M4ProtectedAppendCheck") {
     dependsOn(":nereus-metadata-oxia:compileOxiaIntegrationTestJava")
     dependsOn(":nereus-pulsar-adapter:check")
 }
+
+tasks.register<Exec>("checkPhase4M4RecoveryRootContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 recovery-root publication and reconciliation checkpoint."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-recovery-root-contract-surface.sh")
+}
+
+tasks.register("phase4M4RecoveryRootCheck") {
+    group = "verification"
+    description = "Verify anchor-aware NRC1 root publication, response-loss recovery, and protection repair."
+    dependsOn("phase4M4ProtectedAppendCheck")
+    dependsOn("checkPhase4M4RecoveryRootContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+}

@@ -5,9 +5,9 @@
 > reader/worker、protection crash-cut reconciliation、advisory checkpoint reconciliation、bounded service lifecycle、
 > Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry、terminal workflow-metadata retirement、
 > COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
-> isolated publication；F4-M4 正在实现，NRC1 object-protocol、protected generation-zero append，以及
-> anchor-aware tail/checkpoint planning foundation 已落地；recovery-root publication/retirement/GC 与 F4-M5–M6
-> 尚未实现
+> isolated publication；F4-M4 正在实现，NRC1 object-protocol、protected generation-zero append、anchor-aware
+> planning，以及 guarded recovery-root publication/restart protection reconciliation 已落地；checkpoint-aware
+> replay/repair、retirement/GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -405,6 +405,24 @@ object key、object id、kind 和完整读取范围。metadata contract、anchor
 upload、NRC1 full verification、recovery-root CAS 和 crash-cut reconciliation；anchor-aware replay/repair、source
 retirement 与任何 GC/delete path 也仍未开放。
 
+### 6.7 F4-M4 guarded recovery-root publication checkpoint
+
+Checkpoint D 已实现 `RecoveryCheckpointCoordinator` 与 `RecoveryCheckpointRootReconciler`。coordinator 在一个
+monotonic operation deadline 内完成 activation admission、NRC1 streaming write、每次 provider transmission 前的
+root/registration/commit/index revalidation、guarded if-absent upload、exact HEAD + full NRC1 verification、bounded
+`RECOVERY_CHECKPOINT_PENDING`、root CAS 和 exact lost-response reload。CAS 是唯一 recovery-prefix publication 点；
+失败或竞争不会让 object/task state 替代 root truth。
+
+root CAS 成功后，reconciler 通过新增的 bounded `scanPublications` 逐页读取 immutable NRC1 publication table，
+对 embedded raw generation bytes 与真实 Oxia envelope durable SHA 分别验证，并从 exact `COMMITTED` indexes/ACTIVE
+physical roots 重建 current-root-owned checkpoint-object/target protections。进程若在 CAS 后、permanent protection
+之前退出，重启会先完成该 reconciliation，再删除 deterministic pending protection。真实 in-memory Oxia adapter、
+fake physical store 和 local object store tests 已覆盖 root CAS 成功响应丢失及 CAS 后进程退出/重启修复。
+
+`phase4M4RecoveryRootCheck` 是这一中间边界的 ordinary gate；它不证明 checkpoint-aware append replay/index
+repair、live commit/index/source retirement、physical/cursor GC 或 Docker-backed M4 final scenarios。上述路径和
+所有 delete enablement 继续关闭，F4-M4 仍为 `in progress`。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -413,7 +431,7 @@ retirement 与任何 GC/delete path 也仍未开放。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 object protocol、protected generation-zero append、anchor-aware tail/checkpoint planning foundation implemented/tested；coordinator/root publication/retirement/GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 protocol、protected generation-zero append、anchor-aware planning、guarded root publication/restart protection reconciliation implemented/tested；checkpoint-aware replay/repair、retirement/GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

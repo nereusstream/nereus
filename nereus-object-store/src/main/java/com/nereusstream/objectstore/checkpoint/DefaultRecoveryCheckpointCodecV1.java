@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -223,6 +224,89 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                         throw new CompletionException(mapReadFailure("find recovery checkpoint publication", failure));
                     }
                     return value;
+                });
+    }
+
+    @Override
+    public CompletableFuture<RecoveryCheckpointPublicationPage> scanPublications(
+            RecoveryCheckpointObject object,
+            OptionalInt continuation,
+            int limit,
+            Duration timeout) {
+        try {
+            Objects.requireNonNull(object, "object");
+            Objects.requireNonNull(continuation, "continuation");
+            if (limit <= 0 || limit > RecoveryCheckpointFormatV1.MAX_PUBLICATION_SCAN_PAGE_SIZE) {
+                throw new IllegalArgumentException(
+                        "publication scan limit must be in [1, 1000]");
+            }
+            requireTimeout(timeout);
+        } catch (RuntimeException failure) {
+            return failedRead("invalid recovery checkpoint publication scan", failure);
+        }
+        int start = continuation.orElse(0);
+        if (start < 0 || start >= object.header().expectedPublicationCount()) {
+            return failedRead(
+                    "invalid recovery checkpoint publication continuation",
+                    new IllegalArgumentException(
+                            "publication continuation is outside the table"));
+        }
+        CheckpointReadDeadline deadline = new CheckpointReadDeadline(timeout);
+        CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
+                object.objectKey(), object.directory(), deadline);
+        CompletableFuture<CommitOffsets> commits = readCommitDirectory(
+                object.objectKey(), object.directory(), deadline);
+        return publications.thenCombine(commits, DirectoryState::new)
+                .thenCompose(state -> {
+                    int end = Math.min(
+                            Math.addExact(start, limit),
+                            state.publications().fileOffsets().length);
+                    ArrayList<RecoveryCheckpointPublication> values = new ArrayList<>(end - start);
+                    return readPublicationPage(
+                                    object,
+                                    state.publications(),
+                                    state.commits().fileOffsets()[0],
+                                    start,
+                                    end,
+                                    values,
+                                    deadline)
+                            .thenApply(ignored -> new RecoveryCheckpointPublicationPage(
+                                    values,
+                                    end < state.publications().fileOffsets().length
+                                            ? OptionalInt.of(end)
+                                            : OptionalInt.empty()));
+                })
+                .handle((value, failure) -> {
+                    if (failure != null) {
+                        throw new CompletionException(mapReadFailure(
+                                "scan recovery checkpoint publications", failure));
+                    }
+                    return value;
+                });
+    }
+
+    private CompletableFuture<Void> readPublicationPage(
+            RecoveryCheckpointObject object,
+            PublicationOffsets offsets,
+            long publicationRecordsEnd,
+            int index,
+            int end,
+            List<RecoveryCheckpointPublication> values,
+            CheckpointReadDeadline deadline) {
+        if (index == end) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return readPublicationAt(object, offsets, publicationRecordsEnd, index, deadline)
+                .thenCompose(value -> {
+                    values.add(value);
+                    return readPublicationPage(
+                            object,
+                            offsets,
+                            publicationRecordsEnd,
+                            index + 1,
+                            end,
+                            values,
+                            deadline);
                 });
     }
 

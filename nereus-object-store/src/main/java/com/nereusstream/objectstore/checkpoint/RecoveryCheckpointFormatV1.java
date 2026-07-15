@@ -24,6 +24,7 @@ public final class RecoveryCheckpointFormatV1 {
     public static final int MAX_ENTRY_COUNT = 1_000_000;
     public static final int MAX_PUBLICATION_COUNT = 1_000_000;
     public static final int MAX_PUBLICATION_REFS_PER_ENTRY = 8;
+    public static final int MAX_PUBLICATION_SCAN_PAGE_SIZE = 1_000;
     public static final int MAX_DIRECTORY_BYTES = 32 << 20;
     public static final int MAX_HEADER_BYTES = 128 << 10;
     public static final int MAX_RECORD_BYTES = 128 << 10;

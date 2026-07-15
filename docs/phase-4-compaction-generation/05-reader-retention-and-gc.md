@@ -75,10 +75,11 @@ resolver、exact reader dispatch、pin lifetime、fallback/quarantine and public
 final-gated. The M3 storage-level compacted-format strict reader、exact core NCP1 adapter、exact-source worker、
 protection/checkpoint reconciliation、bounded service lifecycle and Pulsar Entry/NCP1 byte round trip are implemented,
 and M3 terminal workflow-metadata retirement is implemented/final-gated. M4 checkpoint A adds the NRC1 immutable
-object codec and canonical metadata verifier, but no recovery root references those bytes yet. M4 checkpoint B adds
-permanent commit-owned `REACHABLE_APPEND` before head visibility and exact-index-owned `VISIBLE_GENERATION` before
-strict success for every new/recovered generation-zero append. M4 GC coordinators、cursor integration and
-anchor-aware reachability remain planned；
+object codec and canonical metadata verifier. M4 checkpoint B adds permanent commit-owned `REACHABLE_APPEND` before
+head visibility and exact-index-owned `VISIBLE_GENERATION` before strict success for every new/recovered
+generation-zero append. Checkpoint D now publishes verified NRC1 bytes only through the recovery-root CAS and repairs
+checkpoint-object/target protections after CAS or restart before releasing the bounded pending protection. M4 GC
+coordinators、cursor integration and checkpoint-aware replay/repair and retirement remain planned；
 therefore no object deletion is enabled by this checkpoint.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct

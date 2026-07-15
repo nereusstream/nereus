@@ -11,6 +11,7 @@ import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -90,6 +91,22 @@ class RecoveryCheckpointSparseDirectoryTest {
                             RecoveryCheckpointTestSupport.TIMEOUT)
                     .join())
                     .contains(publications.get(0));
+            RecoveryCheckpointPublicationPage first = codec.scanPublications(
+                            opened,
+                            OptionalInt.empty(),
+                            1,
+                            RecoveryCheckpointTestSupport.TIMEOUT)
+                    .join();
+            assertThat(first.values()).containsExactly(publications.get(0));
+            assertThat(first.continuation()).hasValue(1);
+            RecoveryCheckpointPublicationPage second = codec.scanPublications(
+                            opened,
+                            first.continuation(),
+                            1,
+                            RecoveryCheckpointTestSupport.TIMEOUT)
+                    .join();
+            assertThat(second.values()).containsExactly(publications.get(1));
+            assertThat(second.continuation()).isEmpty();
         }
     }
 }

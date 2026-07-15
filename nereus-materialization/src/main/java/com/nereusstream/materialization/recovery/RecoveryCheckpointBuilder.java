@@ -28,6 +28,7 @@ import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
 import com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1;
+import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
@@ -481,7 +482,7 @@ public final class RecoveryCheckpointBuilder {
                 || !value.streamId().equals(registration.streamId())
                 || !value.projectionRef().equals(registration.projectionRef())
                 || !(decodedTarget instanceof ObjectSliceReadTarget)
-                || !canonicalIndexSha256(value).equals(index.durableValueSha256())) {
+                || !durableIndexSha256(value).equals(index.durableValueSha256())) {
             return false;
         }
         int first = -1;
@@ -514,9 +515,6 @@ public final class RecoveryCheckpointBuilder {
         GenerationIndexRecord value = index.value();
         byte[] canonical = generationCodec.encode(value.withMetadataVersion(0));
         Checksum digest = sha256(canonical);
-        if (!digest.equals(index.durableValueSha256())) {
-            throw invariant("generation index durable bytes differ from canonical NRC1 bytes");
-        }
         return new RecoveryCheckpointTarget(
                 new RecoveryCheckpointPublication(
                         value.generation(),
@@ -600,8 +598,9 @@ public final class RecoveryCheckpointBuilder {
         }
     }
 
-    private Checksum canonicalIndexSha256(GenerationIndexRecord value) {
-        return sha256(generationCodec.encode(value.withMetadataVersion(0)));
+    private Checksum durableIndexSha256(GenerationIndexRecord value) {
+        return sha256(MetadataRecordCodecFactory.encodeEnvelope(
+                value.withMetadataVersion(0), GenerationIndexRecord.class));
     }
 
     private static CompletableFuture<RecoveryCheckpointBuildResult> completed(

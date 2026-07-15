@@ -16,13 +16,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /** One monotonic deadline shared by every asynchronous cut in a materialization operation. */
-final class MaterializationDeadline implements AutoCloseable {
+public final class MaterializationDeadline implements AutoCloseable {
     private final long deadlineNanos;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Set<BoundState<?>> active = ConcurrentHashMap.newKeySet();
 
-    MaterializationDeadline(
+    public MaterializationDeadline(
             Duration timeout,
             ScheduledExecutorService scheduler) {
         Objects.requireNonNull(timeout, "timeout");
@@ -42,7 +42,7 @@ final class MaterializationDeadline implements AutoCloseable {
                 : now + timeoutNanos;
     }
 
-    Duration remaining() {
+    public Duration remaining() {
         long nanos = deadlineNanos == Long.MAX_VALUE
                 ? Long.MAX_VALUE
                 : deadlineNanos - System.nanoTime();
@@ -52,7 +52,7 @@ final class MaterializationDeadline implements AutoCloseable {
         return Duration.ofNanos(nanos);
     }
 
-    <T> CompletableFuture<T> bound(
+    public <T> CompletableFuture<T> bound(
             Supplier<CompletableFuture<T>> operation,
             String stage) {
         if (closed.get()) {

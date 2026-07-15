@@ -16,8 +16,7 @@ public record RecoveryCheckpointTarget(
         if (publication.generation() != value.generation()
                 || !publication.publicationId().value().equals(value.publicationId())
                 || publication.coverage().startOffset() != value.offsetStart()
-                || publication.coverage().endOffset() != value.offsetEnd()
-                || !publication.generationIndexRecordSha256().equals(index.durableValueSha256())) {
+                || publication.coverage().endOffset() != value.offsetEnd()) {
             throw new IllegalArgumentException("checkpoint publication does not match its exact index");
         }
     }
