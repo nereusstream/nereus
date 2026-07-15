@@ -71,8 +71,10 @@ non-overlapping 64-shard full passes, coalesces hints into one immediate followi
 executors borrowed, and drains or locally cancels admitted work by `closeTimeout`. Focused tests cover all of these
 cuts, including a hung scan、deadline-forced cancellation and borrowed-executor ownership.
 
-This is still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip now passes, while
-topic-compaction worker、terminal workflow-metadata retirement and the aggregate/real-service M3 gates remain open；
+This is still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip now passes, and
+the protocol-neutral topic-compaction decoder/strategy SPI plus exact frozen-identity registry are implemented. The
+topic-compaction execution engine/worker、terminal workflow-metadata retirement and aggregate/real-service M3 gates
+remain open；
 higher-generation production activation therefore remains disabled.
 
 Full M4–M6 target construction：

@@ -34,8 +34,10 @@ format/read path, the deterministic policy/planner/task-store/recovery/registere
 exact-source reader plus claim-to-output-ready worker path, followed by task-protection owner crash-cut reconciliation
 across recovery/publication, then monotonic advisory checkpoint reconstruction plus bounded dispatcher/service
 lifecycle. A sixth checkpoint proves Pulsar Entry/NCP1 exact-byte and middle-batch MessageId round trip while keeping
-the generation projection ref out of per-entry metadata. This is not a Phase 4 completion claim：topic-compaction
-worker、terminal workflow-metadata retirement and the M3 gates remain open；full
+the generation projection ref out of per-entry metadata. A seventh checkpoint implements the protocol-neutral
+topic-compaction decoder/strategy SPI, closed disposition wire ids, immutable compaction-key facts and an exact
+frozen-identity registry. This is not a Phase 4 completion claim：the topic-compaction execution engine/worker、
+terminal workflow-metadata retirement and the M3 gates remain open；full
 recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
 
 A later milestone is complete only when：
@@ -281,8 +283,8 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > generation-zero fallback。该 fixture 同时暴露并修复 inline `EntryIndexRef` durable round-trip 的内容相等性。
 > F4-M2 is complete/final-gated。M3 已接入真实 compacted format、worker-owned source/output protections、
 > 跨 key crash-cut 恢复、advisory checkpoint reconciliation 与 bounded service lifecycle checkpoints；Pulsar
-> opaque-entry round trip 已完成；topic-compaction worker、terminal workflow-metadata retirement 和 gates 仍需
-> 完成；M4 仍需补齐
+> opaque-entry round trip 与 topic-compaction neutral SPI/registry 已完成；topic-compaction execution
+> engine/worker、terminal workflow-metadata retirement 和 gates 仍需完成；M4 仍需补齐
 > recovery-root/anchor-aware source reachability，physical delete 继续禁用。
 
 ### 4.1 Production artifacts
@@ -383,8 +385,11 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 > full-proof advisory checkpoint reconciliation with exact CAS-response-loss reload、global/per-stream fair task
 > dispatch and the non-overlapping/coalesced/deadline-close `MaterializationService` loop. A sixth checkpoint adds
 > the managed-ledger cross-layer `PulsarEntryOpaqueRoundTripTest` and keeps the generation-level projection identity
-> out of the original logical `ReadBatch` surface. This is not M3 completion：topic-compaction worker、terminal
-> workflow-metadata retirement and both M3 gates below remain pending,
+> out of the original logical `ReadBatch` surface. A seventh checkpoint adds `TopicCompactionDecoder`,
+> `CompactionRecord`, closed `CompactionDisposition` wire ids, versioned `TopicCompactionStrategy` and
+> `TopicCompactionRegistry`; its focused test proves exact frozen-id resolution, duplicate/mutable identity rejection
+> and immutable read-only key ownership. This is not M3 completion：the topic-compaction execution engine/worker、
+> terminal workflow-metadata retirement and both M3 gates below remain pending,
 > and production activation stays disabled.
 
 ### 5.1 Production artifacts
@@ -438,6 +443,7 @@ TopicCompactionDecoder.java
 CompactionRecord.java
 CompactionDisposition.java
 TopicCompactionStrategy.java
+TopicCompactionRegistry.java
 MaterializationService.java
 DefaultMaterializationService.java
 MaterializationConfig.java
@@ -460,6 +466,7 @@ CompactedObjectStreamingUploadTest
 CompactedObjectStagingLimitTest
 PulsarEntryOpaqueRoundTripTest                 in managed-ledger integration layer
 TopicCompactedSparseFormatTest
+TopicCompactionRegistryTest
 ParquetCompactedTargetReaderTest
 CompactedMaterializationFormatVerifierTest
 MaterializationTaskIdentityTest

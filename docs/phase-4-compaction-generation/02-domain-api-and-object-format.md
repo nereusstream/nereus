@@ -7,7 +7,9 @@ physical-reference/reader-pin/activation-proof values and the F4-M3 compacted-Pa
 whole-index planner、task-store、task-recovery and registered-stream-scanner checkpoints identified in document 07
 are implemented. The exact-source reader/lossless-row/claim-to-output-ready worker、task-protection crash-cut
 reconciliation、advisory checkpoint reconciler、bounded M3 service lifecycle and Pulsar Entry/NCP1 exact-byte round
-trip are also implemented；topic worker、terminal metadata retirement and M4–M6 surfaces
+trip are also implemented. The protocol-neutral topic-compaction decoder/strategy SPI and exact frozen-identity
+registry are implemented and covered by focused tests；the topic-compaction execution engine/worker、terminal
+metadata retirement and M4–M6 surfaces
 remain target code until their milestone lands. Package、class and method names are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
@@ -106,6 +108,11 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/
   MaterializationTask.java
   MaterializationOutput.java
   SourceGeneration.java
+  TopicCompactionDecoder.java
+  CompactionRecord.java
+  CompactionDisposition.java
+  TopicCompactionStrategy.java
+  TopicCompactionRegistry.java
   CompactedMaterializationFormatVerifier.java
 ```
 
@@ -902,6 +909,13 @@ public interface TopicCompactionStrategy {
     long version();
     boolean retainTombstone(CompactionRecord tombstone, long planningTimeMillis);
 }
+
+public final class TopicCompactionRegistry {
+    public TopicCompactionRegistry(
+            List<? extends TopicCompactionDecoder> decoders,
+            List<? extends TopicCompactionStrategy> strategies);
+    public Binding resolve(TopicCompactionSpec spec);
+}
 ```
 
 F4 core has no dependency on Pulsar classes. An encrypted/unsupported payload is either retained according to the
@@ -910,6 +924,12 @@ Decoder output must repeat the supplied offset, return a non-empty read-only key
 and never return payload bytes；pass two re-reads the exact source for surviving VALUE rows. Empty decoder output means
 “unkeyed and retain the exact record”, not silent deletion. Strategy id/version are
 the exact task-policy values, and `planningTimeMillis` is captured once so tombstone decisions are deterministic.
+`TopicCompactionRegistry` rejects duplicate decoder ids and duplicate `(strategyId, strategyVersion)` pairs, resolves
+only the exact identities frozen in `TopicCompactionSpec`, and re-reads implementation identities at resolution so a
+mutable implementation cannot silently change durable task semantics. `CompactionRecord` defensively copies a
+non-empty key into a read-only buffer, while `CompactionDisposition` uses explicit durable wire ids rather than enum
+ordinals. The execution engine still owns the configured key-byte cap, supplied-offset equality check, unkeyed
+retain-exact representation and two-pass payload reread; those checks are not delegated to the registry.
 
 ## 9. Recovery Checkpoint Object V1
 
