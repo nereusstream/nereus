@@ -95,8 +95,8 @@ lease/protection、recovery checkpoint、physical GC、
 guarded object PUT 与双 HEAD/owner proof 的 DELETED-root audit retirement、
 `OBJECT_WAL_ASYNC_OBJECT` 与 Pulsar rollout 边界。F4-M1–M2 已完成 API/metadata/object IO、core
 reader/protection、authoritative generation resolve/read 和 restart-safe publication，并于 2026-07-15 通过
-ordinary/Docker-backed final gates；M3 的 Parquet writer/strict-reader foundation 已实现但 worker/gates
-未完成，M4-M6 的 recovery/GC、async/Pulsar execution path 仍是 Designed target。
+ordinary/Docker-backed final gates；M3 的 Parquet writer/strict-reader/full verifier、NTC1 facade 和 core adapter
+已实现但 worker/gates 未完成，M4-M6 的 recovery/GC、async/Pulsar execution path 仍是 Designed target。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。

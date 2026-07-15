@@ -33,9 +33,11 @@ public record CompactedObjectReadRequest(
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         if (target.objectType() != ObjectType.STREAM_COMPACTED_OBJECT
                 || target.objectOffset() != 0
+                || target.objectLength() > CompactedObjectFormatV1.MAX_OBJECT_BYTES
                 || !target.physicalFormat().equals(CompactedObjectFormatV1.physicalFormat(view))
                 || !target.logicalFormat().equals(payloadFormat.name())
                 || target.entryIndexRef().location() != EntryIndexLocation.OBJECT_FOOTER
+                || target.entryIndexRef().length() > CompactedObjectFormatV1.MAX_FOOTER_BYTES
                 || !target.entryIndexRef().objectId().equals(java.util.Optional.of(target.objectId()))
                 || !target.entryIndexRef().objectKey().equals(java.util.Optional.of(target.objectKey()))
                 || target.entryIndexRef().offset() + target.entryIndexRef().length()

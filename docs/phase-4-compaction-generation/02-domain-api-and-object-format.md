@@ -38,6 +38,7 @@ nereus-core/src/main/java/com/nereusstream/core/read/
   GenerationReadResolver.java
   GenerationReadCandidate.java
   PinnedResolvedRange.java
+  ParquetCompactedTargetReader.java
 
 nereus-core/src/main/java/com/nereusstream/core/capability/
   GenerationProtocolActivationGuard.java
@@ -71,6 +72,8 @@ nereus-object-store/src/main/java/com/nereusstream/objectstore/compacted/
   ParquetCompactedObjectWriter.java
   ParquetCompactedObjectReader.java
   TopicCompactedObjectReader.java
+  CompactedObjectVerificationRequest.java
+  CompactedObjectVerifier.java
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/checkpoint/
   RecoveryCheckpointCodecV1.java
@@ -87,6 +90,7 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/
   MaterializationTask.java
   MaterializationOutput.java
   SourceGeneration.java
+  CompactedMaterializationFormatVerifier.java
 ```
 
 The new module also contains task/recovery/GC implementation packages described in documents 04 and 05.
@@ -254,6 +258,7 @@ public interface ReadTargetReader extends AutoCloseable {
     long reservationBytes(ResolvedRange range);
 
     CompletableFuture<WalReadResult> readWithStats(
+            StreamId streamId,
             long startOffset,
             List<ResolvedRange> ranges,
             ReadOptions options);
@@ -451,6 +456,20 @@ public record MaterializationOutput(
         Checksum sourceSetSha256,
         Optional<ProjectionRef> projectionRef) {
 }
+
+public interface MaterializationOutputVerifier {
+    CompletableFuture<Void> verify(
+            MaterializationTask task,
+            MaterializationOutput output,
+            Duration timeout);
+}
+
+public interface MaterializationFormatVerifier {
+    CompletableFuture<Void> verify(
+            MaterializationTask task,
+            MaterializationOutput output,
+            Duration timeout);
+}
 ```
 
 `taskId` is：
@@ -466,6 +485,10 @@ The output key contains both this id and exact content SHA-256；generation is d
 `MaterializationOutput` and file identity. One surviving verified output may be published under a newly allocated
 generation after a lost/aborted publish attempt without rewriting bytes. If that physical root reaches `DELETED`, a
 later worker uses a new claim/output-attempt id and therefore a new key；it never resurrects the deleted identity.
+The verifier signatures deliberately include the exact task：`policyDigestSha256` is not duplicated into
+`MaterializationOutput`, so an output-only verifier could prove byte identity but could not prove that the file's
+policy metadata belongs to the publishing task. HEAD and full-format verification consume one shared monotonic
+deadline.
 
 ### 5.4 Service interfaces
 
@@ -607,6 +630,25 @@ public interface CompactedObjectWriter {
             Flow.Publisher<CompactedObjectRow> rows);
 }
 
+public record CompactedObjectVerificationRequest(
+        StreamId streamId,
+        ReadView view,
+        OffsetRange sourceCoverage,
+        ObjectSliceReadTarget target,
+        PayloadFormat payloadFormat,
+        Checksum storageCrc32c,
+        Checksum contentSha256,
+        Duration timeout) { }
+
+public final class CompactedObjectVerifier {
+    CompletableFuture<CompactedObjectMetadata> verify(
+            CompactedObjectVerificationRequest request);
+
+    CompletableFuture<Void> verifyExact(
+            CompactedObjectVerificationRequest request,
+            CompactedObjectWriteRequest expected);
+}
+
 public interface StagedObjectFile extends ReplayableObjectUpload {
     long sealedLength();
     Checksum storageCrc32c();
@@ -631,6 +673,13 @@ footer reference are recomputed on construction.
 `TopicCompactionSpec`. This explicit field is required because an NTC1 file must persist strategy id/version and key
 codec in its immutable footer metadata, while `nereus-object-store` must not import `nereus-materialization`.
 The worker must copy all three values exactly；neither layer may infer defaults during write or recovery.
+
+The verifier streams the complete immutable object in exact ranges no larger than 8 MiB, recomputes whole-file
+CRC32C and SHA-256, compares the SHA with the canonical key filename, then scans the strict reader in bounded batches
+under the same monotonic deadline. It never aggregates the complete object or all rows in memory. `verifyExact`
+additionally compares every persisted request fact, including policy/source digests、attempt、counts、codec profile
+and NTC1 strategy. The materialization bridge receives both `MaterializationTask` and `MaterializationOutput` so the
+file policy digest cannot be validated against output identity alone.
 
 ## 7. `NEREUS_COMPACTED_PARQUET_V1`
 
@@ -701,7 +750,7 @@ nereus.writer                         = product build id
 nereus.parquet.library.version         = pinned dependency version
 nereus.parquet.writer.version          = PARQUET_2_0
 nereus.parquet.compression              = ZSTD or UNCOMPRESSED
-nereus.parquet.zstd.level               = 3 or absent for UNCOMPRESSED
+nereus.parquet.zstd.level               = 3 for ZSTD；required empty string for UNCOMPRESSED
 nereus.parquet.data.page.bytes          = 1048576
 nereus.parquet.dictionary.enabled       = false
 nereus.parquet.bloom.filter.enabled     = false

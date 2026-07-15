@@ -7,5 +7,8 @@ import java.util.concurrent.CompletableFuture;
 /** Full format/content validation supplied by the exact compacted-object reader. */
 @FunctionalInterface
 public interface MaterializationFormatVerifier {
-    CompletableFuture<Void> verify(MaterializationOutput output, Duration timeout);
+    CompletableFuture<Void> verify(
+            MaterializationTask task,
+            MaterializationOutput output,
+            Duration timeout);
 }

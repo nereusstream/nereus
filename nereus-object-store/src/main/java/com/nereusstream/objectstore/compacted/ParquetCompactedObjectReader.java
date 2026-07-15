@@ -10,6 +10,7 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.RangeReadOptions;
+import com.nereusstream.objectstore.RangeReadResult;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -75,7 +76,7 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
             ObjectStoreParquetInputFile.ReadDeadline deadline =
                     new ObjectStoreParquetInputFile.ReadDeadline(request.timeout());
             long footerBytes = request.target().entryIndexRef().length();
-            objectStore.readRange(
+            RangeReadResult footer = objectStore.readRange(
                             request.target().objectKey(),
                             request.target().entryIndexRef().offset(),
                             footerBytes,
@@ -83,6 +84,16 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                                     Optional.of(request.target().entryIndexRef().checksum()),
                                     deadline.remaining()))
                     .join();
+            if (!footer.key().equals(request.target().objectKey())
+                    || footer.offset() != request.target().entryIndexRef().offset()
+                    || footer.length() != footerBytes
+                    || footer.payload().remaining() != footerBytes
+                    || (footer.checksum().isPresent()
+                            && !footer.checksum().orElseThrow().equals(
+                                    request.target().entryIndexRef().checksum()))) {
+                throw new CompactedObjectFormatException(
+                        "object store returned a mismatched compacted footer range");
+            }
             long maximumReadBytes = Math.addExact(
                     request.target().objectLength(), Math.multiplyExact(footerBytes, 2));
             ObjectStoreParquetInputFile.ReadBudget budget =
@@ -356,16 +367,21 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                 + com.nereusstream.api.keys.KeyComponentCodec.encodeNonNegativeLong(
                         metadata.sourceCoverage().endOffset());
         String viewComponent = metadata.view() == ReadView.COMMITTED
-                ? "/compacted/v1/committed/"
-                : "/compacted/v1/topic-compacted/";
-        String value = key.value();
-        if (!value.contains(viewComponent + streamComponent + "/" + rangeComponent + "/")
-                || !value.endsWith("-" + metadata.outputAttemptId() + ".parquet")) {
+                ? "committed"
+                : "topic-compacted";
+        String[] components = key.value().split("/", -1);
+        if (components.length != 7
+                || components[0].isEmpty()
+                || !components[1].equals("compacted")
+                || !components[2].equals("v1")
+                || !components[3].equals(viewComponent)
+                || !components[4].equals(streamComponent)
+                || !components[5].equals(rangeComponent)
+                || !components[6].endsWith("-" + metadata.outputAttemptId() + ".parquet")) {
             throw new CompactedObjectFormatException("compacted object key does not match file metadata");
         }
-        int slash = value.lastIndexOf('/');
-        int dash = value.lastIndexOf('-', value.length() - ".parquet".length());
-        if (slash < 0 || dash != slash + 1 + 64 || !isLowerHex(value.substring(slash + 1, dash))) {
+        int dash = components[6].indexOf('-');
+        if (dash != 64 || !isLowerHex(components[6].substring(0, dash))) {
             throw new CompactedObjectFormatException("compacted object key content hash is not canonical");
         }
     }
@@ -453,8 +469,8 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                 || current instanceof IllegalStateException) {
             return new CompactedObjectFormatException("invalid compacted Parquet structure", current);
         }
-        return new NereusException(
-                ErrorCode.OBJECT_READ_FAILED, true, "compacted Parquet read failed", current);
+        return new CompactedObjectFormatException(
+                "cannot decode immutable compacted Parquet bytes", current);
     }
 
     private record OffsetStats(long minimum, long maximum) {

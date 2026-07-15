@@ -442,7 +442,10 @@ class GenerationReadResolverTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+                StreamId streamId,
+                long startOffset,
+                List<ResolvedRange> ranges,
+                ReadOptions options) {
             return CompletableFuture.completedFuture(new WalReadResult(List.of(), List.of()));
         }
     }

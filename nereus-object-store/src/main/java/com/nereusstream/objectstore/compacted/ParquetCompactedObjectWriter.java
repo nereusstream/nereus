@@ -50,7 +50,6 @@ import org.apache.parquet.schema.MessageType;
 
 /** Apache Parquet NCP1/NTC1 writer with exact record-bounded row groups and private staging. */
 public final class ParquetCompactedObjectWriter implements CompactedObjectWriter {
-    private static final long MAX_OBJECT_BYTES = 1L << 30;
     private static final int COLUMN_INDEX_TRUNCATE_LENGTH = 64;
 
     private final StagingFileManager stagingFiles;
@@ -303,7 +302,7 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             rowGroup.add(toGroup(row, payload));
             rowGroupPayloadBytes = Math.addExact(rowGroupPayloadBytes, payload.length);
             totalPayloadBytes = Math.addExact(totalPayloadBytes, payload.length);
-            if (totalPayloadBytes > MAX_OBJECT_BYTES) {
+            if (totalPayloadBytes > CompactedObjectFormatV1.MAX_OBJECT_BYTES) {
                 throw new CompactedObjectFormatException("compacted payload exceeds the V1 1 GiB limit");
             }
             previousOffset = row.streamOffset();
@@ -327,6 +326,10 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
             long footerOffset = Math.subtractExact(output.getPos(), footer.length);
             fileWriter.close();
             codecFactory.release();
+            if (output.getPos() > CompactedObjectFormatV1.MAX_OBJECT_BYTES) {
+                throw new CompactedObjectFormatException(
+                        "compacted Parquet object exceeds the V1 1 GiB limit");
+            }
             PrivateStagedObjectFile sealed = stagingFile.seal();
             Checksum footerCrc32c = Crc32cChecksums.checksum(footer);
             ObjectKey objectKey = CompactedObjectFormatV1.objectKey(request, sealed.contentSha256());

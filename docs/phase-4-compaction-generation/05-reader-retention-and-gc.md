@@ -72,9 +72,9 @@ nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention/
 As of F4-M2 on 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain values、the reader-pin manager and the
 durable protection manager are implemented with deterministic handshake/response-loss tests. The committed-generation
 resolver、exact reader dispatch、pin lifetime、fallback/quarantine and publication state machine are integrated and
-final-gated. The first M3 storage-level compacted-format strict reader is implemented, but its core adapter、worker
-and M3 gates plus the M4 GC coordinators、cursor integration and anchor-aware reachability remain planned；therefore
-no object deletion is enabled by this checkpoint.
+final-gated. The M3 storage-level compacted-format strict reader and its exact core NCP1 adapter are implemented, but
+the worker and M3 gates plus the M4 GC coordinators、cursor integration and anchor-aware reachability remain planned；
+therefore no object deletion is enabled by this checkpoint.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.

@@ -630,7 +630,7 @@ final class GenerationPublicationTestSupport {
                     physical,
                     protections,
                     guard,
-                    (ignored, timeout) -> CompletableFuture.completedFuture(null),
+                    (ignoredTask, ignoredOutput, timeout) -> CompletableFuture.completedFuture(null),
                     () -> {
                         int value = publicationSequence.getAndIncrement();
                         if (value > 9) {

@@ -24,20 +24,34 @@ public final class DefaultMaterializationOutputVerifier implements Materializati
 
     @Override
     public CompletableFuture<Void> verify(
+            MaterializationTask task,
             MaterializationOutput output,
             Duration timeout) {
-        MaterializationOutput exact = Objects.requireNonNull(output, "output");
-        Duration bounded = requirePositive(timeout);
+        MaterializationTask exactTask;
+        MaterializationOutput exact;
+        Deadline deadline;
+        try {
+            exactTask = Objects.requireNonNull(task, "task");
+            exact = Objects.requireNonNull(output, "output");
+            deadline = new Deadline(requirePositive(timeout));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
         CompletableFuture<HeadObjectResult> head;
         try {
             head = Objects.requireNonNull(
-                    objectStore.headObject(exact.objectKey(), new HeadObjectOptions(bounded)),
+                    objectStore.headObject(
+                            exact.objectKey(),
+                            new HeadObjectOptions(deadline.remaining())),
                     "head future");
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
         return head.thenApply(value -> requireExactHead(exact, value))
-                .thenCompose(ignored -> formatVerifier.verify(exact, bounded));
+                .thenCompose(ignored -> formatVerifier.verify(
+                        exactTask,
+                        exact,
+                        deadline.remaining()));
     }
 
     private static Void requireExactHead(
@@ -63,5 +77,33 @@ public final class DefaultMaterializationOutputVerifier implements Materializati
             throw new IllegalArgumentException("timeout must be positive");
         }
         return value;
+    }
+
+    private static final class Deadline {
+        private final long deadlineNanos;
+
+        private Deadline(Duration timeout) {
+            long now = System.nanoTime();
+            long nanos;
+            try {
+                nanos = timeout.toNanos();
+            } catch (ArithmeticException failure) {
+                nanos = Long.MAX_VALUE;
+            }
+            deadlineNanos = nanos >= Long.MAX_VALUE - now ? Long.MAX_VALUE : now + nanos;
+        }
+
+        private Duration remaining() {
+            long nanos = deadlineNanos == Long.MAX_VALUE
+                    ? Long.MAX_VALUE
+                    : deadlineNanos - System.nanoTime();
+            if (nanos <= 0) {
+                throw new NereusException(
+                        ErrorCode.TIMEOUT,
+                        true,
+                        "materialization output verification deadline expired");
+            }
+            return Duration.ofNanos(nanos);
+        }
     }
 }

@@ -698,7 +698,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
         private DefaultGenerationCommitter committer(
                 GenerationMetadataStore store,
                 Fixture fixture) {
-            MaterializationFormatVerifier formatVerifier = (output, timeout) ->
+            MaterializationFormatVerifier formatVerifier = (task, output, timeout) ->
                     fixture.objectStore.readRange(
                                     output.objectKey(),
                                     0,
@@ -759,6 +759,7 @@ class GenerationPublicationOxiaS3IntegrationTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
+                StreamId streamId,
                 long startOffset,
                 List<ResolvedRange> ranges,
                 ReadOptions options) {

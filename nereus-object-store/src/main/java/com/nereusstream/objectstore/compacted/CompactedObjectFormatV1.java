@@ -34,6 +34,7 @@ public final class CompactedObjectFormatV1 {
     public static final int MAX_FOOTER_BYTES = 16 << 20;
     public static final int MAX_ROW_GROUPS = 65_536;
     public static final int MAX_ROW_GROUP_BUFFER_BYTES = 64 << 20;
+    public static final long MAX_OBJECT_BYTES = 1L << 30;
     public static final int MAX_PAYLOAD_BYTES = 64 << 20;
     public static final int MAX_OPTIONAL_BINARY_BYTES = 1 << 20;
     public static final int MAX_SCHEMA_IDENTITY_BYTES = 4 << 10;

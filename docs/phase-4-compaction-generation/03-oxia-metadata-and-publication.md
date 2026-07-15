@@ -57,8 +57,9 @@ discovered `COMMITTED` index in the same stream/view that references the same ob
 two retries) before same-view fallback and never changes health metadata.
 
 `nereus-materialization` now also contains strict policy/source/task/output values、canonical source/policy/task
-identity、secure publication-id generation、durable task/output/index mapping、exact HEAD plus delegated full-format
-verification and a shared monotonic operation deadline. `DefaultGenerationCommitter` implements the restart-safe
+identity、secure publication-id generation、durable task/output/index mapping、exact HEAD plus task-aware full-format
+verification and a shared monotonic operation deadline. The M3 bridge now streams whole-file CRC/SHA verification
+and checks the Parquet policy digest against the exact publishing task. `DefaultGenerationCommitter` implements the restart-safe
 publication state machine: it freezes publication id, attaches one allocated view-scoped generation to the durable
 task, creates the deterministic `PREPARED` index, revalidates exact task/output/head/source/root/activation/protection
 facts, and exposes the result only through the exact index `PREPARED -> COMMITTED` version-CAS. It then transfers

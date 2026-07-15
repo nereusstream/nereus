@@ -4,10 +4,14 @@ package com.nereusstream.objectstore.compacted;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
+import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.objectstore.Crc32cChecksums;
+import com.nereusstream.objectstore.ObjectStore;
+import com.nereusstream.objectstore.PutObjectOptions;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.objectstore.staging.StagedObjectFile;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.io.ByteArrayOutputStream;
@@ -19,6 +23,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -72,6 +77,39 @@ final class CompactedParquetTestSupport {
                 Optional.empty());
     }
 
+    static CompactedObjectWriteRequest topicRequest(
+            int sourceRecords,
+            int outputRecords,
+            long logicalBytes,
+            int rowGroupRecords,
+            String compression) {
+        return new CompactedObjectWriteRequest(
+                "test-cluster",
+                ReadView.TOPIC_COMPACTED,
+                new StreamId("s-topic-compacted-test"),
+                new OffsetRange(20, 20 + sourceRecords),
+                "b".repeat(26),
+                sha256('3'),
+                sha256('4'),
+                PayloadFormat.PULSAR_ENTRY_BATCH,
+                PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                Optional.empty(),
+                sourceRecords,
+                outputRecords,
+                sourceRecords,
+                logicalBytes,
+                List.of(),
+                500,
+                500 + logicalBytes,
+                rowGroupRecords,
+                compression,
+                "nereus-test-build",
+                Optional.of(new TopicCompactionFormatSpec(
+                        "latest-key",
+                        1,
+                        "pulsar-message-key-v1")));
+    }
+
     static CompactedObjectRow denseRow(long offset, byte[] payload) {
         return new CompactedObjectRow(
                 offset,
@@ -87,6 +125,71 @@ final class CompactedParquetTestSupport {
                 OptionalInt.empty(),
                 OptionalInt.empty(),
                 Optional.empty());
+    }
+
+    static CompactedObjectRow sparseValue(long offset, byte[] key, byte[] payload) {
+        return new CompactedObjectRow(
+                offset,
+                ByteBuffer.wrap(payload),
+                Crc32cChecksums.intValue(Crc32cChecksums.checksum(payload)),
+                OptionalLong.of(2_000 + offset),
+                OptionalLong.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                OptionalLong.empty(),
+                OptionalLong.empty(),
+                OptionalInt.empty(),
+                OptionalInt.of(1),
+                Optional.of(ByteBuffer.wrap(key)));
+    }
+
+    static CompactedObjectRow sparseTombstone(long offset, byte[] key) {
+        byte[] empty = new byte[0];
+        return new CompactedObjectRow(
+                offset,
+                ByteBuffer.wrap(empty),
+                Crc32cChecksums.intValue(Crc32cChecksums.checksum(empty)),
+                OptionalLong.of(2_000 + offset),
+                OptionalLong.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                OptionalLong.empty(),
+                OptionalLong.empty(),
+                OptionalInt.empty(),
+                OptionalInt.of(2),
+                Optional.of(ByteBuffer.wrap(key)));
+    }
+
+    static ObjectSliceReadTarget target(
+            CompactedObjectWriteRequest request,
+            CompactedObjectWriteResult result) {
+        return new ObjectSliceReadTarget(
+                1,
+                result.objectId(),
+                result.objectKey(),
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                result.physicalFormat(),
+                request.logicalFormat(),
+                request.sourceCoverage().startOffset() + "-" + request.sourceCoverage().endOffset(),
+                0,
+                result.objectLength(),
+                result.storageCrc32c(),
+                result.entryIndexRef());
+    }
+
+    static void upload(ObjectStore store, CompactedObjectWriteResult result) {
+        store.putObject(
+                        result.objectKey(),
+                        result.stagingFile(),
+                        new PutObjectOptions(
+                                "application/vnd.apache.parquet",
+                                result.storageCrc32c(),
+                                true,
+                                Map.of(),
+                                Duration.ofSeconds(10)))
+                .join();
     }
 
     static <T> Flow.Publisher<T> publisher(List<T> values) {

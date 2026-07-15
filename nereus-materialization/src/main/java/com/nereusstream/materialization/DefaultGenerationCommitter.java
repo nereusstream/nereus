@@ -827,7 +827,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
 
         private CompletableFuture<Void> verifyOutput(String stage) {
             return deadline.bound(
-                    () -> outputVerifier.verify(output, deadline.remaining()),
+                    () -> outputVerifier.verify(task, output, deadline.remaining()),
                     stage);
         }
 

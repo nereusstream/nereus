@@ -357,11 +357,12 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 
 > Implementation checkpoint (2026-07-15)：the pinned Apache Parquet/Hadoop/ZSTD dependencies、frozen NCP1/NTC1
 > schemas/metadata parser、streaming private-staging writer、content-addressed identity/footer reference、bounded
-> exact-range strict reader and NTC1-only facade are implemented. `CompactedParquetGoldenTest` and
-> `CompactedParquetStrictReaderTest` prove standard `PAR1` bytes、exact row-group/footer identity and a ZSTD
-> LocalFileObjectStore round trip. This is not M3 completion：the verifier、remaining format/corruption/streaming
-> suites、core adapter、planner/task/worker/recovery/service and both M3 gates below remain pending, and production
-> activation stays disabled.
+> exact-range strict reader、NTC1-only facade、whole-file verifier、task-aware materialization verifier and core NCP1
+> adapter are implemented. The seven object-format suites plus `ParquetCompactedTargetReaderTest` and
+> `CompactedMaterializationFormatVerifierTest` prove standard `PAR1` bytes、random dense/ZSTD+uncompressed files、
+> sparse NTC1、backpressure/cancellation cleanup、footer/page corruption classification、whole-file CRC/SHA/key
+> identity、cross-stream rejection and task-policy binding. This is not M3 completion：Pulsar opaque-entry round trip、
+> planner/task/worker/recovery/service and both M3 gates below remain pending, and production activation stays disabled.
 
 ### 5.1 Production artifacts
 
@@ -377,6 +378,7 @@ compacted/CompactedObjectReader.java
 compacted/ParquetCompactedObjectWriter.java
 compacted/ParquetCompactedObjectReader.java
 compacted/TopicCompactedObjectReader.java
+compacted/CompactedObjectVerificationRequest.java
 compacted/CompactedObjectVerifier.java
 ```
 
@@ -411,9 +413,12 @@ MaterializationService.java
 DefaultMaterializationService.java
 MaterializationConfig.java
 MaterializationMetricsObserver.java
+CompactedMaterializationFormatVerifier.java
 ```
 
-`nereus-core` registers `ParquetCompactedObjectReader` through the exact reader key at product composition.
+`nereus-core` registers `ParquetCompactedTargetReader` through the exact NCP1 reader key at product composition.
+The internal reader call carries the selected `StreamId` in addition to `ResolvedRange` so a self-consistent object
+from another stream cannot pass merely because the old generic resolved-range shape omitted stream identity.
 
 ### 5.2 Focused tests
 
@@ -426,6 +431,8 @@ CompactedObjectStreamingUploadTest
 CompactedObjectStagingLimitTest
 PulsarEntryOpaqueRoundTripTest                 in managed-ledger integration layer
 TopicCompactedSparseFormatTest
+ParquetCompactedTargetReaderTest
+CompactedMaterializationFormatVerifierTest
 MaterializationTaskIdentityTest
 MaterializationPolicyFactoryTest
 MaterializationOutputAttemptIdentityTest

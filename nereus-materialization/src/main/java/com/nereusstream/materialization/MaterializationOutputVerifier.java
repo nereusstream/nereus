@@ -7,5 +7,8 @@ import java.util.concurrent.CompletableFuture;
 /** Exact immutable-object HEAD plus complete logical-format verification before publication. */
 @FunctionalInterface
 public interface MaterializationOutputVerifier {
-    CompletableFuture<Void> verify(MaterializationOutput output, Duration timeout);
+    CompletableFuture<Void> verify(
+            MaterializationTask task,
+            MaterializationOutput output,
+            Duration timeout);
 }

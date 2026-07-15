@@ -307,6 +307,7 @@ class PinnedReadCoordinatorTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
+                StreamId streamId,
                 long startOffset,
                 List<ResolvedRange> ranges,
                 ReadOptions options) {
@@ -339,6 +340,7 @@ class PinnedReadCoordinatorTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
+                StreamId streamId,
                 long startOffset,
                 List<ResolvedRange> ranges,
                 ReadOptions options) {

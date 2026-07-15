@@ -105,7 +105,10 @@ class ReadTargetReaderRegistryTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+                com.nereusstream.api.StreamId streamId,
+                long startOffset,
+                List<ResolvedRange> ranges,
+                ReadOptions options) {
             return CompletableFuture.completedFuture(new WalReadResult(List.of(), List.of()));
         }
     }

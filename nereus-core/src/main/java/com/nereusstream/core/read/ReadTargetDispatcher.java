@@ -3,6 +3,7 @@ package com.nereusstream.core.read;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import com.nereusstream.objectstore.wal.WalSliceReadStats;
@@ -30,13 +31,27 @@ public final class ReadTargetDispatcher {
     }
 
     public CompletableFuture<WalReadResult> read(
-            long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+            StreamId streamId,
+            long startOffset,
+            List<ResolvedRange> ranges,
+            ReadOptions options) {
+        Objects.requireNonNull(streamId, "streamId");
         validateAdapters(ranges);
         List<Run> runs = runs(ranges);
-        return readRun(runs, 0, startOffset, options, new ArrayList<>(), new ArrayList<>(), 0, 0);
+        return readRun(
+                streamId,
+                runs,
+                0,
+                startOffset,
+                options,
+                new ArrayList<>(),
+                new ArrayList<>(),
+                0,
+                0);
     }
 
     private CompletableFuture<WalReadResult> readRun(
+            StreamId streamId,
             List<Run> runs, int index, long startOffset, ReadOptions options,
             List<ReadBatch> batches, List<WalSliceReadStats> stats, long records, long bytes) {
         if (index >= runs.size() || records >= options.maxRecords() || bytes >= options.maxBytes()) {
@@ -47,7 +62,7 @@ public final class ReadTargetDispatcher {
                 Math.toIntExact(options.maxRecords() - records), Math.toIntExact(options.maxBytes() - bytes),
                 options.isolation(), options.timeout());
         ReadTargetReader reader = registry.require(run.key());
-        return reader.readWithStats(startOffset, run.ranges(), remaining).thenCompose(result -> {
+        return reader.readWithStats(streamId, startOffset, run.ranges(), remaining).thenCompose(result -> {
             batches.addAll(result.batches()); stats.addAll(result.sliceStats());
             long next = startOffset;
             long newRecords = records;
@@ -61,7 +76,16 @@ public final class ReadTargetDispatcher {
                     || next < run.ranges().get(run.ranges().size() - 1).offsetRange().endOffset()) {
                 return CompletableFuture.completedFuture(new WalReadResult(batches, stats));
             }
-            return readRun(runs, index + 1, next, options, batches, stats, newRecords, newBytes);
+            return readRun(
+                    streamId,
+                    runs,
+                    index + 1,
+                    next,
+                    options,
+                    batches,
+                    stats,
+                    newRecords,
+                    newBytes);
         });
     }
 

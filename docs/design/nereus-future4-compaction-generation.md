@@ -546,7 +546,8 @@ create/backward-reset 和 pending-trim gates 已实现并 final-gated。Phase 4
 [`F4-M1–M2`](../phase-4-compaction-generation/07-implementation-plan-and-gates.md) 的 API/metadata/object IO、
 physical reference values、durable reader pin/protection、authoritative generation resolve/read 和 restart-safe
 publication 已落地，并通过 ordinary/Docker-backed final gates；F4-M3 当前已落地 real compacted Parquet
-writer/strict-reader foundation，下一步继续 verifier、core adapter、planner/worker，不重新打开协议选型。
+writer/strict-reader/full verifier、NTC1 storage facade 和 core adapter，下一步继续 Pulsar opaque round trip、
+planner/worker，不重新打开协议选型。
 
 F4-M0 只是 design gate；F4-M1–M2 final gates 也不声称 end-to-end materialization、benchmark、chaos 或
 Phase 4 compatibility certification。F4-M3–M6 的确切文件、测试、故障点和 release gates 见代码级实施计划。

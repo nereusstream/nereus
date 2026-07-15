@@ -3,6 +3,7 @@ package com.nereusstream.core.read;
 
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -14,7 +15,10 @@ public interface ReadTargetReader extends AutoCloseable {
     long reservationBytes(ResolvedRange range);
 
     CompletableFuture<WalReadResult> readWithStats(
-            long startOffset, List<ResolvedRange> ranges, ReadOptions options);
+            StreamId streamId,
+            long startOffset,
+            List<ResolvedRange> ranges,
+            ReadOptions options);
 
     @Override
     default void close() {

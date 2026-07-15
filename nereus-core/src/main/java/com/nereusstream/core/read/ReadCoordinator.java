@@ -467,7 +467,7 @@ public final class ReadCoordinator implements StreamViewReader {
             return CompletableFuture.failedFuture(e);
         }
         CompletableFuture<WalReadResult> walRead = deadline.bound(
-                () -> targetDispatcher.read(startOffset, ranges, boundedOptions),
+                () -> targetDispatcher.read(streamId, startOffset, ranges, boundedOptions),
                 "read resolved WAL ranges");
         return walRead.whenComplete((ignored, error) -> reservation.close())
                 .thenApplyAsync(result -> buildReadResult(

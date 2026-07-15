@@ -10,6 +10,7 @@ import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import java.time.Duration;
@@ -35,6 +36,7 @@ class ReadTargetDispatcherMixedFormatTest {
                 range(3, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"));
 
         WalReadResult result = dispatcher.read(
+                        new StreamId("stream"),
                         0,
                         ranges,
                         new ReadOptions(10, 10, ReadIsolation.COMMITTED, Duration.ofSeconds(1)))
@@ -79,7 +81,10 @@ class ReadTargetDispatcherMixedFormatTest {
 
         @Override
         public CompletableFuture<WalReadResult> readWithStats(
-                long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+                StreamId streamId,
+                long startOffset,
+                List<ResolvedRange> ranges,
+                ReadOptions options) {
             runSizes.add(ranges.size());
             List<ReadBatch> batches = ranges.stream().map(range -> {
                 ObjectSliceReadTarget target = (ObjectSliceReadTarget) range.readTarget();

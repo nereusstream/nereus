@@ -2,7 +2,7 @@
 
 > 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate；
 > F4 compacted/topic-compacted/recovery-checkpoint families 已通过 M0 code-level design gate；F4-M3 real Parquet
-> NCP1/NTC1 writer/strict-reader foundation 已实现，完整 M3 gate 尚未完成；
+> NCP1/NTC1 writer/strict-reader/whole-file verifier 与 NCP1 core adapter 已实现，完整 M3 gate 尚未完成；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -14,8 +14,8 @@ Nereus shared data plane 需要多类 immutable objects：
 | --- | --- | --- | --- |
 | Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
 | Index object | large entry/projection index | offset-index reference | Reserved |
-| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 format checkpoint implemented/tested；worker/gates pending |
-| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader facade implemented；focused NTC1/gates pending，broker admission remains F8 |
+| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter implemented/tested；worker/gates pending |
+| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader facade/full verifier + sparse suite implemented；worker/gates pending，broker admission remains F8 |
 | Recovery checkpoint (`NRC1` + `NRF1`) | replace append-replay/index-repair role of a committed prefix | recovery-root CAS | Designed / F4-M0 frozen |
 | Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated through F3-M6 |
 | Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |

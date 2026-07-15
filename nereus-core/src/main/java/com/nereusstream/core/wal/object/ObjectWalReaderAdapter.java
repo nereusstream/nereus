@@ -6,6 +6,7 @@ import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.api.ResolvedRange;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.core.read.ReadTargetReaderKey;
 import com.nereusstream.core.wal.PrimaryWalReader;
 import com.nereusstream.objectstore.wal.WalObjectReader;
@@ -24,7 +25,9 @@ public final class ObjectWalReaderAdapter implements PrimaryWalReader {
     private final WalObjectReader reader;
     public ObjectWalReaderAdapter(WalObjectReader reader) { this.reader = Objects.requireNonNull(reader); }
     @Override public ReadTargetReaderKey key() { return KEY; }
-    @Override public CompletableFuture<WalReadResult> readWithStats(long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+    @Override public CompletableFuture<WalReadResult> readWithStats(
+            StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
+        Objects.requireNonNull(streamId, "streamId");
         try { return reader.readWithStats(startOffset, ranges.stream().map(ResolvedObjectRange::from).toList(), options); }
         catch (IllegalArgumentException e) { return NereusException.failedFuture(ErrorCode.UNSUPPORTED_READ_TARGET,
                 false, "Object WAL reader received a non-object target", e); }

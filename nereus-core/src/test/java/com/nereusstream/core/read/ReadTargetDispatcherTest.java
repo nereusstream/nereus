@@ -35,7 +35,10 @@ class ReadTargetDispatcherTest {
                     Optional.of("WAL_OBJECT_V1")); }
             @Override public long reservationBytes(ResolvedRange range) { calls.incrementAndGet(); return 1; }
             @Override public CompletableFuture<WalReadResult> readWithStats(
-                    long startOffset, List<ResolvedRange> ranges, com.nereusstream.api.ReadOptions options) {
+                    com.nereusstream.api.StreamId streamId,
+                    long startOffset,
+                    List<ResolvedRange> ranges,
+                    com.nereusstream.api.ReadOptions options) {
                 calls.incrementAndGet(); return CompletableFuture.completedFuture(new WalReadResult(List.of(), List.of()));
             }
         };
