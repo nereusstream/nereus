@@ -51,7 +51,8 @@ Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、core 
 policy/planner/task-store/recovery/64-shard registry scanner、exact-source reader/claim-to-output-ready worker、
 protection owner crash-cut reconciliation、advisory checkpoint reconciliation 与 bounded service lifecycle
 checkpoints、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 与 terminal
-workflow-metadata retirement 已落地；topic-compaction execution engine/worker 与 M3 gates 仍 pending，
+workflow-metadata retirement，以及 topic-compaction COMMITTED-source bootstrap、tagged-v1 key encoding、
+sorted-spill two-pass engine/worker/publication focused tests 已落地；M3 aggregate/final gates 仍 pending，
 retention/GC 和 async profile 仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

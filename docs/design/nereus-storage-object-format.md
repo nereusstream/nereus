@@ -4,8 +4,8 @@
 > F4 compacted/topic-compacted/recovery-checkpoint families 已通过 M0 code-level design gate；F4-M3 real Parquet
 > NCP1/NTC1 writer/strict-reader/whole-file verifier、NCP1 core adapter、M3 planner/recovery、exact-source
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
-> checkpoints、topic-compaction neutral SPI/registry 与 terminal workflow-metadata retirement 已实现，
-> topic execution engine/worker 和完整 M3 gate 尚未完成；
+> checkpoints、topic-compaction neutral SPI/registry、COMMITTED-source bootstrap、tagged-v1 key encoding、
+> sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；完整 M3 gate 尚未完成；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -18,7 +18,7 @@ Nereus shared data plane 需要多类 immutable objects：
 | Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
 | Index object | large entry/projection index | offset-index reference | Reserved |
 | Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter + planner/recovery + exact-source worker + protection/checkpoint reconciliation + bounded service lifecycle + Pulsar exact-byte round trip + terminal metadata retirement checkpoints implemented/tested；M3 gates pending |
-| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader facade/full verifier + sparse suite + neutral SPI/registry implemented；topic execution engine/worker and gates pending，broker admission remains F8 |
+| Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader/full verifier + neutral SPI/registry + COMMITTED-source planner bootstrap + tagged-v1 key encoding + sorted-spill two-pass engine/worker/publication focused tests implemented；aggregate/final gates pending，broker admission remains F8 |
 | Recovery checkpoint (`NRC1` + `NRF1`) | replace append-replay/index-repair role of a committed prefix | recovery-root CAS | Designed / F4-M0 frozen |
 | Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated through F3-M6 |
 | Transaction snapshot | large txn/pending-ack state | txn-state ref | Designed |
@@ -296,6 +296,9 @@ F4-M0 freezes three distinct formats：
   row-group bounds、full payload CRC/SHA and an `NCP1` metadata envelope；for `PULSAR_ENTRY_V1` the payload column
   contains one exact full Entry per offset；
 - `NEREUS_TOPIC_COMPACTED_V1` (`NTC1`)：sparse keyed records plus explicit logical coverage/tombstone sections；
+  `compaction_key` uses required `TAGGED_V1` bytes (`0x00 || decoder-key` or
+  `0x01 || int64-big-endian-offset`) so retain-exact unkeyed rows cannot collide with decoder keys；V1 tasks derive
+  only from exact COMMITTED indexes and publish only through the isolated TOPIC_COMPACTED namespace；
   it is legal only in `TOPIC_COMPACTED` and never ordinary fallback；
 - `NEREUS_RECOVERY_CHECKPOINT_V1` (`NRC1` body + `NRF1` footer)：an immutable, checksummed stream-prefix
   recovery/index-repair checkpoint referenced by a versioned recovery root。

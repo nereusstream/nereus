@@ -3,8 +3,8 @@
 > 状态：Implementation in progress；F4-M0 complete，F4-M1–M2 implemented/final-gated；F4-M3 real Parquet
 > read/write, deterministic planner/task/recovery, exact-source worker、protection/checkpoint reconciliation and
 > bounded service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry and
-> terminal workflow-metadata retirement checkpoints implemented，topic execution engine/worker/gates and F4 milestones
-> 4–6 pending
+> terminal workflow-metadata retirement plus COMMITTED-source bootstrap、tagged-v1 key encoding and sorted-spill
+> topic execution engine/worker/publication checkpoints implemented；M3 gates and F4 milestones 4–6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -556,9 +556,12 @@ claim heartbeat、source/output protection、guarded upload、strict output veri
 transition 的 worker checkpoint。随后又实现同 logical task owner 的单调 acquire-or-transfer、
 source/output protection 恢复重建、publication 前后 owner 收敛和重复 expired-claim CAS
 恢复。随后又实现单调 advisory checkpoint reconcile、bounded dispatcher 和可 deadline-close 的 service
-lifecycle。随后完成 Pulsar opaque Entry 经 NCP1 的 byte-for-byte 与 middle-batch MessageId 往返。下一步是
-topic-compaction execution engine/worker 和 M3 gates，不重新打开协议选型。terminal
+lifecycle。随后完成 Pulsar opaque Entry 经 NCP1 的 byte-for-byte 与 middle-batch MessageId 往返。terminal
 workflow-metadata retirement 已用 exact task/index/checkpoint/root/protection proof 与 conditional delete 落地。
+最新 checkpoint 固定 topic task 从 lossless `COMMITTED` sources bootstrap、只向 `TOPIC_COMPACTED` view
+发布，并实现 tagged-v1 keyed/unkeyed namespace、共享 staging budget 的 checksum-verified sorted spills、
+survivor bitmap、两遍 exact-source replay 及 NTC1 worker/isolated publication tests。下一步是 M3
+aggregate/final gates，不重新打开协议选型。
 
 F4-M0 只是 design gate；F4-M1–M2 final gates 也不声称 end-to-end materialization、benchmark、chaos 或
 Phase 4 compatibility certification。F4-M3–M6 的确切文件、测试、故障点和 release gates 见代码级实施计划。

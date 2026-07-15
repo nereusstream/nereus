@@ -52,9 +52,11 @@ public record MaterializationTaskRecord(
             throw new IllegalArgumentException("task must contain at least one source");
         }
         long cursor = offsetStart;
+        int expectedSourceViewId = taskKindId == 2 ? 1 : readViewId;
         for (SourceGenerationRecord source : sources) {
-            if (source.readViewId() != readViewId || source.offsetStart() != cursor) {
-                throw new IllegalArgumentException("task sources must be view-consistent and gap-free");
+            if (source.readViewId() != expectedSourceViewId || source.offsetStart() != cursor) {
+                throw new IllegalArgumentException(
+                        "task sources must use the task-kind source view and be gap-free");
             }
             cursor = source.offsetEnd();
         }

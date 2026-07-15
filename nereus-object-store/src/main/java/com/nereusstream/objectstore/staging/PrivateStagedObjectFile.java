@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.CRC32C;
 
 /** Owner-only staging file whose sealed bytes are replayed without whole-object aggregation. */
-public final class PrivateStagedObjectFile implements StagedObjectFile {
+public final class PrivateStagedObjectFile implements StagedObjectFile, ManagedStagingFile {
     private enum State {
         OPEN,
         SEALED,
@@ -177,7 +177,8 @@ public final class PrivateStagedObjectFile implements StagedObjectFile {
         manager.unregister(this);
     }
 
-    Path path() {
+    @Override
+    public Path path() {
         return path;
     }
 

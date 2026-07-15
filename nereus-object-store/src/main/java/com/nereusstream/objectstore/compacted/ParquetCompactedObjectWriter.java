@@ -400,6 +400,8 @@ public final class ParquetCompactedObjectWriter implements CompactedObjectWriter
                 throw new CompactedObjectFormatException(
                         "topic-compacted rows must be increasing and carry disposition/key");
             }
+            TopicCompactionKeyEncodingV1.validateForOffset(
+                    row.compactionKey().orElseThrow(), row.streamOffset());
             int disposition = row.sparseDisposition().getAsInt();
             if (disposition != 1 && disposition != 2) {
                 throw new CompactedObjectFormatException("unknown topic-compaction disposition");

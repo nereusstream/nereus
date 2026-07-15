@@ -6,6 +6,7 @@ import static com.nereusstream.materialization.GenerationPublicationTestSupport.
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
+import com.nereusstream.api.ReadView;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
@@ -64,6 +65,41 @@ class GenerationIndexPublicationTest {
                         .as("terminal publication must not recreate temporary protections at PUBLISHED")
                         .isLessThan(task.metadataVersion());
             });
+        }
+    }
+
+    @Test
+    void publishesTopicCompactionOnlyIntoTheIsolatedTargetView() {
+        try (GenerationPublicationTestSupport.Context context =
+                GenerationPublicationTestSupport.topicContext()) {
+            DefaultGenerationCommitter committer = context.committer(
+                    context.generations(), GenerationPublicationTestSupport.successfulGuard());
+
+            GenerationCommitResult result = committer.publish(
+                    context.task(), context.output()).join();
+
+            assertThat(result.view()).isEqualTo(ReadView.TOPIC_COMPACTED);
+            assertThat(context.task().sourceView()).isEqualTo(ReadView.COMMITTED);
+            assertThat(context.generations().getIndex(
+                            CLUSTER,
+                            new GenerationIndexIdentity(
+                                    STREAM,
+                                    ReadView.TOPIC_COMPACTED,
+                                    result.coverage().endOffset(),
+                                    result.generation().value()))
+                    .join())
+                    .isPresent();
+            var sameNumericCommittedGeneration = context.generations().getIndex(
+                            CLUSTER,
+                            new GenerationIndexIdentity(
+                                    STREAM,
+                                    ReadView.COMMITTED,
+                                    result.coverage().endOffset(),
+                                    result.generation().value()))
+                    .join();
+            assertThat(sameNumericCommittedGeneration).isPresent();
+            assertThat(sameNumericCommittedGeneration.orElseThrow().value().taskId())
+                    .isNotEqualTo(context.task().taskId());
         }
     }
 }

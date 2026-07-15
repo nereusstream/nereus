@@ -145,7 +145,9 @@ public final class RegisteredMaterializationStreamScanner {
                 return CompletableFuture.completedFuture(null);
             }
             return activationGuard.requireReady(
-                            GenerationOperation.GENERATION_PUBLISH,
+                            policy.taskKind() == TaskKind.TOPIC_KEY_COMPACTION
+                                    ? GenerationOperation.TOPIC_COMPACTED_PUBLISH
+                                    : GenerationOperation.GENERATION_PUBLISH,
                             subject.orElseThrow(),
                             false)
                     .thenCompose(proof -> processAdmittedStream(

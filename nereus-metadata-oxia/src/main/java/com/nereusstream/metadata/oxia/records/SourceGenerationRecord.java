@@ -43,6 +43,9 @@ public record SourceGenerationRecord(
         if ((generation == 0) != materializationPolicySha256.isEmpty()) {
             throw new IllegalArgumentException("source policy digest presence must match generation zero");
         }
+        if (generation == 0 && readViewId != 1) {
+            throw new IllegalArgumentException("generation zero exists only in the COMMITTED source view");
+        }
         payloadFormat = F4RecordValidation.requireText(payloadFormat, "payloadFormat");
         projectionRef = F4RecordValidation.requireOptionalText(projectionRef, "projectionRef", 4096);
         F4RecordValidation.requirePositive(entryCount, "entryCount");

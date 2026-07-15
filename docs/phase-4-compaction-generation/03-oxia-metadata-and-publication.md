@@ -77,7 +77,8 @@ codec round-trips. F4-M2 is complete/final-gated. M3 now implements the compacte
 task-protection creation/crash-cut owner reconciliation、monotonic advisory checkpoint CAS and bounded service
 lifecycle；the Pulsar Entry/NCP1 opaque-byte round trip passes and the topic-compaction neutral SPI/registry is
 implemented. Terminal workflow-metadata retirement now uses exact task/index/checkpoint/root/protection proofs and
-conditional deletes, while the topic execution engine/worker and M3 gates remain. M4 owns full
+conditional deletes. COMMITTED-source topic bootstrap、tagged-v1 NTC1 keys、the sorted-spill two-pass engine、worker
+and isolated TOPIC_COMPACTED publication path are now implemented；the M3 aggregate/final gates remain. M4 owns full
 recovery-root/anchor-aware source reachability before retirement or physical deletion can be enabled.
 
 ### 1.3 F4-M3 planning/recovery checkpoint
@@ -95,7 +96,9 @@ new visibility owner：registration remains a liveness trigger, the planner relo
 truth, task creation revalidates every exact source plus activation proof, and only the M2 generation-index CAS may
 publish output. Exact-source worker IO、checkpoint/service orchestration and Pulsar exact-byte evidence are now
 implemented；the topic-compaction neutral SPI/registry and proof-driven terminal workflow-metadata retirement are
-also implemented, while the topic execution engine/worker and M3 aggregate/final gates remain pending.
+also implemented. Topic tasks now persist exact COMMITTED source indexes, execute the bounded two-pass engine and
+publish sparse NTC1 output only through a TOPIC_COMPACTED index；focused worker/publication tests pass, while the M3
+aggregate/final gates remain pending.
 
 ## 2. Keyspace
 
@@ -921,6 +924,12 @@ Sources/policy are immutable after create. The embedded policy is the recovery s
 the task's id/version/view/kind and canonical digest；current process configuration is not an input to recovery.
 Worker claim、output、generation/publication and failure fields must match their lifecycle exactly. Failure message
 is bounded and never used for retry classification；`failureClassId` is the closed machine field.
+
+The task/policy `readViewId` is the target namespace. `SourceGenerationRecord.readViewId` must instead equal the
+closed `TaskKind.sourceView()` rule；V1 requires `COMMITTED` for both task kinds. Thus a TOPIC task root has
+`readViewId=TOPIC_COMPACTED` while every frozen source record has `readViewId=COMMITTED`. Codec/domain validation
+rejects any other pairing. The two view-scoped sequence records may allocate the same numeric generation without
+collision because every index key、task/output identity and publication check includes its view.
 
 `PUBLISHING` deliberately freezes the publication id before allocating a generation. Its first durable value has a
 non-empty `publicationId` and an empty `allocatedGeneration`；one same-state CAS may attach the first positive

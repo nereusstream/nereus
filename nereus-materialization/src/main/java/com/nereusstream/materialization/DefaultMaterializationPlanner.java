@@ -86,12 +86,6 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             if (maxTasks <= 0 || maxTasks > 1_000) {
                 throw new IllegalArgumentException("maxTasks must be in [1, 1000]");
             }
-            if (policy.view() != ReadView.COMMITTED || policy.taskKind() != TaskKind.LOSSLESS_REWRITE) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.UNSUPPORTED_FORMAT,
-                        false,
-                        "F4-M3 scheduling admits only lossless COMMITTED materialization"));
-            }
             return l0Metadata.getStreamSnapshot(cluster, streamId).thenCompose(snapshot ->
                     generations.getStreamRegistration(cluster, streamId).thenCompose(registration ->
                             planSnapshot(streamId, requestedRange, policy, maxTasks, snapshot, registration)));
@@ -117,22 +111,36 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
         } catch (ArithmeticException overflow) {
             return CompletableFuture.completedFuture(List.of());
         }
-        CompletableFuture<List<VersionedGenerationCandidate>> candidates = scanCandidates(
+        CompletableFuture<List<VersionedGenerationCandidate>> sourceCandidates = scanCandidates(
                 streamId,
-                policy.view(),
+                policy.taskKind().sourceView(),
                 minimumOffsetEnd,
                 bounds.endOffset(),
                 Optional.empty(),
                 new ArrayList<>());
+        CompletableFuture<List<VersionedGenerationCandidate>> targetCandidates =
+                policy.taskKind().sourceView() == policy.view()
+                        ? sourceCandidates
+                        : scanCandidates(
+                                streamId,
+                                policy.view(),
+                                minimumOffsetEnd,
+                                bounds.endOffset(),
+                                Optional.empty(),
+                                new ArrayList<>());
         CompletableFuture<List<VersionedMaterializationTask>> tasks = scanTasks(
                 streamId, Optional.empty(), new ArrayList<>());
-        return candidates.thenCombine(tasks, (allCandidates, allTasks) -> buildPlan(
-                streamId,
-                policy,
-                maxTasks,
-                bounds,
-                allCandidates,
-                allTasks));
+        return sourceCandidates.thenCombine(
+                        targetCandidates,
+                        CandidateSets::new)
+                .thenCombine(tasks, (candidates, allTasks) -> buildPlan(
+                        streamId,
+                        policy,
+                        maxTasks,
+                        bounds,
+                        candidates.sources(),
+                        candidates.targets(),
+                        allTasks));
     }
 
     private PlannerBounds requireBounds(
@@ -260,13 +268,14 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             MaterializationPolicy policy,
             int maxTasks,
             PlannerBounds bounds,
-            List<VersionedGenerationCandidate> candidates,
+            List<VersionedGenerationCandidate> sourceCandidates,
+            List<VersionedGenerationCandidate> targetCandidates,
             List<VersionedMaterializationTask> durableTasks) {
-        List<SourceGeneration> edges = candidates.stream()
+        List<SourceGeneration> edges = sourceCandidates.stream()
                 .map(candidate -> MaterializationSourceMapper.committedSource(
                         candidate,
                         streamId,
-                        policy.view(),
+                        policy.taskKind().sourceView(),
                         bounds.committedEndOffset(),
                         bounds.headCommitVersion(),
                         bounds.effectiveProjection()))
@@ -296,7 +305,7 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                     path.sources(),
                     policy);
             if (!eligible(task, policy)
-                    || alreadyPublished(task, candidates)
+                    || alreadyPublished(task, targetCandidates)
                     || exactTaskExists(task, existingTasks)) {
                 cursor = path.endOffset();
                 continue;
@@ -353,6 +362,11 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
     }
 
     private static boolean eligible(MaterializationTask task, MaterializationPolicy policy) {
+        if (task.taskKind() == TaskKind.TOPIC_KEY_COMPACTION) {
+            // V1 topic tasks always derive from the COMMITTED domain. Exact target-index lookup above is the
+            // fixed point: the same source set/policy is not rewritten after one TOPIC_COMPACTED publication.
+            return true;
+        }
         Checksum digest = policy.digestSha256();
         boolean everySourceAlreadyCurrent = task.sources().stream().allMatch(source ->
                 source.generation() > 0
@@ -371,6 +385,7 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
                 .map(VersionedGenerationIndex.class::cast)
                 .map(VersionedGenerationIndex::value)
                 .anyMatch(index -> index.lifecycle() == GenerationLifecycle.COMMITTED
+                        && index.readViewId() == task.view().wireId()
                         && index.taskId().equals(task.taskId())
                         && index.offsetStart() == task.coverage().startOffset()
                         && index.offsetEnd() == task.coverage().endOffset()
@@ -478,6 +493,15 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
             long committedEndOffset,
             long headCommitVersion,
             Optional<ProjectionRef> effectiveProjection) {
+    }
+
+    private record CandidateSets(
+            List<VersionedGenerationCandidate> sources,
+            List<VersionedGenerationCandidate> targets) {
+        private CandidateSets {
+            sources = List.copyOf(sources);
+            targets = List.copyOf(targets);
+        }
     }
 
     private record Compatibility(

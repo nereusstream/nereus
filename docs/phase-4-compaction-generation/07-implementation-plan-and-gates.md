@@ -29,7 +29,7 @@ gates on 2026-07-15；the following foundation parts are implemented and covered
 `phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check` and
 `phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
 restart-safe publication, pin-owned fallback/quarantine and a real Oxia/LocalStack independent-runtime fixture.
-F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has five implementation checkpoints：the real compacted
+F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has nine implementation checkpoints：the real compacted
 format/read path, the deterministic policy/planner/task-store/recovery/registered-stream-scan path, and the
 exact-source reader plus claim-to-output-ready worker path, followed by task-protection owner crash-cut reconciliation
 across recovery/publication, then monotonic advisory checkpoint reconstruction plus bounded dispatcher/service
@@ -37,8 +37,10 @@ lifecycle. A sixth checkpoint proves Pulsar Entry/NCP1 exact-byte and middle-bat
 the generation projection ref out of per-entry metadata. A seventh checkpoint implements the protocol-neutral
 topic-compaction decoder/strategy SPI, closed disposition wire ids, immutable compaction-key facts and an exact
 frozen-identity registry. An eighth checkpoint implements proof-driven terminal task/protection/stats/old-checkpoint
-retirement with exact reload and response-loss convergence. This is not a Phase 4 completion claim：the
-topic-compaction execution engine/worker and M3 gates remain open；full
+retirement with exact reload and response-loss convergence. A ninth checkpoint implements COMMITTED-source topic
+bootstrap、tagged-v1 keyed/unkeyed encoding、shared-budget checksum-verified sorted spills、bounded two-pass exact
+replay and the NTC1 worker/view-isolated publication path. This is not a Phase 4 completion claim：the M3 aggregate
+and real-service gates remain open；full
 recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
 
 A later milestone is complete only when：
@@ -286,7 +288,8 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > F4-M2 is complete/final-gated。M3 已接入真实 compacted format、worker-owned source/output protections、
 > 跨 key crash-cut 恢复、advisory checkpoint reconciliation 与 bounded service lifecycle checkpoints；Pulsar
 > opaque-entry round trip、topic-compaction neutral SPI/registry 与 terminal workflow-metadata retirement 已完成；
-> topic-compaction execution engine/worker 和 gates 仍需完成；M4 仍需补齐
+> COMMITTED-source topic bootstrap、tagged-v1 NTC1 key、sorted-spill two-pass engine、worker 与 isolated
+> publication tests 也已完成；M3 aggregate/final gates 仍需完成；M4 仍需补齐
 > recovery-root/anchor-aware source reachability，physical delete 继续禁用。
 
 ### 4.1 Production artifacts
@@ -393,8 +396,11 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 > and immutable read-only key ownership. An eighth checkpoint adds `DefaultTerminalWorkflowMetadataRetirer`, bounded
 > checkpoint scanning and exact candidate-by-key lookup. It prevents PUBLISHED recovery from recreating temporary
 > protections, proves the exact index/checkpoint/root/visible owner, retires failed tasks only without a publication,
-> removes stale stats/old checkpoints, and converges lost protection/task delete responses. This is not M3
-> completion；the topic-compaction execution engine/worker and both M3 gates below remain pending,
+> removes stale stats/old checkpoints, and converges lost protection/task delete responses. A ninth checkpoint adds
+> the COMMITTED-source/TOPIC-target planner split、`TAGGED_V1` keyed/unkeyed namespace、shared-budget SHA-verified
+> sorted spills、bounded survivor bitmap、two-pass exact replay and NTC1 worker/publication integration. Focused tests
+> force spills, prove latest-key/unkeyed/tombstone behavior, fail on decoder drift, write/verify real Parquet NTC1 and
+> publish only to the TOPIC_COMPACTED namespace. This is not M3 completion；both M3 gates below remain pending,
 > and production activation stays disabled.
 
 ### 5.1 Production artifacts
@@ -411,8 +417,11 @@ compacted/CompactedObjectReader.java
 compacted/ParquetCompactedObjectWriter.java
 compacted/ParquetCompactedObjectReader.java
 compacted/TopicCompactedObjectReader.java
+compacted/TopicCompactionKeyEncodingV1.java
 compacted/CompactedObjectVerificationRequest.java
 compacted/CompactedObjectVerifier.java
+staging/ManagedStagingFile.java
+staging/PrivateStagingSpillFile.java
 ```
 
 Add pinned Parquet/ZSTD dependencies and dependency constraints. The format does not import Pulsar.
@@ -449,6 +458,11 @@ CompactionRecord.java
 CompactionDisposition.java
 TopicCompactionStrategy.java
 TopicCompactionRegistry.java
+TopicCompactionEngine.java
+DefaultTopicCompactionEngine.java
+TopicCompactionPlan.java
+ExactSourceBatchPublisher.java
+TopicCompactionRowPublisher.java
 TerminalWorkflowMetadataRetirer.java
 DefaultTerminalWorkflowMetadataRetirer.java
 TerminalWorkflowMetadataRetirementResult.java
@@ -474,7 +488,9 @@ CompactedObjectStreamingUploadTest
 CompactedObjectStagingLimitTest
 PulsarEntryOpaqueRoundTripTest                 in managed-ledger integration layer
 TopicCompactedSparseFormatTest
+TopicCompactionKeyEncodingV1Test
 TopicCompactionRegistryTest
+TopicCompactionEngineTest
 ParquetCompactedTargetReaderTest
 CompactedMaterializationFormatVerifierTest
 MaterializationTaskIdentityTest

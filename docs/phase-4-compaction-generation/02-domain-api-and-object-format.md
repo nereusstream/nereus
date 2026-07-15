@@ -7,10 +7,10 @@ physical-reference/reader-pin/activation-proof values and the F4-M3 compacted-Pa
 whole-index planner、task-store、task-recovery and registered-stream-scanner checkpoints identified in document 07
 are implemented. The exact-source reader/lossless-row/claim-to-output-ready worker、task-protection crash-cut
 reconciliation、advisory checkpoint reconciler、bounded M3 service lifecycle and Pulsar Entry/NCP1 exact-byte round
-trip are also implemented. The protocol-neutral topic-compaction decoder/strategy SPI and exact frozen-identity
-registry plus proof-driven terminal workflow-metadata retirement are implemented and covered by focused tests；the
-topic-compaction execution engine/worker and M4–M6 surfaces
-remain target code until their milestone lands. Package、class and method names are normative unless a review replaces them together with
+trip are also implemented. The protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity
+registry、COMMITTED-source planner bootstrap、collision-free tagged-v1 key namespace、checksum-verified sorted-spill
+two-pass engine、NTC1 worker/publication path and proof-driven terminal workflow-metadata retirement are implemented
+and covered by focused tests. The M3 aggregate/final gates and M4–M6 surfaces remain target work. Package、class and method names are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
 The domain model obeys these rules：
@@ -58,8 +58,10 @@ nereus-object-store/src/main/java/com/nereusstream/objectstore/
   ObjectPutRetryPolicy.java
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/staging/
+  ManagedStagingFile.java
   StagedObjectFile.java
   PrivateStagedObjectFile.java
+  PrivateStagingSpillFile.java
   StagingFileManager.java
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/compacted/
@@ -77,6 +79,7 @@ nereus-object-store/src/main/java/com/nereusstream/objectstore/compacted/
   ParquetCompactedObjectWriter.java
   ParquetCompactedObjectReader.java
   TopicCompactedObjectReader.java
+  TopicCompactionKeyEncodingV1.java
   CompactedObjectVerificationRequest.java
   CompactedObjectVerifier.java
 
@@ -113,6 +116,11 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/
   CompactionDisposition.java
   TopicCompactionStrategy.java
   TopicCompactionRegistry.java
+  TopicCompactionEngine.java
+  DefaultTopicCompactionEngine.java
+  TopicCompactionPlan.java
+  ExactSourceBatchPublisher.java
+  TopicCompactionRowPublisher.java
   TerminalWorkflowMetadataRetirer.java
   DefaultTerminalWorkflowMetadataRetirer.java
   TerminalWorkflowMetadataRetirementResult.java
@@ -408,6 +416,7 @@ public enum TaskKind {
     private final int wireId;
     TaskKind(int wireId) { this.wireId = wireId; }
     public int wireId() { return wireId; }
+    public ReadView sourceView() { return ReadView.COMMITTED; }
     public static TaskKind fromWireId(int id) { /* strict closed mapping */ }
 }
 ```
@@ -417,6 +426,13 @@ public enum TaskKind {
 `targetPhysicalFormat=NEREUS_TOPIC_COMPACTED_PARQUET_V1` and a registered non-empty strategy id/version/key codec.
 Compression is exactly `ZSTD` or `UNCOMPRESSED` in V1. Any other combination fails policy construction before a task
 key is calculated.
+
+`MaterializationTask.view` and `MaterializationPolicy.view` are target views. `TaskKind.sourceView()` is the durable
+V1 source-view rule and returns `COMMITTED` for both task kinds. Consequently a topic task freezes only exact
+lossless COMMITTED indexes in `SourceGeneration`; an NTC1 target can prove the current-policy fixed point but is
+never fed back into the dense exact-source reader. The planner scans source and target namespaces separately when
+the views differ. Generation counters remain view-scoped, so equal numeric generations in COMMITTED and
+TOPIC_COMPACTED identify unrelated indexes.
 
 `minMergeSourceRanges` is at least 2 and at most `maxSourceRanges`. It applies only when every selected source is
 already a healthy higher generation written with the exact current policy/format. A run containing generation zero
@@ -881,12 +897,24 @@ nereus.output.record.count            = sparse emitted row count
 nereus.compaction.strategy            = registered strategy id
 nereus.compaction.strategy.version    = decimal long
 nereus.compaction.key.codec           = registered decoder id
+nereus.compaction.key.encoding        = TAGGED_V1
 ```
 
 Rows are strictly increasing but need not be adjacent. Missing offsets mean superseded records, not unavailable
 storage. A tombstone row has no payload；its retention/removal policy is part of the strategy version. The generation
 record stores dense source coverage separately from sparse output count, so this format cannot hydrate the ordinary
 `OffsetIndexEntry/ResolvedRange` type.
+
+`compaction_key` is a collision-free storage namespace, not the raw decoder result：
+
+```text
+keyed record     = 0x00 || non-empty decoder key
+unkeyed record   = 0x01 || stream_offset as signed int64 big-endian
+```
+
+`TopicCompactionKeyEncodingV1` is the sole V1 encoder/decoder. The writer and strict reader reject unknown tags、an
+empty keyed body、a malformed/negative unkeyed offset or an unkeyed value whose embedded offset differs from the row
+offset. This prevents arbitrary decoder keys from colliding with the retain-exact representation.
 
 Protocol payload parsing is supplied through a neutral SPI：
 
@@ -931,8 +959,41 @@ the exact task-policy values, and `planningTimeMillis` is captured once so tombs
 only the exact identities frozen in `TopicCompactionSpec`, and re-reads implementation identities at resolution so a
 mutable implementation cannot silently change durable task semantics. `CompactionRecord` defensively copies a
 non-empty key into a read-only buffer, while `CompactionDisposition` uses explicit durable wire ids rather than enum
-ordinals. The execution engine still owns the configured key-byte cap, supplied-offset equality check, unkeyed
-retain-exact representation and two-pass payload reread; those checks are not delegated to the registry.
+ordinals. The implemented engine owns the configured key-byte cap, supplied-offset equality check, unkeyed
+retain-exact representation and two-pass payload reread；those checks are not delegated to the registry.
+
+The execution surface is：
+
+```java
+public interface TopicCompactionEngine {
+    CompletableFuture<TopicCompactionPlan> prepare(
+            MaterializationTask task,
+            ExactSourceRangeReader sourceReader,
+            ReadOptions readOptions,
+            TopicCompactionRegistry.Binding binding,
+            long planningTimeMillis);
+}
+
+public interface TopicCompactionPlan
+        extends Flow.Publisher<CompactedObjectRow>, AutoCloseable {
+    int outputRecordCount();
+    @Override void close();
+}
+```
+
+`DefaultTopicCompactionEngine` requires a TOPIC task whose sources use `COMMITTED`, re-resolves the exact frozen
+decoder/strategy identities, and captures the durable task `createdAtMillis` as the one tombstone planning time. Pass
+one validates dense one-record-per-offset source batches, updates latest-offset-by-key state, marks unkeyed records
+directly in a bounded survivor `BitSet`, and spills immutable key-sorted runs when its key-memory budget is reached.
+The budget is `[64 KiB, 256 MiB]`, decoded keys are `[1, 1 MiB - 1]` bytes, merge fan-in is `[2, 64]`, and task
+coverage remains capped at 1,048,576 records. Spill runs share `StagingFileManager`'s global byte budget, are sealed
+with file identity plus SHA-256, and are checksum-verified during bounded k-way merge.
+
+Pass one freezes the survivor bitmap、sparse count and a canonical decoder-fact digest, then closes every spill file.
+Pass two reopens the same exact COMMITTED sources, repeats offset/decoder/strategy facts, compares the digest and
+count, and emits only survivors in source-offset order. VALUE rows carry the original exact payload；TOMBSTONE rows
+carry no payload. Any decoder mutation、source substitution、count/digest drift、spill corruption or cancellation
+fails the writer before upload/publication.
 
 ## 9. Recovery Checkpoint Object V1
 
@@ -1212,6 +1273,7 @@ public final class StagingFileManager implements AutoCloseable {
             Duration orphanGrace,
             Executor objectIoExecutor);
     public PrivateStagedObjectFile create(String canonicalPurpose);
+    public PrivateStagingSpillFile createSpill(String canonicalPurpose);
     public int cleanupOrphans();
     public long reservedBytes();
 }
@@ -1219,6 +1281,15 @@ public final class StagingFileManager implements AutoCloseable {
 public final class PrivateStagedObjectFile implements StagedObjectFile {
     public OutputStream outputStream();       // claim once
     public PrivateStagedObjectFile seal();    // force + immutable identity/checksums
+}
+
+public final class PrivateStagingSpillFile implements AutoCloseable {
+    public OutputStream outputStream();
+    public PrivateStagingSpillFile seal();
+    public long sealedLength();
+    public Checksum contentSha256();
+    public InputStream openVerifiedInputStream();
+    @Override public void close();
 }
 
 public record ListObjectsOptions(int maxKeys, Duration timeout) { }
@@ -1279,13 +1350,15 @@ deadline is strictly earlier than that absolute deadline；each following reques
 `min(ObjectStoreConfiguration.requestTimeout, remainingOverallTime)` and requires a positive millisecond duration.
 Production jitter is random；tests inject a deterministic value source.
 
-`PrivateStagedObjectFile` is allocated by the process-shared `StagingFileManager` under a configured owner-only
+`PrivateStagedObjectFile` and `PrivateStagingSpillFile` are allocated by the process-shared `StagingFileManager`
+under a configured owner-only
 directory, opens a new regular file with
 no-follow/exclusive-create semantics, streams Parquet/NRC1 bytes while calculating CRC32C/SHA-256 and is sealed before
 `openPublisher`. Seal records file identity and exact length；publisher open/re-read mismatch fails before upload.
 Closing deletes the staging file best-effort, and startup cleanup removes only valid product-prefixed files older than
 the orphan staging grace. The manager's global byte semaphore bounds sealed + in-progress staging bytes across
-compacted and checkpoint writers. Staging files are never
+compacted/checkpoint writers and topic-compaction spill runs. A sealed spill exposes one active verified input stream；
+EOF validates its exact length and SHA-256, and close deletes it and releases exactly its reserved bytes. Staging files are never
 durable recovery truth；a process crash simply causes task replay and object-store orphan reconciliation.
 
 List is bounded to at most 1,000 logical keys per call and the continuation token is opaque. Because canonical S3
@@ -1313,6 +1386,9 @@ Required tests before any publish gate：
 - byte-for-byte Pulsar Entry comparison including compression、batching、properties and middle-batch MessageId；
 - corrupt footer、row-group stats、payload CRC、offset order、count and trailing/mismatched object metadata；
 - sparse topic-compaction coverage/tombstone strategy tests with no ordinary-reader cross-over；
+- tagged keyed/unkeyed namespace non-collision、malformed-tag and embedded-offset rejection；
+- topic pass-one forced spill/latest-key selection、unkeyed retain-exact、tombstone retention/removal、pass-two exact
+  replay and decoder-fact drift rejection；
 - recovery checkpoint golden bytes、truncation at every byte、CRC/SHA failure、directory lookup and prefix merge；
 - object-key content-hash/output-attempt addressing、already-exists exact comparison and deleted-key no-reuse；
 - LocalStack range/footer/list/delete identity behavior and local-file traversal/symlink safety。

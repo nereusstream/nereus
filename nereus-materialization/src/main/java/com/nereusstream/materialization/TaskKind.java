@@ -1,6 +1,8 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.materialization;
 
+import com.nereusstream.api.ReadView;
+
 /** Closed durable materialization task family. */
 public enum TaskKind {
     LOSSLESS_REWRITE(1),
@@ -14,6 +16,11 @@ public enum TaskKind {
 
     public int wireId() {
         return wireId;
+    }
+
+    /** V1 always derives semantic compaction from the lossless committed source domain. */
+    public ReadView sourceView() {
+        return ReadView.COMMITTED;
     }
 
     public static TaskKind fromWireId(int wireId) {

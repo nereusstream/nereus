@@ -100,7 +100,8 @@ public final class CompactedObjectFormatV1 {
             "nereus.source.coverage.end",
             "nereus.compaction.strategy",
             "nereus.compaction.strategy.version",
-            "nereus.compaction.key.codec");
+            "nereus.compaction.key.codec",
+            "nereus.compaction.key.encoding");
 
     private CompactedObjectFormatV1() {
     }
@@ -159,6 +160,7 @@ public final class CompactedObjectFormatV1 {
             metadata.put("nereus.compaction.strategy", spec.strategyId());
             metadata.put("nereus.compaction.strategy.version", Long.toString(spec.strategyVersion()));
             metadata.put("nereus.compaction.key.codec", spec.keyCodecId());
+            metadata.put("nereus.compaction.key.encoding", TopicCompactionKeyEncodingV1.ID);
         });
         return Map.copyOf(metadata);
     }
@@ -265,6 +267,7 @@ public final class CompactedObjectFormatV1 {
         if (view == ReadView.TOPIC_COMPACTED) {
             requireExact(actual, "nereus.source.coverage.start", Long.toString(start));
             requireExact(actual, "nereus.source.coverage.end", Long.toString(end));
+            requireExact(actual, "nereus.compaction.key.encoding", TopicCompactionKeyEncodingV1.ID);
             topicSpec = Optional.of(new TopicCompactionFormatSpec(
                     requireText(actual, "nereus.compaction.strategy"),
                     parsePositiveLong(actual, "nereus.compaction.strategy.version"),

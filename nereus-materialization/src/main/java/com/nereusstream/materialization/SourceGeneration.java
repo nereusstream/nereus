@@ -59,6 +59,9 @@ public record SourceGeneration(
         if ((generation == 0) != materializationPolicySha256.isEmpty()) {
             throw new IllegalArgumentException("source policy digest presence must match generation zero");
         }
+        if (generation == 0 && view != ReadView.COMMITTED) {
+            throw new IllegalArgumentException("generation zero exists only in the COMMITTED source view");
+        }
         Objects.requireNonNull(payloadFormat, "payloadFormat");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
         if (recordCount <= 0 || recordCount != range.recordCount()

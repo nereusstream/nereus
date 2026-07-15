@@ -141,7 +141,7 @@ final class CompactedParquetTestSupport {
                 OptionalLong.empty(),
                 OptionalInt.empty(),
                 OptionalInt.of(1),
-                Optional.of(ByteBuffer.wrap(key)));
+                Optional.of(TopicCompactionKeyEncodingV1.keyed(ByteBuffer.wrap(key))));
     }
 
     static CompactedObjectRow sparseTombstone(long offset, byte[] key) {
@@ -159,7 +159,7 @@ final class CompactedParquetTestSupport {
                 OptionalLong.empty(),
                 OptionalInt.empty(),
                 OptionalInt.of(2),
-                Optional.of(ByteBuffer.wrap(key)));
+                Optional.of(TopicCompactionKeyEncodingV1.keyed(ByteBuffer.wrap(key))));
     }
 
     static ObjectSliceReadTarget target(

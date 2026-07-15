@@ -346,6 +346,10 @@ public final class ParquetCompactedObjectReader implements CompactedObjectReader
                         || !row.compactionKey().orElseThrow().hasRemaining())) {
             throw new CompactedObjectFormatException("topic-compacted row omits key/disposition");
         }
+        if (metadata.view() == ReadView.TOPIC_COMPACTED) {
+            TopicCompactionKeyEncodingV1.validateForOffset(
+                    row.compactionKey().orElseThrow(), row.streamOffset());
+        }
     }
 
     private static void validateTargetIdentity(CompactedObjectReadRequest request) {

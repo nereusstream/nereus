@@ -12,6 +12,7 @@ MaterializationService
   |- MaterializationWorkerPool
   |    |- SourceProtectionManager
   |    |- ExactSourceRangeReader
+  |    |- TopicCompactionEngine
   |    `- CompactedObjectWriter
   |- GenerationCommitter
   |- TaskRecoveryScanner
@@ -75,10 +76,10 @@ non-overlapping 64-shard full passes, coalesces hints into one immediate followi
 executors borrowed, and drains or locally cancels admitted work by `closeTimeout`. Focused tests cover all of these
 cuts, including a hung scan、deadline-forced cancellation and borrowed-executor ownership.
 
-This is still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip now passes, and
-the protocol-neutral topic-compaction decoder/strategy SPI plus exact frozen-identity registry are implemented. The
-proof-driven terminal workflow-metadata retirer is also wired after checkpoint reconciliation. The topic-compaction
-execution engine/worker and aggregate/real-service M3 gates remain open；
+This is still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip now passes. The
+protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity registry、COMMITTED-source bootstrap、
+shared-budget sorted-spill two-pass engine and NTC1 worker/publication path are implemented. The proof-driven terminal
+workflow-metadata retirer is also wired after checkpoint reconciliation. Aggregate/real-service M3 gates remain open；
 higher-generation production activation therefore remains disabled.
 
 Full M4–M6 target construction：
@@ -425,6 +426,12 @@ For `TOPIC_COMPACTED`, a task source coverage is immutable and append-only offse
 Strategy id/version is part of task identity, so a later policy is a new generation rather than an in-place semantic
 mutation.
 
+In V1 the task/policy `view` is the target namespace, while `taskKind.sourceView()` is `COMMITTED` for both lossless
+and topic tasks. The topic planner therefore performs two bounded scans：COMMITTED candidates form the exact source
+DAG, while TOPIC_COMPACTED candidates only suppress an exact already-published current-policy result. Sparse NTC1
+rows are never reused as a dense exact source. This also makes equal numeric generation values in the two independent
+view counters harmless because the complete source/index identity always includes the view.
+
 ## 5. Worker Algorithm
 
 ### 5.1 Exact source reader
@@ -498,15 +505,36 @@ batch boundary or Entry parse/re-encode attempt is `OUTPUT_INVARIANT`.
 
 ### 5.3 Topic-compaction worker
 
-The worker obtains a registered `TopicCompactionDecoder` for the task policy. It performs a deterministic two-pass
-algorithm bounded by task range/resource limits：
+`DefaultMaterializationWorker` accepts optional `TopicCompactionEngine` + `TopicCompactionRegistry` composition.
+Legacy/lossless constructors leave topic execution disabled；a TOPIC task is admitted only when its target view、
+physical format、strategy snapshot and configured engine all agree. The worker resolves the exact durable binding and
+passes the task's immutable `createdAtMillis` to `prepare` as the one tombstone planning time.
 
-1. pass one builds latest-offset-by-key according to strategy, spilling sorted immutable runs when memory budget is
-   reached；
-2. pass two emits surviving VALUE/TOMBSTONE rows in offset order；
-3. it validates dense source coverage and sparse output count；
-4. output uses the separate NTC1 format/keyspace；
-5. no ordinary generation/index API accepts the result。
+`DefaultTopicCompactionEngine` performs this bounded deterministic protocol：
+
+1. pass one reads only the exact frozen COMMITTED sources, one dense record per offset, and requires decoder output
+   to repeat the supplied offset；empty decoder output marks that offset as unkeyed retain-exact；
+2. keyed facts retain the latest offset per key. The in-memory key budget is configurable in `[64 KiB, 256 MiB]`；
+   keys are capped at `1 MiB - 1`, task records at 1,048,576, and sorted merge fan-in at `[2, 64]`；
+3. full immutable key-sorted runs spill through `StagingFileManager.createSpill`, sharing the same process-wide byte
+   budget as product staging files. Each run is owner-only、fsynced、file-identity sealed and SHA-256 verified while
+   merging；
+4. the merge produces a bounded survivor `BitSet`, output count and canonical digest over all decoder/strategy facts.
+   Spill files are closed and their byte reservations released before the plan is returned；
+5. pass two reopens the same exact sources, recomputes every fact/digest and emits survivors in source-offset order.
+   VALUE carries the original exact payload；TOMBSTONE carries no payload；
+6. the row publisher writes collision-free NTC1 keys as `0x00 || decoder-key` or
+   `0x01 || int64-big-endian-offset`. Writer/strict reader require
+   `nereus.compaction.key.encoding=TAGGED_V1` and validate the unkeyed embedded offset；
+7. any source/decoder mutation、digest/count mismatch、spill corruption、oversized key、cancellation or incomplete
+   replay fails before upload/publication. The plan is close-owned and single-subscription.
+
+After engine preparation, the worker reuses the lossless path's claim、source protections、heartbeat、guarded
+if-absent upload、HEAD/full-format verification、physical-root/output protection and `CLAIMED -> OUTPUT_READY` CAS.
+The resulting `MaterializationOutput` keeps dense `sourceRecordCount` and sparse `outputRecordCount`. Publication uses
+`TOPIC_COMPACTED_PUBLISH` and only the TOPIC_COMPACTED index namespace；ordinary COMMITTED resolve/fallback cannot see
+it. Focused tests cover forced spill、latest-key/unkeyed/tombstone behavior、decoder drift、budget release、real Parquet
+NTC1 output and view-isolated generation publication.
 
 This primitive is tested in F4 but is not scheduled from Pulsar compaction policy until F8.
 

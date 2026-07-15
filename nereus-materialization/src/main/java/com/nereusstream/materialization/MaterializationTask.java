@@ -46,10 +46,11 @@ public record MaterializationTask(
         long cursor = coverage.startOffset();
         long previousCommitVersion = 0;
         for (SourceGeneration source : sources) {
-            if (source.view() != view
+            if (source.view() != taskKind.sourceView()
                     || source.range().startOffset() != cursor
                     || source.commitVersion() < previousCommitVersion) {
-                throw new IllegalArgumentException("task sources must be view-consistent and gap-free");
+                throw new IllegalArgumentException(
+                        "task sources must use the task-kind source view and be gap-free");
             }
             cursor = source.range().endOffset();
             previousCommitVersion = source.commitVersion();
@@ -100,6 +101,10 @@ public record MaterializationTask(
 
     public long taskSequence() {
         return sources.get(sources.size() - 1).commitVersion();
+    }
+
+    public ReadView sourceView() {
+        return taskKind.sourceView();
     }
 
     private static void requireSha256(Checksum value, String field) {

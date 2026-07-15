@@ -57,7 +57,7 @@ public final class StagingFileManager implements AutoCloseable {
     private final Duration orphanGrace;
     private final Executor objectIoExecutor;
     private final Clock clock;
-    private final Set<PrivateStagedObjectFile> openFiles = ConcurrentHashMap.newKeySet();
+    private final Set<ManagedStagingFile> openFiles = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean closed = new AtomicBoolean();
     private long reservedBytes;
 
@@ -133,6 +133,44 @@ public final class StagingFileManager implements AutoCloseable {
                 ErrorCode.OBJECT_UPLOAD_FAILED, false, "failed to allocate a unique private staging file");
     }
 
+    /** Creates an owner-only temporary file that shares the global staging-byte budget. */
+    public PrivateStagingSpillFile createSpill(String purpose) {
+        String canonicalPurpose = requirePurpose(purpose);
+        ensureOpen();
+        for (int attempt = 0; attempt < 16; attempt++) {
+            String name = FILE_PREFIX + canonicalPurpose + "-"
+                    + UUID.randomUUID().toString().replace("-", "") + ".tmp";
+            Path path = directory.resolve(name);
+            try {
+                Files.createFile(path, PosixFilePermissions.asFileAttribute(FILE_PERMISSIONS));
+                PrivateStagingSpillFile staged;
+                try {
+                    staged = new PrivateStagingSpillFile(this, path);
+                } catch (IOException | RuntimeException | Error failure) {
+                    Files.deleteIfExists(path);
+                    throw failure;
+                }
+                openFiles.add(staged);
+                if (closed.get()) {
+                    staged.close();
+                    throw closedFailure();
+                }
+                return staged;
+            } catch (java.nio.file.FileAlreadyExistsException collision) {
+                // Retry with a fresh 128-bit name.
+            } catch (IOException failure) {
+                throw new NereusException(
+                        ErrorCode.OBJECT_UPLOAD_FAILED, true, "failed to create private spill file", failure);
+            } catch (RuntimeException failure) {
+                throw failure;
+            } catch (Error failure) {
+                throw failure;
+            }
+        }
+        throw new NereusException(
+                ErrorCode.OBJECT_UPLOAD_FAILED, false, "failed to allocate a unique private spill file");
+    }
+
     /** Deletes only closed-process product files older than the configured grace. */
     public int cleanupOrphans() {
         ensureOpen();
@@ -143,7 +181,7 @@ public final class StagingFileManager implements AutoCloseable {
             throw new IllegalArgumentException("orphanGrace overflows the cleanup clock", failure);
         }
         Set<Path> active = new HashSet<>();
-        for (PrivateStagedObjectFile file : openFiles) {
+        for (ManagedStagingFile file : openFiles) {
             active.add(file.path());
         }
         int deleted = 0;
@@ -185,7 +223,7 @@ public final class StagingFileManager implements AutoCloseable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-        for (PrivateStagedObjectFile file : Set.copyOf(openFiles)) {
+        for (ManagedStagingFile file : Set.copyOf(openFiles)) {
             file.close();
         }
     }
@@ -209,7 +247,7 @@ public final class StagingFileManager implements AutoCloseable {
         reservedBytes -= bytes;
     }
 
-    void unregister(PrivateStagedObjectFile file) {
+    void unregister(ManagedStagingFile file) {
         openFiles.remove(file);
     }
 

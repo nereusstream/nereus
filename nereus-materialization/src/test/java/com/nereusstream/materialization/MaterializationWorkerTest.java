@@ -12,6 +12,7 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadView;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -33,6 +34,7 @@ import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.ByteBuffer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +42,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Flow;
@@ -206,6 +209,139 @@ class MaterializationWorkerTest {
             assertThat(protections.acquired).hasValue(2);
             assertThat(protections.released).hasValue(2);
             assertThat(exactReader.completedSources).hasValue(0);
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
+    void executesTwoPassTopicCompactionAndFreezesSparseNtc1Output() throws Exception {
+        List<VersionedGenerationCandidate> candidates = List.of(
+                MaterializationPlannerTestSupport.zero("/index/topic-worker-2", 0, 2, 0, 100, 2),
+                MaterializationPlannerTestSupport.zero("/index/topic-worker-4", 2, 4, 100, 100, 4));
+        MaterializationPolicy policy = MaterializationPolicyFactory.topicCompacted(
+                new TopicCompactionSpec("latest", 1, "worker-key-v1"),
+                2,
+                16,
+                1_000,
+                1_000_000,
+                128,
+                "ZSTD");
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(
+                        candidates, List.of(), 0, 4)
+                .plan(STREAM, new OffsetRange(0, 4), policy, 1)
+                .join()
+                .get(0);
+        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        GenerationMetadataStore generations = MaterializationPlannerTestSupport.generationStore(
+                candidates, List.of(), durable);
+        MaterializationTaskStore taskStore = new MaterializationTaskStore(CLUSTER, generations, CLOCK);
+        taskStore.create(task).join();
+        TrackingProtections protections = new TrackingProtections();
+        TrackingExactReader exactReader = new TrackingExactReader();
+        Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("topic-staging"));
+        Files.setPosixFilePermissions(stagingPath, PosixFilePermissions.fromString("rwx------"));
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try (StagingFileManager staging = new StagingFileManager(
+                        stagingPath,
+                        32L << 20,
+                        StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+                        Duration.ofHours(1),
+                        Runnable::run);
+                LocalFileObjectStore objects = new LocalFileObjectStore(
+                        temporaryDirectory.resolve("topic-objects"))) {
+            var parquetReader = new ParquetCompactedObjectReader(objects, Runnable::run);
+            var verifier = new DefaultMaterializationOutputVerifier(
+                    objects,
+                    new CompactedMaterializationFormatVerifier(
+                            new CompactedObjectVerifier(objects, parquetReader)));
+            TopicCompactionDecoder decoder = new TopicCompactionDecoder() {
+                @Override
+                public String id() {
+                    return "worker-key-v1";
+                }
+
+                @Override
+                public Optional<CompactionRecord> decode(long offset, ByteBuffer exactPayload) {
+                    if (offset == 1) {
+                        return Optional.empty();
+                    }
+                    byte key = offset == 0 || offset == 2 ? (byte) 'a' : (byte) 'b';
+                    return Optional.of(new CompactionRecord(
+                            offset,
+                            ByteBuffer.wrap(new byte[] {key}),
+                            offset == 3
+                                    ? CompactionDisposition.TOMBSTONE
+                                    : CompactionDisposition.VALUE,
+                            OptionalLong.of(10_000 + offset),
+                            OptionalLong.empty()));
+                }
+            };
+            TopicCompactionStrategy strategy = new TopicCompactionStrategy() {
+                @Override
+                public String id() {
+                    return "latest";
+                }
+
+                @Override
+                public long version() {
+                    return 1;
+                }
+
+                @Override
+                public boolean retainTombstone(
+                        CompactionRecord tombstone,
+                        long planningTimeMillis) {
+                    return true;
+                }
+            };
+            TopicCompactionRegistry registry = new TopicCompactionRegistry(
+                    List.of(decoder), List.of(strategy));
+            DefaultMaterializationWorker worker = new DefaultMaterializationWorker(
+                    CLUSTER,
+                    "r".repeat(26),
+                    taskStore,
+                    generations,
+                    (target, view) -> CompletableFuture.completedFuture(sourceIdentity(target)),
+                    protections,
+                    ignored -> exactReader,
+                    new ParquetCompactedObjectWriter(staging, Runnable::run),
+                    objects,
+                    verifier,
+                    new DefaultTopicCompactionEngine(
+                            staging,
+                            DefaultTopicCompactionEngine.MIN_IN_MEMORY_KEY_BYTES,
+                            1024,
+                            4,
+                            Runnable::run),
+                    registry,
+                    () -> "c".repeat(26),
+                    1,
+                    64 * 1024,
+                    Duration.ofSeconds(30),
+                    Duration.ofSeconds(5),
+                    Duration.ofSeconds(1),
+                    3,
+                    Duration.ofSeconds(10),
+                    "topic-worker-test",
+                    scheduler,
+                    Runnable::run,
+                    CLOCK);
+
+            MaterializationOutput output = worker.execute(task).join();
+
+            assertThat(output.view()).isEqualTo(ReadView.TOPIC_COMPACTED);
+            assertThat(output.physicalFormat())
+                    .isEqualTo(MaterializationPolicy.TOPIC_COMPACTED_FORMAT);
+            assertThat(output.sourceRecordCount()).isEqualTo(4);
+            assertThat(output.outputRecordCount()).isEqualTo(3);
+            assertThat(taskStore.get(STREAM, task.taskId()).join().orElseThrow()
+                            .value().lifecycle())
+                    .isEqualTo(TaskLifecycle.OUTPUT_READY);
+            assertThat(exactReader.completedSources).hasValue(4);
+            assertThat(exactReader.maxActive).hasValue(1);
+            assertThat(protections.acquired).hasValue(3);
+            assertThat(staging.reservedBytes()).isZero();
         } finally {
             scheduler.shutdownNow();
         }

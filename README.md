@@ -150,9 +150,11 @@ compressed batched Entry 的 exact bytes/properties/ordering-key 与 middle-batc
 且 generation-level projection identity 不泄漏成 per-entry metadata。随后落地的 topic-compaction neutral
 decoder/strategy SPI 与 exact frozen-identity registry 已锁定 durable policy 解析边界。M3 的
 terminal workflow-metadata retirer 也已通过 exact index/checkpoint/root/protection proof、conditional
-delete 与 response-loss reload 收敛 terminal tasks、stale stats 与 old-policy checkpoints。M3 的
-topic-compaction execution engine/worker 与完整 crash-cut/final gates 尚未完成，retention/GC 与 async
-profile 仍不可用。
+delete 与 response-loss reload 收敛 terminal tasks、stale stats 与 old-policy checkpoints。随后完成的
+topic-compaction checkpoint 固定 `COMMITTED` source bootstrap 与独立 `TOPIC_COMPACTED` publication，使用
+collision-free tagged-v1 key 表示 unkeyed retain-exact records，并以共享 staging budget 下的 checksum-
+verified sorted spills 执行两遍 key selection/source replay；NTC1 worker/strict verification/publication focused
+tests 已通过。M3 aggregate/final gates 尚未完成，retention/GC 与 async profile 仍不可用。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

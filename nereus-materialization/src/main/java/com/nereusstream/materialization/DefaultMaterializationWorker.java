@@ -36,6 +36,7 @@ import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteRequest;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteResult;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriter;
+import com.nereusstream.objectstore.compacted.TopicCompactionFormatSpec;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -55,7 +56,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Lossless F4-M3 worker from durable claim through verified OUTPUT_READY.
+ * F4-M3 NCP1/NTC1 worker from durable claim through verified OUTPUT_READY.
  *
  * <p>Visibility remains exclusively owned by {@link GenerationCommitter}; worker success only freezes one immutable
  * output and its durable physical protections.
@@ -73,6 +74,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final CompactedObjectWriter writer;
     private final ObjectStore objectStore;
     private final MaterializationOutputVerifier outputVerifier;
+    private final Optional<TopicCompactionEngine> topicCompactionEngine;
+    private final TopicCompactionRegistry topicCompactionRegistry;
     private final WorkerClaimIdGenerator claimIds;
     private final int sourceReadPageRecords;
     private final int sourceReadPageBytes;
@@ -135,6 +138,56 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 clock);
     }
 
+    public DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            ExactSourceRangeReaderFactory sourceReaders,
+            CompactedObjectWriter writer,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            TopicCompactionEngine topicCompactionEngine,
+            TopicCompactionRegistry topicCompactionRegistry,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                writer,
+                objectStore,
+                outputVerifier,
+                new SecureWorkerClaimIdGenerator(),
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                TopicSupport.enabled(topicCompactionEngine, topicCompactionRegistry));
+    }
+
     DefaultMaterializationWorker(
             String cluster,
             String processRunId,
@@ -158,6 +211,107 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             ScheduledExecutorService scheduler,
             Executor callbackExecutor,
             Clock clock) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                writer,
+                objectStore,
+                outputVerifier,
+                claimIds,
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                TopicSupport.disabled());
+    }
+
+    DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            ExactSourceRangeReaderFactory sourceReaders,
+            CompactedObjectWriter writer,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            TopicCompactionEngine topicCompactionEngine,
+            TopicCompactionRegistry topicCompactionRegistry,
+            WorkerClaimIdGenerator claimIds,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                writer,
+                objectStore,
+                outputVerifier,
+                claimIds,
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                TopicSupport.enabled(topicCompactionEngine, topicCompactionRegistry));
+    }
+
+    private DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            ExactSourceRangeReaderFactory sourceReaders,
+            CompactedObjectWriter writer,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            WorkerClaimIdGenerator claimIds,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock,
+            TopicSupport topicSupport) {
         this.cluster = requireText(cluster, "cluster");
         this.processRunId = requireBase32(processRunId, "processRunId");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
@@ -168,6 +322,9 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         this.writer = Objects.requireNonNull(writer, "writer");
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
         this.outputVerifier = Objects.requireNonNull(outputVerifier, "outputVerifier");
+        TopicSupport exactTopicSupport = Objects.requireNonNull(topicSupport, "topicSupport");
+        this.topicCompactionEngine = exactTopicSupport.engine();
+        this.topicCompactionRegistry = exactTopicSupport.registry();
         this.claimIds = Objects.requireNonNull(claimIds, "claimIds");
         if (sourceReadPageRecords <= 0 || sourceReadPageRecords > 65_536) {
             throw new IllegalArgumentException("sourceReadPageRecords must be in [1, 65536]");
@@ -235,7 +392,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private final Object heartbeatLock = new Object();
         private volatile VersionedMaterializationTask claimed;
         private ObjectProtection outputProtection;
-        private LosslessMaterializationRowPublisher rows;
+        private Runnable rowsCloser;
         private CompactedObjectWriteResult written;
         private ScheduledFuture<?> heartbeatSchedule;
         private CompletableFuture<Void> heartbeatTail = CompletableFuture.completedFuture(null);
@@ -246,14 +403,20 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         private Operation(MaterializationTask task) {
             this.task = task;
             this.deadline = new MaterializationDeadline(operationTimeout, scheduler);
-            if (task.taskKind() != TaskKind.LOSSLESS_REWRITE
-                    || task.policy().targetPhysicalFormat()
-                            .equals(MaterializationPolicy.COMMITTED_FORMAT) == false) {
+            boolean lossless = task.taskKind() == TaskKind.LOSSLESS_REWRITE
+                    && task.policy().targetPhysicalFormat()
+                            .equals(MaterializationPolicy.COMMITTED_FORMAT);
+            boolean topic = task.taskKind() == TaskKind.TOPIC_KEY_COMPACTION
+                    && task.policy().targetPhysicalFormat()
+                            .equals(MaterializationPolicy.TOPIC_COMPACTED_FORMAT)
+                    && task.policy().topicCompaction().isPresent()
+                    && topicCompactionEngine.isPresent();
+            if (!lossless && !topic) {
                 throw execution(
                         TaskFailureClass.UNSUPPORTED_MAPPING,
                         ErrorCode.UNSUPPORTED_FORMAT,
                         false,
-                        "F4-M3 worker admits only lossless NCP1 tasks",
+                        "F4-M3 worker has no execution engine for the durable task policy",
                         null);
             }
         }
@@ -436,11 +599,41 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     sourceReadPageBytes,
                     ReadIsolation.COMMITTED,
                     deadline.remaining());
-            rows = new LosslessMaterializationRowPublisher(
-                    task, exactReader, options, callbackExecutor);
-            CompactedObjectWriteRequest request = writeRequest(facts, admission);
+            if (task.taskKind() == TaskKind.LOSSLESS_REWRITE) {
+                LosslessMaterializationRowPublisher lossless =
+                        new LosslessMaterializationRowPublisher(
+                                task, exactReader, options, callbackExecutor);
+                rowsCloser = lossless::close;
+                return writeRows(
+                        writeRequest(
+                                facts,
+                                admission,
+                                Math.toIntExact(task.coverage().recordCount())),
+                        lossless);
+            }
+            TopicCompactionRegistry.Binding binding = resolveTopicBinding();
             return deadline.bound(
-                            () -> writer.write(request, rows),
+                            () -> topicCompactionEngine.orElseThrow().prepare(
+                                    task,
+                                    exactReader,
+                                    options,
+                                    binding,
+                                    claimed.value().createdAtMillis()),
+                            "prepare two-pass topic compaction")
+                    .thenCompose(plan -> {
+                        rowsCloser = plan::close;
+                        return writeRows(
+                                writeRequest(facts, admission, plan.outputRecordCount()),
+                                plan);
+                    });
+        }
+
+        private CompletableFuture<CompactedObjectWriteResult> writeRows(
+                CompactedObjectWriteRequest request,
+                java.util.concurrent.Flow.Publisher<com.nereusstream.objectstore.compacted.CompactedObjectRow>
+                        publisher) {
+            return deadline.bound(
+                            () -> writer.write(request, publisher),
                             "write compacted Parquet output")
                     .thenApply(result -> {
                         written = result;
@@ -448,9 +641,24 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     });
         }
 
+        private TopicCompactionRegistry.Binding resolveTopicBinding() {
+            try {
+                return topicCompactionRegistry.resolve(
+                        task.policy().topicCompaction().orElseThrow());
+            } catch (Throwable failure) {
+                throw execution(
+                        TaskFailureClass.UNSUPPORTED_MAPPING,
+                        ErrorCode.UNSUPPORTED_FORMAT,
+                        false,
+                        "topic-compaction registry cannot resolve the durable task policy",
+                        failure);
+            }
+        }
+
         private CompactedObjectWriteRequest writeRequest(
                 TaskFacts facts,
-                Admission admission) {
+                Admission admission,
+                int expectedOutputRecordCount) {
             return new CompactedObjectWriteRequest(
                     cluster,
                     task.view(),
@@ -463,7 +671,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     facts.payloadFormat().name(),
                     Optional.of(admission.projectionIdentitySha256()),
                     Math.toIntExact(task.coverage().recordCount()),
-                    Math.toIntExact(task.coverage().recordCount()),
+                    expectedOutputRecordCount,
                     facts.entryCount(),
                     facts.logicalBytes(),
                     facts.schemaRefs(),
@@ -472,7 +680,11 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     task.policy().targetRowGroupRecords(),
                     task.policy().compression(),
                     writerBuild,
-                    Optional.empty());
+                    task.policy().topicCompaction().map(spec ->
+                            new TopicCompactionFormatSpec(
+                                    spec.strategyId(),
+                                    spec.strategyVersion(),
+                                    spec.keyCodecId())));
         }
 
         private CompletableFuture<HeadObjectResult> upload(CompactedObjectWriteResult result) {
@@ -927,8 +1139,8 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                     heartbeatSchedule = null;
                 }
             }
-            if (rows != null) {
-                rows.close();
+            if (rowsCloser != null) {
+                rowsCloser.run();
             }
             if (written != null) {
                 written.close();
@@ -1097,4 +1309,25 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private record FailureDecision(
             TaskLifecycle lifecycle,
             TaskFailureClass failureClass) { }
+
+    private record TopicSupport(
+            Optional<TopicCompactionEngine> engine,
+            TopicCompactionRegistry registry) {
+        private TopicSupport {
+            engine = Objects.requireNonNull(engine, "engine");
+            registry = Objects.requireNonNull(registry, "registry");
+        }
+
+        private static TopicSupport disabled() {
+            return new TopicSupport(Optional.empty(), TopicCompactionRegistry.empty());
+        }
+
+        private static TopicSupport enabled(
+                TopicCompactionEngine engine,
+                TopicCompactionRegistry registry) {
+            return new TopicSupport(
+                    Optional.of(Objects.requireNonNull(engine, "engine")),
+                    Objects.requireNonNull(registry, "registry"));
+        }
+    }
 }

@@ -109,7 +109,12 @@ final class MaterializationPlannerTestSupport {
                                                 : List.of(),
                                         Optional.empty()));
                         case "scanIndex" -> CompletableFuture.completedFuture(
-                                new GenerationScanPage(orderedCandidates, Optional.empty()));
+                                new GenerationScanPage(
+                                        orderedCandidates.stream()
+                                                .filter(candidate -> candidateView(candidate)
+                                                        == (ReadView) args[2])
+                                                .toList(),
+                                        Optional.empty()));
                         case "scanTasks" -> delegate == null
                                 ? CompletableFuture.completedFuture(
                                         new TaskScanPage(orderedTasks, Optional.empty()))
@@ -208,6 +213,54 @@ final class MaterializationPlannerTestSupport {
         return new VersionedGenerationIndex(key, record, metadataVersion, sha(hexCharacter(key)));
     }
 
+    static VersionedGenerationIndex publishedTopic(MaterializationTask task, int outputRecordCount) {
+        long generation = 1;
+        long metadataVersion = 301;
+        SourceGeneration first = task.sources().get(0);
+        SourceGeneration last = task.sources().get(task.sources().size() - 1);
+        ObjectSliceReadTarget target = target(
+                "topic-published-" + task.coverage().endOffset(),
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                MaterializationPolicy.TOPIC_COMPACTED_FORMAT);
+        var encodedTarget = ReadTargetCodecRegistry.phase15().encode(target);
+        GenerationIndexRecord record = new GenerationIndexRecord(
+                1,
+                task.streamId().value(),
+                ReadView.TOPIC_COMPACTED.wireId(),
+                task.coverage().startOffset(),
+                task.coverage().endOffset(),
+                generation,
+                "t".repeat(26),
+                task.taskId(),
+                GenerationLifecycle.COMMITTED,
+                task.sourceSetSha256().value(),
+                task.policyDigestSha256().value(),
+                encodedTarget,
+                encodedTarget.identityChecksumValue(),
+                task.policyDigestSha256().value(),
+                first.payloadFormat().name(),
+                Math.toIntExact(task.coverage().recordCount()),
+                outputRecordCount,
+                task.sources().stream().mapToInt(SourceGeneration::entryCount).sum(),
+                task.sources().stream().mapToLong(SourceGeneration::logicalBytes).sum(),
+                first.cumulativeSizeAtStart(),
+                last.cumulativeSizeAtEnd(),
+                first.commitVersion(),
+                last.commitVersion(),
+                first.schemaRefs(),
+                MaterializationRecordMapper.projectionIdentity(first.projectionRef()),
+                300,
+                301,
+                "",
+                301,
+                metadataVersion);
+        return new VersionedGenerationIndex(
+                "/index/topic-published-" + task.coverage().endOffset(),
+                record,
+                metadataVersion,
+                sha('9'));
+    }
+
     static VersionedMaterializationTask durableTask(MaterializationTask task, long metadataVersion) {
         var record = MaterializationRecordMapper.plannedTask(task, 500).withMetadataVersion(metadataVersion);
         return new VersionedMaterializationTask(
@@ -244,6 +297,13 @@ final class MaterializationPlannerTestSupport {
         }
         VersionedGenerationIndex higher = (VersionedGenerationIndex) candidate;
         return higher.value().offsetEnd() == offsetEnd && higher.value().generation() == generation;
+    }
+
+    private static ReadView candidateView(VersionedGenerationCandidate candidate) {
+        if (candidate instanceof VersionedGenerationZeroIndex) {
+            return ReadView.COMMITTED;
+        }
+        return ReadView.fromWireId(((VersionedGenerationIndex) candidate).value().readViewId());
     }
 
     static VersionedMaterializationStreamRegistration registration() {
