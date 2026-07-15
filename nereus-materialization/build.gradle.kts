@@ -30,10 +30,21 @@ val f4M2IntegrationTest by sourceSets.creating {
     runtimeClasspath += output + compileClasspath
 }
 
+val f4M3IntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
 configurations[f4M2IntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
 )
 configurations[f4M2IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+configurations[f4M3IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[f4M3IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
     configurations.testRuntimeOnly.get(),
 )
 
@@ -46,6 +57,14 @@ dependencies {
     add(f4M2IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
     add(f4M2IntegrationTest.implementationConfigurationName, libs.assertj)
     add(f4M2IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+
+    add(f4M3IntegrationTest.implementationConfigurationName, project())
+    add(f4M3IntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(f4M3IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(f4M3IntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(f4M3IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(f4M3IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(f4M3IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
 }
 
 tasks.register<Test>("f4M2IntegrationTest") {
@@ -53,6 +72,15 @@ tasks.register<Test>("f4M2IntegrationTest") {
     description = "Run F4-M2 publication, restart, durable pin, and fallback against real Oxia and LocalStack."
     testClassesDirs = f4M2IntegrationTest.output.classesDirs
     classpath = f4M2IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}
+
+tasks.register<Test>("f4M3IntegrationTest") {
+    group = "verification"
+    description = "Run F4-M3 worker, exact-source, Parquet publication, and restart against real Oxia/LocalStack."
+    testClassesDirs = f4M3IntegrationTest.output.classesDirs
+    classpath = f4M3IntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
 }

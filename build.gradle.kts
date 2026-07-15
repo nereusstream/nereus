@@ -592,3 +592,31 @@ tasks.register("phase4M2FinalCheck") {
     dependsOn("phase4M2Check")
     dependsOn(":nereus-materialization:f4M2IntegrationTest")
 }
+
+tasks.register<Exec>("checkPhase4M3ContractSurface") {
+    group = "verification"
+    description = "Audit the implemented F4-M3 format, planner, worker, recovery, and test surfaces."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m3-contract-surface.sh")
+}
+
+tasks.register("phase4M3Check") {
+    group = "verification"
+    description = "Verify F4-M3 compacted formats, planning, workers, recovery, and bounded lifecycle."
+    dependsOn("phase4M2Check")
+    dependsOn("checkPhase4M3ContractSurface")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-materialization:compileF4M3IntegrationTestJava")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+}
+
+tasks.register("phase4M3FinalCheck") {
+    group = "verification"
+    description = "Run ordinary and Docker-backed real Oxia/LocalStack F4-M3 materialization gates."
+    dependsOn("phase4M3Check")
+    dependsOn("phase4M2FinalCheck")
+    dependsOn(":nereus-materialization:f4M3IntegrationTest")
+}
