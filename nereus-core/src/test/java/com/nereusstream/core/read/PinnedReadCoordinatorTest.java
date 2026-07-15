@@ -114,10 +114,102 @@ class PinnedReadCoordinatorTest {
         coordinator.close();
     }
 
+    @Test
+    void retriesRetriableTransientFailureOnTheSameCandidateBeforeFallback() {
+        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
+                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        GenerationReadCandidate candidate = candidate(target, 5);
+        AtomicInteger resolves = new AtomicInteger();
+        AtomicInteger handled = new AtomicInteger();
+        SequencedReader reader = new SequencedReader(
+                ReadTargetReaderKey.from(target),
+                List.of(
+                        CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.OBJECT_READ_FAILED, true, "throttled-1")),
+                        CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.OBJECT_READ_FAILED, true, "throttled-2")),
+                        CompletableFuture.completedFuture(result(target, (byte) 11))));
+        ReadCoordinator coordinator = coordinator(
+                (stream, offset, view, deadline, repair, excluded) -> {
+                    resolves.incrementAndGet();
+                    assertThat(excluded).isEmpty();
+                    return CompletableFuture.completedFuture(Optional.of(
+                            new PinnedResolvedRange(candidate, new TestLease(target))));
+                },
+                new ReadTargetReaderRegistry(List.of(reader)),
+                (stream, failed, failure) -> {
+                    handled.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                });
+
+        ReadResult value = coordinator.read(STREAM, 0, options()).join();
+
+        assertThat(value.batches().getFirst().payload()).containsExactly(11);
+        assertThat(resolves).hasValue(3);
+        assertThat(reader.calls).hasValue(3);
+        assertThat(handled).hasValue(0);
+        coordinator.close();
+    }
+
+    @Test
+    void fallsBackOnlyAfterTheConfiguredTransientRetryThreshold() {
+        ObjectSliceReadTarget higherTarget = ReadTargetReaderRegistryTest.target(
+                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        ObjectSliceReadTarget zeroTarget = ReadTargetReaderRegistryTest.target(
+                ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        GenerationReadCandidate higher = candidate(higherTarget, 5);
+        GenerationReadCandidate zero = candidate(zeroTarget, 0);
+        AtomicInteger resolves = new AtomicInteger();
+        AtomicInteger handled = new AtomicInteger();
+        TestReader transientFailure = new TestReader(
+                ReadTargetReaderKey.from(higherTarget),
+                CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.OBJECT_READ_FAILED, true, "throttled")));
+        TestReader healthy = new TestReader(
+                ReadTargetReaderKey.from(zeroTarget),
+                CompletableFuture.completedFuture(result(zeroTarget, (byte) 12)));
+        ReadCoordinator coordinator = coordinator(
+                (stream, offset, view, deadline, repair, excluded) -> {
+                    resolves.incrementAndGet();
+                    GenerationReadCandidate selected = excluded.contains(higher) ? zero : higher;
+                    ObjectSliceReadTarget target = selected == higher ? higherTarget : zeroTarget;
+                    return CompletableFuture.completedFuture(Optional.of(
+                            new PinnedResolvedRange(selected, new TestLease(target))));
+                },
+                new ReadTargetReaderRegistry(List.of(transientFailure, healthy)),
+                (stream, failed, failure) -> {
+                    handled.incrementAndGet();
+                    assertThat(failed).isEqualTo(higher);
+                    return CompletableFuture.completedFuture(null);
+                },
+                new GenerationReadRetryPolicy(1));
+
+        ReadResult value = coordinator.read(STREAM, 0, options()).join();
+
+        assertThat(value.batches().getFirst().payload()).containsExactly(12);
+        assertThat(resolves).hasValue(3);
+        assertThat(transientFailure.calls).hasValue(2);
+        assertThat(healthy.calls).hasValue(1);
+        assertThat(handled).hasValue(1);
+        coordinator.close();
+    }
+
     private static ReadCoordinator coordinator(
             ReadCoordinator.PinnedGenerationResolver generationResolver,
             ReadTargetReaderRegistry readers,
             GenerationReadFailureHandler failureHandler) {
+        return coordinator(
+                generationResolver,
+                readers,
+                failureHandler,
+                GenerationReadRetryPolicy.defaults());
+    }
+
+    private static ReadCoordinator coordinator(
+            ReadCoordinator.PinnedGenerationResolver generationResolver,
+            ReadTargetReaderRegistry readers,
+            GenerationReadFailureHandler failureHandler,
+            GenerationReadRetryPolicy retryPolicy) {
         StreamStorageConfig config = StreamStorageConfig.defaults("cluster", "writer");
         OxiaMetadataStore metadata = (OxiaMetadataStore) Proxy.newProxyInstance(
                 PinnedReadCoordinatorTest.class.getClassLoader(),
@@ -134,6 +226,7 @@ class PinnedReadCoordinatorTest {
                 generationResolver,
                 readers,
                 failureHandler,
+                retryPolicy,
                 ReadMetricsObserver.noop(),
                 Runnable::run);
     }
@@ -219,6 +312,42 @@ class PinnedReadCoordinatorTest {
                 ReadOptions options) {
             calls.incrementAndGet();
             return result;
+        }
+    }
+
+    private static final class SequencedReader implements ReadTargetReader {
+        private final ReadTargetReaderKey key;
+        private final List<CompletableFuture<WalReadResult>> results;
+        private final AtomicInteger calls = new AtomicInteger();
+
+        private SequencedReader(
+                ReadTargetReaderKey key,
+                List<CompletableFuture<WalReadResult>> results) {
+            this.key = key;
+            this.results = List.copyOf(results);
+        }
+
+        @Override
+        public ReadTargetReaderKey key() {
+            return key;
+        }
+
+        @Override
+        public long reservationBytes(ResolvedRange range) {
+            return 1;
+        }
+
+        @Override
+        public CompletableFuture<WalReadResult> readWithStats(
+                long startOffset,
+                List<ResolvedRange> ranges,
+                ReadOptions options) {
+            int index = calls.getAndIncrement();
+            if (index >= results.size()) {
+                return CompletableFuture.failedFuture(new AssertionError(
+                        "sequenced reader received too many calls"));
+            }
+            return results.get(index);
         }
     }
 

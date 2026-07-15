@@ -18,6 +18,7 @@ dependencies {
     implementation(project(":nereus-metadata-oxia"))
     implementation(project(":nereus-object-store"))
 
+    testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)

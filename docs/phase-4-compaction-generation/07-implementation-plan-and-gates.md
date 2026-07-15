@@ -259,11 +259,17 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > generation exact lookup、physical identity resolver、durable pin-owned `GenerationReadResolver` 及其
 > candidate-limit/view-isolation/stale-selection tests 已落地。`ReadCoordinator` 已持有 pin 贯穿 exact-reader IO
 > 和 terminal cleanup，并以 per-operation candidate exclusion 实现 same-view fallback；永久 missing/checksum
-> corruption 会 quarantine exact root 与选中的 higher index，临时 IO failure 不写健康状态。严格
+> corruption 会 quarantine exact root、选中的 higher index 与 bounded scan 发现的所有同 stream/view、同
+> object-key `COMMITTED` index。瞬态 IO failure 默认在同 candidate 上 fresh resolve/read 两次，达到可配
+> 阈值后才 same-view fallback，且不写健康状态。严格
 > policy/source/task/output 值、canonical identity/digest、secure publication id、durable mapper、HEAD/full-format
-> verifier seam 与 monotonic operation deadline 也已落地，但尚未执行 visibility CAS。publication
-> committer/reconciler、同对象全引用域 quarantine repair、瞬态重试阈值、M2 aggregate gates 和 real-service
-> final gate 尚未完成；本检查点不构成 F4-M2 completion claim。
+> verifier seam 与 monotonic operation deadline 也已落地。restart-safe `DefaultGenerationCommitter` 现已执行
+> publication-id/generation task freeze、deterministic PREPARED create、发布前全重验证、唯一
+> `PREPARED -> COMMITTED` visibility CAS、visible-protection owner transfer 和 task PUBLISHED convergence；并发、
+> response-loss、已发布重进与 exactly-proven ABORTED 重分配均有测试。
+> `GenerationPublicationReconciler` 已提供 recovered task/output pair 的幂等重进入口。M2 aggregate gates
+> 和 real-service final gate 尚未完成；M3 仍需接入 worker-owned source/output protections，M4 仍需补齐
+> recovery-root/anchor-aware source reachability。本检查点不构成 F4-M2 completion claim。
 
 ### 4.1 Production artifacts
 
@@ -314,6 +320,7 @@ GenerationAllocatorConcurrencyTest
 GenerationIndexPublicationTest
 GenerationPublicationFailureInjectionTest
 GenerationPublicationPropertyTest
+GenerationPublicationReconcilerTest
 GenerationIndexCompatibilityTest
 GenerationReadResolverTest
 GenerationReadResolverStaleCacheTest

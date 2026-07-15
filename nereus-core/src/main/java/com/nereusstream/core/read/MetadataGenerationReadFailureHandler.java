@@ -6,15 +6,20 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
+import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
+import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
+import java.util.Optional;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +28,8 @@ import java.util.concurrent.CompletionException;
 /** Propagates immutable-object read corruption into physical-root and generation health metadata. */
 public final class MetadataGenerationReadFailureHandler implements GenerationReadFailureHandler {
     private static final int MAX_CAS_ATTEMPTS = 8;
+    private static final int SCAN_PAGE_SIZE = 512;
+    private static final int MAX_REFERENCE_DOMAIN_CANDIDATES = 4_096;
 
     private final String cluster;
     private final GenerationMetadataStore generationStore;
@@ -60,21 +67,20 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
         String reason = cause instanceof NereusException nereus
                 ? "read-" + nereus.code().name().toLowerCase(java.util.Locale.ROOT)
                 : "immutable-object-read-corruption";
-        return quarantineRoot(target, reason, 0)
-                .handle((ignored, rootFailure) -> rootFailure)
-                .thenCompose(rootFailure -> quarantineIndex(exactStream, exactCandidate, reason, 0)
-                        .handle((ignored, indexFailure) -> {
-                            if (rootFailure == null && indexFailure == null) {
-                                return null;
-                            }
-                            Throwable failureToReport = rootFailure == null
-                                    ? unwrap(indexFailure)
-                                    : unwrap(rootFailure);
-                            if (rootFailure != null && indexFailure != null) {
-                                failureToReport.addSuppressed(unwrap(indexFailure));
-                            }
-                            throw new CompletionException(failureToReport);
-                        }));
+        return capture(quarantineRoot(target, reason, 0))
+                .thenCompose(rootFailure -> capture(quarantineIndex(
+                                exactStream, exactCandidate, reason, 0))
+                        .thenCompose(indexFailure -> capture(quarantineReferenceDomain(
+                                        exactStream,
+                                        exactCandidate.view(),
+                                        target,
+                                        reason,
+                                        Optional.empty(),
+                                        0))
+                                .thenApply(domainFailure -> {
+                                    throwIfAny(rootFailure, indexFailure, domainFailure);
+                                    return null;
+                                })));
     }
 
     private CompletableFuture<Void> quarantineRoot(
@@ -167,6 +173,139 @@ public final class MetadataGenerationReadFailureHandler implements GenerationRea
             return CompletableFuture.failedFuture(unwrap(failure));
         }
         return quarantineIndex(streamId, candidate, reason, attempt + 1);
+    }
+
+    private CompletableFuture<Void> quarantineReferenceDomain(
+            StreamId streamId,
+            com.nereusstream.api.ReadView view,
+            ObjectSliceReadTarget corruptTarget,
+            String reason,
+            Optional<F4ScanToken> continuation,
+            int scanned) {
+        return generationStore.scanIndex(
+                        cluster,
+                        streamId,
+                        view,
+                        0,
+                        Long.MAX_VALUE,
+                        continuation,
+                        SCAN_PAGE_SIZE)
+                .thenCompose(page -> quarantineReferenceDomainPage(
+                        streamId, view, corruptTarget, reason, page, scanned));
+    }
+
+    private CompletableFuture<Void> quarantineReferenceDomainPage(
+            StreamId streamId,
+            com.nereusstream.api.ReadView view,
+            ObjectSliceReadTarget corruptTarget,
+            String reason,
+            GenerationScanPage page,
+            int scanned) {
+        int total;
+        try {
+            total = Math.addExact(scanned, page.values().size());
+        } catch (ArithmeticException overflow) {
+            return metadataLimit();
+        }
+        if (total > MAX_REFERENCE_DOMAIN_CANDIDATES) {
+            return metadataLimit();
+        }
+        CompletableFuture<Void> quarantines = CompletableFuture.completedFuture(null);
+        for (VersionedGenerationCandidate candidate : page.values()) {
+            if (candidate instanceof VersionedGenerationIndex index
+                    && referencesObject(index, corruptTarget)) {
+                GenerationIndexIdentity identity = new GenerationIndexIdentity(
+                        streamId,
+                        view,
+                        index.value().offsetEnd(),
+                        index.value().generation());
+                quarantines = quarantines.thenCompose(ignored -> quarantineIndexIdentity(
+                        identity, index.key(), reason, 0));
+            }
+        }
+        if (page.continuation().isEmpty()) {
+            return quarantines;
+        }
+        return quarantines.thenCompose(ignored -> quarantineReferenceDomain(
+                streamId,
+                view,
+                corruptTarget,
+                reason,
+                page.continuation(),
+                total));
+    }
+
+    private CompletableFuture<Void> quarantineIndexIdentity(
+            GenerationIndexIdentity identity,
+            String expectedKey,
+            String reason,
+            int attempt) {
+        return generationStore.getIndex(cluster, identity).thenCompose(optional -> {
+            if (optional.isEmpty()) {
+                return CompletableFuture.completedFuture(null);
+            }
+            VersionedGenerationIndex current = optional.orElseThrow();
+            if (!current.key().equals(expectedKey)) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.METADATA_INVARIANT_VIOLATION,
+                        false,
+                        "generation quarantine reloaded a different index key"));
+            }
+            if (current.value().lifecycle() == GenerationLifecycle.QUARANTINED
+                    || current.value().lifecycle() == GenerationLifecycle.DRAINING
+                    || current.value().lifecycle() == GenerationLifecycle.RETIRED
+                    || current.value().lifecycle() == GenerationLifecycle.ABORTED
+                    || current.value().lifecycle() == GenerationLifecycle.PREPARED) {
+                return CompletableFuture.completedFuture(null);
+            }
+            GenerationIndexRecord replacement = quarantinedIndex(current.value(), reason);
+            return generationStore.compareAndSetIndex(
+                            cluster, replacement, current.metadataVersion())
+                    .thenApply(ignored -> (Void) null)
+                    .exceptionallyCompose(failure -> {
+                        if (attempt + 1 >= MAX_CAS_ATTEMPTS || !isConditionFailure(failure)) {
+                            return CompletableFuture.failedFuture(unwrap(failure));
+                        }
+                        return quarantineIndexIdentity(
+                                identity, expectedKey, reason, attempt + 1);
+                    });
+        });
+    }
+
+    private static boolean referencesObject(
+            VersionedGenerationIndex index,
+            ObjectSliceReadTarget corruptTarget) {
+        var target = ReadTargetCodecRegistry.phase15().decode(index.value().readTarget());
+        return target instanceof ObjectSliceReadTarget object
+                && object.objectKey().equals(corruptTarget.objectKey());
+    }
+
+    private static CompletableFuture<Throwable> capture(CompletableFuture<Void> operation) {
+        return operation.handle((ignored, failure) -> failure == null ? null : unwrap(failure));
+    }
+
+    private static void throwIfAny(Throwable... failures) {
+        Throwable primary = null;
+        for (Throwable failure : failures) {
+            if (failure == null) {
+                continue;
+            }
+            if (primary == null) {
+                primary = failure;
+            } else {
+                primary.addSuppressed(failure);
+            }
+        }
+        if (primary != null) {
+            throw new CompletionException(primary);
+        }
+    }
+
+    private static CompletableFuture<Void> metadataLimit() {
+        return CompletableFuture.failedFuture(new NereusException(
+                ErrorCode.METADATA_LIMIT_EXCEEDED,
+                false,
+                "same-object generation quarantine reference domain exceeds the hard limit"));
     }
 
     private PhysicalObjectRootRecord quarantinedRoot(

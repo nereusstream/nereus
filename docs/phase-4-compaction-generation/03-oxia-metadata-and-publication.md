@@ -51,14 +51,26 @@ identity from the root (or the narrowly allowed generation-zero manifest bootstr
 lease and then reloads both the exact candidate and stream head before returning it. This is an intermediate M2
 checkpoint only。`ReadCoordinator` now retains the lease through exact-reader IO and terminal cleanup, excludes a
 failed exact candidate only inside the current operation/view, and performs a fresh resolve for fallback. Missing or
-checksum-corrupt immutable objects best-effort CAS the exact root and selected higher index to `QUARANTINED`；transient
-object-read failures do not alter health metadata. `nereus-materialization` now also contains strict
-policy/source/task/output values、canonical source/policy/task identity、secure publication-id generation、durable
-task/output/index mapping、exact HEAD plus delegated full-format verification and a shared monotonic operation
-deadline. These classes freeze publication inputs and record construction；they do not yet perform the visibility
-CAS. `PREPARED -> COMMITTED` publication orchestration、task
-reconciliation、same-object reference-domain quarantine repair、retry threshold and M2 gates are still pending, so no
-higher-generation production path is enabled yet.
+checksum-corrupt immutable objects best-effort CAS the exact root, selected higher index and every bounded-scan
+discovered `COMMITTED` index in the same stream/view that references the same object key to `QUARANTINED`. Retriable
+`OBJECT_READ_FAILED` performs fresh same-candidate resolve/read attempts up to `GenerationReadRetryPolicy` (default
+two retries) before same-view fallback and never changes health metadata.
+
+`nereus-materialization` now also contains strict policy/source/task/output values、canonical source/policy/task
+identity、secure publication-id generation、durable task/output/index mapping、exact HEAD plus delegated full-format
+verification and a shared monotonic operation deadline. `DefaultGenerationCommitter` implements the restart-safe
+publication state machine: it freezes publication id, attaches one allocated view-scoped generation to the durable
+task, creates the deterministic `PREPARED` index, revalidates exact task/output/head/source/root/activation/protection
+facts, and exposes the result only through the exact index `PREPARED -> COMMITTED` version-CAS. It then transfers
+`VISIBLE_GENERATION` ownership from the task to the exact index and marks the task `PUBLISHED`. Exact reloads converge
+concurrent publishers and lost task/index CAS responses; an exactly proven `ABORTED` allocation releases its old
+task-owned visible protection, returns the task to `OUTPUT_READY`, and retries with a fresh publication id and
+generation while retaining the old `ABORTED` index. `GenerationPublicationReconciler` is the idempotent re-entry
+surface for an already recovered durable task/output pair; task discovery remains M3 worker work.
+
+M2 aggregate gates and real Oxia/LocalStack publication/pin/fallback fixtures are still pending, so this is not an
+F4-M2 completion claim. M3 still owns source/output task protections and M4 owns full recovery-root/anchor-aware
+source reachability before retirement or physical deletion can be enabled.
 
 ## 2. Keyspace
 

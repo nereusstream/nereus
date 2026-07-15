@@ -33,9 +33,11 @@ import com.nereusstream.objectstore.wal.WalObjectReader;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import com.nereusstream.objectstore.wal.WalSliceReadStats;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -49,6 +51,7 @@ public final class ReadCoordinator implements StreamViewReader {
     private final PinnedGenerationResolver generationResolver;
     private final ReadTargetDispatcher targetDispatcher;
     private final GenerationReadFailureHandler generationFailureHandler;
+    private final GenerationReadRetryPolicy generationRetryPolicy;
     private final ReadResourceLimiter resourceLimiter;
     private final ReadMetricsObserver observer;
     private final Executor callbackExecutor;
@@ -69,6 +72,7 @@ public final class ReadCoordinator implements StreamViewReader {
         this.generationResolver = null;
         this.targetDispatcher = new ReadTargetDispatcher(registry);
         this.generationFailureHandler = GenerationReadFailureHandler.noOp();
+        this.generationRetryPolicy = GenerationReadRetryPolicy.defaults();
         this.observer = Objects.requireNonNull(observer, "observer");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.resourceLimiter = new ReadResourceLimiter(
@@ -87,9 +91,31 @@ public final class ReadCoordinator implements StreamViewReader {
         this(
                 config,
                 resolver,
+                generationResolver,
+                readers,
+                generationFailureHandler,
+                GenerationReadRetryPolicy.defaults(),
+                observer,
+                callbackExecutor);
+    }
+
+    /** F4 constructor with an explicit transient-read retry bound before same-view fallback. */
+    public ReadCoordinator(
+            StreamStorageConfig config,
+            ReadResolver resolver,
+            GenerationReadResolver generationResolver,
+            ReadTargetReaderRegistry readers,
+            GenerationReadFailureHandler generationFailureHandler,
+            GenerationReadRetryPolicy generationRetryPolicy,
+            ReadMetricsObserver observer,
+            Executor callbackExecutor) {
+        this(
+                config,
+                resolver,
                 Objects.requireNonNull(generationResolver, "generationResolver")::resolve,
                 readers,
                 generationFailureHandler,
+                generationRetryPolicy,
                 observer,
                 callbackExecutor);
     }
@@ -102,6 +128,26 @@ public final class ReadCoordinator implements StreamViewReader {
             GenerationReadFailureHandler generationFailureHandler,
             ReadMetricsObserver observer,
             Executor callbackExecutor) {
+        this(
+                config,
+                resolver,
+                generationResolver,
+                readers,
+                generationFailureHandler,
+                GenerationReadRetryPolicy.defaults(),
+                observer,
+                callbackExecutor);
+    }
+
+    ReadCoordinator(
+            StreamStorageConfig config,
+            ReadResolver resolver,
+            PinnedGenerationResolver generationResolver,
+            ReadTargetReaderRegistry readers,
+            GenerationReadFailureHandler generationFailureHandler,
+            GenerationReadRetryPolicy generationRetryPolicy,
+            ReadMetricsObserver observer,
+            Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
         this.generationResolver = Objects.requireNonNull(generationResolver, "generationResolver");
@@ -109,6 +155,8 @@ public final class ReadCoordinator implements StreamViewReader {
                 Objects.requireNonNull(readers, "readers"));
         this.generationFailureHandler = Objects.requireNonNull(
                 generationFailureHandler, "generationFailureHandler");
+        this.generationRetryPolicy = Objects.requireNonNull(
+                generationRetryPolicy, "generationRetryPolicy");
         this.observer = Objects.requireNonNull(observer, "observer");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.resourceLimiter = new ReadResourceLimiter(
@@ -235,7 +283,8 @@ public final class ReadCoordinator implements StreamViewReader {
                 view,
                 options,
                 deadline,
-                new LinkedHashSet<>());
+                new LinkedHashSet<>(),
+                new HashMap<>());
         completeFrom(result, pipeline);
         return result;
     }
@@ -246,7 +295,8 @@ public final class ReadCoordinator implements StreamViewReader {
             ReadView view,
             ReadOptions options,
             ReadOperationDeadline deadline,
-            Set<GenerationReadCandidate> excludedCandidates) {
+            Set<GenerationReadCandidate> excludedCandidates,
+            Map<GenerationReadCandidate, Integer> transientRetries) {
         return generationResolver.resolve(
                         streamId,
                         startOffset,
@@ -262,7 +312,8 @@ public final class ReadCoordinator implements StreamViewReader {
                                 options,
                                 deadline,
                                 pinned,
-                                excludedCandidates))
+                                excludedCandidates,
+                                transientRetries))
                         .orElseGet(() -> CompletableFuture.completedFuture(new ViewReadResult(
                                 view,
                                 new ReadResult(streamId, startOffset, startOffset, List.of(), true),
@@ -276,7 +327,8 @@ public final class ReadCoordinator implements StreamViewReader {
             ReadOptions options,
             ReadOperationDeadline deadline,
             PinnedResolvedRange pinned,
-            Set<GenerationReadCandidate> excludedCandidates) {
+            Set<GenerationReadCandidate> excludedCandidates,
+            Map<GenerationReadCandidate, Integer> transientRetries) {
         CompletableFuture<ReadResult> read = readRanges(
                 streamId,
                 startOffset,
@@ -296,6 +348,22 @@ public final class ReadCoordinator implements StreamViewReader {
             if (!isObjectReadFailure(cause)) {
                 return CompletableFuture.<ViewReadResult>failedFuture(cause);
             }
+            if (isRetriableTransientRead(cause)) {
+                int completedRetries = transientRetries.getOrDefault(pinned.candidate(), 0);
+                if (generationRetryPolicy.retryAfter(completedRetries)) {
+                    Map<GenerationReadCandidate, Integer> nextRetries =
+                            new HashMap<>(transientRetries);
+                    nextRetries.put(pinned.candidate(), completedRetries + 1);
+                    return readGeneration(
+                            streamId,
+                            startOffset,
+                            view,
+                            options,
+                            deadline,
+                            excludedCandidates,
+                            nextRetries);
+                }
+            }
             Set<GenerationReadCandidate> nextExclusions = new LinkedHashSet<>(excludedCandidates);
             nextExclusions.add(pinned.candidate());
             return generationFailureHandler.handle(streamId, pinned.candidate(), cause)
@@ -306,7 +374,8 @@ public final class ReadCoordinator implements StreamViewReader {
                             view,
                             options,
                             deadline,
-                            nextExclusions));
+                            nextExclusions,
+                            transientRetries));
         }).thenCompose(value -> value);
     }
 
@@ -515,6 +584,12 @@ public final class ReadCoordinator implements StreamViewReader {
                 && (nereus.code() == ErrorCode.OBJECT_NOT_FOUND
                         || nereus.code() == ErrorCode.OBJECT_READ_FAILED
                         || nereus.code() == ErrorCode.OBJECT_CHECKSUM_MISMATCH);
+    }
+
+    private static boolean isRetriableTransientRead(Throwable cause) {
+        return cause instanceof NereusException nereus
+                && nereus.code() == ErrorCode.OBJECT_READ_FAILED
+                && nereus.retriable();
     }
 
     private static Throwable unwrap(Throwable error) {

@@ -17,6 +17,8 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.F4MetadataTestValues;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationScanPage;
+import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
@@ -93,17 +95,68 @@ class MetadataGenerationReadFailureHandlerTest {
         assertThat(index.get().value().lifecycle()).isEqualTo(GenerationLifecycle.COMMITTED);
     }
 
+    @Test
+    void quarantinesEveryDiscoveredCommittedIndexThatReferencesTheCorruptObject() {
+        FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
+        AtomicReference<VersionedGenerationIndex> first = new AtomicReference<>(
+                versionedIndex(10, 3, "/generation/index/3"));
+        AtomicReference<VersionedGenerationIndex> second = new AtomicReference<>(
+                versionedIndex(20, 4, "/generation/index/4"));
+        ObjectSliceReadTarget target = target(first.get());
+        physical.createRoot(CLUSTER, root(target)).join();
+        MetadataGenerationReadFailureHandler handler = new MetadataGenerationReadFailureHandler(
+                CLUSTER,
+                generationStore(List.of(first, second)),
+                physical,
+                Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
+
+        handler.handle(
+                STREAM,
+                candidate(first.get()),
+                new NereusException(
+                        ErrorCode.OBJECT_CHECKSUM_MISMATCH,
+                        false,
+                        "bad checksum")).join();
+
+        assertThat(first.get().value().lifecycle()).isEqualTo(GenerationLifecycle.QUARANTINED);
+        assertThat(second.get().value().lifecycle()).isEqualTo(GenerationLifecycle.QUARANTINED);
+    }
+
     private static GenerationMetadataStore generationStore(
             AtomicReference<VersionedGenerationIndex> index) {
+        return generationStore(List.of(index));
+    }
+
+    private static GenerationMetadataStore generationStore(
+            List<AtomicReference<VersionedGenerationIndex>> indexes) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 MetadataGenerationReadFailureHandlerTest.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
                 (proxy, method, args) -> switch (method.getName()) {
-                    case "getIndex" -> CompletableFuture.completedFuture(Optional.of(index.get()));
+                    case "getIndex" -> {
+                        com.nereusstream.metadata.oxia.GenerationIndexIdentity identity =
+                                (com.nereusstream.metadata.oxia.GenerationIndexIdentity) args[1];
+                        yield CompletableFuture.completedFuture(indexes.stream()
+                                .map(AtomicReference::get)
+                                .filter(value -> value.value().generation() == identity.generation()
+                                        && value.value().offsetEnd() == identity.offsetEnd())
+                                .findFirst());
+                    }
+                    case "scanIndex" -> CompletableFuture.completedFuture(
+                            new GenerationScanPage(
+                                    indexes.stream()
+                                            .<VersionedGenerationCandidate>map(AtomicReference::get)
+                                            .toList(),
+                                    Optional.empty()));
                     case "compareAndSetIndex" -> {
                         GenerationIndexRecord replacement = (GenerationIndexRecord) args[1];
                         long expectedVersion = (long) args[2];
-                        VersionedGenerationIndex current = index.get();
+                        AtomicReference<VersionedGenerationIndex> reference = indexes.stream()
+                                .filter(candidate -> candidate.get().value().generation()
+                                        == replacement.generation())
+                                .findFirst()
+                                .orElseThrow();
+                        VersionedGenerationIndex current = reference.get();
                         if (current.metadataVersion() != expectedVersion) {
                             yield CompletableFuture.failedFuture(new IllegalStateException("version mismatch"));
                         }
@@ -112,7 +165,7 @@ class MetadataGenerationReadFailureHandlerTest {
                                 replacement.withMetadataVersion(expectedVersion + 1),
                                 expectedVersion + 1,
                                 new Checksum(ChecksumType.SHA256, "f".repeat(64)));
-                        index.set(updated);
+                        reference.set(updated);
                         yield CompletableFuture.completedFuture(updated);
                     }
                     case "close" -> null;
@@ -121,10 +174,49 @@ class MetadataGenerationReadFailureHandlerTest {
     }
 
     private static VersionedGenerationIndex versionedIndex(long version) {
+        return versionedIndex(version, 3, "/generation/index");
+    }
+
+    private static VersionedGenerationIndex versionedIndex(
+            long version,
+            long generation,
+            String key) {
+        GenerationIndexRecord sample = F4MetadataTestValues.generation(
+                GenerationLifecycle.COMMITTED);
+        GenerationIndexRecord value = new GenerationIndexRecord(
+                sample.schemaVersion(),
+                sample.streamId(),
+                sample.readViewId(),
+                sample.offsetStart(),
+                sample.offsetEnd(),
+                generation,
+                generation == 3 ? sample.publicationId() : "q".repeat(26),
+                generation == 3 ? sample.taskId() : "task-f4-second",
+                sample.lifecycle(),
+                sample.sourceSetSha256(),
+                sample.policySha256(),
+                sample.readTarget(),
+                sample.targetIdentitySha256(),
+                sample.materializationPolicySha256(),
+                sample.payloadFormat(),
+                sample.sourceRecordCount(),
+                sample.outputRecordCount(),
+                sample.entryCount(),
+                sample.logicalBytes(),
+                sample.cumulativeSizeAtStart(),
+                sample.cumulativeSizeAtEnd(),
+                sample.firstCommitVersion(),
+                sample.lastCommitVersion(),
+                sample.schemaRefs(),
+                sample.projectionRef(),
+                sample.createdAtMillis(),
+                sample.committedAtMillis(),
+                sample.stateReason(),
+                sample.stateChangedAtMillis(),
+                version);
         return new VersionedGenerationIndex(
-                "/generation/index",
-                F4MetadataTestValues.generation(GenerationLifecycle.COMMITTED)
-                        .withMetadataVersion(version),
+                key,
+                value,
                 version,
                 new Checksum(ChecksumType.SHA256, "e".repeat(64)));
     }

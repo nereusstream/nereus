@@ -3,6 +3,7 @@ package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
@@ -14,9 +15,13 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.SourceGenerationRecord;
+import com.nereusstream.metadata.oxia.records.TaskFailureClass;
+import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 /** Strict domain/durable mapper shared by publication and recovery. */
 final class MaterializationRecordMapper {
@@ -179,6 +184,135 @@ final class MaterializationRecordMapper {
                 0);
     }
 
+    static GenerationIndexRecord abortedIndex(
+            GenerationIndexRecord prepared,
+            String reason,
+            long nowMillis) {
+        if (prepared.lifecycle() != GenerationLifecycle.PREPARED) {
+            throw new IllegalArgumentException("only a PREPARED generation can be aborted");
+        }
+        String exactReason = requireText(reason, "reason");
+        long changedAt = Math.max(nowMillis, prepared.stateChangedAtMillis());
+        return new GenerationIndexRecord(
+                prepared.schemaVersion(),
+                prepared.streamId(),
+                prepared.readViewId(),
+                prepared.offsetStart(),
+                prepared.offsetEnd(),
+                prepared.generation(),
+                prepared.publicationId(),
+                prepared.taskId(),
+                GenerationLifecycle.ABORTED,
+                prepared.sourceSetSha256(),
+                prepared.policySha256(),
+                prepared.readTarget(),
+                prepared.targetIdentitySha256(),
+                prepared.materializationPolicySha256(),
+                prepared.payloadFormat(),
+                prepared.sourceRecordCount(),
+                prepared.outputRecordCount(),
+                prepared.entryCount(),
+                prepared.logicalBytes(),
+                prepared.cumulativeSizeAtStart(),
+                prepared.cumulativeSizeAtEnd(),
+                prepared.firstCommitVersion(),
+                prepared.lastCommitVersion(),
+                prepared.schemaRefs(),
+                prepared.projectionRef(),
+                prepared.createdAtMillis(),
+                0,
+                exactReason,
+                changedAt,
+                0);
+    }
+
+    static MaterializationTaskRecord publishing(
+            MaterializationTaskRecord current,
+            PublicationId publicationId,
+            long nowMillis) {
+        return taskState(
+                current,
+                TaskLifecycle.PUBLISHING,
+                OptionalLong.empty(),
+                publicationId.value(),
+                nowMillis);
+    }
+
+    static MaterializationTaskRecord attachGeneration(
+            MaterializationTaskRecord current,
+            long generation,
+            long nowMillis) {
+        if (generation <= 0 || current.publicationId().isEmpty()) {
+            throw new IllegalArgumentException("publishing generation identity is invalid");
+        }
+        return taskState(
+                current,
+                TaskLifecycle.PUBLISHING,
+                OptionalLong.of(generation),
+                current.publicationId(),
+                nowMillis);
+    }
+
+    static MaterializationTaskRecord published(
+            MaterializationTaskRecord current,
+            long nowMillis) {
+        if (current.allocatedGeneration().isEmpty() || current.publicationId().isEmpty()) {
+            throw new IllegalArgumentException("published task requires a frozen publication allocation");
+        }
+        return taskState(
+                current,
+                TaskLifecycle.PUBLISHED,
+                current.allocatedGeneration(),
+                current.publicationId(),
+                nowMillis);
+    }
+
+    static MaterializationTaskRecord outputReadyAfterAbort(
+            MaterializationTaskRecord current,
+            long nowMillis) {
+        if (current.lifecycle() != TaskLifecycle.PUBLISHING
+                || current.allocatedGeneration().isEmpty()
+                || current.publicationId().isEmpty()) {
+            throw new IllegalArgumentException("only an allocated PUBLISHING task can clear an aborted publication");
+        }
+        return taskState(
+                current,
+                TaskLifecycle.OUTPUT_READY,
+                OptionalLong.empty(),
+                "",
+                nowMillis);
+    }
+
+    static boolean sameGenerationPublicationIdentity(
+            GenerationIndexRecord left,
+            GenerationIndexRecord right) {
+        return left.schemaVersion() == right.schemaVersion()
+                && left.streamId().equals(right.streamId())
+                && left.readViewId() == right.readViewId()
+                && left.offsetStart() == right.offsetStart()
+                && left.offsetEnd() == right.offsetEnd()
+                && left.generation() == right.generation()
+                && left.publicationId().equals(right.publicationId())
+                && left.taskId().equals(right.taskId())
+                && left.sourceSetSha256().equals(right.sourceSetSha256())
+                && left.policySha256().equals(right.policySha256())
+                && left.readTarget().equals(right.readTarget())
+                && left.targetIdentitySha256().equals(right.targetIdentitySha256())
+                && left.materializationPolicySha256().equals(right.materializationPolicySha256())
+                && left.payloadFormat().equals(right.payloadFormat())
+                && left.sourceRecordCount() == right.sourceRecordCount()
+                && left.outputRecordCount() == right.outputRecordCount()
+                && left.entryCount() == right.entryCount()
+                && left.logicalBytes() == right.logicalBytes()
+                && left.cumulativeSizeAtStart() == right.cumulativeSizeAtStart()
+                && left.cumulativeSizeAtEnd() == right.cumulativeSizeAtEnd()
+                && left.firstCommitVersion() == right.firstCommitVersion()
+                && left.lastCommitVersion() == right.lastCommitVersion()
+                && left.schemaRefs().equals(right.schemaRefs())
+                && left.projectionRef().equals(right.projectionRef())
+                && left.createdAtMillis() == right.createdAtMillis();
+    }
+
     static PhysicalObjectIdentity physicalIdentity(MaterializationOutput output) {
         PhysicalObjectKind kind = output.view() == com.nereusstream.api.ReadView.COMMITTED
                 ? PhysicalObjectKind.COMMITTED_COMPACTED
@@ -210,5 +344,48 @@ final class MaterializationRecordMapper {
         target.append(value.getBytes(StandardCharsets.UTF_8).length)
                 .append(':')
                 .append(value);
+    }
+
+    private static String requireText(String value, String field) {
+        Objects.requireNonNull(value, field);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(field + " cannot be blank");
+        }
+        return value;
+    }
+
+    private static MaterializationTaskRecord taskState(
+            MaterializationTaskRecord current,
+            TaskLifecycle lifecycle,
+            OptionalLong generation,
+            String publicationId,
+            long nowMillis) {
+        long updatedAt = Math.max(nowMillis, current.updatedAtMillis());
+        return new MaterializationTaskRecord(
+                current.schemaVersion(),
+                current.taskId(),
+                current.taskSequence(),
+                current.streamId(),
+                current.readViewId(),
+                current.taskKindId(),
+                current.offsetStart(),
+                current.offsetEnd(),
+                current.sources(),
+                current.sourceSetSha256(),
+                current.policyId(),
+                current.policyVersion(),
+                current.policySha256(),
+                lifecycle,
+                current.attempt(),
+                current.workerClaim(),
+                current.output(),
+                generation,
+                publicationId,
+                TaskFailureClass.NONE.wireId(),
+                "",
+                0,
+                current.createdAtMillis(),
+                updatedAt,
+                0);
     }
 }
