@@ -10,6 +10,7 @@ import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.physical.GcAuthorityToken;
+import com.nereusstream.core.physical.GcReference;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
@@ -99,6 +100,58 @@ class GcPlanTest {
         assertThat(second).isEqualTo(first);
         assertThat(changedAuthority).isNotEqualTo(first);
         assertThat(changedMetadataVersion).isNotEqualTo(first);
+    }
+
+    @Test
+    void everyDomainReferenceRequiresAnExactPlannedRemoval() {
+        PhysicalGcConfig config = PhysicalGcConfig.defaults();
+        VersionedPhysicalObjectRoot active = activeRoot();
+        GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
+        GcCandidate candidate = candidate(config, active, query);
+        GcReference reference = new GcReference(
+                "generation-index",
+                "stream-a/1/42",
+                "/metadata/generation-a",
+                12,
+                SHA_A);
+        GcReferenceSnapshot snapshot = GcReferenceSnapshot.create(
+                "generation-v1",
+                1,
+                query.queryIdentitySha256(),
+                true,
+                false,
+                1,
+                1,
+                List.of(authority("/metadata/generation-a", 12)),
+                List.of(reference));
+
+        assertThat(GcPlan.computeReferenceSetSha256(
+                        config,
+                        candidate,
+                        List.of(snapshot),
+                        List.of(),
+                        List.of(metadata("/metadata/generation-a", 12, SHA_A))))
+                .isNotNull();
+        assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
+                        config, candidate, List.of(snapshot), List.of(), List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact planned metadata removal");
+        assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
+                        config,
+                        candidate,
+                        List.of(snapshot),
+                        List.of(),
+                        List.of(metadata("/metadata/generation-a", 13, SHA_A))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact planned metadata removal");
+        assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
+                        config,
+                        candidate,
+                        List.of(snapshot),
+                        List.of(),
+                        List.of(metadata("/metadata/generation-a", 12, SHA_B))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact planned metadata removal");
     }
 
     @Test

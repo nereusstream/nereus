@@ -770,3 +770,21 @@ tasks.register("phase4M4RootFenceCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M4ReferenceDomainsContractSurface") {
+    group = "verification"
+    description = "Audit query-bound F4-M4 generation, append-recovery, and materialization reference domains."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-reference-domains-contract-surface.sh")
+}
+
+tasks.register("phase4M4ReferenceDomainsCheck") {
+    group = "verification"
+    description = "Verify stateless reference revalidation and exact removal binding over real metadata scans."
+    dependsOn("phase4M4RootFenceCheck")
+    dependsOn("checkPhase4M4ReferenceDomainsContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+}

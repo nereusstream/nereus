@@ -224,6 +224,28 @@ MARKED/DELETING restart discovery independent of object-store listing. It is not
 perform `DELETING -> DELETED`、conditional source/protection/audit deletion or object-store deletion；those remain a
 single later coordinator/recovery path rather than new metadata truth.
 
+### 1.11 F4-M4 metadata-backed reference-domain checkpoint
+
+Checkpoint J consumes existing focused stores without adding a generic Oxia scan/delete API. The generation domain
+calls `scanIndex(cluster, stream, view, 0, Long.MAX_VALUE, token, pageSize)` for both closed views and records every
+returned wrapper's exact key/Oxia version/stored-envelope SHA as an authority token. A matching generation-zero index
+is removable only while non-tombstoned；a matching higher index is removable only in `DRAINING` and all earlier
+addressable/pending lifecycles veto. `RETIRED/ABORTED` remain authorities but no longer reference bytes.
+
+The materialization domain calls only `scanTasks` and treats exact durable task wrappers as authorities. Nonterminal
+task lifecycles retain their matching source/output object references and veto；terminal tasks contribute authority
+but no physical reference. The append-recovery domain calls optional `getRecoveryRoot`, never `getOrCreateRecoveryRoot`,
+then scans `readAppendRecoveryTail` from the root's exact anchor. A missing root is represented by a domain-separated
+absence token at the canonical `F4Keyspace.recoveryRootKey`; a present root keeps its exact wrapper digest. The
+observed stream head is hashed from its full append anchor/version fields under a fixed domain separator, and every
+live commit uses its captured source-record SHA. Matching current-root NRC1 refs or live commits veto deletion.
+
+`stillMatches(query, snapshot)` repeats those exact reads from the supplied durable query rather than recovering
+query fields from a key parser or process-local cache. Plan validation then requires every non-veto reference owner
+tuple to match an exact planned metadata-removal tuple. Stream registrations are not consulted for ownerless proof；
+all three domains return incomplete+veto for ownerless queries until a later global backfill/enumeration authority is
+available. No new metadata key or correctness owner is introduced by this checkpoint.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

@@ -69,7 +69,9 @@ bridge. Checkpoint H adds strict GC configuration、ACTIVE-root candidates and b
 domain/protection/metadata-key facts can be recomputed after restart. Checkpoint I adds canonical exact-domain
 aggregation、mandatory metadata-fact reload、recoverable ACTIVE/MARKED/DELETING fencing and full 256-shard metadata
 root enumeration. It stops at durable delete intent；no source/protection/audit/object delete path is enabled by
-checkpoints G–I.
+checkpoints G–I. Checkpoint J adds query-bound stateless revalidation、exact reference-to-removal binding and the
+affected-stream generation、append-recovery and materialization reference domains. Projection/cursor/future-sentinel
+domains、ownerless global absence proof、retirement/destructive coordination and runtime composition remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -580,9 +582,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > plus restart protection reconciliation), checkpoint E (checkpoint-aware append replay adapter), and checkpoint F
 > (checkpoint-derived committed-index repair), checkpoint G (exact retirement metadata adapters), checkpoint H
 > (bounded/reconstructable GC config/candidate/plan values), and checkpoint I (exact domain aggregation、recoverable
-> root MARK/DRAIN/DELETING fence and 256-shard scanner) are implemented；runtime composition、concrete
-> reference-domain implementations、retirement/delete coordinators and physical/cursor GC completion remain before
-> F4-M4 can be called complete or final-gated.
+> root MARK/DRAIN/DELETING fence and 256-shard scanner), and checkpoint J (query-bound revalidation、exact
+> reference/removal binding and affected-stream generation/append-recovery/materialization domains) are implemented；
+> runtime composition、projection/cursor/future-sentinel and ownerless-global domains、retirement/delete coordinators
+> and physical/cursor GC completion remain before F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
 
@@ -677,9 +680,10 @@ gc/GcReferenceCollectionStatus.java                      implemented checkpoint 
 gc/GcReferenceCollection.java                            implemented checkpoint I
 gc/GcReferenceDomainRegistry.java                        implemented checkpoint I
 gc/GcPlanMetadataRevalidator.java                        implemented checkpoint I
-gc/GenerationReferenceDomain.java
-gc/AppendRecoveryReferenceDomain.java
-gc/MaterializationReferenceDomain.java
+gc/GcReferenceSnapshotAccumulator.java                   implemented checkpoint J
+gc/GenerationReferenceDomain.java                        implemented checkpoint J affected-stream domain
+gc/AppendRecoveryReferenceDomain.java                    implemented checkpoint J affected-stream domain
+gc/MaterializationReferenceDomain.java                   implemented checkpoint J affected-stream domain
 gc/FutureCatalogSentinelDomain.java
 gc/SourceRetirementCoordinator.java
 gc/StreamRegistrationRetirementCoordinator.java
@@ -739,6 +743,9 @@ GenerationZeroPhysicalReferencePublisherTest
 ProtectedStableAppendFailureInjectionTest
 GenerationZeroVisibleProtectionRepairTest
 GcReferenceDomainRegistryTest                              implemented checkpoint I
+GenerationReferenceDomainTest                             implemented checkpoint J
+AppendRecoveryReferenceDomainTest                         implemented checkpoint J
+MaterializationReferenceDomainTest                        implemented checkpoint J
 PhysicalObjectGarbageCollectorTest                         implemented checkpoint I fence/lost-response tests
 PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
@@ -775,6 +782,7 @@ retirement.
 ./gradlew phase4M4RetirementMetadataCheck
 ./gradlew phase4M4GcPlanCheck
 ./gradlew phase4M4RootFenceCheck
+./gradlew phase4M4ReferenceDomainsCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -831,6 +839,14 @@ checks exact lifecycle counts、visitor-failure re-entry and borrowed-resource c
 check rejects any source/audit/protection/object delete dependency in the collector. This is checkpoint-I evidence
 only：the terminal result is durable `DELETING` intent, concrete domains/runtime composition and every destructive
 side effect remain absent.
+
+`phase4M4ReferenceDomainsCheck` extends checkpoint I with query-bound `stillMatches` re-scans and an exact invariant
+that every retained domain reference is paired with the same planned metadata removal key、Oxia version and durable
+value SHA. It proves both-view generation scans、DRAINING-only higher-generation eligibility、optional recovery-root
+plus complete live-tail authorities、active materialization-task vetoes、bounded fail-closed accumulation and
+ownerless fail-closed behavior without treating stream registrations as truth. This is checkpoint-J evidence only：
+projection/cursor/future-sentinel and ownerless-global domains、source retirement、physical deletion and runtime
+composition remain absent.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

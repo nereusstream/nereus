@@ -9,9 +9,10 @@
 > planning、guarded recovery-root publication/restart protection reconciliation，以及 checkpoint-aware append
 > replay adapter、checkpoint-derived index repair、exact source/object-audit retirement metadata adapters、
 > bounded/reconstructable GC config/candidate/plan values、exact reference-domain registry、recoverable
-> `ACTIVE -> MARKED -> DELETING` root fence 和全 256 分片 root scanner 已落地；该 fence 明确停在 durable
-> `DELETING` intent。runtime composition、concrete reference-domain implementations、source/protection/metadata/
-> object retirement、cursor GC 与 F4-M5–M6 尚未实现
+> `ACTIVE -> MARKED -> DELETING` root fence、全 256 分片 root scanner、query-bound stateless revalidation，以及
+> affected-stream generation/append-recovery/materialization concrete domains 已落地；该 fence 明确停在 durable
+> `DELETING` intent。runtime composition、projection/cursor/future-sentinel 与 ownerless global domains、source/
+> protection/metadata/object retirement、cursor GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -542,6 +543,35 @@ lost response、grace/lease 边界、protection/metadata/domain drift unmark、M
 “未执行任何删除”边界。具体 domain implementations、DELETING recovery/retirement/delete 和 runtime
 composition 仍是后续 M4 工作。
 
+### 6.13 F4-M4 query-bound reference-domain checkpoint
+
+Checkpoint J 修正了 concrete domain 实现前暴露出的两个协议缺口。`GcReferenceDomain.stillMatches` 现在同时
+接收 exact `GcReferenceQuery` 和 snapshot；registry 必须把 collection 中的原 query 传回 domain，因此重启后
+可以仅从 authoritative query/root facts 重建验证，不依赖 process-local query cache。`GcPlan` 又新增一条
+结构性约束：每个 non-veto domain `GcReference` 的 `(ownerKey, ownerMetadataVersion,
+ownerIdentitySha256)` 必须被某个 `GcPlannedMetadataRemoval` 精确覆盖。仅把 reference 列入 digest、却不安排
+删除 owner record 的 plan 无法计算 MARK digest。
+
+本 checkpoint 实现了三个 metadata-backed domain：
+
+- `GenerationReferenceDomain` 对每个 affected stream 完整扫描 `COMMITTED` 与 `TOPIC_COMPACTED` 两个 view；
+  generation-zero 非 tombstone index 可以进入 exact removal plan，higher-generation 只有已先 CAS 到
+  `DRAINING` 才可移除，`PREPARED/COMMITTED/QUARANTINED` 引用直接 veto；
+- `AppendRecoveryReferenceDomain` 读取 optional recovery root、把 root absence 也编码成 authority token，并从
+  root anchor 完整分页读取 live append tail。当前 root 仍引用的 NRC1 object 或 live commit 仍指向的 source
+  object 都直接 veto；head/root/commit 变化会使 exact rescan 不匹配；
+- `MaterializationReferenceDomain` 完整分页扫描 affected-stream task roots。`PLANNED/CLAIMED/OUTPUT_READY/
+  PUBLISHING/RETRY_WAIT` 的 matching source/output 是不可计划删除的 veto；只有 terminal task 不再成为
+  physical correctness reference，terminal workflow cleanup 仍由既有 retirer 负责。
+
+三个 domain 都在配置上限内保留 canonical authority/reference lists，超过上限返回 incomplete+veto，而不是
+截断为 permission。它们对 `OWNERLESS_ORPHAN_CANDIDATE` 明确返回 incomplete+veto：当前 stream registration
+只是 discovery hint，不能被误用为 cluster-wide absence proof；必须等待后续 physical-root/registration backfill
+epoch 和 projection/cursor/future-domain global enumeration。`phase4M4ReferenceDomainsCheck` 覆盖 query
+回传、reference/removal binding、两 view scan、DRAINING gate、live-tail/task veto、authority drift 与 ownerless
+fail-closed。projection/cursor/future-sentinel domains、source plan construction、DELETING side effects 和 runtime
+composition 仍未开放。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -550,7 +580,7 @@ composition 仍是后续 M4 工作。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint I, NRC1/recovery replay/index repair、exact retirement metadata、GC plans、exact domain aggregation、recoverable MARK/DRAIN/DELETING fence and 256-shard root scanning are implemented/tested；concrete domains、runtime composition、retirement/delete and cursor GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint J, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner and affected-stream generation/append/materialization domains are implemented/tested；global projection/cursor/sentinel domains、runtime composition、retirement/delete and cursor GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

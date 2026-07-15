@@ -42,6 +42,8 @@ public record GcPlan(
                 referenceSetSha256, "referenceSetSha256");
         validateSnapshots(candidate, domainSnapshots);
         validateProtectionObjects(candidate, plannedProtectionRemovals);
+        GcPlanValidation.requireEveryReferenceHasExactRemoval(
+                domainSnapshots, plannedMetadataRemovals);
         Checksum expected = GcPlanValidation.referenceSetSha256(
                 candidate.referenceQuery(),
                 domainSnapshots,
@@ -79,6 +81,7 @@ public record GcPlan(
                 GcPlanValidation.METADATA_ORDER,
                 config.maxReferencesPerDomainSnapshot(),
                 "plannedMetadataRemovals");
+        GcPlanValidation.requireEveryReferenceHasExactRemoval(snapshots, removals);
         return GcPlanValidation.referenceSetSha256(query, snapshots, protections, removals);
     }
 
@@ -106,6 +109,7 @@ public record GcPlan(
                 config.maxReferencesPerDomainSnapshot(),
                 "plannedMetadataRemovals");
         validateProtectionObjects(candidate, protections);
+        GcPlanValidation.requireEveryReferenceHasExactRemoval(snapshots, removals);
         Checksum digest = GcPlanValidation.referenceSetSha256(
                 candidate.referenceQuery(), snapshots, protections, removals);
         if (markedRoot.value().lifecycle() != PhysicalObjectLifecycle.MARKED

@@ -172,8 +172,22 @@ coordinator for DELETING recovery and destructive work rather than treating this
 
 `PhysicalObjectRootScanner` now provides the restart discovery side of that graph: each pass scans all 256 metadata
 shards with bounded sequential pages/visitor calls, validates key progression and reports exact lifecycle counts.
-Overlapping passes and post-close admission fail；the injected metadata store and scheduler remain borrowed. Production
-runtime composition、concrete reference-domain implementations and all DELETING side effects remain target code.
+Overlapping passes and post-close admission fail；the injected metadata store and scheduler remain borrowed. At
+checkpoint I, production runtime composition、concrete reference-domain implementations and all DELETING side effects
+were still target code；checkpoint J below implements the first three domains without composing them.
+
+F4-M4 checkpoint J now implements the affected-stream storage domains that can be constructed from existing runtime
+dependencies: `GenerationReferenceDomain`、`AppendRecoveryReferenceDomain` and
+`MaterializationReferenceDomain`. They are not process-local adapters：the SPI now passes the exact query back to
+`stillMatches`, and each revalidation repeats its complete bounded authoritative scan. Generation scans both views and
+admits a higher-generation removal only after `DRAINING`; append recovery binds optional root/head/live-tail facts and
+vetoes any currently required checkpoint/source；materialization vetoes matching nonterminal task source/output facts.
+Every emitted removable reference must be covered by an exact plan removal tuple before MARK digest construction.
+
+These domains deliberately fail ownerless queries as incomplete/veto because the registration scanner is a liveness
+hint, not cluster-wide absence truth. Projection/cursor/future-sentinel domains and the global backfill epoch remain
+required before ownerless GC. The new classes are not yet installed in `MaterializationRuntime`; checkpoint J changes
+no production activation or deletion behavior.
 
 Full M4–M6 target construction：
 

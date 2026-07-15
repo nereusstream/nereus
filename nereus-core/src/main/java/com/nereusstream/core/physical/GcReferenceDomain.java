@@ -10,5 +10,6 @@ public interface GcReferenceDomain {
 
     CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query);
 
-    CompletableFuture<Boolean> stillMatches(GcReferenceSnapshot snapshot);
+    CompletableFuture<Boolean> stillMatches(
+            GcReferenceQuery query, GcReferenceSnapshot snapshot);
 }

@@ -116,8 +116,10 @@ canonical restart-reconstructable plan values；the plan digest commits every co
 key/protection while excluding ephemeral candidate identity/time. Checkpoint I adds the exact bounded domain registry、
 mandatory planned-metadata revalidation、recoverable `ACTIVE -> MARKED -> DELETING` root fence and complete 256-shard
 root scan. It stops before every source/protection/audit/object delete and is not production-composed. Concrete
-reference-domain implementations、source retirement planning、DELETING recovery/destructive coordinators、cursor
-integration and physical deletion remain planned；therefore no object deletion is enabled by these checkpoints.
+reference domains arrive in checkpoint J for affected-stream generation、append recovery and materialization facts,
+including query-bound stateless revalidation and exact reference/removal binding. Projection/cursor/future-sentinel
+and ownerless global domains、source retirement planning、DELETING recovery/destructive coordinators、cursor integration
+and physical deletion remain planned；therefore no object deletion is enabled by these checkpoints.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -627,7 +629,9 @@ public interface GcReferenceDomain {
     String domainId();
     int protocolVersion();
     CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query);
-    CompletableFuture<Boolean> stillMatches(GcReferenceSnapshot snapshot);
+    CompletableFuture<Boolean> stillMatches(
+        GcReferenceQuery query,
+        GcReferenceSnapshot snapshot);
 }
 
 public record GcAuthorityToken(
@@ -700,8 +704,10 @@ domain authority/reference set, not merely removal identities. A same-key protec
 changes the digest and invalidates drain. The marked
 root version/epoch are filled only from the successful `ACTIVE -> MARKED` CAS. After restart, recovery uses the
 current MARKED metadata version/epoch directly and never guesses the prior ACTIVE Oxia version or assumes versions are
-consecutive. A plan is process-local and is always reconstructed from the root digest after restart；serializing it
-would create a second correctness owner.
+consecutive. Every domain reference must also match one planned metadata removal by exact owner key、Oxia version and
+durable identity SHA；a reference that is merely hashed but whose owner would survive deletion invalidates the plan.
+A plan is process-local and is always reconstructed from the root digest after restart；serializing it would create a
+second correctness owner.
 
 Checkpoint H implements these three values and `SecureGcIdGenerator`. `GcPlan.computeReferenceSetSha256` is the
 pre-MARK digest operation；`GcPlan.fromMarkedRoot` accepts only the exact MARK response/reload carrying that digest and
@@ -741,8 +747,9 @@ operation deadline rather than acquiring independent timeout budgets.
 
 `GcPlanMetadataRevalidator` is mandatory, not a permissive default. It reloads the authoritative typed metadata facts
 selected by the future source/orphan/cursor planner；the collector canonicalizes and compares the entire returned list
-before MARK and twice during DRAIN. The generic registry and root fence are implemented, but the concrete F4 domain
-classes in the table below are still pending. Config defaults continue to keep mutation disabled and dry-run on.
+before MARK and twice during DRAIN. Checkpoint J implements three concrete F4 domains in the table below；the remaining
+projection/cursor/sentinel and ownerless-global variants are pending. Config defaults continue to keep mutation
+disabled and dry-run on.
 
 The query is a core value；materialization's `GcCandidate` wraps it with retry/plan timestamps and never appears in
 the SPI. Affected streams are sorted/unique and capped at 4,096；`REFERENCED_OBJECT` and
@@ -751,16 +758,32 @@ complete domain-wide absence proof. Query identity hashes the exact object、kin
 candidate-evidence digest and stream set. Evidence is the canonical manifest/reference record when present, otherwise
 the canonical root/listing classification proof. Snapshot lists use canonical `(type/key/version/identity)` order. `complete=false` or
 any count above configured in-memory limits requires `veto=true`；a domain may stream-hash a larger scan for
-diagnostics but cannot truncate it into permission. `stillMatches` re-reads the authority tokens and exact query
-identity rather than trusting list equality alone.
+diagnostics but cannot truncate it into permission. `stillMatches(query, snapshot)` receives the full exact query and
+repeats the authoritative scan；no domain may recover scope from a process-local snapshot-to-query cache.
+
+Checkpoint J's concrete rules are：
+
+- `generation-v1` scans both closed read views for every sorted affected stream. Generation zero is removable while
+  non-tombstoned. Higher generation contributes a removable reference only in `DRAINING`；`PREPARED`、`COMMITTED` and
+  `QUARANTINED` matching records set `veto=true`, while `RETIRED/ABORTED` are non-referencing authorities；
+- `append-recovery-v1` reads optional recovery root plus the full root-anchored live tail. Root absence is an explicit
+  domain-separated token. The observed head and every commit version/digest are authorities；a matching current NRC1
+  root reference or live commit sets `veto=true` because neither can be retired by the physical-object plan；
+- `materialization-v1` scans every durable task for the affected streams. Matching source/output references from
+  `PLANNED/CLAIMED/OUTPUT_READY/PUBLISHING/RETRY_WAIT` set `veto=true`; terminal tasks remain workflow authorities but
+  no longer own physical correctness references.
+
+All three stop with incomplete+veto after the configured bound. All three also return incomplete+veto for
+`OWNERLESS_ORPHAN_CANDIDATE`：the current stream-registration registry is a hint and cannot prove global absence.
+Ownerless permission requires the later registration/physical-root backfill epoch plus all global domains.
 
 F4 registers：
 
 | Domain | Revalidated authority |
 | --- | --- |
-| `generation-v1` | exact committed/draining index records and source coverage |
-| `append-recovery-v1` | head + stable recovery root/checkpoint refs |
-| `materialization-v1` | task roots/output/source identities |
+| `generation-v1` | implemented J for affected streams：both-view exact indexes and DRAINING eligibility |
+| `append-recovery-v1` | implemented J for affected streams：head + optional stable recovery root + complete live tail |
+| `materialization-v1` | implemented J for affected streams：task roots/output/source identities and active-task veto |
 | `projection-generation-v1` | F2 topic projection/incarnation identity、generation marker and old-stream deletion/unaddressability proof |
 | `cursor-snapshot-v1` | F3 retention root + every cursor root + inventory classification |
 | `future-catalog-sentinel-v1` | veto if any later catalog capability is active without its plugin |

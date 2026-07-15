@@ -307,7 +307,12 @@ class GcReferenceDomainRegistryTest {
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(
+                GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+            if (!query.queryIdentitySha256().equals(snapshot.queryIdentitySha256())) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("query does not match snapshot"));
+            }
             revalidationCalls.incrementAndGet();
             return CompletableFuture.completedFuture(stillMatches);
         }

@@ -13,8 +13,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 final class GcPlanValidation {
@@ -135,6 +137,31 @@ final class GcPlanValidation {
             writer.checksum(removal.durableValueSha256());
         }
         return writer.finish();
+    }
+
+    static void requireEveryReferenceHasExactRemoval(
+            List<GcReferenceSnapshot> snapshots,
+            List<GcPlannedMetadataRemoval> metadataRemovals) {
+        Map<String, GcPlannedMetadataRemoval> removalsByKey = new HashMap<>();
+        for (GcPlannedMetadataRemoval removal : metadataRemovals) {
+            GcPlannedMetadataRemoval previous = removalsByKey.put(removal.key(), removal);
+            if (previous != null) {
+                throw new IllegalArgumentException(
+                        "planned metadata removal keys must be unique across removal types");
+            }
+        }
+        for (GcReferenceSnapshot snapshot : snapshots) {
+            for (GcReference reference : snapshot.references()) {
+                GcPlannedMetadataRemoval removal = removalsByKey.get(reference.ownerKey());
+                if (removal == null
+                        || removal.metadataVersion() != reference.ownerMetadataVersion()
+                        || !removal.durableValueSha256().equals(
+                                reference.ownerIdentitySha256())) {
+                    throw new IllegalArgumentException(
+                            "every domain reference must have an exact planned metadata removal");
+                }
+            }
+        }
     }
 
     private static final class DigestWriter {

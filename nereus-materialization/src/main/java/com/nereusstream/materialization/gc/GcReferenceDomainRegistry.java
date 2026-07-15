@@ -99,7 +99,7 @@ public final class GcReferenceDomainRegistry {
                     "only a CLEAR reference collection can be revalidated"));
         }
         requireExactRegisteredSet(collection.snapshots());
-        return revalidate(collection.snapshots(), 0, deadline);
+        return revalidate(collection.query(), collection.snapshots(), 0, deadline);
     }
 
     private CompletableFuture<GcReferenceCollection> collect(
@@ -134,6 +134,7 @@ public final class GcReferenceDomainRegistry {
     }
 
     private CompletableFuture<Boolean> revalidate(
+            GcReferenceQuery query,
             List<GcReferenceSnapshot> snapshots,
             int index,
             MaterializationDeadline deadline) {
@@ -143,7 +144,7 @@ public final class GcReferenceDomainRegistry {
         GcReferenceSnapshot snapshot = snapshots.get(index);
         RegisteredDomain registered = byId.get(snapshot.domainId());
         return deadline.bound(
-                        () -> registered.domain().stillMatches(snapshot),
+                        () -> registered.domain().stillMatches(query, snapshot),
                         "revalidate GC reference domain " + snapshot.domainId())
                 .thenCompose(matches -> {
                     if (matches == null) {
@@ -151,7 +152,7 @@ public final class GcReferenceDomainRegistry {
                                 "reference domain returned a null stillMatches result"));
                     }
                     return matches
-                            ? revalidate(snapshots, index + 1, deadline)
+                            ? revalidate(query, snapshots, index + 1, deadline)
                             : CompletableFuture.completedFuture(false);
                 });
     }

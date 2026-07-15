@@ -580,7 +580,12 @@ class PhysicalObjectGarbageCollectorTest {
         }
 
         @Override
-        public CompletableFuture<Boolean> stillMatches(GcReferenceSnapshot snapshot) {
+        public CompletableFuture<Boolean> stillMatches(
+                GcReferenceQuery query, GcReferenceSnapshot snapshot) {
+            if (!query.queryIdentitySha256().equals(snapshot.queryIdentitySha256())) {
+                return CompletableFuture.failedFuture(
+                        new IllegalArgumentException("query does not match snapshot"));
+            }
             return CompletableFuture.completedFuture(stillMatches);
         }
     }
