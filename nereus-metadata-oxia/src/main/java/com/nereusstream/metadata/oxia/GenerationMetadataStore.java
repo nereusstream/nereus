@@ -30,6 +30,11 @@ public interface GenerationMetadataStore extends AutoCloseable {
 
     CompletableFuture<VersionedGenerationIndex> createPrepared(String cluster, GenerationIndexRecord record);
 
+    CompletableFuture<VersionedGenerationIndex> restoreCommittedFromCheckpoint(
+            String cluster,
+            GenerationIndexRecord record,
+            Checksum canonicalRecordSha256);
+
     CompletableFuture<VersionedGenerationIndex> compareAndSetIndex(
             String cluster, GenerationIndexRecord replacement, long expectedVersion);
 

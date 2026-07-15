@@ -15,7 +15,8 @@ domain values、private-staging streaming writer、strict header/footer/director
 authoritative F4 metadata-record verifier described in section 9 are implemented and focused-tested. The document 03
 §10 generation-zero protocol is also implemented for ordinary and recovery append paths：exact prepared intent、
 physical root/protection proof、protected head CAS、exact index identity and strict visible protection are now the
-production sequence. Recovery-root publication、retirement and GC remain target work. Package、class and method names
+production sequence. Recovery-root publication、checkpoint append replay and checkpoint-derived index repair are now
+implemented checkpoints；runtime composition、retirement and GC remain target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
@@ -48,6 +49,10 @@ nereus-core/src/main/java/com/nereusstream/core/read/
   ReadTargetReaderRegistry.java
   GenerationReadResolver.java
   GenerationReadCandidate.java
+  GenerationIndexRepairer.java
+  GenerationIndexRepairResult.java
+  GenerationIndexRepairSource.java
+  MetadataGenerationIndexRepairer.java
   PinnedResolvedRange.java
   ParquetCompactedTargetReader.java
 
@@ -58,6 +63,10 @@ nereus-core/src/main/java/com/nereusstream/core/capability/
   LiveProjectionSubject.java
   DomainValidatedDeletionSubject.java
   GenerationActivationProof.java
+
+nereus-core/src/main/java/com/nereusstream/core/recovery/
+  CheckpointDerivedIndexRepairer.java
+  RecoveryCheckpointProtectionIdentities.java
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/
   PutObjectAttemptGuard.java
@@ -1018,8 +1027,9 @@ not a data generation and never serves `StreamStorage.read` directly.
 
 > Implementation status (2026-07-15)：the object protocol and bounded publication-table scan in this section are
 > implemented and the guarded coordinator/root-CAS path consumes them. Checkpoint E additionally implements bounded
-> offset-to-entry lookup for append replay. This is not an M4 completion claim；checkpoint-derived index repair and
-> retirement/GC paths in documents 03–05 are still required.
+> offset-to-entry lookup for append replay；checkpoint F consumes the same entry/publication facts for exact committed
+> index restoration. This is not an M4 completion claim；runtime composition and retirement/GC paths in documents
+> 03–05 are still required.
 
 ### 9.1 Streaming codec surface
 
@@ -1118,6 +1128,53 @@ public interface RecoveryCheckpointCodecV1 {
             Duration timeout);
 }
 ```
+
+Checkpoint F adds the following exact metadata/consumer surface：
+
+```java
+public final class GenerationIndexDigests {
+    public static Checksum canonicalRecordSha256(GenerationIndexRecord record);
+    public static Checksum durableValueSha256(GenerationIndexRecord record);
+}
+
+public interface GenerationMetadataStore {
+    CompletableFuture<VersionedGenerationIndex> restoreCommittedFromCheckpoint(
+            String cluster,
+            GenerationIndexRecord record,
+            Checksum canonicalRecordSha256);
+}
+
+public enum GenerationIndexRepairSource {
+    TRIMMED,
+    LIVE_COMMIT,
+    RECOVERY_CHECKPOINT
+}
+
+public record GenerationIndexRepairResult(
+        StreamId streamId,
+        long targetOffset,
+        GenerationIndexRepairSource source,
+        int scannedRecords,
+        Optional<VersionedGenerationIndex> restoredIndex) { }
+
+public interface GenerationIndexRepairer {
+    CompletableFuture<GenerationIndexRepairResult> repair(
+            StreamId streamId, long targetOffset, Duration timeout);
+}
+```
+
+`canonicalRecordSha256` is over `GenerationIndexRecordCodecV1` bytes embedded in NRC1；`durableValueSha256` is over
+the metadata envelope written to Oxia with encoded `metadataVersion == 0`. They are distinct protocol facts.
+`restoreCommittedFromCheckpoint` accepts only a COMMITTED-view unhydrated record whose raw digest matches. It performs
+one final-key put-if-absent and, on conflict/uncertain response, reloads the exact key and accepts only the identical
+hydrated record plus durable-envelope digest. It never creates `PREPARED` and never advances a lifecycle.
+
+`CheckpointDerivedIndexRepairer` first proves trim/head and a root-stable bounded live tail. For checkpoint coverage it
+pins the selected NRC1 object, reads exactly the publication indexes named by the covering commit entry, chooses the
+highest candidate with an exact ACTIVE physical root, establishes the current-root-owned target protection, then
+revalidates activation/root/trim/physical identity/protection around the metadata restore. Root change restarts the
+whole proof；trim returns `TRIMMED` without a write. `GenerationReadResolver` consumes only the terminal result and
+performs a fresh authority scan and ordinary read pin before returning a range.
 
 The production implementation is `DefaultRecoveryCheckpointCodecV1(ObjectStore, StagingFileManager, Executor,
 RecoveryCheckpointVerifier)`. `RecoveryCheckpointVerifier` keeps `nereus-object-store` protocol-neutral while the

@@ -149,6 +149,27 @@ the historical generation-zero target；a live hit retains the existing protecte
 default storage constructors still select the live-only adapter until F4 runtime composition explicitly injects the
 checkpoint reader, and no metadata retirement is enabled by this checkpoint.
 
+### 1.7 F4-M4 checkpoint-derived index repair checkpoint
+
+`GenerationMetadataStore.restoreCommittedFromCheckpoint` is the only new mutation used by NRC1 repair. It accepts an
+unhydrated `COMMITTED`/`COMMITTED-view` `GenerationIndexRecord` plus the NRC1 raw-record SHA. The production adapter
+re-encodes and checks that raw digest, writes the ordinary final generation-index key with put-if-absent, and handles
+create conflict/response uncertainty by exact reload. Reload converges only when every canonical field matches after
+metadata-version hydration and `GenerationIndexDigests.durableValueSha256(record)` matches the stored Oxia envelope.
+It cannot synthesize `PREPARED` state or use publication identity alone to accept a collision.
+
+`CheckpointDerivedIndexRepairer` remains a consumer of existing authorities：recovery root selects immutable NRC1；
+publication rows supply frozen committed-index bytes；physical root supplies target lifecycle/identity；root-owned
+`RECOVERY_CHECKPOINT_TARGET` protection blocks physical deletion；activation and trim remain independent authorities.
+Before the final-key create and again afterward, the repairer reloads/revalidates those facts. A root change raises a
+private retry signal and restarts from snapshot/walk；an already-trimmed target returns `TRIMMED` with no metadata
+write. A concurrent identical restore is idempotent；a different value at the same final key is an invariant violation.
+
+`GenerationReadResolver` now accepts a `GenerationIndexRepairer`. Its compatibility constructor installs
+`MetadataGenerationIndexRepairer` for live commits；F4 runtime composition must explicitly inject the checkpoint-aware
+implementation. After either repair source reports terminal success, resolver performs a new authoritative index
+scan and the existing physical read-pin revalidation. Repair evidence never becomes a parallel visibility domain.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

@@ -130,6 +130,16 @@ legacy constructors remain live-only. Focused tests cover missing live commit ke
 non-aliasing and lease cleanup. Checkpoint-derived index repair、runtime enablement、retirement and GC remain target
 code, so checkpoint E authorizes no deletion.
 
+F4-M4 checkpoint F implements the index-repair half of §8.5. `CheckpointDerivedIndexRepairer` routes a target using
+the root-stable live-tail walk；live coverage retains the existing bounded metadata repair, while checkpoint coverage
+pins/opens NRC1 and reads only the publication indexes named by the covering commit. It chooses the highest exact
+COMMITTED candidate whose physical root is ACTIVE, establishes current-root-owned target protection, revalidates
+`GENERATION_PUBLISH` activation/root/trim/physical identity/protection, and calls the exact committed-index
+put-if-absent restore contract. Raw NRC1 record SHA and durable Oxia envelope SHA remain separate. Root change restarts
+the complete proof and trim performs no write. The resolver then fresh-scans authority rather than trusting the
+repair result as a read answer. Runtime composition、retirement and GC remain target code；checkpoint F authorizes no
+deletion.
+
 Full M4–M6 target construction：
 
 ```java
@@ -816,6 +826,10 @@ result identity only, while its current committed publication-table target is us
   it never regenerates a deleted generation-zero target；
 - in live tail：uses the existing commit record path；
 - a root change during either path restarts the proof。
+
+The implemented terminal result is evidence-labelled as `TRIMMED`、`LIVE_COMMIT` or `RECOVERY_CHECKPOINT`.
+Checkpoint success carries the exact restored `VersionedGenerationIndex` for audit/testing only；ordinary read
+selection must discard that shortcut and run a fresh generation scan plus durable reader-pin handshake.
 
 ### 8.6 Merge and retirement
 

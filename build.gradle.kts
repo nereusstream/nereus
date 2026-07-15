@@ -699,3 +699,23 @@ tasks.register("phase4M4CheckpointReplayCheck") {
     dependsOn(":nereus-metadata-oxia:check")
     dependsOn(":nereus-object-store:check")
 }
+
+tasks.register<Exec>("checkPhase4M4CheckpointIndexRepairContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 checkpoint-derived generation-index repair checkpoint."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-checkpoint-index-repair-contract-surface.sh")
+}
+
+tasks.register("phase4M4CheckpointIndexRepairCheck") {
+    group = "verification"
+    description = "Verify root-stable protected committed-index restoration from NRC1 checkpoint evidence."
+    dependsOn("phase4M4CheckpointReplayCheck")
+    dependsOn("checkPhase4M4CheckpointIndexRepairContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+}

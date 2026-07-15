@@ -123,6 +123,53 @@ class GenerationMetadataStoreContractTest {
     }
 
     @Test
+    void restoresOnlyTheExactCanonicalCommittedCheckpointIndex() {
+        GenerationMetadataStore store = store();
+        GenerationIndexRecord committed =
+                F4MetadataTestValues.generation(GenerationLifecycle.COMMITTED);
+        GenerationIndexIdentity identity = new GenerationIndexIdentity(
+                STREAM_ID,
+                ReadView.COMMITTED,
+                committed.offsetEnd(),
+                committed.generation());
+        Checksum rawDigest = GenerationIndexDigests.canonicalRecordSha256(committed);
+        Checksum durableDigest = GenerationIndexDigests.durableValueSha256(committed);
+
+        assertThat(rawDigest).isNotEqualTo(durableDigest);
+        VersionedGenerationIndex restored = store.restoreCommittedFromCheckpoint(
+                CLUSTER, committed, rawDigest).join();
+        assertThat(restored.value())
+                .isEqualTo(committed.withMetadataVersion(restored.metadataVersion()));
+        assertThat(restored.durableValueSha256()).isEqualTo(durableDigest);
+        assertThat(store.restoreCommittedFromCheckpoint(CLUSTER, committed, rawDigest).join())
+                .isEqualTo(restored);
+
+        assertThatThrownBy(() -> store.restoreCommittedFromCheckpoint(
+                        CLUSTER,
+                        generationWithTask(committed, "other-task"),
+                        GenerationIndexDigests.canonicalRecordSha256(
+                                generationWithTask(committed, "other-task")))
+                .join())
+                .satisfies(error -> assertThat(unwrap(error))
+                        .isInstanceOfSatisfying(
+                                com.nereusstream.api.NereusException.class,
+                                nereus -> assertThat(nereus.code()).isEqualTo(
+                                        com.nereusstream.api.ErrorCode
+                                                .METADATA_INVARIANT_VIOLATION)));
+        assertThatThrownBy(() -> store.restoreCommittedFromCheckpoint(
+                        CLUSTER,
+                        committed,
+                        new Checksum(ChecksumType.SHA256, HASH_B)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        store.deleteIndex(CLUSTER, identity, restored.metadataVersion()).join();
+        VersionedGenerationIndex recreated = store.restoreCommittedFromCheckpoint(
+                CLUSTER, committed, rawDigest).join();
+        assertThat(recreated.metadataVersion()).isGreaterThan(restored.metadataVersion());
+        assertThat(recreated.durableValueSha256()).isEqualTo(durableDigest);
+    }
+
+    @Test
     void taskCheckpointRetentionAndRecoveryRootsUseExactCreateCasScanDeleteContracts() {
         GenerationMetadataStore store = store();
 

@@ -181,6 +181,47 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
     }
 
     @Override
+    public CompletableFuture<VersionedGenerationIndex> restoreCommittedFromCheckpoint(
+            String cluster,
+            GenerationIndexRecord record,
+            Checksum canonicalRecordSha256) {
+        GenerationIndexRecord value = Objects.requireNonNull(record, "record");
+        Checksum expectedRawDigest = Objects.requireNonNull(
+                canonicalRecordSha256, "canonicalRecordSha256");
+        if (value.lifecycle() != GenerationLifecycle.COMMITTED
+                || value.metadataVersion() != 0
+                || ReadView.fromWireId(value.readViewId()) != ReadView.COMMITTED) {
+            throw new IllegalArgumentException(
+                    "checkpoint restore requires an unhydrated COMMITTED-view index");
+        }
+        if (!GenerationIndexDigests.canonicalRecordSha256(value)
+                .equals(expectedRawDigest)) {
+            throw new IllegalArgumentException(
+                    "checkpoint generation-index raw digest does not match canonical bytes");
+        }
+        F4Keyspace keys = new F4Keyspace(cluster);
+        StreamId stream = new StreamId(value.streamId());
+        ReadView view = ReadView.COMMITTED;
+        String key = keys.generationIndexKey(
+                stream, view, value.offsetEnd(), value.generation());
+        GenerationIndexIdentity identity = new GenerationIndexIdentity(
+                stream, view, value.offsetEnd(), value.generation());
+        Checksum expectedDurableDigest = GenerationIndexDigests.durableValueSha256(value);
+        CompletableFuture<VersionedGenerationIndex> create = support.create(
+                        key,
+                        keys.streamPartitionKey(stream),
+                        value,
+                        GenerationIndexRecord.class)
+                .thenApply(item -> index(keys, item));
+        return recoverCreate(create, () -> getIndex(cluster, identity)
+                        .thenApply(existing -> existing.orElseThrow(() ->
+                                F4MetadataStoreSupport.invariant(
+                                        "restored generation index disappeared after create conflict"))))
+                .thenApply(actual -> requireExactRestoredIndex(
+                        value, expectedDurableDigest, actual));
+    }
+
+    @Override
     public CompletableFuture<VersionedGenerationIndex> compareAndSetIndex(
             String cluster, GenerationIndexRecord replacement, long expectedVersion) {
         GenerationIndexRecord value = Objects.requireNonNull(replacement, "replacement");
@@ -879,6 +920,19 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
             throw F4MetadataStoreSupport.invariant("generation index key/value identity mismatch");
         }
         return new VersionedGenerationIndex(item.key(), value, item.version(), item.durableSha256());
+    }
+
+    private static VersionedGenerationIndex requireExactRestoredIndex(
+            GenerationIndexRecord expected,
+            Checksum expectedDurableDigest,
+            VersionedGenerationIndex actual) {
+        if (!expected.withMetadataVersion(actual.metadataVersion())
+                        .equals(actual.value())
+                || !actual.durableValueSha256().equals(expectedDurableDigest)) {
+            throw F4MetadataStoreSupport.invariant(
+                    "checkpoint restore collided with a different generation index");
+        }
+        return actual;
     }
 
     private static VersionedMaterializationTask task(

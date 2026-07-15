@@ -8,7 +8,6 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
-import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -16,6 +15,7 @@ import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.core.recovery.RecoveryCheckpointProtectionIdentities;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.F4ScanToken;
@@ -61,7 +61,8 @@ public final class RecoveryCheckpointProtectionManager {
             long expiresAtMillis) {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(checkpointObject, "checkpointObject");
-        ObjectProtectionOwner owner = rootOwner(plan.baseRoot());
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
+                plan.baseRoot());
         ObjectProtectionRequest request = new ObjectProtectionRequest(
                 checkpointObject,
                 ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING,
@@ -78,7 +79,8 @@ public final class RecoveryCheckpointProtectionManager {
             ObjectProtection pending) {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(pending, "pending");
-        ObjectProtectionOwner owner = rootOwner(plan.baseRoot());
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
+                plan.baseRoot());
         return protections.revalidate(
                 pending,
                 actual -> requireExactRoot(plan.baseRoot(), owner, actual));
@@ -91,11 +93,13 @@ public final class RecoveryCheckpointProtectionManager {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(publishedRoot, "publishedRoot");
         Objects.requireNonNull(checkpointObject, "checkpointObject");
-        ObjectProtectionOwner owner = rootOwner(publishedRoot);
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
+                publishedRoot);
         ObjectProtectionRequest checkpointRequest = new ObjectProtectionRequest(
                 checkpointObject,
                 ObjectProtectionType.RECOVERY_CHECKPOINT_OBJECT,
-                checkpointObjectReferenceId(publishedRoot, checkpointObject),
+                RecoveryCheckpointProtectionIdentities.checkpointObjectReferenceId(
+                        publishedRoot, checkpointObject),
                 owner,
                 0);
         return protections.acquireOrTransfer(
@@ -116,11 +120,13 @@ public final class RecoveryCheckpointProtectionManager {
             PhysicalObjectIdentity checkpointObject) {
         Objects.requireNonNull(publishedRoot, "publishedRoot");
         Objects.requireNonNull(checkpointObject, "checkpointObject");
-        ObjectProtectionOwner owner = rootOwner(publishedRoot);
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
+                publishedRoot);
         ObjectProtectionRequest request = new ObjectProtectionRequest(
                 checkpointObject,
                 ObjectProtectionType.RECOVERY_CHECKPOINT_OBJECT,
-                checkpointObjectReferenceId(publishedRoot, checkpointObject),
+                RecoveryCheckpointProtectionIdentities.checkpointObjectReferenceId(
+                        publishedRoot, checkpointObject),
                 owner,
                 0);
         return protections.acquireOrTransfer(
@@ -133,12 +139,14 @@ public final class RecoveryCheckpointProtectionManager {
             VersionedGenerationIndex target) {
         Objects.requireNonNull(publishedRoot, "publishedRoot");
         Objects.requireNonNull(target, "target");
-        ObjectProtectionOwner owner = rootOwner(publishedRoot);
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
+                publishedRoot);
         return loadExactTargetIdentity(target).thenCompose(identity -> {
             ObjectProtectionRequest request = new ObjectProtectionRequest(
                     identity,
                     ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET,
-                    checkpointTargetReferenceId(publishedRoot, target, identity),
+                    RecoveryCheckpointProtectionIdentities.checkpointTargetReferenceId(
+                            publishedRoot, target, identity),
                     owner,
                     0);
             return revalidateIndex(target)
@@ -155,7 +163,8 @@ public final class RecoveryCheckpointProtectionManager {
             ObjectProtection protection) {
         Objects.requireNonNull(publishedRoot, "publishedRoot");
         Objects.requireNonNull(protection, "protection");
-        ObjectProtectionOwner owner = rootOwner(publishedRoot);
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
+                publishedRoot);
         return protections.revalidate(
                 protection,
                 actual -> requireExactRoot(publishedRoot, owner, actual));
@@ -199,7 +208,8 @@ public final class RecoveryCheckpointProtectionManager {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(publishedRoot, "publishedRoot");
         Objects.requireNonNull(permanent, "permanent");
-        ObjectProtectionOwner owner = rootOwner(publishedRoot);
+        ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
+                publishedRoot);
         return revalidatePermanent(plan, publishedRoot, owner, permanent)
                 .thenCompose(ignored -> protections.release(
                         pending,
@@ -221,8 +231,11 @@ public final class RecoveryCheckpointProtectionManager {
                     ObjectProtectionRequest request = new ObjectProtectionRequest(
                             identity,
                             ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET,
-                            checkpointTargetReferenceId(
-                                    publishedRoot, target.index(), identity),
+                            RecoveryCheckpointProtectionIdentities
+                                    .checkpointTargetReferenceId(
+                                            publishedRoot,
+                                            target.index(),
+                                            identity),
                             owner,
                             0);
                     return revalidateIndex(target.index())
@@ -402,12 +415,6 @@ public final class RecoveryCheckpointProtectionManager {
                 });
     }
 
-    private static ObjectProtectionOwner rootOwner(
-            VersionedRecoveryCheckpointRoot root) {
-        return new ObjectProtectionOwner(
-                root.key(), root.metadataVersion(), root.durableValueSha256());
-    }
-
     private static String pendingReferenceId(
             RecoveryCheckpointPlan plan,
             PhysicalObjectIdentity object) {
@@ -427,27 +434,9 @@ public final class RecoveryCheckpointProtectionManager {
                 + '\0' + object.objectKeyHash().value());
     }
 
-    private static String checkpointObjectReferenceId(
-            VersionedRecoveryCheckpointRoot root,
-            PhysicalObjectIdentity object) {
-        return "rco1-" + stable(root.value().streamId()
-                + '\0' + root.value().checkpointSequence()
-                + '\0' + object.objectKeyHash().value());
-    }
-
-    private static String checkpointTargetReferenceId(
-            VersionedRecoveryCheckpointRoot root,
-            VersionedGenerationIndex target,
-            PhysicalObjectIdentity object) {
-        return "rct1-" + stable(root.value().streamId()
-                + '\0' + root.value().checkpointSequence()
-                + '\0' + target.key()
-                + '\0' + target.durableValueSha256().value()
-                + '\0' + object.objectKeyHash().value());
-    }
-
     private static String stable(String value) {
-        return DeterministicIds.stableHashComponent(value);
+        return com.nereusstream.api.keys.DeterministicIds
+                .stableHashComponent(value);
     }
 
     private static <T> CompletableFuture<T> invoke(

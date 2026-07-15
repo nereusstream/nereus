@@ -183,6 +183,39 @@ class GenerationReadResolverTest {
         assertThat(pages).hasValue(9);
     }
 
+    @Test
+    void checkpointRepairerRestoresAuthorityBeforeResolverRescans() {
+        GenerationStoreState store = new GenerationStoreState(List.of());
+        VersionedGenerationIndex restored = higher(
+                3,
+                GenerationLifecycle.COMMITTED,
+                "NEREUS_COMPACTED_PARQUET_V1",
+                ReadView.COMMITTED);
+        AtomicInteger repairs = new AtomicInteger();
+        GenerationIndexRepairer repairer = (streamId, targetOffset, timeout) -> {
+            repairs.incrementAndGet();
+            store.values.add(restored);
+            store.rebuildExact();
+            return CompletableFuture.completedFuture(
+                    GenerationIndexRepairResult.checkpoint(
+                            streamId, targetOffset, 0, restored));
+        };
+        GenerationReadResolver resolver = resolver(
+                store.proxy(),
+                new TestPinManager(),
+                readers(true),
+                repairer);
+
+        PinnedResolvedRange selected = resolver.resolve(
+                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join().orElseThrow();
+
+        assertThat(repairs).hasValue(1);
+        assertThat(store.scanCalls).hasValue(2);
+        assertThat(selected.resolvedRange().generation()).isEqualTo(3);
+        selected.release().join();
+    }
+
     private static GenerationReadResolver resolver(
             GenerationStoreState store,
             TestPinManager pins,
@@ -203,6 +236,24 @@ class GenerationReadResolverTest {
                 GenerationReadResolverTest::identity,
                 pins,
                 1_000,
+                CLOCK,
+                Runnable::run);
+    }
+
+    private static GenerationReadResolver resolver(
+            GenerationMetadataStore store,
+            TestPinManager pins,
+            ReadTargetReaderRegistry readers,
+            GenerationIndexRepairer repairer) {
+        return new GenerationReadResolver(
+                CLUSTER,
+                l0Store(),
+                store,
+                GenerationIndexValidator.phase15Targets(),
+                readers,
+                GenerationReadResolverTest::identity,
+                pins,
+                repairer,
                 CLOCK,
                 Runnable::run);
     }

@@ -14,7 +14,6 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectReadLease;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
-import com.nereusstream.metadata.oxia.DerivedIndexRepairResult;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationIndexValidator;
@@ -58,7 +57,7 @@ public final class GenerationReadResolver {
     private final ReadTargetReaderRegistry readers;
     private final PhysicalObjectIdentityResolver identityResolver;
     private final ObjectReadPinManager pinManager;
-    private final int maxRepairCommits;
+    private final GenerationIndexRepairer repairer;
     private final Clock clock;
     private final Executor callbackExecutor;
 
@@ -73,6 +72,31 @@ public final class GenerationReadResolver {
             int maxRepairCommits,
             Clock clock,
             Executor callbackExecutor) {
+        this(
+                cluster,
+                l0Store,
+                generationStore,
+                indexValidator,
+                readers,
+                identityResolver,
+                pinManager,
+                new MetadataGenerationIndexRepairer(
+                        cluster, l0Store, maxRepairCommits),
+                clock,
+                callbackExecutor);
+    }
+
+    public GenerationReadResolver(
+            String cluster,
+            OxiaMetadataStore l0Store,
+            GenerationMetadataStore generationStore,
+            GenerationIndexValidator indexValidator,
+            ReadTargetReaderRegistry readers,
+            PhysicalObjectIdentityResolver identityResolver,
+            ObjectReadPinManager pinManager,
+            GenerationIndexRepairer repairer,
+            Clock clock,
+            Executor callbackExecutor) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Store = Objects.requireNonNull(l0Store, "l0Store");
         this.generationStore = Objects.requireNonNull(generationStore, "generationStore");
@@ -80,10 +104,7 @@ public final class GenerationReadResolver {
         this.readers = Objects.requireNonNull(readers, "readers");
         this.identityResolver = Objects.requireNonNull(identityResolver, "identityResolver");
         this.pinManager = Objects.requireNonNull(pinManager, "pinManager");
-        if (maxRepairCommits <= 0) {
-            throw new IllegalArgumentException("maxRepairCommits must be positive");
-        }
-        this.maxRepairCommits = maxRepairCommits;
+        this.repairer = Objects.requireNonNull(repairer, "repairer");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
     }
@@ -165,8 +186,30 @@ public final class GenerationReadResolver {
                                     "all same-view generation candidates failed during this read"));
                         }
                         if (allowRepair && view == ReadView.COMMITTED) {
-                            return repair(streamId, offset, deadline).thenCompose(ignored -> resolve(
-                                    streamId, offset, view, deadline, false, exclusions));
+                            return deadline.bound(
+                                            () -> repairer.repair(
+                                                    streamId,
+                                                    offset,
+                                                    deadline.remaining()),
+                                            "repair committed generation index")
+                                    .thenCompose(result -> {
+                                        requireRepairResult(streamId, offset, result);
+                                        if (result.source()
+                                                == GenerationIndexRepairSource.TRIMMED) {
+                                            return CompletableFuture.failedFuture(
+                                                    new NereusException(
+                                                            ErrorCode.OFFSET_TRIMMED,
+                                                            false,
+                                                            "requested offset was trimmed during index repair"));
+                                        }
+                                        return resolve(
+                                                streamId,
+                                                offset,
+                                                view,
+                                                deadline,
+                                                false,
+                                                exclusions);
+                                    });
                         }
                         return CompletableFuture.failedFuture(new NereusException(
                                 ErrorCode.READ_RESOLUTION_FAILED,
@@ -459,61 +502,15 @@ public final class GenerationReadResolver {
         return false;
     }
 
-    private CompletableFuture<Void> repair(
+    private static void requireRepairResult(
             StreamId streamId,
             long offset,
-            ReadOperationDeadline deadline) {
-        return repair(streamId, offset, Optional.empty(), 0, deadline);
-    }
-
-    private CompletableFuture<Void> repair(
-            StreamId streamId,
-            long offset,
-            Optional<com.nereusstream.metadata.oxia.DerivedIndexRepairCursor> continuation,
-            int scanned,
-            ReadOperationDeadline deadline) {
-        int remaining = maxRepairCommits - scanned;
-        if (remaining <= 0) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.READ_RESOLUTION_FAILED,
-                    true,
-                    "generation-zero index repair exhausted its budget"));
+            GenerationIndexRepairResult result) {
+        if (!result.streamId().equals(streamId)
+                || result.targetOffset() != offset) {
+            throw invariant(
+                    "generation index repair returned another target", null);
         }
-        int pageSize = Math.min(remaining, 512);
-        return deadline.bound(
-                        () -> l0Store.repairDerivedStreamIndexes(
-                                cluster, streamId, offset, continuation, pageSize),
-                        "repair generation-zero index")
-                .thenCompose(result -> continueRepair(streamId, offset, result, scanned, deadline));
-    }
-
-    private CompletableFuture<Void> continueRepair(
-            StreamId streamId,
-            long offset,
-            DerivedIndexRepairResult result,
-            int scanned,
-            ReadOperationDeadline deadline) {
-        if (!result.streamId().equals(streamId)) {
-            return CompletableFuture.failedFuture(invariant(
-                    "generation-zero repair returned another stream", null));
-        }
-        if (result.targetCovered()) {
-            return CompletableFuture.completedFuture(null);
-        }
-        if (!result.repairBudgetExhausted()
-                || result.continuation().isEmpty()
-                || result.scannedRecords() <= 0) {
-            return CompletableFuture.failedFuture(invariant(
-                    "generation-zero repair made no resumable progress", null));
-        }
-        int total;
-        try {
-            total = Math.addExact(scanned, result.scannedRecords());
-        } catch (ArithmeticException overflow) {
-            return CompletableFuture.failedFuture(invariant(
-                    "generation-zero repair accounting overflowed", overflow));
-        }
-        return repair(streamId, offset, result.continuation(), total, deadline);
     }
 
     private static GenerationReadCandidate toCandidate(
