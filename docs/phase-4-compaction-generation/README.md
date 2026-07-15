@@ -495,8 +495,10 @@ Checkpoint H 已实现 `PhysicalGcConfig`、`GcCandidate`、`GcPlan` 与 secure 
 
 Candidate 只能从 exact `ACTIVE` root wrapper 建立，并冻结 root version/epoch、query/evidence 与 root 的最早
 eligibility。Plan 只接受 canonical sorted/unique、配置有界、同 query 的 complete/non-veto domain snapshots，
-且 protection 必须属于 candidate object。`referenceSetSha256` 直接提交每个 domain 的完整 authority/reference
-事实以及每个 planned protection/metadata key；它不包含随机 candidate id 或进程时间。MARK 前可计算同一
+且 protection 必须属于 candidate object/root epoch。每个 protection removal 冻结完整 owner/value、Oxia
+version 和 durable-envelope SHA；其他 metadata removal 冻结 type/key/version/envelope SHA。
+`referenceSetSha256` 直接提交这些 exact removal facts 和每个 domain 的完整 authority/reference 事实；它不包含
+随机 candidate id 或进程时间。MARK 前可计算同一
 digest，MARK 后 `fromMarkedRoot` 只接受 exact attempt/digest/object、递增 metadata version 和 `epoch + 1`，所以
 进程重启只能从 authoritative facts 重建，而不能反序列化第二份 correctness state。
 

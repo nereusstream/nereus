@@ -7,7 +7,7 @@ import com.nereusstream.core.physical.GcAuthorityToken;
 import com.nereusstream.core.physical.GcReference;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
-import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -22,10 +22,10 @@ final class GcPlanValidation {
     static final Comparator<GcReferenceSnapshot> DOMAIN_ORDER = Comparator
             .comparing(GcReferenceSnapshot::domainId)
             .thenComparingInt(GcReferenceSnapshot::protocolVersion);
-    static final Comparator<ObjectProtectionIdentity> PROTECTION_ORDER = Comparator
-            .comparing((ObjectProtectionIdentity value) -> value.object().value())
-            .thenComparingInt(value -> value.type().wireId())
-            .thenComparing(ObjectProtectionIdentity::referenceId);
+    static final Comparator<GcPlannedProtectionRemoval> PROTECTION_ORDER = Comparator
+            .comparing(value -> value.protection().key());
+    static final Comparator<GcPlannedMetadataRemoval> METADATA_ORDER = Comparator
+            .comparing(GcPlannedMetadataRemoval::key);
 
     private GcPlanValidation() {
     }
@@ -79,20 +79,11 @@ final class GcPlanValidation {
         return exact;
     }
 
-    static List<String> canonicalMetadataKeys(List<String> values, int maximum) {
-        List<String> exact = canonicalAllowEmpty(values, Comparator.naturalOrder(), maximum, "plannedMetadataKeys");
-        if (exact.stream().anyMatch(value -> value.isBlank()
-                || value.getBytes(StandardCharsets.UTF_8).length > 4_096)) {
-            throw new IllegalArgumentException("plannedMetadataKeys contains a blank or oversized key");
-        }
-        return exact;
-    }
-
     static Checksum referenceSetSha256(
             GcReferenceQuery query,
             List<GcReferenceSnapshot> domainSnapshots,
-            List<ObjectProtectionIdentity> protections,
-            List<String> metadataKeys) {
+            List<GcPlannedProtectionRemoval> protections,
+            List<GcPlannedMetadataRemoval> metadataRemovals) {
         DigestWriter writer = new DigestWriter("nereus-gc-reference-set-v1");
         writer.checksum(query.queryIdentitySha256());
         writer.int32(domainSnapshots.size());
@@ -121,13 +112,28 @@ final class GcPlanValidation {
             writer.checksum(snapshot.snapshotSha256());
         }
         writer.int32(protections.size());
-        for (ObjectProtectionIdentity protection : protections) {
-            writer.text(protection.object().value());
-            writer.int32(protection.type().wireId());
+        for (GcPlannedProtectionRemoval removal : protections) {
+            ObjectProtectionRecord protection = removal.protection().value();
+            writer.text(removal.protection().key());
+            writer.int64(removal.protection().metadataVersion());
+            writer.checksum(removal.protection().durableValueSha256());
+            writer.text(protection.objectKeyHash());
+            writer.int32(protection.protectionTypeId());
             writer.text(protection.referenceId());
+            writer.text(protection.ownerKey());
+            writer.int64(protection.ownerMetadataVersion());
+            writer.text(protection.ownerIdentitySha256());
+            writer.int64(protection.rootLifecycleEpoch());
+            writer.int64(protection.createdAtMillis());
+            writer.int64(protection.expiresAtMillis());
         }
-        writer.int32(metadataKeys.size());
-        metadataKeys.forEach(writer::text);
+        writer.int32(metadataRemovals.size());
+        for (GcPlannedMetadataRemoval removal : metadataRemovals) {
+            writer.text(removal.removalType());
+            writer.text(removal.key());
+            writer.int64(removal.metadataVersion());
+            writer.checksum(removal.durableValueSha256());
+        }
         return writer.finish();
     }
 

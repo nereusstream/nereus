@@ -193,7 +193,8 @@ Checkpoint H adds no Oxia mutation. Materialization's `GcCandidate.fromActiveRoo
 returned by this module and freezes its ACTIVE metadata version/lifecycle epoch. `GcPlan.fromMarkedRoot` later accepts
 only a successful MARK wrapper carrying the exact candidate object、attempt id、canonical reference-set SHA、newer
 metadata version and unit-incremented lifecycle epoch. The plan remains process-local；after response loss or restart,
-the coordinator must reload authoritative roots/domains/protections/source keys and recompute the same digest. No
+the coordinator must reload authoritative roots/domains and exact protection/source-key values including their Oxia
+versions and stored-envelope digests, then recompute the same digest. No
 codec/keyspace/store for `GcPlan` exists intentionally, because persisting it would create a second correctness owner.
 
 ## 2. Keyspace

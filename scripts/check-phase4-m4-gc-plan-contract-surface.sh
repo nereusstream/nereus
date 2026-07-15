@@ -25,6 +25,8 @@ production_artifacts=(
     PhysicalGcConfig.java
     GcCandidate.java
     GcPlan.java
+    GcPlannedProtectionRemoval.java
+    GcPlannedMetadataRemoval.java
     GcIdGenerator.java
     SecureGcIdGenerator.java
 )
@@ -54,7 +56,9 @@ require_literal "fromMarkedRoot" "$plan"
 require_literal "!snapshot.complete()" "$plan"
 require_literal "snapshot.veto()" "$plan"
 require_literal "markedRoot.value().gcAttemptId().equals(gcAttemptId)" "$plan"
-require_literal "referenceSetDigestUsesAuthoritativeFactsNotEphemeralCandidateIdentity" \
+require_literal "referenceSetDigestUsesExactFactsNotEphemeralCandidateIdentity" \
+    "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"
+require_literal "protectionOwnerVersionAndEnvelopeArePartOfTheMarkDigest" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"
 require_literal "protectionForAnotherObjectCannotEnterMarkDigest" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"

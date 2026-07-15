@@ -658,25 +658,38 @@ public record GcPlan(
         String gcAttemptId,
         GcCandidate candidate,
         List<GcReferenceSnapshot> domainSnapshots,
-        List<ObjectProtectionIdentity> plannedProtectionRemovals,
-        List<String> plannedMetadataKeys,
+        List<GcPlannedProtectionRemoval> plannedProtectionRemovals,
+        List<GcPlannedMetadataRemoval> plannedMetadataRemovals,
         Checksum referenceSetSha256,
         long markedRootMetadataVersion,
         long markedRootLifecycleEpoch,
         long deleteNotBeforeMillis) { }
+
+public record GcPlannedProtectionRemoval(
+        VersionedObjectProtection protection) { }
+
+public record GcPlannedMetadataRemoval(
+        String removalType,
+        String key,
+        long metadataVersion,
+        Checksum durableValueSha256) { }
 ```
 
 Candidate/attempt ids are random 128-bit lowercase base32 and never authorize deletion. Candidate construction
 requires the exact ACTIVE root version/epoch and hashes the root、manifest/inventory evidence and affected stream
-set. Plan lists are canonical sorted/unique and bounded by `PhysicalGcConfig`; `referenceSetSha256` hashes the full
-domain authority/reference sets plus every planned key/protection, not merely the retained Java lists. The marked
+set. Plan lists are canonical sorted/unique and bounded by `PhysicalGcConfig`; every planned protection retains its
+exact key、full owner/value、root epoch、Oxia version and durable-envelope SHA, while every other metadata removal
+retains a canonical type/key/version/envelope SHA. `referenceSetSha256` hashes those full facts plus every complete
+domain authority/reference set, not merely removal identities. A same-key protection owner/version change therefore
+changes the digest and invalidates drain. The marked
 root version/epoch are filled only from the successful `ACTIVE -> MARKED` CAS. A plan is process-local and is always
 reconstructed from the root digest after restart；serializing it would create a second correctness owner.
 
 Checkpoint H implements these three values and `SecureGcIdGenerator`. `GcPlan.computeReferenceSetSha256` is the
 pre-MARK digest operation；`GcPlan.fromMarkedRoot` accepts only the exact MARK response/reload carrying that digest and
 attempt id, an Oxia version newer than the candidate and lifecycle `epoch + 1`. Construction rejects incomplete or
-vetoing snapshots、query mismatch、configured count overflow、non-canonical lists and protections for another object.
+vetoing snapshots、query mismatch、configured count overflow、non-canonical lists、duplicate protection identities、
+protections for another object/root epoch and any exact removal-fact drift.
 This is a value/proof boundary only：no reference domain or lifecycle coordinator calls it yet, and config defaults
 keep both enablement off and dry-run on.
 

@@ -4,7 +4,6 @@ package com.nereusstream.materialization.gc;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
-import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import java.util.List;
@@ -15,8 +14,8 @@ public record GcPlan(
         String gcAttemptId,
         GcCandidate candidate,
         List<GcReferenceSnapshot> domainSnapshots,
-        List<ObjectProtectionIdentity> plannedProtectionRemovals,
-        List<String> plannedMetadataKeys,
+        List<GcPlannedProtectionRemoval> plannedProtectionRemovals,
+        List<GcPlannedMetadataRemoval> plannedMetadataRemovals,
         Checksum referenceSetSha256,
         long markedRootMetadataVersion,
         long markedRootLifecycleEpoch,
@@ -34,8 +33,11 @@ public record GcPlan(
                 GcPlanValidation.PROTECTION_ORDER,
                 PhysicalGcConfig.MAX_DOMAIN_VALUES,
                 "plannedProtectionRemovals");
-        plannedMetadataKeys = GcPlanValidation.canonicalMetadataKeys(
-                plannedMetadataKeys, PhysicalGcConfig.MAX_DOMAIN_VALUES);
+        plannedMetadataRemovals = GcPlanValidation.canonicalAllowEmpty(
+                plannedMetadataRemovals,
+                GcPlanValidation.METADATA_ORDER,
+                PhysicalGcConfig.MAX_DOMAIN_VALUES,
+                "plannedMetadataRemovals");
         referenceSetSha256 = GcReferenceQuery.requireSha256(
                 referenceSetSha256, "referenceSetSha256");
         validateSnapshots(candidate, domainSnapshots);
@@ -44,7 +46,7 @@ public record GcPlan(
                 candidate.referenceQuery(),
                 domainSnapshots,
                 plannedProtectionRemovals,
-                plannedMetadataKeys);
+                plannedMetadataRemovals);
         if (!expected.equals(referenceSetSha256)) {
             throw new IllegalArgumentException("referenceSetSha256 does not match canonical plan facts");
         }
@@ -59,21 +61,26 @@ public record GcPlan(
 
     public static Checksum computeReferenceSetSha256(
             PhysicalGcConfig config,
-            GcReferenceQuery query,
+            GcCandidate candidate,
             List<GcReferenceSnapshot> domainSnapshots,
-            List<ObjectProtectionIdentity> plannedProtectionRemovals,
-            List<String> plannedMetadataKeys) {
+            List<GcPlannedProtectionRemoval> plannedProtectionRemovals,
+            List<GcPlannedMetadataRemoval> plannedMetadataRemovals) {
         Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(candidate, "candidate");
+        GcReferenceQuery query = candidate.referenceQuery();
         List<GcReferenceSnapshot> snapshots = validateForConfig(config, query, domainSnapshots);
-        List<ObjectProtectionIdentity> protections = GcPlanValidation.canonicalAllowEmpty(
+        List<GcPlannedProtectionRemoval> protections = GcPlanValidation.canonicalAllowEmpty(
                 plannedProtectionRemovals,
                 GcPlanValidation.PROTECTION_ORDER,
                 config.maxReferencesPerDomainSnapshot(),
                 "plannedProtectionRemovals");
-        validateProtectionObjects(query, protections);
-        List<String> keys = GcPlanValidation.canonicalMetadataKeys(
-                plannedMetadataKeys, config.maxReferencesPerDomainSnapshot());
-        return GcPlanValidation.referenceSetSha256(query, snapshots, protections, keys);
+        validateProtectionObjects(candidate, protections);
+        List<GcPlannedMetadataRemoval> removals = GcPlanValidation.canonicalAllowEmpty(
+                plannedMetadataRemovals,
+                GcPlanValidation.METADATA_ORDER,
+                config.maxReferencesPerDomainSnapshot(),
+                "plannedMetadataRemovals");
+        return GcPlanValidation.referenceSetSha256(query, snapshots, protections, removals);
     }
 
     public static GcPlan fromMarkedRoot(
@@ -81,23 +88,27 @@ public record GcPlan(
             String gcAttemptId,
             GcCandidate candidate,
             List<GcReferenceSnapshot> domainSnapshots,
-            List<ObjectProtectionIdentity> plannedProtectionRemovals,
-            List<String> plannedMetadataKeys,
+            List<GcPlannedProtectionRemoval> plannedProtectionRemovals,
+            List<GcPlannedMetadataRemoval> plannedMetadataRemovals,
             VersionedPhysicalObjectRoot markedRoot) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(candidate, "candidate");
         Objects.requireNonNull(markedRoot, "markedRoot");
         List<GcReferenceSnapshot> snapshots = validateForConfig(
                 config, candidate.referenceQuery(), domainSnapshots);
-        List<ObjectProtectionIdentity> protections = GcPlanValidation.canonicalAllowEmpty(
+        List<GcPlannedProtectionRemoval> protections = GcPlanValidation.canonicalAllowEmpty(
                 plannedProtectionRemovals,
                 GcPlanValidation.PROTECTION_ORDER,
                 config.maxReferencesPerDomainSnapshot(),
                 "plannedProtectionRemovals");
-        List<String> keys = GcPlanValidation.canonicalMetadataKeys(
-                plannedMetadataKeys, config.maxReferencesPerDomainSnapshot());
+        List<GcPlannedMetadataRemoval> removals = GcPlanValidation.canonicalAllowEmpty(
+                plannedMetadataRemovals,
+                GcPlanValidation.METADATA_ORDER,
+                config.maxReferencesPerDomainSnapshot(),
+                "plannedMetadataRemovals");
+        validateProtectionObjects(candidate, protections);
         Checksum digest = GcPlanValidation.referenceSetSha256(
-                candidate.referenceQuery(), snapshots, protections, keys);
+                candidate.referenceQuery(), snapshots, protections, removals);
         if (markedRoot.value().lifecycle() != PhysicalObjectLifecycle.MARKED
                 || !PhysicalObjectIdentityMatches.exact(candidate, markedRoot)
                 || !markedRoot.value().gcAttemptId().equals(gcAttemptId)
@@ -109,7 +120,7 @@ public record GcPlan(
                 candidate,
                 snapshots,
                 protections,
-                keys,
+                removals,
                 digest,
                 markedRoot.metadataVersion(),
                 markedRoot.value().lifecycleEpoch(),
@@ -153,14 +164,19 @@ public record GcPlan(
     }
 
     private static void validateProtectionObjects(
-            GcCandidate candidate, List<ObjectProtectionIdentity> protections) {
-        validateProtectionObjects(candidate.referenceQuery(), protections);
-    }
-
-    private static void validateProtectionObjects(
-            GcReferenceQuery query, List<ObjectProtectionIdentity> protections) {
-        if (protections.stream().anyMatch(value -> !value.object().equals(query.object().objectKeyHash()))) {
-            throw new IllegalArgumentException("planned protection does not belong to the candidate object");
+            GcCandidate candidate, List<GcPlannedProtectionRemoval> protections) {
+        java.util.HashSet<com.nereusstream.metadata.oxia.ObjectProtectionIdentity> identities =
+                new java.util.HashSet<>();
+        for (GcPlannedProtectionRemoval protection : protections) {
+            if (!protection.identity().object().equals(candidate.object().objectKeyHash())
+                    || protection.protection().value().rootLifecycleEpoch()
+                            != candidate.rootLifecycleEpoch()) {
+                throw new IllegalArgumentException(
+                        "planned protection does not belong to the candidate ACTIVE root");
+            }
+            if (!identities.add(protection.identity())) {
+                throw new IllegalArgumentException("planned protection identities must be unique");
+            }
         }
     }
 
