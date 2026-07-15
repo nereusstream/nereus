@@ -164,8 +164,14 @@ ACTIVE physical root、commit-owned permanent `REACHABLE_APPEND`、protected hea
 index-owned permanent `VISIBLE_GENERATION`，并完成 production shared-Oxia runtime 接线。普通 unit tests 及
 real-Oxia/F4-M2/M3 integration source compilation 已通过；`phase4M4ProtectedAppendCheck` 已于 2026-07-15
 通过完整前置回归链与本地 Pulsar M4 check，Docker-backed M4 execution gate 尚未运行。
-recovery-root publication、retention/GC 以及
-F4-M5–M6 的 async profile 与最终兼容接线仍不可用。
+后续 M4 checkpoints C–J 已继续落地 recovery-root publication、checkpoint-aware replay/index repair、exact
+retirement metadata、可重建 GC plan、root MARK/DRAIN/DELETING fence、全 256 分片扫描，以及 affected-stream
+generation/append/materialization reference domains。Checkpoint K 又把 bounded canonical snapshot builder 下沉到
+core，增加 managed-ledger generation marker 的组合属性/CAS、按 stream 精确读取 F2 binding 与当前 topic
+authority，并实现 `projection-generation-v1` 与 `cursor-snapshot-v1` 两个 query-bound domain。两者均逐次重读
+exact Oxia version/envelope digest，ownerless 查询继续 fail closed。Future sentinel/ownerless-global proof、source
+retirement、DELETING destructive coordinator、runtime composition，以及 F4-M5–M6 的 async profile 与最终兼容
+接线仍不可用；当前 checkpoint 不会删除任何物理对象。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

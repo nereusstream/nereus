@@ -1,6 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.metadata.oxia;
 
+import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.time.Clock;
@@ -23,6 +24,10 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
             String cluster,
             String managedLedgerName);
 
+    CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(
+            String cluster,
+            StreamId streamId);
+
     CompletableFuture<TopicProjectionRecord> createFirstProjection(
             String cluster,
             ProjectionCreateRequest request,
@@ -43,6 +48,12 @@ public interface ManagedLedgerProjectionMetadataStore extends AutoCloseable {
             Map<String, String> properties);
 
     CompletableFuture<TopicProjectionRecord> activateCursorProtocol(
+            String cluster,
+            String managedLedgerName,
+            ManagedLedgerProjectionIdentity expectedIdentity,
+            long expectedMetadataVersion);
+
+    CompletableFuture<TopicProjectionRecord> activateGenerationProtocol(
             String cluster,
             String managedLedgerName,
             ManagedLedgerProjectionIdentity expectedIdentity,

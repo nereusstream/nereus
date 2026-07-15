@@ -10,8 +10,10 @@
 > replay adapter、checkpoint-derived index repair、exact source/object-audit retirement metadata adapters、
 > bounded/reconstructable GC config/candidate/plan values、exact reference-domain registry、recoverable
 > `ACTIVE -> MARKED -> DELETING` root fence、全 256 分片 root scanner、query-bound stateless revalidation，以及
-> affected-stream generation/append-recovery/materialization concrete domains 已落地；该 fence 明确停在 durable
-> `DELETING` intent。runtime composition、projection/cursor/future-sentinel 与 ownerless global domains、source/
+> affected-stream generation/append-recovery/materialization concrete domains 已落地；共享 bounded canonical
+> snapshot builder、managed-ledger generation marker/exact stream projection authority，以及 affected-stream
+> projection-generation/cursor-snapshot domains 也已落地；该 fence 明确停在 durable
+> `DELETING` intent。runtime composition、future-sentinel 与 ownerless global domains、source/
 > protection/metadata/object retirement、cursor GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
@@ -569,8 +571,43 @@ ownerIdentitySha256)` 必须被某个 `GcPlannedMetadataRemoval` 精确覆盖。
 只是 discovery hint，不能被误用为 cluster-wide absence proof；必须等待后续 physical-root/registration backfill
 epoch 和 projection/cursor/future-domain global enumeration。`phase4M4ReferenceDomainsCheck` 覆盖 query
 回传、reference/removal binding、两 view scan、DRAINING gate、live-tail/task veto、authority drift 与 ownerless
-fail-closed。projection/cursor/future-sentinel domains、source plan construction、DELETING side effects 和 runtime
-composition 仍未开放。
+fail-closed。作为 checkpoint-J gate，它不开放 projection/cursor/future-sentinel domains、source plan
+construction、DELETING side effects 或 runtime composition；checkpoint K 的新增范围如下。
+
+### 6.14 F4-M4 managed-ledger projection/cursor reference-domain checkpoint
+
+Checkpoint K 将此前 materialization package-private 的 snapshot accumulator 替换为 core-owned
+`GcReferenceDomainConfig` 与 `GcReferenceSnapshotBuilder`。所有 metadata-backed domain 现在共享相同的 page、
+authority、reference hard limits 和 canonical ordering；第 `max + 1` 个事实只把 snapshot 变为
+`complete=false/veto=true`，不会把截断前缀解释为 deletion permission。`nereus-managed-ledger` 只依赖 core 与
+metadata，不形成 managed-ledger -> materialization correctness dependency。
+
+F2 projection authority 新增 `ManagedLedgerProjectionMetadataStore.getProjectionByStream(cluster, streamId)`。
+它先精确读取 per-stream `VirtualLedgerProjectionRecord`，再按 binding 中的 managed-ledger name 精确读取当前
+`TopicProjectionRecord`；两个 wrapper 都携带 canonical key、Oxia version 与 exact stored-envelope SHA-256。
+缺 binding 或缺 current topic 都被编码为 domain-separated absence authority，并且 veto。当前 topic 与历史
+binding identity 相同时，只有 `DELETED` 或 `nereus.generation-protocol=1` 允许 compatibility proof；`DELETING`
+始终 veto。identity 不同时，只有 incarnation 与 storage-class binding generation 都严格增大，才能证明旧
+stream 已不可寻址。topic 已发布但 derived binding 尚未修复的 crash cut 因 binding absence 而 fail closed。
+
+generation marker 由新的 `ManagedLedgerProtocolProperties` 与已有 cursor marker 组合校验：external reads 隐藏
+两者，external replacement 保留两者，未知 `nereus.*`/`PULSAR.SHADOW_SOURCE` 仍被拒绝。
+`activateGenerationProtocol` 只对 exact projection identity/version 做单 key monotonic CAS；response loss 通过
+重读 exact topic authority 收敛。该 checkpoint 只提供 marker/CAS 基础，并未实现 M5 cluster activation record、
+registration barrier 或 broker runtime activation。
+
+`CursorSnapshotReferenceDomain` 对每个 affected stream 精确读取 F3 retention root 并完整分页 cursor roots。
+retention absence 是显式 authority；非 `ACTIVE` retention、retention/cursor projection identity 不一致、缺
+retention 但存在 cursor，以及匹配当前 candidate object 的 ACTIVE snapshot root 都 veto。每个 retention/root
+authority 使用 exact F3 envelope SHA-256；live root 还产生 owner-bound `cursor-snapshot-root` reference。
+`stillMatches` 全量重跑同一 query，因此 retention lifecycle、root、projection 或版本漂移都会使 drain 失败。
+
+`ProjectionGenerationReferenceDomain` 与 `CursorSnapshotReferenceDomain` 都对 ownerless query 返回
+incomplete+veto；本 checkpoint 没有把 registration hint 当作 global absence truth，也没有安装 runtime
+registry。`phase4M4ManagedLedgerDomainsCheck` 覆盖共享 builder、marker preservation/lost response、F2 exact
+authority、projection recreation/derived-repair crash cut、F3 paged roots、pending retention、authority drift、
+module boundary 与 ownerless fail-closed。Future catalog sentinel/global enumeration、source plan construction、
+DELETING side effects 和 runtime composition 仍未开放。
 
 ## 7. Milestones
 
@@ -580,7 +617,7 @@ composition 仍未开放。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint J, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner and affected-stream generation/append/materialization domains are implemented/tested；global projection/cursor/sentinel domains、runtime composition、retirement/delete and cursor GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint K, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、affected-stream generation/append/materialization/projection/cursor domains and composed generation-marker authority are implemented/tested；future sentinel/ownerless-global proof、runtime composition、retirement/delete and cursor GC completion pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

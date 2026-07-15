@@ -246,6 +246,40 @@ tuple to match an exact planned metadata-removal tuple. Stream registrations are
 all three domains return incomplete+veto for ownerless queries until a later global backfill/enumeration authority is
 available. No new metadata key or correctness owner is introduced by this checkpoint.
 
+### 1.12 F4-M4 managed-ledger authority checkpoint
+
+Checkpoint K adds no F4 record or keyspace. It exposes existing F2/F3 truth with exact stored identities so the M4
+reference registry can interpret compatibility and cursor reachability without owning either protocol.
+
+`ManagedLedgerProjectionMetadataStore.getProjectionByStream(cluster, streamId)` performs two linearizable-by-key
+reads in order：
+
+1. read the canonical per-stream `VirtualLedgerProjectionRecord` key；
+2. when present, validate `identity.streamId == streamId`, derive the authoritative topic key from its exact
+   `managedLedgerName`, and read the current `TopicProjectionRecord`；
+3. validate that the topic name equals the binding name and return `ManagedLedgerStreamProjection` containing
+   `VersionedVirtualLedgerProjection` and `VersionedTopicProjection` optionals.
+
+Each present wrapper retains the canonical key、Oxia version and SHA-256 of the exact stored metadata envelope while
+its decoded record keeps `metadataVersion == 0`. The lookup never reconstructs bytes from a mutable object for the
+authority digest. A missing binding returns both optionals empty；a present binding with no topic returns only the
+binding. A topic may never be returned without the binding that selected its name. These distinct absence shapes are
+required by `projection-generation-v1` and are not repaired or hidden by the read.
+
+The authoritative topic property validator is now `ManagedLedgerProtocolProperties`. It recognizes exactly
+`nereus.cursor-protocol=1` and `nereus.generation-protocol=1`, hides both from external reads, preserves both during
+external replacement and rejects every other `nereus.*` key plus `PULSAR.SHADOW_SOURCE`.
+`ManagedLedgerProjectionMetadataStore.activateGenerationProtocol(...)` validates the exact projection identity and
+expected topic metadata version, then applies a single-key monotonic CAS that changes only the generation marker.
+An already activated exact identity succeeds before expected-version comparison, so a lost write response converges
+by authoritative reload；a different identity or any other state drift fails closed. Topic recreation and external
+property replacement preserve the composed marker rules.
+
+`CursorMetadataDigests` supplies exact F3 envelope SHA-256 for `CursorRetentionRecord` and `CursorStateRecord` so the
+cursor domain binds drain revalidation to durable bytes rather than decoded-field subsets. This checkpoint does not
+create the M5 `GenerationProtocolActivationRecord`, registration coordinator or broker activation guard；therefore
+the marker API and domains are implemented foundations, not production activation or delete authority.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

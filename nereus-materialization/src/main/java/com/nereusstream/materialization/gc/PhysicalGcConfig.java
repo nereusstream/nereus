@@ -2,6 +2,7 @@
 package com.nereusstream.materialization.gc;
 
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.core.physical.GcReferenceDomainConfig;
 import com.nereusstream.materialization.MaterializationConfig;
 import java.time.Duration;
 import java.util.List;
@@ -109,6 +110,13 @@ public record PhysicalGcConfig(
     /** Local config may plan and observe while both disabled and dry-run modes reject mutation. */
     public boolean mutationsAllowed() {
         return enabled && !dryRun;
+    }
+
+    public GcReferenceDomainConfig referenceDomainConfig() {
+        return new GcReferenceDomainConfig(
+                metadataScanPageSize,
+                maxAuthoritiesPerDomainSnapshot,
+                maxReferencesPerDomainSnapshot);
     }
 
     /** Cross-validates publication/recovery grace periods that can retain a physical reference. */

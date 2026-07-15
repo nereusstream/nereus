@@ -1,17 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
-package com.nereusstream.materialization.gc;
+package com.nereusstream.core.physical;
 
-import com.nereusstream.core.physical.GcAuthorityToken;
-import com.nereusstream.core.physical.GcReference;
-import com.nereusstream.core.physical.GcReferenceQuery;
-import com.nereusstream.core.physical.GcReferenceSnapshot;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-/** Bounded canonical accumulator shared by metadata-backed reference domains. */
-final class GcReferenceSnapshotAccumulator {
+/** Bounded canonical builder shared by protocol-neutral reference-domain implementations. */
+public final class GcReferenceSnapshotBuilder {
     private static final Comparator<GcAuthorityToken> AUTHORITY_ORDER = Comparator
             .comparing(GcAuthorityToken::authorityKey)
             .thenComparingLong(GcAuthorityToken::metadataVersion)
@@ -35,20 +31,23 @@ final class GcReferenceSnapshotAccumulator {
     private boolean limitExceeded;
     private boolean veto;
 
-    GcReferenceSnapshotAccumulator(
+    public GcReferenceSnapshotBuilder(
             String domainId,
             int protocolVersion,
             GcReferenceQuery query,
-            PhysicalGcConfig config) {
+            GcReferenceDomainConfig config) {
         this.domainId = Objects.requireNonNull(domainId, "domainId");
+        if (protocolVersion <= 0) {
+            throw new IllegalArgumentException("protocolVersion must be positive");
+        }
         this.protocolVersion = protocolVersion;
         this.query = Objects.requireNonNull(query, "query");
-        Objects.requireNonNull(config, "config");
-        this.maxAuthorities = config.maxAuthoritiesPerDomainSnapshot();
-        this.maxReferences = config.maxReferencesPerDomainSnapshot();
+        GcReferenceDomainConfig exactConfig = Objects.requireNonNull(config, "config");
+        this.maxAuthorities = exactConfig.maxAuthoritiesPerSnapshot();
+        this.maxReferences = exactConfig.maxReferencesPerSnapshot();
     }
 
-    void addAuthority(GcAuthorityToken authority) {
+    public void addAuthority(GcAuthorityToken authority) {
         Objects.requireNonNull(authority, "authority");
         if (authorityCount < maxAuthorities) {
             authorities.add(authority);
@@ -58,7 +57,7 @@ final class GcReferenceSnapshotAccumulator {
         authorityCount = boundedIncrement(authorityCount, maxAuthorities);
     }
 
-    void addReference(GcReference reference) {
+    public void addReference(GcReference reference) {
         Objects.requireNonNull(reference, "reference");
         if (referenceCount < maxReferences) {
             references.add(reference);
@@ -68,15 +67,15 @@ final class GcReferenceSnapshotAccumulator {
         referenceCount = boundedIncrement(referenceCount, maxReferences);
     }
 
-    boolean limitExceeded() {
+    public boolean limitExceeded() {
         return limitExceeded;
     }
 
-    void veto() {
+    public void veto() {
         veto = true;
     }
 
-    GcReferenceSnapshot finish() {
+    public GcReferenceSnapshot build() {
         authorities.sort(AUTHORITY_ORDER);
         references.sort(REFERENCE_ORDER);
         return GcReferenceSnapshot.create(
@@ -91,8 +90,9 @@ final class GcReferenceSnapshotAccumulator {
                 List.copyOf(references));
     }
 
-    static GcReferenceSnapshot unsupportedOwnerless(
+    public static GcReferenceSnapshot unsupportedOwnerless(
             String domainId, int protocolVersion, GcReferenceQuery query) {
+        Objects.requireNonNull(query, "query");
         return GcReferenceSnapshot.create(
                 domainId,
                 protocolVersion,

@@ -14,6 +14,7 @@ import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
+import com.nereusstream.core.physical.GcReferenceSnapshotBuilder;
 import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
 import com.nereusstream.metadata.oxia.AppendRecoveryCommit;
 import com.nereusstream.metadata.oxia.AppendRecoveryHead;
@@ -77,11 +78,11 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
         Objects.requireNonNull(query, "query");
         if (query.kind() == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
             return CompletableFuture.completedFuture(
-                    GcReferenceSnapshotAccumulator.unsupportedOwnerless(
+                    GcReferenceSnapshotBuilder.unsupportedOwnerless(
                             DOMAIN_ID, PROTOCOL_VERSION, query));
         }
-        GcReferenceSnapshotAccumulator accumulator = new GcReferenceSnapshotAccumulator(
-                DOMAIN_ID, PROTOCOL_VERSION, query, config);
+        GcReferenceSnapshotBuilder accumulator = new GcReferenceSnapshotBuilder(
+                DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
         return scanStream(query, accumulator, 0);
     }
 
@@ -100,17 +101,17 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scanStream(
             GcReferenceQuery query,
-            GcReferenceSnapshotAccumulator accumulator,
+            GcReferenceSnapshotBuilder accumulator,
             int streamIndex) {
         if (accumulator.limitExceeded()
                 || streamIndex == query.affectedStreams().size()) {
-            return CompletableFuture.completedFuture(accumulator.finish());
+            return CompletableFuture.completedFuture(accumulator.build());
         }
         StreamId streamId = query.affectedStreams().get(streamIndex);
         return generationStore.getRecoveryRoot(cluster, streamId).thenCompose(optionalRoot -> {
             addRoot(query, accumulator, streamId, optionalRoot);
             if (accumulator.limitExceeded()) {
-                return CompletableFuture.completedFuture(accumulator.finish());
+                return CompletableFuture.completedFuture(accumulator.build());
             }
             AppendRecoveryAnchor anchor = optionalRoot
                     .map(root -> anchor(streamId, root))
@@ -127,7 +128,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scanTail(
             GcReferenceQuery query,
-            GcReferenceSnapshotAccumulator accumulator,
+            GcReferenceSnapshotBuilder accumulator,
             int streamIndex,
             AppendRecoveryAnchor anchor,
             Optional<AppendRecoveryTailCursor> continuation,
@@ -152,7 +153,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
                     }
                     addCommits(query, accumulator, page);
                     if (accumulator.limitExceeded()) {
-                        return CompletableFuture.completedFuture(accumulator.finish());
+                        return CompletableFuture.completedFuture(accumulator.build());
                     }
                     if (page.continuation().isPresent()) {
                         return scanTail(
@@ -169,7 +170,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
 
     private void addRoot(
             GcReferenceQuery query,
-            GcReferenceSnapshotAccumulator accumulator,
+            GcReferenceSnapshotBuilder accumulator,
             StreamId streamId,
             Optional<VersionedRecoveryCheckpointRoot> optionalRoot) {
         if (optionalRoot.isEmpty()) {
@@ -199,7 +200,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
 
     private static void addCommits(
             GcReferenceQuery query,
-            GcReferenceSnapshotAccumulator accumulator,
+            GcReferenceSnapshotBuilder accumulator,
             AppendRecoveryTailPage page) {
         for (AppendRecoveryCommit commit : page.commitsNewestFirst()) {
             accumulator.addAuthority(new GcAuthorityToken(

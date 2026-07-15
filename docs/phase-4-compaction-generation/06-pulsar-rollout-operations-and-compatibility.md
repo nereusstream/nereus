@@ -178,6 +178,17 @@ ManagedLedgerProjectionMetadataStore.activateGenerationProtocol(
 It preserves projection identity、incarnation、virtual ledger、cursor marker and external properties, and changes only
 the monotonic generation marker through one topic-projection CAS.
 
+Checkpoint K implements this property/CAS foundation in the shared F2 metadata path. The composed validator hides and
+preserves both cursor/generation markers, rejects unknown internal keys, and `activateGenerationProtocol` converges a
+lost CAS response only by reloading the exact topic identity. It also adds
+`getProjectionByStream(cluster, streamId)`：the store reads the per-stream binding and then the current topic selected
+by that binding, returning each canonical key、Oxia version and exact stored-envelope SHA-256. That lookup is consumed
+by the M4 projection reference domain and performs no topic load or repair.
+
+This is not cluster activation. `GenerationProtocolActivationRecord`、the registration coordinator/barrier、broker
+capability guard and runtime call sites below remain M5 work, so no production path sets the marker merely because the
+API exists.
+
 ### 3.2 Resolvable projection reference and registration ordering
 
 Background workers must be able to validate a projection without an owned/loaded topic. The managed-ledger adapter

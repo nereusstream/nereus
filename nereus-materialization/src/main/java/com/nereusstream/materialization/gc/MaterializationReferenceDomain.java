@@ -12,6 +12,7 @@ import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
+import com.nereusstream.core.physical.GcReferenceSnapshotBuilder;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.TaskScanPage;
@@ -59,11 +60,11 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
         Objects.requireNonNull(query, "query");
         if (query.kind() == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
             return CompletableFuture.completedFuture(
-                    GcReferenceSnapshotAccumulator.unsupportedOwnerless(
+                    GcReferenceSnapshotBuilder.unsupportedOwnerless(
                             DOMAIN_ID, PROTOCOL_VERSION, query));
         }
-        GcReferenceSnapshotAccumulator accumulator = new GcReferenceSnapshotAccumulator(
-                DOMAIN_ID, PROTOCOL_VERSION, query, config);
+        GcReferenceSnapshotBuilder accumulator = new GcReferenceSnapshotBuilder(
+                DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
         return scan(query, accumulator, 0, Optional.empty(), null);
     }
 
@@ -82,15 +83,15 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scan(
             GcReferenceQuery query,
-            GcReferenceSnapshotAccumulator accumulator,
+            GcReferenceSnapshotBuilder accumulator,
             int streamIndex,
             Optional<F4ScanToken> continuation,
             String previousKey) {
         if (accumulator.limitExceeded()) {
-            return CompletableFuture.completedFuture(accumulator.finish());
+            return CompletableFuture.completedFuture(accumulator.build());
         }
         if (streamIndex == query.affectedStreams().size()) {
-            return CompletableFuture.completedFuture(accumulator.finish());
+            return CompletableFuture.completedFuture(accumulator.build());
         }
         StreamId streamId = query.affectedStreams().get(streamIndex);
         return metadataStore.scanTasks(
@@ -103,7 +104,7 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
                     for (VersionedMaterializationTask task : page.values()) {
                         addTask(query, accumulator, task);
                         if (accumulator.limitExceeded()) {
-                            return CompletableFuture.completedFuture(accumulator.finish());
+                            return CompletableFuture.completedFuture(accumulator.build());
                         }
                     }
                     if (page.continuation().isPresent()) {
@@ -125,7 +126,7 @@ public final class MaterializationReferenceDomain implements GcReferenceDomain {
 
     private static void addTask(
             GcReferenceQuery query,
-            GcReferenceSnapshotAccumulator accumulator,
+            GcReferenceSnapshotBuilder accumulator,
             VersionedMaterializationTask task) {
         accumulator.addAuthority(new GcAuthorityToken(
                 task.key(), task.metadataVersion(), task.durableValueSha256()));

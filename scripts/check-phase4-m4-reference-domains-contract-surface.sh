@@ -22,7 +22,8 @@ require_literal() {
 }
 
 production_artifacts=(
-    GcReferenceSnapshotAccumulator.java
+    GcReferenceDomainConfig.java
+    GcReferenceSnapshotBuilder.java
     GenerationReferenceDomain.java
     AppendRecoveryReferenceDomain.java
     MaterializationReferenceDomain.java

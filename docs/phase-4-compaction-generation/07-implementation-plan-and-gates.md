@@ -70,8 +70,10 @@ domain/protection/metadata-key facts can be recomputed after restart. Checkpoint
 aggregation、mandatory metadata-fact reload、recoverable ACTIVE/MARKED/DELETING fencing and full 256-shard metadata
 root enumeration. It stops at durable delete intent；no source/protection/audit/object delete path is enabled by
 checkpoints G–I. Checkpoint J adds query-bound stateless revalidation、exact reference-to-removal binding and the
-affected-stream generation、append-recovery and materialization reference domains. Projection/cursor/future-sentinel
-domains、ownerless global absence proof、retirement/destructive coordination and runtime composition remain pending.
+affected-stream generation、append-recovery and materialization reference domains. Checkpoint K adds the core shared
+bounded snapshot builder、composed managed-ledger generation-marker/exact-stream-authority APIs, and affected-stream
+projection-generation plus cursor-snapshot domains. Future-sentinel domains、ownerless global absence proof、
+retirement/destructive coordination and runtime composition remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -240,6 +242,8 @@ physical/GcReferenceQueryKind.java
 physical/GcReferenceSnapshot.java
 physical/GcAuthorityToken.java
 physical/GcReference.java
+physical/GcReferenceDomainConfig.java             implemented checkpoint K
+physical/GcReferenceSnapshotBuilder.java          implemented checkpoint K
 capability/GenerationProtocolActivationGuard.java
 capability/GenerationOperation.java
 capability/GenerationActivationSubject.java
@@ -583,8 +587,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > (checkpoint-derived committed-index repair), checkpoint G (exact retirement metadata adapters), checkpoint H
 > (bounded/reconstructable GC config/candidate/plan values), and checkpoint I (exact domain aggregation、recoverable
 > root MARK/DRAIN/DELETING fence and 256-shard scanner), and checkpoint J (query-bound revalidation、exact
-> reference/removal binding and affected-stream generation/append-recovery/materialization domains) are implemented；
-> runtime composition、projection/cursor/future-sentinel and ownerless-global domains、retirement/delete coordinators
+> reference/removal binding and affected-stream generation/append-recovery/materialization domains), and checkpoint K
+> (core bounded snapshot builder、managed-ledger marker/exact projection authority and affected-stream
+> projection-generation/cursor-snapshot domains) are implemented；runtime composition、future-sentinel and
+> ownerless-global domains、retirement/delete coordinators
 > and physical/cursor GC completion remain before F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
@@ -622,6 +628,8 @@ append/AppendCoordinator.java                     protected sync path
 DefaultStreamStorage.java                        required publisher injection
 PreparedStableAppend.java
 MaterializedGenerationZero.java
+physical/GcReferenceDomainConfig.java                 implemented checkpoint K shared bounds
+physical/GcReferenceSnapshotBuilder.java              implemented checkpoint K canonical fail-closed builder
 OxiaMetadataStore                                prepare/commit prepared append
 OxiaJavaClientMetadataStore                      exact two-stage stable append
 AppendRecoveryAnchor.java                        implemented checkpoint C foundation
@@ -655,6 +663,14 @@ retirement/ObjectAuditRetirementStore.java               implemented checkpoint 
 retirement/OxiaJavaObjectAuditRetirementStore.java       implemented checkpoint G
 retirement/VersionedObjectManifestAudit.java             implemented checkpoint G
 retirement/VersionedObjectReferencesAudit.java           implemented checkpoint G
+ManagedLedgerProtocolProperties.java                     implemented checkpoint K composed marker validator
+ManagedLedgerGenerationProtocol.java                     implemented checkpoint K monotonic marker foundation
+ManagedLedgerStreamProjection.java                       implemented checkpoint K exact stream authority view
+VersionedTopicProjection.java                            implemented checkpoint K key/version/envelope wrapper
+VersionedVirtualLedgerProjection.java                    implemented checkpoint K key/version/envelope wrapper
+CursorMetadataDigests.java                               implemented checkpoint K exact F3 envelope digests
+ManagedLedgerProjectionMetadataStore.getProjectionByStream implemented checkpoint K
+ManagedLedgerProjectionMetadataStore.activateGenerationProtocol implemented checkpoint K CAS foundation
 OxiaJavaClientMetadataStore                    bridge live tail to root/NRC1
 testing/FakeOxiaMetadataStore                  exact parity
 ```
@@ -680,7 +696,6 @@ gc/GcReferenceCollectionStatus.java                      implemented checkpoint 
 gc/GcReferenceCollection.java                            implemented checkpoint I
 gc/GcReferenceDomainRegistry.java                        implemented checkpoint I
 gc/GcPlanMetadataRevalidator.java                        implemented checkpoint I
-gc/GcReferenceSnapshotAccumulator.java                   implemented checkpoint J
 gc/GenerationReferenceDomain.java                        implemented checkpoint J affected-stream domain
 gc/AppendRecoveryReferenceDomain.java                    implemented checkpoint J affected-stream domain
 gc/MaterializationReferenceDomain.java                   implemented checkpoint J affected-stream domain
@@ -708,12 +723,12 @@ gc/PhysicalGcConfig.java                                 implemented checkpoint 
 gc/GcMetricsObserver.java
 ```
 
-`nereus-managed-ledger`：
+`nereus-managed-ledger`（直接依赖 core/metadata，不依赖 materialization）：
 
 ```text
-retention/CursorSnapshotReferenceDomain.java
+retention/CursorSnapshotReferenceDomain.java             implemented checkpoint K affected-stream domain
 retention/CursorSnapshotGcScanner.java
-retention/ProjectionGenerationReferenceDomain.java
+retention/ProjectionGenerationReferenceDomain.java       implemented checkpoint K affected-stream domain
 cursor/DefaultCursorSnapshotStore.java          pin/protection integration
 cursor/CursorSnapshotInventory.java             unchanged authority semantics
 ```
@@ -743,9 +758,11 @@ GenerationZeroPhysicalReferencePublisherTest
 ProtectedStableAppendFailureInjectionTest
 GenerationZeroVisibleProtectionRepairTest
 GcReferenceDomainRegistryTest                              implemented checkpoint I
+GcReferenceSnapshotBuilderTest                             implemented checkpoint K
 GenerationReferenceDomainTest                             implemented checkpoint J
 AppendRecoveryReferenceDomainTest                         implemented checkpoint J
 MaterializationReferenceDomainTest                        implemented checkpoint J
+ManagedLedgerGenerationProtocolTest                       implemented checkpoint K marker/CAS authority
 PhysicalObjectGarbageCollectorTest                         implemented checkpoint I fence/lost-response tests
 PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
@@ -759,7 +776,8 @@ MultiStreamWalRetirementTest
 GenerationRetirementFallbackTest
 CursorSnapshotGcScannerTest
 CursorSnapshotGcRaceTest
-ProjectionGenerationReferenceDomainTest
+CursorSnapshotReferenceDomainTest                         implemented checkpoint K
+ProjectionGenerationReferenceDomainTest                   implemented checkpoint K
 ObjectInventoryScannerTest
 StreamRegistrationRetirementCoordinatorTest
 FutureCatalogSentinelTest
@@ -783,6 +801,7 @@ retirement.
 ./gradlew phase4M4GcPlanCheck
 ./gradlew phase4M4RootFenceCheck
 ./gradlew phase4M4ReferenceDomainsCheck
+./gradlew phase4M4ManagedLedgerDomainsCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -844,9 +863,18 @@ side effect remain absent.
 that every retained domain reference is paired with the same planned metadata removal key、Oxia version and durable
 value SHA. It proves both-view generation scans、DRAINING-only higher-generation eligibility、optional recovery-root
 plus complete live-tail authorities、active materialization-task vetoes、bounded fail-closed accumulation and
-ownerless fail-closed behavior without treating stream registrations as truth. This is checkpoint-J evidence only：
-projection/cursor/future-sentinel and ownerless-global domains、source retirement、physical deletion and runtime
-composition remain absent.
+ownerless fail-closed behavior without treating stream registrations as truth. This is checkpoint-J evidence only；
+at that boundary projection/cursor/future-sentinel and ownerless-global domains、source retirement、physical deletion
+and runtime composition remained absent.
+
+`phase4M4ManagedLedgerDomainsCheck` extends checkpoint J with the core shared bounded/canonical builder、composed F2
+cursor/generation marker rules、monotonic generation-marker CAS and exact per-stream binding/current-topic authority
+lookup. It proves stored-envelope/Oxia-version binding、same-incarnation marker/DELETED/DELETING decisions、strictly
+newer incarnation unaddressability、topic-published-before-binding-repair fail-closed behavior、complete paged F3
+retention/cursor scans、live snapshot-root veto、pending-retention and projection drift、configured overflow and
+ownerless fail-closed behavior. The module-boundary gate rejects a managed-ledger -> materialization dependency. This
+is checkpoint-K evidence only：the M5 activation record/registration barrier, future sentinel/ownerless-global proof、
+source retirement、physical deletion and runtime composition remain absent.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.
@@ -867,8 +895,8 @@ nereus-core/.../recovery/GenerationZeroRepairScanner.java
 nereus-core/.../read/ReadAfterStableCommitRepair.java
 nereus-core/.../backpressure/MaterializationLagGate.java
 
-nereus-metadata-oxia/.../ManagedLedgerGenerationProtocol.java
-nereus-metadata-oxia/.../ManagedLedgerProtocolProperties.java
+nereus-metadata-oxia/.../ManagedLedgerGenerationProtocol.java       protocol/CAS foundation implemented K
+nereus-metadata-oxia/.../ManagedLedgerProtocolProperties.java       composed property validator implemented K
 nereus-metadata-oxia/.../GenerationProtocolActivationRecord.java
 nereus-metadata-oxia/.../ReferenceDomainVersionRecord.java
 nereus-metadata-oxia/.../GenerationBackfillProofRecord.java
@@ -876,9 +904,9 @@ nereus-metadata-oxia/.../VersionedGenerationProtocolActivation.java
 nereus-metadata-oxia/.../GenerationProtocolActivationStore.java
 nereus-metadata-oxia/.../OxiaJavaGenerationProtocolActivationStore.java
 nereus-metadata-oxia/.../codec/GenerationProtocolActivationRecordCodecV1.java
-nereus-metadata-oxia/.../ManagedLedgerProjectionMetadataStore.java
-nereus-metadata-oxia/.../ProjectionMetadataStoreCore.java
-nereus-metadata-oxia/.../records/TopicProjectionRecord.java
+nereus-metadata-oxia/.../ManagedLedgerProjectionMetadataStore.java   exact lookup/marker CAS implemented K
+nereus-metadata-oxia/.../ProjectionMetadataStoreCore.java            exact lookup/marker CAS implemented K
+nereus-metadata-oxia/.../records/TopicProjectionRecord.java          composed marker validation implemented K
 
 nereus-managed-ledger/.../retention/RetentionPolicySnapshot.java
 nereus-managed-ledger/.../retention/NereusRetentionConfig.java
@@ -924,7 +952,7 @@ AsyncAppendPhysicalProtectionTest
 AsyncReadAfterCommitRepairTest
 GenerationZeroRepairScannerTest
 MaterializationLagGateTest
-ManagedLedgerGenerationProtocolTest
+ManagedLedgerGenerationProtocolTest                         implemented K protocol/CAS foundation
 ManagedLedgerGenerationProjectionRefV1GoldenTest
 ManagedLedgerMaterializationRegistrationCoordinatorTest
 GenerationActivationCompatibilityTest

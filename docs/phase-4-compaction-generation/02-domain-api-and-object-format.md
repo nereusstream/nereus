@@ -19,10 +19,12 @@ production sequence. Recovery-root publication、checkpoint append replay and ch
 implemented checkpoints. Exact source/object-audit retirement metadata adapters、bounded/reconstructable GC
 config/candidate/plan values、the exact bounded reference-domain registry、recoverable
 `ACTIVE -> MARKED -> DELETING` root fencing、the 256-shard physical-root scanner、query-bound domain revalidation and
-affected-stream generation/append-recovery/materialization domains are also implemented. Every domain reference must
+affected-stream generation/append-recovery/materialization domains are also implemented. The bounded canonical
+reference-snapshot builder now lives in core, and the affected-stream projection-generation/cursor-snapshot domains
+are implemented over exact F2/F3 authority wrappers. Every domain reference must
 match one exact planned metadata removal；active task/live-tail and non-DRAINING higher-generation references veto.
 The collector stops at durable delete intent and deliberately exposes no metadata/protection/object delete call；runtime
-composition、projection/cursor/future-sentinel and ownerless global domains、source/delete coordinators and
+composition、future-sentinel and ownerless global domains、source/delete coordinators and
 physical/cursor completion remain target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.

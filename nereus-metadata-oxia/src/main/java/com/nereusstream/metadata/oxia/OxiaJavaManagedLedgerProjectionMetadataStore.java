@@ -1,6 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.metadata.oxia;
 
+import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.time.Clock;
@@ -42,6 +43,12 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
     }
 
     @Override
+    public CompletableFuture<ManagedLedgerStreamProjection> getProjectionByStream(
+            String cluster, StreamId streamId) {
+        return core.getProjectionByStream(cluster, streamId);
+    }
+
+    @Override
     public CompletableFuture<TopicProjectionRecord> createFirstProjection(
             String cluster,
             ProjectionCreateRequest request,
@@ -78,6 +85,16 @@ public final class OxiaJavaManagedLedgerProjectionMetadataStore
             ManagedLedgerProjectionIdentity expectedIdentity,
             long expectedMetadataVersion) {
         return core.activateCursorProtocol(
+                cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
+    }
+
+    @Override
+    public CompletableFuture<TopicProjectionRecord> activateGenerationProtocol(
+            String cluster,
+            String managedLedgerName,
+            ManagedLedgerProjectionIdentity expectedIdentity,
+            long expectedMetadataVersion) {
+        return core.activateGenerationProtocol(
                 cluster, managedLedgerName, expectedIdentity, expectedMetadataVersion);
     }
 

@@ -185,9 +185,23 @@ vetoes any currently required checkpoint/source；materialization vetoes matchin
 Every emitted removable reference must be covered by an exact plan removal tuple before MARK digest construction.
 
 These domains deliberately fail ownerless queries as incomplete/veto because the registration scanner is a liveness
-hint, not cluster-wide absence truth. Projection/cursor/future-sentinel domains and the global backfill epoch remain
-required before ownerless GC. The new classes are not yet installed in `MaterializationRuntime`; checkpoint J changes
-no production activation or deletion behavior.
+hint, not cluster-wide absence truth. At checkpoint J, projection/cursor/future-sentinel domains and the global
+backfill epoch remained required before ownerless GC. The new classes were not installed in
+`MaterializationRuntime`; checkpoint J changed no production activation or deletion behavior.
+
+F4-M4 checkpoint K adds the two affected-stream managed-ledger domains without changing that runtime boundary.
+`ProjectionGenerationReferenceDomain` reads the exact per-stream F2 binding and the current topic authority selected
+by that binding；missing derived binding/topic、same-incarnation `DELETING`, or a live same-incarnation topic without
+generation marker 1 vetoes. `DELETED` clears the same-incarnation compatibility proof, while a replacement clears an
+old stream only when both incarnation and storage-class binding generation strictly increase. The topic-published /
+binding-repair-missing crash cut therefore cannot authorize deletion.
+
+`CursorSnapshotReferenceDomain` reads the exact F3 retention record and completely pages cursor roots. Pending
+retention lifecycle、retention/cursor projection mismatch、or an ACTIVE root pointing to the candidate object vetoes；
+the last case also emits an owner-bound reference. Both domains use the core bounded canonical snapshot builder,
+rerun the full query in `stillMatches`, and return incomplete+veto for ownerless queries. They are not installed in
+`MaterializationRuntime`; future-catalog/global absence proof、source retirement and every DELETING side effect remain
+later checkpoints.
 
 Full M4–M6 target construction：
 

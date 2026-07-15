@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 materialization_build="$repo_root/nereus-materialization/build.gradle.kts"
+managed_ledger_build="$repo_root/nereus-managed-ledger/build.gradle.kts"
 
 for dependency in nereus-api nereus-core nereus-metadata-oxia nereus-object-store; do
     if ! rg -Fq -- "project(\":$dependency\")" "$materialization_build"; then
@@ -20,6 +21,15 @@ fi
 
 if rg -n 'project\(":nereus-(managed-ledger|pulsar-adapter|kop-adapter)"\)' "$materialization_build"; then
     echo "nereus-materialization must remain protocol-neutral" >&2
+    exit 1
+fi
+
+if ! rg -Fq -- 'project(":nereus-core")' "$managed_ledger_build"; then
+    echo "nereus-managed-ledger is missing the core reference-domain SPI dependency" >&2
+    exit 1
+fi
+if rg -n 'project\(":nereus-materialization"\)' "$managed_ledger_build"; then
+    echo "managed-ledger reference domains must not depend on materialization orchestration" >&2
     exit 1
 fi
 

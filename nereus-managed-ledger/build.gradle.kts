@@ -14,6 +14,7 @@
 
 dependencies {
     api(project(":nereus-api"))
+    api(project(":nereus-core"))
     implementation(project(":nereus-metadata-oxia"))
     api(project(":nereus-object-store"))
     api(libs.pulsar.managed.ledger)
@@ -27,7 +28,6 @@ dependencies {
     testImplementation(platform(libs.opentelemetry.bom))
     testImplementation(platform(libs.opentelemetry.bom.alpha))
     testImplementation(libs.oxia.client)
-    testImplementation(project(":nereus-core"))
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testImplementation(testFixtures(project(":nereus-object-store")))
     testRuntimeOnly(libs.junit.platform.launcher)

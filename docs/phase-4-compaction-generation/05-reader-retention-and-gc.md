@@ -43,6 +43,8 @@ nereus-core/src/main/java/com/nereusstream/core/physical/
   GcReferenceSnapshot.java
   GcAuthorityToken.java
   GcReference.java
+  GcReferenceDomainConfig.java
+  GcReferenceSnapshotBuilder.java
 
 nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/f4/
   PhysicalObjectMetadataStore.java
@@ -117,9 +119,11 @@ key/protection while excluding ephemeral candidate identity/time. Checkpoint I a
 mandatory planned-metadata revalidation、recoverable `ACTIVE -> MARKED -> DELETING` root fence and complete 256-shard
 root scan. It stops before every source/protection/audit/object delete and is not production-composed. Concrete
 reference domains arrive in checkpoint J for affected-stream generation、append recovery and materialization facts,
-including query-bound stateless revalidation and exact reference/removal binding. Projection/cursor/future-sentinel
-and ownerless global domains、source retirement planning、DELETING recovery/destructive coordinators、cursor integration
-and physical deletion remain planned；therefore no object deletion is enabled by these checkpoints.
+including query-bound stateless revalidation and exact reference/removal binding. Checkpoint K moves bounded canonical
+snapshot construction into core and adds affected-stream F2 projection-generation plus F3 cursor-snapshot domains over
+exact stored authority digests. Future-sentinel and ownerless global domains、source retirement planning、DELETING
+recovery/destructive coordinators、cursor completion and physical deletion remain planned；therefore no object
+deletion is enabled by these checkpoints.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -747,9 +751,9 @@ operation deadline rather than acquiring independent timeout budgets.
 
 `GcPlanMetadataRevalidator` is mandatory, not a permissive default. It reloads the authoritative typed metadata facts
 selected by the future source/orphan/cursor planner；the collector canonicalizes and compares the entire returned list
-before MARK and twice during DRAIN. Checkpoint J implements three concrete F4 domains in the table below；the remaining
-projection/cursor/sentinel and ownerless-global variants are pending. Config defaults continue to keep mutation
-disabled and dry-run on.
+before MARK and twice during DRAIN. Checkpoint J implements three storage domains and checkpoint K implements the two
+managed-ledger domains in the table below；future-sentinel and ownerless-global variants are pending. Config defaults
+continue to keep mutation disabled and dry-run on.
 
 The query is a core value；materialization's `GcCandidate` wraps it with retry/plan timestamps and never appears in
 the SPI. Affected streams are sorted/unique and capped at 4,096；`REFERENCED_OBJECT` and
@@ -760,6 +764,12 @@ the canonical root/listing classification proof. Snapshot lists use canonical `(
 any count above configured in-memory limits requires `veto=true`；a domain may stream-hash a larger scan for
 diagnostics but cannot truncate it into permission. `stillMatches(query, snapshot)` receives the full exact query and
 repeats the authoritative scan；no domain may recover scope from a process-local snapshot-to-query cache.
+
+Checkpoint K makes that bounded behavior reusable outside materialization. `GcReferenceDomainConfig` validates
+page size in `[1, 1000]` and authority/reference limits in `[1, 100000]`；`GcReferenceSnapshotBuilder` canonical-sorts
+both lists, retains at most the configured values, reports the first overflow as count `max + 1`, and forces
+`complete=false/veto=true`. `unsupportedOwnerless` is the single fail-closed construction used by domains that lack
+global enumeration. `PhysicalGcConfig.referenceDomainConfig()` supplies the same limits to all implementations.
 
 Checkpoint J's concrete rules are：
 
@@ -777,6 +787,24 @@ All three stop with incomplete+veto after the configured bound. All three also r
 `OWNERLESS_ORPHAN_CANDIDATE`：the current stream-registration registry is a hint and cannot prove global absence.
 Ownerless permission requires the later registration/physical-root backfill epoch plus all global domains.
 
+Checkpoint K's managed-ledger rules are：
+
+- `projection-generation-v1` reads the exact per-stream `VirtualLedgerProjectionRecord` and, when present, the
+  current `TopicProjectionRecord` selected by its managed-ledger name. Present authorities use canonical key、Oxia
+  version and stored-envelope SHA-256；missing binding/topic uses a domain-separated absence token and vetoes. For an
+  equal identity, `DELETED` clears、`DELETING` vetoes、and `OPEN/SEALED` require
+  `nereus.generation-protocol=1`. A different current topic proves an old stream unaddressable only when both its
+  incarnation and storage-class binding generation are strictly greater than the historical binding；
+- `cursor-snapshot-v1` reads the exact F3 retention record and completely pages every cursor root for each affected
+  stream. Retention absence is an authority；non-`ACTIVE` retention、retention/cursor projection mismatch、or cursors
+  without a retention authority veto. An `ACTIVE` snapshot root matching the candidate object emits an exact
+  `cursor-snapshot-root` owner reference and vetoes. A cursor-snapshot query carrying a non-cursor physical object kind
+  also vetoes.
+
+Both domains rerun the full query for `stillMatches` and use exact F3/F2 stored-envelope digests, so state、identity、
+root or version drift cannot survive DRAIN. Both return incomplete+veto for ownerless queries. The shared builder lives
+in core specifically so `nereus-managed-ledger` does not depend on materialization.
+
 F4 registers：
 
 | Domain | Revalidated authority |
@@ -784,8 +812,8 @@ F4 registers：
 | `generation-v1` | implemented J for affected streams：both-view exact indexes and DRAINING eligibility |
 | `append-recovery-v1` | implemented J for affected streams：head + optional stable recovery root + complete live tail |
 | `materialization-v1` | implemented J for affected streams：task roots/output/source identities and active-task veto |
-| `projection-generation-v1` | F2 topic projection/incarnation identity、generation marker and old-stream deletion/unaddressability proof |
-| `cursor-snapshot-v1` | F3 retention root + every cursor root + inventory classification |
+| `projection-generation-v1` | implemented K for affected streams：exact F2 binding/current-topic authority、marker and strict old-incarnation unaddressability proof |
+| `cursor-snapshot-v1` | implemented K for affected streams：exact F3 retention authority + complete paged cursor roots and live-root veto |
 | `future-catalog-sentinel-v1` | veto if any later catalog capability is active without its plugin |
 
 The durable cluster generation-activation record stores the exact required domain id/version set. Runtime startup
@@ -793,10 +821,11 @@ fails F4 readiness if its registered set differs. Future 6 must atomically add i
 catalog reference；F4 never interprets absence of a plugin as absence of references.
 
 `projection-generation-v1` makes the per-topic downgrade fence usable by protocol-neutral GC. For each affected
-stream it returns one of two proofs：the exact live `TopicProjectionRecord`/incarnation has
-`nereus.generation-protocol=1`，or the old incarnation is sealed/logically deleted and no current binding/projection
-can address that stream. A multi-stream WAL object requires a proof for every slice. A true orphan with no stream
-owner still requires the complete projection/binding-domain absence proof；object-list absence is not enough. The
+stream, the implemented proof requires one of：the exact current identity is `DELETED`；the exact current live identity
+has `nereus.generation-protocol=1`；or the current topic identity is strictly newer in both incarnation and storage
+binding generation than the historical per-stream binding. Missing binding/current topic and `DELETING` never count
+as absence. A multi-stream WAL object requires a proof for every slice. A true orphan with no stream owner still
+requires the later complete projection/binding-domain absence proof；object-list absence is not enough. The
 materialization module consumes only the domain snapshot/tokens and never parses Pulsar metadata itself.
 
 ## 8. Logical Retention Candidate
@@ -1009,10 +1038,11 @@ the bounded candidate/plan/digest values. Checkpoint I implements registry colle
   `ObjectStore.deleteObject`, so `DELETE_INTENT` is the terminal result of this checkpoint.
 
 Candidate discovery and typed metadata-plan construction remain owned by later source/orphan/cursor coordinators.
-Concrete reference-domain implementations、DELETING restart/metadata retirement、physical delete and
-`DELETING -> DELETED` are also still pending；no production coordinator currently reaches the checkpoint-G delete
-primitives. A missing key or lost metadata-delete response must eventually be resolved under the unchanged DELETING
-root, never accepted from absence alone.
+The future-catalog sentinel、ownerless-global domain variants、DELETING restart/metadata retirement、physical delete
+and `DELETING -> DELETED` are still pending；the five affected-stream storage/projection/cursor domains implemented
+through checkpoint K are not production-composed, and no production coordinator currently reaches the checkpoint-G
+delete primitives. A missing key or lost metadata-delete response must eventually be resolved under the unchanged
+DELETING root, never accepted from absence alone.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.

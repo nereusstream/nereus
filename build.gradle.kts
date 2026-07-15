@@ -788,3 +788,23 @@ tasks.register("phase4M4ReferenceDomainsCheck") {
     dependsOn(":nereus-core:check")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M4ManagedLedgerDomainsContractSurface") {
+    group = "verification"
+    description = "Audit exact F2 projection and F3 cursor GC reference domains."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-managed-ledger-domains-contract-surface.sh")
+}
+
+tasks.register("phase4M4ManagedLedgerDomainsCheck") {
+    group = "verification"
+    description = "Verify composed generation markers and restart-safe projection/cursor authorities."
+    dependsOn("phase4M4ReferenceDomainsCheck")
+    dependsOn("checkPhase4M4ManagedLedgerDomainsContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+}
