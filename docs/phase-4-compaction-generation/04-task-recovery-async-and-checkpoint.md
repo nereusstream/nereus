@@ -97,6 +97,17 @@ lost head or index response cannot return an unprotected result. Production asse
 the separate L0 and physical adapters and drains storage before closing protection resources. This checkpoint does
 not yet build/publish NRC1 roots or retire the live tail；those runtime graph nodes remain target code.
 
+F4-M4 checkpoint C foundation now implements the exact metadata/core boundary used by the coordinator. Production
+and fake metadata stores expose a bounded newest-to-oldest append-recovery tail whose cursor is bound to the observed
+head and recovery-root anchor；legacy commits are converted to the same metadata-version-zero generic envelope written
+to NRC1. `AnchorAwareCommitWalker` repeats its bounded walk when the root changes. `RecoveryCheckpointBuilder` then
+selects only a grace-old, whole-commit, gap-free prefix covered by exact lossless `COMMITTED` generations, enforces a
+4,096 all-candidate scan bound, constructs canonical entries/publications, and can revalidate every selected durable
+fact before publication. `RecoveryCheckpointProtectionManager` defines root-owned pending/permanent handshakes and
+revalidates exact target key/id/kind/range. The guarded object upload、full NRC1 verification、root CAS、post-CAS
+reconciliation and pending-to-permanent orchestration remain in `RecoveryCheckpointCoordinator` target code；this
+foundation does not retire metadata or authorize deletion.
+
 Full M4–M6 target construction：
 
 ```java

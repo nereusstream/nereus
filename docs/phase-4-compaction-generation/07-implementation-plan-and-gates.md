@@ -50,7 +50,11 @@ commit-owned protection before head CAS、exact generation-zero materialization 
 before strict success, with the same sequence used by recovery and wired into production shared-Oxia assembly.
 Metadata/core/pulsar unit tests and affected real-service source-set compilation pass；a Docker-backed checkpoint-B
 execution gate has not yet run. Full recovery-root/
-anchor-aware retirement/GC and async/Pulsar execution paths still arrive in the remainder of F4-M4–M6.
+anchor-aware retirement/GC and async/Pulsar execution paths still arrive in the remainder of F4-M4–M6. Checkpoint C's
+current foundation adds the exact paged append-recovery tail in production/fake metadata stores, the root-stable
+`AnchorAwareCommitWalker`, the bounded whole-commit `RecoveryCheckpointBuilder`, and root-owned pending/permanent
+protection handshakes. Metadata contracts and focused walker/builder tests pass；guarded upload、full verification、
+root CAS/reconciliation、retirement and GC are not implemented by this foundation.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -556,9 +560,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 
-> Current status：in progress. Checkpoint A (NRC1 object protocol) and checkpoint B (protected generation-zero
-> append/recovery) are implemented；checkpoint coordinator/root CAS、anchor-aware replay/repair、retirement and
-> physical/cursor GC remain before F4-M4 can be called complete or final-gated.
+> Current status：in progress. Checkpoint A (NRC1 object protocol)、checkpoint B (protected generation-zero
+> append/recovery), and checkpoint C's anchor-aware tail/checkpoint-planning foundation are implemented；guarded
+> coordinator upload/root CAS/reconciliation、anchor-aware replay/repair、retirement and physical/cursor GC remain
+> before F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
 
@@ -596,7 +601,12 @@ PreparedStableAppend.java
 MaterializedGenerationZero.java
 OxiaMetadataStore                                prepare/commit prepared append
 OxiaJavaClientMetadataStore                      exact two-stage stable append
-recovery/AnchorAwareCommitWalker.java
+AppendRecoveryAnchor.java                        implemented checkpoint C foundation
+AppendRecoveryCommit.java                        implemented checkpoint C foundation
+AppendRecoveryTailCursor.java                    implemented checkpoint C foundation
+AppendRecoveryTailPage.java                      implemented checkpoint C foundation
+RecoveryCheckpointRootDigests.java               implemented checkpoint C foundation
+recovery/AnchorAwareCommitWalker.java             implemented checkpoint C foundation
 recovery/CheckpointAppendReplayReader.java
 recovery/CheckpointDerivedIndexRepairer.java
 retirement/SourceRetirementMetadataStore.java
@@ -614,9 +624,9 @@ testing/FakeOxiaMetadataStore                  exact parity
 
 ```text
 recovery/RecoveryCheckpointCoordinator.java
-recovery/RecoveryCheckpointBuilder.java
+recovery/RecoveryCheckpointBuilder.java           implemented checkpoint C foundation
 recovery/RecoveryCheckpointMerger.java
-recovery/RecoveryCheckpointProtectionManager.java
+recovery/RecoveryCheckpointProtectionManager.java implemented checkpoint C foundation
 recovery/MetadataRecoveryCheckpointVerifier.java
 gc/GcCandidate.java
 gc/GcPlan.java
@@ -662,6 +672,7 @@ RecoveryCheckpointSparseDirectoryTest
 RecoveryCheckpointDomainValidationTest
 MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
+RecoveryCheckpointBuilderTest
 RecoveryCheckpointMergeTest
 AnchorAwareCommitWalkerTest
 CheckpointAppendReplayTest

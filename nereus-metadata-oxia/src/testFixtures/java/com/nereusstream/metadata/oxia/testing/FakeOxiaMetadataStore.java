@@ -39,6 +39,12 @@ import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.CommitSliceResult;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
 import com.nereusstream.metadata.oxia.CommittedAppend;
+import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
+import com.nereusstream.metadata.oxia.AppendRecoveryCommit;
+import com.nereusstream.metadata.oxia.AppendRecoveryCommitEncoding;
+import com.nereusstream.metadata.oxia.AppendRecoveryHead;
+import com.nereusstream.metadata.oxia.AppendRecoveryTailCursor;
+import com.nereusstream.metadata.oxia.AppendRecoveryTailPage;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
@@ -84,6 +90,7 @@ import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexTargetRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
+import com.nereusstream.metadata.oxia.records.ReadTargetRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
 import com.nereusstream.metadata.oxia.records.StreamHeadRecord;
@@ -93,6 +100,7 @@ import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.metadata.oxia.records.VisibleSliceReferenceRecord;
 import java.time.Duration;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -1080,6 +1088,254 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
             String cluster, CommitAppendRequest request, Optional<AppendReplayCursor> continuation,
             int maxCommitsToScan) {
         return complete(() -> searchTargetReplaySync(cluster, request, continuation, maxCommitsToScan));
+    }
+
+    @Override
+    public CompletableFuture<AppendRecoveryTailPage> readAppendRecoveryTail(
+            String cluster,
+            StreamId streamId,
+            AppendRecoveryAnchor anchor,
+            Optional<AppendRecoveryTailCursor> continuation,
+            int maxCommitsToScan) {
+        return complete(() -> readAppendRecoveryTailSync(
+                cluster, streamId, anchor, continuation, maxCommitsToScan));
+    }
+
+    private AppendRecoveryTailPage readAppendRecoveryTailSync(
+            String cluster,
+            StreamId streamId,
+            AppendRecoveryAnchor anchor,
+            Optional<AppendRecoveryTailCursor> continuation,
+            int maxCommitsToScan) {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(anchor, "anchor");
+        Objects.requireNonNull(continuation, "continuation");
+        if (!anchor.streamId().equals(streamId)
+                || maxCommitsToScan <= 0
+                || maxCommitsToScan > 1_000) {
+            throw new IllegalArgumentException("invalid fake append recovery page request");
+        }
+        StreamHeadRecord currentHead = headOrThrow(cluster, streamId);
+        if (anchor.commitVersion() > currentHead.commitVersion()
+                || anchor.offsetEnd() > currentHead.committedEndOffset()
+                || anchor.cumulativeSize() > currentHead.cumulativeSize()) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "append recovery anchor is ahead of the current stream head");
+        }
+        AppendRecoveryHead observedHead = recoveryHead(streamId, currentHead);
+        String nextCommitId = currentHead.lastCommitId();
+        CommitChainExpectation expectation = expectationFromHead(currentHead);
+        if (continuation.isPresent()) {
+            AppendRecoveryTailCursor cursor = continuation.orElseThrow();
+            validateRecoveryTailCursor(cluster, streamId, anchor, currentHead, cursor);
+            observedHead = cursor.observedHead();
+            nextCommitId = cursor.nextCommitId();
+            expectation = new CommitChainExpectation(
+                    cursor.nextOffsetEnd(),
+                    cursor.nextCumulativeSize(),
+                    cursor.nextCommitVersion());
+        }
+
+        List<AppendRecoveryCommit> commits = new ArrayList<>(maxCommitsToScan);
+        while (commits.size() < maxCommitsToScan) {
+            if (nextCommitId.equals(anchor.lastCommitId())) {
+                requireRecoveryBridge(anchor, expectation);
+                return new AppendRecoveryTailPage(
+                        anchor, observedHead, commits, true, Optional.empty());
+            }
+            if (nextCommitId.isEmpty()) {
+                if (!anchor.isGenesis()) {
+                    throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                            "fake live commit tail ended before the recovery anchor");
+                }
+                requireRecoveryBridge(anchor, expectation);
+                return new AppendRecoveryTailPage(
+                        anchor, observedHead, commits, true, Optional.empty());
+            }
+            Object durable = anyCommit(cluster, streamId, nextCommitId);
+            if (durable == null) {
+                throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                        "fake anchor-aware walk found a missing live commit");
+            }
+            TargetChainView view = targetChainView(durable);
+            if (!view.streamId().equals(streamId.value())
+                    || !view.commitId().equals(nextCommitId)
+                    || view.offsetEnd() != expectation.offsetEnd()
+                    || view.cumulativeSize() != expectation.cumulativeSize()
+                    || view.commitVersion() != expectation.commitVersion()) {
+                throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                        "fake anchor-aware walk found an inconsistent live commit");
+            }
+            commits.add(recoveryCommit(cluster, streamId, durable));
+            expectation = predecessorExpectation(view);
+            nextCommitId = view.previousCommitId();
+        }
+        if (nextCommitId.equals(anchor.lastCommitId())) {
+            requireRecoveryBridge(anchor, expectation);
+            return new AppendRecoveryTailPage(
+                    anchor, observedHead, commits, true, Optional.empty());
+        }
+        AppendRecoveryTailCursor cursor = new AppendRecoveryTailCursor(
+                streamId,
+                anchor,
+                observedHead,
+                nextCommitId,
+                expectation.offsetEnd(),
+                expectation.cumulativeSize(),
+                expectation.commitVersion());
+        return new AppendRecoveryTailPage(
+                anchor, observedHead, commits, false, Optional.of(cursor));
+    }
+
+    private AppendRecoveryCommit recoveryCommit(
+            String cluster,
+            StreamId streamId,
+            Object durable) {
+        StreamCommitTargetRecord canonical;
+        AppendRecoveryCommitEncoding encoding;
+        long metadataVersion;
+        byte[] sourceBytes;
+        String key = new OxiaKeyspace(cluster).streamCommitKey(
+                streamId, targetChainView(durable).commitId());
+        if (durable instanceof StreamCommitTargetRecord target) {
+            canonical = withoutVersion(target);
+            encoding = AppendRecoveryCommitEncoding.GENERIC_STREAM_COMMIT_TARGET_V1;
+            metadataVersion = target.metadataVersion();
+            sourceBytes = targetCommitByKey.envelope(key);
+        } else {
+            StreamCommitRecord legacy = (StreamCommitRecord) durable;
+            canonical = canonicalRecoveryCommit(legacy);
+            encoding = AppendRecoveryCommitEncoding.LEGACY_STREAM_COMMIT_V1;
+            metadataVersion = legacy.metadataVersion();
+            sourceBytes = commitByKey.envelope(key);
+        }
+        byte[] canonicalBytes = MetadataRecordCodecFactory.encodeEnvelope(
+                canonical, StreamCommitTargetRecord.class);
+        return new AppendRecoveryCommit(
+                key,
+                encoding,
+                canonical,
+                metadataVersion,
+                sha256(sourceBytes),
+                ByteBuffer.wrap(canonicalBytes),
+                sha256(canonicalBytes));
+    }
+
+    private static StreamCommitTargetRecord withoutVersion(StreamCommitTargetRecord value) {
+        return new StreamCommitTargetRecord(
+                value.streamId(), value.commitId(), value.previousCommitId(),
+                value.offsetStart(), value.offsetEnd(), value.generation(),
+                value.cumulativeSize(), value.commitVersion(), value.writerId(),
+                value.writerRunIdHash(), value.writerEpoch(), value.fencingTokenHash(),
+                value.readTarget(), value.payloadFormat(), value.recordCount(),
+                value.entryCount(), value.logicalBytes(), value.schemaRefs(),
+                value.projectionRef(), value.minEventTimeMillis(), value.maxEventTimeMillis(),
+                value.preparedAtMillis(), 0);
+    }
+
+    private static StreamCommitTargetRecord canonicalRecoveryCommit(StreamCommitRecord value) {
+        EntryIndexReferenceRecord rawIndex = value.entryIndexRef();
+        EntryIndexRef index = new EntryIndexRef(
+                EntryIndexLocation.valueOf(rawIndex.location()),
+                rawIndex.objectId().isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(new ObjectId(rawIndex.objectId())),
+                rawIndex.objectKey().isEmpty()
+                        ? Optional.empty()
+                        : Optional.of(new ObjectKey(rawIndex.objectKey())),
+                rawIndex.inlineData().length == 0
+                        ? Optional.empty()
+                        : Optional.of(rawIndex.inlineData()),
+                rawIndex.offset(), rawIndex.length(),
+                new Checksum(
+                        ChecksumType.valueOf(rawIndex.checksumType()),
+                        rawIndex.checksumValue()));
+        ObjectSliceReadTarget target = new ObjectSliceReadTarget(
+                1,
+                new ObjectId(value.objectId()),
+                new ObjectKey(value.objectKey()),
+                ObjectType.valueOf(value.objectType()),
+                value.physicalFormat(),
+                value.logicalFormat(),
+                value.sliceId(),
+                value.objectOffset(),
+                value.objectLength(),
+                new Checksum(
+                        ChecksumType.valueOf(value.sliceChecksumType()),
+                        value.sliceChecksumValue()),
+                index);
+        ReadTargetRecord readTarget = ReadTargetCodecRegistry.phase15().encode(target);
+        return new StreamCommitTargetRecord(
+                value.streamId(), value.commitId(), value.previousCommitId(),
+                value.offsetStart(), value.offsetEnd(), 0, value.cumulativeSize(),
+                value.commitVersion(), value.writerId(), value.writerRunIdHash(),
+                value.writerEpoch(), value.fencingTokenHash(), readTarget,
+                value.payloadFormat(), value.recordCount(), value.entryCount(),
+                value.logicalBytes(), value.schemaRefs(), value.projectionRef(),
+                value.minEventTimeMillis(), value.maxEventTimeMillis(),
+                value.preparedAtMillis(), 0);
+    }
+
+    private void validateRecoveryTailCursor(
+            String cluster,
+            StreamId streamId,
+            AppendRecoveryAnchor anchor,
+            StreamHeadRecord currentHead,
+            AppendRecoveryTailCursor cursor) {
+        if (!cursor.streamId().equals(streamId)
+                || !cursor.anchor().equals(anchor)
+                || cursor.observedHead().commitVersion() > currentHead.commitVersion()) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "fake append recovery continuation changed its anchors");
+        }
+        AppendRecoveryHead observed = cursor.observedHead();
+        Object durable = anyCommit(cluster, streamId, observed.lastCommitId());
+        if (durable == null) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "fake append recovery continuation head is missing");
+        }
+        TargetChainView view = targetChainView(durable);
+        if (view.offsetEnd() != observed.offsetEnd()
+                || view.cumulativeSize() != observed.cumulativeSize()
+                || view.commitVersion() != observed.commitVersion()) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "fake append recovery continuation head changed");
+        }
+    }
+
+    private static AppendRecoveryHead recoveryHead(StreamId streamId, StreamHeadRecord head) {
+        return new AppendRecoveryHead(
+                streamId,
+                head.lastCommitId(),
+                head.committedEndOffset(),
+                head.cumulativeSize(),
+                head.commitVersion(),
+                head.metadataVersion());
+    }
+
+    private static CommitChainExpectation predecessorExpectation(TargetChainView view) {
+        long size = Math.subtractExact(view.cumulativeSize(), view.logicalBytes());
+        long version = Math.subtractExact(view.commitVersion(), 1);
+        if (size < 0
+                || (view.previousCommitId().isEmpty()
+                        && (view.offsetStart() != 0 || size != 0 || version != 0))
+                || (!view.previousCommitId().isEmpty()
+                        && (view.offsetStart() == 0 || version <= 0))) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "fake append recovery predecessor scalars are inconsistent");
+        }
+        return new CommitChainExpectation(view.offsetStart(), size, version);
+    }
+
+    private static void requireRecoveryBridge(
+            AppendRecoveryAnchor anchor,
+            CommitChainExpectation expectation) {
+        if (expectation.offsetEnd() != anchor.offsetEnd()
+                || expectation.cumulativeSize() != anchor.cumulativeSize()
+                || expectation.commitVersion() != anchor.commitVersion()) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "fake live tail does not bridge its recovery anchor");
+        }
     }
 
     @Override

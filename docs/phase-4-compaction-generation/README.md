@@ -5,8 +5,9 @@
 > reader/worker、protection crash-cut reconciliation、advisory checkpoint reconciliation、bounded service lifecycle、
 > Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry、terminal workflow-metadata retirement、
 > COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
-> isolated publication；F4-M4 正在实现，NRC1 object-protocol 与 protected generation-zero append 两个
-> checkpoints 已落地，recovery-root/retirement/GC 与 F4-M5–M6 尚未实现
+> isolated publication；F4-M4 正在实现，NRC1 object-protocol、protected generation-zero append，以及
+> anchor-aware tail/checkpoint planning foundation 已落地；recovery-root publication/retirement/GC 与 F4-M5–M6
+> 尚未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -385,6 +386,25 @@ Pulsar M4 check。Docker-backed M4 execution evidence 仍属于后续 checkpoint
 这个 checkpoint 只闭合新写入的 physical-reference 空窗。它不发布 NRC1 recovery root、不退休旧 commit/index
 证据，也不授权任何 physical delete；因此 F4-M4 仍为 `in progress`。
 
+### 6.6 F4-M4 anchor-aware checkpoint-planning foundation
+
+第三个实现检查点的基础部分已提供 production/fake 共用的分页 `readAppendRecoveryTail` surface。每页都绑定
+observed head、recovery-root anchor 和 continuation，按 newest-to-oldest 返回 exact durable key/version/source SHA，
+并把 legacy commit canonicalize 为 metadata-version-zero generic NRC1 envelope。core 的
+`AnchorAwareCommitWalker` 在一次有界 walk 前后重读 recovery root；root 变化时重启，root 稳定时才交付 live-tail
+到 checkpoint anchor 的无歧义 bridge。
+
+`RecoveryCheckpointBuilder` 现在从 grace-old、whole-commit、gap-free live prefix 中，只选择被 exact lossless
+`COMMITTED` generation 覆盖的部分；generation scan 对所有 candidate 使用 4,096 hard bound，并生成 canonical
+NRC1 write request/publication table/entries。publication 前的 `revalidate` 会重读 exact root、registration、selected
+commit evidence 与 generation indexes。`RecoveryCheckpointProtectionManager` 已定义 base-root-owned bounded
+pending protection，以及 published-root-owned checkpoint-object/target permanent protections；target root 校验绑定
+object key、object id、kind 和完整读取范围。metadata contract、anchor walker 与 builder focused tests 已通过。
+
+这仍只是 checkpoint C 的 planning/protection foundation：`RecoveryCheckpointCoordinator` 尚未执行 guarded
+upload、NRC1 full verification、recovery-root CAS 和 crash-cut reconciliation；anchor-aware replay/repair、source
+retirement 与任何 GC/delete path 也仍未开放。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -393,7 +413,7 @@ Pulsar M4 check。Docker-backed M4 execution evidence 仍属于后续 checkpoint
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 object protocol + protected generation-zero append implemented/tested，root publication/retirement/GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 object protocol、protected generation-zero append、anchor-aware tail/checkpoint planning foundation implemented/tested；coordinator/root publication/retirement/GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

@@ -106,6 +106,13 @@ public interface OxiaMetadataStore extends AutoCloseable {
             Optional<AppendReplayCursor> continuation,
             int maxCommitsToScan);
 
+    CompletableFuture<AppendRecoveryTailPage> readAppendRecoveryTail(
+            String cluster,
+            StreamId streamId,
+            AppendRecoveryAnchor anchor,
+            Optional<AppendRecoveryTailCursor> continuation,
+            int maxCommitsToScan);
+
     CompletableFuture<StreamMetadataSnapshot> transitionStreamState(
             String cluster,
             StreamStateTransitionRequest request);

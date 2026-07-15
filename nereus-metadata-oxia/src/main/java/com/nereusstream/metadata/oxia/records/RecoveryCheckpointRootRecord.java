@@ -1,6 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.metadata.oxia.records;
 
+import com.nereusstream.metadata.oxia.RecoveryCheckpointRootDigests;
 import java.util.List;
 
 /** Single-key authority selecting the live NRC1 recovery-checkpoint set. */
@@ -79,6 +80,10 @@ public record RecoveryCheckpointRootRecord(
                     || last.cumulativeSizeAtEnd() != cumulativeSizeAtEnd
                     || !first.firstCommitId().equals(firstCommitId) || !last.lastCommitId().equals(lastCommitId)) {
                 throw new IllegalArgumentException("recovery root summary does not match checkpoint references");
+            }
+            if (!checkpointSetSha256.equals(
+                    RecoveryCheckpointRootDigests.checkpointSetSha256(checkpoints).value())) {
+                throw new IllegalArgumentException("checkpointSetSha256 does not match checkpoint references");
             }
         }
     }

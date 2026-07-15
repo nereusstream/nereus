@@ -347,6 +347,7 @@ public final class F4MetadataTestValues {
 
     public static RecoveryCheckpointRootRecord fullRecoveryRoot() {
         RecoveryCheckpointReferenceRecord reference = checkpointReference();
+        List<RecoveryCheckpointReferenceRecord> references = List.of(reference);
         return new RecoveryCheckpointRootRecord(
                 1,
                 STREAM,
@@ -359,8 +360,8 @@ public final class F4MetadataTestValues {
                 100,
                 reference.firstCommitId(),
                 reference.lastCommitId(),
-                List.of(reference),
-                HASH_E,
+                references,
+                RecoveryCheckpointRootDigests.checkpointSetSha256(references).value(),
                 reference.sourceHeadCommitId(),
                 reference.sourceHeadCommitVersion(),
                 500,

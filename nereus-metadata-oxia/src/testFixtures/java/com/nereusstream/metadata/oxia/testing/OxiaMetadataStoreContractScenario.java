@@ -29,6 +29,9 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.CommitSliceResult;
+import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
+import com.nereusstream.metadata.oxia.AppendRecoveryCommitEncoding;
+import com.nereusstream.metadata.oxia.AppendRecoveryTailPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
@@ -73,6 +76,20 @@ public final class OxiaMetadataStoreContractScenario {
                 "successful commit must materialize one offset index");
         require(store.repairObjectReferences(cluster, request.objectId()).join().visibleSlices().size() == 1,
                 "reference repair must find the reachable commit");
+        AppendRecoveryTailPage recoveryTail = store.readAppendRecoveryTail(
+                cluster,
+                streamId,
+                AppendRecoveryAnchor.genesis(streamId),
+                Optional.empty(),
+                1).join();
+        require(recoveryTail.anchorReached()
+                        && recoveryTail.continuation().isEmpty()
+                        && recoveryTail.commitsNewestFirst().size() == 1,
+                "anchor-aware recovery walk must bridge the legacy live tail to genesis");
+        require(recoveryTail.commitsNewestFirst().get(0).sourceEncoding()
+                        == AppendRecoveryCommitEncoding.LEGACY_STREAM_COMMIT_V1
+                        && recoveryTail.commitsNewestFirst().get(0).canonicalCommit().metadataVersion() == 0,
+                "legacy recovery evidence must be canonicalized as a generic NRC1 envelope");
         store.updateTrim(cluster, streamId, 1, "contract").join();
         require(store.getTrim(cluster, streamId).join().trimOffset() == 1,
                 "trim must persist the requested low-watermark");
