@@ -35,7 +35,6 @@ import com.nereusstream.objectstore.PutObjectResult;
 import com.nereusstream.objectstore.RangeReadOptions;
 import com.nereusstream.objectstore.RangeReadResult;
 import com.nereusstream.objectstore.ReplayableObjectUpload;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -54,10 +53,15 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.CRC32C;
 
 /** Test-fixture object store backed by a caller-supplied local directory. */
 public final class LocalFileObjectStore implements ObjectStore {
+    private static final String INTERNAL_DIRECTORY = ".nereus-internal-v1";
     private final Path root;
+    private final Path internalRoot;
     private volatile boolean closed;
 
     public LocalFileObjectStore(Path root) {
@@ -65,6 +69,12 @@ public final class LocalFileObjectStore implements ObjectStore {
         try {
             Files.createDirectories(root);
             this.root = root.toRealPath();
+            Path internal = this.root.resolve(INTERNAL_DIRECTORY);
+            if (Files.exists(internal, LinkOption.NOFOLLOW_LINKS) && Files.isSymbolicLink(internal)) {
+                throw new IllegalArgumentException("local object-store internal path cannot be a symlink");
+            }
+            Files.createDirectories(internal);
+            this.internalRoot = internal.toRealPath(LinkOption.NOFOLLOW_LINKS);
         } catch (IOException e) {
             throw new IllegalArgumentException("cannot initialize local object store root", e);
         }
@@ -88,49 +98,16 @@ public final class LocalFileObjectStore implements ObjectStore {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(options, "options");
         Objects.requireNonNull(attemptGuard, "attemptGuard");
-        if (source.contentLength() < 0 || source.contentLength() > Integer.MAX_VALUE) {
+        if (closed) {
+            return CompletableFuture.failedFuture(failure(
+                    ErrorCode.STORAGE_CLOSED, false, "object store is closed"));
+        }
+        if (source.contentLength() < 0) {
             return CompletableFuture.failedFuture(failure(
                     ErrorCode.INVALID_ARGUMENT, false, "local upload length is outside the supported bound"));
         }
         return attemptGuard.authorize(key, 1)
-                .thenCompose(ignored -> collect(source))
-                .thenCompose(bytes -> complete(() -> {
-            ensureOpen();
-            Path target = resolveKey(key);
-            rejectExistingSymlink(target);
-            if (bytes.length != source.contentLength()) {
-                throw failure(ErrorCode.OBJECT_UPLOAD_FAILED, false, "upload source length mismatch");
-            }
-            Checksum actual = Crc32cChecksums.checksum(bytes);
-            if (!actual.equals(options.expectedChecksum())) {
-                throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "putObject checksum mismatch");
-            }
-            Files.createDirectories(target.getParent());
-            rejectExistingSymlinkParent(target.getParent());
-            Path temporary = target.resolveSibling(target.getFileName() + ".tmp-" + UUID.randomUUID());
-            try {
-                writeTemporary(temporary, bytes);
-                if (options.ifAbsent() && Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-                    throw new ObjectAlreadyExistsException("object already exists");
-                }
-                try {
-                    Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
-                } catch (AtomicMoveNotSupportedException e) {
-                    Files.move(temporary, target);
-                }
-            } catch (NereusException e) {
-                deleteQuietly(temporary);
-                throw e;
-            } catch (IOException e) {
-                deleteQuietly(temporary);
-                throw failure(ErrorCode.OBJECT_UPLOAD_FAILED, true, "local object upload failed", e);
-            }
-            return new PutObjectResult(
-                    key,
-                    bytes.length,
-                    actual,
-                    actual.value());
-        }));
+                .thenCompose(ignored -> streamPut(key, source, options));
     }
 
     @Override
@@ -217,6 +194,7 @@ public final class LocalFileObjectStore implements ObjectStore {
             try (var paths = Files.walk(root)) {
                 paths.filter(Files::isRegularFile)
                         .filter(path -> !Files.isSymbolicLink(path))
+                        .filter(path -> !path.startsWith(internalRoot))
                         .map(path -> new PathAndKey(path, root.relativize(path).toString().replace('\\', '/')))
                         .filter(value -> value.key().startsWith(prefix.value()))
                         .filter(value -> after.isEmpty() || value.key().compareTo(after) > 0)
@@ -244,14 +222,15 @@ public final class LocalFileObjectStore implements ObjectStore {
             } else {
                 String last = all.get(all.size() - 1).key().value();
                 try (var paths = Files.walk(root)) {
-                    more = paths.filter(Files::isRegularFile)
+                    more = paths.filter(path -> !path.startsWith(internalRoot))
+                            .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
                             .map(path -> root.relativize(path).toString().replace('\\', '/'))
                             .anyMatch(key -> key.startsWith(prefix.value()) && key.compareTo(last) > 0);
                 }
             }
             Optional<String> next = more
                     ? Optional.of(all.get(all.size() - 1).key().value()) : Optional.empty();
-            if (next.equals(continuationToken)) {
+            if (next.isPresent() && next.equals(continuationToken)) {
                 throw failure(ErrorCode.OBJECT_READ_FAILED, false, "local list repeated a continuation token");
             }
             return new ListObjectsResult(prefix, all, next);
@@ -312,6 +291,9 @@ public final class LocalFileObjectStore implements ObjectStore {
         Path current = root;
         for (String segment : segments) {
             validateSegment(segment);
+            if (current.equals(root) && segment.equals(INTERNAL_DIRECTORY)) {
+                throw failure(ErrorCode.INVALID_ARGUMENT, false, "object key uses a reserved local segment");
+            }
             Path next = current.resolve(segment).normalize();
             if (!next.startsWith(root)) {
                 throw failure(ErrorCode.INVALID_ARGUMENT, false, "object key escapes local root");
@@ -346,74 +328,168 @@ public final class LocalFileObjectStore implements ObjectStore {
         }
     }
 
-    private CompletableFuture<byte[]> collect(ReplayableObjectUpload source) {
-        CompletableFuture<byte[]> result = new CompletableFuture<>();
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(Math.toIntExact(source.contentLength()));
+    private CompletableFuture<PutObjectResult> streamPut(
+            ObjectKey key,
+            ReplayableObjectUpload source,
+            PutObjectOptions options) {
+        CompletableFuture<PutObjectResult> result = new CompletableFuture<>();
+        Path target;
+        Path temporary;
+        FileChannel channel;
+        try {
+            ensureOpen();
+            target = resolveKey(key);
+            rejectExistingSymlink(target);
+            Files.createDirectories(target.getParent());
+            rejectExistingSymlinkParent(target.getParent());
+            temporary = internalRoot.resolve("upload-" + UUID.randomUUID() + ".tmp");
+            channel = FileChannel.open(
+                    temporary,
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE,
+                    LinkOption.NOFOLLOW_LINKS);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        AtomicReference<Flow.Subscription> subscription = new AtomicReference<>();
+        AtomicBoolean finished = new AtomicBoolean();
         try {
             source.openPublisher().subscribe(new Flow.Subscriber<>() {
-                private Flow.Subscription subscription;
                 private long received;
+                private final CRC32C crc32c = new CRC32C();
 
                 @Override
                 public void onSubscribe(Flow.Subscription value) {
-                    if (subscription != null) {
+                    if (!subscription.compareAndSet(null, value)) {
                         value.cancel();
                         return;
                     }
-                    subscription = value;
                     value.request(1);
                 }
 
                 @Override
                 public void onNext(ByteBuffer item) {
                     if (result.isDone()) {
-                        subscription.cancel();
+                        Flow.Subscription active = subscription.get();
+                        if (active != null) {
+                            active.cancel();
+                        }
                         return;
                     }
                     ByteBuffer duplicate = Objects.requireNonNull(item, "item").asReadOnlyBuffer();
                     int length = duplicate.remaining();
-                    received = Math.addExact(received, length);
-                    if (received > source.contentLength()) {
-                        subscription.cancel();
-                        result.completeExceptionally(failure(
-                                ErrorCode.OBJECT_UPLOAD_FAILED, false, "upload publisher exceeded declared length"));
-                        return;
+                    try {
+                        received = Math.addExact(received, length);
+                        if (received > source.contentLength()) {
+                            throw failure(
+                                    ErrorCode.OBJECT_UPLOAD_FAILED, false,
+                                    "upload publisher exceeded declared length");
+                        }
+                        ByteBuffer checksumBytes = duplicate.asReadOnlyBuffer();
+                        while (duplicate.hasRemaining()) {
+                            channel.write(duplicate);
+                        }
+                        crc32c.update(checksumBytes);
+                        subscription.get().request(1);
+                    } catch (Throwable failure) {
+                        fail(failure);
                     }
-                    byte[] chunk = new byte[length];
-                    duplicate.get(chunk);
-                    bytes.writeBytes(chunk);
-                    subscription.request(1);
                 }
 
                 @Override
                 public void onError(Throwable throwable) {
-                    result.completeExceptionally(throwable);
+                    fail(throwable);
                 }
 
                 @Override
                 public void onComplete() {
-                    if (received != source.contentLength()) {
-                        result.completeExceptionally(failure(
-                                ErrorCode.OBJECT_UPLOAD_FAILED, false, "upload publisher ended before declared length"));
-                    } else {
-                        result.complete(bytes.toByteArray());
+                    if (!finished.compareAndSet(false, true)) {
+                        return;
                     }
+                    try {
+                        if (received != source.contentLength()) {
+                            throw failure(
+                                    ErrorCode.OBJECT_UPLOAD_FAILED, false,
+                                    "upload publisher ended before declared length");
+                        }
+                        Checksum actual = Crc32cChecksums.checksum((int) crc32c.getValue());
+                        if (!actual.equals(options.expectedChecksum())) {
+                            throw failure(
+                                    ErrorCode.OBJECT_CHECKSUM_MISMATCH, false,
+                                    "putObject checksum mismatch");
+                        }
+                        channel.force(true);
+                        channel.close();
+                        if (options.ifAbsent() && Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+                            throw new ObjectAlreadyExistsException("object already exists");
+                        }
+                        try {
+                            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+                        } catch (AtomicMoveNotSupportedException unsupported) {
+                            Files.move(temporary, target);
+                        }
+                        result.complete(new PutObjectResult(
+                                key, received, actual, actual.value()));
+                    } catch (Throwable failure) {
+                        cleanup();
+                        result.completeExceptionally(mapUploadFailure(failure));
+                    }
+                }
+
+                private void fail(Throwable supplied) {
+                    if (!finished.compareAndSet(false, true)) {
+                        return;
+                    }
+                    Flow.Subscription active = subscription.get();
+                    if (active != null) {
+                        active.cancel();
+                    }
+                    cleanup();
+                    result.completeExceptionally(mapUploadFailure(supplied));
+                }
+
+                private void cleanup() {
+                    try {
+                        channel.close();
+                    } catch (IOException ignored) {
+                        // Terminal test-fixture cleanup.
+                    }
+                    deleteQuietly(temporary);
                 }
             });
         } catch (Throwable failure) {
-            result.completeExceptionally(failure);
+            if (finished.compareAndSet(false, true)) {
+                try {
+                    channel.close();
+                } catch (IOException ignored) {
+                    // Terminal test-fixture cleanup.
+                }
+                deleteQuietly(temporary);
+                result.completeExceptionally(mapUploadFailure(failure));
+            }
         }
+        result.whenComplete((ignored, failure) -> {
+            if (result.isCancelled() && finished.compareAndSet(false, true)) {
+                Flow.Subscription active = subscription.get();
+                if (active != null) {
+                    active.cancel();
+                }
+                try {
+                    channel.close();
+                } catch (IOException ignoredClose) {
+                    // Terminal test-fixture cleanup.
+                }
+                deleteQuietly(temporary);
+            }
+        });
         return result;
     }
 
-    private void writeTemporary(Path temporary, byte[] bytes) throws IOException {
-        try (FileChannel channel = FileChannel.open(
-                temporary,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE)) {
-            channel.write(ByteBuffer.wrap(bytes));
-            channel.force(true);
+    private static Throwable mapUploadFailure(Throwable supplied) {
+        if (supplied instanceof NereusException) {
+            return supplied;
         }
+        return failure(ErrorCode.OBJECT_UPLOAD_FAILED, true, "local object upload failed", supplied);
     }
 
     private <T> CompletableFuture<T> complete(ThrowingSupplier<T> supplier) {

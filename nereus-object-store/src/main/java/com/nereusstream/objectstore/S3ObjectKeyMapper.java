@@ -8,11 +8,16 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 
 /** Strict one-to-one mapping from protocol-neutral keys into one canonical S3 prefix. */
 public final class S3ObjectKeyMapper {
     private static final int MAX_S3_KEY_BYTES = 1_024;
+    private static final String BASE64_URL_ALPHABET =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     private final String prefix;
 
     public S3ObjectKeyMapper(String prefix) {
@@ -32,12 +37,30 @@ public final class S3ObjectKeyMapper {
 
     public String mapPrefix(ObjectKeyPrefix logicalPrefix) {
         byte[] bytes = strictUtf8(Objects.requireNonNull(logicalPrefix, "logicalPrefix").value(), "object key prefix");
-        int completeTriples = bytes.length / 3;
-        if (completeTriples == 0) {
-            return objectRoot();
+        String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        return objectRoot() + encoded.substring(0, (bytes.length * Byte.SIZE) / 6);
+    }
+
+    /** Returns disjoint S3 prefixes whose union is exactly the supplied logical byte prefix. */
+    public List<String> mapPrefixes(ObjectKeyPrefix logicalPrefix) {
+        byte[] bytes = strictUtf8(Objects.requireNonNull(logicalPrefix, "logicalPrefix").value(), "object key prefix");
+        String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        int remainder = bytes.length % 3;
+        if (remainder == 0) {
+            return List.of(objectRoot() + encoded);
         }
-        byte[] stable = java.util.Arrays.copyOf(bytes, completeTriples * 3);
-        return objectRoot() + Base64.getUrlEncoder().withoutPadding().encodeToString(stable);
+        int variants = remainder == 1 ? 16 : 4;
+        String stable = encoded.substring(0, encoded.length() - 1);
+        int first = BASE64_URL_ALPHABET.indexOf(encoded.charAt(encoded.length() - 1));
+        if (first < 0 || first + variants > BASE64_URL_ALPHABET.length()) {
+            throw new IllegalStateException("base64url prefix expansion is invalid");
+        }
+        List<String> result = new ArrayList<>(variants);
+        for (int variant = 0; variant < variants; variant++) {
+            result.add(objectRoot() + stable + BASE64_URL_ALPHABET.charAt(first + variant));
+        }
+        result.sort(Comparator.naturalOrder());
+        return List.copyOf(result);
     }
 
     public ObjectKey unmap(String mappedKey) {

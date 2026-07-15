@@ -36,7 +36,8 @@ public interface ObjectStore extends AutoCloseable {
             source.close();
             throw failure;
         }
-        return result.whenComplete((ignored, failure) -> source.close());
+        result.whenComplete((ignored, failure) -> source.close());
+        return result;
     }
 
     default CompletableFuture<PutObjectResult> putObject(

@@ -10,6 +10,8 @@ import com.nereusstream.api.ObjectKey;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
@@ -66,9 +68,13 @@ class S3CompatibleObjectStoreLocalStackIntegrationTest {
             assertThatThrownBy(() -> firstProvider.create(config, ref -> Optional.empty()))
                     .isInstanceOf(IllegalStateException.class);
             assertThat(first.putObject(key, ByteBuffer.wrap(payload), put).join().checksum()).isEqualTo(checksum);
+            ObjectKey secondKey = new ObjectKey("wal/object-2");
+            assertThat(first.putObject(secondKey, ByteBuffer.wrap(payload), put).join().checksum()).isEqualTo(checksum);
             assertNereus(() -> first.putObject(key, ByteBuffer.wrap(payload), put).join(),
                     ErrorCode.OBJECT_UPLOAD_FAILED);
-            assertThat(first.headObject(key, new HeadObjectOptions(Duration.ofSeconds(10))).join())
+            HeadObjectResult firstHead = first.headObject(
+                    key, new HeadObjectOptions(Duration.ofSeconds(10))).join();
+            assertThat(firstHead)
                     .satisfies(head -> {
                         assertThat(head.objectLength()).isEqualTo(payload.length);
                         assertThat(head.checksum()).isEqualTo(checksum);
@@ -83,6 +89,28 @@ class S3CompatibleObjectStoreLocalStackIntegrationTest {
             assertNereus(() -> first.readRange(key, 0, 4, new RangeReadOptions(
                             Optional.of(Crc32cChecksums.checksum(new byte[] {1})), Duration.ofSeconds(10))).join(),
                     ErrorCode.OBJECT_CHECKSUM_MISMATCH);
+            List<String> listed = new ArrayList<>();
+            Optional<String> continuation = Optional.empty();
+            do {
+                ListObjectsResult page = first.listObjects(
+                        new ObjectKeyPrefix("wal/"),
+                        continuation,
+                        new ListObjectsOptions(1, Duration.ofSeconds(10))).join();
+                listed.addAll(page.objects().stream().map(value -> value.key().value()).toList());
+                continuation = page.continuationToken();
+            } while (continuation.isPresent());
+            assertThat(listed).containsExactlyInAnyOrderElementsOf(List.of("wal/object-1", "wal/object-2"));
+            HeadObjectResult secondHead = first.headObject(
+                    secondKey, new HeadObjectOptions(Duration.ofSeconds(10))).join();
+            DeleteObjectOptions delete = new DeleteObjectOptions(
+                    secondHead.objectLength(),
+                    secondHead.checksum(),
+                    secondHead.etag(),
+                    Duration.ofSeconds(10));
+            assertThat(first.deleteObject(secondKey, delete).join().status())
+                    .isEqualTo(DeleteObjectResult.Status.DELETED);
+            assertThat(first.deleteObject(secondKey, delete).join().status())
+                    .isEqualTo(DeleteObjectResult.Status.ALREADY_ABSENT);
             first.close();
             firstProvider.close();
 

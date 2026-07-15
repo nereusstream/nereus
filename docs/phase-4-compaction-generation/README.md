@@ -194,14 +194,16 @@ the same change.
 
 The first F4-M1 checkpoint now contains the view/generation/publication/object-key-hash API values, the
 `nereus-materialization` module boundary, F4 Oxia keyspace/scan tokens, all ten M1 record families and binary-v1
-codecs, production generation/physical-object metadata-store surfaces, version-conditional delete, and the initial
-guarded replayable PUT/list/delete object-store surface. The local object-store fixture implements the same IO
-surface. Existing object-store implementations remain source-compatible through fail-closed default methods for new
-optional operations.
+codecs, production generation/physical-object metadata-store surfaces, version-conditional delete, and guarded
+replayable PUT/list/delete. The object-store checkpoint now also includes owner-only bounded staging files,
+backpressure-aware replay, deterministic guarded-retry tests, exact base64-prefix expansion, opaque cross-prefix S3
+continuations, whole-operation PUT cancellation/deadlines, streaming local-fixture upload and exact HEAD-before-
+DELETE validation. Existing object-store implementations remain source-compatible through fail-closed default
+methods for new optional operations.
 
-This checkpoint is deliberately not an F4-M1 completion claim. Staging-file ownership, core reader-lease/protection
-managers, capability guards, full metadata/object-store contract tests, frozen codec vectors and the aggregate M1
-gate remain outstanding. No generation publication, resolver, materialization worker, retention or GC behavior is
+This checkpoint is deliberately not an F4-M1 completion claim. Core reader-lease/protection managers, capability
+guards, metadata-store contracts, frozen codec vectors, remaining real-service evidence and the aggregate M1 gate
+remain outstanding. No generation publication, resolver, materialization worker, retention or GC behavior is
 enabled by this checkpoint.
 
 ## 7. Milestones

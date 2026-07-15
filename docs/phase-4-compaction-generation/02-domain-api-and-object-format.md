@@ -1069,6 +1069,29 @@ public interface ReplayableObjectUpload extends AutoCloseable {
     @Override void close();
 }
 
+public interface StagedObjectFile extends ReplayableObjectUpload {
+    long sealedLength();
+    Checksum storageCrc32c();
+    Checksum contentSha256();
+}
+
+public final class StagingFileManager implements AutoCloseable {
+    public StagingFileManager(
+            Path absoluteOwnerOnlyDirectory,
+            long maxStagingBytes,
+            int uploadChunkBytes,
+            Duration orphanGrace,
+            Executor objectIoExecutor);
+    public PrivateStagedObjectFile create(String canonicalPurpose);
+    public int cleanupOrphans();
+    public long reservedBytes();
+}
+
+public final class PrivateStagedObjectFile implements StagedObjectFile {
+    public OutputStream outputStream();       // claim once
+    public PrivateStagedObjectFile seal();    // force + immutable identity/checksums
+}
+
 public record ListObjectsOptions(int maxKeys, Duration timeout) { }
 
 public record ListedObject(
@@ -1129,8 +1152,13 @@ the orphan staging grace. The manager's global byte semaphore bounds sealed + in
 compacted and checkpoint writers. Staging files are never
 durable recovery truth；a process crash simply causes task replay and object-store orphan reconciliation.
 
-List is bounded to at most 1,000 keys per call and the continuation token is opaque. A provider returning more keys、
-wrong prefix/order or a repeated non-terminal token fails the scan.
+List is bounded to at most 1,000 logical keys per call and the continuation token is opaque. Because canonical S3
+keys use base64url, an arbitrary UTF-8 logical prefix is represented by one exact physical prefix when its byte
+length is divisible by three, 16 disjoint prefixes for remainder one, and four for remainder two. The adapter walks
+those disjoint prefixes under one `nls1` Nereus continuation token；it never treats one broad base64 prefix plus
+post-filtering as a complete page. A provider returning more keys、wrong prefix/order, a non-canonical key or a
+repeated non-terminal token fails the scan. Objects are strictly ordered within each returned logical page；callers
+must use the opaque token rather than infer cross-page order from base64 physical keys.
 
 Delete is admitted only while the physical root is `DELETING`. The implementation performs exact HEAD identity
 validation before DELETE. S3 `If-Match` is used where supported；for compatible stores without conditional DELETE，
