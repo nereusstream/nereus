@@ -719,3 +719,20 @@ tasks.register("phase4M4CheckpointIndexRepairCheck") {
     dependsOn(":nereus-metadata-oxia:check")
     dependsOn(":nereus-object-store:check")
 }
+
+tasks.register<Exec>("checkPhase4M4RetirementMetadataContractSurface") {
+    group = "verification"
+    description = "Audit the in-progress F4-M4 exact source/object-audit retirement metadata checkpoint."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-retirement-metadata-contract-surface.sh")
+}
+
+tasks.register("phase4M4RetirementMetadataCheck") {
+    group = "verification"
+    description = "Verify exact read-before-delete metadata retirement without enabling physical deletion."
+    dependsOn("phase4M4CheckpointIndexRepairCheck")
+    dependsOn("checkPhase4M4RetirementMetadataContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-metadata-oxia:check")
+}

@@ -170,6 +170,23 @@ write. A concurrent identical restore is idempotent；a different value at the s
 implementation. After either repair source reports terminal success, resolver performs a new authoritative index
 scan and the existing physical read-pin revalidation. Repair evidence never becomes a parallel visibility domain.
 
+### 1.8 F4-M4 exact retirement metadata checkpoint
+
+Checkpoint G implements the focused `retirement` package and keeps it intentionally narrower than the ordinary
+metadata stores. `SharedOxiaClientRuntime.retirementMetadataClient` lends only exact `get` and
+`deleteIfVersion`, and accepts only a package-constructible opaque `RetirementMetadataKey`；the adapter cannot
+create、CAS-update、scan or list metadata, while unrelated runtime callers cannot forge arbitrary delete keys. The source adapter supports both
+legacy and generic generation-zero index/marker/commit encodings, verifies the canonical key against strictly decoded
+record identity, requires encoded `metadataVersion == 0`, then compares the captured Oxia version and SHA-256 of the
+exact stored envelope before conditional delete.
+
+The design API now includes `getCommittedMarker` and `VersionedGenerationZeroMarker`. This is required because the
+ordinary generation scan and append-tail APIs expose the index and commit node but do not expose the separate
+committed-marker version/digest needed to freeze a recoverable retirement plan. The object-audit adapter returns
+hydrated manifest/reference wrappers while retaining the pre-hydration stored-envelope digest. Neither adapter treats
+absence or response uncertainty as success；the future coordinator must prove idempotence under the same unchanged
+recovery/physical-root attempt. This checkpoint enables no caller or physical delete by itself.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples
@@ -523,26 +540,44 @@ public record LegacyCommittedSliceIdentity(
 public record GenericCommittedAppendIdentity(
         String commitId) implements GenerationZeroMarkerIdentity { }
 
+public record VersionedGenerationZeroMarker(
+        String key,
+        StreamId streamId,
+        GenerationZeroMarkerIdentity identity,
+        long offsetStart,
+        long offsetEnd,
+        long commitVersion,
+        long metadataVersion,
+        Checksum durableValueSha256) { }
+
 public interface SourceRetirementMetadataStore extends AutoCloseable {
+    CompletableFuture<Optional<VersionedGenerationZeroMarker>> getCommittedMarker(
+            String cluster, StreamId streamId, GenerationZeroMarkerIdentity marker);
+
     CompletableFuture<Void> deleteGenerationZeroIndex(
             String cluster, StreamId streamId, long offsetEnd,
-            long expectedVersion, Checksum expectedRecordSha256);
+            long expectedVersion, Checksum expectedDurableValueSha256);
 
     CompletableFuture<Void> deleteCommittedMarker(
             String cluster, StreamId streamId, GenerationZeroMarkerIdentity marker,
-            long expectedVersion, Checksum expectedRecordSha256);
+            long expectedVersion, Checksum expectedDurableValueSha256);
 
     CompletableFuture<Void> deleteCommitNode(
             String cluster, StreamId streamId, String commitId,
-            long expectedVersion, Checksum expectedRecordSha256);
+            long expectedVersion, Checksum expectedDurableValueSha256);
 }
 ```
 
-Each method rebuilds the key through `OxiaKeyspace`, re-reads/strictly decodes the existing L0 record, compares its
-canonical codec SHA-256 and then calls `deleteIfVersion` in the stream partition. Missing is idempotent only when the
+Each delete rebuilds the key through `OxiaKeyspace`, re-reads/strictly decodes the existing L0 record, compares its
+exact stored-envelope SHA-256 and then calls `deleteIfVersion` in the stream partition. Missing is idempotent only when the
 same retirement plan already recorded that exact key/identity. The caller must hold/revalidate the recovery-root、
 generation、activation and physical-root proof from document 05 before every batch；this adapter never infers safety
 from age or a higher generation alone.
+
+`getCommittedMarker` is the only planning read added here. It verifies the same key/value identity and returns the
+captured durable version/digest；it never creates a missing marker. Generation-zero index and commit-node facts remain
+captured from `GenerationMetadataStore` and `AppendRecoveryTailPage`, respectively, so the retirement package does
+not duplicate those authorities.
 
 The last Phase 1 object audit keys also use a focused adapter. They are not generation metadata and are removed only
 while the exact `DELETED` physical root remains the coordinator described in document 05 §9.6：
@@ -569,11 +604,11 @@ public interface ObjectAuditRetirementStore extends AutoCloseable {
 
     CompletableFuture<Void> deleteReferences(
             String cluster, ObjectId objectId,
-            long expectedVersion, Checksum expectedRecordSha256);
+            long expectedVersion, Checksum expectedDurableValueSha256);
 
     CompletableFuture<Void> deleteManifest(
             String cluster, ObjectId objectId,
-            long expectedVersion, Checksum expectedRecordSha256);
+            long expectedVersion, Checksum expectedDurableValueSha256);
 }
 ```
 

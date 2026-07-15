@@ -3,6 +3,9 @@ package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.metadata.oxia.retirement.RetirementMetadataClient;
+import com.nereusstream.metadata.oxia.retirement.RetirementMetadataKey;
+import com.nereusstream.metadata.oxia.retirement.RetirementMetadataValue;
 import io.oxia.client.api.OxiaClientBuilder;
 import io.oxia.client.api.SyncOxiaClient;
 import io.oxia.client.api.exceptions.OxiaException;
@@ -95,6 +98,27 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
             throw new IllegalArgumentException("Oxia adapter configuration does not match the shared runtime");
         }
         ensureOpen();
+    }
+
+    /** Returns a borrowed read/delete-only view used by exact Phase 4 retirement adapters. */
+    public RetirementMetadataClient retirementMetadataClient(OxiaClientConfiguration candidate) {
+        requireCompatible(candidate);
+        return new RetirementMetadataClient() {
+            @Override
+            public java.util.concurrent.CompletableFuture<java.util.Optional<RetirementMetadataValue>> get(
+                    RetirementMetadataKey key) {
+                ensureOpen();
+                return client.get(key.key(), key.partitionKey()).thenApply(optional -> optional.map(value ->
+                        new RetirementMetadataValue(value.key(), value.value(), value.version())));
+            }
+
+            @Override
+            public java.util.concurrent.CompletableFuture<Void> deleteIfVersion(
+                    RetirementMetadataKey key, long expectedVersion) {
+                ensureOpen();
+                return client.deleteIfVersion(key.key(), expectedVersion, key.partitionKey());
+            }
+        };
     }
 
     @Override

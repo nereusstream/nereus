@@ -63,7 +63,9 @@ root-double-read/pinned checkpoint append replay adapter、shared live/NRC1 requ
 `AppendCoordinator`/`DefaultStreamStorage` injection seam. Checkpoint F now adds exact committed-index restore、
 raw/envelope digest separation、root-stable pinned NRC1 repair、highest healthy target selection、current-root-owned
 target protection and the `GenerationReadResolver` terminal repair seam. Runtime composition、retirement and GC
-remain.
+remain. Checkpoint G now adds exact read-before-delete generation-zero source and Phase 1 object-audit metadata
+adapters、committed-marker capture、legacy/generic encoding separation and a borrowed get/delete-only shared-Oxia
+bridge. No coordinator or physical delete path is enabled by checkpoint G.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -572,7 +574,8 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Current status：in progress. Checkpoint A (NRC1 object protocol)、checkpoint B (protected generation-zero
 > append/recovery)、checkpoint C (anchor-aware tail/planning foundation), and checkpoint D (guarded root publication
 > plus restart protection reconciliation), checkpoint E (checkpoint-aware append replay adapter), and checkpoint F
-> (checkpoint-derived committed-index repair) are implemented；runtime composition、retirement and
+> (checkpoint-derived committed-index repair), and checkpoint G (exact retirement metadata adapters) are implemented；
+> runtime composition、retirement coordinators and
 > physical/cursor GC remain before F4-M4 can be called complete or final-gated.
 
 ### 6.1 Production artifacts
@@ -630,13 +633,19 @@ recovery/CheckpointDerivedIndexRepairer.java       implemented checkpoint F
 recovery/RecoveryCheckpointProtectionIdentities.java implemented checkpoint F shared identity
 GenerationIndexDigests.java                        implemented checkpoint F raw/envelope roles
 GenerationMetadataStore.restoreCommittedFromCheckpoint implemented checkpoint F exact create/reload
-retirement/SourceRetirementMetadataStore.java
-retirement/OxiaJavaSourceRetirementMetadataStore.java
-retirement/GenerationZeroMarkerIdentity.java
-retirement/ObjectAuditRetirementStore.java
-retirement/OxiaJavaObjectAuditRetirementStore.java
-retirement/VersionedObjectManifestAudit.java
-retirement/VersionedObjectReferencesAudit.java
+retirement/RetirementMetadataClient.java                 implemented checkpoint G
+retirement/RetirementMetadataKey.java                    implemented checkpoint G
+retirement/RetirementMetadataValue.java                  implemented checkpoint G
+retirement/SourceRetirementMetadataStore.java            implemented checkpoint G
+retirement/OxiaJavaSourceRetirementMetadataStore.java    implemented checkpoint G
+retirement/GenerationZeroMarkerIdentity.java             implemented checkpoint G
+retirement/LegacyCommittedSliceIdentity.java             implemented checkpoint G
+retirement/GenericCommittedAppendIdentity.java           implemented checkpoint G
+retirement/VersionedGenerationZeroMarker.java             implemented checkpoint G
+retirement/ObjectAuditRetirementStore.java               implemented checkpoint G
+retirement/OxiaJavaObjectAuditRetirementStore.java       implemented checkpoint G
+retirement/VersionedObjectManifestAudit.java             implemented checkpoint G
+retirement/VersionedObjectReferencesAudit.java           implemented checkpoint G
 OxiaJavaClientMetadataStore                    bridge live tail to root/NRC1
 testing/FakeOxiaMetadataStore                  exact parity
 ```
@@ -700,8 +709,8 @@ AnchorAwareCommitWalkerTest
 CheckpointAppendReplayTest                         implemented checkpoint E
 CheckpointDerivedIndexRepairTest                    implemented checkpoint F
 MetadataGenerationIndexRepairerTest                 implemented checkpoint F
-SourceRetirementMetadataStoreContractTest
-ObjectAuditRetirementStoreContractTest
+SourceRetirementMetadataStoreContractTest                  implemented checkpoint G
+ObjectAuditRetirementStoreContractTest                     implemented checkpoint G
 RecoveryCheckpointFailureInjectionTest
 PreparedStableAppendContractTest
 GenerationZeroPhysicalReferencePublisherTest
@@ -738,6 +747,7 @@ retirement.
 ./gradlew phase4M4RecoveryRootCheck
 ./gradlew phase4M4CheckpointReplayCheck
 ./gradlew phase4M4CheckpointIndexRepairCheck
+./gradlew phase4M4RetirementMetadataCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -768,6 +778,13 @@ root-owned target protection、activation/trim/root revalidation and resolver fr
 root-at-pin change, trim no-write and lease cleanup. It is checkpoint-F evidence only；the default runtime composition
 still selects the live-only repair adapter, and source/index retirement、physical/cursor GC and all delete enablement
 remain unavailable.
+
+`phase4M4RetirementMetadataCheck` extends checkpoint F with the dedicated read-before-delete source/object-audit
+adapters. It proves legacy/generic generation-zero index、marker and commit-node separation；canonical key/partition、
+encoded version、captured Oxia version and exact stored-envelope SHA checks；hydrated object audits；
+references-before-manifest ordering；and fail-closed missing/response-loss behavior. It deliberately provides no
+source-retirement plan、root MARK/DRAIN/DELETING transition、domain proof、object-store delete or runtime composition,
+so it is checkpoint-G evidence only.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

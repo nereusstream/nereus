@@ -47,6 +47,21 @@ nereus-core/src/main/java/com/nereusstream/core/physical/
 nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/f4/
   PhysicalObjectMetadataStore.java
 
+nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/retirement/
+  RetirementMetadataClient.java
+  RetirementMetadataKey.java
+  RetirementMetadataValue.java
+  GenerationZeroMarkerIdentity.java
+  LegacyCommittedSliceIdentity.java
+  GenericCommittedAppendIdentity.java
+  VersionedGenerationZeroMarker.java
+  SourceRetirementMetadataStore.java
+  OxiaJavaSourceRetirementMetadataStore.java
+  VersionedObjectManifestAudit.java
+  VersionedObjectReferencesAudit.java
+  ObjectAuditRetirementStore.java
+  OxiaJavaObjectAuditRetirementStore.java
+
 nereus-materialization/src/main/java/com/nereusstream/materialization/gc/
   GcCandidate.java
   GcPlan.java
@@ -81,8 +96,11 @@ generation-zero append. Checkpoint D now publishes verified NRC1 bytes only thro
 checkpoint-object/target protections after CAS or restart before releasing the bounded pending protection. M4 GC
 checkpoint E adds the root-stable pinned append-replay consumer. Checkpoint F adds root-stable pinned NRC1
 generation-index repair, exact raw/envelope digest separation, ACTIVE-target selection and current-root-owned target
-protection before committed-index restoration. Runtime composition、source/index retirement、GC coordinators、cursor
-integration and retirement remain planned；therefore no object deletion is enabled by these checkpoints.
+protection before committed-index restoration. Checkpoint G adds the read-before-delete source/object-audit metadata
+adapters with exact key、encoding、Oxia version and stored-envelope digest checks, including explicit committed-marker
+capture and response-loss fail-closed behavior. Runtime composition、source retirement planning/root state machine、GC
+coordinators、cursor integration and physical deletion remain planned；therefore no object deletion is enabled by
+these checkpoints.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -870,6 +888,11 @@ PHYSICAL DELETE
 The root stores only the canonical digest, not an unbounded reference list. Recovery recomputes the set from
 authoritative metadata and requires the same digest before continuing. Conditional metadata deletion makes partial
 progress discoverable.
+
+Checkpoint G implements only the metadata-retirement calls used inside `METADATA RETIREMENT`. It does not expose a
+standalone delete entry point: no production coordinator currently reaches those calls, and the preceding
+DISCOVER/MARK/DRAIN/DELETE INTENT proof remains mandatory future M4 work. A missing key or a lost delete response is
+reported to that future coordinator rather than being accepted from absence alone.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.

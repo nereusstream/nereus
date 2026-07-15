@@ -7,8 +7,8 @@
 > COMMITTED-source bootstrap、tagged-v1 key encoding、shared-budget sorted-spill two-pass engine、NTC1 worker 与
 > isolated publication；F4-M4 正在实现，NRC1 object-protocol、protected generation-zero append、anchor-aware
 > planning、guarded recovery-root publication/restart protection reconciliation，以及 checkpoint-aware append
-> replay adapter、checkpoint-derived index repair 已落地；runtime composition、retirement/GC 与 F4-M5–M6
-> 尚未实现
+> replay adapter、checkpoint-derived index repair 和 exact source/object-audit retirement metadata adapters 已落地；
+> runtime composition、retirement coordinator/physical GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -17,7 +17,7 @@
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
 > `master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`
 
-> 实现状态日期：2026-07-15
+> 实现状态日期：2026-07-16
 
 F4-M1 已经落地 API/metadata/object-store 基础、guarded/replayable object IO，以及 core 的物理对象
 identity、GC reference-domain proof value、generation activation proof contract 和 durable reader pin handshake。
@@ -464,6 +464,26 @@ target protection、trim no-write、root-at-pin restart、lease cleanup 和 reso
 仍使用 live-only compatibility adapter；M4 runtime composition 尚未显式装配 checkpoint repairer，source/index
 retirement 与所有 GC/delete enablement 继续关闭。
 
+### 6.10 F4-M4 exact retirement metadata checkpoint
+
+Checkpoint G 已实现独立的 `retirement` metadata package。`SourceRetirementMetadataStore` 严格区分 legacy
+`CommittedSliceRecord` 与 generic `CommittedAppendRecord` marker，并分别支持 legacy/generic generation-zero index
+和 commit-node 编码。每次删除都会用 `OxiaKeyspace` 重建 canonical key，在正确 stream partition 中重新读取 exact
+stored envelope，严格解码并验证 key/value identity、encoded metadata version、调用方冻结的 Oxia version 与
+durable-envelope SHA-256，最后才调用 `deleteIfVersion`。设计补充了只读 `getCommittedMarker`，使上层 retirement
+plan 能冻结此前没有其他公开读取路径的 marker version/digest；它不创建记录，也不推断删除资格。
+
+`ObjectAuditRetirementStore` 同样只读/条件删除 Phase 1 manifest/reference audit keys，返回 hydration 后的值以及
+exact stored-envelope SHA。references 必须先于 manifest 删除；missing 或 delete-response loss 不会在 adapter
+内部变成成功，上层必须在同一个 unchanged `DELETED` root proof 下重读并收敛。shared Oxia runtime 只向该包提供
+`get + deleteIfVersion` 的 borrowed bridge；bridge 只接受包内可构造的 opaque exact-key capability，既不暴露
+put/list/scan，也不允许其他 runtime caller 拼接任意 key 删除。
+
+`phase4M4RetirementMetadataCheck` 覆盖两种 generation-zero index/marker/commit 编码、identity/version/SHA
+contradiction、references-before-manifest、missing、response loss 和 close admission。该 checkpoint 只提供后续
+coordinator 的 destructive primitive；physical root MARK/DRAIN/DELETING、reference-domain proof、metadata plan
+revalidation 和 object delete 尚未实现，因此 physical deletion 仍完全关闭。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -472,7 +492,7 @@ retirement 与所有 GC/delete enablement 继续关闭。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 protocol、protected generation-zero append、anchor-aware planning、guarded root publication/restart protection reconciliation、checkpoint append replay and checkpoint-derived index repair implemented/tested；runtime composition、retirement/GC pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；NRC1 protocol、protected generation-zero append、anchor-aware planning、guarded root publication/restart protection reconciliation、checkpoint append replay、checkpoint-derived index repair and exact retirement metadata adapters implemented/tested；runtime composition、retirement coordinators/physical GC pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

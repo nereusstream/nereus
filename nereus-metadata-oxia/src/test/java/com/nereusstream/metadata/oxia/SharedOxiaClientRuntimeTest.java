@@ -4,6 +4,10 @@ package com.nereusstream.metadata.oxia;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nereusstream.metadata.oxia.retirement.ObjectAuditRetirementStore;
+import com.nereusstream.metadata.oxia.retirement.OxiaJavaObjectAuditRetirementStore;
+import com.nereusstream.metadata.oxia.retirement.OxiaJavaSourceRetirementMetadataStore;
+import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import io.oxia.client.api.SyncOxiaClient;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
@@ -22,8 +26,14 @@ class SharedOxiaClientRuntimeTest {
         ManagedLedgerProjectionMetadataStore projection =
                 ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                         config, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC());
+        SourceRetirementMetadataStore sourceRetirement =
+                OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(config, runtime);
+        ObjectAuditRetirementStore objectAuditRetirement =
+                OxiaJavaObjectAuditRetirementStore.usingSharedRuntime(config, runtime);
 
         l0.close();
+        sourceRetirement.close();
+        objectAuditRetirement.close();
         assertThat(clientCloses).hasValue(0);
         assertThat(projection.getProjection("cluster", "tenant/ns/topic").join()).isEmpty();
         projection.close();
@@ -62,6 +72,10 @@ class SharedOxiaClientRuntimeTest {
 
             assertThatThrownBy(() -> ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                             drifted, runtime, ProjectionMetadataStoreConfig.defaults(), Clock.systemUTC()))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("does not match");
+            assertThatThrownBy(() -> OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(
+                            drifted, runtime))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("does not match");
         }

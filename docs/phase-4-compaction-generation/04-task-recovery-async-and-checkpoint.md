@@ -140,6 +140,15 @@ the complete proof and trim performs no write. The resolver then fresh-scans aut
 repair result as a read answer. Runtime composition、retirement and GC remain target code；checkpoint F authorizes no
 deletion.
 
+F4-M4 checkpoint G implements the metadata mutation boundary required by the future retirement/GC nodes in the
+runtime graph. The source adapter captures the otherwise-private committed-marker version/digest and conditionally
+deletes exact legacy/generic generation-zero index、marker and checkpoint-replaced commit records. The object-audit
+adapter reads hydrated Phase 1 reference/manifest records while preserving their stored-envelope digest and permits
+only exact conditional delete. Both adapters borrow a get/delete-only view of the shared Oxia runtime and fail closed
+on absence or response uncertainty. No runtime node invokes them yet：the future coordinator must first establish and
+revalidate the recovery-root、generation、activation、reference-domain and physical-root lifecycle proof from document
+05, so checkpoint G still authorizes no physical deletion.
+
 Full M4–M6 target construction：
 
 ```java
