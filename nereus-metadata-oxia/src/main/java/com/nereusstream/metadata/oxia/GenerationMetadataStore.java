@@ -43,6 +43,12 @@ public interface GenerationMetadataStore extends AutoCloseable {
             long offsetEnd,
             long generation);
 
+    CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidateByKey(
+            String cluster,
+            StreamId streamId,
+            ReadView view,
+            String indexKey);
+
     CompletableFuture<GenerationScanPage> scanIndex(
             String cluster,
             StreamId streamId,
@@ -81,6 +87,12 @@ public interface GenerationMetadataStore extends AutoCloseable {
 
     CompletableFuture<VersionedMaterializationCheckpoint> compareAndSetMaterializationCheckpoint(
             String cluster, MaterializationCheckpointRecord checkpoint, long expectedVersion);
+
+    CompletableFuture<MaterializationCheckpointScanPage> scanMaterializationCheckpoints(
+            String cluster,
+            StreamId streamId,
+            Optional<F4ScanToken> continuation,
+            int limit);
 
     CompletableFuture<Void> deleteMaterializationCheckpoint(
             String cluster, StreamId streamId, String policyId, long policyVersion, long expectedVersion);

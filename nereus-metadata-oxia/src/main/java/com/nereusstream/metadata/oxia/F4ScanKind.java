@@ -18,6 +18,7 @@ package com.nereusstream.metadata.oxia;
 public enum F4ScanKind {
     GENERATION_INDEX,
     MATERIALIZATION_TASK,
+    MATERIALIZATION_CHECKPOINT,
     RETENTION_STATS,
     STREAM_REGISTRATION,
     PHYSICAL_ROOT,

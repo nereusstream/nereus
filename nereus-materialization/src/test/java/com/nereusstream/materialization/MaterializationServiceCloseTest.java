@@ -25,7 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 class MaterializationServiceCloseTest {
     private static final RegisteredMaterializationScanResult EMPTY_PASS =
-            new RegisteredMaterializationScanResult(64, 0, 0, 0, 0, 0);
+            new RegisteredMaterializationScanResult(64, 0, 0, 0, 0, 0, 0);
 
     @TempDir
     Path temporaryDirectory;

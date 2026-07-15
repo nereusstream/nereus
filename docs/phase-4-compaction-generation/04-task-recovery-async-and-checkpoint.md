@@ -17,6 +17,7 @@ MaterializationService
   |- TaskRecoveryScanner
   |- MaterializationTaskProtectionReconciler
   |- MaterializationCheckpointReconciler
+  |- TerminalWorkflowMetadataRetirer
   |- RecoveryCheckpointCoordinator
   |- SourceRetirementCoordinator
   |- PhysicalObjectRootScanner
@@ -55,9 +56,12 @@ may create or monotonically converge an existing protection only when its comple
 owner key are unchanged；it rejects owner-version rollback and unrelated-owner takeover and recovers an exact lost CAS
 response. `DefaultMaterializationTaskProtectionReconciler` reconstructs deterministic source/output reference ids and
 physical identities from an exact durable task, revalidates every source and task after the no-gap handshake, and is
-invoked before publication plus after `PUBLISHED`. Duplicate expired-claim scanners reload and converge after one CAS
-wins. Focused tests cover `OUTPUT_READY -> PUBLISHING(attached generation)` owner repair, stale rollback rejection,
-idempotent replay, publication ordering and `PUBLISHED` repair.
+invoked only while the task is `CLAIMED`、`OUTPUT_READY` or `PUBLISHING`, before the committed index becomes the
+durable visibility owner. Duplicate expired-claim scanners reload and converge after one CAS wins. Once a task is
+`PUBLISHED`, recovery never recreates temporary task-owned protections；the terminal retirer instead proves the
+committed index/checkpoint/root/visible-protection facts before releasing them. Focused tests cover
+`OUTPUT_READY -> PUBLISHING(attached generation)` owner repair, stale rollback rejection, idempotent replay,
+publication ordering and `PUBLISHED` re-entry without temporary-protection recreation.
 
 The fifth checkpoint implements `MaterializationConfig`、`DefaultMaterializationCheckpointReconciler`、the bounded
 `DefaultMaterializationTaskDispatcher` and `DefaultMaterializationService`. Configuration now validates the complete
@@ -73,8 +77,8 @@ cuts, including a hung scan、deadline-forced cancellation and borrowed-executor
 
 This is still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip now passes, and
 the protocol-neutral topic-compaction decoder/strategy SPI plus exact frozen-identity registry are implemented. The
-topic-compaction execution engine/worker、terminal workflow-metadata retirement and aggregate/real-service M3 gates
-remain open；
+proof-driven terminal workflow-metadata retirer is also wired after checkpoint reconciliation. The topic-compaction
+execution engine/worker and aggregate/real-service M3 gates remain open；
 higher-generation production activation therefore remains disabled.
 
 Full M4–M6 target construction：
@@ -622,6 +626,18 @@ restarts from exact reads. A live stream keeps its current policy checkpoint. St
 conditionally removed when their whole range is below a stable completed trim or their source index identity/version
 is gone；their absence only makes planning conservative. Sequence、current checkpoint and recovery-root removal is
 reserved for the deleted-stream final proof in document 05. There is no time-only deletion of a non-terminal task.
+
+The implemented `DefaultTerminalWorkflowMetadataRetirer` performs these steps under one bounded deadline and a
+4,096-entry hard cap. `PUBLISHED` recovery no longer recreates temporary task protections after visibility is owned
+by the exact committed index; this closes the race in which a concurrent recovery could recreate a protection between
+the final empty scan and task deletion. The retirer validates the exact index-owned visible protection, releases only
+canonical task-owned source/output protections after exact task/root revalidation, rescans every fact, revalidates
+the live projection, and conditionally deletes the task. `CANCELLED/TERMINAL_FAILED` additionally scan the exact
+offset-end generation prefix and reject any `PREPARED/COMMITTED` task/output reference. Protection and task delete
+response loss converge by exact reload. Stats wholly below stable trim or whose exact source index key/version/digest
+is gone are conditionally deleted. Old-policy checkpoints use two identical full task/index prefix snapshots around
+projection revalidation; the current policy checkpoint is never deleted. The metadata store now exposes bounded
+checkpoint scan pages and exact candidate-by-key lookup required by those proofs.
 
 A live stream may conditionally retire an old `(policyId, policyVersion)` checkpoint after metadata audit grace only
 when the current projection policy is a different exact version, every task for the old version is terminal/retired,

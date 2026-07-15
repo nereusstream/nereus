@@ -8,7 +8,8 @@ public record RegisteredMaterializationScanResult(
         int registrationsAdmitted,
         int registrationsSkipped,
         int existingTasksRecovered,
-        int plannedTasksConverged) {
+        int plannedTasksConverged,
+        int workflowMetadataRetired) {
     public RegisteredMaterializationScanResult {
         if (shardsScanned < 0
                 || registrationsScanned < 0
@@ -16,6 +17,7 @@ public record RegisteredMaterializationScanResult(
                 || registrationsSkipped < 0
                 || existingTasksRecovered < 0
                 || plannedTasksConverged < 0
+                || workflowMetadataRetired < 0
                 || registrationsAdmitted + registrationsSkipped != registrationsScanned) {
             throw new IllegalArgumentException("registered materialization scan accounting is invalid");
         }

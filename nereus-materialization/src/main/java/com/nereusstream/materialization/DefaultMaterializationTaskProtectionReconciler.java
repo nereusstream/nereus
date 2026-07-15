@@ -22,7 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Exact source/output protection reconstruction with no unprotected owner-transfer gap. */
+/** Exact source/output protection reconstruction before publication becomes terminal. */
 public final class DefaultMaterializationTaskProtectionReconciler
         implements MaterializationTaskProtectionReconciler {
     private final String cluster;
@@ -186,8 +186,7 @@ public final class DefaultMaterializationTaskProtectionReconciler
     private static void requireProtectedLifecycle(TaskLifecycle lifecycle) {
         if (lifecycle != TaskLifecycle.CLAIMED
                 && lifecycle != TaskLifecycle.OUTPUT_READY
-                && lifecycle != TaskLifecycle.PUBLISHING
-                && lifecycle != TaskLifecycle.PUBLISHED) {
+                && lifecycle != TaskLifecycle.PUBLISHING) {
             throw new IllegalArgumentException(
                     "task lifecycle does not own materialization protections: " + lifecycle);
         }

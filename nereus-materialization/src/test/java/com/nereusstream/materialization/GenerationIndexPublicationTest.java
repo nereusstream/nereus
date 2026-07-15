@@ -61,9 +61,8 @@ class GenerationIndexPublicationTest {
                         .isEqualTo(ObjectProtectionType.MATERIALIZATION_OUTPUT.wireId());
                 assertThat(protection.value().ownerKey()).isEqualTo(task.key());
                 assertThat(protection.value().ownerMetadataVersion())
-                        .isEqualTo(task.metadataVersion());
-                assertThat(protection.value().ownerIdentitySha256())
-                        .isEqualTo(task.durableValueSha256().value());
+                        .as("terminal publication must not recreate temporary protections at PUBLISHED")
+                        .isLessThan(task.metadataVersion());
             });
         }
     }

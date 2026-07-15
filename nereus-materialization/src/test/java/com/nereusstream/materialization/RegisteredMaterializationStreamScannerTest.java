@@ -77,6 +77,9 @@ class RegisteredMaterializationStreamScannerTest {
                                 exactPolicy.policyId(),
                                 exactPolicy.policyVersion(),
                                 exactPolicy.digestSha256())),
+                (streamId, exactPolicy, trim, mutationGuard) ->
+                        CompletableFuture.completedFuture(
+                                TerminalWorkflowMetadataRetirementResult.empty()),
                 policy,
                 1,
                 10);

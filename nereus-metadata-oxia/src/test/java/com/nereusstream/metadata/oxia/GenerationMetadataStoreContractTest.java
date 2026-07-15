@@ -85,6 +85,12 @@ class GenerationMetadataStoreContractTest {
                         CLUSTER, STREAM_ID, ReadView.COMMITTED,
                         committed.value().offsetEnd(), committed.value().generation()).join())
                 .contains(committed);
+        assertThat(store.getCandidateByKey(
+                        CLUSTER, STREAM_ID, ReadView.COMMITTED, committed.key()).join())
+                .contains(committed);
+        assertThatThrownBy(() -> store.getCandidateByKey(
+                        CLUSTER, STREAM_ID, ReadView.TOPIC_COMPACTED, committed.key()))
+                .isInstanceOf(IllegalArgumentException.class);
 
         assertThatThrownBy(() -> store.createPrepared(
                         CLUSTER, generationWithTask(prepared, "other-task")).join())
@@ -156,6 +162,11 @@ class GenerationMetadataStoreContractTest {
                 CLUSTER,
                 F4MetadataTestValues.advancedMaterializationCheckpoint(),
                 checkpoint.metadataVersion()).join();
+        VersionedMaterializationCheckpoint oldCheckpoint = store.getOrCreateMaterializationCheckpoint(
+                CLUSTER, STREAM_ID, "old-policy", 7, policy).join();
+        assertThat(store.scanMaterializationCheckpoints(
+                        CLUSTER, STREAM_ID, Optional.empty(), 10).join().values())
+                .containsExactlyInAnyOrder(advanced, oldCheckpoint);
 
         VersionedRangeRetentionStats stats1 = store.createRangeRetentionStats(
                 CLUSTER, F4MetadataTestValues.retentionStats(0, 2, 1)).join();
@@ -182,6 +193,8 @@ class GenerationMetadataStoreContractTest {
         store.deleteTask(CLUSTER, STREAM_ID, planned.taskId(), claimed.metadataVersion()).join();
         store.deleteMaterializationCheckpoint(
                 CLUSTER, STREAM_ID, "policy-f4", 1, advanced.metadataVersion()).join();
+        store.deleteMaterializationCheckpoint(
+                CLUSTER, STREAM_ID, "old-policy", 7, oldCheckpoint.metadataVersion()).join();
         store.deleteRangeRetentionStats(
                 CLUSTER, STREAM_ID, 2, 1, stats1.metadataVersion()).join();
         store.deleteRangeRetentionStats(

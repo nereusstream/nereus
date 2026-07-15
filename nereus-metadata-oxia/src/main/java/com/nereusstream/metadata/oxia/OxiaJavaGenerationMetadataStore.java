@@ -233,6 +233,26 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
     }
 
     @Override
+    public CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidateByKey(
+            String cluster,
+            StreamId streamId,
+            ReadView view,
+            String indexKey) {
+        F4Keyspace keys = new F4Keyspace(cluster);
+        StreamId stream = Objects.requireNonNull(streamId, "streamId");
+        ReadView exactView = Objects.requireNonNull(view, "view");
+        String key = Objects.requireNonNull(indexKey, "indexKey");
+        String prefix = keys.generationIndexPrefix(stream, exactView) + "/";
+        if (!key.startsWith(prefix) || key.length() == prefix.length()) {
+            throw new IllegalArgumentException(
+                    "indexKey is outside the requested stream/view generation prefix");
+        }
+        return support.client().get(key, keys.streamPartitionKey(stream))
+                .thenApply(value -> value.map(item ->
+                        generationCandidate(keys, stream, exactView, item)));
+    }
+
+    @Override
     public CompletableFuture<GenerationScanPage> scanIndex(
             String cluster,
             StreamId streamId,
@@ -438,6 +458,26 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
                                     MaterializationCheckpointRecord.class, expectedVersion)
                             .thenApply(item -> checkpoint(keys, item));
                 });
+    }
+
+    @Override
+    public CompletableFuture<MaterializationCheckpointScanPage> scanMaterializationCheckpoints(
+            String cluster,
+            StreamId streamId,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        F4Keyspace keys = new F4Keyspace(cluster);
+        String prefix = F4MetadataStoreSupport.prefixStart(keys.checkpointPrefix(streamId));
+        return scanSimple(
+                keys,
+                streamId,
+                F4ScanKind.MATERIALIZATION_CHECKPOINT,
+                prefix,
+                continuation,
+                limit,
+                MaterializationCheckpointRecord.class,
+                item -> checkpoint(keys, item),
+                MaterializationCheckpointScanPage::new);
     }
 
     @Override

@@ -13,7 +13,6 @@ import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamState;
-import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationOperation;
@@ -305,7 +304,11 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 VersionedMaterializationTask publishingTask,
                 Admission admission) {
             requireFrozenAllocation(publishingTask);
-            return reconcileTaskProtections(publishingTask)
+            CompletableFuture<?> temporaryProtections =
+                    publishingTask.value().lifecycle() == TaskLifecycle.PUBLISHED
+                            ? CompletableFuture.completedFuture(null)
+                            : reconcileTaskProtections(publishingTask);
+            return temporaryProtections
                     .thenCompose(ignored -> loadIndex(publishingTask))
                     .thenCompose(optional -> {
                 if (optional.isPresent()) {
@@ -586,7 +589,6 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             requireCommittedExact(publishingTask, committed);
             return ensureIndexProtection(publishingTask, committed, taskProtection)
                     .thenCompose(protection -> markPublished(publishingTask, committed, 0)
-                            .thenCompose(this::reconcileTaskProtections)
                             .thenCompose(ignored -> deadline.bound(
                                     () -> protectionManager.revalidate(
                                             protection,
@@ -600,7 +602,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 VersionedMaterializationTask durable) {
             return deadline.bound(
                     () -> taskProtectionReconciler.reconcile(durable),
-                    "reconcile source/output task protections");
+                    "reconcile source/output task protections before publication");
         }
 
         private CompletableFuture<ObjectProtection> ensureIndexProtection(
@@ -1057,19 +1059,15 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         }
 
         private ObjectProtectionOwner indexOwner(VersionedGenerationIndex value) {
-            return new ObjectProtectionOwner(
-                    value.key(), value.metadataVersion(), value.durableValueSha256());
+            return MaterializationProtectionIdentities.indexOwner(value);
         }
 
         private String visibleReferenceId(VersionedMaterializationTask publishingTask) {
-            String canonical = cluster
-                    + '\0' + task.streamId().value()
-                    + '\0' + task.view().wireId()
-                    + '\0' + task.coverage().endOffset()
-                    + '\0' + publishingTask.value().allocatedGeneration().orElseThrow()
-                    + '\0' + publishingTask.value().publicationId()
-                    + '\0' + task.taskId();
-            return "vg1-" + DeterministicIds.stableHashComponent(canonical);
+            return MaterializationProtectionIdentities.visibleReferenceId(
+                    cluster,
+                    task,
+                    publishingTask.value().allocatedGeneration().orElseThrow(),
+                    publishingTask.value().publicationId());
         }
 
         private GenerationCommitResult commitResult(

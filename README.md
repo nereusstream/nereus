@@ -149,8 +149,10 @@ pass、hint coalescing 和 deadline close。随后新增的 managed-ledger cross
 compressed batched Entry 的 exact bytes/properties/ordering-key 与 middle-batch MessageId 经 NCP1 往返不变，
 且 generation-level projection identity 不泄漏成 per-entry metadata。随后落地的 topic-compaction neutral
 decoder/strategy SPI 与 exact frozen-identity registry 已锁定 durable policy 解析边界。M3 的
-topic-compaction execution engine/worker、terminal workflow-metadata retirement、完整 crash-cut/final gates
-尚未完成，retention/GC 与 async profile 仍不可用。
+terminal workflow-metadata retirer 也已通过 exact index/checkpoint/root/protection proof、conditional
+delete 与 response-loss reload 收敛 terminal tasks、stale stats 与 old-policy checkpoints。M3 的
+topic-compaction execution engine/worker 与完整 crash-cut/final gates 尚未完成，retention/GC 与 async
+profile 仍不可用。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

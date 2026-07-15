@@ -40,6 +40,7 @@ public final class RegisteredMaterializationStreamScanner {
     private final MaterializationTaskRecovery recovery;
     private final TaskRecoveryScanner recoveryScanner;
     private final MaterializationCheckpointReconciler checkpoints;
+    private final TerminalWorkflowMetadataRetirer metadataRetirer;
     private final MaterializationPolicy policy;
     private final int registryPageSize;
     private final int maxTasksPerPlan;
@@ -55,6 +56,7 @@ public final class RegisteredMaterializationStreamScanner {
             MaterializationTaskRecovery recovery,
             TaskRecoveryScanner recoveryScanner,
             MaterializationCheckpointReconciler checkpoints,
+            TerminalWorkflowMetadataRetirer metadataRetirer,
             MaterializationPolicy policy,
             int registryPageSize,
             int maxTasksPerPlan) {
@@ -67,6 +69,7 @@ public final class RegisteredMaterializationStreamScanner {
         this.recovery = Objects.requireNonNull(recovery, "recovery");
         this.recoveryScanner = Objects.requireNonNull(recoveryScanner, "recoveryScanner");
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
+        this.metadataRetirer = Objects.requireNonNull(metadataRetirer, "metadataRetirer");
         this.policy = Objects.requireNonNull(policy, "policy");
         if (registryPageSize <= 0 || registryPageSize > 1_000) {
             throw new IllegalArgumentException("registryPageSize must be in [1, 1000]");
@@ -209,8 +212,16 @@ public final class RegisteredMaterializationStreamScanner {
                                 tasks, 0, mutationGuard, accumulator));
             }
             return planned.thenCompose(ignored -> checkpoints.reconcile(
-                            streamId, policy, mutationGuard)
-                    .thenApply(checkpoint -> null));
+                            streamId, policy, mutationGuard))
+                    .thenCompose(ignored -> metadataRetirer.retire(
+                            streamId, policy, trim, mutationGuard))
+                    .thenAccept(retired -> accumulator.workflowMetadataRetired = Math.addExact(
+                            accumulator.workflowMetadataRetired,
+                            Math.addExact(
+                                    retired.tasksRetired(),
+                                    Math.addExact(
+                                            retired.retentionStatsRetired(),
+                                            retired.checkpointsRetired()))));
         });
     }
 
@@ -254,6 +265,7 @@ public final class RegisteredMaterializationStreamScanner {
         private int registrationsSkipped;
         private int existingTasksRecovered;
         private int plannedTasksConverged;
+        private int workflowMetadataRetired;
 
         private RegisteredMaterializationScanResult result() {
             return new RegisteredMaterializationScanResult(
@@ -262,7 +274,8 @@ public final class RegisteredMaterializationStreamScanner {
                     registrationsAdmitted,
                     registrationsSkipped,
                     existingTasksRecovered,
-                    plannedTasksConverged);
+                    plannedTasksConverged,
+                    workflowMetadataRetired);
         }
     }
 }

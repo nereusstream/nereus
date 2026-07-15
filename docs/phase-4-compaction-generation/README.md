@@ -4,8 +4,8 @@
 > compacted Parquet read/write/verifier 与 deterministic policy/planner/task-store/recovery/registry-scanner
 > checkpoints、exact-source reader/worker、protection crash-cut reconciliation、advisory checkpoint
 > reconciliation、bounded service lifecycle 以及 Pulsar Entry/NCP1 exact-byte round trip checkpoints 已落地；
-> topic-compaction neutral SPI/registry 已落地；execution engine/worker、terminal workflow-metadata
-> retirement 和 M3 gates 尚未完成；F4-M4–M6 未实现
+> topic-compaction neutral SPI/registry 与 terminal workflow-metadata retirement 已落地；
+> topic-compaction execution engine/worker 与 M3 gates 尚未完成；F4-M4–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -70,7 +70,7 @@ protection 以及 typed durable failure transition。它已通过真实 Parquet 
 OUTPUT_READY` 聚焦测试。第四个 M3 checkpoint 又为 durable protection manager 增加了仅限同
 logical owner key、拒绝版本回滚的 `acquireOrTransfer`，并通过
 `DefaultMaterializationTaskProtectionReconciler` 在 recovery/publication 中从 durable task 重建 source/output
-identity/reference id，收敛 `OUTPUT_READY/PUBLISHING/PUBLISHED` owner。重复 expired-claim CAS、跨状态
+identity/reference id，收敛 `CLAIMED/OUTPUT_READY/PUBLISHING` owner。重复 expired-claim CAS、跨状态
 crash cut 和 protection CAS response loss 测试已通过。第五个 M3 checkpoint 又实现了严格
 `MaterializationConfig`、从 authoritative committed indexes 单调推进的 advisory checkpoint reconciler、
 全局/per-stream 有界且公平的 dispatcher，以及支持 non-overlap、hint coalescing、deadline cancellation 和
@@ -80,8 +80,11 @@ Pulsar Entry 的 exact bytes/properties/ordering key 和 middle-batch MessageId 
 generation-level projection identity 不进入原有 per-entry `ReadBatch` surface。第七个 M3 checkpoint 又实现了
 protocol-neutral topic-compaction decoder/strategy SPI、closed disposition wire ids、immutable compaction-key
 facts 与 exact frozen-identity registry；duplicate/mutable identity 不能改变 durable policy semantics。
-topic-compaction execution engine/worker、terminal workflow-metadata retirement 和 M3 ordinary/final gates
-仍未完成，因此
+第八个 checkpoint 又实现了 terminal workflow-metadata retirement：PUBLISHED 路径验证 exact
+COMMITTED index、checkpoint、root 与 index-owned visible protection，清理临时 task protections 后重读
+全部事实并 conditional-delete task；failed terminal task、stale stats 和 old-policy checkpoint 也按
+bounded prefix proof 收敛，protection/task delete response loss 可精确恢复。topic-compaction execution
+engine/worker 和 M3 ordinary/final gates 仍未完成，因此
 higher-generation materialization 仍未开放。M4
 还需将 source reachability 扩展为
 recovery-root/anchor-aware proof。Phase 4 整体仍为
@@ -324,7 +327,7 @@ M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physi
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
-| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner、exact-source reader/worker、protection/checkpoint reconciliation、bounded service lifecycle、Pulsar Entry/NCP1 exact-byte round trip and topic-compaction neutral SPI/registry checkpoints landed；topic execution engine/worker、terminal metadata retirement and milestone gates pending |
+| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner、exact-source reader/worker、protection/checkpoint reconciliation、bounded service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry and terminal workflow-metadata retirement checkpoints landed；topic execution engine/worker and milestone gates pending |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |

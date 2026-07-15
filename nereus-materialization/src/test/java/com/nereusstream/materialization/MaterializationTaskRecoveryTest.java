@@ -166,7 +166,7 @@ class MaterializationTaskRecoveryTest {
     }
 
     @Test
-    void publishedRecoveryRepairsTaskProtectionsWithoutReenteringPublication() {
+    void publishedRecoveryDoesNotRecreateRetirableTaskProtections() {
         try (GenerationPublicationTestSupport.Context context =
                 GenerationPublicationTestSupport.context()) {
             context.committer(
@@ -197,8 +197,8 @@ class MaterializationTaskRecoveryTest {
                     Duration.ofSeconds(1));
 
             assertThat(recovery.recover(published).join())
-                    .isEqualTo(MaterializationTaskRecoveryAction.PROTECTIONS_RECONCILED);
-            assertThat(protectionReconciles).hasValue(1);
+                    .isEqualTo(MaterializationTaskRecoveryAction.NONE);
+            assertThat(protectionReconciles).hasValue(0);
         }
     }
 

@@ -76,7 +76,8 @@ higher object disappears. The fixture also exposed and fixed inline `EntryIndexR
 codec round-trips. F4-M2 is complete/final-gated. M3 now implements the compacted-object worker、source/output
 task-protection creation/crash-cut owner reconciliation、monotonic advisory checkpoint CAS and bounded service
 lifecycle；the Pulsar Entry/NCP1 opaque-byte round trip passes and the topic-compaction neutral SPI/registry is
-implemented, while the topic execution engine/worker、terminal metadata retirement and M3 gates remain. M4 owns full
+implemented. Terminal workflow-metadata retirement now uses exact task/index/checkpoint/root/protection proofs and
+conditional deletes, while the topic execution engine/worker and M3 gates remain. M4 owns full
 recovery-root/anchor-aware source reachability before retirement or physical deletion can be enabled.
 
 ### 1.3 F4-M3 planning/recovery checkpoint
@@ -93,8 +94,8 @@ per-stream task recovery and all-64-shard registered-stream scanner. These are o
 new visibility owner：registration remains a liveness trigger, the planner reloads L0 head/trim and generation-index
 truth, task creation revalidates every exact source plus activation proof, and only the M2 generation-index CAS may
 publish output. Exact-source worker IO、checkpoint/service orchestration and Pulsar exact-byte evidence are now
-implemented；the topic-compaction neutral SPI/registry is also implemented, while the topic execution engine/worker、
-terminal metadata retirement and the M3 aggregate/final gates remain pending.
+implemented；the topic-compaction neutral SPI/registry and proof-driven terminal workflow-metadata retirement are
+also implemented, while the topic execution engine/worker and M3 aggregate/final gates remain pending.
 
 ## 2. Keyspace
 
@@ -218,6 +219,12 @@ public interface GenerationMetadataStore extends AutoCloseable {
     CompletableFuture<Optional<VersionedGenerationIndex>> getIndex(
             String cluster, GenerationIndexIdentity identity);
 
+    CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidate(
+            String cluster, StreamId streamId, ReadView view,
+            long offsetEnd, long generation);
+    CompletableFuture<Optional<VersionedGenerationCandidate>> getCandidateByKey(
+            String cluster, StreamId streamId, ReadView view, String indexKey);
+
     CompletableFuture<GenerationScanPage> scanIndex(
             String cluster, StreamId streamId, ReadView view,
             long minOffsetEndInclusive, long maxOffsetEndInclusive,
@@ -245,6 +252,9 @@ public interface GenerationMetadataStore extends AutoCloseable {
             long policyVersion, Checksum policySha256);
     CompletableFuture<VersionedMaterializationCheckpoint> compareAndSetMaterializationCheckpoint(
             String cluster, MaterializationCheckpointRecord checkpoint, long expectedVersion);
+    CompletableFuture<MaterializationCheckpointScanPage> scanMaterializationCheckpoints(
+            String cluster, StreamId streamId,
+            Optional<F4ScanToken> continuation, int limit);
     CompletableFuture<Void> deleteMaterializationCheckpoint(
             String cluster, StreamId streamId, String policyId,
             long policyVersion, long expectedVersion);
@@ -351,6 +361,9 @@ public record GenerationScanPage(
 public record TaskScanPage(
         List<VersionedMaterializationTask> values,
         Optional<F4ScanToken> continuation) { }
+public record MaterializationCheckpointScanPage(
+        List<VersionedMaterializationCheckpoint> values,
+        Optional<F4ScanToken> continuation) { }
 public record StreamRegistrationScanPage(
         List<VersionedMaterializationStreamRegistration> values,
         Optional<F4ScanToken> continuation) { }
@@ -383,7 +396,7 @@ All metadata scans share one process-local, scope-bound token：
 
 ```java
 public enum F4ScanKind {
-    GENERATION_INDEX, MATERIALIZATION_TASK, RETENTION_STATS,
+    GENERATION_INDEX, MATERIALIZATION_TASK, MATERIALIZATION_CHECKPOINT, RETENTION_STATS,
     STREAM_REGISTRATION, PHYSICAL_ROOT, READER_LEASE, OBJECT_PROTECTION
 }
 

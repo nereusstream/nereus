@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 
-/** Idempotent restart entry point for every non-terminal task lifecycle. */
+/** Idempotent restart entry point for every executable task lifecycle. */
 public final class MaterializationTaskRecovery {
     private static final String EXPIRED_CLAIM_MESSAGE = "worker claim expired during task recovery";
 
@@ -66,7 +66,9 @@ public final class MaterializationTaskRecovery {
                         : completed(MaterializationTaskRecoveryAction.NONE);
                 case CLAIMED -> recoverClaim(durable, exactGuard);
                 case OUTPUT_READY, PUBLISHING -> reconcilePublication(durable, task, record);
-                case PUBLISHED -> reconcileProtections(durable);
+                // PUBLISHED is terminal. Recreating task-owned temporary protections here would race the
+                // terminal-metadata retirer after it has proved the index-owned visible protection.
+                case PUBLISHED -> completed(MaterializationTaskRecoveryAction.NONE);
                 case CANCELLED, TERMINAL_FAILED ->
                         completed(MaterializationTaskRecoveryAction.NONE);
             };
@@ -167,12 +169,6 @@ public final class MaterializationTaskRecovery {
         return protections.reconcile(durable)
                 .thenCompose(ignored -> publications.reconcile(task, output))
                 .thenApply(ignored -> MaterializationTaskRecoveryAction.PUBLICATION_RECONCILED);
-    }
-
-    private CompletableFuture<MaterializationTaskRecoveryAction> reconcileProtections(
-            VersionedMaterializationTask durable) {
-        return protections.reconcile(durable)
-                .thenApply(ignored -> MaterializationTaskRecoveryAction.PROTECTIONS_RECONCILED);
     }
 
     private CompletableFuture<MaterializationTaskRecoveryAction> dispatch(

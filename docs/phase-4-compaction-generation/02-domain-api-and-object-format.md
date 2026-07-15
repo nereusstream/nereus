@@ -8,8 +8,8 @@ whole-index planner、task-store、task-recovery and registered-stream-scanner c
 are implemented. The exact-source reader/lossless-row/claim-to-output-ready worker、task-protection crash-cut
 reconciliation、advisory checkpoint reconciler、bounded M3 service lifecycle and Pulsar Entry/NCP1 exact-byte round
 trip are also implemented. The protocol-neutral topic-compaction decoder/strategy SPI and exact frozen-identity
-registry are implemented and covered by focused tests；the topic-compaction execution engine/worker、terminal
-metadata retirement and M4–M6 surfaces
+registry plus proof-driven terminal workflow-metadata retirement are implemented and covered by focused tests；the
+topic-compaction execution engine/worker and M4–M6 surfaces
 remain target code until their milestone lands. Package、class and method names are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
@@ -113,6 +113,9 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/
   CompactionDisposition.java
   TopicCompactionStrategy.java
   TopicCompactionRegistry.java
+  TerminalWorkflowMetadataRetirer.java
+  DefaultTerminalWorkflowMetadataRetirer.java
+  TerminalWorkflowMetadataRetirementResult.java
   CompactedMaterializationFormatVerifier.java
 ```
 
