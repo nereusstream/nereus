@@ -1,13 +1,12 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
-> 状态：Designed / F4-M0 code-level design gate complete；F4 生产代码尚未实现
+> 状态：Implementation in progress；F4-M0 complete，F4-M1 primitives partial，M1 aggregate/final gate pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
 Phase 4 的代码级实现合同以
 [`docs/phase-4-compaction-generation/`](../phase-4-compaction-generation/README.md) 及其 `01`–`07`
-编号文档为准。本文是 north-star 摘要；两者冲突时，在 Phase 4 生产代码出现之前，
-代码级合同优先。
+编号文档为准。本文是 north-star 摘要；两者冲突时，已实现代码/测试优先，其次是代码级合同。
 
 本文定义 Nereus L3 compaction 和 generation replacement 设计。Future 4 的核心目标是
 > 把 multi-stream WAL object 转换为 per-stream read-optimized object，并通过 Oxia offset
@@ -542,9 +541,11 @@ F4-M0 已完成以下代码级评审并冻结合同：
   snapshots。
 
 Phase 3 M1-M6 所需的 owner-session claim/fencing、cursor-generation、snapshot-reference、protected
-create/backward-reset 和 pending-trim gates 已实现并 final-gated。Phase 4 的下一步是
-[`F4-M1`](../phase-4-compaction-generation/07-implementation-plan-and-gates.md)，不是继续补协议选型。
+create/backward-reset 和 pending-trim gates 已实现并 final-gated。Phase 4 当前正在执行
+[`F4-M1`](../phase-4-compaction-generation/07-implementation-plan-and-gates.md)：API/metadata/object IO、
+physical reference values、durable reader pin 与 protection handshakes 已落地；剩余 M1 contracts/gates 继续
+按实施计划收口，不重新打开协议选型。
 
-F4-M0 只是 design gate；它不声称 production capability、benchmark、chaos、compatibility
-certification 或 CI evidence。F4-M1–M6 的确切文件、测试、故障点和 release gates 见代码级
-实施计划。
+F4-M0 只是 design gate；当前 F4-M1 检查点也不声称 end-to-end generation capability、benchmark、chaos、
+compatibility certification 或 final CI evidence。F4-M1–M6 的确切文件、测试、故障点和 release gates
+见代码级实施计划。

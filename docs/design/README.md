@@ -6,7 +6,7 @@
 `docs/phase-2-managed-ledger-facade/`、
 `docs/phase-3-cursor-subscription/` 与
 `docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
-测试优先；Phase 4 目录当前是已通过 M0 的代码级 target contract，不表示代码已实现。
+测试优先；Phase 4 目录同时记录已通过 M0 的 target contract 与正在落地的 F4-M1 实现检查点。
 
 建议阅读顺序：
 
@@ -36,7 +36,9 @@ capability/admission/durable-ack integration、F3-M5 deterministic/10k/two-broke
 MessageId/property/reset/limit/rollout/incarnation/F4-handoff gates 均已完成；Phase 3 已 final-gated。
 2026-07-14 已完成 Phase 4 F4-M0 本地 Nereus/Pulsar source audit 和代码级设计门禁，冻结
 generation publish、object format、task/recovery、reader lease、retention/GC、Object-WAL async 和
-Pulsar rollout 合同。下一实施里程碑是 F4-M1；Phase 4 生产代码尚未开始。
+Pulsar rollout 合同。2026-07-15 F4-M1 已开始实现 API/metadata/codecs、guarded object IO、physical
+reference values、durable reader pin 与 durable protection handshakes；M1 aggregate/final gate 尚未完成，
+generation publication、materialization、retention/GC 和 async profile 仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

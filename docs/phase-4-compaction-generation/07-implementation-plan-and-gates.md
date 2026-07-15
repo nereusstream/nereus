@@ -12,12 +12,14 @@ parts are implemented and covered by focused tests：
   object-store fixture；
 - strict physical-object/reference-domain proof values、the protocol-neutral generation activation proof surface and
   the durable create/revalidate/release reader-pin handshake backed by one process/object lease；
+- durable protection acquire/revalidate/same-key owner-transfer/owner-authorized-release handshakes, including
+  response-loss cleanup ownership and fail-safe deletion-veto behavior；
 - deterministic fake physical metadata storage used by the reader/reference handshake tests。
 
-This is an implementation checkpoint, not an F4-M1 completion claim. The durable protection manager/model tests、
-remaining metadata golden/store contracts、the `phase4M1Check`/`phase4M1FinalCheck` tasks and real Oxia/LocalStack
-evidence are still required. Core activation values are contracts only；the product activation adapter and every
-mutation-boundary integration arrive in later M1/M2-M6 work.
+This is an implementation checkpoint, not an F4-M1 completion claim. The remaining metadata golden/store contracts、
+the `phase4M1Check`/`phase4M1FinalCheck` tasks and real Oxia/LocalStack evidence are still required. Core activation
+and protection values are contracts/primitives only；the product activation adapter and every mutation-boundary
+integration arrive in later M1/M2-M6 work.
 
 A later milestone is complete only when：
 
@@ -170,6 +172,8 @@ physical/ObjectReadLease.java
 physical/ObjectProtectionManager.java
 physical/DefaultObjectProtectionManager.java
 physical/ObjectProtection.java
+physical/ObjectProtectionOwner.java
+physical/ObjectProtectionRequest.java
 physical/GcReferenceDomain.java
 physical/GcReferenceQuery.java
 physical/GcReferenceQueryKind.java

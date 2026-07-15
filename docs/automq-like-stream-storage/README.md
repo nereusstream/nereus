@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Designed / F4-M0 code-level contract frozen，尚未实现端到端执行路径
+> 状态：Implementation in progress / F4-M1 primitives partial，尚未实现端到端 async 执行路径
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
 
@@ -29,12 +29,14 @@ Already present：
 - Object WAL v1 bytes and Phase 1 head-CAS/commit-log primitives。
 - Phase 1.5 generic target/adapter and stable-commit/materialization separation（implemented and final-gated）。
 - F4-M0 task/generation/recovery/lease/GC/rollout code-level design and M1–M6 gates。
+- F4-M1 API/metadata records/codecs/store surface、guarded object IO、physical reference values and durable
+  reader/protection handshakes（implemented primitives，M1 aggregate/final gate pending）。
 
 Not present：
 
 - core branch implementing `WAL_DURABLE` success；
 - BookKeeper WAL writer/reader/location types；
-- materialization stream-registry/task/checkpoint store；
+- materialization stream-registry/task/checkpoint orchestration and production workflow contracts/gates；
 - background worker and generation committer；
 - primary-WAL retention gate、lag backpressure and recovery daemon；
 - mixed primary target resolver。

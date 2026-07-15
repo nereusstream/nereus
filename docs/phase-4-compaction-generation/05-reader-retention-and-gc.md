@@ -33,7 +33,10 @@ nereus-core/src/main/java/com/nereusstream/core/physical/
   PhysicalObjectRecords.java
   PhysicalValueDigests.java
   ObjectProtectionManager.java
+  DefaultObjectProtectionManager.java
   ObjectProtection.java
+  ObjectProtectionOwner.java
+  ObjectProtectionRequest.java
   GcReferenceDomain.java
   GcReferenceQuery.java
   GcReferenceQueryKind.java
@@ -66,10 +69,10 @@ nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention/
   CursorSnapshotGcScanner.java
 ```
 
-As of 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain values、`ObjectReadPinManager`/
-`DefaultObjectReadPinManager` and their deterministic fake-store tests are implemented. The protection manager、GC
-coordinators and product reader/cursor integrations in this layout remain planned work；therefore no object deletion
-or higher-generation read is enabled by this checkpoint.
+As of 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain values、the reader-pin manager and the durable
+protection manager are implemented with deterministic fake-store handshake/response-loss tests. GC coordinators and
+product reader/cursor/publication integrations in this layout remain planned work；therefore no object deletion or
+higher-generation read is enabled by this checkpoint.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -339,6 +342,53 @@ public record ObjectProtectionIdentity(
         ObjectKeyHash object,
         ObjectProtectionType type,
         String referenceId) { }
+
+public record ObjectProtectionOwner(
+        String ownerKey,
+        long metadataVersion,
+        Checksum identitySha256) { }
+
+public record ObjectProtectionRequest(
+        PhysicalObjectIdentity object,
+        ObjectProtectionType type,
+        String referenceId,
+        ObjectProtectionOwner owner,
+        long expiresAtMillis) {
+    public ObjectProtectionIdentity identity();
+    public boolean isPending();
+}
+
+public record ObjectProtection(
+        PhysicalObjectIdentity object,
+        ObjectProtectionIdentity identity,
+        ObjectProtectionOwner owner,
+        long rootLifecycleEpoch,
+        long createdAtMillis,
+        long expiresAtMillis,
+        long metadataVersion,
+        Checksum durableValueSha256) {
+    public boolean isPending();
+}
+
+public interface ObjectProtectionManager extends AutoCloseable {
+    interface OwnerRevalidator {
+        CompletableFuture<Void> revalidate(ObjectProtectionOwner expectedOwner);
+    }
+
+    interface RemovalAuthorizer {
+        CompletableFuture<Void> authorizeRemoval(ObjectProtection protection);
+    }
+
+    CompletableFuture<ObjectProtection> acquire(
+            ObjectProtectionRequest request, OwnerRevalidator ownerRevalidator);
+    CompletableFuture<ObjectProtection> revalidate(
+            ObjectProtection protection, OwnerRevalidator ownerRevalidator);
+    CompletableFuture<ObjectProtection> transfer(
+            ObjectProtection protection, ObjectProtectionOwner newOwner,
+            OwnerRevalidator newOwnerRevalidator);
+    CompletableFuture<Void> release(
+            ObjectProtection protection, RemovalAuthorizer removalAuthorizer);
+}
 ```
 
 The value states which authoritative owner can re-prove the reference. Protection keys are not reference counts；
@@ -356,6 +406,13 @@ cursor or recovery root version plus an attempt/output digest. Before its owner 
 root、protection and skew-safe non-expiry. After expiry, GC re-reads the owner：if publication succeeded it repairs
 the permanent protection；otherwise it conditionally removes the pending record. A pending record never makes bytes
 visible.
+
+`DefaultObjectProtectionManager` is constructed with cluster、physical metadata store、pending duration、maximum
+clock skew、orphan grace and clock. It uses 256 bounded process-local serialization stripes keyed by the complete
+`ObjectProtectionIdentity`；cross-process ordering still comes only from the exact metadata CAS. A pending acquire
+requires `now + maximumClockSkew < expiresAt <= now + pendingProtectionDuration` and every later revalidation also
+requires `expiresAt <= createdAt + pendingProtectionDuration`. `close()` rejects acquire/revalidate/transfer but
+continues to admit authenticated release so shutdown cannot strand cleanup.
 
 ## 4. Physical-object Store API
 
@@ -459,14 +516,24 @@ reread authoritative owner and require owner identity/version still matches
 return acquired protection
 ```
 
-If any post-check fails, the caller conditionally deletes P and does not use the object. A concurrent GC that marks
-after the post-check waits the mark grace and rescans protections；it sees P and returns the root to ACTIVE before any
-index/object deletion.
+If any post-check fails, the manager conditionally deletes P only when the successful create response proves that
+this invocation created that exact version. A recovered create after response loss never claims exclusive cleanup
+ownership；failure leaves the protection as a deletion veto for reconciliation. A concurrent GC that marks after the
+post-check waits the mark grace and rescans protections；it sees P and returns the root to ACTIVE before any
+index/object deletion. An exact duplicate with the same owner/expiry/root epoch is idempotent；a different owner or
+root epoch requires explicit transfer/reconciliation and is never overwritten by acquire.
 
-Removing a protection is also owner-checked. For example, a visible-generation protection is removed only after its
-index is `DRAINING/RETIRED/deleted` and recovery root no longer cites it.
+Removing a protection is also owner-checked. `release` first loads the exact handle version、calls the owner-specific
+`RemovalAuthorizer`、reloads the same version and only then conditionally deletes. A lost delete response succeeds
+only after the exact key is observed absent；a changed owner/version fails without deletion. For example, a
+visible-generation protection is removed only after its index is `DRAINING/RETIRED/deleted` and recovery root no
+longer cites it.
 
-Owner transfer uses the same-key protection CAS while the old protection remains a veto. Generation publication
+Owner transfer prevalidates the new owner, uses the same-key protection CAS while the old protection remains a veto,
+then revalidates the unchanged ACTIVE root and new owner. It preserves reference id、creation time and expiry；only
+owner fields、root epoch and metadata version may change. If either post-check fails, the new durable value is not
+rolled back or deleted because it remains the safe GC veto. An idempotent retry recognizes the exact new owner and
+same immutable protection fields. Generation publication
 transfers `VISIBLE_GENERATION` from the exact `PUBLISHING` task to the exact `COMMITTED` index. Recovery checkpoint
 and cursor snapshot publication replace a bounded pending protection with a permanent root-owned protection before
 removing the pending key. Response loss always reloads and compares both owner identities.

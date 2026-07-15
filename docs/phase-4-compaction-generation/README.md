@@ -14,8 +14,9 @@
 当前 F4-M1 检查点已经落地 API/metadata/object-store 基础、guarded/replayable object IO，以及 core 的物理对象
 identity、GC reference-domain proof value、generation activation proof contract 和 durable reader pin handshake。
 reader pin 通过同一 `(processRunId, object)` durable lease 复用本地并发读，并在每次 admission 后重新验证
-ACTIVE root 与调用方 selection；失败会条件清理刚写入的 lease。该状态尚未实现 protection manager、M1 完整
-golden/store contract、Gradle milestone gate 或真实 Oxia/LocalStack final evidence，因此仍标记为
+ACTIVE root 与调用方 selection；失败会条件清理刚写入的 lease。durable protection manager 也已实现
+create/root/owner post-check、same-key owner transfer、owner-authorized release 和 response-loss fail-safe veto。
+该状态尚未完成 M1 全部 golden/store contract、Gradle milestone gate 或真实 Oxia/LocalStack final evidence，因此仍标记为
 `Implementation in progress`，不开放 higher-generation read 或 physical delete。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
@@ -208,10 +209,14 @@ continuations, whole-operation PUT cancellation/deadlines, streaming local-fixtu
 DELETE validation. Existing object-store implementations remain source-compatible through fail-closed default
 methods for new optional operations.
 
-This checkpoint is deliberately not an F4-M1 completion claim. Core reader-lease/protection managers, capability
-guards, metadata-store contracts, frozen codec vectors, remaining real-service evidence and the aggregate M1 gate
-remain outstanding. No generation publication, resolver, materialization worker, retention or GC behavior is
-enabled by this checkpoint.
+The core checkpoint now additionally implements strict physical/reference proof values、the protocol-neutral
+activation-proof contract、durable reader leases and durable protections. Protection acquisition cleans up only a
+version whose successful response proves local creation；response-loss recovery and failed transfer post-checks leave
+a safe deletion veto. Same-key owner transfer and owner-authorized conditional release have deterministic race tests.
+
+This checkpoint is deliberately not an F4-M1 completion claim. Product capability guards/integrations、remaining
+metadata-store contracts、frozen codec vectors、real-service evidence and the aggregate M1 gate remain outstanding.
+No generation publication, resolver, materialization worker, retention or GC behavior is enabled by this checkpoint.
 
 ## 7. Milestones
 
