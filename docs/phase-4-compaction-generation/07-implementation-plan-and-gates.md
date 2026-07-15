@@ -29,9 +29,10 @@ gates on 2026-07-15；the following foundation parts are implemented and covered
 `phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check` and
 `phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
 restart-safe publication, pin-owned fallback/quarantine and a real Oxia/LocalStack independent-runtime fixture.
-F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has two implementation checkpoints：the real compacted
-format/read path and the deterministic policy/planner/task-store/recovery/registered-stream-scan path. This is not a
-Phase 4 completion claim：exact-source worker/service composition and the M3 gates remain open；full
+F4-M1 is complete；F4-M2 is complete/final-gated. F4-M3 now has three implementation checkpoints：the real compacted
+format/read path, the deterministic policy/planner/task-store/recovery/registered-stream-scan path, and the
+exact-source reader plus claim-to-output-ready worker path. This is not a Phase 4 completion claim：protection-owner
+crash-cut reconciliation, Pulsar opaque round trip, service composition and the M3 gates remain open；full
 recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M4–M6.
 
 A later milestone is complete only when：
@@ -275,8 +276,9 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > aggregate gates 已通过；real Oxia/LocalStack fixture 验证两个独立 runtime 的并发发布收敛、COMMITTED
 > response loss 后重启恢复，以及 higher object 丢失后的 exact pin release、root/index quarantine 与同 view
 > generation-zero fallback。该 fixture 同时暴露并修复 inline `EntryIndexRef` durable round-trip 的内容相等性。
-> F4-M2 is complete/final-gated。M3 仍需接入 worker-owned source/output protections 与真实 compacted format，
-> M4 仍需补齐 recovery-root/anchor-aware source reachability；physical delete 继续禁用。
+> F4-M2 is complete/final-gated。M3 已接入真实 compacted format 与 worker-owned source/output
+> protections checkpoint，但跨 key crash-cut 恢复、service 和 gates 仍需完成；M4 仍需补齐
+> recovery-root/anchor-aware source reachability，physical delete 继续禁用。
 
 ### 4.1 Production artifacts
 
@@ -367,9 +369,12 @@ also run with `--rerun-tasks` so the real-service evidence was not satisfied fro
 > identity、cross-stream rejection and task-policy binding. The next checkpoint implements deterministic policy
 > versioning、the bounded whole-index DAG planner/fixed-point rule、exact-source task-create revalidation、complete
 > durable policy snapshots、different-clock duplicate-create convergence、claim-expiry/publication recovery、per-stream
-> task pagination and all-64-shard registered-stream discovery with activation revalidation. This is not M3
-> completion：Pulsar opaque-entry round trip、exact-source worker/protections、service lifecycle and both M3 gates below
-> remain pending, and production activation stays disabled.
+> task pagination and all-64-shard registered-stream discovery with activation revalidation. A third checkpoint adds
+> the stream-scoped exact-source reader, durable pin/revalidation, lossless single-source row stream, deterministic
+> claim/heartbeat worker, guarded upload, strict full-output verification, source/output task protections and typed
+> durable failure transitions through `OUTPUT_READY`. This is not M3 completion：protection-owner convergence across
+> all cross-key crash cuts, Pulsar opaque-entry round trip, service lifecycle and both M3 gates below remain pending,
+> and production activation stays disabled.
 
 ### 5.1 Production artifacts
 

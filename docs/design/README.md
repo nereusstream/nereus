@@ -7,7 +7,7 @@
 `docs/phase-3-cursor-subscription/` 与
 `docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
 测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1–M2 实现、正在进行的
-M3 object-format checkpoint 和后续目标。
+M3 format/planner/recovery/exact-source worker checkpoints 和后续目标。
 
 建议阅读顺序：
 
@@ -49,7 +49,8 @@ fallback、同对象全引用 quarantine、bounded transient retry 和 restart-s
 并发、response loss 后重启、pin/quarantine/fallback。F4-M1–M2 已 final-gated；M3 的真实 compacted
 Parquet writer/strict reader、whole-file verifier、NTC1 storage facade、core adapter，以及 deterministic
 policy/planner/task-store/recovery/64-shard registry scanner 已落地，但 Pulsar opaque round trip、exact-source
-worker/service 与 M3 gates 仍 pending，retention/GC 和 async profile 仍不可用。
+reader/claim-to-output-ready worker checkpoint 也已落地，但 protection crash-cut reconciliation、Pulsar
+opaque round trip、service 与 M3 gates 仍 pending，retention/GC 和 async profile 仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

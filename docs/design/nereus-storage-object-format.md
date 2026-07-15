@@ -2,8 +2,8 @@
 
 > 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate；
 > F4 compacted/topic-compacted/recovery-checkpoint families 已通过 M0 code-level design gate；F4-M3 real Parquet
-> NCP1/NTC1 writer/strict-reader/whole-file verifier、NCP1 core adapter 与 M3 planner/recovery checkpoint 已实现，
-> exact-source worker 和完整 M3 gate 尚未完成；
+> NCP1/NTC1 writer/strict-reader/whole-file verifier、NCP1 core adapter、M3 planner/recovery 与 exact-source
+> worker checkpoints 已实现，protection crash-cut recovery/service 和完整 M3 gate 尚未完成；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -15,7 +15,7 @@ Nereus shared data plane 需要多类 immutable objects：
 | --- | --- | --- | --- |
 | Multi-stream WAL object | primary Object WAL bytes | reachable append + generation-0 index | Implemented v1 |
 | Index object | large entry/projection index | offset-index reference | Reserved |
-| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter + planner/recovery implemented/tested；exact-source worker/gates pending |
+| Stream compacted object (`NCP1`) | per-stream lossless higher-generation `COMMITTED` target | generation index `PREPARED -> COMMITTED` CAS | F4-M3 writer/reader/full verifier/core adapter + planner/recovery + exact-source worker checkpoints implemented/tested；protection recovery/service/gates pending |
 | Topic-compacted object (`NTC1`) | sparse lossy `TOPIC_COMPACTED` target | separate view generation index CAS | F4-M3 schema/writer/strict-reader facade/full verifier + sparse suite implemented；topic worker/gates pending，broker admission remains F8 |
 | Recovery checkpoint (`NRC1` + `NRF1`) | replace append-replay/index-repair role of a committed prefix | recovery-root CAS | Designed / F4-M0 frozen |
 | Cursor snapshot | large ack state | cursor-state CAS ref | Implemented/final-gated through F3-M6 |

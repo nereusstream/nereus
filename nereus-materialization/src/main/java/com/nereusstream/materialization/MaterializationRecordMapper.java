@@ -25,6 +25,7 @@ import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.SourceGenerationRecord;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
+import com.nereusstream.metadata.oxia.records.WorkerClaimRecord;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
@@ -288,6 +289,121 @@ final class MaterializationRecordMapper {
                 output.cumulativeSizeAtEnd(),
                 new Checksum(ChecksumType.SHA256, output.sourceSetSha256()),
                 ProjectionIdentity.decode(output.projectionRef()));
+    }
+
+    static MaterializationTaskRecord claimed(
+            MaterializationTaskRecord current,
+            String claimId,
+            String processRunId,
+            long claimedAtMillis,
+            long expiresAtMillis) {
+        if (current.lifecycle() != TaskLifecycle.PLANNED
+                && current.lifecycle() != TaskLifecycle.RETRY_WAIT) {
+            throw new IllegalArgumentException("only PLANNED/RETRY_WAIT tasks may be claimed");
+        }
+        if (claimedAtMillis < 0 || expiresAtMillis <= claimedAtMillis) {
+            throw new IllegalArgumentException("worker claim time window is invalid");
+        }
+        long attempt = Math.addExact(current.attempt(), 1);
+        long updatedAt = Math.max(current.updatedAtMillis(), claimedAtMillis);
+        return taskExecutionState(
+                current,
+                TaskLifecycle.CLAIMED,
+                attempt,
+                Optional.of(new WorkerClaimRecord(
+                        claimId,
+                        processRunId,
+                        attempt,
+                        claimedAtMillis,
+                        expiresAtMillis)),
+                Optional.empty(),
+                TaskFailureClass.NONE,
+                "",
+                0,
+                updatedAt);
+    }
+
+    static MaterializationTaskRecord heartbeat(
+            MaterializationTaskRecord current,
+            long expiresAtMillis,
+            long nowMillis) {
+        if (current.lifecycle() != TaskLifecycle.CLAIMED || current.workerClaim().isEmpty()) {
+            throw new IllegalArgumentException("only a claimed task may heartbeat");
+        }
+        WorkerClaimRecord claim = current.workerClaim().orElseThrow();
+        if (expiresAtMillis <= claim.expiresAtMillis()) {
+            throw new IllegalArgumentException("heartbeat must extend claim expiry");
+        }
+        return taskExecutionState(
+                current,
+                TaskLifecycle.CLAIMED,
+                current.attempt(),
+                Optional.of(new WorkerClaimRecord(
+                        claim.claimId(),
+                        claim.processRunId(),
+                        claim.attempt(),
+                        claim.claimedAtMillis(),
+                        expiresAtMillis)),
+                Optional.empty(),
+                TaskFailureClass.NONE,
+                "",
+                0,
+                Math.max(current.updatedAtMillis(), nowMillis));
+    }
+
+    static MaterializationTaskRecord outputReady(
+            MaterializationTaskRecord current,
+            MaterializationOutput output,
+            long nowMillis) {
+        if (current.lifecycle() != TaskLifecycle.CLAIMED || current.workerClaim().isEmpty()) {
+            throw new IllegalArgumentException("only a claimed task may persist worker output");
+        }
+        if (!current.workerClaim().orElseThrow().claimId().equals(output.outputAttemptId())) {
+            throw new IllegalArgumentException("worker output does not belong to the active claim");
+        }
+        return taskExecutionState(
+                current,
+                TaskLifecycle.OUTPUT_READY,
+                current.attempt(),
+                Optional.empty(),
+                Optional.of(outputRecord(output)),
+                TaskFailureClass.NONE,
+                "",
+                0,
+                Math.max(current.updatedAtMillis(), nowMillis));
+    }
+
+    static MaterializationTaskRecord failedClaim(
+            MaterializationTaskRecord current,
+            TaskLifecycle lifecycle,
+            TaskFailureClass failureClass,
+            String failureMessage,
+            long retryNotBeforeMillis,
+            long nowMillis) {
+        if (current.lifecycle() != TaskLifecycle.CLAIMED
+                || (lifecycle != TaskLifecycle.RETRY_WAIT
+                        && lifecycle != TaskLifecycle.CANCELLED
+                        && lifecycle != TaskLifecycle.TERMINAL_FAILED)
+                || failureClass == TaskFailureClass.NONE) {
+            throw new IllegalArgumentException("claimed task failure transition is invalid");
+        }
+        long updatedAt = Math.max(current.updatedAtMillis(), nowMillis);
+        if (lifecycle == TaskLifecycle.RETRY_WAIT && retryNotBeforeMillis <= updatedAt) {
+            throw new IllegalArgumentException("retry wait must begin after the update timestamp");
+        }
+        if (lifecycle != TaskLifecycle.RETRY_WAIT && retryNotBeforeMillis != 0) {
+            throw new IllegalArgumentException("terminal/cancelled task cannot carry a retry time");
+        }
+        return taskExecutionState(
+                current,
+                lifecycle,
+                current.attempt(),
+                Optional.empty(),
+                Optional.empty(),
+                failureClass,
+                requireText(failureMessage, "failureMessage"),
+                retryNotBeforeMillis,
+                updatedAt);
     }
 
     static GenerationIndexRecord preparedIndex(
@@ -570,6 +686,45 @@ final class MaterializationRecordMapper {
                 0,
                 current.createdAtMillis(),
                 updatedAt,
+                0);
+    }
+
+    private static MaterializationTaskRecord taskExecutionState(
+            MaterializationTaskRecord current,
+            TaskLifecycle lifecycle,
+            long attempt,
+            Optional<WorkerClaimRecord> claim,
+            Optional<MaterializationOutputRecord> output,
+            TaskFailureClass failureClass,
+            String failureMessage,
+            long retryNotBeforeMillis,
+            long updatedAtMillis) {
+        return new MaterializationTaskRecord(
+                current.schemaVersion(),
+                current.taskId(),
+                current.taskSequence(),
+                current.streamId(),
+                current.readViewId(),
+                current.taskKindId(),
+                current.offsetStart(),
+                current.offsetEnd(),
+                current.sources(),
+                current.sourceSetSha256(),
+                current.policyId(),
+                current.policyVersion(),
+                current.policySha256(),
+                current.policy(),
+                lifecycle,
+                attempt,
+                claim,
+                output,
+                OptionalLong.empty(),
+                "",
+                failureClass.wireId(),
+                failureMessage,
+                retryNotBeforeMillis,
+                current.createdAtMillis(),
+                updatedAtMillis,
                 0);
     }
 }

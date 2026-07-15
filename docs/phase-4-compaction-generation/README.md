@@ -2,7 +2,8 @@
 
 > 状态：Implementation in progress；F4-M1–M2 已完成并通过 ordinary/Docker-backed final gates；F4-M3
 > compacted Parquet read/write/verifier 与 deterministic policy/planner/task-store/recovery/registry-scanner
-> checkpoints 已落地，exact-source worker/service 与 M3 gates 尚未完成；F4-M4–M6 未实现
+> checkpoints 以及 exact-source reader/worker checkpoint 已落地；protection crash-cut reconciliation、
+> service lifecycle 和 M3 gates 尚未完成；F4-M4–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -60,8 +61,13 @@ tests 均通过。随后落地的第二个 M3 checkpoint 又加入 deterministic
 planner、fixed-point/overlap suppression、exact-source task create revalidation、64 KiB durable task limit、完整
 immutable policy snapshot、claim-expiry/publication recovery、per-stream task scanner 和全 64 分片 registered-stream
 scanner。当前配置变化不会再改变或阻塞旧 durable task 的恢复；不同 broker 时钟生成的同一 deterministic
-task 也会在 create-response-loss 路径收敛。Pulsar opaque-entry round trip、exact-source worker/protection、
-service lifecycle 和 M3 ordinary/final gates 仍未完成，因此 higher-generation materialization 仍未开放。M4
+task 也会在 create-response-loss 路径收敛。第三个 M3 checkpoint 又实现了 stream-scoped exact-source reader、
+durable read pin 内的 exact index/root/format/offset 再验证、single-source-at-a-time 无损 row publisher、
+claim/heartbeat 驱动的 worker、guarded if-absent upload、严格 full-output verification、source/output task
+protection 以及 typed durable failure transition。它已通过真实 Parquet + local object-store 的 `CLAIMED ->
+OUTPUT_READY` 聚焦测试，但 protection owner 在跨 key crash cut 后的恢复收敛、publication 前的保护重建、
+Pulsar opaque-entry round trip、service lifecycle 和 M3 ordinary/final gates 仍未完成，因此
+higher-generation materialization 仍未开放。M4
 还需将 source reachability 扩展为
 recovery-root/anchor-aware proof。Phase 4 整体仍为
 `Implementation in progress`；physical delete、materialization worker 和 async profile 均未开放。
@@ -303,7 +309,7 @@ M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physi
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
-| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner checkpoints landed；Pulsar opaque round trip、exact-source worker/protection、service lifecycle and milestone gates pending |
+| F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | in progress；real Parquet writer/reader/full verifier、NTC1 facade、core adapter、policy/planner/task-store/recovery/registry-scanner and exact-source reader/worker checkpoints landed；protection crash-cut reconciliation、Pulsar opaque round trip、service lifecycle and milestone gates pending |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |

@@ -26,7 +26,7 @@ MaterializationService
 `MaterializationService` is process-shared and multi-stream. It has no broker/topic ownership assumption. Duplicate
 planners/workers on multiple brokers are expected；deterministic task ids and Oxia CAS converge them.
 
-### 1.1 Implemented F4-M3 orchestration checkpoint
+### 1.1 Implemented F4-M3 orchestration and worker checkpoints
 
 The current implementation includes `MaterializationPolicyFactory`、`DefaultMaterializationPlanner`、
 `MaterializationTaskStore`、`MaterializationTaskRecovery`、`TaskRecoveryScanner` and
@@ -34,8 +34,24 @@ The current implementation includes `MaterializationPolicyFactory`、`DefaultMat
 tiling independent of scan order、fixed-point termination、exact-source revalidation before create、different-clock
 duplicate create convergence、claim expiry with clock-skew margin、publication re-entry from durable task/output and
 all-64-shard registered-stream discovery. `MaterializationWorkerPool`、exact-source IO/protection、checkpoint
-reconciliation and `MaterializationService` lifecycle composition remain target code, so this checkpoint does not
-enable production materialization.
+reconciliation and `MaterializationService` lifecycle composition were still target code at that checkpoint.
+
+The next checkpoint implements `DefaultExactSourceRangeReader`、`LosslessMaterializationRowPublisher` and
+`DefaultMaterializationWorker`. The exact reader is stream-scoped, refuses generation substitution, acquires a
+durable read pin before IO, revalidates the frozen index/root/format/schema/projection/object identity and enforces
+dense offsets while producing exact payload/accounting digests. The row publisher keeps at most one exact source
+and one requested page active, maps one source offset to one compacted row without parsing or re-encoding payloads,
+and propagates cancellation to the active source.
+
+The worker now performs deterministic claim/response-loss reload, periodic same-claim heartbeat, source protection
+acquisition, real Parquet staging, guarded if-absent upload, exact HEAD/full-output verification, output protection
+acquisition and the `CLAIMED -> OUTPUT_READY` CAS. Typed failure classes drive durable `RETRY_WAIT`、`CANCELLED` or
+`TERMINAL_FAILED` transitions without parsing exception text. Focused tests cover exact multi-page reads and pin
+cleanup, missing-frozen-index rejection, real Parquet/local-object-store success and retryable writer failure.
+
+This is still not the production materialization gate. Owner convergence for source/output protections across every
+cross-key heartbeat/output crash cut, recovery-time protection reconstruction before publication, checkpoint
+reconciliation, Pulsar opaque-entry evidence and `MaterializationService` lifecycle composition remain open.
 
 Target construction：
 
