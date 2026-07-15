@@ -241,6 +241,25 @@ class ApiValueValidationTest {
         byte[] returned = ref.inlineData().orElseThrow();
         returned[1] = 9;
         assertThat(ref.inlineData()).hasValueSatisfying(bytes -> assertThat(bytes).containsExactly(1, 2));
+
+        EntryIndexRef independentlyDecoded = new EntryIndexRef(
+                EntryIndexLocation.INLINE,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(new byte[] {1, 2}),
+                0,
+                0,
+                checksum());
+        EntryIndexRef differentBytes = new EntryIndexRef(
+                EntryIndexLocation.INLINE,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(new byte[] {1, 3}),
+                0,
+                0,
+                checksum());
+        assertThat(independentlyDecoded).isEqualTo(ref).hasSameHashCodeAs(ref);
+        assertThat(differentBytes).isNotEqualTo(ref);
     }
 
     @Test

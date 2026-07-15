@@ -68,9 +68,13 @@ task-owned visible protection, returns the task to `OUTPUT_READY`, and retries w
 generation while retaining the old `ABORTED` index. `GenerationPublicationReconciler` is the idempotent re-entry
 surface for an already recovered durable task/output pair; task discovery remains M3 worker work.
 
-M2 aggregate gates and real Oxia/LocalStack publication/pin/fallback fixtures are still pending, so this is not an
-F4-M2 completion claim. M3 still owns source/output task protections and M4 owns full recovery-root/anchor-aware
-source reachability before retirement or physical deletion can be enabled.
+`phase4M2Check` and `phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. The real Oxia/LocalStack final fixture
+uses independent client runtimes to prove concurrent-publisher convergence and COMMITTED-response-loss recovery
+across restart, then proves exact pin release、root/index quarantine and same-view generation-zero fallback after a
+higher object disappears. The fixture also exposed and fixed inline `EntryIndexRef` value equality across durable
+codec round-trips. F4-M2 is complete/final-gated. M3 still owns source/output task protections and the compacted
+object worker；M4 owns full recovery-root/anchor-aware source reachability before retirement or physical deletion
+can be enabled.
 
 ## 2. Keyspace
 

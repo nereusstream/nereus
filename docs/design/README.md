@@ -6,8 +6,8 @@
 `docs/phase-2-managed-ledger-facade/`、
 `docs/phase-3-cursor-subscription/` 与
 `docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
-测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1 实现和后续
-M2–M6 目标。
+测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1–M2 实现和后续
+M3–M6 目标。
 
 建议阅读顺序：
 
@@ -42,12 +42,12 @@ reference values、durable reader pin 与 durable protection handshakes，并增
 conditional delete、43 个 codec golden、stream-scoped CAS guards 及 production/fake 共用 physical-root transition
 validation。真实 Oxia gate 验证 slash-aware fixed-depth range scan；pinned LocalStack gate 验证 SDK response/
 exact-byte upload completion 与 exact HEAD 后的受限 conditional-delete fallback；`phase4M1Check` 和
-`phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M1 已 final-gated，但 M2–M6 的 generation
-publication/read、materialization、retention/GC 和 async profile 仍不可用。F4-M2 已进入实现：exact
-target-reader dispatch、generation allocator/index compatibility、physical identity resolution 与 authoritative
-scan + durable pin + exact revalidation resolver 基础已经落地；coordinator 现持有 pin 贯穿 IO/cleanup，并完成
-same-view candidate exclusion fallback 与永久对象损坏的 selected-candidate quarantine。publication、同对象
-全引用域 quarantine repair、瞬态重试阈值和 M2 gates 尚未完成。
+`phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M2 也已完成 exact target-reader dispatch、
+generation allocation/index compatibility、authoritative scan + durable pin + exact revalidation、same-view
+fallback、同对象全引用 quarantine、bounded transient retry 和 restart-safe publication/re-entry state machine。
+`phase4M2Check` 与 `phase4M2FinalCheck --rerun-tasks` 已通过；真实 Oxia/LocalStack fixture 覆盖独立 runtime
+并发、response loss 后重启、pin/quarantine/fallback。F4-M1–M2 已 final-gated，但 M3–M6 的 compacted
+object format/worker、retention/GC 和 async profile 仍不可用。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

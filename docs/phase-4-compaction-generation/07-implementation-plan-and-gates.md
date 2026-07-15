@@ -3,8 +3,8 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1 completed its ordinary and Docker-backed final gates on
-2026-07-15；the following parts are implemented and covered by focused and real-service tests：
+`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1 and F4-M2 completed their ordinary and Docker-backed final
+gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
   delete surface；
@@ -26,10 +26,11 @@ F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and 
   fixed-depth ranges、restart、CAS、pagination and conditional metadata delete；
 - M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
-`phase4M1Check` and `phase4M1FinalCheck --rerun-tasks` passed on 2026-07-15. The final gate ran focused real Oxia、
-pinned LocalStack and its Phase 3/Pulsar prerequisites；F4-M1 is complete. This is not a Phase 4 completion claim：core
-activation and protection values remain contracts/primitives, and the product activation adapter、higher-generation
-read、materialization、retention/GC and async execution paths arrive in F4-M2–M6.
+`phase4M1Check`、`phase4M1FinalCheck --rerun-tasks`、`phase4M2Check` and
+`phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. M2 adds authoritative committed-generation resolve/read,
+restart-safe publication, pin-owned fallback/quarantine and a real Oxia/LocalStack independent-runtime fixture.
+F4-M1 is complete；F4-M2 is complete/final-gated. This is not a Phase 4 completion claim：the compacted object format/worker、full
+recovery-root/anchor-aware retirement/GC and async/Pulsar execution paths arrive in F4-M3–M6.
 
 A later milestone is complete only when：
 
@@ -267,9 +268,12 @@ Both passed on 2026-07-15. M1 does not publish a higher generation or delete a p
 > publication-id/generation task freeze、deterministic PREPARED create、发布前全重验证、唯一
 > `PREPARED -> COMMITTED` visibility CAS、visible-protection owner transfer 和 task PUBLISHED convergence；并发、
 > response-loss、已发布重进与 exactly-proven ABORTED 重分配均有测试。
-> `GenerationPublicationReconciler` 已提供 recovered task/output pair 的幂等重进入口。M2 aggregate gates
-> 和 real-service final gate 尚未完成；M3 仍需接入 worker-owned source/output protections，M4 仍需补齐
-> recovery-root/anchor-aware source reachability。本检查点不构成 F4-M2 completion claim。
+> `GenerationPublicationReconciler` 已提供 recovered task/output pair 的幂等重进入口。M2 ordinary/final
+> aggregate gates 已通过；real Oxia/LocalStack fixture 验证两个独立 runtime 的并发发布收敛、COMMITTED
+> response loss 后重启恢复，以及 higher object 丢失后的 exact pin release、root/index quarantine 与同 view
+> generation-zero fallback。该 fixture 同时暴露并修复 inline `EntryIndexRef` durable round-trip 的内容相等性。
+> F4-M2 is complete/final-gated。M3 仍需接入 worker-owned source/output protections 与真实 compacted format，
+> M4 仍需补齐 recovery-root/anchor-aware source reachability；physical delete 继续禁用。
 
 ### 4.1 Production artifacts
 
@@ -310,8 +314,9 @@ GenerationCommitResult.java
 GenerationPublicationReconciler.java
 ```
 
-No compacted Parquet production reader is required until M3；M2 tests use an exact in-memory test reader and proves
-the publication/resolver contract independently of file format.
+No compacted Parquet production reader is required until M3；M2 tests use exact test readers, including one that
+checks LocalStack object bytes, and prove the publication/resolver contract independently of the future compacted
+file format.
 
 ### 4.2 Focused tests
 
@@ -321,16 +326,14 @@ GenerationIndexPublicationTest
 GenerationPublicationFailureInjectionTest
 GenerationPublicationPropertyTest
 GenerationPublicationReconcilerTest
+MaterializationDomainTest
 GenerationIndexCompatibilityTest
 GenerationReadResolverTest
-GenerationReadResolverStaleCacheTest
-GenerationReadResolverCandidateLimitTest
-GenerationReadFallbackTest
-PhysicalObjectQuarantinePropagationTest
+MetadataGenerationReadFailureHandlerTest
 ReadTargetReaderRegistryTest
 ReadTargetDispatcherMixedFormatTest
 PinnedReadCoordinatorTest
-CommittedTopicViewIsolationTest
+GenerationPublicationOxiaS3IntegrationTest             real-service final fixture
 ```
 
 Required assertions：unique generations with valid gaps；allocation-response loss plus interleaving can burn only
@@ -346,8 +349,9 @@ goldens still resolve.
 ./gradlew phase4M2FinalCheck --rerun-tasks
 ```
 
-Final adds multi-process real Oxia allocation/publication/response-loss and LocalStack pin/fallback fixtures. Physical
-delete stays disabled and all source objects remain protected.
+Final adds independent-runtime real Oxia allocation/publication/response-loss and LocalStack pin/fallback fixtures. Physical
+delete stays disabled and all source objects remain protected. Both gates passed on 2026-07-15；the final gate was
+also run with `--rerun-tasks` so the real-service evidence was not satisfied from Gradle cache.
 
 ## 5. F4-M3 — Object Format, Planner, and Worker
 

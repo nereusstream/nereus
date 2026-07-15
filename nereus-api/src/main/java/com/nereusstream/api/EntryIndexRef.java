@@ -14,6 +14,7 @@
 
 package com.nereusstream.api;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -39,6 +40,29 @@ public record EntryIndexRef(
     @Override
     public Optional<byte[]> inlineData() {
         return copyOptionalBytes(inlineData);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof EntryIndexRef that)) {
+            return false;
+        }
+        return offset == that.offset
+                && length == that.length
+                && location == that.location
+                && objectId.equals(that.objectId)
+                && objectKey.equals(that.objectKey)
+                && Arrays.equals(inlineData.orElse(null), that.inlineData.orElse(null))
+                && checksum.equals(that.checksum);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(location, objectId, objectKey, offset, length, checksum);
+        return 31 * result + Arrays.hashCode(inlineData.orElse(null));
     }
 
     private static Optional<byte[]> copyOptionalBytes(Optional<byte[]> bytes) {

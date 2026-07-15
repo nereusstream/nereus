@@ -118,7 +118,7 @@ F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unlo
 factory cache，避免新 broker topic 复用已删除 stream。`phase3M6Check`、`phase3M6FinalCheck`、
 `phase3Check` 和 `phase3FinalCheck` 构成完整 release gate；Future 3 已实现并 final-gated。
 
-Phase 4 F4-M0 已于 2026-07-14 完成代码级设计门禁，F4-M1 已于 2026-07-15 完成并通过普通与
+Phase 4 F4-M0 已于 2026-07-14 完成代码级设计门禁，F4-M1–M2 已于 2026-07-15 完成并通过普通与
 Docker-backed final gate。M1 已落地
 F4 API/metadata/Oxia 基础、materialization 模块边界、guarded/replayable object-store IO、物理对象与 GC
 reference-domain 强类型、generation activation proof contract、create/revalidate/release durable reader pin
@@ -127,17 +127,20 @@ handshake，以及无保护空窗的 durable protection acquire/owner-transfer/r
 校验。43 个 lifecycle/optional codec golden、stream-scoped CAS transition guards、Oxia slash-aware fixed-depth
 range bounds、SDK response 与 exact-byte upload 双完成条件，以及 exact HEAD 后受限于 HTTP 405/501 的
 conditional-DELETE compatibility fallback 均已由 focused real Oxia 与 pinned LocalStack 验证；
-`phase4M1Check` 和 `phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M2 当前已实现
+`phase4M1Check` 和 `phase4M1FinalCheck --rerun-tasks` 均已于 2026-07-15 通过。F4-M2 已实现
 view-aware read contract、exact target-reader registry/dispatch、generation allocator、strict index hydration、
 exact candidate lookup、physical identity resolution、fresh-scan/pin/revalidation resolver，以及 pin-through-IO 的
-`ReadCoordinator` same-view fallback 与 selected-candidate quarantine；publication、全引用域 quarantine repair、
-瞬态重试阈值与 M2 gates 仍在进行中。
+`ReadCoordinator` same-view fallback、全引用域 quarantine repair 与 bounded transient retry。restart-safe
+publication state machine、re-entry reconciler、canonical task/output identity 和 visible-protection owner transfer
+也已落地。`phase4M2Check` 与 `phase4M2FinalCheck --rerun-tasks` 已通过；真实 Oxia/LocalStack fixture 验证
+两个独立 runtime 并发发布、COMMITTED response loss 后重启恢复、exact pin/quarantine 与同 view fallback。
 新的
 `docs/phase-4-compaction-generation/` 冻结了 API/module ownership、`NCP1/NTC1/NRC1` formats、
 Oxia records/keys/codecs、generation publication、task/recovery/async state machines、durable reader
 leases/protections、64-shard restart-safe stream discovery、retention/GC、guarded PUT 与可界的 DELETED-root audit
 retirement、Pulsar rollout 与 F4-M1–M6 实施门禁。该目录同时记录 normative target 与已落地检查点；
-F4-M2 尚未完成，M3–M6 亦未开始；higher-generation production read、materialization、retention/GC 与 async profile 仍不可用。Phase 4 只计划实现
+F4-M1–M2 已 final-gated，M3–M6 尚未实现；真实 compacted object format/worker、retention/GC 与 async
+profile 仍不可用。Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
 Start with `docs/design/nereus-design-index.md` for document authority and current status. Use

@@ -567,3 +567,28 @@ tasks.register("phase4M1FinalCheck") {
     dependsOn(":nereus-metadata-oxia:f4OxiaIntegrationTest")
     dependsOn(":nereus-object-store:s3IntegrationTest")
 }
+
+tasks.register<Exec>("checkPhase4M2ContractSurface") {
+    group = "verification"
+    description = "Audit the implemented F4-M2 publication, resolver, fallback, test, and documentation surfaces."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m2-contract-surface.sh")
+}
+
+tasks.register("phase4M2Check") {
+    group = "verification"
+    description = "Verify F4-M2 generation publication, committed reads, bounded retry, and quarantine propagation."
+    dependsOn("phase4M1Check")
+    dependsOn("checkPhase4M2ContractSurface")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-materialization:compileF4M2IntegrationTestJava")
+    dependsOn(":nereus-metadata-oxia:check")
+}
+
+tasks.register("phase4M2FinalCheck") {
+    group = "verification"
+    description = "Run ordinary and Docker-backed real Oxia/LocalStack F4-M2 publication and fallback gates."
+    dependsOn("phase4M2Check")
+    dependsOn(":nereus-materialization:f4M2IntegrationTest")
+}

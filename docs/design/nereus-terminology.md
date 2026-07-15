@@ -163,7 +163,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   rollout 的 code-level target-design gate；complete 表示 M1 可开始，不表示 Phase 4 生产代码已存在。
 - **F4-M1**：Future 4 metadata、physical-object lifecycle、guarded object IO、reader lease/protection primitive
   里程碑；已于 2026-07-15 通过 ordinary/Docker-backed final gate。M1 complete 不表示
-  higher-generation read、GC 或 async profile 已启用，这些仍属于 F4-M2–M6。
+  higher-generation read、GC 或 async profile 已启用；generation publication/read 属于 M2，其他能力属于 M3–M6。
+- **F4-M2**：Future 4 generation publication、authoritative committed read、exact dispatch、durable pin、
+  same-view fallback/quarantine 里程碑；已于 2026-07-15 通过 ordinary 与 real Oxia/LocalStack final gate。
+  M2 complete 不表示 compacted object worker、retirement/GC 或 async profile 已启用，这些属于 F4-M3–M6。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

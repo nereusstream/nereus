@@ -1,6 +1,6 @@
 # Phase 4 Materialization / Compaction / Generation / GC Detailed Design
 
-> 状态：Implementation in progress；F4-M1 已完成并通过 ordinary/Docker-backed final gates，F4-M2 已落地读取和发布核心路径、尚待 aggregate/final gates，F4-M3–M6 未实现
+> 状态：Implementation in progress；F4-M1–M2 已完成并通过 ordinary/Docker-backed final gates，F4-M3–M6 未实现
 >
 > 设计基线日期：2026-07-14
 >
@@ -44,9 +44,13 @@ identity、128-bit-or-stronger publication id、durable task/output/index mapper
 `PREPARED -> COMMITTED` version-CAS 作为可见性点。发布结果丢失、并发发布、已发布重进和经证明的
 `ABORTED` 重分配已有生产 codec/CAS adapter 测试；visible-output protection 的 owner 从 task
 精确移交到 committed index。`GenerationPublicationReconciler` 提供已恢复 task/output pair 的幂等重进入口；
-扫描器属于 M3 worker orchestration。M2 ordinary/final aggregate gates、真实 Oxia/LocalStack 发布与
-pin/fallback fixture 仍未实现，因此不能标记 F4-M2 完成。M3 还需将 source/output task
-protection 接入 worker，M4 还需将 source reachability 扩展为 recovery-root/anchor-aware proof。Phase 4 整体仍为
+扫描器属于 M3 worker orchestration。真实 Oxia/LocalStack final fixture 已验证两个独立 runtime 的并发发布、
+COMMITTED CAS 成功响应丢失后的进程重启与同一 publication/generation 收敛，以及 higher object 丢失后的
+exact root/index quarantine、lease 清理和同 view generation-zero fallback。该门禁同时暴露并修复了 inline
+`EntryIndexRef` 在 durable codec round-trip 后按数组引用而非内容比较的问题。`phase4M2Check` 与
+`phase4M2FinalCheck --rerun-tasks` 已于 2026-07-15 通过，因此 F4-M2 已 final-gated。M3 还需将
+source/output task protection 接入 worker，并实现真实 compacted object format；M4 还需将 source
+reachability 扩展为 recovery-root/anchor-aware proof。Phase 4 整体仍为
 `Implementation in progress`；physical delete、materialization worker 和 async profile 均未开放。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
@@ -261,7 +265,23 @@ delete；pinned LocalStack covers guarded upload completion、list、HEAD identi
 
 Both `phase4M1Check` and `phase4M1FinalCheck --rerun-tasks` passed on 2026-07-15, so F4-M1 is final-gated. This is
 deliberately not a Phase 4 completion claim. No generation publication, resolver, materialization worker, retention
-or GC behavior is enabled by M1；those execution paths remain F4-M2–M6 work.
+or GC behavior is enabled by M1；generation publication/read arrives in M2 and the remaining execution paths are
+F4-M3–M6 work.
+
+### 6.2 F4-M2 implemented checkpoint
+
+The completed F4-M2 checkpoint adds authoritative view-scoped candidate resolution, strict committed-index
+validation, exact reader dispatch, durable read-pin lifetime, bounded same-view fallback/quarantine, and the
+restart-safe generation publication state machine. Publication freezes one task-owned publication id and generation,
+creates one deterministic `PREPARED` index, repeats all publication proofs after recovery, and exposes visibility
+only through the exact `PREPARED -> COMMITTED` version-CAS. Lost responses and concurrent publishers converge on
+the same durable result；visible-output protection transfers from the task to the committed index.
+
+`phase4M2Check` and `phase4M2FinalCheck --rerun-tasks` passed on 2026-07-15. The final gate uses real Oxia and
+LocalStack to cover independent runtimes, response loss plus restart, exact object verification, durable pins,
+quarantine, and same-view generation-zero fallback. F4-M2 is complete/final-gated. This remains a milestone claim,
+not a Phase 4 completion claim：M3 owns compacted object format/planner/worker and task source/output protections；
+M4 owns recovery-root/anchor-aware retirement and deletion eligibility, so physical deletion remains disabled.
 
 ## 7. Milestones
 
@@ -269,7 +289,7 @@ or GC behavior is enabled by M1；those execution paths remain F4-M2–M6 work.
 | --- | --- | --- |
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
-| F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | in progress；resolver/allocator/exact dispatch/pinned coordinator、restart-safe committer/re-entry reconciler、same-object quarantine propagation 和 bounded transient retry 已实现；aggregate/real-service final gates pending |
+| F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | planned |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |

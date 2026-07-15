@@ -69,10 +69,11 @@ nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention/
   CursorSnapshotGcScanner.java
 ```
 
-As of 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain values、the reader-pin manager and the durable
-protection manager are implemented with deterministic fake-store handshake/response-loss tests. GC coordinators and
-product reader/cursor/publication integrations in this layout remain planned work；therefore no object deletion or
-higher-generation read is enabled by this checkpoint.
+As of F4-M2 on 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain values、the reader-pin manager and the
+durable protection manager are implemented with deterministic handshake/response-loss tests. The committed-generation
+resolver、exact reader dispatch、pin lifetime、fallback/quarantine and publication state machine are integrated and
+final-gated. The M3 compacted-format reader/worker and the M4 GC coordinators、cursor integration and anchor-aware
+reachability remain planned；therefore no object deletion is enabled by this checkpoint.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.

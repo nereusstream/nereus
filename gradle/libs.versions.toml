@@ -15,6 +15,7 @@ oxia-testcontainers = "0.7.4"
 testcontainers = "1.20.4"
 assertj = "3.27.7"
 aws-sdk-v2 = "2.47.5"
+commons-codec = "1.17.0"
 
 [libraries]
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
@@ -39,5 +40,6 @@ testcontainers-localstack = { module = "org.testcontainers:localstack", version.
 aws-sdk-v2-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk-v2" }
 aws-sdk-v2-s3 = { module = "software.amazon.awssdk:s3" }
 aws-sdk-v2-netty-client = { module = "software.amazon.awssdk:netty-nio-client" }
+commons-codec = { module = "commons-codec:commons-codec", version.ref = "commons-codec" }
 
 [plugins]
