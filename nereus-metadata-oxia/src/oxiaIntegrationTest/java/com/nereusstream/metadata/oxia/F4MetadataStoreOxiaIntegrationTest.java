@@ -78,6 +78,22 @@ class F4MetadataStoreOxiaIntegrationTest {
                     cluster,
                     F4MetadataTestValues.generation(GenerationLifecycle.COMMITTED),
                     created.metadataVersion()).join();
+            F4Keyspace keys = new F4Keyspace(cluster);
+            String scanFrom = keys.generationIndexScanFrom(stream, ReadView.COMMITTED, 0);
+            String scanTo = keys.generationIndexScanToAfterEnd(stream, ReadView.COMMITTED, 2);
+            assertThat(runtime.client().get(
+                            committed.key(), keys.streamPartitionKey(stream)).join())
+                    .as("exact generation key before range scan")
+                    .isPresent();
+            assertThat(runtime.client().list(
+                            scanFrom, scanTo, keys.streamPartitionKey(stream)).join())
+                    .as("generation key in bounded Oxia list")
+                    .containsExactly(committed.key());
+            assertThat(runtime.client().rangeScan(
+                            scanFrom, scanTo, 1, keys.streamPartitionKey(stream)).join())
+                    .as("generation value in bounded Oxia range scan")
+                    .extracting(PartitionedOxiaClient.VersionedValue::key)
+                    .containsExactly(committed.key());
             GenerationScanPage generationPage = generations.scanIndex(
                     cluster, stream, ReadView.COMMITTED, 0, 2, Optional.empty(), 1).join();
             assertThat(generationPage.values()).containsExactly(committed);

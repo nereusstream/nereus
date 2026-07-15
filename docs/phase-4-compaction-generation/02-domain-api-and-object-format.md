@@ -1128,6 +1128,13 @@ the local fixture consumes the same publisher. No provider may aggregate the who
 `openPublisher` may be called again only for an explicit provider retry after the prior publisher terminates；the
 source remains open until the returned `putObject` future completes, and the caller closes it exactly once afterward.
 
+The production S3 future completes only after both the SDK response succeeds and exactly the declared
+`contentLength` bytes have been delivered to the SDK subscriber. It does not require the upstream publisher's
+`onComplete` after the last byte because an SDK may cancel a known-length publisher once it has consumed that byte.
+The adapter then synchronously rechecks byte count and CRC32C before exposing success. A short/long/error body fails
+closed；body failure cancels the SDK request, while caller cancellation or deadline cancellation cancels the active
+SDK request. An early SDK response therefore cannot acknowledge an incompletely consumed body.
+
 The guarded overload is mandatory for Object WAL, compacted output, recovery checkpoint and cursor-snapshot writes
 once F4 publication hooks are enabled. `providerAttemptNumber` starts at one and increases exactly once per actual
 provider transmission. Immediately before each transmission, including a retry, the adapter awaits `authorize` under
@@ -1171,8 +1178,11 @@ must use the opaque token rather than infer cross-page order from base64 physica
 
 Delete is admitted only while the physical root is `DELETING`. The implementation performs exact HEAD identity
 validation before DELETE. S3 `If-Match` is used where supported；for compatible stores without conditional DELETE，
-immutability + no-key-reuse + the durable root fence close the race. `ALREADY_ABSENT` is idempotent success only when
-the root already records the exact expected immutable identity；absence during ordinary reads remains corruption.
+only a raw HTTP 405 or 501 response to that conditional DELETE permits one retry without `If-Match`. The exact HEAD、
+conditional attempt and compatibility fallback share the original absolute deadline, and cancellation follows the
+currently active request. Every other conditional failure remains closed. For that narrow fallback, immutability +
+no-key-reuse + the durable root fence close the race. `ALREADY_ABSENT` is idempotent success only when the root already
+records the exact expected immutable identity；absence during ordinary reads remains corruption.
 
 ## 11. Object-format Test Contract
 

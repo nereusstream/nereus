@@ -455,7 +455,9 @@ public interface PhysicalObjectMetadataStore extends AutoCloseable {
 
 All scan results include continuation plus the exact key/version/value. `scanRoots` accepts only `0..255` and scans
 the root-only shard prefix；lease/protection scans cannot escape one object prefix. A repeated/out-of-prefix/non-
-increasing page is an invariant failure.
+increasing page is an invariant failure. Production Oxia ranges are slash-aware and fixed-depth：roots/readers use
+one-descendant bounds while protections use two-descendant bounds. Java-string prefix successor logic is forbidden；
+the logical continuation scope still records the canonical `base + "/"` prefix.
 `deleteRoot` rebuilds the shard/key, re-reads and strictly decodes the exact value, compares version/value SHA and
 requires `DELETED` with a non-zero valid tombstone observation. It then performs one expected-version conditional
 delete. Missing-key success is decided only by the coordinator's exact response-loss proof；the store never exposes an
@@ -837,6 +839,8 @@ METADATA RETIREMENT
 PHYSICAL DELETE
   HEAD exact expected immutable identity
   ObjectStore.deleteObject(expected identity)
+    use If-Match first; retry without it only for conditional DELETE HTTP 405/501
+    keep HEAD + both DELETE attempts under one absolute deadline
   ALREADY_ABSENT is idempotent only under the same DELETING root
   CAS root DELETING -> DELETED
   emit bounded structured audit log/metrics; DELETED root is the durable outcome

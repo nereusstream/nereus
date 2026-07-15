@@ -80,6 +80,31 @@ class S3CompatibleObjectStoreTest {
     }
 
     @Test
+    void putWaitsForExactBodyCompletionWhenSdkResponseWinsTheRace() {
+        StubClient stub = new StubClient();
+        stub.deferPutBody = true;
+        stub.put = ignored -> CompletableFuture.completedFuture(
+                PutObjectResponse.builder().eTag("response-before-body").build());
+        store = store(stub);
+        byte[] payload = "deferred-body".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var checksum = Crc32cChecksums.checksum(payload);
+
+        CompletableFuture<PutObjectResult> result = store.putObject(
+                new ObjectKey("wal/deferred"),
+                ByteBuffer.wrap(payload),
+                new PutObjectOptions(
+                        "application/octet-stream", checksum, true, Map.of(), Duration.ofSeconds(1)));
+
+        assertThat(result).isNotDone();
+        stub.completeDeferredPutBody().join();
+        assertThat(result.join())
+                .satisfies(value -> {
+                    assertThat(value.checksum()).isEqualTo(checksum);
+                    assertThat(value.etag()).isEqualTo("response-before-body");
+                });
+    }
+
+    @Test
     void requiresExactPartialContentRangeAndChecksum() {
         StubClient stub = new StubClient();
         stub.get = request -> {
@@ -169,6 +194,8 @@ class S3CompatibleObjectStoreTest {
         private java.util.function.Function<PutObjectRequest, CompletableFuture<PutObjectResponse>> put;
         private java.util.function.Function<GetObjectRequest, CompletableFuture<ResponseBytes<GetObjectResponse>>> get;
         private java.util.function.Function<Object, CompletableFuture<HeadObjectResponse>> head;
+        private final AtomicReference<AsyncRequestBody> deferredPutBody = new AtomicReference<>();
+        private boolean deferPutBody;
 
         private S3AsyncClient proxy() {
             return (S3AsyncClient) Proxy.newProxyInstance(
@@ -178,8 +205,16 @@ class S3CompatibleObjectStoreTest {
         @Override
         public Object invoke(Object proxy, Method method, Object[] arguments) {
             return switch (method.getName()) {
-                case "putObject" -> consume((AsyncRequestBody) arguments[1])
-                        .thenCompose(ignored -> put.apply((PutObjectRequest) arguments[0]));
+                case "putObject" -> {
+                    AsyncRequestBody body = (AsyncRequestBody) arguments[1];
+                    if (deferPutBody) {
+                        if (!deferredPutBody.compareAndSet(null, body)) {
+                            throw new IllegalStateException("only one deferred PUT body is supported");
+                        }
+                        yield put.apply((PutObjectRequest) arguments[0]);
+                    }
+                    yield consume(body).thenCompose(ignored -> put.apply((PutObjectRequest) arguments[0]));
+                }
                 case "getObject" -> get.apply((GetObjectRequest) arguments[0]);
                 case "headObject" -> head.apply(arguments[0]);
                 case "serviceName" -> "S3";
@@ -187,6 +222,14 @@ class S3CompatibleObjectStoreTest {
                 case "toString" -> "StubS3AsyncClient";
                 default -> throw new UnsupportedOperationException(method.toString());
             };
+        }
+
+        private CompletableFuture<Void> completeDeferredPutBody() {
+            AsyncRequestBody body = deferredPutBody.getAndSet(null);
+            if (body == null) {
+                throw new IllegalStateException("no deferred PUT body is available");
+            }
+            return consume(body);
         }
 
         private static CompletableFuture<Void> consume(AsyncRequestBody body) {

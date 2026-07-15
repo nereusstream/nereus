@@ -3,12 +3,13 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1 implementation is in progress as of 2026-07-15；the following
-parts are implemented and covered by focused tests：
+`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1 completed its ordinary and Docker-backed final gates on
+2026-07-15；the following parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
   delete surface；
-- replayable private staging、guarded/retried S3 PUT、exact logical-prefix LIST、HEAD-before-DELETE and the safe local
+- replayable private staging、guarded/retried S3 PUT、SDK-response plus exact-byte upload completion、exact
+  logical-prefix LIST、HEAD-before-DELETE、narrow HTTP 405/501 conditional-delete fallback and the safe local
   object-store fixture；
 - strict physical-object/reference-domain proof values、the protocol-neutral generation activation proof surface and
   the durable create/revalidate/release reader-pin handshake backed by one process/object lease；
@@ -21,15 +22,14 @@ parts are implemented and covered by focused tests：
   generation-index/task create recovery with immutable identity checks；
 - `GenerationMetadataTransitions` guards closed index/task lifecycles、the publication-before-allocation task shape、
   monotonic checkpoint/registration/recovery progress and immutable retention boundaries；
-- 43 frozen F4 metadata envelope vectors cover every lifecycle/optional branch；the focused real Oxia source compiles
-  and covers restart、CAS、pagination and conditional delete；
+- 43 frozen F4 metadata envelope vectors cover every lifecycle/optional branch；focused real Oxia covers slash-aware
+  fixed-depth ranges、restart、CAS、pagination and conditional metadata delete；
 - M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
-This is an implementation checkpoint, not an F4-M1 completion claim. `phase4M1Check` passed on 2026-07-15；real
-Oxia/LocalStack execution is still required, and the current machine has no available Docker daemon.
-Core activation
-and protection values are contracts/primitives only；the product activation adapter and every mutation-boundary
-integration arrive in later M1/M2-M6 work.
+`phase4M1Check` and `phase4M1FinalCheck --rerun-tasks` passed on 2026-07-15. The final gate ran focused real Oxia、
+pinned LocalStack and its Phase 3/Pulsar prerequisites；F4-M1 is complete. This is not a Phase 4 completion claim：core
+activation and protection values remain contracts/primitives, and the product activation adapter、higher-generation
+read、materialization、retention/GC and async execution paths arrive in F4-M2–M6.
 
 A later milestone is complete only when：
 
@@ -248,9 +248,9 @@ root-only pagination and same-object root/lease/protection partition equality.
 ```
 
 Ordinary gate compiles/tests M1 modules、both integration source sets and contract/dependency/doc/source-lock/guarded-
-PUT audits. Final gate adds focused real Oxia
-conditional delete/CAS/range pagination and pinned LocalStack list/delete/HEAD identity tests. M1 does not publish a
-higher generation or delete a product object.
+PUT audits. Final gate adds focused real Oxia slash-aware fixed-depth range/CAS/pagination/conditional-delete coverage
+and pinned LocalStack SDK-response/exact-byte upload、list、HEAD identity and conditional-delete compatibility tests.
+Both passed on 2026-07-15. M1 does not publish a higher generation or delete a product object.
 
 ## 4. F4-M2 — Generation Publication and Committed Read
 

@@ -113,7 +113,10 @@ public final class F4Keyspace {
     }
 
     public String generationIndexScanToAfterEnd(StreamId streamId, ReadView view, long offsetEndInclusive) {
-        return lexicographicSuccessor(generationIndexScanFrom(streamId, view, offsetEndInclusive));
+        if (offsetEndInclusive == Long.MAX_VALUE) {
+            return generationIndexPrefix(streamId, view) + "/~/";
+        }
+        return generationIndexScanFrom(streamId, view, offsetEndInclusive + 1);
     }
 
     public String recoveryRootKey(StreamId streamId) {
@@ -140,7 +143,10 @@ public final class F4Keyspace {
     }
 
     public String retentionStatsScanToAfterEnd(StreamId streamId, long offsetEndInclusive) {
-        return lexicographicSuccessor(retentionStatsScanFrom(streamId, offsetEndInclusive));
+        if (offsetEndInclusive == Long.MAX_VALUE) {
+            return retentionStatsPrefix(streamId) + "/~/";
+        }
+        return retentionStatsScanFrom(streamId, offsetEndInclusive + 1);
     }
 
     public String generationProtocolActivationKey() {
@@ -224,14 +230,6 @@ public final class F4Keyspace {
         } catch (NoSuchAlgorithmException error) {
             throw new IllegalStateException("SHA-256 is unavailable", error);
         }
-    }
-
-    private static String lexicographicSuccessor(String prefix) {
-        char last = prefix.charAt(prefix.length() - 1);
-        if (last == Character.MAX_VALUE) {
-            throw new IllegalArgumentException("prefix has no finite lexicographic successor");
-        }
-        return prefix.substring(0, prefix.length() - 1) + (char) (last + 1);
     }
 
     private static String twoDigit(int value) {

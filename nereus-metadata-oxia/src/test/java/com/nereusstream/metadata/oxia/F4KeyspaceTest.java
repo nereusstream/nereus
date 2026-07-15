@@ -43,9 +43,27 @@ class F4KeyspaceTest {
         String to = keys.generationIndexScanToAfterEnd(streamId, ReadView.COMMITTED, Long.MAX_VALUE);
 
         assertThat(from).endsWith("/9223372036854775807/");
-        assertThat(to).endsWith("/92233720368547758070");
+        assertThat(to).endsWith("/~/");
         assertThat(keys.generationIndexKey(streamId, ReadView.COMMITTED, Long.MAX_VALUE, Long.MAX_VALUE))
                 .isBetween(from, to);
+        assertThat(keys.generationIndexScanToAfterEnd(streamId, ReadView.COMMITTED, 12))
+                .endsWith("/0000000000000000013/");
+        assertThat(keys.retentionStatsScanToAfterEnd(streamId, Long.MAX_VALUE))
+                .endsWith("/~/");
+    }
+
+    @Test
+    void oxiaAwareFixedDepthBoundsPreserveSlashCount() {
+        String base = "/root/protections";
+
+        assertThat(F4MetadataStoreSupport.fixedDepthStart(base, 1)).isEqualTo("/root/protections/");
+        assertThat(F4MetadataStoreSupport.fixedDepthEnd(base, 1)).isEqualTo("/root/protections/~");
+        assertThat(F4MetadataStoreSupport.fixedDepthStart(base, 2)).isEqualTo("/root/protections/!/");
+        assertThat(F4MetadataStoreSupport.fixedDepthEnd(base, 2)).isEqualTo("/root/protections/~/");
+        assertThat("/root/protections/01/reference")
+                .isBetween(
+                        F4MetadataStoreSupport.fixedDepthStart(base, 2),
+                        F4MetadataStoreSupport.fixedDepthEnd(base, 2));
     }
 
     @Test

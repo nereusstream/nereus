@@ -20,7 +20,7 @@ Phase 4 metadata is split deliberately：
 No task、checkpoint、watch、cache or object listing can substitute for an authoritative record named for another
 domain. The stream registration owns enumeration only；it never proves work、visibility or deletion eligibility.
 
-### 1.1 Current F4-M1 implementation checkpoint
+### 1.1 Implemented F4-M1 checkpoint
 
 The production Oxia adapter and deterministic partition-aware test backend now execute generation allocation/index、
 task、checkpoint、range-stat、recovery-root、64-shard stream-registration、256-shard physical-root and exact
@@ -33,8 +33,8 @@ The adapter now also reloads the exact expected version before every ordinary CA
 enforces closed index/task edges、immutable planning/publication identity、monotonic checkpoint and registration
 progress、immutable retention boundaries and monotonic one-sequence-at-a-time recovery-root publication. The 43
 frozen codec vectors cover every lifecycle/optional branch, and the real Oxia restart/CAS/pagination/delete source
-compiles. The ordinary `phase4M1Check` gate passed on 2026-07-15；Docker-backed evidence and the final M1 gate are
-still outstanding. Nothing in this checkpoint enables generation publication or physical deletion.
+runs with slash-aware fixed-depth bounds. `phase4M1Check` and `phase4M1FinalCheck --rerun-tasks` passed on
+2026-07-15. Nothing in M1 enables generation publication or physical deletion；those paths remain M2–M4 work.
 
 ## 2. Keyspace
 
@@ -119,12 +119,16 @@ public final class F4Keyspace {
 }
 ```
 
-`generationIndexScanToAfterEnd` and `retentionStatsScanToAfterEnd` return the lexicographic successor of the complete
-`.../{offsetEnd019}/` sub-prefix, so all generation/commit-version suffixes for that end are included without
-calculating `offsetEnd + 1`. Both remain defined at `Long.MAX_VALUE`. Unit tests assert exact keys、prefix upper bounds、long
-ordering、encoded path traversal resistance and that the ordinary/index view cannot produce the topic-compacted
-prefix. Physical-object tests freeze hash-byte shard vectors、root-only prefix bounds and same-object partition
-equality across root/reader/protection keys.
+Oxia orders hierarchical keys with slash-aware semantics, so scan bounds must not use a Java-string successor of a
+trailing slash. `generationIndexScanToAfterEnd` and `retentionStatsScanToAfterEnd` use the next fixed-width offset
+sub-prefix when `offsetEnd < Long.MAX_VALUE`；at `Long.MAX_VALUE` they use the reserved `.../~/` upper sentinel.
+Canonical key components cannot contain `!` or `~`. Generic fixed-depth scans use half-open bounds
+`[base + "/", base + "/~")` for one descendant segment and `[base + "/!/", base + "/~/")` for two；the latter is
+used by protection records while reader/root scans stay at their exact depth. The logical token prefix remains
+`base + "/"`, but the physical range bound carries the required depth. Unit and real-Oxia tests assert exact keys、
+prefix upper bounds、long ordering、encoded path traversal resistance、bounded list/range inclusion and that the
+ordinary/index view cannot produce the topic-compacted prefix. Physical-object tests freeze hash-byte shard vectors、
+root-only prefix bounds and same-object partition equality across root/reader/protection keys.
 The activation key is the fixed cluster key shown above and uses
 `PartitionKey("generation-protocol-v1")`; no stream/object key may share that partition accidentally.
 

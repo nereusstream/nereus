@@ -1,6 +1,6 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
-> 状态：Implementation in progress；F4-M0 complete，F4-M1 primitives partial，M1 aggregate/final gate pending
+> 状态：Implementation in progress；F4-M0 complete，F4-M1 implemented/final-gated，later F4 milestones not implemented
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -541,11 +541,10 @@ F4-M0 已完成以下代码级评审并冻结合同：
   snapshots。
 
 Phase 3 M1-M6 所需的 owner-session claim/fencing、cursor-generation、snapshot-reference、protected
-create/backward-reset 和 pending-trim gates 已实现并 final-gated。Phase 4 当前正在执行
-[`F4-M1`](../phase-4-compaction-generation/07-implementation-plan-and-gates.md)：API/metadata/object IO、
-physical reference values、durable reader pin 与 protection handshakes 已落地；剩余 M1 contracts/gates 继续
-按实施计划收口，不重新打开协议选型。
+create/backward-reset 和 pending-trim gates 已实现并 final-gated。Phase 4
+[`F4-M1`](../phase-4-compaction-generation/07-implementation-plan-and-gates.md) 的 API/metadata/object IO、
+physical reference values、durable reader pin 与 protection handshakes 已落地，并通过 ordinary/Docker-backed
+final gate；下一步是 F4-M2 generation publication/read，不重新打开协议选型。
 
-F4-M0 只是 design gate；当前 F4-M1 检查点也不声称 end-to-end generation capability、benchmark、chaos、
-compatibility certification 或 final CI evidence。F4-M1–M6 的确切文件、测试、故障点和 release gates
-见代码级实施计划。
+F4-M0 只是 design gate；F4-M1 final gate 也不声称 end-to-end generation capability、benchmark、chaos 或
+Phase 4 compatibility certification。F4-M2–M6 的确切文件、测试、故障点和 release gates 见代码级实施计划。

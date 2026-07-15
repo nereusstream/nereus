@@ -218,6 +218,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                 object,
                 F4ScanKind.READER_LEASE,
                 base,
+                1,
                 continuation,
                 limit,
                 ObjectReaderLeaseRecord.class,
@@ -295,6 +296,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                 object,
                 F4ScanKind.OBJECT_PROTECTION,
                 base,
+                2,
                 continuation,
                 limit,
                 ObjectProtectionRecord.class,
@@ -333,6 +335,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
             ObjectKeyHash object,
             F4ScanKind kind,
             String base,
+            int descendantSegments,
             Optional<F4ScanToken> continuation,
             int limit,
             Class<R> recordType,
@@ -342,8 +345,10 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
         String prefix = F4MetadataStoreSupport.prefixStart(base);
         String scope = support.scopeSha256(kind.name() + "\0" + object.value());
         F4ScanToken token = support.validateToken(continuation, keys.cluster(), kind, scope, prefix);
-        String from = token == null ? prefix : token.resumeFromInclusive();
-        String to = F4MetadataStoreSupport.prefixEnd(base);
+        String from = token == null
+                ? F4MetadataStoreSupport.fixedDepthStart(base, descendantSegments)
+                : token.resumeFromInclusive();
+        String to = F4MetadataStoreSupport.fixedDepthEnd(base, descendantSegments);
         return support.client().rangeScan(
                         from, to, limit, keys.physicalObjectPartitionKey(object))
                 .thenApply(stored -> {

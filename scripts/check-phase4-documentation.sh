@@ -28,7 +28,10 @@ require_literal "publication id before allocating a generation" \
     "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
 require_literal "GenerationMetadataTransitions" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "real Oxia source compiles" "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "F4-M1 is complete" "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "slash-aware fixed-depth" "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
+require_literal "SDK response succeeds" "docs/phase-4-compaction-generation/02-domain-api-and-object-format.md"
+require_literal "HTTP 405 or 501" "docs/phase-4-compaction-generation/02-domain-api-and-object-format.md"
 
 for gate in phase4M1Check phase4M1FinalCheck; do
     require_literal "$gate" "build.gradle.kts"

@@ -163,6 +163,35 @@ class S3ObjectListDeleteErrorMapperTest {
     }
 
     @Test
+    void deleteFallsBackAfterProviderRejectsConditionalDelete() {
+        ObjectKey key = new ObjectKey("gc/compatible-provider");
+        Checksum checksum = new Checksum(ChecksumType.CRC32C, "01020304");
+        StubClient stub = new StubClient();
+        stub.head = request -> CompletableFuture.completedFuture(HeadObjectResponse.builder()
+                .contentLength(11L)
+                .eTag("etag-1")
+                .metadata(Map.of(
+                        S3CompatibleObjectStore.CHECKSUM_TYPE_METADATA, "CRC32C",
+                        S3CompatibleObjectStore.CHECKSUM_VALUE_METADATA, checksum.value()))
+                .build());
+        List<Optional<String>> conditions = new ArrayList<>();
+        stub.delete = request -> {
+            conditions.add(Optional.ofNullable(request.ifMatch()));
+            if (request.ifMatch() != null) {
+                return CompletableFuture.failedFuture(service(501));
+            }
+            return CompletableFuture.completedFuture(DeleteObjectResponse.builder().build());
+        };
+        store = store(stub);
+
+        DeleteObjectResult result = store.deleteObject(
+                key, new DeleteObjectOptions(11, checksum, Optional.of("etag-1"), TIMEOUT)).join();
+
+        assertThat(result.status()).isEqualTo(DeleteObjectResult.Status.DELETED);
+        assertThat(conditions).containsExactly(Optional.of("etag-1"), Optional.empty());
+    }
+
+    @Test
     void listAndDeleteServiceFailuresUseClosedRedactedMappings() {
         NereusException list = S3ObjectErrorMapper.list(service(503), "bucket");
         NereusException delete = S3ObjectErrorMapper.delete(

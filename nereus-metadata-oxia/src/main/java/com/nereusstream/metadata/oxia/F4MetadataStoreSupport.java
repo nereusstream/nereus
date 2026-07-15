@@ -120,11 +120,33 @@ final class F4MetadataStoreSupport {
     }
 
     static String prefixStart(String prefix) {
-        return prefix + "/";
+        return fixedDepthStart(prefix, 1);
     }
 
     static String prefixEnd(String prefix) {
-        return prefix + "0";
+        return fixedDepthEnd(prefix, 1);
+    }
+
+    static String fixedDepthStart(String prefix, int descendantSegments) {
+        Objects.requireNonNull(prefix, "prefix");
+        if (descendantSegments <= 0) {
+            throw new IllegalArgumentException("descendantSegments must be positive");
+        }
+        if (descendantSegments == 1) {
+            return prefix + "/";
+        }
+        return prefix + "/!".repeat(descendantSegments - 1) + "/";
+    }
+
+    static String fixedDepthEnd(String prefix, int descendantSegments) {
+        Objects.requireNonNull(prefix, "prefix");
+        if (descendantSegments <= 0) {
+            throw new IllegalArgumentException("descendantSegments must be positive");
+        }
+        if (descendantSegments == 1) {
+            return prefix + "/~";
+        }
+        return prefix + "/~".repeat(descendantSegments - 1) + "/";
     }
 
     static void requirePageLimit(int limit) {

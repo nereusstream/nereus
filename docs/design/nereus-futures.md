@@ -31,7 +31,7 @@ protocol/table state = projection
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
-| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1 primitives partial | Complete F4-M1 contracts and aggregate/final gates |
+| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1 final-gated | Implement F4-M2 generation publication and committed read |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
@@ -189,7 +189,7 @@ Current milestone: F3-M0/M0R design-gated；F3-M1-M6 implemented/final-gated
 Detailed design: `nereus-future4-compaction-generation.md`
 Code-level target contract: `../phase-4-compaction-generation/README.md`
 Current milestone: F4-M0 source audit/design gate complete；F4-M1 API/metadata/object IO and core
-reader/protection primitives implemented，remaining M1 contracts/gates in progress；no generation/GC/async path yet
+reader/protection primitives implemented/final-gated；F4-M2 is next and no generation/GC/async path exists yet
 
 ### Owns
 
