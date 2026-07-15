@@ -24,6 +24,7 @@ require_literal() {
 production_artifacts=(
     PhysicalGcConfig.java
     GcCandidate.java
+    GcCandidateRootState.java
     GcPlan.java
     GcPlannedProtectionRemoval.java
     GcPlannedMetadataRemoval.java
@@ -49,6 +50,8 @@ require_literal "validateAgainst(MaterializationConfig materialization)" "$confi
 require_literal "OptionalLong deadline" "$config"
 require_literal "Math.addExact" "$config"
 require_literal "fromActiveRoot" "$candidate"
+require_literal "fromMarkedRoot" "$candidate"
+require_literal "GcCandidateRootState.MARKED_RECOVERY" "$candidate"
 require_literal "PhysicalObjectLifecycle.ACTIVE" "$candidate"
 require_literal "maxStreamsPerCandidate" "$candidate"
 require_literal "computeReferenceSetSha256" "$plan"
@@ -63,6 +66,8 @@ require_literal "protectionOwnerVersionAndEnvelopeArePartOfTheMarkDigest" \
 require_literal "protectionForAnotherObjectCannotEnterMarkDigest" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"
 require_literal "responseLossReconstructionRequiresExactRootAttemptAndDigest" \
+    "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"
+require_literal "reconstructsPlanFromMarkedRootWithoutInventingPreviousOxiaVersion" \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/gc/GcPlanTest.java"
 require_literal "phase4M4GcPlanCheck" "build.gradle.kts"
 require_literal "phase4M4GcPlanCheck" \

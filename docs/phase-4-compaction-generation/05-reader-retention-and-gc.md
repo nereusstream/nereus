@@ -649,6 +649,7 @@ public record GcCandidate(
         PhysicalObjectIdentity object,
         GcReferenceQuery referenceQuery,
         Checksum discoveryEvidenceSha256,
+        GcCandidateRootState rootState,
         long rootMetadataVersion,
         long rootLifecycleEpoch,
         long discoveredAtMillis,
@@ -676,14 +677,17 @@ public record GcPlannedMetadataRemoval(
 ```
 
 Candidate/attempt ids are random 128-bit lowercase base32 and never authorize deletion. Candidate construction
-requires the exact ACTIVE root version/epoch and hashes the root、manifest/inventory evidence and affected stream
+uses either the exact ACTIVE root version/epoch (`ACTIVE_DISCOVERY`) or the current exact MARKED wrapper
+(`MARKED_RECOVERY`) and hashes the root、manifest/inventory evidence and affected stream
 set. Plan lists are canonical sorted/unique and bounded by `PhysicalGcConfig`; every planned protection retains its
 exact key、full owner/value、root epoch、Oxia version and durable-envelope SHA, while every other metadata removal
 retains a canonical type/key/version/envelope SHA. `referenceSetSha256` hashes those full facts plus every complete
 domain authority/reference set, not merely removal identities. A same-key protection owner/version change therefore
 changes the digest and invalidates drain. The marked
-root version/epoch are filled only from the successful `ACTIVE -> MARKED` CAS. A plan is process-local and is always
-reconstructed from the root digest after restart；serializing it would create a second correctness owner.
+root version/epoch are filled only from the successful `ACTIVE -> MARKED` CAS. After restart, recovery uses the
+current MARKED metadata version/epoch directly and never guesses the prior ACTIVE Oxia version or assumes versions are
+consecutive. A plan is process-local and is always reconstructed from the root digest after restart；serializing it
+would create a second correctness owner.
 
 Checkpoint H implements these three values and `SecureGcIdGenerator`. `GcPlan.computeReferenceSetSha256` is the
 pre-MARK digest operation；`GcPlan.fromMarkedRoot` accepts only the exact MARK response/reload carrying that digest and

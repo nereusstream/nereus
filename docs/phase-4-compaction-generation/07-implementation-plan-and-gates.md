@@ -663,6 +663,7 @@ recovery/RecoveryCheckpointProtectionManager.java implemented checkpoint C found
 recovery/RecoveryCheckpointRootReconciler.java            implemented checkpoint D
 recovery/MetadataRecoveryCheckpointVerifier.java
 gc/GcCandidate.java                                      implemented checkpoint H
+gc/GcCandidateRootState.java                             implemented checkpoint H
 gc/GcPlan.java                                           implemented checkpoint H
 gc/GcPlannedProtectionRemoval.java                       implemented checkpoint H
 gc/GcPlannedMetadataRemoval.java                         implemented checkpoint H
@@ -799,7 +800,8 @@ so it is checkpoint-G evidence only.
 deadline overflow、ACTIVE-root candidate construction、secure non-authorizing ids and canonical complete-domain plan
 digests. It proves configured bounds cannot be implemented by truncation, unrelated-object protections cannot enter a
 MARK digest, protection owner/value/version/envelope drift changes that digest, and a response-loss reload must match
-exact root object/attempt/digest/version/epoch. `GcPlan` has no
+exact root object/attempt/digest/version/epoch. Restart recovery uses the current MARKED version and does not invent a
+previous or adjacent Oxia version. `GcPlan` has no
 durable codec and this gate invokes no root CAS or delete primitive；it is checkpoint-H evidence only.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is

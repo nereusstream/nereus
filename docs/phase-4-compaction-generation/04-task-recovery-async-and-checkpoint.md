@@ -151,7 +151,8 @@ revalidate the recovery-root、generation、activation、reference-domain and ph
 
 F4-M4 checkpoint H implements the process-local inputs for the future GC nodes without instantiating those nodes.
 `PhysicalGcConfig` is cross-validated with materialization/storage lifetimes and defaults to observation-only；
-`GcCandidate` freezes one exact ACTIVE root/query/evidence tuple；`GcPlan` commits complete non-veto domain facts、
+`GcCandidate` freezes one exact ACTIVE root/query/evidence tuple or the current MARKED wrapper during restart；the
+restart form does not assume the prior Oxia version is adjacent. `GcPlan` commits complete non-veto domain facts、
 full versioned protection owner/value facts and typed metadata key/version/envelope facts into a canonical digest,
 then binds that digest to the exact successful MARK wrapper. The
 plan has deliberately no durable codec. Crash recovery must rerun discovery and obtain the same digest from

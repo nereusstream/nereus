@@ -493,8 +493,9 @@ Checkpoint H 已实现 `PhysicalGcConfig`、`GcCandidate`、`GcPlan` 与 secure 
 `enabled=false, dryRun=true`；只有同时 `enabled && !dryRun` 才允许未来 coordinator 进入 mutation，配置本身
 不覆盖 cluster deletion capability。deadline 使用 `Math.addExact`；溢出返回 ineligible，而不产生环绕时间。
 
-Candidate 只能从 exact `ACTIVE` root wrapper 建立，并冻结 root version/epoch、query/evidence 与 root 的最早
-eligibility。Plan 只接受 canonical sorted/unique、配置有界、同 query 的 complete/non-veto domain snapshots，
+Candidate 初次只能从 exact `ACTIVE` root wrapper 建立，并冻结 root version/epoch、query/evidence 与 root 的最早
+eligibility；重启后可从 exact `MARKED` wrapper 建立 `MARKED_RECOVERY` candidate，直接使用当前 version/epoch，
+不猜测 MARK 前 version。Plan 只接受 canonical sorted/unique、配置有界、同 query 的 complete/non-veto domain snapshots，
 且 protection 必须属于 candidate object/root epoch。每个 protection removal 冻结完整 owner/value、Oxia
 version 和 durable-envelope SHA；其他 metadata removal 冻结 type/key/version/envelope SHA。
 `referenceSetSha256` 直接提交这些 exact removal facts 和每个 domain 的完整 authority/reference 事实；它不包含

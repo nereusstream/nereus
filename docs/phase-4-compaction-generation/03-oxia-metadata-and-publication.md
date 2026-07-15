@@ -190,7 +190,9 @@ recovery/physical-root attempt. This checkpoint enables no caller or physical de
 ### 1.9 F4-M4 GC plan checkpoint
 
 Checkpoint H adds no Oxia mutation. Materialization's `GcCandidate.fromActiveRoot` consumes the exact versioned root
-returned by this module and freezes its ACTIVE metadata version/lifecycle epoch. `GcPlan.fromMarkedRoot` later accepts
+returned by this module and freezes its ACTIVE metadata version/lifecycle epoch. After restart,
+`GcCandidate.fromMarkedRoot` instead freezes the current MARKED wrapper；it never derives a fictitious previous Oxia
+version. `GcPlan.fromMarkedRoot` accepts
 only a successful MARK wrapper carrying the exact candidate object、attempt id、canonical reference-set SHA、newer
 metadata version and unit-incremented lifecycle epoch. The plan remains process-local；after response loss or restart,
 the coordinator must reload authoritative roots/domains and exact protection/source-key values including their Oxia

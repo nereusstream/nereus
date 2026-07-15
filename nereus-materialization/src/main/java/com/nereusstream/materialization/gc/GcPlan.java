@@ -50,9 +50,8 @@ public record GcPlan(
         if (!expected.equals(referenceSetSha256)) {
             throw new IllegalArgumentException("referenceSetSha256 does not match canonical plan facts");
         }
-        if (markedRootMetadataVersion <= candidate.rootMetadataVersion()
-                || markedRootLifecycleEpoch != Math.addExact(candidate.rootLifecycleEpoch(), 1)) {
-            throw new IllegalArgumentException("marked root version/epoch do not follow the candidate ACTIVE root");
+        if (!matchesMarkedRoot(candidate, markedRootMetadataVersion, markedRootLifecycleEpoch)) {
+            throw new IllegalArgumentException("marked root version/epoch do not match the candidate root source");
         }
         if (deleteNotBeforeMillis < candidate.notBeforeMillis()) {
             throw new IllegalArgumentException("deleteNotBeforeMillis precedes candidate eligibility");
@@ -170,7 +169,7 @@ public record GcPlan(
         for (GcPlannedProtectionRemoval protection : protections) {
             if (!protection.identity().object().equals(candidate.object().objectKeyHash())
                     || protection.protection().value().rootLifecycleEpoch()
-                            != candidate.rootLifecycleEpoch()) {
+                            != candidate.activeRootLifecycleEpoch()) {
                 throw new IllegalArgumentException(
                         "planned protection does not belong to the candidate ACTIVE root");
             }
@@ -178,6 +177,18 @@ public record GcPlan(
                 throw new IllegalArgumentException("planned protection identities must be unique");
             }
         }
+    }
+
+    private static boolean matchesMarkedRoot(
+            GcCandidate candidate,
+            long markedRootMetadataVersion,
+            long markedRootLifecycleEpoch) {
+        return switch (candidate.rootState()) {
+            case ACTIVE_DISCOVERY -> markedRootMetadataVersion > candidate.rootMetadataVersion()
+                    && markedRootLifecycleEpoch == Math.addExact(candidate.rootLifecycleEpoch(), 1);
+            case MARKED_RECOVERY -> markedRootMetadataVersion == candidate.rootMetadataVersion()
+                    && markedRootLifecycleEpoch == candidate.rootLifecycleEpoch();
+        };
     }
 
     private static final class PhysicalObjectIdentityMatches {

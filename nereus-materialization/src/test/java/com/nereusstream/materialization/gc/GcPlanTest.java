@@ -251,6 +251,37 @@ class GcPlanTest {
     }
 
     @Test
+    void reconstructsPlanFromMarkedRootWithoutInventingPreviousOxiaVersion() {
+        PhysicalGcConfig config = PhysicalGcConfig.defaults();
+        VersionedPhysicalObjectRoot active = activeRoot();
+        GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
+        GcCandidate activeCandidate = candidate(config, active, query);
+        List<GcReferenceSnapshot> snapshots = List.of(
+                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        Checksum digest = GcPlan.computeReferenceSetSha256(
+                config, activeCandidate, snapshots, List.of(), List.of());
+        VersionedPhysicalObjectRoot marked = markedRoot(
+                active, ATTEMPT_ID, digest, 300, 500, 42);
+        GcCandidate recovered = GcCandidate.fromMarkedRoot(
+                config, "c".repeat(52), marked, query, SHA_A, 900);
+
+        GcPlan plan = GcPlan.fromMarkedRoot(
+                config,
+                ATTEMPT_ID,
+                recovered,
+                snapshots,
+                List.of(),
+                List.of(),
+                marked);
+
+        assertThat(recovered.rootState()).isEqualTo(GcCandidateRootState.MARKED_RECOVERY);
+        assertThat(recovered.rootMetadataVersion()).isEqualTo(42);
+        assertThat(recovered.notBeforeMillis()).isEqualTo(500);
+        assertThat(recovered.discoveredAtMillis()).isEqualTo(900);
+        assertThat(plan.markedRootMetadataVersion()).isEqualTo(42);
+    }
+
+    @Test
     void candidateRejectsNonActiveAndPrematureRootEvidence() {
         PhysicalGcConfig config = PhysicalGcConfig.defaults();
         VersionedPhysicalObjectRoot active = activeRoot();
@@ -372,6 +403,16 @@ class GcPlanTest {
             Checksum digest,
             long markedAtMillis,
             long deleteNotBeforeMillis) {
+        return markedRoot(active, attemptId, digest, markedAtMillis, deleteNotBeforeMillis, 8);
+    }
+
+    private static VersionedPhysicalObjectRoot markedRoot(
+            VersionedPhysicalObjectRoot active,
+            String attemptId,
+            Checksum digest,
+            long markedAtMillis,
+            long deleteNotBeforeMillis,
+            long metadataVersion) {
         PhysicalObjectRootRecord record = rootRecord(
                 PhysicalObjectIdentity.from(active.value()),
                 PhysicalObjectLifecycle.MARKED,
@@ -381,8 +422,8 @@ class GcPlanTest {
                 markedAtMillis,
                 deleteNotBeforeMillis,
                 0,
-                8);
-        return new VersionedPhysicalObjectRoot(active.key(), record, 8, SHA_B);
+                metadataVersion);
+        return new VersionedPhysicalObjectRoot(active.key(), record, metadataVersion, SHA_B);
     }
 
     private static PhysicalObjectRootRecord rootRecord(
