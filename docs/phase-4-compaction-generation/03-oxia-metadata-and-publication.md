@@ -746,6 +746,7 @@ public record SourceGenerationRecord(
         String indexRecordSha256,
         ReadTargetRecord readTarget,
         String targetIdentitySha256,
+        String materializationPolicySha256,
         String payloadFormat,
         String projectionRef,
         int recordCount,

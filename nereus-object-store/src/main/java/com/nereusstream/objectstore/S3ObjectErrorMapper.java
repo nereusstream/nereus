@@ -36,6 +36,14 @@ final class S3ObjectErrorMapper {
         return map(failure, Operation.HEAD, bucket, key);
     }
 
+    static NereusException list(Throwable failure, String bucket) {
+        return map(failure, Operation.LIST, bucket, null);
+    }
+
+    static NereusException delete(Throwable failure, String bucket, ObjectKey key) {
+        return map(failure, Operation.DELETE, bucket, key);
+    }
+
     static NereusException timeout(Operation operation, String bucket, ObjectKey key) {
         return failure(ErrorCode.TIMEOUT, true, operation, bucket, key, "deadline expired");
     }
@@ -67,7 +75,7 @@ final class S3ObjectErrorMapper {
         }
         if (failure instanceof S3Exception service) {
             int status = service.statusCode();
-            if (status == 404 && operation != Operation.PUT) {
+            if (status == 404 && operation != Operation.PUT && operation != Operation.LIST) {
                 return failure(ErrorCode.OBJECT_NOT_FOUND, true, operation, bucket, key, "HTTP 404");
             }
             if (status == 412 && operation == Operation.PUT) {
@@ -137,7 +145,9 @@ final class S3ObjectErrorMapper {
     enum Operation {
         PUT("put", ErrorCode.OBJECT_UPLOAD_FAILED),
         READ("read", ErrorCode.OBJECT_READ_FAILED),
-        HEAD("head", ErrorCode.OBJECT_READ_FAILED);
+        HEAD("head", ErrorCode.OBJECT_READ_FAILED),
+        LIST("list", ErrorCode.OBJECT_READ_FAILED),
+        DELETE("delete", ErrorCode.OBJECT_UPLOAD_FAILED);
 
         private final String label;
         private final ErrorCode fallback;

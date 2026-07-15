@@ -16,6 +16,7 @@ import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
@@ -55,12 +56,19 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
                     .overrideConfiguration(ClientOverrideConfiguration.builder()
                             .apiCallTimeout(config.requestTimeout())
                             .apiCallAttemptTimeout(config.requestTimeout())
+                            .retryPolicy(RetryPolicy.none())
                             .build())
                     .build();
             deadlineScheduler = Executors.newSingleThreadScheduledExecutor(
                     daemonFactory("nereus-s3-deadline"));
             verifyBucket(client, config);
-            store = new S3CompatibleObjectStore(client, deadlineScheduler, config.bucket(), config.prefix());
+            store = new S3CompatibleObjectStore(
+                    client,
+                    deadlineScheduler,
+                    config.bucket(),
+                    config.prefix(),
+                    config.requestTimeout(),
+                    config.putRetryPolicy());
             return store;
         } catch (Throwable failure) {
             if (deadlineScheduler != null) {

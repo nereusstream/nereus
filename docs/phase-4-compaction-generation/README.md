@@ -1,6 +1,6 @@
 # Phase 4 Materialization / Compaction / Generation / GC Detailed Design
 
-> 状态：Designed / code-level design gate；尚未写 Phase 4 生产代码
+> 状态：Implementation in progress；F4-M1 基础协议、metadata codec/store 与 object-store IO 正在落地，尚未通过完整 M1 gate
 >
 > 设计基线日期：2026-07-14
 >
@@ -8,6 +8,8 @@
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
 > `master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`
+
+> 实现状态日期：2026-07-15
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
 per-stream、read-optimized 的 higher generation，并补齐 reader pin、source retirement、recovery checkpoint、
@@ -188,12 +190,26 @@ an implementation detail in this directory, this directory owns the Phase 4 targ
 After implementation, code + executable tests become the highest authority and both document sets must be updated in
 the same change.
 
+### 6.1 Current implementation checkpoint
+
+The first F4-M1 checkpoint now contains the view/generation/publication/object-key-hash API values, the
+`nereus-materialization` module boundary, F4 Oxia keyspace/scan tokens, all ten M1 record families and binary-v1
+codecs, production generation/physical-object metadata-store surfaces, version-conditional delete, and the initial
+guarded replayable PUT/list/delete object-store surface. The local object-store fixture implements the same IO
+surface. Existing object-store implementations remain source-compatible through fail-closed default methods for new
+optional operations.
+
+This checkpoint is deliberately not an F4-M1 completion claim. Staging-file ownership, core reader-lease/protection
+managers, capability guards, full metadata/object-store contract tests, frozen codec vectors and the aggregate M1
+gate remain outstanding. No generation publication, resolver, materialization worker, retention or GC behavior is
+enabled by this checkpoint.
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
 | --- | --- | --- |
 | F4-M0 | local source audit and code-level protocol/design gate | complete in docs；design-only |
-| F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | planned |
+| F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | in progress；API/metadata/codecs/object-store foundation implemented，M1 gate not yet complete |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | planned |
 | F4-M3 | lossless compacted format、planner/task/worker and sync-profile materialization | planned |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | planned |

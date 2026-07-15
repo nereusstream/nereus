@@ -9,9 +9,12 @@ import com.nereusstream.api.ObjectKey;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -22,8 +25,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.concurrent.Flow;
+import java.util.zip.CRC32C;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import software.amazon.awssdk.awscore.AwsRequestOverrideConfiguration;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
@@ -31,8 +39,12 @@ import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
@@ -46,6 +58,8 @@ public final class S3CompatibleObjectStore implements ObjectStore {
     private final ScheduledExecutorService deadlineScheduler;
     private final String bucket;
     private final S3ObjectKeyMapper keys;
+    private final Duration requestTimeout;
+    private final ObjectPutRetryPolicy putRetryPolicy;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Set<CompletableFuture<?>> admitted = ConcurrentHashMap.newKeySet();
 
@@ -54,10 +68,28 @@ public final class S3CompatibleObjectStore implements ObjectStore {
             ScheduledExecutorService deadlineScheduler,
             String bucket,
             String prefix) {
+        this(
+                client,
+                deadlineScheduler,
+                bucket,
+                prefix,
+                Duration.ofSeconds(30),
+                ObjectPutRetryPolicy.defaults());
+    }
+
+    S3CompatibleObjectStore(
+            S3AsyncClient client,
+            ScheduledExecutorService deadlineScheduler,
+            String bucket,
+            String prefix,
+            Duration requestTimeout,
+            ObjectPutRetryPolicy putRetryPolicy) {
         this.client = Objects.requireNonNull(client, "client");
         this.deadlineScheduler = Objects.requireNonNull(deadlineScheduler, "deadlineScheduler");
         this.bucket = requireText(bucket, "bucket");
         this.keys = new S3ObjectKeyMapper(prefix);
+        this.requestTimeout = Objects.requireNonNull(requestTimeout, "requestTimeout");
+        this.putRetryPolicy = Objects.requireNonNull(putRetryPolicy, "putRetryPolicy");
     }
 
     @Override
@@ -65,38 +97,40 @@ public final class S3CompatibleObjectStore implements ObjectStore {
             ObjectKey key,
             ByteBuffer payload,
             PutObjectOptions options) {
+        ByteBufferObjectUpload source = new ByteBufferObjectUpload(payload);
+        CompletableFuture<PutObjectResult> result = putObject(key, source, options);
+        return result.whenComplete((ignored, failure) -> source.close());
+    }
+
+    @Override
+    public CompletableFuture<PutObjectResult> putObject(
+            ObjectKey key,
+            ReplayableObjectUpload source,
+            PutObjectOptions options) {
+        return putObject(key, source, options, (ignored, attempt) -> CompletableFuture.completedFuture(null));
+    }
+
+    @Override
+    public CompletableFuture<PutObjectResult> putObject(
+            ObjectKey key,
+            ReplayableObjectUpload source,
+            PutObjectOptions options,
+            PutObjectAttemptGuard attemptGuard) {
         Objects.requireNonNull(key, "key");
-        Objects.requireNonNull(payload, "payload");
+        Objects.requireNonNull(source, "source");
         Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(attemptGuard, "attemptGuard");
         if (closed.get()) {
             return failed(S3ObjectErrorMapper.closed(S3ObjectErrorMapper.Operation.PUT, bucket, key));
         }
         try {
             requireCrc32c(options.expectedChecksum(), "put checksum");
-            byte[] bytes = copy(payload);
-            Checksum actual = Crc32cChecksums.checksum(bytes);
-            if (!actual.equals(options.expectedChecksum())) {
-                return failed(new NereusException(
-                        ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "put checksum mismatch"));
+            if (source.contentLength() < 0) {
+                throw new IllegalArgumentException("upload contentLength must be non-negative");
             }
-            String mappedKey = keys.map(key);
-            Map<String, String> metadata = putMetadata(options.metadata(), actual);
-            AwsRequestOverrideConfiguration.Builder override = operationOverride(options.timeout());
-            if (options.ifAbsent()) {
-                override.putHeader("If-None-Match", "*");
-            }
-            PutObjectRequest request = PutObjectRequest.builder()
-                    .bucket(bucket)
-                    .key(mappedKey)
-                    .contentType(options.contentType())
-                    .contentLength((long) bytes.length)
-                    .metadata(metadata)
-                    .overrideConfiguration(override.build())
-                    .build();
-            CompletableFuture<PutObjectResponse> sdk = client.putObject(request, AsyncRequestBody.fromBytes(bytes));
-            return link(sdk, options.timeout(), S3ObjectErrorMapper.Operation.PUT, key,
-                    response -> putResult(key, bytes.length, actual, response));
-        } catch (IllegalArgumentException error) {
+            long deadline = Math.addExact(System.nanoTime(), options.timeout().toNanos());
+            return guardedPut(key, source, options, attemptGuard, 1, deadline);
+        } catch (IllegalArgumentException | ArithmeticException error) {
             return failed(S3ObjectErrorMapper.invalid(
                     S3ObjectErrorMapper.Operation.PUT, bucket, key, "invalid request"));
         } catch (RuntimeException error) {
@@ -168,6 +202,96 @@ public final class S3CompatibleObjectStore implements ObjectStore {
     }
 
     @Override
+    public CompletableFuture<ListObjectsResult> listObjects(
+            ObjectKeyPrefix prefix,
+            Optional<String> continuationToken,
+            ListObjectsOptions options) {
+        Objects.requireNonNull(prefix, "prefix");
+        Objects.requireNonNull(continuationToken, "continuationToken");
+        Objects.requireNonNull(options, "options");
+        if (closed.get()) {
+            return failed(S3ObjectErrorMapper.closed(S3ObjectErrorMapper.Operation.LIST, bucket, null));
+        }
+        try {
+            String mappedPrefix = keys.mapPrefix(prefix);
+            ListObjectsV2Request request = ListObjectsV2Request.builder()
+                    .bucket(bucket)
+                    .prefix(mappedPrefix)
+                    .maxKeys(options.maxKeys())
+                    .continuationToken(continuationToken.orElse(null))
+                    .overrideConfiguration(operationOverride(options.timeout()).build())
+                    .build();
+            CompletableFuture<ListObjectsV2Response> sdk = client.listObjectsV2(request);
+            return link(sdk, options.timeout(), S3ObjectErrorMapper.Operation.LIST, null,
+                    response -> listResult(prefix, mappedPrefix, continuationToken, options, response));
+        } catch (IllegalArgumentException error) {
+            return failed(S3ObjectErrorMapper.invalid(
+                    S3ObjectErrorMapper.Operation.LIST, bucket, null, "invalid request"));
+        } catch (RuntimeException error) {
+            return failed(S3ObjectErrorMapper.list(error, bucket));
+        }
+    }
+
+    @Override
+    public CompletableFuture<DeleteObjectResult> deleteObject(
+            ObjectKey key,
+            DeleteObjectOptions options) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(options, "options");
+        if (closed.get()) {
+            return failed(S3ObjectErrorMapper.closed(S3ObjectErrorMapper.Operation.DELETE, bucket, key));
+        }
+        requireCrc32c(options.expectedStorageChecksum(), "delete checksum");
+        CompletableFuture<Optional<HeadObjectResult>> head = headObject(key, new HeadObjectOptions(options.timeout()))
+                .handle((value, failure) -> {
+                    if (failure == null) {
+                        return Optional.of(value);
+                    }
+                    NereusException mapped = S3ObjectErrorMapper.head(failure, bucket, key);
+                    if (mapped.code() == ErrorCode.OBJECT_NOT_FOUND) {
+                        return Optional.empty();
+                    }
+                    throw new java.util.concurrent.CompletionException(mapped);
+                });
+        return head.thenCompose(optional -> {
+            if (optional.isEmpty()) {
+                return CompletableFuture.completedFuture(
+                        new DeleteObjectResult(key, DeleteObjectResult.Status.ALREADY_ABSENT));
+            }
+            HeadObjectResult value = optional.orElseThrow();
+            if (value.objectLength() != options.expectedLength()
+                    || !value.checksum().equals(options.expectedStorageChecksum())
+                    || options.expectedEtag().filter(expected -> value.etag().filter(expected::equals).isEmpty()).isPresent()) {
+                return failed(new NereusException(
+                        ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "delete identity mismatch"));
+            }
+            DeleteObjectRequest.Builder request = DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(keys.map(key))
+                    .overrideConfiguration(operationOverride(options.timeout()).build());
+            options.expectedEtag().ifPresent(request::ifMatch);
+            CompletableFuture<DeleteObjectResponse> sdk;
+            try {
+                sdk = client.deleteObject(request.build());
+            } catch (RuntimeException failure) {
+                return failed(S3ObjectErrorMapper.delete(failure, bucket, key));
+            }
+            return link(sdk, options.timeout(), S3ObjectErrorMapper.Operation.DELETE, key,
+                    ignored -> new DeleteObjectResult(key, DeleteObjectResult.Status.DELETED))
+                    .handle((result, failure) -> {
+                        if (failure == null) {
+                            return result;
+                        }
+                        NereusException mapped = S3ObjectErrorMapper.delete(failure, bucket, key);
+                        if (mapped.code() == ErrorCode.OBJECT_NOT_FOUND) {
+                            return new DeleteObjectResult(key, DeleteObjectResult.Status.ALREADY_ABSENT);
+                        }
+                        throw new java.util.concurrent.CompletionException(mapped);
+                    });
+        });
+    }
+
+    @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) {
             return;
@@ -176,6 +300,152 @@ public final class S3CompatibleObjectStore implements ObjectStore {
         admitted.clear();
         client.close();
         deadlineScheduler.shutdownNow();
+    }
+
+    private CompletableFuture<PutObjectResult> guardedPut(
+            ObjectKey key,
+            ReplayableObjectUpload source,
+            PutObjectOptions options,
+            PutObjectAttemptGuard attemptGuard,
+            int attempt,
+            long deadlineNanos) {
+        if (closed.get()) {
+            return failed(S3ObjectErrorMapper.closed(S3ObjectErrorMapper.Operation.PUT, bucket, key));
+        }
+        Duration remaining;
+        try {
+            remaining = remainingTimeout(deadlineNanos);
+        } catch (RuntimeException failure) {
+            return failed(S3ObjectErrorMapper.timeout(S3ObjectErrorMapper.Operation.PUT, bucket, key));
+        }
+        CompletableFuture<Void> authorization;
+        try {
+            authorization = Objects.requireNonNull(
+                    attemptGuard.authorize(key, attempt), "attemptGuard result");
+        } catch (Throwable failure) {
+            return failed(failure);
+        }
+        CompletableFuture<Void> guardedAuthorization = authorization.handle((ignored, failure) -> {
+            if (failure != null) {
+                throw new PutGuardRejectedException(unwrap(failure));
+            }
+            return null;
+        });
+        return guardedAuthorization.thenCompose(ignored -> transmitPut(key, source, options, remaining))
+                .handle((result, failure) -> {
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(result);
+                    }
+                    Throwable exact = unwrap(failure);
+                    if (exact instanceof PutGuardRejectedException rejected) {
+                        return S3CompatibleObjectStore.<PutObjectResult>failed(rejected.getCause());
+                    }
+                    if (!retryablePut(exact) || attempt >= putRetryPolicy.maxAttempts()) {
+                        return S3CompatibleObjectStore.<PutObjectResult>failed(exact);
+                    }
+                    int nextAttempt = attempt + 1;
+                    long maximumDelay = putRetryPolicy.maximumBackoffMillis(nextAttempt);
+                    long delay = maximumDelay == 0
+                            ? 0 : ThreadLocalRandom.current().nextLong(maximumDelay + 1);
+                    long now = System.nanoTime();
+                    long retryAt;
+                    try {
+                        retryAt = Math.addExact(now, TimeUnit.MILLISECONDS.toNanos(delay));
+                    } catch (ArithmeticException overflow) {
+                        return S3CompatibleObjectStore.<PutObjectResult>failed(
+                                S3ObjectErrorMapper.timeout(S3ObjectErrorMapper.Operation.PUT, bucket, key));
+                    }
+                    if (retryAt >= deadlineNanos) {
+                        return S3CompatibleObjectStore.<PutObjectResult>failed(
+                                S3ObjectErrorMapper.timeout(S3ObjectErrorMapper.Operation.PUT, bucket, key));
+                    }
+                    CompletableFuture<PutObjectResult> retried = new CompletableFuture<>();
+                    try {
+                        deadlineScheduler.schedule(() -> guardedPut(
+                                        key, source, options, attemptGuard, nextAttempt, deadlineNanos)
+                                .whenComplete((value, retryFailure) -> {
+                                    if (retryFailure == null) {
+                                        retried.complete(value);
+                                    } else {
+                                        retried.completeExceptionally(retryFailure);
+                                    }
+                                }), delay, TimeUnit.MILLISECONDS);
+                    } catch (RuntimeException rejected) {
+                        retried.completeExceptionally(
+                                S3ObjectErrorMapper.closed(S3ObjectErrorMapper.Operation.PUT, bucket, key));
+                    }
+                    return retried;
+                }).thenCompose(Function.identity());
+    }
+
+    private CompletableFuture<PutObjectResult> transmitPut(
+            ObjectKey key,
+            ReplayableObjectUpload source,
+            PutObjectOptions options,
+            Duration remaining) {
+        try {
+            String mappedKey = keys.map(key);
+            Map<String, String> metadata = putMetadata(options.metadata(), options.expectedChecksum());
+            AwsRequestOverrideConfiguration.Builder override = operationOverride(remaining);
+            if (options.ifAbsent()) {
+                override.putHeader("If-None-Match", "*");
+            }
+            PutObjectRequest request = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(mappedKey)
+                    .contentType(options.contentType())
+                    .contentLength(source.contentLength())
+                    .metadata(metadata)
+                    .overrideConfiguration(override.build())
+                    .build();
+            UploadAttemptBody body = new UploadAttemptBody(source);
+            CompletableFuture<PutObjectResponse> sdk = client.putObject(request, body);
+            return link(sdk, remaining, S3ObjectErrorMapper.Operation.PUT, key, response -> {
+                Checksum actual = body.requireCompletedChecksum();
+                if (!actual.equals(options.expectedChecksum())) {
+                    throw new NereusException(
+                            ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "put checksum mismatch");
+                }
+                return putResult(key, source.contentLength(), actual, response);
+            });
+        } catch (IllegalArgumentException failure) {
+            return failed(S3ObjectErrorMapper.invalid(
+                    S3ObjectErrorMapper.Operation.PUT, bucket, key, "invalid request"));
+        } catch (RuntimeException failure) {
+            return failed(S3ObjectErrorMapper.put(failure, bucket, key));
+        }
+    }
+
+    private Duration remainingTimeout(long deadlineNanos) {
+        long remaining = deadlineNanos - System.nanoTime();
+        if (remaining <= 0) {
+            throw new IllegalStateException("deadline expired");
+        }
+        Duration exact = Duration.ofNanos(remaining);
+        Duration bounded = exact.compareTo(requestTimeout) > 0 ? requestTimeout : exact;
+        long millis = bounded.toMillis();
+        if (millis <= 0) {
+            throw new IllegalStateException("deadline has less than one millisecond remaining");
+        }
+        return Duration.ofMillis(millis);
+    }
+
+    private static boolean retryablePut(Throwable failure) {
+        return failure instanceof NereusException nereus
+                && nereus.retriable()
+                && nereus.code() != ErrorCode.OBJECT_CHECKSUM_MISMATCH
+                && nereus.code() != ErrorCode.STORAGE_CLOSED
+                && nereus.code() != ErrorCode.CANCELLED;
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof java.util.concurrent.CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 
     private CompletableFuture<RangeReadResult> zeroLengthRead(
@@ -206,7 +476,7 @@ public final class S3CompatibleObjectStore implements ObjectStore {
 
     private PutObjectResult putResult(
             ObjectKey key,
-            int length,
+            long length,
             Checksum checksum,
             PutObjectResponse response) {
         String etag = response.eTag();
@@ -266,7 +536,69 @@ public final class S3CompatibleObjectStore implements ObjectStore {
             throw new NereusException(
                     ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "S3 object has malformed Nereus CRC32C metadata");
         }
-        return new HeadObjectResult(key, response.contentLength(), checksum, metadata);
+        return new HeadObjectResult(
+                key,
+                response.contentLength(),
+                checksum,
+                Optional.ofNullable(response.eTag()).filter(etag -> !etag.isBlank()),
+                metadata);
+    }
+
+    private ListObjectsResult listResult(
+            ObjectKeyPrefix logicalPrefix,
+            String mappedPrefix,
+            Optional<String> suppliedContinuation,
+            ListObjectsOptions options,
+            ListObjectsV2Response response) {
+        if (!mappedPrefix.equals(response.prefix())
+                || response.contents().size() > options.maxKeys()
+                || (response.keyCount() != null && response.keyCount() != response.contents().size())) {
+            throw new NereusException(
+                    ErrorCode.OBJECT_READ_FAILED, false, "S3 returned an invalid list page");
+        }
+        List<ListedObject> objects = new ArrayList<>();
+        String previousMapped = null;
+        for (software.amazon.awssdk.services.s3.model.S3Object item : response.contents()) {
+            String mapped = item.key();
+            if (mapped == null || !mapped.startsWith(mappedPrefix)
+                    || (previousMapped != null && previousMapped.compareTo(mapped) >= 0)
+                    || item.size() == null || item.size() < 0) {
+                throw new NereusException(
+                        ErrorCode.OBJECT_READ_FAILED, false, "S3 list page is not strictly ordered or bounded");
+            }
+            previousMapped = mapped;
+            ObjectKey logical;
+            try {
+                logical = keys.unmap(mapped);
+            } catch (IllegalArgumentException failure) {
+                throw new NereusException(
+                        ErrorCode.OBJECT_READ_FAILED, false, "S3 list returned a non-canonical Nereus key");
+            }
+            if (logical.value().startsWith(logicalPrefix.value())) {
+                objects.add(new ListedObject(
+                        logical,
+                        item.size(),
+                        Optional.ofNullable(item.eTag()).filter(value -> !value.isBlank()),
+                        Optional.ofNullable(item.lastModified())));
+            }
+        }
+        objects.sort(java.util.Comparator.comparing(listed -> listed.key().value()));
+        Optional<String> next;
+        if (Boolean.TRUE.equals(response.isTruncated())) {
+            String token = response.nextContinuationToken();
+            if (token == null || token.isBlank() || suppliedContinuation.filter(token::equals).isPresent()) {
+                throw new NereusException(
+                        ErrorCode.OBJECT_READ_FAILED, false, "S3 list returned an invalid continuation token");
+            }
+            next = Optional.of(token);
+        } else {
+            if (response.nextContinuationToken() != null && !response.nextContinuationToken().isBlank()) {
+                throw new NereusException(
+                        ErrorCode.OBJECT_READ_FAILED, false, "non-terminal token appeared on a terminal list page");
+            }
+            next = Optional.empty();
+        }
+        return new ListObjectsResult(logicalPrefix, objects, next);
     }
 
     private <S, T> CompletableFuture<T> link(
@@ -323,6 +655,8 @@ public final class S3CompatibleObjectStore implements ObjectStore {
             case PUT -> S3ObjectErrorMapper.put(failure, bucket, key);
             case READ -> S3ObjectErrorMapper.read(failure, bucket, key);
             case HEAD -> S3ObjectErrorMapper.head(failure, bucket, key);
+            case LIST -> S3ObjectErrorMapper.list(failure, bucket);
+            case DELETE -> S3ObjectErrorMapper.delete(failure, bucket, key);
         };
     }
 
@@ -408,6 +742,133 @@ public final class S3CompatibleObjectStore implements ObjectStore {
 
     private static <T> CompletableFuture<T> failed(Throwable failure) {
         return CompletableFuture.failedFuture(failure);
+    }
+
+    private static final class UploadAttemptBody implements AsyncRequestBody {
+        private final ReplayableObjectUpload source;
+        private final AtomicBoolean subscribed = new AtomicBoolean();
+        private final CRC32C crc32c = new CRC32C();
+        private long emittedBytes;
+        private boolean completed;
+        private Throwable terminalFailure;
+
+        private UploadAttemptBody(ReplayableObjectUpload source) {
+            this.source = source;
+        }
+
+        @Override
+        public Optional<Long> contentLength() {
+            return Optional.of(source.contentLength());
+        }
+
+        @Override
+        public void subscribe(Subscriber<? super ByteBuffer> downstream) {
+            Objects.requireNonNull(downstream, "downstream");
+            if (!subscribed.compareAndSet(false, true)) {
+                downstream.onSubscribe(new Subscription() {
+                    @Override
+                    public void request(long count) {
+                    }
+
+                    @Override
+                    public void cancel() {
+                    }
+                });
+                downstream.onError(new IllegalStateException("one provider attempt body supports one subscription"));
+                return;
+            }
+            Flow.Publisher<ByteBuffer> publisher;
+            try {
+                publisher = source.openPublisher();
+            } catch (Throwable failure) {
+                synchronized (this) {
+                    terminalFailure = failure;
+                }
+                downstream.onSubscribe(new Subscription() {
+                    @Override
+                    public void request(long count) {
+                    }
+
+                    @Override
+                    public void cancel() {
+                    }
+                });
+                downstream.onError(failure);
+                return;
+            }
+            publisher.subscribe(new Flow.Subscriber<>() {
+                private Flow.Subscription upstream;
+
+                @Override
+                public void onSubscribe(Flow.Subscription subscription) {
+                    upstream = subscription;
+                    downstream.onSubscribe(new Subscription() {
+                        @Override
+                        public void request(long count) {
+                            upstream.request(count);
+                        }
+
+                        @Override
+                        public void cancel() {
+                            upstream.cancel();
+                        }
+                    });
+                }
+
+                @Override
+                public void onNext(ByteBuffer value) {
+                    ByteBuffer duplicate = Objects.requireNonNull(value, "value").asReadOnlyBuffer();
+                    ByteBuffer checksumBytes = duplicate.asReadOnlyBuffer();
+                    synchronized (UploadAttemptBody.this) {
+                        emittedBytes = Math.addExact(emittedBytes, checksumBytes.remaining());
+                        if (emittedBytes > source.contentLength()) {
+                            upstream.cancel();
+                            terminalFailure = new IllegalStateException("upload publisher exceeded declared length");
+                            downstream.onError(terminalFailure);
+                            return;
+                        }
+                        crc32c.update(checksumBytes);
+                    }
+                    downstream.onNext(duplicate);
+                }
+
+                @Override
+                public void onError(Throwable failure) {
+                    synchronized (UploadAttemptBody.this) {
+                        terminalFailure = failure;
+                    }
+                    downstream.onError(failure);
+                }
+
+                @Override
+                public void onComplete() {
+                    synchronized (UploadAttemptBody.this) {
+                        if (emittedBytes != source.contentLength()) {
+                            terminalFailure = new IllegalStateException(
+                                    "upload publisher ended before its declared length");
+                            downstream.onError(terminalFailure);
+                            return;
+                        }
+                        completed = true;
+                    }
+                    downstream.onComplete();
+                }
+            });
+        }
+
+        private synchronized Checksum requireCompletedChecksum() {
+            if (!completed || terminalFailure != null || emittedBytes != source.contentLength()) {
+                throw new NereusException(
+                        ErrorCode.OBJECT_UPLOAD_FAILED, false, "provider completed before consuming exact upload bytes");
+            }
+            return Crc32cChecksums.checksum((int) crc32c.getValue());
+        }
+    }
+
+    private static final class PutGuardRejectedException extends RuntimeException {
+        private PutGuardRejectedException(Throwable cause) {
+            super(cause);
+        }
     }
 
     private static final class OperationFuture<T> extends CompletableFuture<T> {

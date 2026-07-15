@@ -42,6 +42,7 @@ class PartitionedOxiaClientTest {
         client.get("/get", partitionKey).join();
         client.putIfAbsent("/put-if-absent", new byte[] {1}, partitionKey).join();
         client.putIfVersion("/put-if-version", new byte[] {2}, 3, partitionKey).join();
+        client.deleteIfVersion("/delete-if-version", 4, partitionKey).join();
         client.list("/list/a", "/list/z", partitionKey).join();
         client.rangeScan("/range/a", "/range/z", 7, partitionKey).join();
         client.watchPrefix("/watch", partitionKey, () -> { }).close();
@@ -55,6 +56,7 @@ class PartitionedOxiaClientTest {
                         "get",
                         "putIfAbsent",
                         "putIfVersion",
+                        "deleteIfVersion",
                         "list",
                         "rangeScan",
                         "watchPrefix");
@@ -98,6 +100,16 @@ class PartitionedOxiaClientTest {
                 PartitionKey partitionKey) {
             operations.add(new Operation("putIfVersion", key, Long.toString(expectedVersion), partitionKey.value(), value));
             return CompletableFuture.completedFuture(new PartitionedOxiaClient.WriteResult(expectedVersion + 1));
+        }
+
+        @Override
+        public CompletableFuture<Void> deleteIfVersion(
+                String key,
+                long expectedVersion,
+                PartitionKey partitionKey) {
+            operations.add(new Operation(
+                    "deleteIfVersion", key, Long.toString(expectedVersion), partitionKey.value(), new byte[0]));
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override

@@ -62,6 +62,19 @@ final class PartitionedOxiaClient {
                 requirePartitionKey(partitionKey));
     }
 
+    CompletableFuture<Void> deleteIfVersion(
+            String key,
+            long expectedVersion,
+            PartitionKey partitionKey) {
+        if (expectedVersion < 0) {
+            throw new IllegalArgumentException("expectedVersion must be non-negative");
+        }
+        return backend.deleteIfVersion(
+                requireKey(key, "key"),
+                expectedVersion,
+                requirePartitionKey(partitionKey));
+    }
+
     CompletableFuture<List<VersionedValue>> rangeScan(
             String fromInclusive,
             String toExclusive,
@@ -111,6 +124,11 @@ final class PartitionedOxiaClient {
         CompletableFuture<WriteResult> putIfVersion(
                 String key,
                 byte[] value,
+                long expectedVersion,
+                PartitionKey partitionKey);
+
+        CompletableFuture<Void> deleteIfVersion(
+                String key,
                 long expectedVersion,
                 PartitionKey partitionKey);
 

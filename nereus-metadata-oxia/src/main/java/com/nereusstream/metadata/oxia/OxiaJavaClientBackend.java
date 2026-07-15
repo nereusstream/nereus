@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia;
 import io.oxia.client.api.GetResult;
 import io.oxia.client.api.SyncOxiaClient;
 import io.oxia.client.api.options.GetOption;
+import io.oxia.client.api.options.DeleteOption;
 import io.oxia.client.api.options.ListOption;
 import io.oxia.client.api.options.PutOption;
 import io.oxia.client.api.options.RangeScanOption;
@@ -86,6 +87,29 @@ final class OxiaJavaClientBackend implements PartitionedOxiaClient.Backend {
                                 PutOption.PartitionKey(partitionKey.value()),
                                 PutOption.IfVersionIdEquals(expectedVersion)))
                 .version().versionId()));
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteIfVersion(
+            String key,
+            long expectedVersion,
+            PartitionKey partitionKey) {
+        return supply(() -> {
+            boolean deleted;
+            try {
+                deleted = client.delete(
+                        key,
+                        Set.of(
+                                DeleteOption.PartitionKey(partitionKey.value()),
+                                DeleteOption.IfVersionIdEquals(expectedVersion)));
+            } catch (io.oxia.client.api.exceptions.UnexpectedVersionIdException failure) {
+                throw new F4MetadataConditionFailedException("unexpected version during conditional delete", failure);
+            }
+            if (!deleted) {
+                throw new F4MetadataConditionFailedException("key is absent during conditional delete");
+            }
+            return null;
+        });
     }
 
     @Override

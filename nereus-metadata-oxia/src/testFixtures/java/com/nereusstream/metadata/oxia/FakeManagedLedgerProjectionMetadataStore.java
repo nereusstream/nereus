@@ -140,6 +140,18 @@ public final class FakeManagedLedgerProjectionMetadataStore
             return new PartitionedOxiaClient.WriteResult(version);
         }
 
+        private synchronized void deleteIfVersion(
+                String key, long expectedVersion, PartitionKey partitionKey) {
+            StoredValue current = values.get(key);
+            if (current == null || current.version() != expectedVersion) {
+                throw new F4MetadataConditionFailedException("unexpected version for key: " + key);
+            }
+            if (!current.partitionKey().equals(partitionKey.value())) {
+                throw new IllegalStateException("partition key changed for durable key: " + key);
+            }
+            values.remove(key);
+        }
+
         private synchronized List<String> list(String fromInclusive, String toExclusive) {
             return values.keySet().stream()
                     .filter(key -> key.compareTo(fromInclusive) >= 0 && key.compareTo(toExclusive) < 0)
@@ -315,6 +327,15 @@ public final class FakeManagedLedgerProjectionMetadataStore
                 long expectedVersion,
                 PartitionKey partitionKey) {
             return invoke(() -> state.putIfVersion(key, value, expectedVersion, partitionKey));
+        }
+
+        @Override
+        public CompletableFuture<Void> deleteIfVersion(
+                String key, long expectedVersion, PartitionKey partitionKey) {
+            return invoke(() -> {
+                state.deleteIfVersion(key, expectedVersion, partitionKey);
+                return null;
+            });
         }
 
         @Override

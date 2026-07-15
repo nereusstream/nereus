@@ -19,9 +19,12 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.http.SdkHttpResponse;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -175,7 +178,8 @@ class S3CompatibleObjectStoreTest {
         @Override
         public Object invoke(Object proxy, Method method, Object[] arguments) {
             return switch (method.getName()) {
-                case "putObject" -> put.apply((PutObjectRequest) arguments[0]);
+                case "putObject" -> consume((AsyncRequestBody) arguments[1])
+                        .thenCompose(ignored -> put.apply((PutObjectRequest) arguments[0]));
                 case "getObject" -> get.apply((GetObjectRequest) arguments[0]);
                 case "headObject" -> head.apply(arguments[0]);
                 case "serviceName" -> "S3";
@@ -183,6 +187,31 @@ class S3CompatibleObjectStoreTest {
                 case "toString" -> "StubS3AsyncClient";
                 default -> throw new UnsupportedOperationException(method.toString());
             };
+        }
+
+        private static CompletableFuture<Void> consume(AsyncRequestBody body) {
+            CompletableFuture<Void> consumed = new CompletableFuture<>();
+            body.subscribe(new Subscriber<>() {
+                @Override
+                public void onSubscribe(Subscription subscription) {
+                    subscription.request(Long.MAX_VALUE);
+                }
+
+                @Override
+                public void onNext(ByteBuffer ignored) {
+                }
+
+                @Override
+                public void onError(Throwable failure) {
+                    consumed.completeExceptionally(failure);
+                }
+
+                @Override
+                public void onComplete() {
+                    consumed.complete(null);
+                }
+            });
+            return consumed;
         }
     }
 }

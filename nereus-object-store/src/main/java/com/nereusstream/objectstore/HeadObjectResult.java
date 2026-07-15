@@ -19,18 +19,34 @@ import com.nereusstream.api.MetadataCanonicalizer;
 import com.nereusstream.api.ObjectKey;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 public record HeadObjectResult(
         ObjectKey key,
         long objectLength,
         Checksum checksum,
+        Optional<String> etag,
         Map<String, String> metadata) {
     public HeadObjectResult {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(checksum, "checksum");
+        etag = Objects.requireNonNull(etag, "etag").map(value -> {
+            if (value.isBlank()) {
+                throw new IllegalArgumentException("etag cannot be blank");
+            }
+            return value;
+        });
         metadata = MetadataCanonicalizer.canonicalStringMap(metadata, Integer.MAX_VALUE, "metadata");
         if (objectLength < 0) {
             throw new IllegalArgumentException("objectLength must be non-negative");
         }
+    }
+
+    public HeadObjectResult(
+            ObjectKey key,
+            long objectLength,
+            Checksum checksum,
+            Map<String, String> metadata) {
+        this(key, objectLength, checksum, Optional.empty(), metadata);
     }
 }

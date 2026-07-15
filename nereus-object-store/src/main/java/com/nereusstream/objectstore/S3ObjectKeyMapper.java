@@ -30,6 +30,52 @@ public final class S3ObjectKeyMapper {
         return mapped;
     }
 
+    public String mapPrefix(ObjectKeyPrefix logicalPrefix) {
+        byte[] bytes = strictUtf8(Objects.requireNonNull(logicalPrefix, "logicalPrefix").value(), "object key prefix");
+        int completeTriples = bytes.length / 3;
+        if (completeTriples == 0) {
+            return objectRoot();
+        }
+        byte[] stable = java.util.Arrays.copyOf(bytes, completeTriples * 3);
+        return objectRoot() + Base64.getUrlEncoder().withoutPadding().encodeToString(stable);
+    }
+
+    public ObjectKey unmap(String mappedKey) {
+        Objects.requireNonNull(mappedKey, "mappedKey");
+        if (!mappedKey.startsWith(objectRoot())) {
+            throw new IllegalArgumentException("S3 key is outside the configured Nereus object prefix");
+        }
+        String encoded = mappedKey.substring(objectRoot().length());
+        if (encoded.isEmpty()) {
+            throw new IllegalArgumentException("mapped object key has no identity payload");
+        }
+        byte[] decoded;
+        try {
+            decoded = Base64.getUrlDecoder().decode(encoded);
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalArgumentException("mapped object key is not canonical base64url", failure);
+        }
+        String logical;
+        try {
+            logical = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(decoded))
+                    .toString();
+        } catch (CharacterCodingException failure) {
+            throw new IllegalArgumentException("mapped object key is not valid UTF-8", failure);
+        }
+        ObjectKey result = new ObjectKey(logical);
+        if (!map(result).equals(mappedKey)) {
+            throw new IllegalArgumentException("mapped object key is not canonical");
+        }
+        return result;
+    }
+
+    private String objectRoot() {
+        return prefix + "/objects/v1/";
+    }
+
     private static String requirePrefix(String value) {
         Objects.requireNonNull(value, "prefix");
         if (value.isBlank() || value.startsWith("/") || value.endsWith("/")) {

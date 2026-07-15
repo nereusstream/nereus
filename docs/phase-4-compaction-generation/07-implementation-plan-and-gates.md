@@ -61,6 +61,7 @@ F4ScanKind.java
 F4ScanToken.java
 GenerationIndexIdentity.java
 GenerationZeroIndexEncoding.java
+ObjectProtectionIdentity.java
 GenerationMetadataStore.java
 PhysicalObjectMetadataStore.java
 VersionedGenerationSequence.java
@@ -151,7 +152,6 @@ testing/LocalFileObjectStore.java            safe list/delete fixture
 
 ```text
 physical/PhysicalObjectIdentity.java
-physical/ObjectProtectionIdentity.java
 physical/ObjectReadPinManager.java
 physical/DefaultObjectReadPinManager.java
 physical/ObjectReadLease.java
@@ -175,6 +175,10 @@ capability/GenerationActivationProof.java
 `nereus-materialization` module scaffold adds `build.gradle.kts` now, then M2/M3 add implementation classes. Add the
 module to `settings.gradle.kts` and `nereus-bom`；dependency audit enforces
 `materialization -> core` and forbids `core -> materialization` or Pulsar imports.
+
+`ObjectProtectionIdentity` lives with the Oxia store/key identity rather than in `nereus-core` because
+`PhysicalObjectMetadataStore` uses it directly and metadata must not depend on core. Core protection managers reuse
+that protocol-neutral metadata identity; this preserves the documented acyclic dependency direction.
 
 ### 3.2 Focused tests
 

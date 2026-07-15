@@ -19,6 +19,7 @@ public record ObjectStoreConfiguration(
         String prefix,
         boolean pathStyleAccess,
         Duration requestTimeout,
+        ObjectPutRetryPolicy putRetryPolicy,
         int maxConnections,
         Optional<String> accessKeySecretRef,
         Optional<String> secretKeySecretRef,
@@ -30,8 +31,12 @@ public record ObjectStoreConfiguration(
         bucket = requireText(bucket, "bucket");
         prefix = requireCanonicalPrefix(prefix);
         Objects.requireNonNull(requestTimeout, "requestTimeout");
-        if (requestTimeout.isZero() || requestTimeout.isNegative()) {
-            throw new IllegalArgumentException("requestTimeout must be positive");
+        if (requestTimeout.isZero() || requestTimeout.isNegative() || requestTimeout.toMillis() <= 0) {
+            throw new IllegalArgumentException("requestTimeout must be positive and millisecond-representable");
+        }
+        Objects.requireNonNull(putRetryPolicy, "putRetryPolicy");
+        if (putRetryPolicy.maxBackoff().compareTo(requestTimeout) > 0) {
+            throw new IllegalArgumentException("put retry maxBackoff cannot exceed requestTimeout");
         }
         if (maxConnections <= 0) {
             throw new IllegalArgumentException("maxConnections must be positive");
@@ -45,6 +50,44 @@ public record ObjectStoreConfiguration(
         if (sessionTokenSecretRef.isPresent() && accessKeySecretRef.isEmpty()) {
             throw new IllegalArgumentException("session-token reference requires access and secret key references");
         }
+    }
+
+    /** Source-compatible constructor for pre-F4 callers; guarded PUTs use the bounded default policy. */
+    public ObjectStoreConfiguration(
+            String providerClassName,
+            URI endpoint,
+            String region,
+            String bucket,
+            String prefix,
+            boolean pathStyleAccess,
+            Duration requestTimeout,
+            int maxConnections,
+            Optional<String> accessKeySecretRef,
+            Optional<String> secretKeySecretRef,
+            Optional<String> sessionTokenSecretRef) {
+        this(
+                providerClassName,
+                endpoint,
+                region,
+                bucket,
+                prefix,
+                pathStyleAccess,
+                requestTimeout,
+                defaultRetryPolicy(requestTimeout),
+                maxConnections,
+                accessKeySecretRef,
+                secretKeySecretRef,
+                sessionTokenSecretRef);
+    }
+
+    private static ObjectPutRetryPolicy defaultRetryPolicy(Duration timeout) {
+        Objects.requireNonNull(timeout, "requestTimeout");
+        if (timeout.toMillis() <= 0) {
+            throw new IllegalArgumentException("requestTimeout must be millisecond-representable");
+        }
+        Duration max = timeout.compareTo(Duration.ofSeconds(1)) < 0 ? timeout : Duration.ofSeconds(1);
+        Duration min = max.compareTo(Duration.ofMillis(25)) < 0 ? max : Duration.ofMillis(25);
+        return new ObjectPutRetryPolicy(3, min, max);
     }
 
     private static URI requireEndpoint(URI endpoint) {

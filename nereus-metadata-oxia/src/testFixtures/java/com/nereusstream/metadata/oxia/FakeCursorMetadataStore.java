@@ -91,6 +91,16 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
             return new PartitionedOxiaClient.WriteResult(version);
         }
 
+        private synchronized void deleteIfVersion(
+                String key, long expectedVersion, PartitionKey partitionKey) {
+            StoredValue current = values.get(key);
+            if (current == null || current.version() != expectedVersion) {
+                throw new F4MetadataConditionFailedException("unexpected version for key: " + key);
+            }
+            requirePartition(current, partitionKey, key);
+            values.remove(key);
+        }
+
         private synchronized List<String> list(String fromInclusive, String toExclusive) {
             return values.keySet().stream()
                     .filter(key -> compareHierarchical(key, fromInclusive) >= 0
@@ -290,6 +300,16 @@ public final class FakeCursorMetadataStore implements CursorMetadataStore {
                         key, value, expectedVersion, partitionKey);
                 state.notifyWatches(key, partitionKey);
                 return result;
+            });
+        }
+
+        @Override
+        public CompletableFuture<Void> deleteIfVersion(
+                String key, long expectedVersion, PartitionKey partitionKey) {
+            return invoke(() -> {
+                state.deleteIfVersion(key, expectedVersion, partitionKey);
+                state.notifyWatches(key, partitionKey);
+                return null;
             });
         }
 
