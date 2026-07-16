@@ -173,6 +173,11 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M4 checkpoint V**：F3 cursor snapshot 的 guarded PUT、current-root pending protection、cursor-CAS
   visibility、permanent root protection、response-loss hydrate repair 和 durable reader-lease ordinary checkpoint；
   它关闭新写/读 frontier，但不表示 legacy backfill、snapshot candidate deletion 或 production GC 已启用。
+- **F4-M4 checkpoint W**：在 completed same-epoch registration proof 之后遍历全部 64 registry shards，
+  对 recovery-root commit tail、完整 generation-zero index 和 F3 active cursor inventory 建立 exact physical
+  roots 与 owner-bound permanent protections，并在最终 authority revalidation 后 CAS physical/cursor backfill
+  proofs 的 ordinary checkpoint；它不表示 broker cold-topic registration backfill/barrier、object inventory、
+  cursor deletion scanner 或 production GC 已启用。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

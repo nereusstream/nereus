@@ -8,23 +8,56 @@ import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
 
-/** Canonical V1 protection identities shared by validation and publication. */
-final class GenerationZeroProtectionIdentities {
+/** Canonical V1 protection identities shared by live publication and rollout backfill. */
+public final class GenerationZeroProtectionIdentities {
     private GenerationZeroProtectionIdentities() {
     }
 
     static String reachableAppendReferenceId(PreparedStableAppend prepared) {
-        return "ra1-" + DeterministicIds.stableHashComponent(
-                prepared.request().streamId().value()
-                        + prepared.commitId()
-                        + prepared.objectKeyHash().value());
+        return reachableAppendReferenceId(
+                prepared.request().streamId(),
+                prepared.commitId(),
+                prepared.objectKeyHash());
     }
 
     static String visibleGenerationReferenceId(MaterializedGenerationZero materialized) {
+        return visibleGenerationReferenceId(
+                materialized.committedAppend().streamId(),
+                materialized.indexKey(),
+                materialized.indexRecordSha256());
+    }
+
+    public static String reachableAppendReferenceId(
+            com.nereusstream.api.StreamId streamId,
+            String commitId,
+            ObjectKeyHash objectKeyHash) {
+        java.util.Objects.requireNonNull(streamId, "streamId");
+        if (java.util.Objects.requireNonNull(commitId, "commitId").isBlank()) {
+            throw new IllegalArgumentException("commitId cannot be blank");
+        }
+        java.util.Objects.requireNonNull(objectKeyHash, "objectKeyHash");
+        return "ra1-" + DeterministicIds.stableHashComponent(
+                streamId.value() + commitId + objectKeyHash.value());
+    }
+
+    public static String visibleGenerationReferenceId(
+            com.nereusstream.api.StreamId streamId,
+            String indexKey,
+            com.nereusstream.api.Checksum indexRecordSha256) {
+        java.util.Objects.requireNonNull(streamId, "streamId");
+        if (java.util.Objects.requireNonNull(indexKey, "indexKey").isBlank()) {
+            throw new IllegalArgumentException("indexKey cannot be blank");
+        }
+        java.util.Objects.requireNonNull(indexRecordSha256, "indexRecordSha256");
+        if (indexRecordSha256.type()
+                != com.nereusstream.api.ChecksumType.SHA256) {
+            throw new IllegalArgumentException(
+                    "indexRecordSha256 must use SHA256");
+        }
         return "vg0-" + DeterministicIds.stableHashComponent(
-                materialized.committedAppend().streamId().value()
-                        + materialized.indexKey()
-                        + materialized.indexRecordSha256().value());
+                streamId.value()
+                        + indexKey
+                        + indexRecordSha256.value());
     }
 
     static ObjectKeyHash objectKeyHash(CommittedAppend append) {

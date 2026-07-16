@@ -229,6 +229,15 @@ Decode uses strict UTF-8、exact lengths/no trailing bytes、the existing manage
 the guard decodes the exact name, computes its topic key, linearly reads `TopicProjectionRecord` and compares every
 identity field. The ref remains stable across mutable property/state-version updates but changes on topic recreation.
 
+Checkpoint W implements the strict NPR1 codec and freezes a golden ref/digest vector. It also adds the protocol-neutral
+`GenerationProjectionAuthorityReader`/snapshot contract in core and
+`ManagedLedgerGenerationProjectionAuthorityReader` in the managed-ledger adapter. The reader decodes and verifies the
+subject digest, linearly reads the per-stream binding plus the topic authority selected by that binding, and reports
+`live=true` only for the exact identity in `OPEN` or `SEALED`. Missing、recreated、`DELETING` or `DELETED`
+projections return a versioned non-live classification whose binding/topic presence or absence authorities must still
+match at final revalidation. This reader is consumed by the checkpoint-W physical-root backfill；the broker-side
+registration executor、cluster barrier and production activation guard below remain M5 rollout work.
+
 First activation is a recoverable cross-key sequence：
 
 ```text

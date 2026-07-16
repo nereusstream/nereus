@@ -935,3 +935,24 @@ tasks.register("phase4M4CursorProtectionCheck") {
     dependsOn(":nereus-managed-ledger:compileCursorM2IntegrationTestJava")
     dependsOn(":nereus-pulsar-adapter:check")
 }
+
+tasks.register<Exec>("checkPhase4M4PhysicalRootBackfillContractSurface") {
+    group = "verification"
+    description = "Audit all-shard physical-root/cursor-root backfill and activation-proof closure."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-physical-root-backfill-contract-surface.sh")
+}
+
+tasks.register("phase4M4PhysicalRootBackfillCheck") {
+    group = "verification"
+    description = "Verify stable live-reference backfill, exact roots/protections, and dual activation proofs."
+    dependsOn("phase4M4CursorProtectionCheck")
+    dependsOn("checkPhase4M4PhysicalRootBackfillContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+}

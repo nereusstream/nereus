@@ -102,14 +102,15 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4 through checkpoint V 已实现 NRC1 protocol、protected generation-zero append、
+Oxia/LocalStack final gates。M4 through checkpoint W 已实现 NRC1 protocol、protected generation-zero append、
 recovery-root/replay/index repair、bounded GC plan/root/journal fence、root-authenticated destructive skeleton、typed
 generation-zero source retirement，以及 completed-trim/COMMITTED/TOPIC_COMPACTED source eligibility 和
 grace-fenced higher-generation pre-drain/reproof，并增加 durable generation-activation authority、future sentinel
 与五个 ownerless-global domains、dual-absence DELETED-root/Phase 1 audit retirement，以及 guarded/pending/
-permanent/pinned cursor-snapshot new-write/read frontier。Backfill/broker guard、physical-root backfill、cursor
-snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition 及
-M5-M6 仍是 target；production deletion 继续关闭。
+permanent/pinned cursor-snapshot new-write/read frontier，以及 strict NPR1 projection identity 和 all-shard
+physical/cursor live-reference backfill。Broker cold-topic registration backfill/capability barrier、cursor snapshot
+candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition 及 M5-M6
+仍是 target；production deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -321,11 +322,11 @@ flowchart TB
 | Module | Target responsibility | Current status (2026-07-16) |
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented |
-| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI and protocol-neutral global reference scope implemented；M4 recovery/root/GC consumers are in progress through checkpoint T |
+| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI、protocol-neutral global reference scope、projection-authority capture contract and public generation-zero protection identities implemented；M4 recovery/root/GC consumers are in progress through checkpoint W |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay、F4-M1–M3 metadata/publication gates、M4 exact protected-append proof adapter and checkpoint-S generation-activation exact-key/CAS authority foundation implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
-| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint V implements NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、ownerless-global storage domains、dual-absence DELETED-root retirement and the managed-ledger cursor protection frontier, while remaining production composition/final GC remains pending；depends on core, never the reverse |
-| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；projection、ledger/factory、append/read/lifecycle、durable cursor/retention、10k scale、rollout/limit/reset and F4 snapshot inventory boundaries complete |
+| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint W implements NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、ownerless-global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier and all-shard physical/cursor live-reference backfill, while remaining production composition/final GC remains pending；depends on core, never the reverse |
+| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；projection、ledger/factory、append/read/lifecycle、durable cursor/retention、10k scale、rollout/limit/reset、F4 snapshot inventory boundaries and checkpoint-W strict NPR1 projection authority reader complete |
 | `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider implemented；fork binding/admission/capability/policy guards、unloaded binding-aware admin validation and M6 real two-broker acceptance complete |
 | `nereus-kop-adapter` | Kafka projection | marker only |
 

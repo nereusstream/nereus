@@ -37,8 +37,10 @@
 > audit retirement。Checkpoint V 已把 F3 cursor snapshot 新写入切换为 guarded PUT + pending protection +
 > cursor CAS + permanent protection，并让 hydrate/read 在 durable reader lease 内执行、可修复 CAS response
 > loss；`DefaultNereusRuntimeProvider` 已装配 shared physical store/protection/read-pin 到该路径。
-> Backfill/broker activation guard、physical-root backfill、cursor snapshot candidate/deletion scanner、object
-> inventory、registration retirement、其余 materialization/GC runtime composition 与最终删除开关仍保持关闭
+> Checkpoint W 又实现 strict NPR1 projection authority、全 64-shard live-reference physical/cursor-root backfill、
+> exact commit/index/cursor owner protection、最终 authority revalidation 和 response-loss-safe dual activation
+> proofs。Broker registration backfill/barrier、cursor snapshot candidate/deletion scanner、object inventory、
+> registration retirement、其余 materialization/GC runtime composition 与最终删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
 >
@@ -773,9 +775,10 @@ COMMITTED NRC1 facts，也绝不让跨 view generation 互相覆盖。
 candidate-root final fence 与 response-loss-safe CAS；已经 DRAINING 的 higher source 和 generation-zero removal
 在 plan/reload 时重复各自 exact eligibility proof。
 
-Checkpoint R 是 source-eligibility 的 ordinary completion checkpoint，不是 M4 final gate。Checkpoint V 后
-future-sentinel、ownerless global absence proof 与 DELETED-root/Phase 1 audit retirement 已落地，但 production
-physical-root backfill、cursor snapshot candidate/deletion scanner、object inventory、registration retirement、
+Checkpoint R 是 source-eligibility 的 ordinary completion checkpoint，不是 M4 final gate。Checkpoint W 后
+future-sentinel、ownerless global absence proof、DELETED-root/Phase 1 audit retirement 与 live-reference
+physical/cursor-root backfill 已落地，但 broker registration backfill/barrier、cursor snapshot
+candidate/deletion scanner、object inventory、registration retirement、
 其余 materialization/GC runtime composition、real-service destructive scenarios 和 final M4 gate 仍待完成；
 production deletion 继续关闭。
 
@@ -881,6 +884,31 @@ sets 已迁移到同一协议，`cursorS3IntegrationTest` 与 `cursorM2Integrati
 2026-07-16 通过。`phase4M4CursorProtectionCheck` 是 checkpoint V 的 ordinary gate 且已通过；它不实现
 `CursorSnapshotGcScanner`、legacy backfill、inventory、broker activation barrier 或 production deletion。
 
+### 6.25 F4-M4 physical-root and cursor-root backfill checkpoint
+
+Checkpoint W 把 rollout 前的 live-reference coverage 从设计合同落成代码。Core 新增
+`GenerationProjectionAuthorityReader`/snapshot，managed-ledger 新增 strict NPR1
+`ManagedLedgerGenerationProjectionRefV1` 与 exact binding/topic reader。NPR1 使用无 padding base64url、
+strict UTF-8、完整 identity fields、trailing-byte rejection 和 CRC32C；golden test 冻结 exact ref 与
+SHA-256 identity digest。Reader 对 missing/recreated/DELETING/DELETED projection 返回带 presence/absence
+authority 的 non-live classification，不把 registration hint 当成 projection truth。
+
+`DefaultPhysicalRootBackfillCoordinator` 只在同 readiness epoch 的 registration proof 已完成后运行。它遍历
+全部 64 registry shards，在 canonical fold 下有界并发处理 stream；live stream 会扫描 recovery-root-anchored
+commit tail、完整 COMMITTED generation-zero index prefix 和 F3 retention/cursor roots。每个存量对象先执行
+exact HEAD，再通过 production `ObjectProtectionManager` 创建/验证 ACTIVE root 与 commit/index/cursor
+owner-bound permanent protection。Generation-zero protection reference id 与新 append 路径共享同一公开公式，
+因此 backfill 不会产生第二套兼容身份。
+
+每个 stream 在计入 coverage 前会重读 registration、完整 L0 snapshot、projection、recovery root/head 和
+cursor inventory digest。完整零失败 traversal 才能 CAS `physicalRootBackfill` 与
+`cursorSnapshotBackfill`；CAS response loss 只在 reload 得到 exact desired proofs 时成功。Focused tests
+覆盖 empty-registry all-shard proof、lost activation response、shared WAL commit+index、cursor snapshot ETag
+root/permanent owner protection，以及 registration proof 缺失时 fail closed。
+`phase4M4PhysicalRootBackfillCheck` 是 checkpoint W ordinary gate；它不执行 broker cold-topic registration
+backfill/barrier、不设置 delete bits、不运行 cursor deletion scanner/object listing，也不是 M4 final gate；
+该 gate 已于 2026-07-16 使用 `--rerun-tasks` 通过。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -889,7 +917,7 @@ sets 已迁移到同一协议，`cursorS3IntegrationTest` 与 `cursorM2Integrati
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint V, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement and guarded/protected/pinned cursor-snapshot new writes are implemented/tested；backfill/broker guard、physical-root backfill、cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition and final gate pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；broker registration backfill/barrier、cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition and final gate pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

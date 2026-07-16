@@ -507,9 +507,10 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 ## 15. GC protocol
 
 > Status: In progress. Physical reference values/leases/protections、NRC1 recovery-root publication/replay/index repair、
-> typed source retirement、DELETED-root/Phase 1 audit retirement and guarded/protected/pinned cursor-snapshot new
-> writes are implemented through F4-M4 checkpoint V；physical-root backfill、cursor snapshot candidate/deletion
-> scanning、inventory/remaining runtime composition and production deletion remain disabled.
+> typed source retirement、DELETED-root/Phase 1 audit retirement、guarded/protected/pinned cursor-snapshot new
+> writes and all-shard physical/cursor live-reference backfill are implemented through F4-M4 checkpoint W；
+> broker registration backfill/barrier、cursor snapshot candidate/deletion scanning、inventory/remaining runtime
+> composition and production deletion remain disabled.
 
 An object is deletable only when all relevant conditions are true：
 

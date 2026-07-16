@@ -95,8 +95,10 @@ ownerless variants for all five concrete domains. Checkpoint U adds the persiste
 fresh ownerless-domain/handle revalidation、late exact-byte cleanup、Phase 1 references-before-manifest retirement and
 root-last response-loss-safe CAS. Checkpoint V adds guarded cursor-snapshot upload、current-root pending protection、
 cursor-CAS-then-permanent completion、response-loss repair on hydrate/read、durable reader lease and the shared
-physical/protection/read-pin production wiring for this path. Backfill/broker guard、physical-root backfill、cursor
-snapshot candidate/deletion scanning、object inventory、registration retirement and the remaining
+physical/protection/read-pin production wiring for this path. Checkpoint W adds strict NPR1 projection resolution、
+the all-64-shard physical-root/cursor-root live-reference backfill、exact commit/index/cursor owner protections、
+stable final revalidation and response-loss-safe dual activation proofs. Broker registration backfill/barrier、
+cursor snapshot candidate/deletion scanning、object inventory、registration retirement and the remaining
 materialization/GC runtime composition remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
@@ -611,8 +613,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > checkpoint T implements the future sentinel、activation-gated full registration scope and affected/ownerless variants
 > of all five reference domains. Checkpoint U implements persisted dual-absence DELETED-root/Phase 1 audit retirement.
 > Checkpoint V implements the guarded/protected/pinned cursor-snapshot new-write frontier and its production
-> physical/protection/read-pin wiring. Backfill/broker guard、physical-root backfill、cursor snapshot
-> candidate/deletion scanning、object inventory、registration retirement、remaining materialization/GC runtime
+> physical/protection/read-pin wiring. Checkpoint W implements strict NPR1 projection authority and the stable
+> physical-root/cursor-root live-reference backfill plus dual activation proofs. Broker registration backfill/barrier、
+> cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining materialization/GC runtime
 > composition、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
 
 ### 6.1 Production artifacts
@@ -643,7 +646,7 @@ append/StableAppendCommitter.java                 split prepare/protected commit
 append/GenerationZeroIndexMaterializer.java       return exact versioned index
 append/GenerationZeroPhysicalReferencePublisher.java
 append/DefaultGenerationZeroPhysicalReferencePublisher.java
-append/GenerationZeroProtectionIdentities.java
+append/GenerationZeroProtectionIdentities.java            public backfill overloads checkpoint W
 append/ProtectedStableAppend.java
 append/ProtectedGenerationZero.java
 append/AppendCoordinator.java                     protected sync path
@@ -654,6 +657,8 @@ physical/GcReferenceDomainConfig.java                 implemented checkpoint K s
 physical/GcReferenceSnapshotBuilder.java              implemented checkpoint K canonical fail-closed builder
 physical/GcGlobalReferenceScope.java                  implemented checkpoint T protocol-neutral ownerless scope
 physical/GcGlobalReferenceScopeSnapshot.java          implemented checkpoint T canonical activation/registration facts
+capability/GenerationProjectionAuthorityReader.java   implemented checkpoint W protocol-neutral F2 authority seam
+capability/GenerationProjectionAuthoritySnapshot.java implemented checkpoint W exact live/non-live authority capture
 OxiaMetadataStore                                prepare/commit prepared append
 OxiaJavaClientMetadataStore                      exact two-stage stable append
 AppendRecoveryAnchor.java                        implemented checkpoint C foundation
@@ -783,11 +788,13 @@ gc/DefaultPhysicalRootTombstoneRetirementCoordinator.java  implemented checkpoin
 gc/TombstoneRetirementResult.java                          implemented checkpoint U
 gc/TombstoneRetirementStatus.java                          implemented checkpoint U
 gc/TombstoneRetirementDigests.java                         implemented checkpoint U
-gc/PhysicalRootBackfillCoordinator.java
-gc/PhysicalRootBackfillRequest.java
-gc/PhysicalRootBackfillReport.java
-gc/PhysicalRootBackfillFailure.java
-gc/PhysicalRootBackfillStage.java
+gc/PhysicalRootBackfillCoordinator.java                  implemented checkpoint W contract
+gc/DefaultPhysicalRootBackfillCoordinator.java           implemented checkpoint W all-shard backfill/proof CAS
+gc/PhysicalRootBackfillDigest.java                        implemented checkpoint W hierarchical coverage digest
+gc/PhysicalRootBackfillRequest.java                       implemented checkpoint W bounded request
+gc/PhysicalRootBackfillReport.java                        implemented checkpoint W full counters/bounded failures
+gc/PhysicalRootBackfillFailure.java                       implemented checkpoint W redacted failure
+gc/PhysicalRootBackfillStage.java                         implemented checkpoint W stable machine stage
 gc/ObjectInventoryScanner.java
 gc/PhysicalGcConfig.java                                 implemented checkpoint H
 gc/GcMetricsObserver.java
@@ -804,6 +811,8 @@ cursor/CursorSnapshotPublication.java                     implemented checkpoint
 cursor/CursorSnapshotStore.java                           extended checkpoint V two-stage contract
 cursor/DefaultCursorSnapshotStore.java                    implemented checkpoint V guarded/pending/permanent/pinned IO
 cursor/CursorSnapshotInventory.java             unchanged authority semantics
+generation/ManagedLedgerGenerationProjectionRefV1.java   implemented checkpoint W strict NPR1 + golden identity
+generation/ManagedLedgerGenerationProjectionAuthorityReader.java implemented checkpoint W binding/topic capture
 ```
 
 ### 6.2 Focused tests
@@ -859,7 +868,8 @@ CursorSnapshotStoreTest                                   extended checkpoint V 
 CursorStorageOxiaS3IntegrationTest                        migrated checkpoint V real Oxia/S3 protocol
 DefaultCursorSnapshotStoreLocalStackIntegrationTest       migrated checkpoint V real S3 restart/collision protocol
 NereusManagedLedgerRuntimeTest                            extended checkpoint V F4 resource ownership
-PhysicalRootBackfillCoordinatorTest
+ManagedLedgerGenerationProjectionRefV1Test                implemented checkpoint W NPR1/authority drift
+PhysicalRootBackfillCoordinatorTest                       implemented checkpoint W data/cursor/response-loss paths
 MultiStreamWalRetirementTest
 GenerationRetirementFallbackTest
 CursorSnapshotGcScannerTest
@@ -897,6 +907,7 @@ retirement.
 ./gradlew phase4M4GlobalDomainsCheck
 ./gradlew phase4M4TombstoneRetirementCheck
 ./gradlew phase4M4CursorProtectionCheck
+./gradlew phase4M4PhysicalRootBackfillCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -1050,6 +1061,19 @@ physical-root/cursor inventory backfill、`CursorSnapshotGcScanner` candidate/de
 object inventory、registration retirement or production deletion. The ordinary gate plus
 `cursorS3IntegrationTest` and `cursorM2IntegrationTest --rerun-tasks` passed on 2026-07-16.
 
+`phase4M4PhysicalRootBackfillCheck` extends checkpoint V with checkpoint W. It audits strict NPR1 projection
+identity、the protocol-neutral live/non-live projection authority capture、same-epoch completed registration-proof
+admission、all 64 registry shards、bounded deterministic stream concurrency、recovery-root-anchored commit traversal、
+complete generation-zero index traversal、F3 retention/cursor inventory、HEAD-before-root and exact owner-bound
+`REACHABLE_APPEND`/`VISIBLE_GENERATION`/`CURSOR_SNAPSHOT_ROOT` handshakes. Final admission reloads registration、L0
+snapshot、projection、recovery root/head and cursor inventory before publishing the two coverage proofs. Focused tests
+cover an empty stable registry、activation-CAS response loss、one Object-WAL shared by a reachable commit and visible
+index、a canonical NCS1 cursor snapshot with ETag, and fail-closed registration preconditions. Listing is forbidden as
+coverage evidence. This ordinary checkpoint does not implement the broker-side cold-topic registration backfill or
+capability barrier, enable delete bits, schedule `CursorSnapshotGcScanner`, enumerate orphan object inventory, retire
+registrations, or run the real-service destructive final scenarios. The ordinary gate passed with
+`--rerun-tasks` on 2026-07-16.
+
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.
 It also proves live-reference root/protection backfill, all-shard lifecycle recovery with empty object listing, 10,000
@@ -1090,7 +1114,8 @@ nereus-managed-ledger/.../retention/RetentionStatsToken.java
 nereus-managed-ledger/.../retention/RetentionCandidate.java
 nereus-managed-ledger/.../retention/RetentionCandidatePlanner.java
 nereus-managed-ledger/.../retention/NereusManagedLedgerRetentionService.java
-nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionRefV1.java
+nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionRefV1.java checkpoint W strict codec
+nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionAuthorityReader.java checkpoint W reader
 nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCoordinator.java
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationGuard.java
 nereus-managed-ledger/.../NereusManagedLedger.java

@@ -367,6 +367,30 @@ concurrent new objects are covered by their write hook. Object-store listing is 
 or deleted-incarnation bytes enter the orphan/domain-proof path separately. Any unknown live index/target format
 keeps deletion disabled.
 
+Checkpoint W implements this contract in `DefaultPhysicalRootBackfillCoordinator`. The coordinator first requires the
+same-epoch completed stream-registration proof, then walks every one of the 64 registration shards in canonical page
+order. Up to `maxConcurrentStreams` streams are processed concurrently, while their per-stream data/cursor coverage
+digests are folded in registry order so scheduling cannot change the report. A live registration is admitted only
+after its L0 state/profile/head and the exact F2 binding/topic authority agree；stale non-live registrations remain
+part of the stable classification digest but do not manufacture live references.
+
+For each admitted stream, the implementation walks the recovery-root-anchored reachable commit tail and the complete
+COMMITTED index prefix, accepting only generation-zero Object-WAL targets whose optional projection is empty or
+equals the live registration. Exact object HEAD precedes every bootstrap. Commit-owned `REACHABLE_APPEND` and
+index-owned `VISIBLE_GENERATION` reuse the same public reference-id formulas as the append path and re-read their
+exact key/version/durable SHA through the retirement/generation stores during `acquireOrTransfer` and revalidation.
+Cursor inventory requires an ACTIVE same-projection retention root, scans every cursor root, verifies the canonical
+NCS1 key/HEAD metadata and installs `CURSOR_SNAPSHOT_ROOT` with the exact cursor key/version/envelope SHA as owner.
+
+Before counting a stream covered, checkpoint W reloads the registration、full L0 snapshot、F2 authority、
+recovery-root/head and complete cursor-authority digest. Only a zero-failure run whose activation record still has
+the same broker readiness epoch、domain set and registration proof may install the two coverage proofs. Lost
+activation-CAS responses converge only when a reload contains the exact desired data/cursor proofs. The report keeps
+the first 100 redacted failures while counters cover the entire attempted traversal；`dataObjectsScanned` and
+`cursorObjectsScanned` count successful reference handshakes, so one shared Object-WAL root may be verified once per
+distinct commit/index owner. Checkpoint W does not use object listing, enable delete bits, implement the broker-side
+registration backfill, or schedule production GC.
+
 ### 3.3 Reader lease
 
 ```java

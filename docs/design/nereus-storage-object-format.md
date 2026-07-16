@@ -1,7 +1,8 @@
 # Nereus Storage Object Format
 
 > 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate，并在 F4-M4
-> checkpoint V 接入 guarded upload、pending/permanent protection 与 durable read pin；
+> checkpoint V 接入 guarded upload、pending/permanent protection 与 durable read pin，checkpoint W 又把
+> exact Object-WAL 与 cursor-snapshot identities 纳入 all-shard physical/cursor live-reference backfill；
 > F4 compacted/topic-compacted/recovery-checkpoint families 已通过 M0 code-level design gate；F4-M3 real Parquet
 > NCP1/NTC1 writer/strict-reader/whole-file verifier、NCP1 core adapter、M3 planner/recovery、exact-source
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip

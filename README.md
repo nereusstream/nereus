@@ -182,11 +182,14 @@ gated 的 64-shard global scope、future-catalog sentinel，并让 generation/ap
 DELETED-root audit retirement。Checkpoint V 又把 cursor snapshot 新写入切换为 guarded immutable PUT、
 current-root pending protection、cursor CAS、permanent root protection，并让 hydrate/read 在 durable reader
 lease 内执行且可修复 CAS response loss；shared physical/protection/read-pin 已接入 production provider。
-Backfill/broker activation guard、physical-root backfill、cursor snapshot candidate/deletion scanner、object
+Checkpoint W 已实现 strict NPR1 projection authority、全 64-shard live-reference physical/cursor-root
+backfill、exact commit/index/cursor owner protection、final authority revalidation 和 response-loss-safe dual
+activation proofs。Broker registration backfill/barrier、cursor snapshot candidate/deletion scanner、object
 inventory、registration retirement、其余 materialization/GC runtime composition，以及 F4-M5–M6 的 async
-profile 与最终兼容接线仍不可用；所有 capability bits 和 production deletion 继续关闭。
+profile 与最终兼容接线仍不可用；delete bits 和 production deletion 继续关闭。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
+`phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 
