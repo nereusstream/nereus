@@ -194,6 +194,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M5 checkpoint AB**：实现 product-owned generation activation guard、exact six-domain/readiness/
   projection/registration proof revalidation 和默认关闭 first-marker switch 的 ordinary checkpoint；它不表示
   cluster ACTIVE transition、mutation call sites、async publication 或 physical deletion 已启用。
+- **F4-M5 checkpoint AC**：实现 product-owned、proof-gated publication-only cluster ACTIVE CAS，并让 broker
+  zero-failure backfill completion 等待该 activation 的 ordinary checkpoint；它不表示 topic marker、
+  mutation call sites、async profile 或 physical deletion 已启用。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

@@ -609,9 +609,15 @@ record、current readiness epoch、complete registration proof 和 exact six-dom
 projection、L0 与 registration 后才可创建/验证 monotonic marker，并把 topic/cluster metadata versions、
 readiness/domain digest/capability bits 冻结进 short-lived proof；mutation CAS 前再次重证。Pulsar
 `nereusGenerationProtocolEnabled` 默认 false，只控制首次 marker。Physical delete 还要求同 epoch delete
-proofs/object capability 和 exact `projection-generation-v1` snapshot。Cluster ACTIVE controller 和具体
-mutation call sites 尚未接入。
+proofs/object capability 和 exact `projection-generation-v1` snapshot。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 through checkpoint AB 也不声称 production physical GC、
+M5 checkpoint AC 已实现 product-owned `ManagedLedgerGenerationProtocolActivationCoordinator`。它只在显式
+开关开启、current readiness 与 durable epoch 相同、same-epoch registration proof 已完成且 exact six-domain
+set 匹配时执行 publication-only `PREPARED -> ACTIVE` CAS；condition conflict bounded retry，lost response 只从
+durable ACTIVE 收敛，CAS 后还会重证 cached readiness 与 durable authority。Broker 的 zero-failure backfill
+promise 在 proof 完成后等待 activation；失败 report 或默认关闭状态不调用 coordinator。具体 mutation call
+sites 和 topic marker 尚未接入。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 through checkpoint AC 也不声称 production physical GC、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

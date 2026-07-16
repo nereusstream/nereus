@@ -9,8 +9,8 @@ import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
 import com.nereusstream.managedledger.config.ManagedLedgerOpenConfigView;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.managedledger.errors.OperationContext;
-import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCandidate;
+import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.stats.NereusManagedLedgerFactoryStats;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.util.ArrayList;
@@ -123,6 +123,19 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return runtime
                     .generationRegistrationBackfillProofCoordinator()
                     .complete(completion);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    public CompletableFuture<Void> activateGenerationPublication() {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(factoryClosed());
+        }
+        try {
+            return runtime
+                    .generationProtocolActivationCoordinator()
+                    .activatePublication();
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }

@@ -120,6 +120,11 @@ generation and activation stores, the exact six-domain runtime set, the projecti
 the broker readiness provider. `NereusManagedLedgerRuntime` owns/exposes the typed guard. Construction itself does
 not advance cluster activation、start materialization/GC or enable a delete bit.
 
+Checkpoint AC constructs `DefaultManagedLedgerGenerationProtocolActivationCoordinator` from that same activation
+store、exact domain set and readiness provider. `NereusManagedLedgerRuntime` exposes only the typed
+`activatePublication()` boundary；the broker never imports or mutates `GenerationProtocolActivationStore`. The
+coordinator owns the publication-only ACTIVE CAS and still does not start materialization/GC or enable a delete bit.
+
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive
 the ObjectStore it uses.
@@ -206,7 +211,8 @@ by the M4 projection reference domain and performs no topic load or repair.
 This is not cluster activation. `GenerationProtocolActivationRecord`、the registration coordinator/barrier、broker
 capability guard and runtime call sites below remain M5 work, so no production path sets the marker merely because the
 API exists. Checkpoints S、X–AA later add those durable prerequisites；checkpoint AB finally constructs the guard,
-but still does not advance cluster activation or install a mutation caller.
+and checkpoint AC adds proof-gated publication-only cluster activation. No checkpoint through AC installs a topic
+mutation caller.
 
 ### 3.2 Resolvable projection reference and registration ordering
 
@@ -249,8 +255,8 @@ subject digest, linearly reads the per-stream binding plus the topic authority s
 projections return a versioned non-live classification whose binding/topic presence or absence authorities must still
 match at final revalidation. This reader is consumed by the checkpoint-W physical-root backfill. Checkpoints X–AA
 later add the broker-side registration executor、cluster barrier and durable registration proof；checkpoint AB adds
-the production activation guard itself, while cluster ACTIVE orchestration and mutation call sites remain rollout
-work.
+the production activation guard itself，and checkpoint AC adds publication-only cluster ACTIVE orchestration after
+the durable proof. Mutation call sites remain rollout work.
 
 Checkpoint X implements the registration half of this ordering. `ProjectionIdentity.encode` is now the single
 canonical length-delimited encoder used by durable materialization records and registration. The managed-ledger
@@ -422,6 +428,14 @@ capability bits；`revalidate` reloads them immediately before the caller's muta
 requires current delete bits/backfill/object-store proof and an exact `projection-generation-v1` snapshot. The switch
 defaults to false and does not itself move the cluster activation record from `PREPARED` to `ACTIVE`.
 
+Checkpoint AC implements that missing cluster transition through a separate product-owned coordinator. When the
+explicit switch is true, it requires current exact readiness、the same durable readiness epoch、a completed
+same-epoch registration proof and the exact six-domain set before its only write：
+`PREPARED -> ACTIVE(publication=true, physicalDelete=false, cursorSnapshotDelete=false)`. Condition conflicts retry
+from the reloaded PREPARED record；a concurrent success or lost response converges only from a valid durable ACTIVE
+record. Cached readiness and durable authority are revalidated after CAS. A final readiness drift fails the caller,
+while the old-epoch durable ACTIVE record remains harmless because the checkpoint-AB guard rejects it.
+
 Checkpoint Y implements the broker half of this contract in the locked local fork. Lookup decoration now publishes
 the reserved binding、cursor and generation properties together. `requireGenerationReadiness()` filters to
 persistent-topic brokers, validates all three exact versions, and compares two full snapshots rather than only their
@@ -439,6 +453,11 @@ cover notification-before-cache and notification-between-snapshot cuts. Checkpoi
 cold-topic backfill. Checkpoint Z provides that bounded traversal/report, and Checkpoint AA now hands exact readiness
 plus zero-failure coverage to the product-owned durable proof CAS. Neither checkpoint sets a topic marker or implements
 the product activation guard.
+
+Checkpoint AC changes only the sequencing after that proof：`NereusManagedLedgerStorage` waits for the product
+publication coordinator only when the backfill report has zero failures and the explicit switch is enabled. A failed
+report or disabled switch never calls activation；activation failure fails the returned completion promise. The broker
+still does not own the activation metadata and does not set a topic marker.
 
 ### 4.3 Cluster activation record
 
@@ -534,6 +553,10 @@ proof before operations resume. `ACTIVE` requires：
 - exact domain registry match；
 - object-store list/delete capability probe passed before delete bit is enabled。
 
+Checkpoint AC is the first production owner of the ACTIVE CAS, but only for publication. It proves the first two
+publication prerequisites above through exact broker readiness and the durable registration proof；the physical-root、
+cursor-snapshot and object-store prerequisites remain mandatory only for later delete-bit transitions.
+
 Publication and deletion bits are separate. Higher generation may be admitted while physical delete remains disabled.
 `physicalDeleteEnabled` additionally requires stream-registration、physical-root and cursor-snapshot proofs complete
 and the non-empty object-store capability digest. `cursorSnapshotDeleteEnabled` can remain false while ordinary source
@@ -550,11 +573,13 @@ deletion is also kept false；V1 does not permit partially enabling physical del
 2. Every persistent broker constructs F4 runtime and advertises generation=1.
    Workers remain inert; no marker/index/delete is written.
 
-3. Run the tenant/namespace/persistent-topic backfill from 3.3 and CAS its coverage bit;
-   run metadata/object capability probes and backfill physical roots/protections.
+3. Run the tenant/namespace/persistent-topic backfill from 3.3. A zero-failure report first CASes the durable
+   registration proof and, when the explicit switch is enabled, waits for the product publication coordinator.
+   Separately run metadata/object capability probes and backfill physical roots/protections before deletion.
    Dry-run inventory reports missing registrations and all uncovered/ambiguous objects.
 
-4. CAS cluster activation PREPARED -> ACTIVE(publication=true, deletion=false).
+4. The product coordinator CASes
+   PREPARED -> ACTIVE(publication=true, physicalDelete=false, cursorSnapshotDelete=false).
 
 5. On first F4 operation per topic, revalidate its registration, pass the
    two-snapshot barrier and CAS the topic projection generation marker.
@@ -747,7 +772,7 @@ pulsar-broker/.../storage/nereus/
   NereusResolvedTopicFeatures.java                      exact retention/backlog values
   NereusTopicFeatureResolver.java                       exact policy normalization
   NereusTopicFeatureValidator.java                      F4 admission matrix
-  NereusManagedLedgerStorage.java                       runtime readiness/unloaded admin
+  NereusManagedLedgerStorage.java                       runtime readiness, proof completion and AC activation sequencing
   NereusBrokerStorageConfiguration.java                 F4 typed config mapping
 
 pulsar-broker/.../service/persistent/PersistentTopic.java

@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("f52108468837917234637c514eb7524b9b3fb5f8")
+    .orElse("ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1128,6 +1128,51 @@ tasks.register("phase4M5ActivationGuardCheck") {
     dependsOn("phase4M5RegistrationProofCheck")
     dependsOn("checkPhase4M5ActivationGuardContractSurface")
     dependsOn("phase4M5ActivationGuardPulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("checkPhase4M5PublicationActivationContractSurface") {
+    group = "verification"
+    description = "Audit proof-gated PREPARED-to-ACTIVE publication activation and broker sequencing."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-publication-activation-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M5PublicationActivationPulsarCheck") {
+    group = "verification"
+    description = "Run the locked Pulsar proof-to-publication activation formatting, style, and focused tests."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M5ActivationGuardCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusGenerationRegistrationBackfillTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusManagedLedgerStorageGenerationActivationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M5PublicationActivationCheck") {
+    group = "verification"
+    description = "Verify checkpoint AC publication-only cluster activation after exact registration proof."
+    dependsOn("phase4M5ActivationGuardCheck")
+    dependsOn("checkPhase4M5PublicationActivationContractSurface")
+    dependsOn("phase4M5PublicationActivationPulsarCheck")
     dependsOn("checkPhase4Documentation")
     dependsOn(":nereus-core:check")
     dependsOn(":nereus-managed-ledger:check")

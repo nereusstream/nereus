@@ -44,7 +44,7 @@ the real two-broker test proves durable subscription recovery、stable MessageId
 BookKeeper coexistence over real Oxia and pinned LocalStack S3。`phase3M5Check` and `phase3M5FinalCheck` are green。
 
 F3-M6 is complete and final-gated against the current clean Pulsar fork
-`master@f52108468837917234637c514eb7524b9b3fb5f8`。It preserves exact ordinary/middle-batch MessageIds across
+`master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`。It preserves exact ordinary/middle-batch MessageIds across
 history、seek、unload、owner failover and broker restart；preserves internal cursor properties；closes reset、root/
 snapshot limit、activation rollout、topic-incarnation and callback rejection boundaries；publishes a read-only F4
 snapshot inventory；and audits every loaded、unloaded and namespace admin route。The real gate also proves that topic
@@ -696,7 +696,7 @@ Implemented milestone and aggregate gates：
 `phase3M5PulsarFinalCheck` is pinned to the historical M5 method only；`phase3M6PulsarFinalCheck` independently runs
 `NereusCursorMultiBrokerIntegrationTest.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts` so M6
 cannot pass by accidentally reusing the M5 recovery scenario。The current exact source lock is
-`f52108468837917234637c514eb7524b9b3fb5f8`。
+`ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`。
 
 The aggregate gate runs with Gradle parallelism enabled，but every nested build that writes the same Pulsar checkout
 is explicitly serialized：local Nereus compile/test and Docker gates finish first，then Phase 2 ordinary Pulsar、M4

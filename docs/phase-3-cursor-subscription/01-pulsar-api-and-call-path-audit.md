@@ -26,7 +26,7 @@ master source selector，不把它描述为已发布版本。
 以上 commit 是 F3-M0 的历史 API/blob 审计快照。F3-M4 broker integration 的历史 checkpoint 是
 `master@12edc9381c147ceec8bedd530acb5be7db339707`，F3-M5 recovery checkpoint 是
 `master@a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；当前 F3-M6 implementation/source lock 是
-`master@f52108468837917234637c514eb7524b9b3fb5f8`。`phase3M6Check` / `phase3M6FinalCheck` 对该 clean checkout
+`master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`。`phase3M6Check` / `phase3M6FinalCheck` 对该 clean checkout
 重新执行 composite compile、loaded/unloaded/namespace route audit、focused/real-service tests、spotless and
 checkstyle gates。M0 的 blob 表不回写为后续实现文件 hash，以保留可复核的原始 gate evidence。
 

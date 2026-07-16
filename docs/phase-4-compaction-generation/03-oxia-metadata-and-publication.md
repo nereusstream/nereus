@@ -281,8 +281,10 @@ create the M5 cluster authority. Checkpoint S now provides the durable `Generati
 exact-key/CAS store foundation；Checkpoint AA now composes the shared production store and installs the exact
 zero-failure `streamRegistrationBackfill` proof through a product-owned bounded CAS. Checkpoint T consumes the same
 authority for future-sentinel and ownerless-global scans. Checkpoint AB adds the product-owned activation guard and
-typed runtime wiring, but cluster ACTIVE orchestration and every mutation caller remain pending；the marker API and
-domains therefore still are not an enabled production publication or delete path.
+typed runtime wiring. Checkpoint AC adds the product-owned publication-only `PREPARED -> ACTIVE` coordinator and
+broker proof-to-activation sequencing after a zero-failure durable registration backfill. Every mutation caller and
+the topic marker remain pending；the metadata bit therefore still is not an enabled production publication or delete
+path.
 
 ### 1.13 F4-M4 generation-index retirement checkpoint
 

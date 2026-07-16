@@ -109,7 +109,7 @@ Exclusive/Failover/Shared、稳定 MessageId、partial-batch ack、owner/runtime
 storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、Shared dispatcher 所需 mutable entry list
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
-F3-M6 已在当前 Pulsar source lock `master@f52108468837917234637c514eb7524b9b3fb5f8` 完成。M6 增加
+F3-M6 已在当前 Pulsar source lock `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4` 完成。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace admin route 静态审计。
@@ -198,16 +198,21 @@ failures 已冻结。Checkpoint AA 又把完整 broker-set readiness 转换为 p
 object-store capability。Checkpoint AB 又实现 product-owned generation activation guard：ACTIVE cluster
 record、current readiness/registration proof、exact six-domain digest、strict NPR1 projection/L0/registration
 truth 和 monotonic marker 被绑定为 short-lived proof，mutation CAS 前会重证；Pulsar first-marker switch
-默认关闭，physical delete 还要求 exact projection-domain snapshot 和同 epoch delete proofs。Cluster ACTIVE
-controller、具体 mutation call sites、cursor snapshot candidate/deletion scanner、object inventory、
-registration retirement、其余 materialization/GC runtime composition，以及 F4-M5–M6 的 async profile 与最终
-兼容接线仍不可用；publication/delete bits 和 production deletion 继续关闭。
+默认关闭，physical delete 还要求 exact projection-domain snapshot 和同 epoch delete proofs。Checkpoint AC
+又实现 product-owned publication coordinator：只在显式开关开启、zero-failure registration backfill proof
+已经 durable、current readiness/epoch/domain set 完全匹配时，执行 publication-only
+`PREPARED -> ACTIVE` CAS；broker backfill completion 会等待 activation，并对 conflict、lost response 和
+final readiness drift fail closed。具体 mutation call sites、topic marker、cursor snapshot candidate/deletion
+scanner、object inventory、registration retirement、其余 materialization/GC runtime composition，以及
+F4-M5–M6 的 async profile 与最终兼容接线仍不可用；delete bits 和 production deletion 继续关闭，
+publication bit 也尚无 mutation caller。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。
+`phase4M5PublicationActivationCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5RegistrationBackfillCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5RegistrationProofCheck` 已于 2026-07-16 通过。
 Phase 4 只计划实现

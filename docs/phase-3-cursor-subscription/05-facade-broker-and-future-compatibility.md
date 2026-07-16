@@ -178,7 +178,7 @@ Still rejected：
 
 The M4 fork changes below landed at local Pulsar
 `master@12edc9381c147ceec8bedd530acb5be7db339707` and are locked by `phase3M4Check`。The current implementation/source
-lock is `master@f52108468837917234637c514eb7524b9b3fb5f8` after M6 compatibility hardening；the M5 historical checkpoint
+lock is `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4` after M6 compatibility hardening；the M5 historical checkpoint
 remains `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`。`phase3M6Check` and `phase3M6FinalCheck` run the focused suites、
 loaded/unloaded/namespace route audit、real two-broker MessageId/property/incarnation gate、spotless and checkstyle
 against that exact clean checkout。

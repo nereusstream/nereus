@@ -23,8 +23,10 @@ import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.cursor.DefaultCursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.DefaultCursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.DefaultCursorStorage;
+import com.nereusstream.managedledger.generation.DefaultManagedLedgerGenerationProtocolActivationCoordinator;
 import com.nereusstream.managedledger.generation.DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.DefaultManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
@@ -88,6 +90,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                 null;
         ManagedLedgerGenerationRegistrationBackfillProofCoordinator
                 generationRegistrationBackfillProofCoordinator = null;
+        ManagedLedgerGenerationProtocolActivationCoordinator
+                generationProtocolActivationCoordinator = null;
         GenerationProtocolActivationGuard generationProtocolActivationGuard =
                 null;
         ManagedLedgerMaterializationRegistrationCoordinator
@@ -147,6 +151,15 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             streamConfig.cluster(),
                             generationProtocolActivationStore,
                             context.generationCapabilityReadinessProvider(),
+                            NereusGenerationProtocolReferenceDomains
+                                    .currentV1(),
+                            clock);
+            generationProtocolActivationCoordinator =
+                    new DefaultManagedLedgerGenerationProtocolActivationCoordinator(
+                            streamConfig.cluster(),
+                            context.generationProtocolActivationEnabled(),
+                            context.generationCapabilityReadinessProvider(),
+                            generationProtocolActivationStore,
                             NereusGenerationProtocolReferenceDomains
                                     .currentV1(),
                             clock);
@@ -244,6 +257,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     activationGuard,
                     generationProtocolActivationStore,
                     generationRegistrationBackfillProofCoordinator,
+                    generationProtocolActivationCoordinator,
                     generationProtocolActivationGuard,
                     objectReadPinManager,
                     objectProtectionManager,

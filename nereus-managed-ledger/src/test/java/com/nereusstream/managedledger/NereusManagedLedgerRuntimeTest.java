@@ -15,6 +15,7 @@ import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.CursorStorage;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
@@ -111,6 +112,9 @@ class NereusManagedLedgerRuntimeTest {
                         false);
         ManagedLedgerGenerationRegistrationBackfillProofCoordinator proofCoordinator =
                 completion -> CompletableFuture.completedFuture(null);
+        ManagedLedgerGenerationProtocolActivationCoordinator
+                activationCoordinator =
+                        () -> CompletableFuture.completedFuture(null);
         GenerationProtocolActivationGuard generationActivationGuard =
                 allowGenerationActivation();
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
@@ -126,6 +130,7 @@ class NereusManagedLedgerRuntimeTest {
                 allowActivation(),
                 generationActivationStore,
                 proofCoordinator,
+                activationCoordinator,
                 generationActivationGuard,
                 readPins,
                 proxy(AutoCloseable.class, "protection", closes, false),
@@ -144,6 +149,8 @@ class NereusManagedLedgerRuntimeTest {
         assertThat(runtime.objectReadPinManager()).isSameAs(readPins);
         assertThat(runtime.generationRegistrationBackfillProofCoordinator())
                 .isSameAs(proofCoordinator);
+        assertThat(runtime.generationProtocolActivationCoordinator())
+                .isSameAs(activationCoordinator);
         assertThat(runtime.generationProtocolActivationGuard())
                 .isSameAs(generationActivationGuard);
         runtime.close();

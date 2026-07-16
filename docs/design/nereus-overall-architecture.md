@@ -118,7 +118,9 @@ product-neutral full-readiness handoff、零失败 proof admission、response-lo
 `streamRegistrationBackfill` CAS、same-epoch coverage immutability 和 newer-epoch dependent-proof invalidation。
 Checkpoint AB 又实现 product-owned activation guard、frozen six-domain proof、strict
 projection/L0/registration authority、response-loss-safe monotonic marker 和 mutation 前 proof revalidation，并把
-默认关闭的 Pulsar first-marker switch 接到 runtime。Cluster ACTIVE orchestration、mutation call sites、cursor
+默认关闭的 Pulsar first-marker switch 接到 runtime。Checkpoint AC 又实现 product-owned publication
+coordinator、proof-gated publication-only `PREPARED -> ACTIVE` CAS、bounded conflict/lost-response recovery、final
+readiness revalidation 和 broker zero-failure backfill sequencing。Mutation call sites、topic marker、cursor
 snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition 及
 M5-M6 仍是 target；
 production deletion 继续关闭。

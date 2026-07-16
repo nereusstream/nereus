@@ -82,11 +82,11 @@ streamId + offset
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Reserved` | profile/durability names and M2 publication plus M3 planning/recovery/exact-source worker/checkpoint/service building blocks exist；profile admission、retention and execution gates do not |
-| `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6；F4 T/W + M5 checkpoints X/Z/AA/AB） | F2 ledger facade/cursor boundary plus F3 state machines、F4 projection/cursor reference domains、strict NPR1 authority、checkpoint-X exact durable registration coordinator/open-return barrier、checkpoint-Z immutable unloaded projection candidate、checkpoint-AA product-owned durable registration proof coordinator and checkpoint-AB activation guard are implemented/tested |
-| `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete；F4 M5 checkpoints X/AA/AB wiring + fork checkpoints Y/Z/AA/AB） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、checkpoint-X shared generation-store/registration ownership、checkpoint-Y generation capability/readiness barrier、checkpoint-Z canonical bounded cold-topic traversal/report、checkpoint-AA exact readiness/proof handoff and checkpoint-AB default-off activation-guard composition are implemented/tested；mutation callers remain pending |
+| `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6；F4 T/W + M5 checkpoints X/Z/AA–AC） | F2 ledger facade/cursor boundary plus F3 state machines、F4 projection/cursor reference domains、strict NPR1 authority、checkpoint-X exact durable registration coordinator/open-return barrier、checkpoint-Z immutable unloaded projection candidate、checkpoint-AA product-owned durable registration proof coordinator、checkpoint-AB activation guard and checkpoint-AC publication-only cluster activation coordinator are implemented/tested |
+| `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete；F4 M5 checkpoints X/AA–AC wiring + fork checkpoints Y/Z/AA–AC） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、checkpoint-X shared generation-store/registration ownership、checkpoint-Y generation capability/readiness barrier、checkpoint-Z canonical bounded cold-topic traversal/report、checkpoint-AA exact readiness/proof handoff、checkpoint-AB default-off activation-guard composition and checkpoint-AC proof-to-ACTIVE sequencing are implemented/tested；mutation callers remain pending |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Future 4 materialization/compaction | `In progress / F4-M1–M3 final-gated；M4 through W；M5 through AB` | M4 NRC1/recovery、retirement/GC fences、activation/global domains、cursor protection and physical/cursor live-reference backfill are implemented/tested；M5 checkpoint X adds exact durable registration create/refresh/final revalidation、open/recreate return barrier and production ownership，checkpoint Y adds reserved generation lookup capability and deterministic two-stable-snapshot broker readiness，checkpoint Z adds exact unloaded projection capture plus canonical bounded cold-topic traversal/report，checkpoint AA persists exact zero-failure coverage under a product-owned response-loss-safe proof CAS，and checkpoint AB adds exact activation proof/revalidation plus the default-off first-marker switch；cluster ACTIVE orchestration、mutation callers、remaining M4 GC runtime and M5–M6 remain |
+| Future 4 materialization/compaction | `In progress / F4-M1–M3 final-gated；M4 through W；M5 through AC` | M4 NRC1/recovery、retirement/GC fences、activation/global domains、cursor protection and physical/cursor live-reference backfill are implemented/tested；M5 checkpoint X adds exact durable registration create/refresh/final revalidation、open/recreate return barrier and production ownership，checkpoint Y adds reserved generation lookup capability and deterministic two-stable-snapshot broker readiness，checkpoint Z adds exact unloaded projection capture plus canonical bounded cold-topic traversal/report，checkpoint AA persists exact zero-failure coverage under a product-owned response-loss-safe proof CAS，checkpoint AB adds exact activation proof/revalidation plus the default-off first-marker switch，and checkpoint AC adds proof-gated publication-only cluster ACTIVE orchestration；mutation callers、remaining M4 GC runtime and M5–M6 remain |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -164,7 +164,7 @@ Phase 3 M6 and aggregate gates are：
 ```
 
 They pass against the current clean Pulsar fork
-`master@f52108468837917234637c514eb7524b9b3fb5f8`。M6 covers exact ordinary/middle-batch MessageIds across history/
+`master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`。M6 covers exact ordinary/middle-batch MessageIds across history/
 seek/unload/failover/restart、cursor internal properties、reset/limit/rollout/incarnation boundaries、read-only F4
 snapshot inventory、callback rejection and loaded/unloaded/namespace admin-route audit。The aggregate final task also
 reruns Phase 1、1.5 and 2 final gates。Future 3 is `Implemented / final-gated`。
@@ -285,7 +285,7 @@ decision behind items 14 and 16-18。
 1. `nereus-future3-cursor-subscription.md`；
 2. `../phase-3-cursor-subscription/README.md`；
 3. 依次评审该目录的 `01` 到 `06` code-level documents；
-4. 使用本地 Pulsar `master@f52108468837917234637c514eb7524b9b3fb5f8` 重新验证当前 implementation/source lock；M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
+4. 使用本地 Pulsar `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4` 重新验证当前 implementation/source lock；M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
 5. 执行 `phase3Check` 和 `phase3FinalCheck --rerun-tasks`；
 6. 后续 F4/F5/F8 必须消费 F3 已冻结的 cursor/reference/MessageId contract，不得另建 correctness owner。
 
@@ -297,7 +297,7 @@ decision behind items 14 and 16-18。
 3. 以 `../phase-4-compaction-generation/README.md` 为入口，依次评审 `01` 到 `07` 代码级文档；
 4. 实现必须按 `07-implementation-plan-and-gates.md` 的 M1–M6 顺序和 mandatory review stops 推进；
 5. 重新审计时使用本地 Pulsar
-   `master@f52108468837917234637c514eb7524b9b3fb5f8`，不把未发布的 Maven snapshot 当作权威源；
+   `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`，不把未发布的 Maven snapshot 当作权威源；
 6. 在 F4-M6 之前不得将 Designed 的 generation/async/GC 路径写成 Implemented。
 
 ### 评审 Phase 1.5

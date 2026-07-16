@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="f52108468837917234637c514eb7524b9b3fb5f8"
+current_pulsar_lock="ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4"
 
 require_literal() {
     local literal="$1"
@@ -80,6 +80,8 @@ require_literal "phase4M5RegistrationProofCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M5ActivationGuardCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M5PublicationActivationCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint U" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint V" \
@@ -95,6 +97,8 @@ require_literal "Checkpoint Z" \
 require_literal "Checkpoint AA" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AB" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AC" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "ManagedLedgerMaterializationRegistrationCandidate" \
     "docs/phase-4-compaction-generation/README.md"
@@ -145,4 +149,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through W and M5 through AB, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through W and M5 through AC, source lock, gates, and local links verified."
