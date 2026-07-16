@@ -16,11 +16,14 @@
 > production/fake store parity、manifest-last seal/load service 与 collector PREPARE-before-MARK/final reload
 > 也已实现。首个 root-authenticated destructive-recovery checkpoint 进一步加入 typed metadata-retirement
 > registry、journal-driven protection retirement、exact HEAD/delete 与 restart-safe `DELETING -> DELETED` CAS；
-> 正常删除、已缺失对象和缺失 journal 的零副作用失败已有聚焦测试。完整 source metadata planning、
+> 正常删除、已缺失对象和缺失 journal 的零副作用失败已有聚焦测试。完整 source eligibility、
 > runtime composition、future-sentinel 与 ownerless global domains、cursor GC 与 F4-M5–M6 尚未实现。随后
 > checkpoint N 已接入 canonical generation-index restart router、exact generation-zero conditional delete、
 > higher-generation `DRAINING -> RETIRED` handler，以及每个 destructive batch/physical-delete fence 的 root +
-> journal reauthentication；marker/commit-node plan construction 与 production runtime 仍保持关闭
+> journal reauthentication。Checkpoint O 进一步实现 legacy/generic marker/commit exact-key inverse、两个
+> response-loss-safe typed handler，以及把 NRC1/source commit/index/marker 绑定为三条 removal 的
+> `SourceRetirementPlanBuilder`/exact-key revalidator；healthy replacement physical-root proof、higher-generation
+> pre-drain、production runtime 与最终删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
 >
@@ -664,8 +667,29 @@ response loss 和进程重启只能识别该 exact replacement。reference/remov
 Coordinator 同时收紧为每个 metadata/protection batch、uncertain protection/object response、physical HEAD/delete
 前和最终 DELETED CAS 前重读 exact DELETING wrapper 与 byte-for-byte 相同的 sealed journal。聚焦测试证明 journal
 在第二批或 physical fence 消失时不会继续下一次 mutation/object access。`phase4M4GenerationRetirementCheck`
-冻结这些规则；generation-zero marker/commit-node typed actions、source plan construction、future/global domains、
-runtime composition 和 final M4 gate 仍待实现。
+冻结这些规则。
+
+### 6.17 F4-M4 generation-zero source-retirement checkpoint
+
+Checkpoint O 补齐 journal 只有 exact key 而进程已丢失 source identity 时的恢复路径。Legacy
+`committed-slices` key 最后一段是 `(objectId, sliceId)` 的单向 hash，不能从 key 独立恢复 `sliceId`；focused
+`SourceRetirementMetadataStore` 因此新增 exact-key read/delete：先严格解析当前 cluster/stream/family，读取并
+解码 durable record，再从 value 重建 marker/commit identity 与 canonical key，只有 byte-for-byte round trip、
+Oxia version 和 stored-envelope SHA 全部匹配才允许条件删除。`VersionedGenerationZeroCommit` 同时保存 source
+encoding、canonical generic commit 及其 NRC1 envelope SHA；generic marker 也保留 read-target identity SHA。
+
+`GenerationZeroMarkerRetirementHandler` 和 `GenerationZeroCommitRetirementHandler` 只处理各自 journal type；
+delete response 不确定时仅在相同 root/journal 下 exact-key reload 为 absent 才收敛。新的
+`SourceRetirementPlanBuilder` 扫描完整 affected-stream generation namespace，对 generation zero 要求当前
+recovery root 的唯一 NRC1 reference 覆盖同一 range/commitVersion，严格打开 NRC1、找到同一 commit，并验证
+NRC1 canonical commit SHA、source commit、index 和 marker 完全一致后，才冻结 index + marker + commit 三条
+removal；它也实现 `GcPlanMetadataRevalidator`，逐 key 返回当前 authoritative facts。Root 在计划冻结期间变化、
+marker/version drift、key/value alias、NRC1 canonical commit 不同或不属于 candidate 的额外 source removal
+均 fail closed；每次 exact list 命中后都会从 candidate index 重新构造完整三元组，而不是把 key 存在当权限。
+
+Checkpoint O 仍是 ordinary foundation：NRC1 publication 所指 healthy higher index/physical root 的完整
+eligibility proof、`COMMITTED/QUARANTINED -> DRAINING`、future/global domains、runtime composition、cursor/root/
+audit retirement 与 final M4 gate 仍待实现，因此 production deletion 未开启。
 
 ## 7. Milestones
 
@@ -675,7 +699,7 @@ runtime composition 和 final M4 gate 仍待实现。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint N, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、affected-stream generation/append/materialization/projection/cursor domains、root-authenticated journal/destructive recovery and generation-index retirement handlers are implemented/tested；marker/commit source planning、future sentinel/ownerless-global proof、runtime composition、cursor/root/audit completion and final gate pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint O, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、affected-stream generation/append/materialization/projection/cursor domains、root-authenticated journal/destructive recovery、generation-index/source typed handlers and NRC1-bound generation-zero source-plan freezing are implemented/tested；healthy replacement/root eligibility、higher pre-drain、future sentinel/ownerless-global proof、runtime composition、cursor/root/audit completion and final gate pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

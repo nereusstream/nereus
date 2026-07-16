@@ -19,6 +19,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
 import com.nereusstream.metadata.oxia.PartitionKey;
+import com.nereusstream.metadata.oxia.AppendRecoveryCommitEncoding;
 import com.nereusstream.metadata.oxia.records.CommittedAppendRecord;
 import com.nereusstream.metadata.oxia.records.CommittedSliceRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
@@ -121,6 +122,78 @@ class SourceRetirementMetadataStoreContractTest {
                 capturedGeneric.metadataVersion(),
                 capturedGeneric.durableValueSha256()).join();
         assertThat(client.contains(genericKey, partition)).isFalse();
+    }
+
+    @Test
+    void exactJournalKeysRecoverLegacyIdentityAndCanonicalCommitEvidence() {
+        RetirementMetadataStoreTestSupport.FakeClient client = new RetirementMetadataStoreTestSupport.FakeClient();
+        SourceRetirementMetadataStore store = new OxiaJavaSourceRetirementMetadataStore(client);
+        OxiaKeyspace keys = new OxiaKeyspace(CLUSTER);
+        PartitionKey partition = keys.streamPartitionKey(STREAM_ID);
+
+        CommittedSliceRecord marker = RetirementMetadataStoreTestSupport.legacyMarker();
+        String markerKey = keys.committedSliceKey(
+                STREAM_ID, new ObjectId(OBJECT_ID), SLICE_ID);
+        client.put(markerKey, partition, marker, CommittedSliceRecord.class, 57);
+        VersionedGenerationZeroMarker capturedMarker = store.getCommittedMarkerByKey(
+                CLUSTER, markerKey).join().orElseThrow();
+        assertThat(capturedMarker.identity()).isEqualTo(new LegacyCommittedSliceIdentity(
+                new ObjectId(OBJECT_ID), SLICE_ID));
+        store.deleteCommittedMarkerByKey(
+                CLUSTER,
+                markerKey,
+                capturedMarker.metadataVersion(),
+                capturedMarker.durableValueSha256()).join();
+        assertThat(client.contains(markerKey, partition)).isFalse();
+
+        StreamCommitRecord commit = RetirementMetadataStoreTestSupport.legacyCommit();
+        String commitKey = keys.streamCommitKey(STREAM_ID, COMMIT_ID);
+        client.put(commitKey, partition, commit, StreamCommitRecord.class, 59);
+        VersionedGenerationZeroCommit capturedCommit = store.getCommitNodeByKey(
+                CLUSTER, commitKey).join().orElseThrow();
+        assertThat(capturedCommit.sourceEncoding())
+                .isEqualTo(AppendRecoveryCommitEncoding.LEGACY_STREAM_COMMIT_V1);
+        assertThat(capturedCommit.markerIdentity()).isEqualTo(capturedMarker.identity());
+        assertThat(capturedCommit.canonicalCommitRecordSha256().value()).hasSize(64);
+        store.deleteCommitNodeByKey(
+                CLUSTER,
+                commitKey,
+                capturedCommit.metadataVersion(),
+                capturedCommit.durableValueSha256()).join();
+        assertThat(client.contains(commitKey, partition)).isFalse();
+    }
+
+    @Test
+    void exactJournalRoutingRejectsCrossFamilyAndKeyValueAliasAttempts() {
+        RetirementMetadataStoreTestSupport.FakeClient client = new RetirementMetadataStoreTestSupport.FakeClient();
+        SourceRetirementMetadataStore store = new OxiaJavaSourceRetirementMetadataStore(client);
+        OxiaKeyspace keys = new OxiaKeyspace(CLUSTER);
+        PartitionKey partition = keys.streamPartitionKey(STREAM_ID);
+        String canonical = keys.committedSliceKey(
+                STREAM_ID, new ObjectId(OBJECT_ID), SLICE_ID);
+        String aliased = canonical.substring(0, canonical.length() - 1)
+                + (canonical.endsWith("a") ? "b" : "a");
+        CommittedSliceRecord marker = RetirementMetadataStoreTestSupport.legacyMarker();
+        client.put(aliased, partition, marker, CommittedSliceRecord.class, 60);
+
+        assertThatThrownBy(() -> store.getCommittedMarkerByKey(CLUSTER, aliased).join())
+                .satisfies(error -> assertThat(unwrap(error))
+                        .isInstanceOfSatisfying(NereusException.class, nereus ->
+                                assertThat(nereus.code()).isEqualTo(
+                                        ErrorCode.METADATA_INVARIANT_VIOLATION)));
+        assertThat(client.contains(aliased, partition)).isTrue();
+
+        String indexKey = keys.offsetIndexKey(STREAM_ID, OFFSET_END, 0);
+        assertThatThrownBy(() -> store.getCommitNodeByKey(CLUSTER, indexKey))
+                .isInstanceOfSatisfying(NereusException.class, nereus ->
+                        assertThat(nereus.code()).isEqualTo(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION));
+        String otherClusterKey = new OxiaKeyspace("other-cluster")
+                .streamCommitKey(STREAM_ID, COMMIT_ID);
+        assertThatThrownBy(() -> store.getCommitNodeByKey(CLUSTER, otherClusterKey))
+                .isInstanceOfSatisfying(NereusException.class, nereus ->
+                        assertThat(nereus.code()).isEqualTo(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION));
     }
 
     @Test

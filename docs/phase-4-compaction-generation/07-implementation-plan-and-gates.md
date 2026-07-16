@@ -81,7 +81,9 @@ at drain admission and the final delete-intent fence. Checkpoint M adds the root
 typed dispatch seam、journaled protection removal、exact object delete and DELETED convergence. Checkpoint N adds
 strict generation-index restart routing、exact generation-zero conditional deletion、higher-generation
 `DRAINING -> RETIRED` recovery and root+journal reauthentication at every destructive batch/final object fence.
-Source marker/commit planning、future/global domains、runtime composition and the remaining M4 passes are pending.
+Checkpoint O adds exact-key legacy/generic marker/commit inverse routing、response-loss-safe typed handlers and an
+NRC1/source/index/marker-bound generation-zero plan builder plus exact-key revalidator. Healthy replacement target/
+physical-root proof、higher pre-drain、future/global domains、runtime composition and the remaining M4 passes are pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -663,12 +665,13 @@ GenerationMetadataStore.restoreCommittedFromCheckpoint implemented checkpoint F 
 retirement/RetirementMetadataClient.java                 implemented checkpoint G
 retirement/RetirementMetadataKey.java                    implemented checkpoint G
 retirement/RetirementMetadataValue.java                  implemented checkpoint G
-retirement/SourceRetirementMetadataStore.java            implemented checkpoint G
-retirement/OxiaJavaSourceRetirementMetadataStore.java    implemented checkpoint G
+retirement/SourceRetirementMetadataStore.java            implemented G, exact-key restart API extended O
+retirement/OxiaJavaSourceRetirementMetadataStore.java    implemented G, strict inverse extended O
 retirement/GenerationZeroMarkerIdentity.java             implemented checkpoint G
 retirement/LegacyCommittedSliceIdentity.java             implemented checkpoint G
 retirement/GenericCommittedAppendIdentity.java           implemented checkpoint G
-retirement/VersionedGenerationZeroMarker.java             implemented checkpoint G
+retirement/VersionedGenerationZeroMarker.java             implemented G, target identity extended O
+retirement/VersionedGenerationZeroCommit.java             implemented checkpoint O
 retirement/ObjectAuditRetirementStore.java               implemented checkpoint G
 retirement/OxiaJavaObjectAuditRetirementStore.java       implemented checkpoint G
 retirement/VersionedObjectManifestAudit.java             implemented checkpoint G
@@ -726,7 +729,10 @@ gc/GcMetadataRetirementOutcome.java                      implemented checkpoint 
 gc/GcMetadataRetirementRegistry.java                     implemented checkpoint M dispatch foundation
 gc/GenerationZeroIndexRetirementHandler.java             implemented checkpoint N
 gc/HigherGenerationIndexRetirementHandler.java           implemented checkpoint N
-gc/GenerationRetirementOperations.java                   implemented checkpoint N focused seams
+gc/GenerationZeroMarkerRetirementHandler.java            implemented checkpoint O
+gc/GenerationZeroCommitRetirementHandler.java            implemented checkpoint O
+gc/SourceRetirementPlanBuilder.java                      implemented checkpoint O source-freeze foundation
+gc/GenerationRetirementOperations.java                   implemented N, source seams extended O
 gc/GcIdGenerator.java                                    implemented checkpoint H
 gc/SecureGcIdGenerator.java                              implemented checkpoint H
 gc/GcReferenceDomainVersion.java                         implemented checkpoint I
@@ -814,6 +820,8 @@ GcRetirementJournalMetadataStoreContractTest             implemented checkpoint 
 DefaultGcRetirementJournalTest                           implemented checkpoint L seal/reload/crash cuts
 SourceRetirementCoordinatorTest                          implemented checkpoint M initial recovery cuts
 GenerationIndexRetirementHandlerTest                     implemented checkpoint N response-loss cuts
+GenerationZeroSourceRetirementHandlerTest                implemented checkpoint O response-loss cuts
+SourceRetirementPlanBuilderTest                          implemented checkpoint O NRC1/source binding
 PhysicalObjectRootScannerTest                              implemented checkpoint I
 PhysicalRootTombstoneRetirementTest
 LatePutAfterTombstoneTest
@@ -942,14 +950,18 @@ absent object under matching authority、same-record `DELETED` restart, and miss
 The gate does not yet claim production source-metadata handlers, protection/metadata response-loss coverage, runtime
 composition, future-sentinel/ownerless-global domains, cursor completion or final M4 deletion enablement.
 
-`phase4M4GenerationRetirementCheck` extends checkpoint M with checkpoint N's strict type-owned generation-index
-actions. API/metadata tests freeze canonical inverse key decoding、encoded stream ids、both view namespaces、fixed
-depth and current-cluster round trips. Handler tests prove exact generation-zero deletion、delete-response-loss
-absence classification、DRAINING-only higher retirement、attempt+reference-set-bound deterministic RETIRED recovery、
-CAS-response-loss convergence and drift rejection. Plan tests require reference/removal type equality. Coordinator
-tests force `maxConcurrentDeletes=1`, remove the journal before batch two or the physical fence, and prove no later
-handler/object call occurs. This remains ordinary checkpoint-N evidence：marker/commit-node source-plan actions、
-future/global domains、runtime composition、cursor/root/audit retirement and the final M4 gate remain pending.
+`phase4M4GenerationRetirementCheck` extends checkpoint M through checkpoints N/O. API/metadata tests freeze canonical
+inverse key decoding、encoded stream ids、both view namespaces、fixed depth/current-cluster round trips, plus exact-key
+legacy/generic marker/commit value-to-key reconstruction. Handler tests prove exact generation-zero index/marker/
+commit deletion、delete-response-loss absence classification、DRAINING-only higher retirement、attempt+reference-set-
+bound deterministic RETIRED recovery、CAS-response-loss convergence and drift rejection. Source-plan tests require an
+unchanged recovery root, one covering NRC1 entry, identical canonical commit SHA/source/index/marker facts and exact
+candidate-bound revalidator output；root drift、a different NRC1 canonical commit and an existing but unbound extra
+source removal fail closed. Plan tests require reference/removal
+type equality. Coordinator tests force `maxConcurrentDeletes=1`, remove the journal before batch two or the physical
+fence, and prove no later handler/object call occurs. This remains ordinary checkpoint-O evidence：healthy replacement
+target/root proof、higher pre-drain、future/global domains、runtime composition、cursor/root/audit retirement and the
+final M4 gate remain pending.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

@@ -57,6 +57,7 @@ nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/retirement/
   LegacyCommittedSliceIdentity.java
   GenericCommittedAppendIdentity.java
   VersionedGenerationZeroMarker.java
+  VersionedGenerationZeroCommit.java
   SourceRetirementMetadataStore.java
   OxiaJavaSourceRetirementMetadataStore.java
   VersionedObjectManifestAudit.java
@@ -83,6 +84,11 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/gc/
   PhysicalObjectRootVisitor.java
   PhysicalObjectRootScanResult.java
   PhysicalObjectRootScanner.java
+  GenerationZeroIndexRetirementHandler.java
+  GenerationZeroMarkerRetirementHandler.java
+  GenerationZeroCommitRetirementHandler.java
+  HigherGenerationIndexRetirementHandler.java
+  SourceRetirementPlanBuilder.java
   PhysicalRootTombstoneRetirementCoordinator.java
   TombstoneRetirementResult.java
   TombstoneRetirementStatus.java
@@ -123,8 +129,10 @@ including query-bound stateless revalidation and exact reference/removal binding
 snapshot construction into core and adds affected-stream F2 projection-generation plus F3 cursor-snapshot domains over
 exact stored authority digests. Checkpoint M adds the root-authenticated DELETING recovery skeleton；checkpoint N adds
 canonical generation-index routing plus generation-zero delete/higher-generation RETIRED handlers and reauthenticates
-root+journal at every destructive batch. Future-sentinel、ownerless global domains、source marker/commit planning、
-cursor completion and runtime composition remain planned；therefore production deletion is still disabled.
+root+journal at every destructive batch. Checkpoint O adds exact-key generation-zero marker/commit handlers and
+NRC1-bound source triple freezing/revalidation. Healthy replacement index/physical-root eligibility、higher pre-drain、
+future-sentinel、ownerless global domains、cursor completion and runtime composition remain planned；therefore
+production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1149,8 +1157,25 @@ deterministic replacement. The plan validator additionally requires removal type
 metadata/protection batch, before physical object access, after uncertain protection/object responses, and before the
 final DELETED CAS. The DELETING wrapper comparison includes Oxia version and durable-envelope SHA；journal comparison
 includes manifest and every entry wrapper. If either disappears or changes, later batches/object HEAD are not issued.
-Generation-zero marker/commit-node actions and the planner that freezes them are the next source-retirement slice；
-checkpoint N remains ordinary evidence and does not enable production runtime deletion.
+Checkpoint O adds the remaining two generation-zero source action types. `generation-zero-marker` and
+`generation-zero-commit` route only through the focused adapter's exact-key APIs. The adapter strictly decodes the
+current cluster/stream/family, reads the value and reconstructs the canonical legacy/generic identity；this is
+necessary because a legacy marker key contains a one-way slice hash. Key/value alias、wrong family、non-canonical
+component or foreign cluster fails before delete. Both handlers require the sealed key/version/envelope SHA, and an
+uncertain delete converges only after exact-key absence under the same authenticated root/journal.
+
+`SourceRetirementPlanBuilder` now scans the complete bounded generation namespace and, for each matching
+generation-zero index, requires one unchanged recovery root reference that covers the same range/commit version. It
+strictly opens that NRC1, finds the covering commit, then compares NRC1 canonical commit SHA、exact source commit、
+index fields/read target and committed marker before returning three separate removals. It reloads the recovery root
+after all source reads and implements `GcPlanMetadataRevalidator` as closed type-owned exact-key reloads. Tests freeze
+legacy/generic inverse routing、response-loss cuts、root drift、a different canonical NRC1 commit and rejection of an
+otherwise-existing source removal that cannot be reconstructed from a candidate-owned generation index.
+
+This is still not the complete §9.1 eligibility proof：the NRC1 publication target must next be tied to a current
+healthy COMMITTED index and ACTIVE physical root, and higher-generation source records still need their earlier
+`COMMITTED/QUARANTINED -> DRAINING` transition. Checkpoint O therefore remains ordinary evidence and does not enable
+production runtime deletion.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.

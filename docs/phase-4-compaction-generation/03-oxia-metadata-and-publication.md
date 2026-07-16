@@ -299,6 +299,28 @@ reason binds GC attempt plus reference-set digest and its timestamp is the physi
 or a lost response is classified only under the same root-authenticated journal. This checkpoint still does not
 construct marker/commit-node removal entries or compose a production GC runtime.
 
+### 1.14 F4-M4 exact generation-zero source-retirement checkpoint
+
+Checkpoint O resolves the remaining restart identity problem for generation-zero source records. A legacy
+`committed-slices/{objectId}/{hash(objectId,sliceId)}` key cannot reveal `sliceId` after process loss. The retirement
+adapter therefore accepts only a journaled exact key in one of the closed marker/commit families, strictly decodes
+cluster、stream and reversible components, reads the value, reconstructs the missing identity from that value and
+requires the rebuilt `OxiaKeyspace` key to equal the supplied bytes. An arbitrary stream key、wrong family、foreign
+cluster、non-canonical component or key/value alias fails before conditional delete.
+
+`VersionedGenerationZeroCommit` retains both the exact source envelope identity and the canonical generic
+`StreamCommitTargetRecord`/NRC1 envelope SHA. The wrapper constructor recomputes that SHA；legacy conversion uses the
+same read-target codec as append recovery. Generic marker wrappers additionally retain the read-target identity SHA.
+These facts allow `SourceRetirementPlanBuilder` to prove that one recovery-root-selected NRC1 entry、the exact source
+commit、generation-zero index and committed marker describe the same range、commit version and read target before it
+freezes three independent journal removals. A final exact recovery-root reload fences root replacement during freeze.
+
+The builder also implements the exact-key `GcPlanMetadataRevalidator` surface. An exact key list is necessary but not
+sufficient：after reload it rebuilds every source triple from candidate-owned generation indexes and rejects any
+unbound extra marker/commit removal. This checkpoint does not yet claim
+complete source eligibility：healthy NRC1 publication target/physical-root proof and the earlier higher-generation
+transition into `DRAINING` remain required before runtime composition.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples
@@ -664,12 +686,33 @@ public record VersionedGenerationZeroMarker(
         long offsetStart,
         long offsetEnd,
         long commitVersion,
+        Optional<Checksum> readTargetIdentitySha256,
+        long metadataVersion,
+        Checksum durableValueSha256) { }
+
+public record VersionedGenerationZeroCommit(
+        String key,
+        StreamId streamId,
+        String commitId,
+        AppendRecoveryCommitEncoding sourceEncoding,
+        GenerationZeroMarkerIdentity markerIdentity,
+        StreamCommitTargetRecord canonicalCommit,
+        long offsetStart,
+        long offsetEnd,
+        long commitVersion,
+        Checksum canonicalCommitRecordSha256,
         long metadataVersion,
         Checksum durableValueSha256) { }
 
 public interface SourceRetirementMetadataStore extends AutoCloseable {
+    CompletableFuture<Optional<VersionedGenerationZeroMarker>> getCommittedMarkerByKey(
+            String cluster, String exactKey);
+
     CompletableFuture<Optional<VersionedGenerationZeroMarker>> getCommittedMarker(
             String cluster, StreamId streamId, GenerationZeroMarkerIdentity marker);
+
+    CompletableFuture<Optional<VersionedGenerationZeroCommit>> getCommitNodeByKey(
+            String cluster, String exactKey);
 
     CompletableFuture<Void> deleteGenerationZeroIndex(
             String cluster, StreamId streamId, long offsetEnd,
@@ -679,8 +722,16 @@ public interface SourceRetirementMetadataStore extends AutoCloseable {
             String cluster, StreamId streamId, GenerationZeroMarkerIdentity marker,
             long expectedVersion, Checksum expectedDurableValueSha256);
 
+    CompletableFuture<Void> deleteCommittedMarkerByKey(
+            String cluster, String exactKey,
+            long expectedVersion, Checksum expectedDurableValueSha256);
+
     CompletableFuture<Void> deleteCommitNode(
             String cluster, StreamId streamId, String commitId,
+            long expectedVersion, Checksum expectedDurableValueSha256);
+
+    CompletableFuture<Void> deleteCommitNodeByKey(
+            String cluster, String exactKey,
             long expectedVersion, Checksum expectedDurableValueSha256);
 }
 ```
@@ -691,10 +742,10 @@ same retirement plan already recorded that exact key/identity. The caller must h
 generation、activation and physical-root proof from document 05 before every batch；this adapter never infers safety
 from age or a higher generation alone.
 
-`getCommittedMarker` is the only planning read added here. It verifies the same key/value identity and returns the
-captured durable version/digest；it never creates a missing marker. Generation-zero index and commit-node facts remain
-captured from `GenerationMetadataStore` and `AppendRecoveryTailPage`, respectively, so the retirement package does
-not duplicate those authorities.
+`getCommittedMarker` remains the identity-addressed planning read. Checkpoint O adds exact-key marker/commit reads for
+restart and journal replay；they verify the same key/value identity and return captured durable version/digest without
+creating a missing record. Generation-zero index facts remain owned by `GenerationMetadataStore`; the focused
+retirement package exposes commit bytes only to bind an already selected NRC1 entry and never scans a commit prefix.
 
 The last Phase 1 object audit keys also use a focused adapter. They are not generation metadata and are removed only
 while the exact `DELETED` physical root remains the coordinator described in document 05 §9.6：

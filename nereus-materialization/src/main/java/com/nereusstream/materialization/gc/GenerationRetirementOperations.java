@@ -5,6 +5,8 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
+import com.nereusstream.metadata.oxia.retirement.VersionedGenerationZeroCommit;
+import com.nereusstream.metadata.oxia.retirement.VersionedGenerationZeroMarker;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +31,32 @@ interface GenerationZeroIndexDelete {
     CompletableFuture<Void> delete(
             StreamId streamId,
             long offsetEnd,
+            long expectedVersion,
+            com.nereusstream.api.Checksum expectedDurableValueSha256);
+}
+
+@FunctionalInterface
+interface GenerationZeroMarkerLoader {
+    CompletableFuture<Optional<VersionedGenerationZeroMarker>> load(String exactKey);
+}
+
+@FunctionalInterface
+interface GenerationZeroMarkerDelete {
+    CompletableFuture<Void> delete(
+            String exactKey,
+            long expectedVersion,
+            com.nereusstream.api.Checksum expectedDurableValueSha256);
+}
+
+@FunctionalInterface
+interface GenerationZeroCommitLoader {
+    CompletableFuture<Optional<VersionedGenerationZeroCommit>> load(String exactKey);
+}
+
+@FunctionalInterface
+interface GenerationZeroCommitDelete {
+    CompletableFuture<Void> delete(
+            String exactKey,
             long expectedVersion,
             com.nereusstream.api.Checksum expectedDurableValueSha256);
 }
