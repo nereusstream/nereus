@@ -117,6 +117,41 @@ class CursorSnapshotReferenceDomainTest {
         }
     }
 
+    @Test
+    void ownerlessGlobalScopePagesTheExactCursorNamespaceAndDetectsDrift() {
+        try (var store = new FakeCursorMetadataStore()) {
+            StreamId streamId = new StreamId(projection().streamId());
+            var domain = new CursorSnapshotReferenceDomain(
+                    CLUSTER,
+                    store,
+                    CONFIG,
+                    ManagedLedgerGlobalScopeTestSupport.complete(streamId));
+            GcReferenceQuery ownerless = GcReferenceQuery.create(
+                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
+                    object("cursor-snapshots/orphan.ncs"),
+                    List.of(),
+                    sha256('2'));
+
+            var clear = domain.snapshot(ownerless).join();
+
+            assertThat(clear.complete()).isTrue();
+            assertThat(clear.veto()).isFalse();
+            assertThat(clear.authorities()).hasSize(2);
+            assertThat(clear.authorities())
+                    .extracting(value -> value.authorityKey())
+                    .contains("/global/reference-scope");
+            assertThat(domain.stillMatches(ownerless, clear).join()).isTrue();
+
+            store.createCursor(
+                    CLUSTER,
+                    cursor(
+                            projection(),
+                            "subscription-global-drift",
+                            Optional.empty())).join();
+            assertThat(domain.stillMatches(ownerless, clear).join()).isFalse();
+        }
+    }
+
     private static GcReferenceQuery query(String objectKey) {
         return GcReferenceQuery.create(
                 GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE,

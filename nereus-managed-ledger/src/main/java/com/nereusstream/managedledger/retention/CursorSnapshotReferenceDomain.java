@@ -3,6 +3,7 @@ package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.physical.GcAuthorityToken;
+import com.nereusstream.core.physical.GcGlobalReferenceScope;
 import com.nereusstream.core.physical.GcReference;
 import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceDomainConfig;
@@ -23,6 +24,7 @@ import com.nereusstream.metadata.oxia.records.CursorRetentionLifecycle;
 import com.nereusstream.metadata.oxia.records.CursorSnapshotReferenceRecord;
 import com.nereusstream.metadata.oxia.records.CursorStateRecord;
 import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -35,15 +37,29 @@ public final class CursorSnapshotReferenceDomain implements GcReferenceDomain {
     private final String cluster;
     private final CursorMetadataStore metadataStore;
     private final GcReferenceDomainConfig config;
+    private final GcGlobalReferenceScope globalScope;
     private final CursorKeyspace keys;
 
     public CursorSnapshotReferenceDomain(
             String cluster,
             CursorMetadataStore metadataStore,
             GcReferenceDomainConfig config) {
+        this(
+                cluster,
+                metadataStore,
+                config,
+                GcGlobalReferenceScope.unsupported());
+    }
+
+    public CursorSnapshotReferenceDomain(
+            String cluster,
+            CursorMetadataStore metadataStore,
+            GcReferenceDomainConfig config,
+            GcGlobalReferenceScope globalScope) {
         this.cluster = requireText(cluster, "cluster");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         this.config = Objects.requireNonNull(config, "config");
+        this.globalScope = Objects.requireNonNull(globalScope, "globalScope");
         this.keys = new CursorKeyspace(cluster);
     }
 
@@ -60,18 +76,16 @@ public final class CursorSnapshotReferenceDomain implements GcReferenceDomain {
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        if (query.kind() == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
-            return CompletableFuture.completedFuture(
-                    GcReferenceSnapshotBuilder.unsupportedOwnerless(
-                            DOMAIN_ID, PROTOCOL_VERSION, query));
-        }
         GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(
                 DOMAIN_ID, PROTOCOL_VERSION, query, config);
         if (query.kind() == GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE
                 && query.object().kind() != PhysicalObjectKind.CURSOR_SNAPSHOT) {
             builder.veto();
         }
-        return scanStream(query, builder, 0);
+        return GcGlobalReferenceScope.resolveStreams(
+                        query, builder, globalScope)
+                .thenCompose(streams ->
+                        scanStream(query, streams, builder, 0));
     }
 
     @Override
@@ -89,13 +103,14 @@ public final class CursorSnapshotReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scanStream(
             GcReferenceQuery query,
+            List<StreamId> streams,
             GcReferenceSnapshotBuilder builder,
             int streamIndex) {
         if (builder.limitExceeded()
-                || streamIndex == query.affectedStreams().size()) {
+                || streamIndex == streams.size()) {
             return CompletableFuture.completedFuture(builder.build());
         }
-        StreamId streamId = query.affectedStreams().get(streamIndex);
+        StreamId streamId = streams.get(streamIndex);
         return metadataStore.getRetention(cluster, streamId).thenCompose(retention -> {
             addRetention(builder, streamId, retention);
             if (builder.limitExceeded()) {
@@ -103,6 +118,7 @@ public final class CursorSnapshotReferenceDomain implements GcReferenceDomain {
             }
             return scanCursors(
                     query,
+                    streams,
                     builder,
                     streamIndex,
                     retention.map(value -> value.value().projection()),
@@ -114,13 +130,14 @@ public final class CursorSnapshotReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scanCursors(
             GcReferenceQuery query,
+            List<StreamId> streams,
             GcReferenceSnapshotBuilder builder,
             int streamIndex,
             Optional<ManagedLedgerProjectionIdentity> retentionProjection,
             boolean cursorSeen,
             Optional<CursorScanToken> continuation,
             String previousKey) {
-        StreamId streamId = query.affectedStreams().get(streamIndex);
+        StreamId streamId = streams.get(streamIndex);
         return metadataStore.scanCursors(
                         cluster,
                         streamId,
@@ -146,6 +163,7 @@ public final class CursorSnapshotReferenceDomain implements GcReferenceDomain {
                                 page.records().get(page.records().size() - 1).value());
                         return scanCursors(
                                 query,
+                                streams,
                                 builder,
                                 streamIndex,
                                 retentionProjection,
@@ -156,7 +174,7 @@ public final class CursorSnapshotReferenceDomain implements GcReferenceDomain {
                     if (retentionProjection.isEmpty() && sawCursor) {
                         builder.veto();
                     }
-                    return scanStream(query, builder, streamIndex + 1);
+                    return scanStream(query, streams, builder, streamIndex + 1);
                 });
     }
 

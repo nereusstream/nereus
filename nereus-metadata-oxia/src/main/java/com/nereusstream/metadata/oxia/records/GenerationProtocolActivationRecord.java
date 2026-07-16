@@ -41,11 +41,12 @@ public record GenerationProtocolActivationRecord(
                     "requiredReferenceDomains must be non-empty");
         }
         for (int index = 1; index < requiredReferenceDomains.size(); index++) {
-            if (requiredReferenceDomains.get(index - 1)
-                            .compareTo(requiredReferenceDomains.get(index))
-                    >= 0) {
+            ReferenceDomainVersionRecord previous = requiredReferenceDomains.get(index - 1);
+            ReferenceDomainVersionRecord current = requiredReferenceDomains.get(index);
+            if (previous.compareTo(current) >= 0
+                    || previous.domainId().equals(current.domainId())) {
                 throw new IllegalArgumentException(
-                        "requiredReferenceDomains must be strictly sorted and unique");
+                        "requiredReferenceDomains must be strictly sorted with unique domain ids");
             }
         }
         Objects.requireNonNull(streamRegistrationBackfill, "streamRegistrationBackfill");

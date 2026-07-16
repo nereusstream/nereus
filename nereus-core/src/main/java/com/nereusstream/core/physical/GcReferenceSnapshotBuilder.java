@@ -29,6 +29,7 @@ public final class GcReferenceSnapshotBuilder {
     private long authorityCount;
     private long referenceCount;
     private boolean limitExceeded;
+    private boolean incomplete;
     private boolean veto;
 
     public GcReferenceSnapshotBuilder(
@@ -71,6 +72,10 @@ public final class GcReferenceSnapshotBuilder {
         return limitExceeded;
     }
 
+    public void markIncomplete() {
+        incomplete = true;
+    }
+
     public void veto() {
         veto = true;
     }
@@ -82,8 +87,8 @@ public final class GcReferenceSnapshotBuilder {
                 domainId,
                 protocolVersion,
                 query.queryIdentitySha256(),
-                !limitExceeded,
-                limitExceeded || veto,
+                !limitExceeded && !incomplete,
+                limitExceeded || incomplete || veto,
                 authorityCount,
                 referenceCount,
                 List.copyOf(authorities),

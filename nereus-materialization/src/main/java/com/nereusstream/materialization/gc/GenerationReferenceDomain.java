@@ -8,10 +8,10 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.core.physical.GcAuthorityToken;
+import com.nereusstream.core.physical.GcGlobalReferenceScope;
 import com.nereusstream.core.physical.GcReference;
 import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceQuery;
-import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
 import com.nereusstream.core.physical.GcReferenceSnapshotBuilder;
 import com.nereusstream.metadata.oxia.F4ScanToken;
@@ -39,14 +39,28 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
     private final String cluster;
     private final GenerationMetadataStore metadataStore;
     private final PhysicalGcConfig config;
+    private final GcGlobalReferenceScope globalScope;
 
     public GenerationReferenceDomain(
             String cluster,
             GenerationMetadataStore metadataStore,
             PhysicalGcConfig config) {
+        this(
+                cluster,
+                metadataStore,
+                config,
+                GcGlobalReferenceScope.unsupported());
+    }
+
+    public GenerationReferenceDomain(
+            String cluster,
+            GenerationMetadataStore metadataStore,
+            PhysicalGcConfig config,
+            GcGlobalReferenceScope globalScope) {
         this.cluster = requireText(cluster, "cluster");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         this.config = Objects.requireNonNull(config, "config");
+        this.globalScope = Objects.requireNonNull(globalScope, "globalScope");
     }
 
     @Override
@@ -62,14 +76,18 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        if (query.kind() == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
-            return CompletableFuture.completedFuture(
-                    GcReferenceSnapshotBuilder.unsupportedOwnerless(
-                            DOMAIN_ID, PROTOCOL_VERSION, query));
-        }
         GcReferenceSnapshotBuilder accumulator = new GcReferenceSnapshotBuilder(
                 DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
-        return scan(query, accumulator, 0, 0, Optional.empty(), null);
+        return GcGlobalReferenceScope.resolveStreams(
+                        query, accumulator, globalScope)
+                .thenCompose(streams -> scan(
+                        query,
+                        streams,
+                        accumulator,
+                        0,
+                        0,
+                        Optional.empty(),
+                        null));
     }
 
     @Override
@@ -87,6 +105,7 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scan(
             GcReferenceQuery query,
+            List<StreamId> streams,
             GcReferenceSnapshotBuilder accumulator,
             int streamIndex,
             int viewIndex,
@@ -95,13 +114,20 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
         if (accumulator.limitExceeded()) {
             return CompletableFuture.completedFuture(accumulator.build());
         }
-        if (streamIndex == query.affectedStreams().size()) {
+        if (streamIndex == streams.size()) {
             return CompletableFuture.completedFuture(accumulator.build());
         }
         if (viewIndex == VIEWS.size()) {
-            return scan(query, accumulator, streamIndex + 1, 0, Optional.empty(), null);
+            return scan(
+                    query,
+                    streams,
+                    accumulator,
+                    streamIndex + 1,
+                    0,
+                    Optional.empty(),
+                    null);
         }
-        StreamId streamId = query.affectedStreams().get(streamIndex);
+        StreamId streamId = streams.get(streamIndex);
         ReadView view = VIEWS.get(viewIndex);
         return metadataStore.scanIndex(
                         cluster,
@@ -137,6 +163,7 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
                     if (page.continuation().isPresent()) {
                         return scan(
                                 query,
+                                streams,
                                 accumulator,
                                 streamIndex,
                                 viewIndex,
@@ -145,6 +172,7 @@ public final class GenerationReferenceDomain implements GcReferenceDomain {
                     }
                     return scan(
                             query,
+                            streams,
                             accumulator,
                             streamIndex,
                             viewIndex + 1,

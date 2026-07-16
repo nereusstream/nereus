@@ -871,3 +871,23 @@ tasks.register("phase4M4ActivationMetadataCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-metadata-oxia:check")
 }
+
+tasks.register<Exec>("checkPhase4M4GlobalDomainsContractSurface") {
+    group = "verification"
+    description = "Audit activation-gated ownerless global scope and future catalog sentinel."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-global-domains-contract-surface.sh")
+}
+
+tasks.register("phase4M4GlobalDomainsCheck") {
+    group = "verification"
+    description = "Verify all five ownerless global domains and future-domain fail-closed capability checks."
+    dependsOn("phase4M4ActivationMetadataCheck")
+    dependsOn("checkPhase4M4GlobalDomainsContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-managed-ledger:check")
+}

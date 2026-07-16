@@ -189,6 +189,9 @@ hint, not cluster-wide absence truth. At checkpoint J, projection/cursor/future-
 backfill epoch remained required before ownerless GC. The new classes were not installed in
 `MaterializationRuntime`; checkpoint J changed no production activation or deletion behavior.
 
+Checkpoint T later adds the activation/backfill/domain-set-gated global scope and reuses these same exact scans for
+ownerless queries. It still does not install them in `MaterializationRuntime` or enable production deletion.
+
 F4-M4 checkpoint K adds the two affected-stream managed-ledger domains without changing that runtime boundary.
 `ProjectionGenerationReferenceDomain` reads the exact per-stream F2 binding and the current topic authority selected
 by that binding；missing derived binding/topic、same-incarnation `DELETING`, or a live same-incarnation topic without

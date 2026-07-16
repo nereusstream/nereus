@@ -42,6 +42,48 @@ class GcReferenceSnapshotBuilderTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void globalScopeContributesAuthoritiesAndExplicitIncompleteness() {
+        GcReferenceQuery query = query();
+        var builder = new GcReferenceSnapshotBuilder(
+                "test-domain-v1",
+                1,
+                query,
+                new GcReferenceDomainConfig(1, 4, 1));
+        var scope = new GcGlobalReferenceScopeSnapshot(
+                false,
+                1,
+                1,
+                List.of(new StreamId("stream/reference-builder")),
+                List.of(new GcAuthorityToken("authority/global", 3, sha256('d'))));
+
+        scope.contributeTo(builder);
+
+        GcReferenceSnapshot snapshot = builder.build();
+        assertThat(snapshot.complete()).isFalse();
+        assertThat(snapshot.veto()).isTrue();
+        assertThat(snapshot.authorities())
+                .containsExactly(new GcAuthorityToken("authority/global", 3, sha256('d')));
+    }
+
+    @Test
+    void completeGlobalScopeMustBeCanonicalAndCountExact() {
+        assertThatThrownBy(() -> new GcGlobalReferenceScopeSnapshot(
+                        true,
+                        2,
+                        0,
+                        List.of(new StreamId("stream/a")),
+                        List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GcGlobalReferenceScopeSnapshot(
+                        true,
+                        2,
+                        0,
+                        List.of(new StreamId("stream/b"), new StreamId("stream/a")),
+                        List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private static GcReferenceQuery query() {
         PhysicalObjectIdentity object = PhysicalObjectIdentity.create(
                 new ObjectKey("objects/reference-builder"),

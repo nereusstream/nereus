@@ -243,8 +243,8 @@ live commit uses its captured source-record SHA. Matching current-root NRC1 refs
 `stillMatches(query, snapshot)` repeats those exact reads from the supplied durable query rather than recovering
 query fields from a key parser or process-local cache. Plan validation then requires every non-veto reference owner
 tuple to match an exact planned metadata-removal tuple. Stream registrations are not consulted for ownerless proof；
-all three domains return incomplete+veto for ownerless queries until a later global backfill/enumeration authority is
-available. No new metadata key or correctness owner is introduced by this checkpoint.
+at checkpoint J all three domains returned incomplete+veto for ownerless queries. Checkpoint T later adds the
+activation/backfill-gated global enumeration authority without changing any per-stream truth owner.
 
 ### 1.12 F4-M4 managed-ledger authority checkpoint
 
@@ -279,7 +279,8 @@ property replacement preserve the composed marker rules.
 cursor domain binds drain revalidation to durable bytes rather than decoded-field subsets. Checkpoint K itself did not
 create the M5 cluster authority. Checkpoint S now provides the durable `GenerationProtocolActivationRecord`、codec and
 exact-key/CAS store foundation, but the registration backfill coordinator and broker activation guard remain pending；
-therefore the marker API and domains still are not production activation or delete authority.
+Checkpoint T consumes that authority for future-sentinel and ownerless-global scans. The marker API and domains still
+are not production activation or delete authority until the backfill/broker guard and runtime composition are wired.
 
 ### 1.13 F4-M4 generation-index retirement checkpoint
 
@@ -408,6 +409,27 @@ readiness epoch and capability bits cannot regress. A completed backfill is immu
 changing an object-store capability proof requires a newer epoch. Lost CAS response converges only when authoritative
 reload equals the exact desired durable value at a later version. This foundation does not run registration/root/cursor
 backfills and does not enable any capability bit.
+
+### 1.19 F4-M4 activation-gated global reference authority
+
+Checkpoint T adds no new durable key. `RegisteredStreamGcGlobalReferenceScope` first performs read-only
+`GenerationProtocolActivationStore.get(cluster)` and freezes that wrapper as an authority token. Registration records
+become a global scan scope only when the record is ACTIVE、both V1 deletion bits are true、all three backfills are
+complete for the current broker-readiness epoch、the object-store capability digest is present and
+`requiredReferenceDomains` exactly equals the canonical installed plugin set. Multiple versions for one domain id are
+now rejected by the activation record itself.
+
+The scope then scans all `00..63` registration shards with bounded pages. Every wrapper contributes exact
+key/version/stored-envelope SHA and one canonical `StreamId`; duplicate streams、non-progressing pages and configured
+authority overflow fail incomplete. After shard 63 it reloads the exact activation wrapper, so a rollout transition
+during enumeration cannot produce a clear proof. Activation absence is represented by a domain-separated version-zero
+token, and neither scope nor sentinel calls `getOrCreate`.
+
+The protocol-neutral core scope snapshot is injected into all five concrete domains. Affected-stream behavior is
+unchanged. Ownerless queries add activation/registration authority tokens and scan the returned sorted streams through
+the existing generation、append recovery、task、projection and cursor exact APIs. Every `stillMatches` call repeats both
+the global enumeration and the domain scan. The production runtime has not yet installed this composition, so this
+checkpoint changes correctness capability without enabling deletion.
 
 ## 2. Keyspace
 

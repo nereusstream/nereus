@@ -108,6 +108,42 @@ class AppendRecoveryReferenceDomainTest {
         assertThat(tailReads).hasValue(tailsBefore);
     }
 
+    @Test
+    void ownerlessGlobalScopeScansRecoveryRootAndLiveTailForEveryRegisteredStream() {
+        VersionedGenerationZeroIndex source = MaterializationPlannerTestSupport.zero(
+                "/index/global-append-source", 0, 2, 0, 100, 2);
+        VersionedGenerationZeroIndex unrelated = MaterializationPlannerTestSupport.zero(
+                "/index/global-append-unrelated", 2, 4, 100, 100, 4);
+        ObjectSliceReadTarget sourceTarget = (ObjectSliceReadTarget) source.value().readTarget();
+        ObjectSliceReadTarget unrelatedTarget =
+                (ObjectSliceReadTarget) unrelated.value().readTarget();
+        AtomicInteger rootReads = new AtomicInteger();
+        AtomicInteger tailReads = new AtomicInteger();
+        AppendRecoveryReferenceDomain domain = new AppendRecoveryReferenceDomain(
+                MaterializationPlannerTestSupport.CLUSTER,
+                l0Store(new AtomicReference<>(page(sourceTarget)), tailReads),
+                generationStore(rootReads),
+                PhysicalGcConfig.defaults(),
+                GcGlobalScopeTestSupport.complete(
+                        MaterializationPlannerTestSupport.STREAM));
+        GcReferenceQuery ownerless = GcReferenceQuery.create(
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
+                object(unrelatedTarget),
+                List.of(),
+                EVIDENCE);
+
+        var snapshot = domain.snapshot(ownerless).join();
+
+        assertThat(snapshot.complete()).isTrue();
+        assertThat(snapshot.veto()).isFalse();
+        assertThat(snapshot.references()).isEmpty();
+        assertThat(snapshot.authorities())
+                .extracting(value -> value.authorityKey())
+                .contains("/global/reference-scope");
+        assertThat(rootReads).hasValue(1);
+        assertThat(tailReads).hasValue(1);
+    }
+
     private static AppendRecoveryTailPage page(ObjectSliceReadTarget target) {
         AppendRecoveryAnchor anchor = AppendRecoveryAnchor.genesis(
                 MaterializationPlannerTestSupport.STREAM);

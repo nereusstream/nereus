@@ -105,6 +105,37 @@ class MaterializationReferenceDomainTest {
         assertThat(scans).hasValue(0);
     }
 
+    @Test
+    void ownerlessGlobalScopePagesTheAuthoritativeTaskNamespace() {
+        AtomicInteger scans = new AtomicInteger();
+        MaterializationReferenceDomain domain = new MaterializationReferenceDomain(
+                MaterializationPlannerTestSupport.CLUSTER,
+                store(new AtomicReference<>(List.of()), scans),
+                PhysicalGcConfig.defaults(),
+                GcGlobalScopeTestSupport.complete(
+                        MaterializationPlannerTestSupport.STREAM));
+        VersionedGenerationCandidate candidate = MaterializationPlannerTestSupport.zero(
+                "/index/global-task", 0, 2, 0, 100, 2);
+        ObjectSliceReadTarget target = (ObjectSliceReadTarget)
+                ((com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex) candidate)
+                        .value()
+                        .readTarget();
+        GcReferenceQuery ownerless = GcReferenceQuery.create(
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
+                object(target),
+                List.of(),
+                EVIDENCE);
+
+        var snapshot = domain.snapshot(ownerless).join();
+
+        assertThat(snapshot.complete()).isTrue();
+        assertThat(snapshot.veto()).isFalse();
+        assertThat(snapshot.authorities()).singleElement()
+                .satisfies(authority -> assertThat(authority.authorityKey())
+                        .isEqualTo("/global/reference-scope"));
+        assertThat(scans).hasValue(1);
+    }
+
     private static GcReferenceQuery query(MaterializationTask task) {
         ObjectSliceReadTarget target = (ObjectSliceReadTarget) task.sources().get(0).readTarget();
         return GcReferenceQuery.create(

@@ -154,6 +154,49 @@ class ProjectionGenerationReferenceDomainTest {
         }
     }
 
+    @Test
+    void ownerlessGlobalScopeReusesExactProjectionAuthoritiesWithoutMaterializationDependency() {
+        var state = new FakeManagedLedgerProjectionMetadataStore.DurableState();
+        try (var store = projectionStore(state)) {
+            TopicProjectionRecord created = store.createFirstProjection(
+                    CLUSTER, request(NAME, 3, 1), ALLOW).join();
+            TopicProjectionRecord activated = store.activateGenerationProtocol(
+                    CLUSTER,
+                    NAME,
+                    created.projectionIdentity(),
+                    created.metadataVersion()).join();
+            StreamId streamId = new StreamId(created.streamId());
+            var domain = new ProjectionGenerationReferenceDomain(
+                    CLUSTER,
+                    store,
+                    CONFIG,
+                    ManagedLedgerGlobalScopeTestSupport.complete(streamId));
+            GcReferenceQuery ownerless = GcReferenceQuery.create(
+                    GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
+                    object(),
+                    List.of(),
+                    sha256('2'));
+
+            var clear = domain.snapshot(ownerless).join();
+
+            assertThat(clear.complete()).isTrue();
+            assertThat(clear.veto()).isFalse();
+            assertThat(clear.authorities()).hasSize(3);
+            assertThat(clear.authorities())
+                    .extracting(value -> value.authorityKey())
+                    .contains("/global/reference-scope");
+            assertThat(domain.stillMatches(ownerless, clear).join()).isTrue();
+
+            store.updateProperties(
+                    CLUSTER,
+                    NAME,
+                    activated.projectionIdentity(),
+                    activated.metadataVersion(),
+                    Map.of("owner", "global-change")).join();
+            assertThat(domain.stillMatches(ownerless, clear).join()).isFalse();
+        }
+    }
+
     private static FakeManagedLedgerProjectionMetadataStore projectionStore(
             FakeManagedLedgerProjectionMetadataStore.DurableState state) {
         return new FakeManagedLedgerProjectionMetadataStore(

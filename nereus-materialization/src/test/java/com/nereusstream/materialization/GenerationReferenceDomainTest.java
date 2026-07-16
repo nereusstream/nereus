@@ -10,6 +10,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
+import com.nereusstream.core.physical.GcGlobalReferenceScopeSnapshot;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.materialization.gc.GenerationReferenceDomain;
@@ -126,6 +127,49 @@ class GenerationReferenceDomainTest {
         var draining = domain.snapshot(query).join();
         assertThat(draining.references()).hasSize(1);
         assertThat(draining.veto()).isFalse();
+    }
+
+    @Test
+    void ownerlessGlobalScopeScansEveryAuthoritativeStreamAndRevalidatesScope() {
+        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero(
+                "/index/global-domain", 0, 2, 0, 100, 2);
+        AtomicReference<List<VersionedGenerationCandidate>> candidates =
+                new AtomicReference<>(List.of(first));
+        AtomicInteger scans = new AtomicInteger();
+        AtomicReference<GcGlobalReferenceScopeSnapshot> scope =
+                new AtomicReference<>(GcGlobalScopeTestSupport.snapshot(
+                        List.of(MaterializationPlannerTestSupport.STREAM),
+                        1,
+                        GcGlobalScopeTestSupport.sha('b')));
+        GenerationReferenceDomain domain = new GenerationReferenceDomain(
+                MaterializationPlannerTestSupport.CLUSTER,
+                store(candidates, scans),
+                PhysicalGcConfig.defaults(),
+                () -> CompletableFuture.completedFuture(scope.get()));
+        GcReferenceQuery ownerless = GcReferenceQuery.create(
+                GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
+                object(first),
+                List.of(),
+                EVIDENCE);
+
+        var snapshot = domain.snapshot(ownerless).join();
+
+        assertThat(snapshot.complete()).isTrue();
+        assertThat(snapshot.veto()).isFalse();
+        assertThat(snapshot.references()).singleElement()
+                .satisfies(reference -> assertThat(reference.referenceType())
+                        .isEqualTo("generation-zero-index"));
+        assertThat(snapshot.authorities())
+                .extracting(value -> value.authorityKey())
+                .contains("/global/reference-scope", first.key());
+        assertThat(scans).hasValue(2);
+        assertThat(domain.stillMatches(ownerless, snapshot).join()).isTrue();
+
+        scope.set(GcGlobalScopeTestSupport.snapshot(
+                List.of(MaterializationPlannerTestSupport.STREAM),
+                2,
+                GcGlobalScopeTestSupport.sha('c')));
+        assertThat(domain.stillMatches(ownerless, snapshot).join()).isFalse();
     }
 
     private static GcReferenceQuery query(VersionedGenerationZeroIndex candidate) {

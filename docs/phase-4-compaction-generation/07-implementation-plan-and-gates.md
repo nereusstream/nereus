@@ -88,10 +88,11 @@ final exact index/root reload. Checkpoint Q adds a shared replacement verifier�
 and response-loss-safe higher-generation `COMMITTED/QUARANTINED -> DRAINING`, with DRAINING plan-time reproof.
 Checkpoint R adds exact completed-trim eligibility for generation-zero and either higher view、current strictly newer
 TOPIC_COMPACTED/ACTIVE same-view replacement proof, and a pre-read source-retirement grace fence；all three higher
-eligibility branches are repeated at DRAINING plan time. Future/global domains、runtime composition and the remaining
-M4 passes are pending. Checkpoint S adds the durable cluster generation-activation record/codec/exact-key store、
+eligibility branches are repeated at DRAINING plan time. Checkpoint S adds the durable cluster generation-activation record/codec/exact-key store、
 read-only lookup、PREPARED bootstrap、monotonic CAS guard and frozen lifecycle/capability vectors. It is authority
-foundation only：backfill coordinators、future sentinel、ownerless-global proof and runtime activation remain pending.
+foundation only. Checkpoint T adds the future sentinel、activation/backfill/domain-set-gated 64-shard global scope and
+ownerless variants for all five concrete domains. Backfill/broker guard、runtime composition and the remaining M4
+cursor/root/audit passes are pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -599,19 +600,12 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 
-> Current status：in progress. Checkpoint A (NRC1 object protocol)、checkpoint B (protected generation-zero
-> append/recovery)、checkpoint C (anchor-aware tail/planning foundation), and checkpoint D (guarded root publication
-> plus restart protection reconciliation), checkpoint E (checkpoint-aware append replay adapter), and checkpoint F
-> (checkpoint-derived committed-index repair), checkpoint G (exact retirement metadata adapters), checkpoint H
-> (bounded/reconstructable GC config/candidate/plan values), and checkpoint I (exact domain aggregation、recoverable
-> root MARK/DRAIN/DELETING fence and 256-shard scanner), and checkpoint J (query-bound revalidation、exact
-> reference/removal binding and affected-stream generation/append-recovery/materialization domains), and checkpoint K
-> (core bounded snapshot builder、managed-ledger marker/exact projection authority and affected-stream
-> projection-generation/cursor-snapshot domains) are implemented；runtime composition、future-sentinel and
-> ownerless-global domains、retirement/delete coordinators
-> and physical/cursor GC completion remain before F4-M4 can be called complete or final-gated. Checkpoint L's
-> retirement-journal schema/digest、durable store/writer and PREPARE-before-MARK/final-intent authentication are
-> implemented and ordinary-gated；DELETING recovery is still required before M4 is complete.
+> Current status：in progress. Checkpoints A–R implement NRC1/protected append/recovery、checkpoint replay/index repair、
+> retirement metadata、bounded GC plan/root/journal fencing、root-authenticated destructive recovery、typed source
+> retirement and all view/trim eligibility paths. Checkpoint S implements durable generation activation metadata；
+> checkpoint T implements the future sentinel、activation-gated full registration scope and affected/ownerless variants
+> of all five reference domains. Backfill/broker guard、production runtime composition、cursor/root/audit retirement、
+> real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
 
 ### 6.1 Production artifacts
 
@@ -650,6 +644,8 @@ PreparedStableAppend.java
 MaterializedGenerationZero.java
 physical/GcReferenceDomainConfig.java                 implemented checkpoint K shared bounds
 physical/GcReferenceSnapshotBuilder.java              implemented checkpoint K canonical fail-closed builder
+physical/GcGlobalReferenceScope.java                  implemented checkpoint T protocol-neutral ownerless scope
+physical/GcGlobalReferenceScopeSnapshot.java          implemented checkpoint T canonical activation/registration facts
 OxiaMetadataStore                                prepare/commit prepared append
 OxiaJavaClientMetadataStore                      exact two-stage stable append
 AppendRecoveryAnchor.java                        implemented checkpoint C foundation
@@ -756,10 +752,12 @@ gc/GcReferenceCollectionStatus.java                      implemented checkpoint 
 gc/GcReferenceCollection.java                            implemented checkpoint I
 gc/GcReferenceDomainRegistry.java                        implemented checkpoint I
 gc/GcPlanMetadataRevalidator.java                        implemented checkpoint I
-gc/GenerationReferenceDomain.java                        implemented checkpoint J affected-stream domain
-gc/AppendRecoveryReferenceDomain.java                    implemented checkpoint J affected-stream domain
-gc/MaterializationReferenceDomain.java                   implemented checkpoint J affected-stream domain
-gc/FutureCatalogSentinelDomain.java
+gc/GenerationReferenceDomain.java                        implemented J affected, extended T ownerless
+gc/AppendRecoveryReferenceDomain.java                    implemented J affected, extended T ownerless
+gc/MaterializationReferenceDomain.java                   implemented J affected, extended T ownerless
+gc/GenerationProtocolDomainSets.java                     implemented checkpoint T exact installed set
+gc/RegisteredStreamGcGlobalReferenceScope.java           implemented checkpoint T 64-shard authority
+gc/FutureCatalogSentinelDomain.java                      implemented checkpoint T
 gc/SourceRetirementCoordinator.java                      implemented checkpoint M recovery foundation
 gc/PhysicalGcDeletionResult.java                         implemented checkpoint M recovery foundation
 gc/PhysicalGcDeletionStatus.java                         implemented checkpoint M recovery foundation
@@ -788,9 +786,9 @@ gc/GcMetricsObserver.java
 `nereus-managed-ledger`（直接依赖 core/metadata，不依赖 materialization）：
 
 ```text
-retention/CursorSnapshotReferenceDomain.java             implemented checkpoint K affected-stream domain
+retention/CursorSnapshotReferenceDomain.java             implemented K affected, extended T ownerless
 retention/CursorSnapshotGcScanner.java
-retention/ProjectionGenerationReferenceDomain.java       implemented checkpoint K affected-stream domain
+retention/ProjectionGenerationReferenceDomain.java       implemented K affected, extended T ownerless
 cursor/DefaultCursorSnapshotStore.java          pin/protection integration
 cursor/CursorSnapshotInventory.java             unchanged authority semantics
 ```
@@ -820,10 +818,11 @@ GenerationZeroPhysicalReferencePublisherTest
 ProtectedStableAppendFailureInjectionTest
 GenerationZeroVisibleProtectionRepairTest
 GcReferenceDomainRegistryTest                              implemented checkpoint I
-GcReferenceSnapshotBuilderTest                             implemented checkpoint K
-GenerationReferenceDomainTest                             implemented checkpoint J
-AppendRecoveryReferenceDomainTest                         implemented checkpoint J
-MaterializationReferenceDomainTest                        implemented checkpoint J
+GcReferenceSnapshotBuilderTest                             implemented K, extended T explicit incomplete/global scope
+RegisteredStreamGcGlobalReferenceScopeTest                 implemented checkpoint T
+GenerationReferenceDomainTest                             implemented J, extended T ownerless
+AppendRecoveryReferenceDomainTest                         implemented J, extended T ownerless
+MaterializationReferenceDomainTest                        implemented J, extended T ownerless
 ManagedLedgerGenerationProtocolTest                       implemented checkpoint K marker/CAS authority
 PhysicalObjectGarbageCollectorTest                         checkpoint I fence, extended L PREPARE/final-load tests
 PhysicalObjectGarbageCollectorModelTest
@@ -848,11 +847,11 @@ MultiStreamWalRetirementTest
 GenerationRetirementFallbackTest
 CursorSnapshotGcScannerTest
 CursorSnapshotGcRaceTest
-CursorSnapshotReferenceDomainTest                         implemented checkpoint K
-ProjectionGenerationReferenceDomainTest                   implemented checkpoint K
+CursorSnapshotReferenceDomainTest                         implemented K, extended T ownerless
+ProjectionGenerationReferenceDomainTest                   implemented K, extended T ownerless
 ObjectInventoryScannerTest
 StreamRegistrationRetirementCoordinatorTest
-FutureCatalogSentinelTest
+FutureCatalogSentinelTest                                 implemented checkpoint T
 ```
 
 The GC model enumerates all reader/protection/mark/delete orderings for a small state space. Failure tests kill after
@@ -878,6 +877,7 @@ retirement.
 ./gradlew phase4M4DestructiveRecoveryCheck
 ./gradlew phase4M4GenerationRetirementCheck
 ./gradlew phase4M4ActivationMetadataCheck
+./gradlew phase4M4GlobalDomainsCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -966,8 +966,9 @@ It verifies that a matching sealed journal is mandatory before destructive work,
 through an explicitly registered type-owned handler, an exact immutable object is HEADed/deleted under the shared
 deadline, and the exact attempt alone can CAS `DELETING -> DELETED`. Focused tests cover ordinary deletion、an already
 absent object under matching authority、same-record `DELETED` restart, and missing-journal failure before object access.
-The gate does not yet claim production source-metadata handlers, protection/metadata response-loss coverage, runtime
-composition, future-sentinel/ownerless-global domains, cursor completion or final M4 deletion enablement.
+At checkpoint M the gate did not claim production source-metadata handlers, protection/metadata response-loss
+coverage、runtime composition、future-sentinel/ownerless-global domains、cursor completion or final M4 deletion
+enablement.
 
 `phase4M4GenerationRetirementCheck` extends checkpoint M through checkpoint R. API/metadata tests freeze canonical
 inverse key decoding、encoded stream ids、both view namespaces、fixed depth/current-cluster round trips, plus exact-key
@@ -991,7 +992,8 @@ source/full-stream-snapshot/recovery-root rereads. For untrimmed TOPIC_COMPACTED
 current same-view index that covers offset/commit/cumulative bounds with matching payload/projection, plus another-
 object `ACTIVE/TOPIC_COMPACTED` root and final index/root/source reload. Tests cover successful same-view pre-drain and
 DRAINING plan reproof、MARKED replacement veto、trim success/drift and a grace result before any metadata/root read.
-Future/global domains、runtime composition、cursor/root/audit retirement and the final M4 gate remain pending.
+At checkpoint R, future/global domains、runtime composition、cursor/root/audit retirement and the final M4 gate
+remained pending；checkpoints S/T close the activation/global-domain portion only.
 
 `phase4M4ActivationMetadataCheck` extends the ordinary checkpoint chain with checkpoint S's single-key cluster
 authority foundation. It audits the exact key/partition、record fields and contradictions、explicit codec registration、
@@ -999,6 +1001,14 @@ monotonic transition guard、production Oxia create/CAS/reload behavior and thre
 contract test proves two runtime adapters converge on one PREPARED value, then advance publication and deletion facts
 without accepting stale versions or domain/capability regression. This gate does not execute any backfill、install the
 future sentinel、prove ownerless global absence or enable production capability bits.
+
+`phase4M4GlobalDomainsCheck` extends checkpoint S with checkpoint T. It audits the core global-scope contract、
+read-only activation lookup、exact deletion-ready/domain-set admission、all 64 registration shards、pagination
+progress、post-scan activation reload、authority overflow and the future sentinel. Focused tests prove activation
+absence never creates authority、unknown installed domains and publication-only rollout veto、page-size-one global
+enumeration is canonical, activation drift invalidates revalidation, and generation/append/task/projection/cursor
+domains all repeat their exact per-stream scans for ownerless queries. This gate does not execute the backfill/broker
+barrier or install production runtime deletion.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

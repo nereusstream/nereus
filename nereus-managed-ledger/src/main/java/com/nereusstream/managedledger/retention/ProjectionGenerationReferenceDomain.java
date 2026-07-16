@@ -3,10 +3,10 @@ package com.nereusstream.managedledger.retention;
 
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.physical.GcAuthorityToken;
+import com.nereusstream.core.physical.GcGlobalReferenceScope;
 import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceDomainConfig;
 import com.nereusstream.core.physical.GcReferenceQuery;
-import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
 import com.nereusstream.core.physical.GcReferenceSnapshotBuilder;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
@@ -17,6 +17,7 @@ import com.nereusstream.metadata.oxia.ManagedLedgerStreamProjection;
 import com.nereusstream.metadata.oxia.VersionedTopicProjection;
 import com.nereusstream.metadata.oxia.VersionedVirtualLedgerProjection;
 import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -28,15 +29,29 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
     private final String cluster;
     private final ManagedLedgerProjectionMetadataStore metadataStore;
     private final GcReferenceDomainConfig config;
+    private final GcGlobalReferenceScope globalScope;
     private final ManagedLedgerProjectionKeyspace keys;
 
     public ProjectionGenerationReferenceDomain(
             String cluster,
             ManagedLedgerProjectionMetadataStore metadataStore,
             GcReferenceDomainConfig config) {
+        this(
+                cluster,
+                metadataStore,
+                config,
+                GcGlobalReferenceScope.unsupported());
+    }
+
+    public ProjectionGenerationReferenceDomain(
+            String cluster,
+            ManagedLedgerProjectionMetadataStore metadataStore,
+            GcReferenceDomainConfig config,
+            GcGlobalReferenceScope globalScope) {
         this.cluster = requireText(cluster, "cluster");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         this.config = Objects.requireNonNull(config, "config");
+        this.globalScope = Objects.requireNonNull(globalScope, "globalScope");
         this.keys = new ManagedLedgerProjectionKeyspace(cluster);
     }
 
@@ -53,14 +68,11 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        if (query.kind() == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
-            return CompletableFuture.completedFuture(
-                    GcReferenceSnapshotBuilder.unsupportedOwnerless(
-                            DOMAIN_ID, PROTOCOL_VERSION, query));
-        }
         GcReferenceSnapshotBuilder builder = new GcReferenceSnapshotBuilder(
                 DOMAIN_ID, PROTOCOL_VERSION, query, config);
-        return scan(query, builder, 0);
+        return GcGlobalReferenceScope.resolveStreams(
+                        query, builder, globalScope)
+                .thenCompose(streams -> scan(query, streams, builder, 0));
     }
 
     @Override
@@ -78,19 +90,20 @@ public final class ProjectionGenerationReferenceDomain implements GcReferenceDom
 
     private CompletableFuture<GcReferenceSnapshot> scan(
             GcReferenceQuery query,
+            List<StreamId> streams,
             GcReferenceSnapshotBuilder builder,
             int streamIndex) {
         if (builder.limitExceeded()
-                || streamIndex == query.affectedStreams().size()) {
+                || streamIndex == streams.size()) {
             return CompletableFuture.completedFuture(builder.build());
         }
-        StreamId streamId = query.affectedStreams().get(streamIndex);
+        StreamId streamId = streams.get(streamIndex);
         return metadataStore.getProjectionByStream(cluster, streamId).thenCompose(view -> {
             addProjectionAuthorities(builder, streamId, view);
             if (builder.limitExceeded()) {
                 return CompletableFuture.completedFuture(builder.build());
             }
-            return scan(query, builder, streamIndex + 1);
+            return scan(query, streams, builder, streamIndex + 1);
         });
     }
 

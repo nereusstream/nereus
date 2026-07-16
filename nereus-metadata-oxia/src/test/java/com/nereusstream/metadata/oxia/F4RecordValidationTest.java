@@ -26,6 +26,7 @@ import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
+import com.nereusstream.metadata.oxia.records.ReferenceDomainVersionRecord;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -192,6 +193,34 @@ class F4RecordValidationTest {
                         0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot be newer");
+    }
+
+    @Test
+    void rejectsMultipleProtocolVersionsForOneActivationDomainId() {
+        List<ReferenceDomainVersionRecord> domains = new java.util.ArrayList<>(
+                F4MetadataTestValues.referenceDomains());
+        domains.add(1, new ReferenceDomainVersionRecord("append-recovery-v1", 2));
+
+        assertThatThrownBy(() -> new GenerationProtocolActivationRecord(
+                        1,
+                        1,
+                        GenerationProtocolActivationLifecycle.PREPARED,
+                        false,
+                        false,
+                        false,
+                        0,
+                        domains,
+                        GenerationBackfillProofRecord.incomplete(0),
+                        GenerationBackfillProofRecord.incomplete(0),
+                        GenerationBackfillProofRecord.incomplete(0),
+                        "",
+                        F4MetadataTestValues.PROCESS,
+                        100,
+                        0,
+                        100,
+                        0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unique domain ids");
     }
 
     private static GenerationIndexRecord generationLifecycle(

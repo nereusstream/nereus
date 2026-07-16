@@ -144,8 +144,8 @@ COMMITTED-view whole-range NRC1/count/schema proof and response-loss-safe higher
 `COMMITTED/QUARANTINED -> DRAINING`, then repeats that proof when a DRAINING removal is frozen. Checkpoint R adds
 exact completed-trim eligibility for generation-zero and either higher view、strictly newer current
 TOPIC_COMPACTED/ACTIVE same-view replacement eligibility, and a zero-read `sourceRetirementGrace` admission fence.
-Future-sentinel、ownerless global domains、cursor/root/audit completion and runtime composition remain planned；
-therefore production deletion is still disabled.
+Checkpoint T implements future-sentinel and ownerless global domain variants；cursor/root/audit completion and runtime
+composition remain planned，so production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -828,8 +828,8 @@ operation deadline rather than acquiring independent timeout budgets.
 `GcPlanMetadataRevalidator` is mandatory, not a permissive default. It reloads the authoritative typed metadata facts
 selected by the future source/orphan/cursor planner；the collector canonicalizes and compares the entire returned list
 before MARK and twice during DRAIN. Checkpoint J implements three storage domains and checkpoint K implements the two
-managed-ledger domains in the table below；future-sentinel and ownerless-global variants are pending. Config defaults
-continue to keep mutation disabled and dry-run on.
+managed-ledger domains in the table below；checkpoint T adds the future sentinel and activation-gated ownerless-global
+variants. Config defaults continue to keep mutation disabled and dry-run on.
 
 The query is a core value；materialization's `GcCandidate` wraps it with retry/plan timestamps and never appears in
 the SPI. Affected streams are sorted/unique and capped at 4,096；`REFERENCED_OBJECT` and
@@ -844,8 +844,10 @@ repeats the authoritative scan；no domain may recover scope from a process-loca
 Checkpoint K makes that bounded behavior reusable outside materialization. `GcReferenceDomainConfig` validates
 page size in `[1, 1000]` and authority/reference limits in `[1, 100000]`；`GcReferenceSnapshotBuilder` canonical-sorts
 both lists, retains at most the configured values, reports the first overflow as count `max + 1`, and forces
-`complete=false/veto=true`. `unsupportedOwnerless` is the single fail-closed construction used by domains that lack
-global enumeration. `PhysicalGcConfig.referenceDomainConfig()` supplies the same limits to all implementations.
+`complete=false/veto=true`. Checkpoint K's `unsupportedOwnerless` remains a compatibility helper；checkpoint T's
+default domain constructors instead inject `GcGlobalReferenceScope.unsupported()`, whose explicit incomplete snapshot
+flows through the same builder. `PhysicalGcConfig.referenceDomainConfig()` supplies the same limits to all
+implementations.
 
 Checkpoint J's concrete rules are：
 
@@ -859,9 +861,10 @@ Checkpoint J's concrete rules are：
   `PLANNED/CLAIMED/OUTPUT_READY/PUBLISHING/RETRY_WAIT` set `veto=true`; terminal tasks remain workflow authorities but
   no longer own physical correctness references.
 
-All three stop with incomplete+veto after the configured bound. All three also return incomplete+veto for
-`OWNERLESS_ORPHAN_CANDIDATE`：the current stream-registration registry is a hint and cannot prove global absence.
-Ownerless permission requires the later registration/physical-root backfill epoch plus all global domains.
+All three stop with incomplete+veto after the configured bound. At checkpoint J they also returned incomplete+veto for
+`OWNERLESS_ORPHAN_CANDIDATE` because the stream-registration registry alone is a hint. Checkpoint T supplies the
+required registration/physical-root/cursor backfill epoch plus exact installed-domain authority before the same scans
+may consume the full registry as scope.
 
 Checkpoint K's managed-ledger rules are：
 
@@ -878,29 +881,31 @@ Checkpoint K's managed-ledger rules are：
   also vetoes.
 
 Both domains rerun the full query for `stillMatches` and use exact F3/F2 stored-envelope digests, so state、identity、
-root or version drift cannot survive DRAIN. Both return incomplete+veto for ownerless queries. The shared builder lives
-in core specifically so `nereus-managed-ledger` does not depend on materialization.
+root or version drift cannot survive DRAIN. Their default constructors still return incomplete+veto for ownerless
+queries；checkpoint T's runtime-facing constructors accept the protocol-neutral core global scope and scan its exact
+streams. The shared builder/scope live in core specifically so `nereus-managed-ledger` does not depend on
+materialization.
 
 F4 registers：
 
 | Domain | Revalidated authority |
 | --- | --- |
-| `generation-v1` | implemented J for affected streams：both-view exact indexes and DRAINING eligibility |
-| `append-recovery-v1` | implemented J for affected streams：head + optional stable recovery root + complete live tail |
-| `materialization-v1` | implemented J for affected streams：task roots/output/source identities and active-task veto |
-| `projection-generation-v1` | implemented K for affected streams：exact F2 binding/current-topic authority、marker and strict old-incarnation unaddressability proof |
-| `cursor-snapshot-v1` | implemented K for affected streams：exact F3 retention authority + complete paged cursor roots and live-root veto |
-| `future-catalog-sentinel-v1` | veto if any later catalog capability is active without its plugin |
+| `generation-v1` | implemented J affected / T ownerless：both-view exact indexes and DRAINING eligibility |
+| `append-recovery-v1` | implemented J affected / T ownerless：head + optional stable recovery root + complete live tail |
+| `materialization-v1` | implemented J affected / T ownerless：task roots/output/source identities and active-task veto |
+| `projection-generation-v1` | implemented K affected / T ownerless：exact F2 binding/current-topic authority、marker and strict old-incarnation unaddressability proof |
+| `cursor-snapshot-v1` | implemented K affected / T ownerless：exact F3 retention authority + complete paged cursor roots and live-root veto |
+| `future-catalog-sentinel-v1` | implemented T：veto if durable required domain set differs from installed plugins or deletion stage is disabled |
 
 The durable cluster generation-activation record stores the exact required domain id/version set. Runtime startup
 fails F4 readiness if its registered set differs. Future 6 must atomically add its capability/domain before writing a
 catalog reference；F4 never interprets absence of a plugin as absence of references.
 
 Checkpoint S implements this record/codec/exact-key store and its monotonic CAS authority, including a read-only `get`
-that future GC scans can use without bootstrapping cluster state. It also freezes three backfill-proof slots、the broker
-readiness epoch and V1's all-or-nothing physical/cursor deletion rule. It does not yet provide the sentinel or global
-stream enumeration：until the backfill coordinators, exact installed-domain comparison and ownerless scans land, an
-ownerless query remains incomplete+veto and production deletion remains disabled.
+that GC scans use without bootstrapping cluster state. It also freezes three backfill-proof slots、the broker readiness
+epoch and V1's all-or-nothing physical/cursor deletion rule. Checkpoint T adds exact installed-domain comparison、
+sentinel and full ownerless scans. The actual backfill coordinators and broker/runtime activation are still pending, so
+production deletion remains disabled.
 
 `projection-generation-v1` makes the per-topic downgrade fence usable by protocol-neutral GC. For each affected
 stream, the implemented proof requires one of：the exact current identity is `DELETED`；the exact current live identity
@@ -1135,8 +1140,8 @@ the bounded candidate/plan/digest values. Checkpoint I implements registry colle
   `ObjectStore.deleteObject`, so `DELETE_INTENT` is the terminal result of this checkpoint.
 
 Candidate discovery and typed metadata-plan construction remain owned by later source/orphan/cursor coordinators.
-The future-catalog sentinel、ownerless-global domain variants and production runtime composition remain pending；the
-five affected-stream storage/projection/cursor domains implemented through checkpoint K are not production-composed.
+Checkpoint T implements the future-catalog sentinel and ownerless-global variants, but production runtime composition
+remains pending；the five affected/ownerless storage/projection/cursor domains are not production-composed.
 Checkpoint M supplies the first DELETING-recovery coordinator and checkpoint N reaches the checkpoint-G
 generation-zero-index delete primitive plus higher-index CAS. Marker/commit-node typed actions and their planner are
 still pending. A missing key or lost metadata-delete response is resolved only under the unchanged DELETING

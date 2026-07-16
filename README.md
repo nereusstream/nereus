@@ -175,8 +175,10 @@ healthy replacement 证明、candidate-root final fence 和 response-loss-safe
 Checkpoint R 又补齐 completed-trim 和 `TOPIC_COMPACTED` same-view replacement 两条 eligibility 分支，并在任何
 metadata/root read 前执行 source-retirement grace。Checkpoint S 已落地 cluster generation activation 的 exact
 record/codec/key、read-only lookup、PREPARED bootstrap、monotonic CAS 与冻结 golden/contract tests，作为后续
-global proof 和 M5 rollout 的 durable authority foundation。Future sentinel/ownerless-global proof、backfill/
-broker activation guard、runtime composition，以及 F4-M5–M6 的 async profile 与最终兼容接线仍不可用；所有
+global proof 和 M5 rollout 的 durable authority foundation。Checkpoint T 又新增 activation/backfill/domain-set
+gated 的 64-shard global scope、future-catalog sentinel，并让 generation/append/materialization/projection/cursor
+五个 domain 对 ownerless query 执行同一 authoritative stream set 的完整扫描与重验。Backfill/broker activation
+guard、production runtime composition，以及 F4-M5–M6 的 async profile 与最终兼容接线仍不可用；所有
 capability bits 和 production deletion 继续关闭。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。

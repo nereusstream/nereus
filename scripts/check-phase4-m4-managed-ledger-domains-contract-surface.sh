@@ -68,14 +68,16 @@ require_literal "getProjectionByStream" "$projection_domain"
 require_literal "ManagedLedgerGenerationProtocol.isActivated" "$projection_domain"
 require_literal "ManagedLedgerFacadeState.DELETED" "$projection_domain"
 require_literal "currentIdentity.incarnation() > historical.incarnation()" "$projection_domain"
-require_literal "unsupportedOwnerless" "$projection_domain"
+require_literal "GcGlobalReferenceScope.unsupported()" "$projection_domain"
+require_literal "GcGlobalReferenceScope.resolveStreams" "$projection_domain"
 
 require_literal 'DOMAIN_ID = "cursor-snapshot-v1"' "$cursor_domain"
 require_literal "getRetention" "$cursor_domain"
 require_literal "scanCursors" "$cursor_domain"
 require_literal "CursorRetentionLifecycle.ACTIVE" "$cursor_domain"
 require_literal '"cursor-snapshot-root"' "$cursor_domain"
-require_literal "unsupportedOwnerless" "$cursor_domain"
+require_literal "GcGlobalReferenceScope.unsupported()" "$cursor_domain"
+require_literal "GcGlobalReferenceScope.resolveStreams" "$cursor_domain"
 
 require_literal "lostGenerationActivationResponseConvergesFromTheExactTopicAuthority" \
     "nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/ManagedLedgerGenerationProtocolTest.java"

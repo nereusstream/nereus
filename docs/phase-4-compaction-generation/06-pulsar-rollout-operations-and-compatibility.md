@@ -419,6 +419,11 @@ Concurrent PREPARED creation converges on the existing exact record, and compare
 exact desired replacement reloaded at a later metadata version. Broker capability collection、the three backfill
 executors、future sentinel and runtime activation guard remain later rollout work.
 
+Checkpoint T implements the sentinel and global-scope consumer side. It accepts the 64-shard registration set as
+ownerless scope only under an exact ACTIVE/deletion-ready activation wrapper with all three completed backfills and an
+exact installed domain set, then rereads that wrapper after enumeration. This does not implement or simulate the
+backfill executors/broker readiness barrier；production cannot manufacture those proofs from the scanner itself.
+
 Schema/protocol are `1`. Domain pairs are canonical sorted/unique, non-empty and capped at 32. Run/broker ids are
 random 128-bit lowercase base32；coverage/capability digests are lowercase SHA-256. An incomplete backfill has empty
 run/digest、zero completion time but still records the readiness epoch being attempted；a complete proof has all

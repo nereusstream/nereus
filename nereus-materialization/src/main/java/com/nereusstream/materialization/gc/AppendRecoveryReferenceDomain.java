@@ -9,10 +9,10 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.core.physical.GcAuthorityToken;
+import com.nereusstream.core.physical.GcGlobalReferenceScope;
 import com.nereusstream.core.physical.GcReference;
 import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceQuery;
-import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
 import com.nereusstream.core.physical.GcReferenceSnapshotBuilder;
 import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -47,6 +48,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
     private final OxiaMetadataStore l0MetadataStore;
     private final GenerationMetadataStore generationStore;
     private final PhysicalGcConfig config;
+    private final GcGlobalReferenceScope globalScope;
     private final OxiaKeyspace l0Keys;
     private final F4Keyspace f4Keys;
 
@@ -55,10 +57,25 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
             OxiaMetadataStore l0MetadataStore,
             GenerationMetadataStore generationStore,
             PhysicalGcConfig config) {
+        this(
+                cluster,
+                l0MetadataStore,
+                generationStore,
+                config,
+                GcGlobalReferenceScope.unsupported());
+    }
+
+    public AppendRecoveryReferenceDomain(
+            String cluster,
+            OxiaMetadataStore l0MetadataStore,
+            GenerationMetadataStore generationStore,
+            PhysicalGcConfig config,
+            GcGlobalReferenceScope globalScope) {
         this.cluster = requireText(cluster, "cluster");
         this.l0MetadataStore = Objects.requireNonNull(l0MetadataStore, "l0MetadataStore");
         this.generationStore = Objects.requireNonNull(generationStore, "generationStore");
         this.config = Objects.requireNonNull(config, "config");
+        this.globalScope = Objects.requireNonNull(globalScope, "globalScope");
         this.l0Keys = new OxiaKeyspace(cluster);
         this.f4Keys = new F4Keyspace(cluster);
     }
@@ -76,14 +93,12 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
     @Override
     public CompletableFuture<GcReferenceSnapshot> snapshot(GcReferenceQuery query) {
         Objects.requireNonNull(query, "query");
-        if (query.kind() == GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE) {
-            return CompletableFuture.completedFuture(
-                    GcReferenceSnapshotBuilder.unsupportedOwnerless(
-                            DOMAIN_ID, PROTOCOL_VERSION, query));
-        }
         GcReferenceSnapshotBuilder accumulator = new GcReferenceSnapshotBuilder(
                 DOMAIN_ID, PROTOCOL_VERSION, query, config.referenceDomainConfig());
-        return scanStream(query, accumulator, 0);
+        return GcGlobalReferenceScope.resolveStreams(
+                        query, accumulator, globalScope)
+                .thenCompose(streams ->
+                        scanStream(query, streams, accumulator, 0));
     }
 
     @Override
@@ -101,13 +116,14 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scanStream(
             GcReferenceQuery query,
+            List<StreamId> streams,
             GcReferenceSnapshotBuilder accumulator,
             int streamIndex) {
         if (accumulator.limitExceeded()
-                || streamIndex == query.affectedStreams().size()) {
+                || streamIndex == streams.size()) {
             return CompletableFuture.completedFuture(accumulator.build());
         }
-        StreamId streamId = query.affectedStreams().get(streamIndex);
+        StreamId streamId = streams.get(streamIndex);
         return generationStore.getRecoveryRoot(cluster, streamId).thenCompose(optionalRoot -> {
             addRoot(query, accumulator, streamId, optionalRoot);
             if (accumulator.limitExceeded()) {
@@ -118,6 +134,7 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
                     .orElseGet(() -> AppendRecoveryAnchor.genesis(streamId));
             return scanTail(
                     query,
+                    streams,
                     accumulator,
                     streamIndex,
                     anchor,
@@ -128,12 +145,13 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
 
     private CompletableFuture<GcReferenceSnapshot> scanTail(
             GcReferenceQuery query,
+            List<StreamId> streams,
             GcReferenceSnapshotBuilder accumulator,
             int streamIndex,
             AppendRecoveryAnchor anchor,
             Optional<AppendRecoveryTailCursor> continuation,
             AppendRecoveryHead expectedHead) {
-        StreamId streamId = query.affectedStreams().get(streamIndex);
+        StreamId streamId = streams.get(streamIndex);
         return l0MetadataStore.readAppendRecoveryTail(
                         cluster,
                         streamId,
@@ -158,13 +176,14 @@ public final class AppendRecoveryReferenceDomain implements GcReferenceDomain {
                     if (page.continuation().isPresent()) {
                         return scanTail(
                                 query,
+                                streams,
                                 accumulator,
                                 streamIndex,
                                 anchor,
                                 page.continuation(),
                                 observed);
                     }
-                    return scanStream(query, accumulator, streamIndex + 1);
+                    return scanStream(query, streams, accumulator, streamIndex + 1);
                 });
     }
 
