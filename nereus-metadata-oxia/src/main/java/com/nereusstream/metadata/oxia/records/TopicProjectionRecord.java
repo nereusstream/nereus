@@ -46,8 +46,18 @@ public record TopicProjectionRecord(
                 || !streamId.equals(ManagedLedgerProjectionNames.streamId(managedLedgerName, incarnation).value())) {
             throw new IllegalArgumentException("topic projection stream identity mismatch");
         }
+        StorageProfile parsedProfile;
+        try {
+            parsedProfile = StorageProfile.valueOf(storageProfile);
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalArgumentException(
+                    "unknown topic projection storage profile",
+                    failure);
+        }
         if (!ManagedLedgerProjectionNames.STORAGE_CLASS.equals(storageClass)
-                || !StorageProfile.OBJECT_WAL_SYNC_OBJECT.name().equals(storageProfile)
+                || parsedProfile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                        && parsedProfile
+                                != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
                 || virtualLedgerId < ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID
                 || virtualLedgerId >= Long.MAX_VALUE
                 || positionMappingVersion != ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION

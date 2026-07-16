@@ -180,8 +180,12 @@ public final class PositionProjection {
                 .equals(snapshot.streamName())) {
             throw new ProjectionValidationException("projection and stream snapshot have different stream names");
         }
-        if (snapshot.profile().canonical() != StorageProfile.OBJECT_WAL_SYNC_OBJECT) {
-            throw new ProjectionValidationException("F2 requires OBJECT_WAL_SYNC_OBJECT");
+        StorageProfile profile = snapshot.profile().canonical();
+        if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                && profile
+                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+            throw new ProjectionValidationException(
+                    "F2 requires an Object-WAL storage profile");
         }
         if (!snapshot.attributes().equals(REQUIRED_ATTRIBUTES)) {
             throw new ProjectionValidationException("stream payload mapping attributes do not match F2");

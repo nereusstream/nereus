@@ -174,6 +174,7 @@ class MaterializationConfigTest {
                     lagThrottleBytes,
                     lagRejectBytes,
                     Duration.ofMinutes(5),
+                    Duration.ofMillis(25),
                     Duration.ofHours(1),
                     Duration.ofHours(1),
                     metadataAuditGrace,

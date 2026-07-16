@@ -37,11 +37,20 @@ class ProjectionMetadataModelTest {
                                 payloadAttributes()), Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("canonical empty");
-        assertThatThrownBy(() -> new ProjectionCreateRequest(
-                        NAME, 3, 1, stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL_ASYNC_OBJECT, 0, 0, 0,
-                                payloadAttributes()), Map.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("canonical empty");
+        ProjectionCreateRequest async = new ProjectionCreateRequest(
+                NAME,
+                3,
+                1,
+                stream(
+                        StreamState.ACTIVE,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+                        0,
+                        0,
+                        0,
+                        payloadAttributes()),
+                Map.of());
+        assertThat(async.emptyStream().profile())
+                .isEqualTo(StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
         assertThatThrownBy(() -> new ProjectionCreateRequest(
                         NAME, 3, 1, stream(StreamState.ACTIVE, StorageProfile.OBJECT_WAL, 0, 0, 0,
                                 payloadAttributes()), Map.of()))

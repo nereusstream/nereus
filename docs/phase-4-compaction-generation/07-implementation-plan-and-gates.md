@@ -116,8 +116,10 @@ Checkpoint AC adds the product-owned publication coordinator、proof-gated
 revalidation and broker sequencing after a zero-failure durable backfill proof. The task/index/checkpoint/trim/delete
 mutation call sites remain pending. Checkpoint AD adds the opt-in Phase 4 Object-WAL profile matrix、protected-head
 `WAL_DURABLE` acknowledgement boundary、independently bounded generation-zero repair、root-stable restart scanner and
-protected read-after-commit live repair. Legacy runtime constructors remain Phase 1.5-only；pre-IO activation/lag
-admission and production F4 reader/scanner composition remain pending.
+protected read-after-commit live repair. Checkpoint AE adds exact F2 sync/async profile round-trip、per-stream-lane
+pre-IO activation/marker proof and final revalidation、authoritative records/bytes/age lag measurement and
+throttle/reject semantics. Legacy runtime constructors remain Phase 1.5-only；production provider/Pulsar config and F4
+reader/scanner/service composition remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1111,9 +1113,15 @@ bounded audit metadata only after the long grace, while a stale first/retried PU
 ```text
 nereus-core/.../profile/Phase4StorageProfileResolver.java             implemented checkpoint AD
 nereus-core/.../append/AsyncObjectWalAppendCoordinator.java          implemented checkpoint AD
+nereus-core/.../append/AppendAdmissionGuard.java                      implemented checkpoint AE
+nereus-core/.../append/AppendAdmissionRequest.java                    implemented checkpoint AE
 nereus-core/.../recovery/GenerationZeroRepairScanner.java            implemented checkpoint AD
 nereus-core/.../read/ReadAfterStableCommitRepair.java                implemented checkpoint AD
-nereus-core/.../backpressure/MaterializationLagGate.java
+nereus-core/.../backpressure/MaterializationLagSnapshot.java          implemented checkpoint AE
+nereus-core/.../backpressure/MaterializationLagSnapshotReader.java    implemented checkpoint AE
+nereus-core/.../backpressure/MaterializationLagThresholds.java        implemented checkpoint AE
+nereus-core/.../backpressure/MaterializationLagGate.java              implemented checkpoint AE
+nereus-materialization/.../DefaultMaterializationLagSnapshotReader.java implemented checkpoint AE
 
 nereus-metadata-oxia/.../ManagedLedgerGenerationProtocol.java       protocol/CAS foundation implemented K
 nereus-metadata-oxia/.../ManagedLedgerProtocolProperties.java       composed property validator implemented K
@@ -1144,6 +1152,7 @@ nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCan
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationRegistrationBackfillProofCoordinator.java checkpoint AA product boundary
 nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java checkpoint AA proof CAS
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationGuard.java checkpoint AB exact admission/proof
+nereus-managed-ledger/.../generation/ManagedLedgerAsyncAppendAdmissionGuard.java checkpoint AE pre-IO proof/lag admission
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationCoordinator.java checkpoint AC product boundary
 nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationProtocolActivationCoordinator.java checkpoint AC ACTIVE CAS
 nereus-managed-ledger/.../NereusManagedLedger.java
@@ -1190,7 +1199,9 @@ AsyncObjectWalAppendCoordinatorTest                                 implemented 
 AsyncAppendPhysicalProtectionTest                                   implemented checkpoint AD
 AsyncReadAfterCommitRepairTest                                      implemented checkpoint AD
 GenerationZeroRepairScannerTest                                     implemented checkpoint AD
-MaterializationLagGateTest
+MaterializationLagGateTest                                          implemented checkpoint AE
+DefaultMaterializationLagSnapshotReaderTest                         implemented checkpoint AE
+ManagedLedgerAsyncAppendAdmissionGuardTest                          implemented checkpoint AE
 ManagedLedgerGenerationProtocolTest                         implemented K protocol/CAS foundation
 ManagedLedgerGenerationProjectionRefV1GoldenTest
 ManagedLedgerMaterializationRegistrationCoordinatorTest    implemented checkpoint X identity/hint/response-loss/drift
@@ -1321,6 +1332,16 @@ for exact `VISIBLE_GENERATION` protection、secondary failure cannot revoke an a
 repair materializes and protects the exact reachable commit、trim wins without creating a new index, and
 NRC1-covered offsets are not regenerated as generation zero. It does not install the resolver in the production
 provider, create the first topic marker, apply lag admission, or claim async Pulsar policy support.
+
+Checkpoint AE closes the next product-neutral cut without claiming production rollout. It adds exact sync/async
+Object-WAL profile persistence across F2 create/open/append, inserts activation/first-marker proof plus final
+revalidation and authoritative lag admission into the per-stream append lane before writer preparation, and derives
+lag from rebuilt current-policy COMMITTED coverage rather than tasks/checkpoint counters. Focused tests cover blocked
+pre-I/O admission、one-delay remeasurement、records/bytes/age rejection、disabled thresholds、projection/profile
+contradictions、proof revalidation、exact live-tail bytes/age and ahead-checkpoint rejection. On 2026-07-16 the full
+`:nereus-core:test :nereus-metadata-oxia:test :nereus-managed-ledger:test :nereus-materialization:test` regression
+passed. A named checkpoint-AE gate, production provider composition and locked Pulsar profile/config tests remain for
+the next checkpoint.
 
 ## 8. F4-M6 — Final Acceptance
 

@@ -93,6 +93,7 @@ public final class AppendCoordinator implements AutoCloseable {
     private final GenerationZeroPhysicalReferencePublisher physicalReferences;
     private final AppendRecoverySearcher recoverySearcher;
     private final StorageProfileResolver profileResolver;
+    private final AppendAdmissionGuard appendAdmissionGuard;
     private final AsyncObjectWalAppendCoordinator appendCompletionCoordinator;
     private final ConcurrentHashMap<StreamId, StreamLane> lanes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<AppendAttemptId, Attempt> retainedAttempts = new ConcurrentHashMap<>();
@@ -154,6 +155,30 @@ public final class AppendCoordinator implements AutoCloseable {
             StorageProfileResolver profileResolver,
             Clock clock,
             Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                sessionManager,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                AppendAdmissionGuard.noOp(),
+                clock,
+                callbackExecutor);
+    }
+
+    public AppendCoordinator(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            AppendSessionManager sessionManager,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Clock clock,
+            Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
@@ -161,6 +186,8 @@ public final class AppendCoordinator implements AutoCloseable {
         this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
         this.recoverySearcher = Objects.requireNonNull(recoverySearcher, "recoverySearcher");
         this.profileResolver = Objects.requireNonNull(profileResolver, "profileResolver");
+        this.appendAdmissionGuard = Objects.requireNonNull(
+                appendAdmissionGuard, "appendAdmissionGuard");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.writerRunIdHash = DeterministicIds.stableHashComponent(config.processRunId());
@@ -240,7 +267,10 @@ public final class AppendCoordinator implements AutoCloseable {
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "load stream profile")
                 .thenApplyAsync(metadata -> validateProfile(metadata, options), callbackExecutor)
-                .thenComposeAsync(ignored -> acceptAndEnqueue(attempt), callbackExecutor);
+                .thenComposeAsync(profile -> {
+                    attempt.setStorageProfile(profile);
+                    return acceptAndEnqueue(attempt);
+                }, callbackExecutor);
         pipeline.whenComplete((value, error) -> {
             if (error == null) {
                 attempt.completeQuiescedIfNoHeadSource();
@@ -576,17 +606,29 @@ public final class AppendCoordinator implements AutoCloseable {
         }
         rejectClosedBeforeUpload();
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start append");
-        CompletableFuture<Long> expectedOffset = lane.expectedOffset() == null
-                ? attempt.deadline().bound(
-                                () -> metadataStore.getCommittedEndOffset(config.cluster(), attempt.streamId()),
-                                AppendOutcome.KNOWN_NOT_COMMITTED,
-                                "load committed end offset")
-                        .thenApply(record -> {
-                            lane.initializeExpectedOffset(record.committedEndOffset());
-                            return record.committedEndOffset();
-                        })
-                : CompletableFuture.completedFuture(lane.expectedOffset());
-        return expectedOffset
+        return attempt.deadline().bound(
+                        () -> appendAdmissionGuard.admit(
+                                new AppendAdmissionRequest(
+                                        attempt.streamId(),
+                                        attempt.storageProfile(),
+                                        attempt.options().durabilityLevel(),
+                                        attempt.deadline().remaining())),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "admit append before primary WAL IO")
+                .thenCompose(ignored -> lane.expectedOffset() == null
+                        ? attempt.deadline().bound(
+                                        () -> metadataStore.getCommittedEndOffset(
+                                                config.cluster(),
+                                                attempt.streamId()),
+                                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                                        "load committed end offset")
+                                .thenApply(record -> {
+                                    lane.initializeExpectedOffset(
+                                            record.committedEndOffset());
+                                    return record.committedEndOffset();
+                                })
+                        : CompletableFuture.completedFuture(
+                                lane.expectedOffset()))
                 .thenCompose(offset -> sessionManager.ensureSession(
                         attempt.streamId(),
                         attempt.options().appendSession(),
@@ -800,7 +842,9 @@ public final class AppendCoordinator implements AutoCloseable {
         }, callbackExecutor);
     }
 
-    private StreamMetadataRecord validateProfile(StreamMetadataRecord metadata, AppendOptions options) {
+    private StorageProfile validateProfile(
+            StreamMetadataRecord metadata,
+            AppendOptions options) {
         StreamState state;
         StorageProfile profile;
         try {
@@ -822,7 +866,7 @@ public final class AppendCoordinator implements AutoCloseable {
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
         profileResolver.requireExecutable(profile, options.durabilityLevel(), true, true);
-        return metadata;
+        return profile;
     }
 
     private ObjectManifestRecord toManifest(WalWriteResult result, AppendSession session) {
@@ -1012,6 +1056,7 @@ public final class AppendCoordinator implements AutoCloseable {
         private volatile WalWriteResult writeResult;
         private volatile WrittenStreamSlice slice;
         private volatile StreamLane lane;
+        private volatile StorageProfile storageProfile;
         private volatile CompletableFuture<StableAppendResult> headSource;
         private volatile CompletableFuture<AppendResult> recoveryFlight;
         private volatile com.nereusstream.metadata.oxia.AppendReplayCursor replayCursor;
@@ -1036,6 +1081,18 @@ public final class AppendCoordinator implements AutoCloseable {
 
         void attachLane(StreamLane value) { lane = value; }
         StreamLane lane() { return Objects.requireNonNull(lane, "attempt lane"); }
+        void setStorageProfile(StorageProfile value) {
+            if (storageProfile != null) {
+                throw new IllegalStateException(
+                        "append storage profile is already captured");
+            }
+            storageProfile = Objects.requireNonNull(
+                    value, "storageProfile").canonical();
+        }
+        StorageProfile storageProfile() {
+            return Objects.requireNonNull(
+                    storageProfile, "storageProfile");
+        }
 
         void retainPhysical(CommitAppendRequest request, WalWriteResult result, WrittenStreamSlice writtenSlice) {
             commitRequest = Objects.requireNonNull(request);

@@ -26,25 +26,47 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Centralizes every F2 request option sent to protocol-neutral L0. */
 public final class F2L0RequestFactory {
     public static final String TERMINATE_REASON = "pulsar-managed-ledger-terminate";
     public static final String DELETE_REASON = "pulsar-managed-ledger-delete";
+    private final StorageProfile createProfile;
+
+    public F2L0RequestFactory() {
+        this(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
+
+    public F2L0RequestFactory(StorageProfile createProfile) {
+        this.createProfile = requireObjectWalProfile(createProfile);
+    }
 
     public StreamCreateOptions createOptions() {
         return new StreamCreateOptions(
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                createProfile,
                 Map.of(
                         ManagedLedgerProjectionNames.PAYLOAD_MAPPING_ATTRIBUTE,
                         ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1));
     }
 
     public AppendOptions appendOptions(Duration timeout) {
+        return appendOptions(
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                timeout);
+    }
+
+    public AppendOptions appendOptions(
+            StorageProfile profile,
+            Duration timeout) {
+        StorageProfile exact = requireObjectWalProfile(profile);
         return new AppendOptions(
                 Optional.empty(),
-                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                exact == StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                        ? DurabilityLevel.WAL_DURABLE
+                        : DurabilityLevel
+                                .WAL_DURABLE_AND_INDEX_COMMITTED,
                 timeout,
                 true,
                 Map.of());
@@ -64,5 +86,19 @@ public final class F2L0RequestFactory {
 
     public DeleteOptions deleteOptions(Duration timeout) {
         return new DeleteOptions(timeout, DELETE_REASON);
+    }
+
+    private static StorageProfile requireObjectWalProfile(
+            StorageProfile profile) {
+        StorageProfile exact = Objects.requireNonNull(
+                        profile, "profile")
+                .canonical();
+        if (exact != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                && exact
+                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+            throw new IllegalArgumentException(
+                    "managed-ledger facade requires an Object-WAL profile");
+        }
+        return exact;
     }
 }

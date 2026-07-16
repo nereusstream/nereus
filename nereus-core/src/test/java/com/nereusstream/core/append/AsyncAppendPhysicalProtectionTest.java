@@ -41,6 +41,10 @@ import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
+import com.nereusstream.objectstore.wal.PreparedWalObject;
+import com.nereusstream.objectstore.wal.WalObjectWriter;
+import com.nereusstream.objectstore.wal.WalWriteRequest;
+import com.nereusstream.objectstore.wal.WalWriteResult;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
@@ -53,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -205,6 +210,116 @@ class AsyncAppendPhysicalProtectionTest {
                     .anyMatch(value -> ObjectProtectionType.fromWireId(
                                     value.value().protectionTypeId())
                             == ObjectProtectionType.VISIBLE_GENERATION);
+        } finally {
+            storage.close();
+            metadata.close();
+            objects.close();
+        }
+    }
+
+    @Test
+    void serializedAdmissionCompletesBeforePrimaryWalPreparation() {
+        StreamStorageConfig config =
+                StreamStorageConfig.defaults(
+                        "async-admission-cluster", "writer");
+        FakeOxiaMetadataStore metadata =
+                new FakeOxiaMetadataStore(CLOCK::millis);
+        LocalFileObjectStore objects =
+                new LocalFileObjectStore(
+                        temporaryDirectory.resolve(
+                                "admission-objects"));
+        DefaultObjectProtectionManager protections =
+                new DefaultObjectProtectionManager(
+                        config.cluster(),
+                        metadata,
+                        Duration.ofMinutes(10),
+                        Duration.ZERO,
+                        Duration.ofHours(24),
+                        CLOCK);
+        GenerationZeroPhysicalReferencePublisher physicalReferences =
+                new DefaultGenerationZeroPhysicalReferencePublisher(
+                        config.cluster(),
+                        metadata,
+                        metadata,
+                        protections);
+        DefaultWalObjectWriter delegate =
+                new DefaultWalObjectWriter(
+                        objects, "test-writer", CLOCK);
+        AtomicInteger prepares = new AtomicInteger();
+        WalObjectWriter writer = new WalObjectWriter() {
+            @Override
+            public PreparedWalObject prepare(
+                    WalWriteRequest request) {
+                prepares.incrementAndGet();
+                return delegate.prepare(request);
+            }
+
+            @Override
+            public CompletableFuture<WalWriteResult> upload(
+                    PreparedWalObject preparedObject) {
+                return delegate.upload(preparedObject);
+            }
+        };
+        CompletableFuture<Void> admission =
+                new CompletableFuture<>();
+        AtomicReference<AppendAdmissionRequest> admitted =
+                new AtomicReference<>();
+        DefaultStreamStorage storage = new DefaultStreamStorage(
+                config,
+                metadata,
+                writer,
+                new DefaultWalObjectReader(objects),
+                physicalReferences,
+                new MetadataAppendRecoverySearcher(
+                        config.cluster(), metadata),
+                new Phase4StorageProfileResolver(),
+                request -> {
+                    admitted.set(request);
+                    return admission;
+                },
+                CLOCK,
+                Runnable::run,
+                ReadMetricsObserver.noop(),
+                TrimMetricsObserver.noop());
+        try {
+            var stream = storage.createOrGetStream(
+                            new StreamName(
+                                    "async-admission-object-wal"),
+                            new StreamCreateOptions(
+                                    StorageProfile
+                                            .OBJECT_WAL_ASYNC_OBJECT,
+                                    Map.of()))
+                    .join();
+
+            CompletableFuture<?> append = storage.append(
+                    stream.streamId(),
+                    batch("admitted-payload"),
+                    new AppendOptions(
+                            Optional.empty(),
+                            DurabilityLevel
+                                    .WAL_DURABLE_AND_INDEX_COMMITTED,
+                            Duration.ofSeconds(5),
+                            true,
+                            Map.of()));
+
+            assertThat(admitted).doesNotHaveValue(null);
+            assertThat(admitted.get().streamId())
+                    .isEqualTo(stream.streamId());
+            assertThat(admitted.get().storageProfile())
+                    .isEqualTo(StorageProfile
+                            .OBJECT_WAL_ASYNC_OBJECT);
+            assertThat(prepares).hasValue(0);
+            assertThat(append).isNotDone();
+            assertThat(metadata.getCommittedEndOffset(
+                            config.cluster(), stream.streamId())
+                    .join()
+                    .committedEndOffset())
+                    .isZero();
+
+            admission.complete(null);
+
+            assertThat(append.join()).isNotNull();
+            assertThat(prepares).hasValue(1);
         } finally {
             storage.close();
             metadata.close();

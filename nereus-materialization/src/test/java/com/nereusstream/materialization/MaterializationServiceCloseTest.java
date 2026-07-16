@@ -194,6 +194,7 @@ class MaterializationServiceCloseTest {
                 1_000,
                 2_000,
                 Duration.ofMinutes(5),
+                Duration.ofMillis(25),
                 Duration.ofHours(1),
                 Duration.ofHours(1),
                 Duration.ofHours(2),

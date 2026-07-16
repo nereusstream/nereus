@@ -1,6 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.managedledger;
 
+import com.nereusstream.api.StorageProfile;
 import java.time.Duration;
 import java.util.Objects;
 
@@ -18,8 +19,40 @@ public record NereusManagedLedgerFactoryConfig(
         int maxOpenLedgers,
         int maxPendingCallbacks,
         int maxRetainedAppendAttempts,
-        int maxScanEntries) {
+        int maxScanEntries,
+        StorageProfile defaultStorageProfile) {
     public static final String STORAGE_CLASS_NAME = "nereus";
+
+    public NereusManagedLedgerFactoryConfig(
+            String storageClassName,
+            Duration metadataTimeout,
+            Duration appendTimeout,
+            Duration appendRecoveryTimeout,
+            Duration readTimeout,
+            Duration closeTimeout,
+            Duration tailPollInterval,
+            int maxEntryBytes,
+            int maxReadEntries,
+            int maxOpenLedgers,
+            int maxPendingCallbacks,
+            int maxRetainedAppendAttempts,
+            int maxScanEntries) {
+        this(
+                storageClassName,
+                metadataTimeout,
+                appendTimeout,
+                appendRecoveryTimeout,
+                readTimeout,
+                closeTimeout,
+                tailPollInterval,
+                maxEntryBytes,
+                maxReadEntries,
+                maxOpenLedgers,
+                maxPendingCallbacks,
+                maxRetainedAppendAttempts,
+                maxScanEntries,
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
 
     public NereusManagedLedgerFactoryConfig {
         if (!STORAGE_CLASS_NAME.equals(storageClassName)) {
@@ -48,6 +81,17 @@ public record NereusManagedLedgerFactoryConfig(
                 || maxScanEntries <= 0) {
             throw new IllegalArgumentException("all F2 managed-ledger limits must be positive");
         }
+        defaultStorageProfile = Objects.requireNonNull(
+                        defaultStorageProfile,
+                        "defaultStorageProfile")
+                .canonical();
+        if (defaultStorageProfile
+                        != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                && defaultStorageProfile
+                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+            throw new IllegalArgumentException(
+                    "defaultStorageProfile must be an Object-WAL profile");
+        }
     }
 
     public static NereusManagedLedgerFactoryConfig defaults(int maxEntryBytes) {
@@ -64,7 +108,8 @@ public record NereusManagedLedgerFactoryConfig(
                 10_000,
                 1_024,
                 1_024,
-                10_000);
+                10_000,
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT);
     }
 
     private static void requirePositive(Duration value, String name) {

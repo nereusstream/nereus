@@ -653,7 +653,11 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         runtime.streamStorage().append(
                         projection.streamId(),
                         encoded.appendBatch(),
-                        requests.appendOptions(runtime.config().appendTimeout()))
+                        requests.appendOptions(
+                                snapshots.current()
+                                        .metadata()
+                                        .profile(),
+                                runtime.config().appendTimeout()))
                 .whenComplete((result, error) -> {
                     if (error == null) {
                         completeAppend(admission, encoded, result, callback, ctx, Optional.empty(), startedNanos);

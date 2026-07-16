@@ -38,7 +38,7 @@ public final class NereusManagedLedgerOpenCoordinator {
     private final NereusManagedLedgerRuntime runtime;
     private final NereusCreationGuard creationGuard;
     private final Supplier<String> ownerSessionIdSupplier;
-    private final F2L0RequestFactory requests = new F2L0RequestFactory();
+    private final F2L0RequestFactory requests;
 
     public NereusManagedLedgerOpenCoordinator(
             NereusManagedLedgerRuntime runtime,
@@ -54,6 +54,8 @@ public final class NereusManagedLedgerOpenCoordinator {
         this.creationGuard = Objects.requireNonNull(creationGuard, "creationGuard");
         this.ownerSessionIdSupplier = Objects.requireNonNull(
                 ownerSessionIdSupplier, "ownerSessionIdSupplier");
+        this.requests = new F2L0RequestFactory(
+                runtime.config().defaultStorageProfile());
     }
 
     public CompletableFuture<NereusLedgerOpenResult> open(
@@ -384,9 +386,24 @@ public final class NereusManagedLedgerOpenCoordinator {
     }
 
     private static void validateExact(TopicProjectionRecord topic, StreamMetadata metadata) {
+        final StorageProfile topicProfile;
+        try {
+            topicProfile = StorageProfile.valueOf(
+                    topic.storageProfile());
+        } catch (IllegalArgumentException failure) {
+            throw new NereusException(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "topic projection has an unknown storage profile",
+                    failure);
+        }
         if (!metadata.streamId().value().equals(topic.streamId())
                 || !metadata.streamName().value().equals(topic.streamName())
-                || metadata.profile() != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                || metadata.profile() != topicProfile
+                || metadata.profile()
+                                != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                        && metadata.profile()
+                                != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
                 || !metadata.attributes().equals(PAYLOAD_ATTRIBUTES)
                 || metadata.createdAtMillis() != topic.createdAtMillis()) {
             throw new NereusException(

@@ -41,6 +41,7 @@ public record MaterializationConfig(
         long lagThrottleBytes,
         long lagRejectBytes,
         Duration lagRejectAge,
+        Duration lagThrottleDelay,
         Duration sourceRetirementGrace,
         Duration appendReplayGrace,
         Duration metadataAuditGrace,
@@ -121,7 +122,10 @@ public record MaterializationConfig(
         }
         requireThresholds(lagThrottleRecords, lagRejectRecords, "record lag");
         requireThresholds(lagThrottleBytes, lagRejectBytes, "byte lag");
-        lagRejectAge = requirePositiveMillis(lagRejectAge, "lagRejectAge");
+        lagRejectAge = requireNonNegativeMillis(
+                lagRejectAge, "lagRejectAge");
+        lagThrottleDelay = requirePositiveMillis(
+                lagThrottleDelay, "lagThrottleDelay");
         sourceRetirementGrace = requirePositiveMillis(
                 sourceRetirementGrace, "sourceRetirementGrace");
         appendReplayGrace = requirePositiveMillis(appendReplayGrace, "appendReplayGrace");
@@ -176,6 +180,7 @@ public record MaterializationConfig(
                 1L << 30,
                 8L << 30,
                 Duration.ofMinutes(10),
+                Duration.ofMillis(25),
                 Duration.ofHours(1),
                 Duration.ofHours(6),
                 Duration.ofHours(24),
@@ -224,9 +229,14 @@ public record MaterializationConfig(
     }
 
     private static void requireThresholds(long throttle, long reject, String field) {
-        if (throttle < 0 || reject <= throttle) {
+        if (throttle < 0
+                || reject < 0
+                || throttle > 0
+                        && reject > 0
+                        && reject <= throttle) {
             throw new IllegalArgumentException(
-                    field + " throttle must be non-negative and strictly below reject");
+                    field
+                            + " thresholds must be non-negative and throttle must be below reject when both are enabled");
         }
     }
 

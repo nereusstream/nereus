@@ -305,6 +305,7 @@ public record MaterializationConfig(
         long lagThrottleBytes,
         long lagRejectBytes,
         Duration lagRejectAge,
+        Duration lagThrottleDelay,
         Duration sourceRetirementGrace,
         Duration appendReplayGrace,
         Duration metadataAuditGrace,
@@ -327,7 +328,8 @@ Validation：
 - maximum clock skew is non-negative and millisecond-representable；operation timeout plus maximum clock skew is
   strictly less than claim duration；
 - retry backoff is positive and bounded；
-- throttle thresholds are strictly below corresponding reject thresholds；
+- each lag threshold is non-negative and zero disables only that threshold；when throttle and reject are both enabled,
+  throttle is strictly below reject；lag throttle delay is positive；
 - source-retirement、append-replay and metadata-audit grace are positive；metadata audit grace is not shorter than
   source-retirement grace；
 - checkpoint entry/byte limits do not exceed NRC1 hard limits；
@@ -983,9 +985,62 @@ Checkpoint AD implements the core boundary without prematurely enabling it in th
 - both Object-WAL profiles are accepted by the F4 `GenerationReadResolver`.
 
 Legacy `DefaultStreamStorage` constructors continue to install `Phase15StorageProfileResolver`. The new explicit
-resolver constructor is an integration seam, not a rollout switch. Production remains disabled until the exact
-registration/topic-marker activation proof and materialization lag gate execute before primary object preparation,
-and until the provider installs the F4 generation resolver/checkpoint composite/scanner lifecycle.
+resolver constructor is an integration seam, not a rollout switch. Checkpoint AE implements the exact
+registration/topic-marker/lag admission seam described below, but production remains disabled until the provider
+installs that seam together with the F4 generation resolver/checkpoint composite/scanner lifecycle.
+
+#### 9.3.2 Implemented checkpoint AE admission and lag truth
+
+`AppendCoordinator` captures the canonical L0 storage profile before enqueue, then executes
+`AppendAdmissionGuard.admit(AppendAdmissionRequest)` inside the stream lane before expected-offset initialization、
+session acquisition and `WalObjectWriter.prepare`. This ordering is normative：
+
+```text
+validate L0 profile
+ -> enqueue on exact stream lane
+ -> activation + lag admission
+ -> load/init expected offset
+ -> acquire/reuse append session
+ -> prepare/upload primary WAL
+ -> protected stable commit
+```
+
+Admission timeout is the append's remaining monotonic deadline. Any activation, metadata, throttle or scheduler
+failure completes as `KNOWN_NOT_COMMITTED` because no primary bytes have been prepared. Append recovery does not run
+the admission guard：backpressure may stop new async work, but it may never stop convergence of a previously prepared
+or committed append.
+
+For a managed-ledger async append, `ManagedLedgerAsyncAppendAdmissionGuard`：
+
+1. loads `getProjectionByStream(cluster, streamId)`；
+2. requires exact binding/current-topic/stream/name/projection identity and a live `OPEN` or `SEALED` facade；
+3. requires both L0 and topic projection to remain `OBJECT_WAL_ASYNC_OBJECT`；
+4. derives the canonical NPR1 `LiveProjectionSubject`；
+5. obtains `GenerationOperation.GENERATION_PUBLISH` readiness with first-marker activation allowed；
+6. runs `MaterializationLagGate`；
+7. revalidates the exact activation proof immediately before returning to the stream lane.
+
+The lag reader independently rebuilds current-policy visibility. Starting at logical trim, it repeatedly chooses the
+healthy current-policy `COMMITTED` generation that covers the cursor and reaches the farthest offset, with generation
+and UTF-8 key tie-breaks. Every selected index must match stream/view/head bounds、policy SHA、
+materialization-policy SHA、projection ref and a decodable NCP1 compacted target. The stored materialization
+checkpoint is advisory：`checkpoint.covered <= rebuilt.covered` is allowed；an ahead checkpoint is an invariant
+violation and cannot hide a coverage gap.
+
+Records and bytes are then exact arithmetic：
+
+```text
+lagRecords = stableHeadOffset - rebuiltCoveredOffset
+lagBytes   = stableHeadCumulativeBytes - cumulativeBytesAt(rebuiltCoveredOffset)
+oldestAge  = now - preparedAtMillis(oldest unmaterialized canonical commit)
+```
+
+The cumulative/age fact comes from a recovery-root-double-read live tail. If the rebuilt coverage starts before the
+NRC1 anchor, `RangeRetentionStatsRecord` values must form one contiguous chain to the anchor；each source index key、
+metadata version、durable digest、offset/commit/cumulative coverage is reloaded and checked, and the chain's final
+cumulative bytes must equal the first live commit's cumulative start. Missing or contradictory stats fail closed.
+The complete stream snapshot、registration、recovery root and rebuilt coverage are revalidated；authority drift retries
+at most four complete measurements.
 
 ### 9.4 Lag/backpressure
 
@@ -1008,6 +1063,10 @@ nereus_materialization_append_reject_total{reason}
 At throttle threshold, append admission applies bounded delay before primary IO. At reject threshold/age, new async
 appends fail retriably before primary IO while reads/repair/workers continue. Existing acknowledged primary ranges are
 never discarded to reduce lag.
+
+Each records/bytes/age threshold uses zero as an individual disable value. Throttle applies at most one configured
+delay（default 25ms），then performs a fresh authoritative measurement；reject thresholds are checked both before and
+after that delay. If all thresholds are disabled, the reader is not invoked.
 
 ## 10. Worker/Runtime Close
 

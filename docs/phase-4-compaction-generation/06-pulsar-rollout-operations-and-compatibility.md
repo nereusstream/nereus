@@ -857,6 +857,7 @@ Initial product defaults keep active mutation off：
 | `nereusMaterializationLagThrottleBytes` | deployment-set | zero disables threshold |
 | `nereusMaterializationLagRejectBytes` | deployment-set | zero disables；otherwise > throttle |
 | `nereusMaterializationLagRejectAgeSeconds` | deployment-set | zero disables；otherwise positive |
+| `nereusMaterializationLagThrottleDelayMillis` | `25` | positive；one bounded delay followed by exact remeasurement |
 | `nereusRetentionStatsScanPageSize` | `512` | positive and `<= 512` |
 | `nereusRetentionMaxConcurrentPlans` | `4` | positive；at most one executing per stream |
 | `nereusRetentionMaxQueuedPlans` | `1024` | positive bounded admission queue |
@@ -865,6 +866,11 @@ Initial product defaults keep active mutation off：
 
 Secrets and object-store credentials remain on the existing resolver path. Config logs redact secret refs/tokens and
 do not log object keys at info level.
+
+Checkpoint AE has implemented the product-neutral `MaterializationConfig.lagThrottleDelay` and core/managed-ledger
+admission seam. The properties in this table are still a rollout target until
+`NereusBrokerStorageConfiguration` and `DefaultNereusRuntimeProvider` map them into the Phase 4 resolver、exact lag
+reader and guard；absence of that composition must keep async topic policy disabled.
 
 ## 12. Operations and Status
 

@@ -1,6 +1,7 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint T，尚未实现端到端 async 执行路径
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AE；
+> core pre-I/O async admission 已实现，production provider/Pulsar policy wiring 尚未完成
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
 
@@ -33,24 +34,29 @@ Already present：
   reader/protection handshakes（implemented and ordinary/Docker-backed final-gated）。
 - F4-M2 committed-generation resolver/read path and restart-safe publication, plus F4-M3 planner/task/worker/service、
   exact-source protection、Parquet/NTC1 formats and terminal workflow-metadata retirement（final-gated）。
-- F4-M4 through checkpoint T：NRC1/protected append/recovery、root/journal fencing、typed source retirement、
+- F4-M4 through checkpoint W：NRC1/protected append/recovery、root/journal fencing、typed source retirement、
   completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、grace-fenced higher-generation pre-drain and the durable
   generation-activation metadata authority foundation，plus activation-gated future sentinel and five ownerless-global
   reference domains. New strict appends now establish `REACHABLE_APPEND` before head CAS and `VISIBLE_GENERATION`
-  before success；backfill/broker activation、runtime composition and the async acknowledgement branch remain disabled。
+  before success；registration/backfill/readiness/activation proofs and physical/cursor live-reference backfill are
+  implemented, while the remaining runtime composition stays disabled.
+- F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
+  generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
+  seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative
+  materialization-lag throttle/reject logic before primary Object-WAL preparation or upload.
 
 Not present：
 
-- core branch implementing `WAL_DURABLE` success；
 - BookKeeper WAL writer/reader/location types；
 - production-composed global-domain source retirement and physical/cursor/root/audit GC completion；
-- primary-WAL retention gate、lag backpressure and recovery daemon/runtime composition；
-- async-profile broker admission、`WAL_DURABLE` completion branch and task-loss/read-repair production wiring；
+- primary-WAL retention gate and complete recovery/materialization/GC daemon composition；
+- production provider/Pulsar configuration wiring for the implemented async admission and lag reader；
 - mixed primary target resolver。
 
-Creating metadata with an async profile does not mean the current core can execute it。The current runtime must fail unsupported
-profiles with `UNSUPPORTED_STORAGE_PROFILE` and non-strict durability with
-`UNSUPPORTED_DURABILITY_LEVEL` until these gates close。
+The explicit Phase 4 resolver/guard can execute async Object-WAL in focused composition, but legacy constructors and
+the current production provider still install the sync-only boundary. Merely creating async metadata or setting a
+broker property therefore does not enable the profile；the broker path must remain fail closed until provider,
+configuration and topic-policy wiring install the exact guard.
 
 Phase 4 的首个执行范围只是 `OBJECT_WAL_ASYNC_OBJECT`。该 profile 仍在 success 前完成
 primary Object WAL upload 和 stable head commit；后台化的是 secondary/read-optimized generation。

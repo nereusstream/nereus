@@ -37,6 +37,7 @@ import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.TrimOptions;
+import com.nereusstream.core.append.AppendAdmissionGuard;
 import com.nereusstream.core.append.AppendCoordinator;
 import com.nereusstream.core.append.AppendSessionManager;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
@@ -219,6 +220,38 @@ public final class DefaultStreamStorage implements StreamStorage {
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver,
             TrimMetricsObserver trimMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                AppendAdmissionGuard.noOp(),
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    /**
+     * Complete Phase 4 append seam. The admission guard executes on the per-stream lane immediately before primary
+     * WAL preparation.
+     */
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
@@ -226,6 +259,7 @@ public final class DefaultStreamStorage implements StreamStorage {
         Objects.requireNonNull(physicalReferences, "physicalReferences");
         Objects.requireNonNull(recoverySearcher, "recoverySearcher");
         Objects.requireNonNull(profileResolver, "profileResolver");
+        Objects.requireNonNull(appendAdmissionGuard, "appendAdmissionGuard");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
@@ -239,6 +273,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 physicalReferences,
                 recoverySearcher,
                 profileResolver,
+                appendAdmissionGuard,
                 clock,
                 callbackExecutor);
         ReadResolver readResolver = new ReadResolver(

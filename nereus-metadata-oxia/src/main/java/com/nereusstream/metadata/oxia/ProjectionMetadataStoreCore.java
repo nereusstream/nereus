@@ -680,7 +680,7 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                 request.emptyStream().streamName().value(),
                 request.emptyStream().streamId().value(),
                 ManagedLedgerProjectionNames.STORAGE_CLASS,
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                request.emptyStream().profile().name(),
                 ledgerId,
                 ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION,
                 ManagedLedgerProjectionNames.PAYLOAD_MAPPING_V1,
@@ -764,6 +764,8 @@ final class ProjectionMetadataStoreCore implements ManagedLedgerProjectionMetada
                 && record.incarnation() == request.incarnation()
                 && record.streamName().equals(request.emptyStream().streamName().value())
                 && record.streamId().equals(request.emptyStream().streamId().value())
+                && record.storageProfile().equals(
+                        request.emptyStream().profile().name())
                 && record.parsedFacadeState() == ManagedLedgerFacadeState.OPEN;
     }
 
