@@ -12,6 +12,7 @@ import com.nereusstream.managedledger.cursor.CursorLedgerIdentity;
 import com.nereusstream.managedledger.cursor.CursorOwnerSession;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.integration.NereusCreationPermit;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCandidate;
 import com.nereusstream.managedledger.projection.F2L0RequestFactory;
 import com.nereusstream.managedledger.projection.VirtualLedgerProjection;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
@@ -131,6 +132,68 @@ public final class NereusManagedLedgerOpenCoordinator {
                                 Optional.of(metadata));
                     });
                 });
+    }
+
+    public CompletableFuture<ManagedLedgerMaterializationRegistrationCandidate>
+            inspectMaterializationRegistrationCandidate(
+                    String managedLedgerName,
+                    long expectedStorageClassBindingGeneration) {
+        final String exactName;
+        try {
+            exactName = ManagedLedgerProjectionNames.requireManagedLedgerName(
+                    managedLedgerName);
+            if (expectedStorageClassBindingGeneration < 1) {
+                throw new IllegalArgumentException(
+                        "expectedStorageClassBindingGeneration must be positive");
+            }
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return runtime.projectionStore()
+                .getProjection(runtime.cluster(), exactName)
+                .thenCompose(optional -> {
+                    TopicProjectionRecord projection =
+                            optional.orElse(null);
+                    if (projection == null) {
+                        return failed(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                false,
+                                "active Nereus binding has no topic projection");
+                    }
+                    if (projection.storageClassBindingGeneration()
+                            != expectedStorageClassBindingGeneration) {
+                        return failed(
+                                ErrorCode.METADATA_CONDITION_FAILED,
+                                true,
+                                "topic projection binding generation changed during backfill");
+                    }
+                    ManagedLedgerFacadeState state =
+                            projection.parsedFacadeState();
+                    if (state != ManagedLedgerFacadeState.OPEN
+                            && state != ManagedLedgerFacadeState.SEALED) {
+                        return failed(
+                                ErrorCode.STREAM_NOT_ACTIVE,
+                                true,
+                                "topic projection is not live for registration backfill");
+                    }
+                    return CompletableFuture.completedFuture(
+                            ManagedLedgerMaterializationRegistrationCandidate
+                                    .from(projection));
+                });
+    }
+
+    public CompletableFuture<Void> ensureMaterializationRegistration(
+            ManagedLedgerMaterializationRegistrationCandidate candidate) {
+        final ManagedLedgerMaterializationRegistrationCandidate exact;
+        try {
+            exact = Objects.requireNonNull(candidate, "candidate");
+        } catch (Throwable error) {
+            return CompletableFuture.failedFuture(error);
+        }
+        return runtime.materializationRegistrationCoordinator()
+                .ensureRegistered(
+                        exact.managedLedgerName(),
+                        exact.projectionIdentity());
     }
 
     private CompletableFuture<NereusLedgerOpenResult> openExisting(

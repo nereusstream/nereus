@@ -31,6 +31,7 @@ import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
 import com.nereusstream.managedledger.config.ManagedLedgerOpenConfigView;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.integration.NereusCreationPermit;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCandidate;
 import com.nereusstream.metadata.oxia.FakeManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
@@ -119,6 +120,57 @@ class NereusManagedLedgerOpenCoordinatorTest {
             registration.complete(null);
             assertThat(opened.join().topicProjection().managedLedgerName())
                     .isEqualTo(NAME);
+        }
+    }
+
+    @Test
+    void unloadedBackfillCapturesExactLiveProjectionBeforeRegistration() {
+        FakeStreamStorage streamStorage = new FakeStreamStorage();
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        AtomicInteger registrations = new AtomicInteger();
+        AtomicReference<ManagedLedgerProjectionIdentity> registered =
+                new AtomicReference<>();
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(
+                        streamStorage,
+                        projections,
+                        (name, identity) -> {
+                            assertThat(name).isEqualTo(NAME);
+                            registered.set(identity);
+                            registrations.incrementAndGet();
+                            return CompletableFuture.completedFuture(null);
+                        })) {
+            NereusManagedLedgerOpenCoordinator coordinator =
+                    new NereusManagedLedgerOpenCoordinator(
+                            runtime, new MutableGuard(3));
+            coordinator.open(NAME, openConfig(true)).join();
+
+            ManagedLedgerMaterializationRegistrationCandidate candidate =
+                    coordinator
+                            .inspectMaterializationRegistrationCandidate(
+                                    NAME, 3)
+                            .join();
+            assertThat(candidate.managedLedgerName()).isEqualTo(NAME);
+            assertThat(candidate.storageClassBindingGeneration())
+                    .isEqualTo(3);
+            assertThat(candidate.projectionIdentity())
+                    .isEqualTo(projections
+                            .getProjection(CLUSTER, NAME)
+                            .join()
+                            .orElseThrow()
+                            .projectionIdentity());
+
+            coordinator.ensureMaterializationRegistration(candidate).join();
+
+            assertThat(registrations).hasValue(2);
+            assertThat(registered).hasValue(candidate.projectionIdentity());
+            assertNereusFailure(
+                    () -> coordinator
+                            .inspectMaterializationRegistrationCandidate(
+                                    NAME, 4)
+                            .join(),
+                    ErrorCode.METADATA_CONDITION_FAILED);
         }
     }
 

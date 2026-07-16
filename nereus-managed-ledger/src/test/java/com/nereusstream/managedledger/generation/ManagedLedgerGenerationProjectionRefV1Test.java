@@ -58,6 +58,41 @@ class ManagedLedgerGenerationProjectionRefV1Test {
     }
 
     @Test
+    void backfillCandidateFreezesTheSameExactNpr1Identity() {
+        try (var store =
+                new FakeManagedLedgerProjectionMetadataStore()) {
+            TopicProjectionRecord projection = store.createFirstProjection(
+                    CLUSTER, request(NAME, 7, 1), ALLOW).join();
+
+            ManagedLedgerMaterializationRegistrationCandidate candidate =
+                    ManagedLedgerMaterializationRegistrationCandidate.from(
+                            projection);
+
+            assertThat(candidate.managedLedgerName()).isEqualTo(NAME);
+            assertThat(candidate.storageClassBindingGeneration())
+                    .isEqualTo(7);
+            assertThat(candidate.projectionIdentity())
+                    .isEqualTo(projection.projectionIdentity());
+            assertThat(candidate.projectionIdentitySha256())
+                    .isEqualTo(new ManagedLedgerGenerationProjectionRefV1(
+                                    NAME, projection.projectionIdentity())
+                            .projectionIdentitySha256());
+            assertThatThrownBy(() ->
+                            new ManagedLedgerMaterializationRegistrationCandidate(
+                                    NAME,
+                                    7,
+                                    projection.projectionIdentity(),
+                                    new com.nereusstream.api.Checksum(
+                                            com.nereusstream.api.ChecksumType
+                                                    .SHA256,
+                                            "00".repeat(32))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining(
+                            "projectionIdentitySha256");
+        }
+    }
+
+    @Test
     void rejectsWrongTypePaddingAndCorruptCrc() {
         try (var store =
                 new FakeManagedLedgerProjectionMetadataStore()) {

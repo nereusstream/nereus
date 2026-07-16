@@ -182,6 +182,12 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、
   two-snapshot broker barrier、cold-topic traversal、topic marker 或 cluster backfill proof 已启用。
+- **F4-M5 checkpoint Y**：发布 reserved generation lookup capability，并冻结 exact
+  binding/cursor/generation two-stable-snapshot broker readiness identity 的 ordinary checkpoint；它不表示
+  cold-topic traversal、durable backfill proof、topic marker 或 activation guard 已启用。
+- **F4-M5 checkpoint Z**：对 unloaded topic 捕获 exact NPR1 projection candidate，并执行 canonical bounded
+  cold-topic registration traversal/full report 的 ordinary checkpoint；它不表示 durable backfill proof CAS、
+  topic marker、activation guard 或 publication/delete bits 已启用。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

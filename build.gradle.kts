@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("1f28c2b08b03f1cff17479671ba2368644023db3")
+    .orElse("1720bc00a9122b2e89d555891956f38a5f64e3d1")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1018,4 +1018,50 @@ tasks.register("phase4M5GenerationCapabilityCheck") {
     dependsOn("checkPhase4M5GenerationCapabilityContractSurface")
     dependsOn("phase4M5GenerationCapabilityPulsarCheck")
     dependsOn("checkPhase4Documentation")
+}
+
+tasks.register<Exec>("checkPhase4M5RegistrationBackfillContractSurface") {
+    group = "verification"
+    description = "Audit the exact unloaded-topic registration candidate and canonical broker backfill surface."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-registration-backfill-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M5RegistrationBackfillPulsarCheck") {
+    group = "verification"
+    description = "Run the locked Pulsar registration-backfill formatting, style, and focused tests."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M5GenerationCapabilityCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker-common:spotlessJavaCheck",
+        ":pulsar-broker-common:checkstyleMain",
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusGenerationRegistrationBackfillTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBrokerStorageConfigurationTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusGenerationProtocolCapabilityTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M5RegistrationBackfillCheck") {
+    group = "verification"
+    description = "Verify checkpoint Z canonical cold-topic registration traversal and bounded report."
+    dependsOn("phase4M5GenerationCapabilityCheck")
+    dependsOn("checkPhase4M5RegistrationBackfillContractSurface")
+    dependsOn("phase4M5RegistrationBackfillPulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn(":nereus-managed-ledger:check")
 }

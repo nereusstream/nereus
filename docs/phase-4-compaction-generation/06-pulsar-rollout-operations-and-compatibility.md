@@ -290,8 +290,9 @@ deleted-incarnation proof for every stream slice.
 ### 3.3 Cold-topic registration backfill
 
 Checkpoint X makes every Nereus topic create/open/recreate create or verify its registration even while generation
-publication is disabled, closing the concurrent new-topic frontier. Existing unloaded topics are still covered by the
-explicit idempotent broker backfill below；that traversal and its coverage-proof CAS are not yet implemented：
+publication is disabled, closing the concurrent new-topic frontier. Checkpoint Z now covers existing unloaded topics
+with the explicit idempotent broker traversal below；the traversal/report are implemented, while the durable
+coverage-proof CAS is still a later checkpoint：
 
 ```java
 public record GenerationRegistrationBackfillRequest(
@@ -342,11 +343,23 @@ are capped at 100 and the digest/counters cover the full canonical traversal. It
 time under the broker's existing topic-list memory limiter/size-cache pattern and incrementally hashes names；it never
 holds an all-cluster topic list.
 
-The run starts and ends under the same two-snapshot broker readiness epoch, which proves the new-topic registration
-hook was active throughout. Any list/read/register failure、epoch change or nonzero failure count prevents the cluster
-activation record's `streamRegistrationBackfillComplete` bit. Process loss simply reruns from the beginning；same-key
-create-or-verify is idempotent. The backfill creates no topic marker and cannot activate publication. If an old broker
-later joins, readiness is invalidated and the bit must be re-proved/rerun before F4 mutations resume.
+The run starts and ends under the same two-snapshot broker readiness value, which proves the new-topic registration
+hook was active throughout. Checkpoint Z compares the complete value, including full broker-set SHA and broker count,
+not only its 63-bit epoch. Any list/read/register failure、readiness change or nonzero failure count makes the report
+ineligible for the later activation record's `streamRegistrationBackfill` proof. Process loss simply reruns from the
+beginning；same-key create-or-verify is idempotent. The backfill creates no topic marker, writes no activation record
+and cannot activate publication. If an old broker later joins, readiness is invalidated and the proof must be
+created/refreshed by the later proof-CAS checkpoint before F4 mutations may run.
+
+The product boundary captures an immutable
+`ManagedLedgerMaterializationRegistrationCandidate(managedLedgerName, storageClassBindingGeneration, projectionIdentity,
+projectionIdentitySha256)` from the exact live `OPEN`/`SEALED` projection before crossing into the broker. The
+candidate validates the strict NPR1 identity/digest and the broker re-reads storage binding after registration；
+binding generation/class drift is a failure, while deletion after the idempotent write is a counted skip. Pulsar
+attaches the traversal to `NereusManagedLedgerStorage` from `BrokerRegistryImpl`, with defaults of 16 concurrent topic
+operations and a 3600-second whole-run deadline. Canonical topic batches are folded in order, all failures contribute
+to the digest, only the first 100 redacted failures are retained, and the frozen two-topic fixture coverage SHA is
+`2f234d6b9baa3a760460090850d22734f94cd72d51fd0f27706fda272fc01d7c`.
 
 ## 4. Broker Capability
 
@@ -397,8 +410,9 @@ process-local revision and invalidates the cached identity；a revision change d
 snapshots fails with `NEREUS_CLUSTER_CAPABILITY_SNAPSHOT_CHANGED`. Cache publication and reads compare the same
 revision, and registry stop/unregister clears the visible cache. Focused tests freeze the identity, reject missing or
 spoofed capabilities, prove input-order independence, distinguish same-id broker restart by start timestamp, and
-cover notification-before-cache and notification-between-snapshot cuts. Checkpoint Y does not run the cold-topic
-backfill, write its proof, set a topic marker or implement the product activation guard.
+cover notification-before-cache and notification-between-snapshot cuts. Checkpoint Y itself did not run the
+cold-topic backfill. Checkpoint Z now provides that bounded traversal/report but still does not write its durable
+proof, set a topic marker or implement the product activation guard.
 
 ### 4.3 Cluster activation record
 

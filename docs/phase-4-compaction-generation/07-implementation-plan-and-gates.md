@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`1f28c2b08b03f1cff17479671ba2368644023db3`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`1720bc00a9122b2e89d555891956f38a5f64e3d1`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -97,13 +97,15 @@ root-last response-loss-safe CAS. Checkpoint V adds guarded cursor-snapshot uplo
 cursor-CAS-then-permanent completion、response-loss repair on hydrate/read、durable reader lease and the shared
 physical/protection/read-pin production wiring for this path. Checkpoint W adds strict NPR1 projection resolution、
 the all-64-shard physical-root/cursor-root live-reference backfill、exact commit/index/cursor owner protections、
-stable final revalidation and response-loss-safe dual activation proofs. Broker registration backfill/barrier、
+stable final revalidation and response-loss-safe dual activation proofs. Broker registration backfill proof/barrier、
 cursor snapshot candidate/deletion scanning、object inventory、registration retirement and the remaining
 materialization/GC runtime composition remain pending. Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
 binding/cursor/generation two-stable-snapshot barrier、deterministic broker-incarnation readiness epoch/full digest
-and registry-notification invalidation；cold-topic traversal/proof CAS and the product activation guard remain pending.
+and registry-notification invalidation. Checkpoint Z adds the exact unloaded-projection candidate、canonical
+one-namespace-at-a-time cold-topic traversal、bounded concurrency/deadline、deterministic full report and final
+binding/readiness revalidation；durable proof CAS and the product activation guard remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -618,12 +620,13 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > of all five reference domains. Checkpoint U implements persisted dual-absence DELETED-root/Phase 1 audit retirement.
 > Checkpoint V implements the guarded/protected/pinned cursor-snapshot new-write frontier and its production
 > physical/protection/read-pin wiring. Checkpoint W implements strict NPR1 projection authority and the stable
-> physical-root/cursor-root live-reference backfill plus dual activation proofs. Broker registration backfill/barrier、
+> physical-root/cursor-root live-reference backfill plus dual activation proofs. Broker registration proof/barrier、
 > cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining materialization/GC runtime
 > composition、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
-> identity, but no marker、cold-topic coverage proof or product activation permit is produced yet.
+> identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
+> activation permit is produced yet.
 
 ### 6.1 Production artifacts
 
@@ -1125,9 +1128,10 @@ nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionRefV1.java
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionAuthorityReader.java checkpoint W reader
 nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCoordinator.java checkpoint X broker-safe contract
 nereus-managed-ledger/.../generation/DefaultManagedLedgerMaterializationRegistrationCoordinator.java checkpoint X exact registration
+nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCandidate.java checkpoint Z exact unloaded projection fact
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationGuard.java
 nereus-managed-ledger/.../NereusManagedLedger.java
-nereus-managed-ledger/.../NereusManagedLedgerOpenCoordinator.java     checkpoint X return-before-registration
+nereus-managed-ledger/.../NereusManagedLedgerOpenCoordinator.java     checkpoint X return-before-registration, extended Z inspect/ensure
 nereus-managed-ledger/.../NereusManagedLedgerRuntime.java             checkpoint X generation-store/registration ownership
 
 nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java
@@ -1141,7 +1145,12 @@ pulsar-broker/.../nereus/NereusGenerationProtocolCapability.java       implement
 pulsar-broker/.../nereus/NereusGenerationCapabilityReadiness.java     implemented checkpoint Y
 pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java       extended checkpoint Y
 pulsar-broker/.../nereus/NereusCursorProtocolCapability.java          extended checkpoint Y reserved chain
-pulsar-broker/.../nereus/NereusGenerationRegistrationBackfill.java
+pulsar-broker/.../nereus/NereusGenerationRegistrationBackfill.java    implemented checkpoint Z contract
+pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java implemented checkpoint Z traversal/report
+pulsar-broker/.../nereus/GenerationRegistrationBackfillRequest.java   implemented checkpoint Z bounded request
+pulsar-broker/.../nereus/GenerationRegistrationBackfillReport.java    implemented checkpoint Z counters/digest/failures
+pulsar-broker/.../nereus/GenerationRegistrationBackfillStage.java     implemented checkpoint Z stable stages
+pulsar-broker/.../nereus/BackfillFailure.java                          implemented checkpoint Z redacted failure
 pulsar-broker/.../nereus/NereusStorageBindingCapability.java
 pulsar-broker/.../nereus/NereusResolvedTopicFeatures.java
 pulsar-broker/.../nereus/NereusTopicFeatureResolver.java
@@ -1167,7 +1176,8 @@ MaterializationLagGateTest
 ManagedLedgerGenerationProtocolTest                         implemented K protocol/CAS foundation
 ManagedLedgerGenerationProjectionRefV1GoldenTest
 ManagedLedgerMaterializationRegistrationCoordinatorTest    implemented checkpoint X identity/hint/response-loss/drift
-NereusManagedLedgerOpenCoordinatorTest                     extended checkpoint X return ordering
+ManagedLedgerGenerationProjectionRefV1Test                 extended checkpoint Z exact candidate identity
+NereusManagedLedgerOpenCoordinatorTest                     extended checkpoint X return ordering and Z unloaded capture
 NereusManagedLedgerRuntimeTest                             extended checkpoint X ownership/close order
 ProjectionIdentityTest                                     implemented checkpoint X canonical encoder
 GenerationActivationCompatibilityTest
@@ -1185,7 +1195,7 @@ Pulsar fork：
 NereusGenerationProtocolCapabilityTest                    implemented checkpoint Y
 NereusCursorProtocolCapabilityTest                        extended checkpoint Y
 NereusStorageBindingCapabilityTest                        extended checkpoint Y
-NereusGenerationRegistrationBackfillTest
+NereusGenerationRegistrationBackfillTest                  implemented checkpoint Z order/concurrency/digest/drift
 NereusTopicFeatureResolverF4Test
 NereusTopicFeatureValidatorF4Test
 NereusAdminOperationF4Test
@@ -1201,6 +1211,7 @@ NereusGenerationProtocolBrokerTest
 ```text
 ./gradlew phase4M5RegistrationFrontierCheck
 ./gradlew phase4M5GenerationCapabilityCheck
+./gradlew phase4M5RegistrationBackfillCheck
 ./gradlew phase4M5Check
 ./gradlew phase4M5FinalCheck --rerun-tasks
 ```
@@ -1218,7 +1229,7 @@ does not modify the local Pulsar fork, advertise generation capability, activate
 topics, or publish a cluster backfill proof. The ordinary gate passed with `--rerun-tasks` on 2026-07-16.
 
 `phase4M5GenerationCapabilityCheck` is the checkpoint-Y precursor. It consumes the exact clean local fork
-`master@1f28c2b08b03f1cff17479671ba2368644023db3`, audits the capability/readiness/invalidation surface, publishes
+`master@1720bc00a9122b2e89d555891956f38a5f64e3d1`, audits the capability/readiness/invalidation surface, publishes
 the existing Nereus F2 development composite, and runs broker spotless、checkstyle plus focused generation/cursor/
 binding suites. The readiness identity is domain-separated SHA-256 over sorted persistent broker registry keys、
 advertised broker ids、start timestamps and sorted required protocol pairs；the frozen two-broker fixture yields
@@ -1226,6 +1237,17 @@ epoch `4351585672493013605` and digest
 `bc63f01d0aa01a65c7205625a2714f0246d8ba7e7b88b8a653137abbc719cc0d`. Registry notifications invalidate the
 cache and a notification between equal snapshots fails closed. This gate does not enumerate cold topics、CAS the
 registration backfill proof、activate a topic marker or enable publication/deletion. It passed with `--rerun-tasks`
+on 2026-07-16.
+
+`phase4M5RegistrationBackfillCheck` is the checkpoint-Z precursor. It consumes the current exact clean local fork
+`master@1720bc00a9122b2e89d555891956f38a5f64e3d1`, publishes the Nereus development composite, audits the product
+candidate and broker traversal/config/lifecycle surfaces, and runs managed-ledger plus Pulsar spotless、checkstyle and
+focused suites. The traversal never loads/owns a topic；it sorts tenants/namespaces/topics, processes one namespace at
+a time, batches topic work under the configured concurrency, captures strict NPR1 projection identity, performs
+idempotent registration, re-reads binding and requires identical start/end readiness. The report hashes the full
+canonical traversal, retains only the first 100 redacted failures and freezes coverage SHA
+`2f234d6b9baa3a760460090850d22734f94cd72d51fd0f27706fda272fc01d7c`. This gate does not CAS the durable
+`streamRegistrationBackfill` proof, activate a marker or enable publication/deletion. It passed with `--rerun-tasks`
 on 2026-07-16.
 
 ## 8. F4-M6 — Final Acceptance

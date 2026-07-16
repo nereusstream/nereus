@@ -111,9 +111,11 @@ permanent/pinned cursor-snapshot new-write/read frontier，以及 strict NPR1 pr
 physical/cursor live-reference backfill。M5 checkpoint X 又实现 exact durable registration create/refresh/final
 revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、
-broker-incarnation-aware deterministic readiness epoch/full digest 和 registry-notification invalidation。Broker
-cold-topic registration backfill/proof CAS、generation activation guard、cursor snapshot candidate/deletion
-scanning、object inventory、registration retirement、remaining runtime composition 及 M5-M6 仍是 target；
+broker-incarnation-aware deterministic readiness epoch/full digest 和 registry-notification invalidation。
+Checkpoint Z 又实现 exact unloaded projection candidate、canonical bounded cold-topic registration
+traversal/report、final binding/readiness revalidation 和 frozen coverage digest。Durable registration backfill
+proof CAS、generation activation guard、cursor snapshot candidate/deletion scanning、object inventory、
+registration retirement、remaining runtime composition 及 M5-M6 仍是 target；
 production deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated

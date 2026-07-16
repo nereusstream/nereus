@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="1f28c2b08b03f1cff17479671ba2368644023db3"
+current_pulsar_lock="1720bc00a9122b2e89d555891956f38a5f64e3d1"
 
 require_literal() {
     local literal="$1"
@@ -74,6 +74,8 @@ require_literal "phase4M5RegistrationFrontierCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M5GenerationCapabilityCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M5RegistrationBackfillCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint U" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint V" \
@@ -83,6 +85,12 @@ require_literal "Checkpoint W" \
 require_literal "Checkpoint X" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint Y" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint Z" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "ManagedLedgerMaterializationRegistrationCandidate" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "2f234d6b9baa3a760460090850d22734f94cd72d51fd0f27706fda272fc01d7c" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "NereusGenerationCapabilityReadiness" \
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
@@ -129,4 +137,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through W and M5 through Y, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through W and M5 through Z, source lock, gates, and local links verified."

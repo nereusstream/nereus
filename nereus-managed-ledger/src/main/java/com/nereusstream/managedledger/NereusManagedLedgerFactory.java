@@ -9,6 +9,7 @@ import com.nereusstream.managedledger.config.ManagedLedgerOpenConfigView;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.managedledger.errors.OperationContext;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCandidate;
 import com.nereusstream.managedledger.stats.NereusManagedLedgerFactoryStats;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.util.ArrayList;
@@ -91,6 +92,25 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         return openCoordinator.inspectStorageState(managedLedgerName);
+    }
+
+    public CompletableFuture<ManagedLedgerMaterializationRegistrationCandidate>
+            inspectMaterializationRegistrationCandidate(
+                    String managedLedgerName,
+                    long expectedStorageClassBindingGeneration) {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(factoryClosed());
+        }
+        return openCoordinator.inspectMaterializationRegistrationCandidate(
+                managedLedgerName, expectedStorageClassBindingGeneration);
+    }
+
+    public CompletableFuture<Void> ensureMaterializationRegistration(
+            ManagedLedgerMaterializationRegistrationCandidate candidate) {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(factoryClosed());
+        }
+        return openCoordinator.ensureMaterializationRegistration(candidate);
     }
 
     @Override
