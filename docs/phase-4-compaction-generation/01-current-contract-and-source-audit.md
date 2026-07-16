@@ -39,7 +39,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@6914bce939550a2d4929c7920b8cb9ed7cea5857`。
+`master@f52108468837917234637c514eb7524b9b3fb5f8`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -65,9 +65,10 @@ broker snapshots, readiness includes broker start timestamps, and broker-registr
 process-local epoch. It also contains the canonical one-namespace-at-a-time cold-topic registration traversal/report
 and its broker lifecycle/config wiring. Checkpoint AA extends that surface with a product-neutral exact-readiness
 provider and a zero-failure completion handoff；the broker still does not own activation metadata. The Nereus side
-owns the shared-Oxia activation store and response-loss-safe `streamRegistrationBackfill` CAS. The exact current
-files/tests are audited by `phase4M5RegistrationProofCheck`；topic marker activation and the product mutation guard
-remain outside this checkpoint.
+owns the shared-Oxia activation store and response-loss-safe `streamRegistrationBackfill` CAS. Checkpoint AB adds the
+product-owned guard、exact six-domain proof、strict projection/L0/registration revalidation and the default-off
+first-marker switch. The exact current files/tests are audited by `phase4M5ActivationGuardCheck`；cluster ACTIVE
+orchestration and concrete mutation call sites remain outside this checkpoint.
 
 Pulsar M0 uses local source and compiled member checks only；no internet or published M1 snapshot is an input.
 

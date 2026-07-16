@@ -2,6 +2,7 @@
 package com.nereusstream.managedledger;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
@@ -50,6 +51,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private GenerationProtocolActivationStore generationProtocolActivationStore;
     private ManagedLedgerGenerationRegistrationBackfillProofCoordinator
             generationRegistrationBackfillProofCoordinator;
+    private GenerationProtocolActivationGuard generationProtocolActivationGuard;
     private final ObjectReadPinManager objectReadPinManager;
     private final AutoCloseable objectProtectionManager;
     private final AutoCloseable physicalMetadataStore;
@@ -220,6 +222,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             GenerationProtocolActivationStore generationProtocolActivationStore,
             ManagedLedgerGenerationRegistrationBackfillProofCoordinator
                     generationRegistrationBackfillProofCoordinator,
+            GenerationProtocolActivationGuard generationProtocolActivationGuard,
             ObjectReadPinManager objectReadPinManager,
             AutoCloseable objectProtectionManager,
             AutoCloseable physicalMetadataStore,
@@ -264,6 +267,10 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                 Objects.requireNonNull(
                         generationRegistrationBackfillProofCoordinator,
                         "generationRegistrationBackfillProofCoordinator");
+        this.generationProtocolActivationGuard =
+                Objects.requireNonNull(
+                        generationProtocolActivationGuard,
+                        "generationProtocolActivationGuard");
     }
 
     public StreamStorage streamStorage() {
@@ -302,6 +309,15 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                     "this runtime was assembled without the F4 registration backfill proof coordinator");
         }
         return generationRegistrationBackfillProofCoordinator;
+    }
+
+    public GenerationProtocolActivationGuard
+            generationProtocolActivationGuard() {
+        if (generationProtocolActivationGuard == null) {
+            throw new IllegalStateException(
+                    "this runtime was assembled without the F4 generation activation guard");
+        }
+        return generationProtocolActivationGuard;
     }
 
     public ObjectReadPinManager objectReadPinManager() {

@@ -47,7 +47,12 @@
 > canonical registration traversal、exact unloaded projection candidate、bounded concurrency/deadline、full
 > deterministic coverage report 与 final binding/readiness revalidation。Checkpoint AA 又实现 exact
 > full-readiness handoff、零失败 admission、product-owned response-loss-safe durable registration proof CAS、
-> same-epoch coverage immutability 和 newer-epoch dependent-proof invalidation；generation activation guard、
+> same-epoch coverage immutability 和 newer-epoch dependent-proof invalidation。Checkpoint AB 已实现
+> product-owned generation activation guard：它把 ACTIVE cluster record、当前 readiness epoch、exact six-domain
+> digest、registration proof、strict NPR1 projection/L0/registration truth 和 monotonic topic marker 绑定为
+> short-lived proof，并在 mutation CAS 前重证；first marker 由默认关闭的 broker switch 控制，response loss
+> 只通过 exact reload 收敛，physical delete 还要求同 epoch delete bits/proofs 和 exact
+> `projection-generation-v1` snapshot。Cluster `PREPARED -> ACTIVE` controller、具体 mutation call sites、
 > cursor snapshot candidate/deletion scanner、object inventory、
 > registration retirement、其余 materialization/GC runtime composition 与最终删除开关仍保持关闭
 >
@@ -56,7 +61,7 @@
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@6914bce939550a2d4929c7920b8cb9ed7cea5857`
+> `master@f52108468837917234637c514eb7524b9b3fb5f8`
 
 > 实现状态日期：2026-07-16
 
@@ -1022,6 +1027,37 @@ Pulsar formatting/checkstyle/focused tests，增加 core/managed-ledger/adapter 
 proof invalidation、lost-CAS-response convergence、post-CAS readiness invalidation、runtime ownership/close order
 以及 broker 只在成功 final revalidation 后提交 proof。Gate 已于 2026-07-16 通过。
 
+### 6.30 F4-M5 generation activation guard checkpoint
+
+Checkpoint AB 落地 `ManagedLedgerGenerationProtocolActivationGuard`。每次 `requireReady` 都先取得 exact
+`GenerationCapabilityReadiness`，再要求 durable cluster activation 已是 `ACTIVE`、publication bit 已开、
+required reference domains 与本 runtime 的六项 canonical set 完全一致，并且
+`streamRegistrationBackfill` 已在同一 readiness epoch 完成。六项 domain set 的冻结 SHA-256 是
+`5b29cf6df71cce198d01299f5bd740f0f123c601e12f04d8251d336a6a2a8c4d`。
+
+Live subject 必须是 strict NPR1 identity。Guard 重读 binding-selected projection、topic metadata version、L0
+stream identity/profile/lifecycle 和 exact materialization registration；首次 marker CAS 只有在
+`nereusGenerationProtocolEnabled=true` 时允许，写响应丢失只在 exact projection reload 已显示 marker 后
+收敛。开关随后关闭不会撤销 monotonic marker。生成的 proof 绑定 topic metadata version、cluster activation
+metadata version、readiness epoch、domain-set digest 和 capability bits；`revalidate` 在 mutation CAS 前重读
+这些 authority，任何 topic property/version、readiness 或 activation drift 都 fail closed。
+
+Physical delete 只接受 `DomainValidatedDeletionSubject`，除 ACTIVE/publication 条件外还要求 physical/cursor
+delete bits、同 epoch physical-root/cursor backfill proof、object-store capability，以及 exact complete、
+non-vetoed `projection-generation-v1` snapshot。Logical trim 同样要求 deletion capability，但继续使用 live
+projection subject。Runtime provider 使用 shared projection/L0/generation/activation stores 构造 guard，
+`NereusManagedLedgerRuntime` 只暴露 typed guard，不把 raw activation metadata 交给 broker。
+
+Pulsar fork 新增默认 `false` 的 `nereusGenerationProtocolEnabled`，checked broker configuration 把它作为
+first-activation switch 传入 `NereusRuntimeContext`。该开关不会把 cluster record 从 `PREPARED` 推进到
+`ACTIVE`，本 checkpoint 也尚未把 guard 接入 task/index/checkpoint/trim/delete mutation call sites，因此
+publication、async profile 和 physical deletion 仍不可用。
+
+`phase4M5ActivationGuardCheck` 是 checkpoint AB ordinary gate。它验证 frozen domain digest、first-marker
+disable/enable、existing marker monotonicity、lost-response convergence、missing coverage/registration、
+projection/readiness drift、physical-delete snapshot drift、runtime ownership，以及 locked Pulsar broker
+configuration 的格式、checkstyle、编译和 focused test。Gate 已于 2026-07-16 通过。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -1030,8 +1066,8 @@ proof invalidation、lost-CAS-response convergence、post-CAS readiness invalida
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；checkpoint AA now supplies the durable broker registration proof, while cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition and final gate remain pending |
-| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；activation guard、async/profile/retention/admin wiring remain |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；checkpoint AA supplies durable broker registration proof and checkpoint AB supplies exact deletion admission validation, while cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition and final gate remain pending |
+| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；cluster ACTIVE transition、mutation call sites、async/profile/retention/admin wiring remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：

@@ -115,6 +115,11 @@ Checkpoint X adds the shared `OxiaJavaGenerationMetadataStore` and
 before projection/L0/shared Oxia resources. It still does not construct the generation activation guard、
 materialization/GC services or enable any capability bit.
 
+Checkpoint AB constructs `ManagedLedgerGenerationProtocolActivationGuard` from the shared projection、L0、
+generation and activation stores, the exact six-domain runtime set, the projection-generation reference domain and
+the broker readiness provider. `NereusManagedLedgerRuntime` owns/exposes the typed guard. Construction itself does
+not advance cluster activation、start materialization/GC or enable a delete bit.
+
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive
 the ObjectStore it uses.
@@ -129,7 +134,7 @@ closed write frontier. Test-only no-op construction is forbidden by the runtime-
 ```java
 MaterializationService materializationService();
 NereusManagedLedgerRetentionService retentionService();
-GenerationProtocolActivationGuard generationActivationGuard();
+GenerationProtocolActivationGuard generationProtocolActivationGuard();
 ObjectReadPinManager objectReadPinManager();
 ```
 
@@ -200,7 +205,8 @@ by the M4 projection reference domain and performs no topic load or repair.
 
 This is not cluster activation. `GenerationProtocolActivationRecord`、the registration coordinator/barrier、broker
 capability guard and runtime call sites below remain M5 work, so no production path sets the marker merely because the
-API exists.
+API exists. Checkpoints S、X–AA later add those durable prerequisites；checkpoint AB finally constructs the guard,
+but still does not advance cluster activation or install a mutation caller.
 
 ### 3.2 Resolvable projection reference and registration ordering
 
@@ -241,8 +247,10 @@ Checkpoint W implements the strict NPR1 codec and freezes a golden ref/digest ve
 subject digest, linearly reads the per-stream binding plus the topic authority selected by that binding, and reports
 `live=true` only for the exact identity in `OPEN` or `SEALED`. Missing、recreated、`DELETING` or `DELETED`
 projections return a versioned non-live classification whose binding/topic presence or absence authorities must still
-match at final revalidation. This reader is consumed by the checkpoint-W physical-root backfill；the broker-side
-registration executor、cluster barrier and production activation guard below remain M5 rollout work.
+match at final revalidation. This reader is consumed by the checkpoint-W physical-root backfill. Checkpoints X–AA
+later add the broker-side registration executor、cluster barrier and durable registration proof；checkpoint AB adds
+the production activation guard itself, while cluster ACTIVE orchestration and mutation call sites remain rollout
+work.
 
 Checkpoint X implements the registration half of this ordering. `ProjectionIdentity.encode` is now the single
 canonical length-delimited encoder used by durable materialization records and registration. The managed-ledger
@@ -404,6 +412,15 @@ and a broker-set capability readiness epoch invalidated by membership/property c
 those subject/version checks immediately before the mutation CAS. First activation requires the full two-stable-
 snapshot barrier. Subsequent operations may use the coordinator's validated cached epoch, but an old/incapable broker
 joining invalidates it and blocks new F4 mutations until two stable capable snapshots converge again.
+
+Checkpoint AB implements this product half. It requires the durable cluster record to be `ACTIVE` with publication
+enabled、the current readiness epoch、complete registration proof and an exact canonical six-domain set. Live
+subjects are verified against strict NPR1 projection、L0 and materialization-registration truth；the first monotonic
+topic marker is allowed only while `nereusGenerationProtocolEnabled=true`, and a lost marker response converges only
+after exact reload. The returned proof freezes topic/cluster metadata versions、readiness epoch、domain-set digest and
+capability bits；`revalidate` reloads them immediately before the caller's mutation CAS. Physical delete additionally
+requires current delete bits/backfill/object-store proof and an exact `projection-generation-v1` snapshot. The switch
+defaults to false and does not itself move the cluster activation record from `PREPARED` to `ACTIVE`.
 
 Checkpoint Y implements the broker half of this contract in the locked local fork. Lookup decoration now publishes
 the reserved binding、cursor and generation properties together. `requireGenerationReadiness()` filters to

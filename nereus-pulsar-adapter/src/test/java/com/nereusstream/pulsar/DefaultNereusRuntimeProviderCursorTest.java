@@ -4,6 +4,7 @@ package com.nereusstream.pulsar;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nereusstream.core.capability.GenerationCapabilityReadinessProvider;
 import com.nereusstream.managedledger.cursor.CursorLedgerIdentity;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
@@ -37,8 +38,24 @@ class DefaultNereusRuntimeProviderCursorTest {
         CursorProtocolActivationGuard selected =
                 DefaultNereusRuntimeProvider.cursorProtocolActivationGuard(context);
         assertThat(selected).isSameAs(guard);
+        assertThat(context.generationProtocolActivationEnabled()).isFalse();
         selected.acquireFirstActivationPermit(ledger()).join();
         assertThat(permits).hasValue(1);
+    }
+
+    @Test
+    void canonicalContextCarriesTheExplicitGenerationActivationSwitch() {
+        NereusRuntimeContext context = new NereusRuntimeContext(
+                eventLoopGroup(),
+                OpenTelemetry.noop(),
+                creationGuard(),
+                CursorProtocolActivationGuard.unavailable(),
+                GenerationCapabilityReadinessProvider.unavailable(),
+                true,
+                reference -> Optional.empty(),
+                getClass().getClassLoader());
+
+        assertThat(context.generationProtocolActivationEnabled()).isTrue();
     }
 
     @Test

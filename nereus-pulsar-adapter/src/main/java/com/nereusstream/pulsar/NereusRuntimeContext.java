@@ -16,8 +16,28 @@ public record NereusRuntimeContext(
         NereusCreationGuard creationGuard,
         CursorProtocolActivationGuard cursorProtocolActivationGuard,
         GenerationCapabilityReadinessProvider generationCapabilityReadinessProvider,
+        boolean generationProtocolActivationEnabled,
         ObjectStoreSecretResolver secretResolver,
         ClassLoader pluginClassLoader) {
+    public NereusRuntimeContext(
+            EventLoopGroup eventLoopGroup,
+            OpenTelemetry openTelemetry,
+            NereusCreationGuard creationGuard,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            GenerationCapabilityReadinessProvider generationCapabilityReadinessProvider,
+            ObjectStoreSecretResolver secretResolver,
+            ClassLoader pluginClassLoader) {
+        this(
+                eventLoopGroup,
+                openTelemetry,
+                creationGuard,
+                cursorProtocolActivationGuard,
+                generationCapabilityReadinessProvider,
+                false,
+                secretResolver,
+                pluginClassLoader);
+    }
+
     public NereusRuntimeContext(
             EventLoopGroup eventLoopGroup,
             OpenTelemetry openTelemetry,
@@ -31,6 +51,7 @@ public record NereusRuntimeContext(
                 creationGuard,
                 cursorProtocolActivationGuard,
                 GenerationCapabilityReadinessProvider.unavailable(),
+                false,
                 secretResolver,
                 pluginClassLoader);
     }
@@ -47,6 +68,7 @@ public record NereusRuntimeContext(
                 creationGuard,
                 CursorProtocolActivationGuard.unavailable(),
                 GenerationCapabilityReadinessProvider.unavailable(),
+                false,
                 secretResolver,
                 pluginClassLoader);
     }

@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.core.capability.GenerationActivationProof;
+import com.nereusstream.core.capability.GenerationActivationSubject;
+import com.nereusstream.core.capability.GenerationOperation;
+import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
@@ -28,10 +32,10 @@ import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -99,7 +103,7 @@ class NereusManagedLedgerRuntimeTest {
         ExecutorService callbacks = Executors.newSingleThreadExecutor();
         ObjectReadPinManager readPins =
                 proxy(ObjectReadPinManager.class, "read-pins", closes, false);
-        GenerationProtocolActivationStore generationActivation =
+        GenerationProtocolActivationStore generationActivationStore =
                 proxy(
                         GenerationProtocolActivationStore.class,
                         "generation-activation",
@@ -107,6 +111,8 @@ class NereusManagedLedgerRuntimeTest {
                         false);
         ManagedLedgerGenerationRegistrationBackfillProofCoordinator proofCoordinator =
                 completion -> CompletableFuture.completedFuture(null);
+        GenerationProtocolActivationGuard generationActivationGuard =
+                allowGenerationActivation();
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
@@ -118,8 +124,9 @@ class NereusManagedLedgerRuntimeTest {
                 proxy(CursorStorage.class, "cursor-storage", closes, false),
                 CursorStorageConfig.defaults(),
                 allowActivation(),
-                generationActivation,
+                generationActivationStore,
                 proofCoordinator,
+                generationActivationGuard,
                 readPins,
                 proxy(AutoCloseable.class, "protection", closes, false),
                 proxy(AutoCloseable.class, "physical", closes, false),
@@ -137,6 +144,8 @@ class NereusManagedLedgerRuntimeTest {
         assertThat(runtime.objectReadPinManager()).isSameAs(readPins);
         assertThat(runtime.generationRegistrationBackfillProofCoordinator())
                 .isSameAs(proofCoordinator);
+        assertThat(runtime.generationProtocolActivationGuard())
+                .isSameAs(generationActivationGuard);
         runtime.close();
 
         assertThat(closes).containsExactly(
@@ -295,5 +304,29 @@ class NereusManagedLedgerRuntimeTest {
             allowRegistration() {
         return (name, identity) ->
                 CompletableFuture.completedFuture(null);
+    }
+
+    private static GenerationProtocolActivationGuard
+            allowGenerationActivation() {
+        return new GenerationProtocolActivationGuard() {
+            @Override
+            public CompletableFuture<GenerationActivationProof>
+                    requireReady(
+                            GenerationOperation operation,
+                            GenerationActivationSubject subject,
+                            boolean activateLiveProjectionIfAbsent) {
+                return CompletableFuture.failedFuture(
+                        new UnsupportedOperationException(
+                                "not used by runtime ownership test"));
+            }
+
+            @Override
+            public CompletableFuture<Void> revalidate(
+                    GenerationActivationProof proof) {
+                return CompletableFuture.failedFuture(
+                        new UnsupportedOperationException(
+                                "not used by runtime ownership test"));
+            }
+        };
     }
 }

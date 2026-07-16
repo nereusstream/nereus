@@ -280,8 +280,9 @@ cursor domain binds drain revalidation to durable bytes rather than decoded-fiel
 create the M5 cluster authority. Checkpoint S now provides the durable `GenerationProtocolActivationRecord`、codec and
 exact-key/CAS store foundation；Checkpoint AA now composes the shared production store and installs the exact
 zero-failure `streamRegistrationBackfill` proof through a product-owned bounded CAS. Checkpoint T consumes the same
-authority for future-sentinel and ownerless-global scans. The broker activation guard remains pending, so the marker
-API and domains still are not production activation or delete authority.
+authority for future-sentinel and ownerless-global scans. Checkpoint AB adds the product-owned activation guard and
+typed runtime wiring, but cluster ACTIVE orchestration and every mutation caller remain pending；the marker API and
+domains therefore still are not an enabled production publication or delete path.
 
 ### 1.13 F4-M4 generation-index retirement checkpoint
 

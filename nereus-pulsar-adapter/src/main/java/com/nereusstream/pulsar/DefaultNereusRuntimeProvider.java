@@ -6,6 +6,8 @@ import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
+import com.nereusstream.core.physical.GcReferenceDomainConfig;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -23,8 +25,10 @@ import com.nereusstream.managedledger.cursor.DefaultCursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.DefaultCursorStorage;
 import com.nereusstream.managedledger.generation.DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.DefaultManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.retention.ProjectionGenerationReferenceDomain;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
@@ -59,6 +63,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
     private static final Duration READER_LEASE_DURATION = Duration.ofMinutes(2);
     private static final Duration MAXIMUM_CLOCK_SKEW = Duration.ofSeconds(5);
     private static final Duration ORPHAN_GRACE = Duration.ofDays(1);
+    private static final GcReferenceDomainConfig ACTIVATION_REFERENCE_CONFIG =
+            new GcReferenceDomainConfig(256, 100_000, 100_000);
 
     @Override
     public NereusManagedLedgerRuntime create(
@@ -82,6 +88,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                 null;
         ManagedLedgerGenerationRegistrationBackfillProofCoordinator
                 generationRegistrationBackfillProofCoordinator = null;
+        GenerationProtocolActivationGuard generationProtocolActivationGuard =
+                null;
         ManagedLedgerMaterializationRegistrationCoordinator
                 materializationRegistrationCoordinator = null;
         CursorMetadataStore cursorMetadataStore = null;
@@ -141,6 +149,22 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             context.generationCapabilityReadinessProvider(),
                             NereusGenerationProtocolReferenceDomains
                                     .currentV1(),
+                            clock);
+            generationProtocolActivationGuard =
+                    new ManagedLedgerGenerationProtocolActivationGuard(
+                            streamConfig.cluster(),
+                            context.generationProtocolActivationEnabled(),
+                            context.generationCapabilityReadinessProvider(),
+                            generationProtocolActivationStore,
+                            NereusGenerationProtocolReferenceDomains
+                                    .currentV1(),
+                            projectionStore,
+                            l0MetadataStore,
+                            generationMetadataStore,
+                            new ProjectionGenerationReferenceDomain(
+                                    streamConfig.cluster(),
+                                    projectionStore,
+                                    ACTIVATION_REFERENCE_CONFIG),
                             clock);
             materializationRegistrationCoordinator =
                     new DefaultManagedLedgerMaterializationRegistrationCoordinator(
@@ -220,6 +244,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     activationGuard,
                     generationProtocolActivationStore,
                     generationRegistrationBackfillProofCoordinator,
+                    generationProtocolActivationGuard,
                     objectReadPinManager,
                     objectProtectionManager,
                     physicalMetadataStore,

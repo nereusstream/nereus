@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("6914bce939550a2d4929c7920b8cb9ed7cea5857")
+    .orElse("f52108468837917234637c514eb7524b9b3fb5f8")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1082,6 +1082,52 @@ tasks.register("phase4M5RegistrationProofCheck") {
     description = "Verify checkpoint AA durable stream-registration backfill proof completion."
     dependsOn("phase4M5RegistrationBackfillCheck")
     dependsOn("checkPhase4M5RegistrationProofContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("checkPhase4M5ActivationGuardContractSurface") {
+    group = "verification"
+    description = "Audit the product-owned generation activation guard and disabled-by-default broker switch."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-activation-guard-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M5ActivationGuardPulsarCheck") {
+    group = "verification"
+    description = "Run the locked Pulsar activation-switch formatting, style, and focused configuration test."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M5RegistrationProofCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker-common:spotlessJavaCheck",
+        ":pulsar-broker-common:checkstyleMain",
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBrokerStorageConfigurationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M5ActivationGuardCheck") {
+    group = "verification"
+    description = "Verify checkpoint AB exact generation activation admission and runtime composition."
+    dependsOn("phase4M5RegistrationProofCheck")
+    dependsOn("checkPhase4M5ActivationGuardContractSurface")
+    dependsOn("phase4M5ActivationGuardPulsarCheck")
     dependsOn("checkPhase4Documentation")
     dependsOn(":nereus-core:check")
     dependsOn(":nereus-managed-ledger:check")
