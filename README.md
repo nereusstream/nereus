@@ -109,7 +109,7 @@ Exclusive/Failover/Shared、稳定 MessageId、partial-batch ack、owner/runtime
 storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、Shared dispatcher 所需 mutable entry list
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
-F3-M6 已在当前 Pulsar source lock `master@1720bc00a9122b2e89d555891956f38a5f64e3d1` 完成。M6 增加
+F3-M6 已在当前 Pulsar source lock `master@6914bce939550a2d4929c7920b8cb9ed7cea5857` 完成。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace admin route 静态审计。
@@ -192,16 +192,19 @@ barrier、包含 broker start timestamp 的 deterministic readiness epoch/full d
 cache invalidation。Checkpoint Z 已实现 exact unloaded projection candidate，以及按 tenant/namespace/topic
 canonical 排序、one-namespace-at-a-time、bounded concurrency/deadline 的 broker cold-topic registration
 traversal；完整 readiness/binding revalidation、deterministic coverage SHA、full counters 和前 100 个 redacted
-failures 已冻结。Durable registration backfill proof CAS、generation activation guard、cursor snapshot
-candidate/deletion scanner、object inventory、registration retirement、其余 materialization/GC runtime
-composition，以及 F4-M5–M6 的 async profile 与最终兼容接线仍不可用；delete bits 和 production deletion
-继续关闭。
+failures 已冻结。Checkpoint AA 又把完整 broker-set readiness 转换为 product-neutral identity，并在
+零失败 report、final readiness 不变的条件下通过 product-owned、response-loss-safe CAS 持久化
+`streamRegistrationBackfill` proof；同 epoch coverage 不可变，新 epoch 会清空其他旧 epoch proof 与
+object-store capability。Generation activation guard、cursor snapshot candidate/deletion scanner、object
+inventory、registration retirement、其余 materialization/GC runtime composition，以及 F4-M5–M6 的 async
+profile 与最终兼容接线仍不可用；publication/delete bits 和 production deletion 继续关闭。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5RegistrationBackfillCheck --rerun-tasks` 已于 2026-07-16 通过。
+`phase4M5RegistrationProofCheck` 已于 2026-07-16 通过。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

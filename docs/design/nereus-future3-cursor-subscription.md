@@ -394,5 +394,5 @@ loaded/unloaded/namespace route-audit, callback rejection and F4 snapshot-invent
 
 Future 3 is implemented/final-gated；subsequent tracks consume its compatibility contract without moving durable
 cursor correctness into projection or GC。The current Pulsar source lock is
-`master@1720bc00a9122b2e89d555891956f38a5f64e3d1`。See the detailed
+`master@6914bce939550a2d4929c7920b8cb9ed7cea5857`。See the detailed
 [implementation plan](../phase-3-cursor-subscription/06-implementation-plan-and-gates.md)。

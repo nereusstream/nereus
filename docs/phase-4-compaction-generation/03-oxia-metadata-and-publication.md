@@ -278,9 +278,10 @@ property replacement preserve the composed marker rules.
 `CursorMetadataDigests` supplies exact F3 envelope SHA-256 for `CursorRetentionRecord` and `CursorStateRecord` so the
 cursor domain binds drain revalidation to durable bytes rather than decoded-field subsets. Checkpoint K itself did not
 create the M5 cluster authority. Checkpoint S now provides the durable `GenerationProtocolActivationRecord`、codec and
-exact-key/CAS store foundation, but the registration backfill coordinator and broker activation guard remain pending；
-Checkpoint T consumes that authority for future-sentinel and ownerless-global scans. The marker API and domains still
-are not production activation or delete authority until the backfill/broker guard and runtime composition are wired.
+exact-key/CAS store foundation；Checkpoint AA now composes the shared production store and installs the exact
+zero-failure `streamRegistrationBackfill` proof through a product-owned bounded CAS. Checkpoint T consumes the same
+authority for future-sentinel and ownerless-global scans. The broker activation guard remains pending, so the marker
+API and domains still are not production activation or delete authority.
 
 ### 1.13 F4-M4 generation-index retirement checkpoint
 

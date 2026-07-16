@@ -113,9 +113,11 @@ revalidation、topic open/recreate return barrier，以及 shared generation-sto
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、
 broker-incarnation-aware deterministic readiness epoch/full digest 和 registry-notification invalidation。
 Checkpoint Z 又实现 exact unloaded projection candidate、canonical bounded cold-topic registration
-traversal/report、final binding/readiness revalidation 和 frozen coverage digest。Durable registration backfill
-proof CAS、generation activation guard、cursor snapshot candidate/deletion scanning、object inventory、
-registration retirement、remaining runtime composition 及 M5-M6 仍是 target；
+traversal/report、final binding/readiness revalidation 和 frozen coverage digest。Checkpoint AA 又实现
+product-neutral full-readiness handoff、零失败 proof admission、response-loss-safe durable
+`streamRegistrationBackfill` CAS、same-epoch coverage immutability 和 newer-epoch dependent-proof invalidation。
+Generation activation guard、cursor snapshot candidate/deletion scanning、object inventory、registration
+retirement、remaining runtime composition 及 M5-M6 仍是 target；
 production deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
@@ -332,8 +334,8 @@ flowchart TB
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay、F4-M1–M3 metadata/publication gates、M4 protected-append/activation foundations and checkpoint-X canonical projection-ref encoder implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
 | `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint W implements NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、ownerless-global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier and all-shard physical/cursor live-reference backfill, while remaining production composition/final GC remains pending；depends on core, never the reverse |
-| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority and M5 checkpoint-X exact durable registration/open-return frontier complete |
-| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths and checkpoint-X shared generation/registration ownership implemented；generation broker rollout remains pending |
+| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、M5 checkpoint-X exact durable registration/open-return frontier and checkpoint-AA durable registration proof coordinator complete |
+| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、checkpoint-X shared generation/registration ownership and checkpoint-AA readiness/proof runtime composition implemented；activation guard remains pending |
 | `nereus-kop-adapter` | Kafka projection | marker only |
 
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、

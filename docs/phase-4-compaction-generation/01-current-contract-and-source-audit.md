@@ -30,18 +30,23 @@ Repository baseline：`e330969cd5c2c11cd38d0bd7f687185171ae91e2`。
 | `nereus-managed-ledger/.../cursor/CursorSnapshotInventory.java` | `e8b46f08ba6904d2312ae245bd1bbc661c2fc739` | read-only live/orphan classification；not delete authority |
 | `nereus-managed-ledger/.../cursor/DefaultCursorRetentionCoordinator.java` | `66a81bba145d54150097e2bb1dec3370fe2e1848` | owner-scoped pending protection/trim protocol |
 | `nereus-managed-ledger/.../AbstractNereusManagedLedger.java` | `5a3b8214ce81b19280963d799ad1f86e8a68a83c` | current trim housekeeping no-op |
-| `nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java` | `f8375944f8313460f7c9f2b85ed17416ead680ce` | current product composition/close owner |
+| `nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java` | `25b21d7b4fe594804b048940ea81a65d4964b06f` | current product-owned exact readiness/proof CAS owner |
+| `nereus-managed-ledger/.../NereusManagedLedgerRuntime.java` | `a91a7c36498091fa29a442250a8733751e68fc24` | current activation-store/proof-coordinator lifecycle owner |
+| `nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java` | `6f96b29762d06bf1ab013693973f6ac40c59f0c7` | current product composition/close owner |
 
 All paths above are under `src/main/java/com/nereusstream/...`; shortened prefixes are only for table readability.
 
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@1720bc00a9122b2e89d555891956f38a5f64e3d1`。
+`master@6914bce939550a2d4929c7920b8cb9ed7cea5857`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
-| `pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java` | `c43fc2c6356befac1a1106a3f2e3152d31e4cd61` | two-stable-snapshot cluster capability barrier |
+| `pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java` | `0b76b1939603c7ba60ed1c4691287819421d3ed4` | two-stable-snapshot barrier plus product-neutral readiness provider |
+| `pulsar-broker/.../nereus/NereusGenerationCapabilityReadiness.java` | `782303d1442972a02a290955f920835971a8d8fe` | exact full readiness identity and core conversion |
+| `pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java` | `385215ac919a837e11ff999fc4c8bfe02d170b60` | canonical traversal/report plus zero-failure proof handoff |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `4f0878fa1d871fb5c7b9d094be45523eaef5e23f` | broker-to-product proof completion delegate |
 | `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `14916134ed514fc0d2c2e6628e7317463798bb89` | current retention/compaction/admin denylist |
 | `pulsar-broker/.../nereus/NereusAdminOperation.java` | `a99c967347ce7b9edc29b57892b220f42bedf8be` | closed loaded/unloaded admin operation set |
 | `pulsar-broker/.../service/BacklogQuotaManager.java` | `686e2244b560a16c69303e854719016d610fb305` | cursor skip/mark-delete backlog eviction call path |
@@ -53,13 +58,16 @@ Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
 | `pulsar-broker-common/.../resources/NamespaceResources.java` | `1f20be916edd5e2cf92713a169064c32a9b46514` | `listNamespacesAsync(tenant)` backfill traversal |
 | `pulsar-broker-common/.../resources/TopicResources.java` | `66d2e81fb0eb9ebfda99deef636857e6200cf0e6` | `listPersistentTopicsAsync(namespace)` including unloaded topics |
 
-The table preserves the M0 blob audit. At the current checkpoint-Z source lock, the fork additionally contains
+The table preserves the M0 blob audit. At the current checkpoint-AA source lock, the fork additionally contains
 `NereusGenerationProtocolCapability`、`NereusGenerationCapabilityReadiness` and the generation extension to
 `NereusBrokerCapabilityCoordinator`：all three protocol versions are advertised/verified under two stable persistent-
 broker snapshots, readiness includes broker start timestamps, and broker-registry notifications invalidate the
 process-local epoch. It also contains the canonical one-namespace-at-a-time cold-topic registration traversal/report
-and its broker lifecycle/config wiring. The exact current files/tests are audited by
-`phase4M5RegistrationBackfillCheck`；durable backfill proof CAS and activation remain outside this checkpoint.
+and its broker lifecycle/config wiring. Checkpoint AA extends that surface with a product-neutral exact-readiness
+provider and a zero-failure completion handoff；the broker still does not own activation metadata. The Nereus side
+owns the shared-Oxia activation store and response-loss-safe `streamRegistrationBackfill` CAS. The exact current
+files/tests are audited by `phase4M5RegistrationProofCheck`；topic marker activation and the product mutation guard
+remain outside this checkpoint.
 
 Pulsar M0 uses local source and compiled member checks only；no internet or published M1 snapshot is an input.
 

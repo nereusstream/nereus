@@ -21,10 +21,13 @@ import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.cursor.DefaultCursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.DefaultCursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.DefaultCursorStorage;
+import com.nereusstream.managedledger.generation.DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.DefaultManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
@@ -75,6 +78,10 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         ObjectReadPinManager objectReadPinManager = null;
         ManagedLedgerProjectionMetadataStore projectionStore = null;
         GenerationMetadataStore generationMetadataStore = null;
+        GenerationProtocolActivationStore generationProtocolActivationStore =
+                null;
+        ManagedLedgerGenerationRegistrationBackfillProofCoordinator
+                generationRegistrationBackfillProofCoordinator = null;
         ManagedLedgerMaterializationRegistrationCoordinator
                 materializationRegistrationCoordinator = null;
         CursorMetadataStore cursorMetadataStore = null;
@@ -116,6 +123,24 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     OxiaJavaGenerationMetadataStore.usingSharedRuntime(
                             configuration.oxia(),
                             sharedOxiaRuntime,
+                            clock);
+            generationProtocolActivationStore =
+                    GenerationProtocolActivationStore.usingSharedRuntime(
+                            configuration.oxia(),
+                            sharedOxiaRuntime,
+                            clock,
+                            DeterministicIds.stableHashComponent(
+                                    "generation-activation/"
+                                            + streamConfig.processRunId()),
+                            NereusGenerationProtocolReferenceDomains
+                                    .currentV1());
+            generationRegistrationBackfillProofCoordinator =
+                    new DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
+                            streamConfig.cluster(),
+                            generationProtocolActivationStore,
+                            context.generationCapabilityReadinessProvider(),
+                            NereusGenerationProtocolReferenceDomains
+                                    .currentV1(),
                             clock);
             materializationRegistrationCoordinator =
                     new DefaultManagedLedgerMaterializationRegistrationCoordinator(
@@ -193,6 +218,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorStorage,
                     cursorConfig,
                     activationGuard,
+                    generationProtocolActivationStore,
+                    generationRegistrationBackfillProofCoordinator,
                     objectReadPinManager,
                     objectProtectionManager,
                     physicalMetadataStore,
@@ -213,6 +240,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorRetentionCoordinator,
                     cursorSnapshotStore,
                     cursorMetadataStore,
+                    generationProtocolActivationStore,
                     generationMetadataStore,
                     projectionStore,
                     streamStorage,

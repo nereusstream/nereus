@@ -11,9 +11,11 @@ import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.CursorStorage;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -97,6 +99,14 @@ class NereusManagedLedgerRuntimeTest {
         ExecutorService callbacks = Executors.newSingleThreadExecutor();
         ObjectReadPinManager readPins =
                 proxy(ObjectReadPinManager.class, "read-pins", closes, false);
+        GenerationProtocolActivationStore generationActivation =
+                proxy(
+                        GenerationProtocolActivationStore.class,
+                        "generation-activation",
+                        closes,
+                        false);
+        ManagedLedgerGenerationRegistrationBackfillProofCoordinator proofCoordinator =
+                completion -> CompletableFuture.completedFuture(null);
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
@@ -108,6 +118,8 @@ class NereusManagedLedgerRuntimeTest {
                 proxy(CursorStorage.class, "cursor-storage", closes, false),
                 CursorStorageConfig.defaults(),
                 allowActivation(),
+                generationActivation,
+                proofCoordinator,
                 readPins,
                 proxy(AutoCloseable.class, "protection", closes, false),
                 proxy(AutoCloseable.class, "physical", closes, false),
@@ -123,6 +135,8 @@ class NereusManagedLedgerRuntimeTest {
                 "pulsar-f2/" + PROCESS_RUN_ID);
 
         assertThat(runtime.objectReadPinManager()).isSameAs(readPins);
+        assertThat(runtime.generationRegistrationBackfillProofCoordinator())
+                .isSameAs(proofCoordinator);
         runtime.close();
 
         assertThat(closes).containsExactly(
@@ -130,6 +144,7 @@ class NereusManagedLedgerRuntimeTest {
                 "cursor-retention",
                 "cursor-snapshot",
                 "cursor-metadata",
+                "generation-activation",
                 "generation",
                 "projection",
                 "stream",

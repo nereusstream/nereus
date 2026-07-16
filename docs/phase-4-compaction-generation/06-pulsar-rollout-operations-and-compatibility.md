@@ -291,8 +291,8 @@ deleted-incarnation proof for every stream slice.
 
 Checkpoint X makes every Nereus topic create/open/recreate create or verify its registration even while generation
 publication is disabled, closing the concurrent new-topic frontier. Checkpoint Z now covers existing unloaded topics
-with the explicit idempotent broker traversal below；the traversal/report are implemented, while the durable
-coverage-proof CAS is still a later checkpoint：
+with the explicit idempotent broker traversal below；Checkpoint AA now consumes an eligible report through the
+product-owned durable coverage-proof CAS：
 
 ```java
 public record GenerationRegistrationBackfillRequest(
@@ -345,11 +345,19 @@ holds an all-cluster topic list.
 
 The run starts and ends under the same two-snapshot broker readiness value, which proves the new-topic registration
 hook was active throughout. Checkpoint Z compares the complete value, including full broker-set SHA and broker count,
-not only its 63-bit epoch. Any list/read/register failure、readiness change or nonzero failure count makes the report
-ineligible for the later activation record's `streamRegistrationBackfill` proof. Process loss simply reruns from the
-beginning；same-key create-or-verify is idempotent. The backfill creates no topic marker, writes no activation record
-and cannot activate publication. If an old broker later joins, readiness is invalidated and the proof must be
-created/refreshed by the later proof-CAS checkpoint before F4 mutations may run.
+not only its 63-bit epoch. Any list/read/register failure、readiness change or nonzero failure count keeps the report
+ineligible for `streamRegistrationBackfill`. Process loss simply reruns from the beginning；same-key create-or-verify
+is idempotent. The broker traversal creates no topic marker and does not own the activation record.
+
+Checkpoint AA adds `GenerationRegistrationBackfillCompletion` as the product boundary. After the final full-readiness
+comparison, only a zero-failure report is submitted, within the same whole-run deadline. The product coordinator
+reacquires exact readiness before CAS, compares epoch/full digest/broker count, and installs the proof through the
+shared-Oxia activation store. Same-epoch completed coverage is immutable；a rerun with another run id and the same
+coverage converges. A newer readiness epoch resets physical-root/cursor-snapshot proof epochs to incomplete and clears
+the old object-store capability；deletion-enabled authority rejects standalone refresh. CAS response loss and
+condition conflicts reload the durable value. Final cached-readiness plus durable-proof revalidation is mandatory.
+An old broker joining therefore invalidates readiness immediately；the durable old-epoch proof remains harmless and
+the activation guard must block F4 mutations until all required proofs are refreshed under a stable capable epoch.
 
 The product boundary captures an immutable
 `ManagedLedgerMaterializationRegistrationCandidate(managedLedgerName, storageClassBindingGeneration, projectionIdentity,
@@ -411,8 +419,9 @@ snapshots fails with `NEREUS_CLUSTER_CAPABILITY_SNAPSHOT_CHANGED`. Cache publica
 revision, and registry stop/unregister clears the visible cache. Focused tests freeze the identity, reject missing or
 spoofed capabilities, prove input-order independence, distinguish same-id broker restart by start timestamp, and
 cover notification-before-cache and notification-between-snapshot cuts. Checkpoint Y itself did not run the
-cold-topic backfill. Checkpoint Z now provides that bounded traversal/report but still does not write its durable
-proof, set a topic marker or implement the product activation guard.
+cold-topic backfill. Checkpoint Z provides that bounded traversal/report, and Checkpoint AA now hands exact readiness
+plus zero-failure coverage to the product-owned durable proof CAS. Neither checkpoint sets a topic marker or implements
+the product activation guard.
 
 ### 4.3 Cluster activation record
 

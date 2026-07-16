@@ -3,6 +3,7 @@ package com.nereusstream.managedledger;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.core.capability.GenerationRegistrationBackfillCompletion;
 import com.nereusstream.managedledger.cache.NereusNoopEntryCacheManager;
 import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
 import com.nereusstream.managedledger.config.ManagedLedgerOpenConfigView;
@@ -111,6 +112,20 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         return openCoordinator.ensureMaterializationRegistration(candidate);
+    }
+
+    public CompletableFuture<Void> completeGenerationRegistrationBackfill(
+            GenerationRegistrationBackfillCompletion completion) {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(factoryClosed());
+        }
+        try {
+            return runtime
+                    .generationRegistrationBackfillProofCoordinator()
+                    .complete(completion);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
     }
 
     @Override

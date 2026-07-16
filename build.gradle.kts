@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("1720bc00a9122b2e89d555891956f38a5f64e3d1")
+    .orElse("6914bce939550a2d4929c7920b8cb9ed7cea5857")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1064,4 +1064,26 @@ tasks.register("phase4M5RegistrationBackfillCheck") {
     dependsOn("phase4M5RegistrationBackfillPulsarCheck")
     dependsOn("checkPhase4Documentation")
     dependsOn(":nereus-managed-ledger:check")
+}
+
+tasks.register<Exec>("checkPhase4M5RegistrationProofContractSurface") {
+    group = "verification"
+    description = "Audit the exact broker-readiness handoff and product-owned durable registration proof CAS."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-registration-proof-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register("phase4M5RegistrationProofCheck") {
+    group = "verification"
+    description = "Verify checkpoint AA durable stream-registration backfill proof completion."
+    dependsOn("phase4M5RegistrationBackfillCheck")
+    dependsOn("checkPhase4M5RegistrationProofContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-pulsar-adapter:check")
 }

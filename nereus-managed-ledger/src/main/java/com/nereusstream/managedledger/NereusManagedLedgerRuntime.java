@@ -8,9 +8,11 @@ import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.CursorStorage;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
@@ -45,6 +47,9 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private final CursorStorage cursorStorage;
     private final CursorStorageConfig cursorStorageConfig;
     private final CursorProtocolActivationGuard cursorProtocolActivationGuard;
+    private GenerationProtocolActivationStore generationProtocolActivationStore;
+    private ManagedLedgerGenerationRegistrationBackfillProofCoordinator
+            generationRegistrationBackfillProofCoordinator;
     private final ObjectReadPinManager objectReadPinManager;
     private final AutoCloseable objectProtectionManager;
     private final AutoCloseable physicalMetadataStore;
@@ -200,6 +205,67 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         this.callbackPermits = new Semaphore(config.maxPendingCallbacks());
     }
 
+    public NereusManagedLedgerRuntime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            GenerationMetadataStore generationMetadataStore,
+            ManagedLedgerMaterializationRegistrationCoordinator
+                    materializationRegistrationCoordinator,
+            CursorMetadataStore cursorMetadataStore,
+            CursorSnapshotStore cursorSnapshotStore,
+            CursorRetentionCoordinator cursorRetentionCoordinator,
+            CursorStorage cursorStorage,
+            CursorStorageConfig cursorStorageConfig,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            GenerationProtocolActivationStore generationProtocolActivationStore,
+            ManagedLedgerGenerationRegistrationBackfillProofCoordinator
+                    generationRegistrationBackfillProofCoordinator,
+            ObjectReadPinManager objectReadPinManager,
+            AutoCloseable objectProtectionManager,
+            AutoCloseable physicalMetadataStore,
+            OxiaMetadataStore l0MetadataStore,
+            SharedOxiaClientRuntime sharedOxiaRuntime,
+            ObjectStore objectStore,
+            ObjectStoreProvider objectStoreProvider,
+            ScheduledExecutorService scheduler,
+            ExecutorService callbackExecutor,
+            NereusManagedLedgerFactoryConfig config,
+            String cluster,
+            String processRunId,
+            String writerId) {
+        this(
+                streamStorage,
+                projectionStore,
+                generationMetadataStore,
+                materializationRegistrationCoordinator,
+                cursorMetadataStore,
+                cursorSnapshotStore,
+                cursorRetentionCoordinator,
+                cursorStorage,
+                cursorStorageConfig,
+                cursorProtocolActivationGuard,
+                objectReadPinManager,
+                objectProtectionManager,
+                physicalMetadataStore,
+                l0MetadataStore,
+                sharedOxiaRuntime,
+                objectStore,
+                objectStoreProvider,
+                scheduler,
+                callbackExecutor,
+                config,
+                cluster,
+                processRunId,
+                writerId);
+        this.generationProtocolActivationStore = Objects.requireNonNull(
+                generationProtocolActivationStore,
+                "generationProtocolActivationStore");
+        this.generationRegistrationBackfillProofCoordinator =
+                Objects.requireNonNull(
+                        generationRegistrationBackfillProofCoordinator,
+                        "generationRegistrationBackfillProofCoordinator");
+    }
+
     public StreamStorage streamStorage() {
         return streamStorage;
     }
@@ -227,6 +293,15 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
 
     public CursorProtocolActivationGuard cursorProtocolActivationGuard() {
         return cursorProtocolActivationGuard;
+    }
+
+    public ManagedLedgerGenerationRegistrationBackfillProofCoordinator
+            generationRegistrationBackfillProofCoordinator() {
+        if (generationRegistrationBackfillProofCoordinator == null) {
+            throw new IllegalStateException(
+                    "this runtime was assembled without the F4 registration backfill proof coordinator");
+        }
+        return generationRegistrationBackfillProofCoordinator;
     }
 
     public ObjectReadPinManager objectReadPinManager() {
@@ -284,6 +359,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         closeOne(cursorRetentionCoordinator, failures);
         closeOne(cursorSnapshotStore, failures);
         closeOne(cursorMetadataStore, failures);
+        closeOneIfPresent(generationProtocolActivationStore, failures);
         closeOne(generationMetadataStore, failures);
         closeOne(projectionStore, failures);
         closeOne(streamStorage, failures);

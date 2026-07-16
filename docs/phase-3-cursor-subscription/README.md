@@ -27,7 +27,7 @@ Pulsar ManagedCursor API
 | Nereus baseline | `nereusstream/nereus@623662d9796af1bf2ff929f41df1a8c946a02279`；F2 final-gated |
 | Pulsar fork checkout | `/Users/liusinan/apps/ideaproject/nereusstream/pulsar` |
 | Pulsar M0 source/API audit baseline | local `master@7efae25af39a15407c1397d9e1f4ac4658d09daa`；historical blob/member evidence remains pinned |
-| Pulsar current implementation/source lock | local `master@1720bc00a9122b2e89d555891956f38a5f64e3d1`；contains F3-M6 MessageId/property/incarnation gate、unloaded binding-aware admin validation and the M5 recovery fixes |
+| Pulsar current implementation/source lock | local `master@6914bce939550a2d4929c7920b8cb9ed7cea5857`；contains F3-M6 MessageId/property/incarnation gate、unloaded binding-aware admin validation and the M5 recovery fixes |
 | Pulsar version interpretation | checkout 中的 `5.0.0-M1-SNAPSHOT` 只是本地 master 的 source-project selector，不是已发布的 M1 snapshot |
 | Executable Nereus profile inherited from F2 | `OBJECT_WAL_SYNC_OBJECT` only |
 | Coordinate contract | one Pulsar Entry = one Nereus stream offset；`Position.entryId == offset` |
