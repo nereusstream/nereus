@@ -37,7 +37,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`。
+`master@1f28c2b08b03f1cff17479671ba2368644023db3`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -52,6 +52,13 @@ Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
 | `pulsar-broker-common/.../resources/TenantResources.java` | `1f954e6bfe89640c214915cc206c0bd52ae95180` | async tenant enumeration for cold-topic registration backfill |
 | `pulsar-broker-common/.../resources/NamespaceResources.java` | `1f20be916edd5e2cf92713a169064c32a9b46514` | `listNamespacesAsync(tenant)` backfill traversal |
 | `pulsar-broker-common/.../resources/TopicResources.java` | `66d2e81fb0eb9ebfda99deef636857e6200cf0e6` | `listPersistentTopicsAsync(namespace)` including unloaded topics |
+
+The table preserves the M0 blob audit. At the current checkpoint-Y source lock, the fork additionally contains
+`NereusGenerationProtocolCapability`、`NereusGenerationCapabilityReadiness` and the generation extension to
+`NereusBrokerCapabilityCoordinator`：all three protocol versions are advertised/verified under two stable persistent-
+broker snapshots, readiness includes broker start timestamps, and broker-registry notifications invalidate the
+process-local epoch. The exact current files/tests are audited by
+`phase4M5GenerationCapabilityCheck`；cold-topic traversal and activation remain outside this checkpoint.
 
 Pulsar M0 uses local source and compiled member checks only；no internet or published M1 snapshot is an input.
 

@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`c2f7c22fdc562022b992a5c7aecb5fd5c02d318d`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`1f28c2b08b03f1cff17479671ba2368644023db3`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -101,7 +101,9 @@ stable final revalidation and response-loss-safe dual activation proofs. Broker 
 cursor snapshot candidate/deletion scanning、object inventory、registration retirement and the remaining
 materialization/GC runtime composition remain pending. Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
-production ownership；the broker capability/barrier and cold-topic traversal remain pending.
+production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
+binding/cursor/generation two-stable-snapshot barrier、deterministic broker-incarnation readiness epoch/full digest
+and registry-notification invalidation；cold-topic traversal/proof CAS and the product activation guard remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -620,7 +622,8 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining materialization/GC runtime
 > composition、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
-> durable registration, but no marker、broker capability or cold-topic coverage proof is produced yet.
+> durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
+> identity, but no marker、cold-topic coverage proof or product activation permit is produced yet.
 
 ### 6.1 Production artifacts
 
@@ -1134,8 +1137,10 @@ nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoint
 ### 7.2 Local Pulsar fork artifacts
 
 ```text
-pulsar-broker/.../nereus/NereusGenerationProtocolCapability.java
-pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java
+pulsar-broker/.../nereus/NereusGenerationProtocolCapability.java       implemented checkpoint Y
+pulsar-broker/.../nereus/NereusGenerationCapabilityReadiness.java     implemented checkpoint Y
+pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java       extended checkpoint Y
+pulsar-broker/.../nereus/NereusCursorProtocolCapability.java          extended checkpoint Y reserved chain
 pulsar-broker/.../nereus/NereusGenerationRegistrationBackfill.java
 pulsar-broker/.../nereus/NereusStorageBindingCapability.java
 pulsar-broker/.../nereus/NereusResolvedTopicFeatures.java
@@ -1177,8 +1182,9 @@ NereusRuntimeF4ConfigurationCrossValidationTest
 Pulsar fork：
 
 ```text
-NereusGenerationProtocolCapabilityTest
-NereusBrokerCapabilityCoordinatorGenerationTest
+NereusGenerationProtocolCapabilityTest                    implemented checkpoint Y
+NereusCursorProtocolCapabilityTest                        extended checkpoint Y
+NereusStorageBindingCapabilityTest                        extended checkpoint Y
 NereusGenerationRegistrationBackfillTest
 NereusTopicFeatureResolverF4Test
 NereusTopicFeatureValidatorF4Test
@@ -1194,6 +1200,7 @@ NereusGenerationProtocolBrokerTest
 
 ```text
 ./gradlew phase4M5RegistrationFrontierCheck
+./gradlew phase4M5GenerationCapabilityCheck
 ./gradlew phase4M5Check
 ./gradlew phase4M5FinalCheck --rerun-tasks
 ```
@@ -1209,6 +1216,17 @@ projection-ref encoder、exact projection/L0 registration capture、idempotent c
 response-loss reload、final authority revalidation、open-return ordering and production shared-store ownership. It
 does not modify the local Pulsar fork, advertise generation capability, activate a topic marker, enumerate cold
 topics, or publish a cluster backfill proof. The ordinary gate passed with `--rerun-tasks` on 2026-07-16.
+
+`phase4M5GenerationCapabilityCheck` is the checkpoint-Y precursor. It consumes the exact clean local fork
+`master@1f28c2b08b03f1cff17479671ba2368644023db3`, audits the capability/readiness/invalidation surface, publishes
+the existing Nereus F2 development composite, and runs broker spotless、checkstyle plus focused generation/cursor/
+binding suites. The readiness identity is domain-separated SHA-256 over sorted persistent broker registry keys、
+advertised broker ids、start timestamps and sorted required protocol pairs；the frozen two-broker fixture yields
+epoch `4351585672493013605` and digest
+`bc63f01d0aa01a65c7205625a2714f0246d8ba7e7b88b8a653137abbc719cc0d`. Registry notifications invalidate the
+cache and a notification between equal snapshots fails closed. This gate does not enumerate cold topics、CAS the
+registration backfill proof、activate a topic marker or enable publication/deletion. It passed with `--rerun-tasks`
+on 2026-07-16.
 
 ## 8. F4-M6 — Final Acceptance
 

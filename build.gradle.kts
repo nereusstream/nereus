@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("c2f7c22fdc562022b992a5c7aecb5fd5c02d318d")
+    .orElse("1f28c2b08b03f1cff17479671ba2368644023db3")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -975,4 +975,47 @@ tasks.register("phase4M5RegistrationFrontierCheck") {
     dependsOn(":nereus-managed-ledger:check")
     dependsOn(":nereus-materialization:check")
     dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("checkPhase4M5GenerationCapabilityContractSurface") {
+    group = "verification"
+    description = "Audit the locked Pulsar generation capability, readiness identity, and invalidation surface."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-generation-capability-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M5GenerationCapabilityPulsarCheck") {
+    group = "verification"
+    description = "Run the exact Pulsar generation capability/readiness formatting, style, and focused tests."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M5RegistrationFrontierCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusGenerationProtocolCapabilityTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusCursorProtocolCapabilityTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusStorageBindingCapabilityTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M5GenerationCapabilityCheck") {
+    group = "verification"
+    description = "Verify checkpoint Y generation capability and deterministic stable broker readiness."
+    dependsOn("phase4M5RegistrationFrontierCheck")
+    dependsOn("checkPhase4M5GenerationCapabilityContractSurface")
+    dependsOn("phase4M5GenerationCapabilityPulsarCheck")
+    dependsOn("checkPhase4Documentation")
 }

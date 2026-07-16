@@ -384,6 +384,22 @@ those subject/version checks immediately before the mutation CAS. First activati
 snapshot barrier. Subsequent operations may use the coordinator's validated cached epoch, but an old/incapable broker
 joining invalidates it and blocks new F4 mutations until two stable capable snapshots converge again.
 
+Checkpoint Y implements the broker half of this contract in the locked local fork. Lookup decoration now publishes
+the reserved binding、cursor and generation properties together. `requireGenerationReadiness()` filters to
+persistent-topic brokers, validates all three exact versions, and compares two full snapshots rather than only their
+key sets. Its canonical SHA-256 input is domain-separated and length-prefixed；brokers are sorted by registry key and
+each contributes that key、the advertised `BrokerLookupData.brokerId`、`startTimestamp` and sorted required
+property/value pairs. The bounded V1 `brokerReadinessEpoch` is the non-negative first 63 digest bits；the complete
+lowercase digest and broker count remain available for exact comparison.
+
+The coordinator registers a broker-registry listener before readiness is used. Every notification increments a
+process-local revision and invalidates the cached identity；a revision change during two otherwise identical
+snapshots fails with `NEREUS_CLUSTER_CAPABILITY_SNAPSHOT_CHANGED`. Cache publication and reads compare the same
+revision, and registry stop/unregister clears the visible cache. Focused tests freeze the identity, reject missing or
+spoofed capabilities, prove input-order independence, distinguish same-id broker restart by start timestamp, and
+cover notification-before-cache and notification-between-snapshot cuts. Checkpoint Y does not run the cold-topic
+backfill, write its proof, set a topic marker or implement the product activation guard.
+
 ### 4.3 Cluster activation record
 
 ```text
@@ -683,8 +699,9 @@ Target fork files：
 
 ```text
 pulsar-broker/.../storage/nereus/
-  NereusGenerationProtocolCapability.java               new
-  NereusBrokerCapabilityCoordinator.java                compose generation property/barrier
+  NereusGenerationProtocolCapability.java               checkpoint Y reserved property/version
+  NereusGenerationCapabilityReadiness.java              checkpoint Y deterministic epoch/full digest
+  NereusBrokerCapabilityCoordinator.java                checkpoint Y generation property/barrier/cache invalidation
   NereusGenerationRegistrationBackfill.java             cold unloaded-topic enumeration/coverage gate
   NereusStorageBindingCapability.java                   reserve generation property
   NereusResolvedTopicFeatures.java                      exact retention/backlog values

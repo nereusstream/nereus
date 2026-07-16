@@ -109,8 +109,10 @@ grace-fenced higher-generation pre-drain/reproof，并增加 durable generation-
 与五个 ownerless-global domains、dual-absence DELETED-root/Phase 1 audit retirement，以及 guarded/pending/
 permanent/pinned cursor-snapshot new-write/read frontier，以及 strict NPR1 projection identity 和 all-shard
 physical/cursor live-reference backfill。M5 checkpoint X 又实现 exact durable registration create/refresh/final
-revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Broker
-cold-topic registration backfill/capability barrier、generation activation guard、cursor snapshot candidate/deletion
+revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
+又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、
+broker-incarnation-aware deterministic readiness epoch/full digest 和 registry-notification invalidation。Broker
+cold-topic registration backfill/proof CAS、generation activation guard、cursor snapshot candidate/deletion
 scanning、object inventory、registration retirement、remaining runtime composition 及 M5-M6 仍是 target；
 production deletion 继续关闭。
 
