@@ -23,9 +23,10 @@ affected-stream generation/append-recovery/materialization domains are also impl
 reference-snapshot builder and activation-gated global scope now live in core, and affected plus ownerless
 projection-generation/cursor-snapshot domains are implemented over exact F2/F3 authority wrappers. Every domain reference must
 match one exact planned metadata removal；active task/live-tail and non-DRAINING higher-generation references veto.
-The collector stops at durable delete intent and deliberately exposes no metadata/protection/object delete call；runtime
-composition、backfill/broker guard、source/delete completion and physical/cursor/root/audit completion remain target
-work. Package、class and method names
+The collector stops at durable delete intent and deliberately exposes no metadata/protection/object delete call；
+typed source destructive recovery and the separate DELETED-root/Phase 1 audit-retirement coordinator are now
+implemented, but runtime composition、backfill/broker guard、cursor snapshot GC、object inventory and registration
+retirement remain target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 

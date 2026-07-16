@@ -32,9 +32,10 @@
 > record/codec/exact key、read-only lookup、PREPARED bootstrap、monotonic CAS 和冻结 golden/contract tests；该
 > authority foundation 不会自行启用 publication/delete bits。Checkpoint T 已实现 activation/backfill/domain-set
 > gated 的全 64-shard registration scope、future-catalog sentinel，并把五个 storage/managed-ledger reference
-> domains 的 ownerless query 改为完整 global scan + exact revalidation。Backfill/broker activation guard、
-> production runtime composition、
-> cursor/root/audit completion 与最终删除开关仍保持关闭
+> domains 的 ownerless query 改为完整 global scan + exact revalidation。Checkpoint U 又实现 persisted dual
+> absence window、late exact-byte cleanup、Phase 1 references-before-manifest 和 root-last CAS 的 DELETED-root
+> audit retirement。Backfill/broker activation guard、physical-root backfill、production runtime composition、cursor
+> snapshot GC、object inventory、registration retirement 与最终删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
 >
@@ -769,9 +770,10 @@ COMMITTED NRC1 facts，也绝不让跨 view generation 互相覆盖。
 candidate-root final fence 与 response-loss-safe CAS；已经 DRAINING 的 higher source 和 generation-zero removal
 在 plan/reload 时重复各自 exact eligibility proof。
 
-Checkpoint R 是 source-eligibility 的 ordinary completion checkpoint，不是 M4 final gate。Checkpoint T 后
-future-sentinel 与 ownerless global absence proof 已落地，但 production runtime composition、cursor/root/audit retirement、real-service
-destructive scenarios 和 final M4 gate 仍待完成；production deletion 继续关闭。
+Checkpoint R 是 source-eligibility 的 ordinary completion checkpoint，不是 M4 final gate。Checkpoint U 后
+future-sentinel、ownerless global absence proof 与 DELETED-root/Phase 1 audit retirement 已落地，但 production
+runtime composition、physical-root backfill、cursor snapshot GC、object inventory、registration retirement、
+real-service destructive scenarios 和 final M4 gate 仍待完成；production deletion 继续关闭。
 
 ### 6.21 F4-M4 generation-protocol activation metadata foundation
 
@@ -823,6 +825,29 @@ core scope interface，不依赖 materialization。默认旧构造器仍注入 u
 revalidation。该 gate 不实现实际 backfill executor、broker readiness guard 或 runtime composition，production
 capability bits 和 deletion 继续关闭。
 
+### 6.23 F4-M4 DELETED-root tombstone-retirement checkpoint
+
+Checkpoint U 实现 `PhysicalRootTombstoneRetirementCoordinator` 的 production
+`DefaultPhysicalRootTombstoneRetirementCoordinator`。入口只接受 root scanner 返回的 exact `DELETED` wrapper；
+disabled/dry-run 在任何 read 前返回。每次 pass 只读取一次 wall clock，并以同一 monotonic deadline 串行执行
+root reload、exact HEAD、reader/protection scan 和 activation-gated ownerless domain scan。第一个 clear pass 将
+immutable/deletion-attempt root facts、query identity、handle absence 与所有 canonical domain snapshot digest
+编码为 `nereus-deleted-root-tombstone-proof-v1`，通过合法的 `DELETED -> DELETED` CAS 持久化首次 absence
+时间；没有进程内 timer 或候选队列承担 correctness。
+
+第二个严格 `orphanGrace + maximumClockSkew` 窗口后，coordinator 必须重得相同 proof。任何 lease/protection、
+owner reference、domain incomplete/veto 或 authority drift 都清除/替换 observation 并重新开始窗口。若旧 key
+出现 exact immutable bytes，只在 exact root reload、handle absence 和 `stillMatches` ownerless proof 后删除，
+response loss 通过新 HEAD absence 收敛；identity mismatch 返回 `QUARANTINED` 且不删除未知 bytes。
+
+带 Phase 1 `objectId` 的 root 会捕获 exact reference/manifest wrapper，逐次重验同一 DELETED root，先条件删除
+references、再删除 manifest、重读二者 absent，最后再次执行完整 HEAD/handle/domain proof。root 是最终 metadata
+action，并同时绑定 Oxia version 与 durable-value SHA；lost response 只在 exact key absent 时成功。
+`PhysicalRootTombstoneRetirementTest` 与 `LatePutAfterTombstoneTest` 覆盖 dual window、authority/owner/handle
+drift、late PUT、mismatched bytes，以及 object/audit/root response-loss cuts。
+`phase4M4TombstoneRetirementCheck` 已于 2026-07-16 通过完整 ordinary 前置链；它不启用 production runtime
+deletion，也不是 M4 final gate。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -831,7 +856,7 @@ capability bits 和 deletion 继续关闭。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint T, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel and affected/ownerless generation/append/materialization/projection/cursor domains are implemented/tested；backfill/broker guard、runtime composition、cursor/root/audit completion and final gate pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint U, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains and dual-absence DELETED-root/Phase 1 audit retirement are implemented/tested；backfill/broker guard、runtime composition、cursor snapshot GC、object inventory、registration retirement and final gate pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

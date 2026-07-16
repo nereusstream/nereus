@@ -417,12 +417,14 @@ Checkpoint S implements this record、codec and exact-key production store. The 
 non-creating because GC/reference-domain evaluation must never manufacture rollout authority while checking it.
 Concurrent PREPARED creation converges on the existing exact record, and compare-and-set recovery accepts only the
 exact desired replacement reloaded at a later metadata version. Broker capability collection、the three backfill
-executors、future sentinel and runtime activation guard remain later rollout work.
+executors and runtime activation guard remain later rollout work；the future sentinel is implemented by checkpoint T.
 
 Checkpoint T implements the sentinel and global-scope consumer side. It accepts the 64-shard registration set as
 ownerless scope only under an exact ACTIVE/deletion-ready activation wrapper with all three completed backfills and an
 exact installed domain set, then rereads that wrapper after enumeration. This does not implement or simulate the
 backfill executors/broker readiness barrier；production cannot manufacture those proofs from the scanner itself.
+Checkpoint U consumes the resulting ownerless proof in the standalone DELETED-root tombstone coordinator, but does not
+change this rollout boundary or schedule production deletion.
 
 Schema/protocol are `1`. Domain pairs are canonical sorted/unique, non-empty and capped at 32. Run/broker ids are
 random 128-bit lowercase base32；coverage/capability digests are lowercase SHA-256. An incomplete backfill has empty

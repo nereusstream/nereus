@@ -167,6 +167,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M2**：Future 4 generation publication、authoritative committed read、exact dispatch、durable pin、
   same-view fallback/quarantine 里程碑；已于 2026-07-15 通过 ordinary 与 real Oxia/LocalStack final gate。
   M2 complete 不表示 compacted object worker、retirement/GC 或 async profile 已启用，这些属于 F4-M3–M6。
+- **F4-M4 checkpoint U**：DELETED physical root 的持久化双 HEAD/ownerless-domain absence window、late exact-byte
+  cleanup、Phase 1 references-before-manifest 和 root-last conditional retirement ordinary checkpoint；它不表示
+  production runtime 已启用 physical deletion。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

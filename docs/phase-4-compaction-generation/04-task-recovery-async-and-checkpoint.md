@@ -192,6 +192,11 @@ backfill epoch remained required before ownerless GC. The new classes were not i
 Checkpoint T later adds the activation/backfill/domain-set-gated global scope and reuses these same exact scans for
 ownerless queries. It still does not install them in `MaterializationRuntime` or enable production deletion.
 
+Checkpoint U adds the standalone `DefaultPhysicalRootTombstoneRetirementCoordinator`. It consumes those ownerless
+domain proofs plus reader/protection absence, persists the separated HEAD-absence window and retires Phase 1 audits
+root-last. The class is production code but is still not scheduled or installed by `MaterializationRuntime`；the
+activation/backfill/runtime boundary therefore remains unchanged.
+
 F4-M4 checkpoint K adds the two affected-stream managed-ledger domains without changing that runtime boundary.
 `ProjectionGenerationReferenceDomain` reads the exact per-stream F2 binding and the current topic authority selected
 by that binding；missing derived binding/topic、same-incarnation `DELETING`, or a live same-incarnation topic without
@@ -202,9 +207,8 @@ binding-repair-missing crash cut therefore cannot authorize deletion.
 `CursorSnapshotReferenceDomain` reads the exact F3 retention record and completely pages cursor roots. Pending
 retention lifecycle、retention/cursor projection mismatch、or an ACTIVE root pointing to the candidate object vetoes；
 the last case also emits an owner-bound reference. Both domains use the core bounded canonical snapshot builder,
-rerun the full query in `stillMatches`, and return incomplete+veto for ownerless queries. They are not installed in
-`MaterializationRuntime`; future-catalog/global absence proof、source retirement and every DELETING side effect remain
-later checkpoints.
+rerun the full query in `stillMatches`, and at checkpoint K returned incomplete+veto for ownerless queries. Checkpoint
+T later supplies the gated global scope；production runtime installation and cursor snapshot GC remain later work.
 
 Full M4–M6 target construction：
 

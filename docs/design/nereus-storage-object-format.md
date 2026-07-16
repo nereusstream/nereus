@@ -408,6 +408,10 @@ replace their replay/index-repair role.
 root are conditionally removed in that order only after two exact HEAD-absence windows and unchanged complete owner/
 domain proofs. Every actual PUT transmission revalidates its durable owner/root, and a later write attempt uses a
 fresh attempt-addressed key, so this metadata bound never permits deleted-key reuse.
+F4-M4 checkpoint U implements this with a durable first-absence timestamp/proof on the DELETED root、fresh
+reader/protection and ownerless-domain scans、late exact-byte cleanup、mismatched-byte quarantine and
+references-before-manifest-before-root conditional retirement. Production scheduling/delete activation remains
+disabled until the remaining M4 gates are complete.
 Old incarnation projection mirrors are separately collectible only after current topic authority and every recovery/
 task/audit reference have moved away from their stream.
 

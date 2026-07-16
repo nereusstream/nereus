@@ -91,8 +91,10 @@ TOPIC_COMPACTED/ACTIVE same-view replacement proof, and a pre-read source-retire
 eligibility branches are repeated at DRAINING plan time. Checkpoint S adds the durable cluster generation-activation record/codec/exact-key store、
 read-only lookup、PREPARED bootstrap、monotonic CAS guard and frozen lifecycle/capability vectors. It is authority
 foundation only. Checkpoint T adds the future sentinel、activation/backfill/domain-set-gated 64-shard global scope and
-ownerless variants for all five concrete domains. Backfill/broker guard、runtime composition and the remaining M4
-cursor/root/audit passes are pending.
+ownerless variants for all five concrete domains. Checkpoint U adds the persisted dual-absence DELETED-root pass、
+fresh ownerless-domain/handle revalidation、late exact-byte cleanup、Phase 1 references-before-manifest retirement and
+root-last response-loss-safe CAS. Backfill/broker guard、runtime composition、cursor snapshot GC、object inventory and
+registration retirement remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -604,8 +606,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > retirement metadata、bounded GC plan/root/journal fencing、root-authenticated destructive recovery、typed source
 > retirement and all view/trim eligibility paths. Checkpoint S implements durable generation activation metadata；
 > checkpoint T implements the future sentinel、activation-gated full registration scope and affected/ownerless variants
-> of all five reference domains. Backfill/broker guard、production runtime composition、cursor/root/audit retirement、
-> real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
+> of all five reference domains. Checkpoint U implements persisted dual-absence DELETED-root/Phase 1 audit retirement.
+> Backfill/broker guard、production runtime composition、physical-root backfill、cursor snapshot GC、object inventory、
+> registration retirement、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called
+> complete.
 
 ### 6.1 Production artifacts
 
@@ -770,9 +774,11 @@ gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint
 gc/PhysicalObjectRootVisitor.java                         implemented checkpoint I
 gc/PhysicalObjectRootScanResult.java                      implemented checkpoint I
 gc/PhysicalObjectRootScanner.java                         implemented checkpoint I
-gc/PhysicalRootTombstoneRetirementCoordinator.java
-gc/TombstoneRetirementResult.java
-gc/TombstoneRetirementStatus.java
+gc/PhysicalRootTombstoneRetirementCoordinator.java         implemented checkpoint U boundary
+gc/DefaultPhysicalRootTombstoneRetirementCoordinator.java  implemented checkpoint U
+gc/TombstoneRetirementResult.java                          implemented checkpoint U
+gc/TombstoneRetirementStatus.java                          implemented checkpoint U
+gc/TombstoneRetirementDigests.java                         implemented checkpoint U
 gc/PhysicalRootBackfillCoordinator.java
 gc/PhysicalRootBackfillRequest.java
 gc/PhysicalRootBackfillReport.java
@@ -840,8 +846,8 @@ GenerationZeroSourceRetirementHandlerTest                implemented checkpoint 
 SourceRetirementPlanBuilderTest                          extended checkpoint R completed-trim proof/reproof
 HigherGenerationPreDrainCoordinatorTest                  extended checkpoint R view/trim/grace/race cuts
 PhysicalObjectRootScannerTest                              implemented checkpoint I
-PhysicalRootTombstoneRetirementTest
-LatePutAfterTombstoneTest
+PhysicalRootTombstoneRetirementTest                        implemented checkpoint U
+LatePutAfterTombstoneTest                                  implemented checkpoint U
 PhysicalRootBackfillCoordinatorTest
 MultiStreamWalRetirementTest
 GenerationRetirementFallbackTest
@@ -878,6 +884,7 @@ retirement.
 ./gradlew phase4M4GenerationRetirementCheck
 ./gradlew phase4M4ActivationMetadataCheck
 ./gradlew phase4M4GlobalDomainsCheck
+./gradlew phase4M4TombstoneRetirementCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -993,7 +1000,8 @@ current same-view index that covers offset/commit/cumulative bounds with matchin
 object `ACTIVE/TOPIC_COMPACTED` root and final index/root/source reload. Tests cover successful same-view pre-drain and
 DRAINING plan reproof、MARKED replacement veto、trim success/drift and a grace result before any metadata/root read.
 At checkpoint R, future/global domains、runtime composition、cursor/root/audit retirement and the final M4 gate
-remained pending；checkpoints S/T close the activation/global-domain portion only.
+remained pending；checkpoints S/T close the activation/global-domain portion and checkpoint U closes DELETED-root audit
+retirement only.
 
 `phase4M4ActivationMetadataCheck` extends the ordinary checkpoint chain with checkpoint S's single-key cluster
 authority foundation. It audits the exact key/partition、record fields and contradictions、explicit codec registration、
@@ -1009,6 +1017,15 @@ absence never creates authority、unknown installed domains and publication-only
 enumeration is canonical, activation drift invalidates revalidation, and generation/append/task/projection/cursor
 domains all repeat their exact per-stream scans for ownerless queries. This gate does not execute the backfill/broker
 barrier or install production runtime deletion.
+
+`phase4M4TombstoneRetirementCheck` extends checkpoint T with checkpoint U. It audits the exact DELETED input、
+disabled/dry-run no-mutation paths、strict audit/orphan-plus-skew boundaries、persisted first-absence proof、reader and
+protection handle veto、owner/reference versus generic domain veto classification、authority-digest window restart、
+exact late-object delete/retry handling、mismatched-byte quarantine、Phase 1 references-before-manifest conditional
+retirement and root-last version+durable-SHA delete. Focused tests force audit/root/object delete response loss and an
+owner appearing before the late-PUT provider delete. This gate still does not run physical-root backfill、cursor
+snapshot GC、object inventory、registration retirement、production runtime composition or the real-service M4 final
+scenarios. The ordinary gate passed on 2026-07-16.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

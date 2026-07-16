@@ -177,9 +177,11 @@ metadata/root read 前执行 source-retirement grace。Checkpoint S 已落地 cl
 record/codec/key、read-only lookup、PREPARED bootstrap、monotonic CAS 与冻结 golden/contract tests，作为后续
 global proof 和 M5 rollout 的 durable authority foundation。Checkpoint T 又新增 activation/backfill/domain-set
 gated 的 64-shard global scope、future-catalog sentinel，并让 generation/append/materialization/projection/cursor
-五个 domain 对 ownerless query 执行同一 authoritative stream set 的完整扫描与重验。Backfill/broker activation
-guard、production runtime composition，以及 F4-M5–M6 的 async profile 与最终兼容接线仍不可用；所有
-capability bits 和 production deletion 继续关闭。
+五个 domain 对 ownerless query 执行同一 authoritative stream set 的完整扫描与重验。Checkpoint U 已实现
+持久化双 absence 窗口、late exact-byte cleanup、Phase 1 references-before-manifest 与 root-last CAS 的
+DELETED-root audit retirement。Backfill/broker activation guard、production runtime composition、cursor snapshot
+GC、object inventory、registration retirement，以及 F4-M5–M6 的 async profile 与最终兼容接线仍不可用；所有
+capability bits 和 production deletion 继续关闭。`phase4M4TombstoneRetirementCheck` 已于 2026-07-16 通过。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

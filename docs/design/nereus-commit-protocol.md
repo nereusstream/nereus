@@ -506,8 +506,9 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 
 ## 15. GC protocol
 
-> Status: In progress. Physical reference values/leases/protections and NRC1 object bytes are implemented；recovery-root
-> publication、anchor-aware retirement and physical/cursor deletion remain designed and disabled.
+> Status: In progress. Physical reference values/leases/protections、NRC1 recovery-root publication/replay/index repair、
+> typed source retirement and DELETED-root/Phase 1 audit retirement are implemented through F4-M4 checkpoint U；
+> physical-root backfill、cursor snapshot GC、inventory/runtime composition and production deletion remain disabled.
 
 An object is deletable only when all relevant conditions are true：
 
@@ -551,6 +552,12 @@ long grace, two exact HEAD-absence windows and two unchanged complete owner/doma
 Phase 1 object-reference record, manifest and finally the exact-version root. Every actual provider PUT/retry first
 revalidates its durable owner and requires an absent or same ACTIVE root；a stale attempt is rejected and a new attempt
 uses a fresh key. Therefore audit retirement bounds metadata without changing the no-reuse rule.
+
+F4-M4 checkpoint U implements that terminal audit pass. The first absence time and canonical proof digest are persisted
+by an exact same-state DELETED-root CAS；restart does not retain a timer. Reader/protection handles、owner references、
+domain veto/incompleteness or authority drift clear/restart the window. Reappearing exact bytes are deleted only after a
+fresh ownerless-domain `stillMatches` fence；mismatched bytes are quarantined. Conditional references/manifest/root
+delete response loss converges only after the exact unchanged root authority proves the corresponding key absent.
 
 ## 16. Linearization summary
 

@@ -98,8 +98,10 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/gc/
   HigherGenerationPreDrainStatus.java
   SourceRetirementPlanBuilder.java
   PhysicalRootTombstoneRetirementCoordinator.java
+  DefaultPhysicalRootTombstoneRetirementCoordinator.java
   TombstoneRetirementResult.java
   TombstoneRetirementStatus.java
+  TombstoneRetirementDigests.java
   SourceRetirementCoordinator.java
   StreamRegistrationRetirementCoordinator.java
   ObjectInventoryScanner.java
@@ -144,8 +146,11 @@ COMMITTED-view whole-range NRC1/count/schema proof and response-loss-safe higher
 `COMMITTED/QUARANTINED -> DRAINING`, then repeats that proof when a DRAINING removal is frozen. Checkpoint R adds
 exact completed-trim eligibility for generation-zero and either higher view、strictly newer current
 TOPIC_COMPACTED/ACTIVE same-view replacement eligibility, and a zero-read `sourceRetirementGrace` admission fence.
-Checkpoint T implements future-sentinel and ownerless global domain variants；cursor/root/audit completion and runtime
-composition remain planned，so production deletion is still disabled.
+Checkpoint T implements future-sentinel and ownerless global domain variants. Checkpoint U implements the slow
+DELETED-root/Phase 1 audit-retirement pass with a persisted first-absence checkpoint、fresh ownerless-domain scans、
+late-byte cleanup、references-before-manifest ordering、root-last conditional delete and response-loss convergence.
+Physical-root backfill、object inventory、cursor snapshot GC、registration retirement and runtime composition remain
+planned，so production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1266,6 +1271,7 @@ pass. It does not change the `DELETED` lifecycle outcome and it is never part of
 
 ```java
 public enum TombstoneRetirementStatus {
+    DISABLED, DRY_RUN,
     RETIRED, NOT_OLD_ENOUGH, OWNER_PRESENT, HANDLE_PRESENT,
     DOMAIN_VETO, OBJECT_PRESENT, VERSION_CHANGED, QUARANTINED
 }
@@ -1306,6 +1312,24 @@ reload both optional audit keys and require absent
 repeat owner/domain scan and HEAD absence; reload exact unchanged D2
 deleteRoot(objectKeyHash, D2.version, D2.durableValueSha256) as the final metadata action
 ```
+
+Checkpoint U implements this contract in
+`DefaultPhysicalRootTombstoneRetirementCoordinator`. One public call captures one non-negative clock value and shares
+one monotonic operation deadline across all metadata and object-store cuts. The first clear pass computes
+`nereus-deleted-root-tombstone-proof-v1` from the immutable/deletion-attempt root facts、the ownerless query identity、
+explicit reader/protection absence markers and every canonical domain snapshot digest, then uses the permitted
+`DELETED -> DELETED` CAS to persist `tombstoneFirstAbsentAtMillis` and the proof. No scheduler or in-memory wait retains
+the candidate. A later scanner pass must observe both strict grace boundaries and the same proof before it can read or
+delete an audit key.
+
+The implemented coordinator treats any persisted reader lease or protection as `HANDLE_PRESENT`, any emitted domain
+reference as `OWNER_PRESENT`, and an incomplete/vetoing reference-domain pass as `DOMAIN_VETO`. Each blocker clears the
+persisted absence observation by exact root CAS. An exact reappearing object is deleted only after the root is reloaded,
+handles remain absent and the previously captured ownerless collection passes `stillMatches`; delete-response loss is
+accepted only after exact HEAD absence. A mismatched HEAD returns `QUARANTINED` without provider deletion. Optional
+Phase 1 references and manifest are captured against the root identity, reauthenticated before each mutation, deleted
+in that order and reloaded absent. The final root delete uses both Oxia version and durable-value SHA；a lost response
+converges only when that exact key is absent.
 
 Both separated HEAD absence observations are direct, non-cached requests. Root-shard scans resume the durable first
 observation after restart and keep only one candidate/page in memory. If its authority digest changes, if the object

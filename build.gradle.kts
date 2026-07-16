@@ -891,3 +891,23 @@ tasks.register("phase4M4GlobalDomainsCheck") {
     dependsOn(":nereus-materialization:check")
     dependsOn(":nereus-managed-ledger:check")
 }
+
+tasks.register<Exec>("checkPhase4M4TombstoneRetirementContractSurface") {
+    group = "verification"
+    description = "Audit dual-absence, audit-order, and root-last DELETED tombstone retirement."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-tombstone-retirement-contract-surface.sh")
+}
+
+tasks.register("phase4M4TombstoneRetirementCheck") {
+    group = "verification"
+    description = "Verify restart-safe DELETED-root and Phase 1 object-audit retirement."
+    dependsOn("phase4M4GlobalDomainsCheck")
+    dependsOn("checkPhase4M4TombstoneRetirementContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-materialization:check")
+}

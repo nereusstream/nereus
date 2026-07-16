@@ -64,7 +64,9 @@ require_literal "phase4M4ActivationMetadataCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M4GlobalDomainsCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
-require_literal "Checkpoint T" \
+require_literal "phase4M4TombstoneRetirementCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "Checkpoint U" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "F4-M4 NRC1 object-protocol checkpoint" \
     "docs/phase-4-compaction-generation/README.md"
@@ -107,4 +109,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus current M4 checkpoints/root-authenticated journal, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus current M4 checkpoints/tombstone retirement, source lock, gates, and local links verified."
