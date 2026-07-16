@@ -67,7 +67,17 @@ public final class NereusManagedLedgerOpenCoordinator {
                             .thenCompose(existing -> existing
                                     .map(topic -> openExisting(topic, permit, config))
                                     .orElseGet(() -> createFirst(exactName, permit, config)));
-                });
+                })
+                .thenCompose(this::registerBeforeReturn);
+    }
+
+    private CompletableFuture<NereusLedgerOpenResult> registerBeforeReturn(
+            NereusLedgerOpenResult opened) {
+        return runtime.materializationRegistrationCoordinator()
+                .ensureRegistered(
+                        opened.topicProjection().managedLedgerName(),
+                        opened.topicProjection().projectionIdentity())
+                .thenApply(ignored -> opened);
     }
 
     public CompletableFuture<NereusWritableLedgerOpenResult> openWritable(

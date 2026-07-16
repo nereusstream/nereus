@@ -39,7 +39,10 @@
 > loss；`DefaultNereusRuntimeProvider` 已装配 shared physical store/protection/read-pin 到该路径。
 > Checkpoint W 又实现 strict NPR1 projection authority、全 64-shard live-reference physical/cursor-root backfill、
 > exact commit/index/cursor owner protection、最终 authority revalidation 和 response-loss-safe dual activation
-> proofs。Broker registration backfill/barrier、cursor snapshot candidate/deletion scanner、object inventory、
+> proofs。Checkpoint X 已实现 canonical projection-ref encoding、exact create/refresh/final-revalidate
+> registration coordinator、topic open/recreate return-before-registration ordering和 shared generation-store
+> production ownership。Broker cold-topic registration backfill/capability barrier、generation activation guard、
+> cursor snapshot candidate/deletion scanner、object inventory、
 > registration retirement、其余 materialization/GC runtime composition 与最终删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
@@ -909,6 +912,27 @@ root/permanent owner protection，以及 registration proof 缺失时 fail close
 backfill/barrier、不设置 delete bits、不运行 cursor deletion scanner/object listing，也不是 M4 final gate；
 该 gate 已于 2026-07-16 使用 `--rerun-tasks` 通过。
 
+### 6.26 F4-M5 durable registration frontier checkpoint
+
+Checkpoint X 关闭 cold-topic backfill 开始前必须先关闭的新写前沿。`ProjectionIdentity` 现在拥有共享的
+canonical present/absent encoder，materialization durable mapper 与 managed-ledger registration 不再各自复制
+length-delimited encoding。`ManagedLedgerMaterializationRegistrationCoordinator` 只暴露 broker-safe 的
+`managedLedgerName + expected immutable projection identity`；default 实现线性读取当前 exact topic
+projection 和完整 L0 snapshot，验证 name/stream/profile/payload/lifecycle，派生 strict NPR1 ref/digest，
+create-or-verify registration，并以 version CAS 单调刷新 `lastHintCommitVersion`。
+
+CAS failure 或 response loss 只在 reload 得到同一 ref/digest/profile 且 hint 已覆盖本次观察值时收敛。
+返回成功前再次读取 projection、L0 和 registration；mutable property CAS 不会改变 registration identity，
+同名 recreation、DELETING/DELETED 或 L0/profile drift 会 fail closed。`NereusManagedLedgerOpenCoordinator`
+现在在 create、existing open、sealed open 和 recreate 的 ledger result 返回前等待该 coordinator，因此
+broker topic publication 不会越过 registration。`DefaultNereusRuntimeProvider` 通过同一 shared Oxia runtime
+装配并由 `NereusManagedLedgerRuntime` 持有/关闭 production generation metadata store。
+
+`phase4M5RegistrationFrontierCheck` 是 checkpoint X ordinary gate。它不设置 generation marker，不实现
+Pulsar generation lookup property/two-snapshot barrier，不遍历 tenants/namespaces/persistent topics，也不 CAS
+cluster `streamRegistrationBackfill` proof；这些仍是后续 M5 broker rollout checkpoint。该 gate 已于
+2026-07-16 使用 `--rerun-tasks` 通过。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -918,7 +942,7 @@ backfill/barrier、不设置 delete bits、不运行 cursor deletion scanner/obj
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；broker registration backfill/barrier、cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition and final gate pending |
-| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
+| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；broker generation capability/barrier、cold-topic backfill/proof CAS、activation guard、async/profile/retention/admin wiring remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：

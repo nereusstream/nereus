@@ -8,7 +8,9 @@ import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.CursorStorage;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
@@ -34,6 +36,9 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
 
     private final StreamStorage streamStorage;
     private final ManagedLedgerProjectionMetadataStore projectionStore;
+    private final GenerationMetadataStore generationMetadataStore;
+    private final ManagedLedgerMaterializationRegistrationCoordinator
+            materializationRegistrationCoordinator;
     private final CursorMetadataStore cursorMetadataStore;
     private final CursorSnapshotStore cursorSnapshotStore;
     private final CursorRetentionCoordinator cursorRetentionCoordinator;
@@ -59,6 +64,9 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     public NereusManagedLedgerRuntime(
             StreamStorage streamStorage,
             ManagedLedgerProjectionMetadataStore projectionStore,
+            GenerationMetadataStore generationMetadataStore,
+            ManagedLedgerMaterializationRegistrationCoordinator
+                    materializationRegistrationCoordinator,
             CursorMetadataStore cursorMetadataStore,
             CursorSnapshotStore cursorSnapshotStore,
             CursorRetentionCoordinator cursorRetentionCoordinator,
@@ -78,6 +86,8 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         this(
                 streamStorage,
                 projectionStore,
+                generationMetadataStore,
+                materializationRegistrationCoordinator,
                 cursorMetadataStore,
                 cursorSnapshotStore,
                 cursorRetentionCoordinator,
@@ -102,6 +112,9 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     public NereusManagedLedgerRuntime(
             StreamStorage streamStorage,
             ManagedLedgerProjectionMetadataStore projectionStore,
+            GenerationMetadataStore generationMetadataStore,
+            ManagedLedgerMaterializationRegistrationCoordinator
+                    materializationRegistrationCoordinator,
             CursorMetadataStore cursorMetadataStore,
             CursorSnapshotStore cursorSnapshotStore,
             CursorRetentionCoordinator cursorRetentionCoordinator,
@@ -123,6 +136,12 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             String writerId) {
         this.streamStorage = Objects.requireNonNull(streamStorage, "streamStorage");
         this.projectionStore = Objects.requireNonNull(projectionStore, "projectionStore");
+        this.generationMetadataStore = Objects.requireNonNull(
+                generationMetadataStore, "generationMetadataStore");
+        this.materializationRegistrationCoordinator =
+                Objects.requireNonNull(
+                        materializationRegistrationCoordinator,
+                        "materializationRegistrationCoordinator");
         this.cursorMetadataStore = Objects.requireNonNull(cursorMetadataStore, "cursorMetadataStore");
         this.cursorSnapshotStore = Objects.requireNonNull(cursorSnapshotStore, "cursorSnapshotStore");
         this.cursorRetentionCoordinator = Objects.requireNonNull(
@@ -157,6 +176,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         List<Object> ownedResources = new ArrayList<>(List.of(
                 streamStorage,
                 projectionStore,
+                generationMetadataStore,
                 cursorMetadataStore,
                 cursorSnapshotStore,
                 cursorRetentionCoordinator,
@@ -186,6 +206,11 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
 
     public ManagedLedgerProjectionMetadataStore projectionStore() {
         return projectionStore;
+    }
+
+    public ManagedLedgerMaterializationRegistrationCoordinator
+            materializationRegistrationCoordinator() {
+        return materializationRegistrationCoordinator;
     }
 
     public CursorStorage cursorStorage() {
@@ -259,6 +284,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         closeOne(cursorRetentionCoordinator, failures);
         closeOne(cursorSnapshotStore, failures);
         closeOne(cursorMetadataStore, failures);
+        closeOne(generationMetadataStore, failures);
         closeOne(projectionStore, failures);
         closeOne(streamStorage, failures);
         closeOneIfPresent(objectReadPinManager, failures);

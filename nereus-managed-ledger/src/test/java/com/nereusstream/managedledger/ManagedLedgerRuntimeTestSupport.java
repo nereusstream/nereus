@@ -10,7 +10,9 @@ import com.nereusstream.managedledger.cursor.CursorStorage;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.cursor.TestCursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.TestCursorStorage;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
@@ -43,13 +45,28 @@ final class ManagedLedgerRuntimeTestSupport {
     static NereusManagedLedgerRuntime runtime(
             StreamStorage streamStorage,
             ManagedLedgerProjectionMetadataStore projectionStore,
+            ManagedLedgerMaterializationRegistrationCoordinator
+                    registrationCoordinator) {
+        return runtime(
+                streamStorage,
+                projectionStore,
+                new TestCursorStorage(),
+                Executors.newSingleThreadScheduledExecutor(),
+                Executors.newSingleThreadExecutor(),
+                registrationCoordinator);
+    }
+
+    static NereusManagedLedgerRuntime runtime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
             CursorStorage cursorStorage) {
         return runtime(
                 streamStorage,
                 projectionStore,
                 cursorStorage,
                 Executors.newSingleThreadScheduledExecutor(),
-                Executors.newSingleThreadExecutor());
+                Executors.newSingleThreadExecutor(),
+                allowRegistration());
     }
 
     static NereusManagedLedgerRuntime runtime(
@@ -58,6 +75,23 @@ final class ManagedLedgerRuntimeTestSupport {
             CursorStorage cursorStorage,
             ScheduledExecutorService scheduler,
             ExecutorService callbacks) {
+        return runtime(
+                streamStorage,
+                projectionStore,
+                cursorStorage,
+                scheduler,
+                callbacks,
+                allowRegistration());
+    }
+
+    static NereusManagedLedgerRuntime runtime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            CursorStorage cursorStorage,
+            ScheduledExecutorService scheduler,
+            ExecutorService callbacks,
+            ManagedLedgerMaterializationRegistrationCoordinator
+                    registrationCoordinator) {
         try {
             CursorStorageConfig cursorConfig = CursorStorageConfig.defaults();
             CursorProtocolActivationGuard activationGuard = ledger ->
@@ -65,6 +99,8 @@ final class ManagedLedgerRuntimeTestSupport {
             return new NereusManagedLedgerRuntime(
                     streamStorage,
                     projectionStore,
+                    proxy(GenerationMetadataStore.class),
+                    registrationCoordinator,
                     proxy(CursorMetadataStore.class),
                     proxy(CursorSnapshotStore.class),
                     new TestCursorRetentionCoordinator(),
@@ -84,6 +120,13 @@ final class ManagedLedgerRuntimeTestSupport {
         } catch (ReflectiveOperationException e) {
             throw new AssertionError(e);
         }
+    }
+
+    private static ManagedLedgerMaterializationRegistrationCoordinator
+            allowRegistration() {
+        return (name, identity) ->
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        null);
     }
 
     static NereusWritableLedgerOpenResult writable(

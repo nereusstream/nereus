@@ -509,8 +509,9 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 > Status: In progress. Physical reference values/leases/protections、NRC1 recovery-root publication/replay/index repair、
 > typed source retirement、DELETED-root/Phase 1 audit retirement、guarded/protected/pinned cursor-snapshot new
 > writes and all-shard physical/cursor live-reference backfill are implemented through F4-M4 checkpoint W；
-> broker registration backfill/barrier、cursor snapshot candidate/deletion scanning、inventory/remaining runtime
-> composition and production deletion remain disabled.
+> F4-M5 checkpoint X additionally closes exact durable registration before topic open/recreate return；
+> broker cold-topic registration backfill/barrier、generation activation guard、cursor snapshot candidate/deletion
+> scanning、inventory/remaining runtime composition and production deletion remain disabled.
 
 An object is deletable only when all relevant conditions are true：
 

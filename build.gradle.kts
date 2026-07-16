@@ -956,3 +956,23 @@ tasks.register("phase4M4PhysicalRootBackfillCheck") {
     dependsOn(":nereus-managed-ledger:check")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
+    group = "verification"
+    description = "Audit exact managed-ledger registration before every topic-open return."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m5-registration-frontier-contract-surface.sh")
+}
+
+tasks.register("phase4M5RegistrationFrontierCheck") {
+    group = "verification"
+    description = "Verify the F4 registration new-write/open frontier and shared production wiring."
+    dependsOn("phase4M4PhysicalRootBackfillCheck")
+    dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}

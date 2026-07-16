@@ -6,12 +6,30 @@ import com.nereusstream.api.ProjectionType;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 public final class ProjectionIdentity {
     private ProjectionIdentity() { }
 
+    public static String encode(Optional<ProjectionRef> projection) {
+        Optional<ProjectionRef> exact =
+                Objects.requireNonNull(projection, "projection");
+        StringBuilder result = new StringBuilder();
+        append(result, "projectionRef");
+        if (exact.isEmpty()) {
+            append(result, "absent");
+            return result.toString();
+        }
+        ProjectionRef value = exact.orElseThrow();
+        append(result, "present");
+        append(result, value.type().name());
+        append(result, value.value());
+        return result.toString();
+    }
+
     public static Optional<ProjectionRef> decode(String encoded) {
+        Objects.requireNonNull(encoded, "encoded");
         List<String> values = new ArrayList<>();
         int cursor = 0;
         while (cursor < encoded.length()) {
@@ -37,5 +55,11 @@ public final class ProjectionIdentity {
             return Optional.of(new ProjectionRef(ProjectionType.valueOf(values.get(2)), values.get(3)));
         }
         throw new IllegalArgumentException("unsupported projection identity");
+    }
+
+    private static void append(StringBuilder target, String value) {
+        target.append(value.getBytes(StandardCharsets.UTF_8).length)
+                .append(':')
+                .append(value);
     }
 }

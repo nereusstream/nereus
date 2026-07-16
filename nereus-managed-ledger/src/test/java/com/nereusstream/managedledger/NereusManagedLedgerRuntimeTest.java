@@ -11,7 +11,9 @@ import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.CursorStorage;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -44,6 +46,8 @@ class NereusManagedLedgerRuntimeTest {
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
+                proxy(GenerationMetadataStore.class, "generation", closes, false),
+                allowRegistration(),
                 proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
                 proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
                 proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
@@ -71,6 +75,7 @@ class NereusManagedLedgerRuntimeTest {
                 "cursor-retention",
                 "cursor-snapshot",
                 "cursor-metadata",
+                "generation",
                 "projection",
                 "stream",
                 "l0",
@@ -95,6 +100,8 @@ class NereusManagedLedgerRuntimeTest {
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
+                proxy(GenerationMetadataStore.class, "generation", closes, false),
+                allowRegistration(),
                 proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
                 proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
                 proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
@@ -123,6 +130,7 @@ class NereusManagedLedgerRuntimeTest {
                 "cursor-retention",
                 "cursor-snapshot",
                 "cursor-metadata",
+                "generation",
                 "projection",
                 "stream",
                 "read-pins",
@@ -143,6 +151,8 @@ class NereusManagedLedgerRuntimeTest {
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, true),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, true),
+                proxy(GenerationMetadataStore.class, "generation", closes, false),
+                allowRegistration(),
                 proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
                 proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
                 proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
@@ -169,6 +179,7 @@ class NereusManagedLedgerRuntimeTest {
                 "cursor-retention",
                 "cursor-snapshot",
                 "cursor-metadata",
+                "generation",
                 "projection",
                 "stream",
                 "l0",
@@ -189,6 +200,8 @@ class NereusManagedLedgerRuntimeTest {
             assertThatThrownBy(() -> new NereusManagedLedgerRuntime(
                             proxy(StreamStorage.class, "stream", closes, false),
                             proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
+                            proxy(GenerationMetadataStore.class, "generation", closes, false),
+                            allowRegistration(),
                             proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
                             proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
                             proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
@@ -261,5 +274,11 @@ class NereusManagedLedgerRuntimeTest {
 
     private static CursorProtocolActivationGuard allowActivation() {
         return ledger -> CompletableFuture.completedFuture(null);
+    }
+
+    private static ManagedLedgerMaterializationRegistrationCoordinator
+            allowRegistration() {
+        return (name, identity) ->
+                CompletableFuture.completedFuture(null);
     }
 }

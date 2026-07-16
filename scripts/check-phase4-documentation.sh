@@ -70,11 +70,15 @@ require_literal "phase4M4CursorProtectionCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M4PhysicalRootBackfillCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M5RegistrationFrontierCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint U" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint V" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint W" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint X" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "strict NPR1" \
     "docs/phase-4-compaction-generation/README.md"
@@ -119,4 +123,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 checkpoints through W, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through W and M5 through X, source lock, gates, and local links verified."

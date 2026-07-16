@@ -109,6 +109,12 @@ read-pin/protection/physical triplet in dependency order。Generation activation
 backfill、`MaterializationRuntime` and GC service composition remain later checkpoints；this partial wiring does not
 enable any deletion capability bit。
 
+Checkpoint X adds the shared `OxiaJavaGenerationMetadataStore` and
+`DefaultManagedLedgerMaterializationRegistrationCoordinator` to this production ownership graph.
+`NereusManagedLedgerRuntime` exposes only the broker-safe registration coordinator and closes the generation store
+before projection/L0/shared Oxia resources. It still does not construct the generation activation guard、
+materialization/GC services or enable any capability bit.
+
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive
 the ObjectStore it uses.
@@ -238,6 +244,14 @@ projections return a versioned non-live classification whose binding/topic prese
 match at final revalidation. This reader is consumed by the checkpoint-W physical-root backfill；the broker-side
 registration executor、cluster barrier and production activation guard below remain M5 rollout work.
 
+Checkpoint X implements the registration half of this ordering. `ProjectionIdentity.encode` is now the single
+canonical length-delimited encoder used by durable materialization records and registration. The managed-ledger
+coordinator captures exact current projection identity plus a full L0 snapshot, creates/verifies the NPR1
+registration, monotonically refreshes the commit-version hint with version CAS, repairs a lost CAS response only from
+an exact reload, and finally rereads projection/L0/registration. Mutable projection property CAS is compatible；
+recreation、non-live state or profile/payload drift fails closed. The topic open/recreate path waits for this final
+revalidation before returning the ledger result. Marker activation and broker readiness remain pending.
+
 First activation is a recoverable cross-key sequence：
 
 ```text
@@ -275,8 +289,9 @@ deleted-incarnation proof for every stream slice.
 
 ### 3.3 Cold-topic registration backfill
 
-After every broker has the F4 runtime, new Nereus topic creation always creates/verifies its registration even while
-generation publication is disabled. Existing unloaded topics are covered by an explicit idempotent backfill：
+Checkpoint X makes every Nereus topic create/open/recreate create or verify its registration even while generation
+publication is disabled, closing the concurrent new-topic frontier. Existing unloaded topics are still covered by the
+explicit idempotent broker backfill below；that traversal and its coverage-proof CAS are not yet implemented：
 
 ```java
 public record GenerationRegistrationBackfillRequest(

@@ -21,9 +21,13 @@ import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.cursor.DefaultCursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.DefaultCursorSnapshotStore;
 import com.nereusstream.managedledger.cursor.DefaultCursorStorage;
+import com.nereusstream.managedledger.generation.DefaultManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
@@ -70,6 +74,9 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         ObjectProtectionManager objectProtectionManager = null;
         ObjectReadPinManager objectReadPinManager = null;
         ManagedLedgerProjectionMetadataStore projectionStore = null;
+        GenerationMetadataStore generationMetadataStore = null;
+        ManagedLedgerMaterializationRegistrationCoordinator
+                materializationRegistrationCoordinator = null;
         CursorMetadataStore cursorMetadataStore = null;
         ScheduledExecutorService scheduler = null;
         ExecutorService callbackExecutor = null;
@@ -105,6 +112,18 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     clock);
             projectionStore = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, configuration.projectionMetadata(), clock);
+            generationMetadataStore =
+                    OxiaJavaGenerationMetadataStore.usingSharedRuntime(
+                            configuration.oxia(),
+                            sharedOxiaRuntime,
+                            clock);
+            materializationRegistrationCoordinator =
+                    new DefaultManagedLedgerMaterializationRegistrationCoordinator(
+                            streamConfig.cluster(),
+                            projectionStore,
+                            l0MetadataStore,
+                            generationMetadataStore,
+                            clock);
             cursorMetadataStore = CursorMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, configuration.cursorMetadata());
             scheduler = Executors.newSingleThreadScheduledExecutor(daemonFactory("nereus-f2-scheduler"));
@@ -166,6 +185,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             return new NereusManagedLedgerRuntime(
                     streamStorage,
                     projectionStore,
+                    generationMetadataStore,
+                    materializationRegistrationCoordinator,
                     cursorMetadataStore,
                     cursorSnapshotStore,
                     cursorRetentionCoordinator,
@@ -192,6 +213,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorRetentionCoordinator,
                     cursorSnapshotStore,
                     cursorMetadataStore,
+                    generationMetadataStore,
                     projectionStore,
                     streamStorage,
                     objectReadPinManager,

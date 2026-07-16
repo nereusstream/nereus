@@ -34,6 +34,7 @@ import com.nereusstream.managedledger.integration.NereusCreationPermit;
 import com.nereusstream.metadata.oxia.FakeManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerFacadeState;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
+import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.time.Clock;
 import java.time.Instant;
@@ -43,7 +44,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +75,50 @@ class NereusManagedLedgerOpenCoordinatorTest {
             assertThat(guard.validations).hasValue(1);
             assertThat(streamStorage.createCalls).hasValue(creates);
             assertThat(streamStorage.getCalls.get()).isPositive();
+        }
+    }
+
+    @Test
+    void openDoesNotReturnBeforeExactMaterializationRegistration() {
+        FakeStreamStorage streamStorage = new FakeStreamStorage();
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        CompletableFuture<Void> registration = new CompletableFuture<>();
+        CompletableFuture<Void> registrationInvoked =
+                new CompletableFuture<>();
+        AtomicReference<String> registeredName = new AtomicReference<>();
+        AtomicReference<ManagedLedgerProjectionIdentity> registeredIdentity =
+                new AtomicReference<>();
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(
+                        streamStorage,
+                        projections,
+                        (name, identity) -> {
+                            registeredName.set(name);
+                            registeredIdentity.set(identity);
+                            registrationInvoked.complete(null);
+                            return registration;
+                        })) {
+            NereusManagedLedgerOpenCoordinator coordinator =
+                    new NereusManagedLedgerOpenCoordinator(
+                            runtime, new MutableGuard(3));
+
+            CompletableFuture<NereusLedgerOpenResult> opened =
+                    coordinator.open(NAME, openConfig(true));
+
+            registrationInvoked.orTimeout(5, TimeUnit.SECONDS).join();
+            assertThat(opened).isNotDone();
+            assertThat(registeredName).hasValue(NAME);
+            assertThat(registeredIdentity.get())
+                    .isEqualTo(projections
+                            .getProjection(CLUSTER, NAME)
+                            .join()
+                            .orElseThrow()
+                            .projectionIdentity());
+
+            registration.complete(null);
+            assertThat(opened.join().topicProjection().managedLedgerName())
+                    .isEqualTo(NAME);
         }
     }
 

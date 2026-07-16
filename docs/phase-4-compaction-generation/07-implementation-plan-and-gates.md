@@ -99,7 +99,9 @@ physical/protection/read-pin production wiring for this path. Checkpoint W adds 
 the all-64-shard physical-root/cursor-root live-reference backfill、exact commit/index/cursor owner protections、
 stable final revalidation and response-loss-safe dual activation proofs. Broker registration backfill/barrier、
 cursor snapshot candidate/deletion scanning、object inventory、registration retirement and the remaining
-materialization/GC runtime composition remain pending.
+materialization/GC runtime composition remain pending. Checkpoint X starts M5 by adding the exact durable
+registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
+production ownership；the broker capability/barrier and cold-topic traversal remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -617,6 +619,8 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > physical-root/cursor-root live-reference backfill plus dual activation proofs. Broker registration backfill/barrier、
 > cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining materialization/GC runtime
 > composition、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
+> Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
+> durable registration, but no marker、broker capability or cold-topic coverage proof is produced yet.
 
 ### 6.1 Production artifacts
 
@@ -1116,13 +1120,15 @@ nereus-managed-ledger/.../retention/RetentionCandidatePlanner.java
 nereus-managed-ledger/.../retention/NereusManagedLedgerRetentionService.java
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionRefV1.java checkpoint W strict codec
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionAuthorityReader.java checkpoint W reader
-nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCoordinator.java
+nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCoordinator.java checkpoint X broker-safe contract
+nereus-managed-ledger/.../generation/DefaultManagedLedgerMaterializationRegistrationCoordinator.java checkpoint X exact registration
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationGuard.java
 nereus-managed-ledger/.../NereusManagedLedger.java
-nereus-managed-ledger/.../NereusManagedLedgerRuntime.java             checkpoint V read-pin ownership/accessor
+nereus-managed-ledger/.../NereusManagedLedgerOpenCoordinator.java     checkpoint X return-before-registration
+nereus-managed-ledger/.../NereusManagedLedgerRuntime.java             checkpoint X generation-store/registration ownership
 
 nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java
-nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoint V cursor physical/protection/pin wiring
+nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoint X shared generation/registration wiring
 ```
 
 ### 7.2 Local Pulsar fork artifacts
@@ -1155,7 +1161,10 @@ GenerationZeroRepairScannerTest
 MaterializationLagGateTest
 ManagedLedgerGenerationProtocolTest                         implemented K protocol/CAS foundation
 ManagedLedgerGenerationProjectionRefV1GoldenTest
-ManagedLedgerMaterializationRegistrationCoordinatorTest
+ManagedLedgerMaterializationRegistrationCoordinatorTest    implemented checkpoint X identity/hint/response-loss/drift
+NereusManagedLedgerOpenCoordinatorTest                     extended checkpoint X return ordering
+NereusManagedLedgerRuntimeTest                             extended checkpoint X ownership/close order
+ProjectionIdentityTest                                     implemented checkpoint X canonical encoder
 GenerationActivationCompatibilityTest
 RetentionCandidatePlannerTest
 NereusRetentionConfigTest
@@ -1184,6 +1193,7 @@ NereusGenerationProtocolBrokerTest
 ### 7.4 Gates
 
 ```text
+./gradlew phase4M5RegistrationFrontierCheck
 ./gradlew phase4M5Check
 ./gradlew phase4M5FinalCheck --rerun-tasks
 ```
@@ -1193,6 +1203,12 @@ focused fork tests/spotless. Final gate runs real two-broker Pulsar with real Ox
 BookKeeper coexistence. It proves projection-ref resolution、registration-before-marker crash cuts、async ack/read
 repair、cold-topic backfill、policy trim、backlog eviction、capability rollout and source retirement without claiming a
 Nereus BookKeeper profile.
+
+`phase4M5RegistrationFrontierCheck` is the checkpoint-X precursor to those full M5 gates. It verifies the shared
+projection-ref encoder、exact projection/L0 registration capture、idempotent create/monotonic hint refresh、
+response-loss reload、final authority revalidation、open-return ordering and production shared-store ownership. It
+does not modify the local Pulsar fork, advertise generation capability, activate a topic marker, enumerate cold
+topics, or publish a cluster backfill proof. The ordinary gate passed with `--rerun-tasks` on 2026-07-16.
 
 ## 8. F4-M6 — Final Acceptance
 

@@ -178,6 +178,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   roots 与 owner-bound permanent protections，并在最终 authority revalidation 后 CAS physical/cursor backfill
   proofs 的 ordinary checkpoint；它不表示 broker cold-topic registration backfill/barrier、object inventory、
   cursor deletion scanner 或 production GC 已启用。
+- **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
+  create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
+  generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、
+  two-snapshot broker barrier、cold-topic traversal、topic marker 或 cluster backfill proof 已启用。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

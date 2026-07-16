@@ -13,7 +13,6 @@ import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
-import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
@@ -26,7 +25,6 @@ import com.nereusstream.metadata.oxia.records.SourceGenerationRecord;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import com.nereusstream.metadata.oxia.records.WorkerClaimRecord;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -627,22 +625,7 @@ final class MaterializationRecordMapper {
     }
 
     static String projectionIdentity(Optional<ProjectionRef> projection) {
-        if (projection.isEmpty()) {
-            return CommitSliceRequest.emptyProjectionIdentity();
-        }
-        ProjectionRef value = projection.orElseThrow();
-        StringBuilder result = new StringBuilder();
-        append(result, "projectionRef");
-        append(result, "present");
-        append(result, value.type().name());
-        append(result, value.value());
-        return result.toString();
-    }
-
-    private static void append(StringBuilder target, String value) {
-        target.append(value.getBytes(StandardCharsets.UTF_8).length)
-                .append(':')
-                .append(value);
+        return ProjectionIdentity.encode(projection);
     }
 
     private static String requireText(String value, String field) {

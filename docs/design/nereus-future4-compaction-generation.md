@@ -581,6 +581,11 @@ Broker cold-topic registration backfill/capability barrier、cursor snapshot can
 inventory、registration retirement、remaining materialization/GC runtime composition 和 final M4 gate 仍待完成；
 production deletion 保持关闭。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates 和 M4 through checkpoint W 也不声称 production physical GC、
+M5 checkpoint X 已进一步实现共享 canonical projection-ref encoder、exact durable registration
+create/refresh/final revalidation、topic create/open/recreate return barrier，以及 production shared generation-store
+ownership。它关闭 concurrent new-topic registration frontier，但不广告 generation capability、不设置 marker、
+不遍历 cold topics，也不写 cluster registration backfill proof。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 checkpoint X 也不声称 production physical GC、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。
