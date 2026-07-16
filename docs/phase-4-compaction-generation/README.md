@@ -14,9 +14,10 @@
 > snapshot builder、managed-ledger generation marker/exact stream projection authority，以及 affected-stream
 > projection-generation/cursor-snapshot domains 也已落地；retirement journal 的 fixed-depth Oxia keyspace、
 > production/fake store parity、manifest-last seal/load service 与 collector PREPARE-before-MARK/final reload
-> 也已实现。该 fence 明确停在 durable
-> `DELETING` intent。runtime composition、future-sentinel 与 ownerless global domains、source/
-> protection/metadata/object retirement、cursor GC 与 F4-M5–M6 尚未实现
+> 也已实现。首个 root-authenticated destructive-recovery checkpoint 进一步加入 typed metadata-retirement
+> registry、journal-driven protection retirement、exact HEAD/delete 与 restart-safe `DELETING -> DELETED` CAS；
+> 正常删除、已缺失对象和缺失 journal 的零副作用失败已有聚焦测试。production source-metadata handler、
+> runtime composition、future-sentinel 与 ownerless global domains、cursor GC 与 F4-M5–M6 尚未实现
 >
 > 设计基线日期：2026-07-14
 >

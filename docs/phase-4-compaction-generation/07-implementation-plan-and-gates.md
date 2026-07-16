@@ -714,6 +714,10 @@ gc/GcDomainSnapshotProof.java                            implemented checkpoint 
 gc/GcRetirementJournal.java                              implemented checkpoint L durable-store slice
 gc/GcRetirementJournalSnapshot.java                      implemented checkpoint L durable-store slice
 gc/DefaultGcRetirementJournal.java                       implemented checkpoint L durable-store slice
+gc/GcMetadataRetirementContext.java                      implemented checkpoint M dispatch foundation
+gc/GcMetadataRetirementHandler.java                      implemented checkpoint M dispatch foundation
+gc/GcMetadataRetirementOutcome.java                      implemented checkpoint M dispatch foundation
+gc/GcMetadataRetirementRegistry.java                     implemented checkpoint M dispatch foundation
 gc/GcIdGenerator.java                                    implemented checkpoint H
 gc/SecureGcIdGenerator.java                              implemented checkpoint H
 gc/GcReferenceDomainVersion.java                         implemented checkpoint I
@@ -725,7 +729,9 @@ gc/GenerationReferenceDomain.java                        implemented checkpoint 
 gc/AppendRecoveryReferenceDomain.java                    implemented checkpoint J affected-stream domain
 gc/MaterializationReferenceDomain.java                   implemented checkpoint J affected-stream domain
 gc/FutureCatalogSentinelDomain.java
-gc/SourceRetirementCoordinator.java
+gc/SourceRetirementCoordinator.java                      implemented checkpoint M recovery foundation
+gc/PhysicalGcDeletionResult.java                         implemented checkpoint M recovery foundation
+gc/PhysicalGcDeletionStatus.java                         implemented checkpoint M recovery foundation
 gc/StreamRegistrationRetirementCoordinator.java
 gc/PhysicalGcMarkStatus.java                              implemented checkpoint I
 gc/PhysicalGcMarkResult.java                              implemented checkpoint I
@@ -797,6 +803,7 @@ F4MetadataCodecGoldenTest                                extended checkpoint L f
 F4RecordValidationTest                                   extended checkpoint L foundation
 GcRetirementJournalMetadataStoreContractTest             implemented checkpoint L durable-store parity
 DefaultGcRetirementJournalTest                           implemented checkpoint L seal/reload/crash cuts
+SourceRetirementCoordinatorTest                          implemented checkpoint M initial recovery cuts
 PhysicalObjectRootScannerTest                              implemented checkpoint I
 PhysicalRootTombstoneRetirementTest
 LatePutAfterTombstoneTest
@@ -832,6 +839,7 @@ retirement.
 ./gradlew phase4M4ReferenceDomainsCheck
 ./gradlew phase4M4ManagedLedgerDomainsCheck
 ./gradlew phase4M4RetirementJournalCheck
+./gradlew phase4M4DestructiveRecoveryCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -914,6 +922,14 @@ when an entry is missing. Collector tests prove exact PREPARE completes before a
 failure leaves the root ACTIVE, both drain admission and final intent fence reload the same root-authenticated
 snapshot, and a missing final snapshot leaves the root MARKED. This is checkpoint-L ordinary evidence only：it stops
 at DELETING intent and does not enable source/protection/metadata/object deletion or replace the M4 final gate.
+
+`phase4M4DestructiveRecoveryCheck` extends checkpoint L with checkpoint M's first root-authenticated recovery slice.
+It verifies that a matching sealed journal is mandatory before destructive work, generic removal types dispatch only
+through an explicitly registered type-owned handler, an exact immutable object is HEADed/deleted under the shared
+deadline, and the exact attempt alone can CAS `DELETING -> DELETED`. Focused tests cover ordinary deletion、an already
+absent object under matching authority、same-record `DELETED` restart, and missing-journal failure before object access.
+The gate does not yet claim production source-metadata handlers, protection/metadata response-loss coverage, runtime
+composition, future-sentinel/ownerless-global domains, cursor completion or final M4 deletion enablement.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

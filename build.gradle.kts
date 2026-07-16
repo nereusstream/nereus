@@ -826,3 +826,12 @@ tasks.register("phase4M4RetirementJournalCheck") {
     dependsOn(":nereus-metadata-oxia:check")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register("phase4M4DestructiveRecoveryCheck") {
+    group = "verification"
+    description = "Verify root-authenticated DELETING recovery, exact object deletion, and DELETED convergence."
+    dependsOn("phase4M4RetirementJournalCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-materialization:check")
+}

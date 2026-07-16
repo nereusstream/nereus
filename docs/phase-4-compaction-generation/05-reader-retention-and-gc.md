@@ -1104,11 +1104,11 @@ the bounded candidate/plan/digest values. Checkpoint I implements registry colle
   `ObjectStore.deleteObject`, so `DELETE_INTENT` is the terminal result of this checkpoint.
 
 Candidate discovery and typed metadata-plan construction remain owned by later source/orphan/cursor coordinators.
-The future-catalog sentinel、ownerless-global domain variants、DELETING restart/metadata retirement、physical delete
-and `DELETING -> DELETED` are still pending；the five affected-stream storage/projection/cursor domains implemented
-through checkpoint K are not production-composed, and no production coordinator currently reaches the checkpoint-G
-delete primitives. A missing key or lost metadata-delete response must eventually be resolved under the unchanged
-DELETING root, never accepted from absence alone.
+The future-catalog sentinel、ownerless-global domain variants and production runtime composition remain pending；the
+five affected-stream storage/projection/cursor domains implemented through checkpoint K are not production-composed.
+Checkpoint M now supplies the first DELETING-recovery coordinator, but production type-owned source-metadata handlers
+still do not reach the checkpoint-G delete primitives. A missing key or lost metadata-delete response must eventually
+be resolved under the unchanged DELETING root, never accepted from absence alone.
 
 Checkpoint L's protocol foundation changes the canonical digest to protocol v2 and adds the validated manifest、domain
 proof、protection/removal records plus explicit binary-v1 codecs and frozen vectors. Its durable-store slice is also
@@ -1125,10 +1125,15 @@ final exact MARKED-root reload, immediately before activation revalidation and t
 journal therefore leaves the root MARKED. `phase4M4RetirementJournalCheck` freezes these orderings and the two-load
 contract in addition to store/writer restart and response-loss behavior.
 
-This finishes the journal protocol through durable DELETING intent, not destructive recovery. No coordinator yet
-uses the journal to classify/delete source metadata after a partial retirement, and the storage primitive is not an
-independent correctness owner or deletion authority；the destructive path remains disabled until DELETING recovery
-and exact physical deletion are implemented and gated.
+Checkpoint M adds the initial root-authenticated destructive-recovery implementation. `SourceRetirementCoordinator`
+accepts only `DELETING/DELETED` roots, reloads the exact sealed journal, rejects every unregistered metadata-removal
+type before mutation, dispatches journaled metadata keys through a closed type-owned handler registry, conditionally
+removes only journaled protections, then performs exact immutable HEAD/delete and CASes the same attempt to `DELETED`.
+An already absent object is accepted only after the matching root and journal have authenticated the attempt；a later
+restart from the exact `DELETED` record is idempotent. Focused tests freeze successful deletion、already-absent
+convergence and missing-journal failure before object access. Production handlers for generation-zero/higher index
+families, response-loss crash cuts for every metadata/protection/root CAS, runtime composition and the final M4 gate
+remain pending, so this checkpoint does not enable production deletion.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.
