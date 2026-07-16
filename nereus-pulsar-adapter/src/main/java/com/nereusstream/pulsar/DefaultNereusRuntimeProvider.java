@@ -2,11 +2,14 @@
 package com.nereusstream.pulsar;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.managedledger.NereusManagedLedgerRuntime;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
@@ -46,6 +49,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider {
     private static final String WRITER_VERSION = "nereus-pulsar-f2";
     private static final Duration PENDING_PROTECTION_DURATION = Duration.ofMinutes(5);
+    private static final Duration READER_LEASE_DURATION = Duration.ofMinutes(2);
     private static final Duration MAXIMUM_CLOCK_SKEW = Duration.ofSeconds(5);
     private static final Duration ORPHAN_GRACE = Duration.ofDays(1);
 
@@ -64,6 +68,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         OxiaMetadataStore l0MetadataStore = null;
         PhysicalObjectMetadataStore physicalMetadataStore = null;
         ObjectProtectionManager objectProtectionManager = null;
+        ObjectReadPinManager objectReadPinManager = null;
         ManagedLedgerProjectionMetadataStore projectionStore = null;
         CursorMetadataStore cursorMetadataStore = null;
         ScheduledExecutorService scheduler = null;
@@ -86,6 +91,15 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     streamConfig.cluster(),
                     physicalMetadataStore,
                     PENDING_PROTECTION_DURATION,
+                    MAXIMUM_CLOCK_SKEW,
+                    ORPHAN_GRACE,
+                    clock);
+            objectReadPinManager = new DefaultObjectReadPinManager(
+                    streamConfig.cluster(),
+                    DeterministicIds.stableHashComponent(
+                            "f4-reader/" + streamConfig.processRunId()),
+                    physicalMetadataStore,
+                    READER_LEASE_DURATION,
                     MAXIMUM_CLOCK_SKEW,
                     ORPHAN_GRACE,
                     clock);
@@ -114,8 +128,13 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             cursorSnapshotStore = new DefaultCursorSnapshotStore(
                     streamConfig.cluster(),
                     objectStore,
+                    cursorMetadataStore,
+                    physicalMetadataStore,
+                    objectProtectionManager,
+                    objectReadPinManager,
                     cursorConfig,
                     configuration.objectStore().requestTimeout(),
+                    PENDING_PROTECTION_DURATION,
                     clock);
             CursorStateMachine stateMachine = new CursorStateMachine(cursorConfig);
             CursorStatePersistencePlanner persistencePlanner = new CursorStatePersistencePlanner(
@@ -153,6 +172,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorStorage,
                     cursorConfig,
                     activationGuard,
+                    objectReadPinManager,
                     objectProtectionManager,
                     physicalMetadataStore,
                     l0MetadataStore,
@@ -174,6 +194,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorMetadataStore,
                     projectionStore,
                     streamStorage,
+                    objectReadPinManager,
                     objectProtectionManager,
                     physicalMetadataStore,
                     l0MetadataStore,

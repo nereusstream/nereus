@@ -66,7 +66,11 @@ require_literal "phase4M4GlobalDomainsCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M4TombstoneRetirementCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M4CursorProtectionCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint U" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint V" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "F4-M4 NRC1 object-protocol checkpoint" \
     "docs/phase-4-compaction-generation/README.md"

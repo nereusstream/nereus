@@ -102,6 +102,13 @@ NereusManagedLedgerRetentionService
 NereusManagedLedgerRuntime
 ```
 
+Checkpoint V implements the cursor-snapshot subset of this target composition：the provider shares the physical
+metadata store、`DefaultObjectProtectionManager` and `DefaultObjectReadPinManager` with
+`DefaultCursorSnapshotStore`，and `NereusManagedLedgerRuntime` owns/exposes the read-pin manager and closes the
+read-pin/protection/physical triplet in dependency order。Generation activation guard、reference-domain registry、
+backfill、`MaterializationRuntime` and GC service composition remain later checkpoints；this partial wiring does not
+enable any deletion capability bit。
+
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive
 the ObjectStore it uses.

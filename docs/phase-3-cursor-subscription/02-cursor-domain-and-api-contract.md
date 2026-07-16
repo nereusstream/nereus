@@ -289,7 +289,13 @@ public record CursorSnapshotWriteRequest(
 }
 
 public interface CursorSnapshotStore extends AutoCloseable {
-    CompletableFuture<CursorSnapshotReference> write(CursorSnapshotWriteRequest request);
+    CompletableFuture<CursorSnapshotPublication> prepareWrite(
+            CursorSnapshotWriteRequest request,
+            CursorSnapshotWriteAuthority authority);
+
+    CompletableFuture<Void> completeWrite(
+            CursorSnapshotPublication publication,
+            VersionedCursorState publishedRoot);
 
     CompletableFuture<CursorAckState> read(
             CursorSnapshotReference reference,
@@ -306,20 +312,32 @@ Production construction is explicit：
 public DefaultCursorSnapshotStore(
         String cluster,
         ObjectStore objectStore,
+        CursorMetadataStore cursorMetadataStore,
+        PhysicalObjectMetadataStore physicalMetadataStore,
+        ObjectProtectionManager protections,
+        ObjectReadPinManager readPins,
         CursorStorageConfig cursorConfig,
         Duration objectStoreRequestTimeout,
+        Duration pendingProtectionDuration,
         Clock clock);
 ```
 
-The store captures one `cursorSnapshotOperationTimeout` deadline per `write`/`read`。Each PUT/HEAD/range-read receives
+The store captures one `cursorSnapshotOperationTimeout` deadline per `prepareWrite`/`read`。Each PUT/HEAD/range-read receives
 `min(remaining snapshot deadline, objectStoreRequestTimeout)`；timeout is recomputed before every subcall and a
 nonpositive remainder fails without issuing IO。Production random IDs use `SecureRandom` internally；package-private
 tests inject the deterministic ID source。`cluster` is canonicalized exactly as the owning runtime cluster and the
-object-store request timeout must be positive。
+object-store request timeout must be positive。The F4 pending-protection duration must be exact-millisecond、
+positive and longer than the snapshot operation timeout。
 
 Constructors validate positive generation/sequence，exact identity/hash/checksum/version and defensive copies。
-`write` owns random snapshot-ID generation、encode、immutable PUT and HEAD verification；`read` owns HEAD、one exact
-full-object range read and strict decode。Neither method publishes visibility；only the later cursor-root CAS does。
+`prepareWrite` captures the exact ACTIVE cursor root/session/version, guards the immutable PUT before every provider
+attempt, verifies HEAD, registers the `ACTIVE` physical root and returns only after a bounded
+`CURSOR_SNAPSHOT_PENDING` protection is revalidated。`DefaultCursorStorage` then performs the unchanged cursor-root
+CAS visibility point and calls `completeWrite`, which creates/transfers the permanent `CURSOR_SNAPSHOT_ROOT`
+protection before releasing pending protection。`read` first converges a missing permanent protection from the exact
+live cursor root (including cursor-CAS response-loss recovery), then obtains a durable reader lease and holds it
+through the second HEAD、full-object range read and strict decode。Neither preparation nor protection metadata becomes
+cursor visibility authority；only the cursor-root CAS does。
 
 ## 4. CursorStorage API
 

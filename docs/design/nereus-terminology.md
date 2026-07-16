@@ -170,6 +170,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M4 checkpoint U**：DELETED physical root 的持久化双 HEAD/ownerless-domain absence window、late exact-byte
   cleanup、Phase 1 references-before-manifest 和 root-last conditional retirement ordinary checkpoint；它不表示
   production runtime 已启用 physical deletion。
+- **F4-M4 checkpoint V**：F3 cursor snapshot 的 guarded PUT、current-root pending protection、cursor-CAS
+  visibility、permanent root protection、response-loss hydrate repair 和 durable reader-lease ordinary checkpoint；
+  它关闭新写/读 frontier，但不表示 legacy backfill、snapshot candidate deletion 或 production GC 已启用。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

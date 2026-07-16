@@ -113,6 +113,12 @@ nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention/
   ProjectionGenerationReferenceDomain.java
   CursorSnapshotReferenceDomain.java
   CursorSnapshotGcScanner.java
+
+nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/cursor/
+  CursorSnapshotWriteAuthority.java
+  CursorSnapshotPublication.java
+  CursorSnapshotStore.java
+  DefaultCursorSnapshotStore.java
 ```
 
 As of F4-M2 on 2026-07-15, `PhysicalObjectIdentity`、the GC reference-domain values、the reader-pin manager and the
@@ -149,8 +155,11 @@ TOPIC_COMPACTED/ACTIVE same-view replacement eligibility, and a zero-read `sourc
 Checkpoint T implements future-sentinel and ownerless global domain variants. Checkpoint U implements the slow
 DELETED-root/Phase 1 audit-retirement pass with a persisted first-absence checkpoint、fresh ownerless-domain scans、
 late-byte cleanup、references-before-manifest ordering、root-last conditional delete and response-loss convergence.
-Physical-root backfill、object inventory、cursor snapshot GC、registration retirement and runtime composition remain
-planned，so production deletion is still disabled.
+Checkpoint V closes the new cursor-snapshot write/read frontier：guarded immutable PUT、ACTIVE physical root、
+current-root-owned bounded pending protection、cursor-CAS visibility、permanent live-root protection and durable read
+lease；a hydrate/read repairs permanent protection after cursor-CAS response loss. Physical-root backfill、object
+inventory、cursor snapshot candidate/deletion scanning、registration retirement and the remaining
+materialization/GC runtime composition remain planned，so production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1370,7 +1379,7 @@ Before snapshot deletion is enabled：
 - list every known F3 cursor-snapshot prefix page；
 - create exact physical roots for discovered keys older than orphan grace；
 - create `CURSOR_SNAPSHOT_ROOT` protections for every ACTIVE root reference；
-- register F4 pinning in `DefaultCursorSnapshotStore.read`；
+- register F4 pinning in `DefaultCursorSnapshotStore.read`（implemented in checkpoint V）；
 - prove a complete paginated cursor/root inventory at the configured 10,000-root limit；
 - set the cursor-snapshot GC coverage bit in generation activation metadata。
 
@@ -1395,9 +1404,19 @@ old snapshot remains candidate only after old root version disappears
 ```
 
 If the cursor-root CAS loses, pending protection is retained only through its bounded expiry/orphan grace and then
-reconciled. If root
-CAS wins but live protection creation is delayed, the authoritative cursor domain revalidation vetoes deletion even
-when the protection key is temporarily absent.
+reconciled. If root CAS wins but its response or permanent-protection completion is lost, every later hydrate/read
+loads the exact ACTIVE cursor root, creates/transfers and revalidates `CURSOR_SNAPSHOT_ROOT`, and only then admits a
+durable reader lease；the original pending protection may remain until bounded expiry. The authoritative cursor
+reference domain therefore vetoes deletion even while the permanent key is temporarily absent.
+
+Checkpoint V implements this with `CursorSnapshotWriteAuthority` and `CursorSnapshotPublication`.
+`DefaultCursorStorage` visibly orders `prepareWrite -> compareAndSetCursor -> completeWrite`；strict APPLIED success
+comes only after permanent protection and pending release. `DefaultCursorSnapshotStore.prepareWrite` uses the
+replayable guarded PUT hook so every provider attempt reloads the exact captured cursor root and rejects owner/root
+drift or any non-`ACTIVE` conflicting physical root. `read` performs an identity-only HEAD, converges permanent
+protection from the live root, acquires `ObjectReadPinManager`, then performs the second HEAD/range read/decode and
+releases the lease on both success and failure. The initial HEAD never admits byte consumption and a concurrent
+MARK blocks protection/pin acquisition before range IO.
 
 ### 10.3 Candidate deletion
 

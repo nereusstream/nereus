@@ -911,3 +911,27 @@ tasks.register("phase4M4TombstoneRetirementCheck") {
     dependsOn(":nereus-object-store:check")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M4CursorProtectionContractSurface") {
+    group = "verification"
+    description = "Audit guarded cursor snapshot publication, permanent protection, and durable read pinning."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-cursor-protection-contract-surface.sh")
+}
+
+tasks.register("phase4M4CursorProtectionCheck") {
+    group = "verification"
+    description = "Verify the F4-protected cursor snapshot write/read frontier and runtime wiring."
+    dependsOn("phase4M4TombstoneRetirementCheck")
+    dependsOn("checkPhase4M4CursorProtectionContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-managed-ledger:compileCursorS3IntegrationTestJava")
+    dependsOn(":nereus-managed-ledger:compileCursorM2IntegrationTestJava")
+    dependsOn(":nereus-pulsar-adapter:check")
+}

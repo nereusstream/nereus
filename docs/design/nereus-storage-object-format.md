@@ -1,6 +1,7 @@
 # Nereus Storage Object Format
 
-> 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate；
+> 状态：Object WAL v1 `Implemented`；cursor snapshot V1 已通过 F3-M1 implementation/final gate，并在 F4-M4
+> checkpoint V 接入 guarded upload、pending/permanent protection 与 durable read pin；
 > F4 compacted/topic-compacted/recovery-checkpoint families 已通过 M0 code-level design gate；F4-M3 real Parquet
 > NCP1/NTC1 writer/strict-reader/whole-file verifier、NCP1 core adapter、M3 planner/recovery、exact-source
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
@@ -350,8 +351,11 @@ The writable-ledger `ownerSessionId` is intentionally root-only and absent from 
 claims the root while preserving the same snapshot reference；root version/session fencing，not snapshot rewriting，
 prevents an old broker from publishing a later cursor mutation。
 
-Publish is immutable PUT-if-absent -> exact HEAD -> cursor-root CAS。Stable missing/corrupt reference fails cursor
-open；no older snapshot or inline-only fallback is allowed。CAS-lost/old objects remain F4 orphan/reference-GC input。
+Publish is guarded immutable PUT-if-absent -> exact HEAD -> ACTIVE physical root + bounded pending protection ->
+cursor-root CAS -> permanent root protection -> pending release。The cursor CAS remains the only visibility point。
+Stable missing/corrupt reference fails cursor open；no older snapshot or inline-only fallback is allowed。A
+post-CAS hydrate/read repairs missing permanent protection from the exact live root, then holds a durable reader lease
+through the second HEAD/range read/decode。CAS-lost/old objects remain F4 orphan/reference-GC input。
 
 ### Transaction snapshot
 

@@ -1069,18 +1069,28 @@ public final class DefaultCursorStorage implements CursorStorage {
         }
         CursorStatePersistencePlanner.SnapshotPlan snapshot =
                 (CursorStatePersistencePlanner.SnapshotPlan) plan;
-        return snapshotStore.write(snapshot.request()).thenCompose(reference -> {
+        CursorSnapshotWriteAuthority authority = new CursorSnapshotWriteAuthority(
+                current.root(),
+                candidate.ownerSessionId(),
+                candidate.mutationSequence());
+        return snapshotStore.prepareWrite(snapshot.request(), authority).thenCompose(publication -> {
             final CursorStateRecord root;
             try {
-                root = persistencePlanner.afterSnapshot(candidate, reference);
+                root = persistencePlanner.afterSnapshot(
+                        candidate, publication.reference());
             } catch (Throwable error) {
                 return CompletableFuture.failedFuture(error);
             }
-            return compareAndPublish(
-                    root,
-                    candidate,
-                    Optional.of(reference),
-                    current.root().metadataVersion());
+            return metadataStore.compareAndSetCursor(
+                            cluster,
+                            root,
+                            current.root().metadataVersion())
+                    .thenCompose(published -> snapshotStore.completeWrite(
+                                    publication, published)
+                            .thenApply(ignored -> persistencePlanner.persisted(
+                                    candidate,
+                                    Optional.of(publication.reference()),
+                                    published.metadataVersion())));
         });
     }
 

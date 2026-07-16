@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
@@ -79,6 +80,58 @@ class NereusManagedLedgerRuntimeTest {
         assertThat(callbacks.isShutdown()).isTrue();
         assertThat(scheduler.isShutdown()).isTrue();
         assertThat(runtime.isClosed()).isTrue();
+    }
+
+    @Test
+    void exposesAndClosesTheF4ReadPinProtectionAndPhysicalStoreTriplet() throws Exception {
+        List<String> closes = new ArrayList<>();
+        AtomicInteger sharedClientCloses = new AtomicInteger();
+        SharedOxiaClientRuntime shared = sharedRuntime(sharedClientCloses);
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor();
+        ExecutorService callbacks = Executors.newSingleThreadExecutor();
+        ObjectReadPinManager readPins =
+                proxy(ObjectReadPinManager.class, "read-pins", closes, false);
+        NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
+                proxy(StreamStorage.class, "stream", closes, false),
+                proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
+                proxy(CursorMetadataStore.class, "cursor-metadata", closes, false),
+                proxy(CursorSnapshotStore.class, "cursor-snapshot", closes, false),
+                proxy(CursorRetentionCoordinator.class, "cursor-retention", closes, false),
+                proxy(CursorStorage.class, "cursor-storage", closes, false),
+                CursorStorageConfig.defaults(),
+                allowActivation(),
+                readPins,
+                proxy(AutoCloseable.class, "protection", closes, false),
+                proxy(AutoCloseable.class, "physical", closes, false),
+                proxy(OxiaMetadataStore.class, "l0", closes, false),
+                shared,
+                proxy(ObjectStore.class, "object", closes, false),
+                proxy(ObjectStoreProvider.class, "provider", closes, false),
+                scheduler,
+                callbacks,
+                NereusManagedLedgerFactoryConfig.defaults(1024),
+                "cluster/a",
+                PROCESS_RUN_ID,
+                "pulsar-f2/" + PROCESS_RUN_ID);
+
+        assertThat(runtime.objectReadPinManager()).isSameAs(readPins);
+        runtime.close();
+
+        assertThat(closes).containsExactly(
+                "cursor-storage",
+                "cursor-retention",
+                "cursor-snapshot",
+                "cursor-metadata",
+                "projection",
+                "stream",
+                "read-pins",
+                "protection",
+                "physical",
+                "l0",
+                "object",
+                "provider");
+        assertThat(sharedClientCloses).hasValue(1);
     }
 
     @Test

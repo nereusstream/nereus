@@ -2,6 +2,7 @@
 package com.nereusstream.managedledger;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
 import com.nereusstream.managedledger.cursor.CursorSnapshotStore;
@@ -39,6 +40,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private final CursorStorage cursorStorage;
     private final CursorStorageConfig cursorStorageConfig;
     private final CursorProtocolActivationGuard cursorProtocolActivationGuard;
+    private final ObjectReadPinManager objectReadPinManager;
     private final AutoCloseable objectProtectionManager;
     private final AutoCloseable physicalMetadataStore;
     private final OxiaMetadataStore l0MetadataStore;
@@ -84,6 +86,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                 cursorProtocolActivationGuard,
                 null,
                 null,
+                null,
                 l0MetadataStore,
                 sharedOxiaRuntime,
                 objectStore,
@@ -105,6 +108,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             CursorStorage cursorStorage,
             CursorStorageConfig cursorStorageConfig,
             CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            ObjectReadPinManager objectReadPinManager,
             AutoCloseable objectProtectionManager,
             AutoCloseable physicalMetadataStore,
             OxiaMetadataStore l0MetadataStore,
@@ -127,10 +131,14 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         this.cursorStorageConfig = Objects.requireNonNull(cursorStorageConfig, "cursorStorageConfig");
         this.cursorProtocolActivationGuard = Objects.requireNonNull(
                 cursorProtocolActivationGuard, "cursorProtocolActivationGuard");
-        if ((objectProtectionManager == null) != (physicalMetadataStore == null)) {
+        boolean hasReadPins = objectReadPinManager != null;
+        boolean hasProtections = objectProtectionManager != null;
+        boolean hasPhysicalStore = physicalMetadataStore != null;
+        if (hasReadPins != hasProtections || hasReadPins != hasPhysicalStore) {
             throw new IllegalArgumentException(
-                    "objectProtectionManager and physicalMetadataStore must be supplied together");
+                    "objectReadPinManager, objectProtectionManager, and physicalMetadataStore must be supplied together");
         }
+        this.objectReadPinManager = objectReadPinManager;
         this.objectProtectionManager = objectProtectionManager;
         this.physicalMetadataStore = physicalMetadataStore;
         this.l0MetadataStore = Objects.requireNonNull(l0MetadataStore, "l0MetadataStore");
@@ -162,6 +170,9 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         if (objectProtectionManager != null) {
             ownedResources.add(objectProtectionManager);
         }
+        if (objectReadPinManager != null) {
+            ownedResources.add(objectReadPinManager);
+        }
         if (physicalMetadataStore != null) {
             ownedResources.add(physicalMetadataStore);
         }
@@ -191,6 +202,14 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
 
     public CursorProtocolActivationGuard cursorProtocolActivationGuard() {
         return cursorProtocolActivationGuard;
+    }
+
+    public ObjectReadPinManager objectReadPinManager() {
+        if (objectReadPinManager == null) {
+            throw new IllegalStateException(
+                    "this runtime was assembled without F4 object read pinning");
+        }
+        return objectReadPinManager;
     }
 
     public ScheduledExecutorService scheduler() {
@@ -242,6 +261,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         closeOne(cursorMetadataStore, failures);
         closeOne(projectionStore, failures);
         closeOne(streamStorage, failures);
+        closeOneIfPresent(objectReadPinManager, failures);
         closeOneIfPresent(objectProtectionManager, failures);
         closeOneIfPresent(physicalMetadataStore, failures);
         closeOne(l0MetadataStore, failures);

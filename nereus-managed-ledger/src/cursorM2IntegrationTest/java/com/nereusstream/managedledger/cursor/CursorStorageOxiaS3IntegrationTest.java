@@ -11,11 +11,18 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.DefaultObjectReadPinManager;
+import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
+import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.ProjectionCreateRequest;
 import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
@@ -273,6 +280,9 @@ class CursorStorageOxiaS3IntegrationTest {
                 new ScheduledThreadPoolExecutor(4);
         private final AtomicInteger activationCalls = new AtomicInteger();
         private final SharedOxiaClientRuntime oxiaRuntime;
+        private final PhysicalObjectMetadataStore physicalMetadataStore;
+        private final ObjectProtectionManager objectProtectionManager;
+        private final ObjectReadPinManager objectReadPinManager;
         private final ManagedLedgerProjectionMetadataStore projectionStore;
         private final CursorStorageTestSupport.ControllableCursorMetadataStore metadataStore;
         private final S3CompatibleObjectStoreProvider objectStoreProvider;
@@ -289,6 +299,25 @@ class CursorStorageOxiaS3IntegrationTest {
             Clock clock = Clock.systemUTC();
             OxiaClientConfiguration oxiaConfiguration = oxiaConfiguration();
             oxiaRuntime = SharedOxiaClientRuntime.connect(oxiaConfiguration, clock);
+            physicalMetadataStore =
+                    OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
+                            oxiaConfiguration, oxiaRuntime, clock);
+            objectProtectionManager = new DefaultObjectProtectionManager(
+                    cluster,
+                    physicalMetadataStore,
+                    Duration.ofMinutes(5),
+                    Duration.ofSeconds(5),
+                    Duration.ofHours(1),
+                    clock);
+            objectReadPinManager = new DefaultObjectReadPinManager(
+                    cluster,
+                    DeterministicIds.stableHashComponent(
+                            "cursor-m2-reader/" + cluster),
+                    physicalMetadataStore,
+                    Duration.ofMinutes(2),
+                    Duration.ofSeconds(5),
+                    Duration.ofHours(1),
+                    clock);
             projectionStore = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                     oxiaConfiguration,
                     oxiaRuntime,
@@ -305,8 +334,13 @@ class CursorStorageOxiaS3IntegrationTest {
             snapshotStore = new DefaultCursorSnapshotStore(
                     cluster,
                     objectStore,
+                    metadataStore,
+                    physicalMetadataStore,
+                    objectProtectionManager,
+                    objectReadPinManager,
                     cursorConfig,
                     objectStoreConfiguration.requestTimeout(),
+                    Duration.ofMinutes(5),
                     clock);
             CursorProtocolActivationGuard activationGuard = ignored -> {
                 activationCalls.incrementAndGet();
@@ -349,6 +383,9 @@ class CursorStorageOxiaS3IntegrationTest {
                         snapshotStore,
                         metadataStore,
                         projectionStore,
+                        objectReadPinManager,
+                        objectProtectionManager,
+                        physicalMetadataStore,
                         objectStore,
                         objectStoreProvider,
                         oxiaRuntime);

@@ -208,13 +208,17 @@ nereus-managed-ledger/.../cursor/
   DefaultCursorSnapshotStore.java
   CursorSnapshotReference.java
   CursorSnapshotWriteRequest.java
+  CursorSnapshotWriteAuthority.java
+  CursorSnapshotPublication.java
   CursorRetentionView.java
   CursorStorageConfig.java
 ```
 
 `F3MetadataCodecs` is an explicit fourth registry addition；record types are the exact Java simple names
 `CursorStateRecord` / `CursorRetentionRecord`，and it must not use decoder probing or shadow F1/F1.5/F2 record
-types。The snapshot store consumes existing generic ObjectStore APIs and adds no provider-specific S3 call。
+types。The snapshot store consumes the existing generic guarded replayable ObjectStore API and F4 physical
+root/protection/read-pin contracts；it adds no provider-specific S3 call。The cursor CAS remains the only visibility
+point, while a post-CAS hydrate/read repairs permanent protection after response loss。
 
 ### 4.2 Tests
 

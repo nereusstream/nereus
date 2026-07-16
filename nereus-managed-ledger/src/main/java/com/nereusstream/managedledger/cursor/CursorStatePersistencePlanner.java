@@ -425,18 +425,7 @@ public final class CursorStatePersistencePlanner {
     }
 
     private static CursorSnapshotReferenceRecord toRecord(CursorSnapshotReference reference) {
-        return new CursorSnapshotReferenceRecord(
-                reference.objectKey().value(),
-                reference.snapshotId(),
-                reference.cursorGeneration(),
-                reference.sourceMutationSequence(),
-                reference.baseMarkDeleteOffset(),
-                reference.objectLength(),
-                reference.storageChecksum().type().name(),
-                reference.storageChecksum().value(),
-                reference.formatCrc32c(),
-                reference.formatVersion(),
-                reference.createdAtMillis());
+        return reference.toMetadataRecord();
     }
 
     private static List<CursorAckRangeRecord> toRangeRecords(List<OffsetRange> ranges) {

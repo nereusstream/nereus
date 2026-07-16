@@ -93,8 +93,11 @@ read-only lookup、PREPARED bootstrap、monotonic CAS guard and frozen lifecycle
 foundation only. Checkpoint T adds the future sentinel、activation/backfill/domain-set-gated 64-shard global scope and
 ownerless variants for all five concrete domains. Checkpoint U adds the persisted dual-absence DELETED-root pass、
 fresh ownerless-domain/handle revalidation、late exact-byte cleanup、Phase 1 references-before-manifest retirement and
-root-last response-loss-safe CAS. Backfill/broker guard、runtime composition、cursor snapshot GC、object inventory and
-registration retirement remain pending.
+root-last response-loss-safe CAS. Checkpoint V adds guarded cursor-snapshot upload、current-root pending protection、
+cursor-CAS-then-permanent completion、response-loss repair on hydrate/read、durable reader lease and the shared
+physical/protection/read-pin production wiring for this path. Backfill/broker guard、physical-root backfill、cursor
+snapshot candidate/deletion scanning、object inventory、registration retirement and the remaining
+materialization/GC runtime composition remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -607,9 +610,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > retirement and all view/trim eligibility paths. Checkpoint S implements durable generation activation metadata；
 > checkpoint T implements the future sentinel、activation-gated full registration scope and affected/ownerless variants
 > of all five reference domains. Checkpoint U implements persisted dual-absence DELETED-root/Phase 1 audit retirement.
-> Backfill/broker guard、production runtime composition、physical-root backfill、cursor snapshot GC、object inventory、
-> registration retirement、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called
-> complete.
+> Checkpoint V implements the guarded/protected/pinned cursor-snapshot new-write frontier and its production
+> physical/protection/read-pin wiring. Backfill/broker guard、physical-root backfill、cursor snapshot
+> candidate/deletion scanning、object inventory、registration retirement、remaining materialization/GC runtime
+> composition、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
 
 ### 6.1 Production artifacts
 
@@ -795,7 +799,10 @@ gc/GcMetricsObserver.java
 retention/CursorSnapshotReferenceDomain.java             implemented K affected, extended T ownerless
 retention/CursorSnapshotGcScanner.java
 retention/ProjectionGenerationReferenceDomain.java       implemented K affected, extended T ownerless
-cursor/DefaultCursorSnapshotStore.java          pin/protection integration
+cursor/CursorSnapshotWriteAuthority.java                  implemented checkpoint V
+cursor/CursorSnapshotPublication.java                     implemented checkpoint V
+cursor/CursorSnapshotStore.java                           extended checkpoint V two-stage contract
+cursor/DefaultCursorSnapshotStore.java                    implemented checkpoint V guarded/pending/permanent/pinned IO
 cursor/CursorSnapshotInventory.java             unchanged authority semantics
 ```
 
@@ -848,6 +855,10 @@ HigherGenerationPreDrainCoordinatorTest                  extended checkpoint R v
 PhysicalObjectRootScannerTest                              implemented checkpoint I
 PhysicalRootTombstoneRetirementTest                        implemented checkpoint U
 LatePutAfterTombstoneTest                                  implemented checkpoint U
+CursorSnapshotStoreTest                                   extended checkpoint V protection/read-pin/response-loss
+CursorStorageOxiaS3IntegrationTest                        migrated checkpoint V real Oxia/S3 protocol
+DefaultCursorSnapshotStoreLocalStackIntegrationTest       migrated checkpoint V real S3 restart/collision protocol
+NereusManagedLedgerRuntimeTest                            extended checkpoint V F4 resource ownership
 PhysicalRootBackfillCoordinatorTest
 MultiStreamWalRetirementTest
 GenerationRetirementFallbackTest
@@ -885,6 +896,7 @@ retirement.
 ./gradlew phase4M4ActivationMetadataCheck
 ./gradlew phase4M4GlobalDomainsCheck
 ./gradlew phase4M4TombstoneRetirementCheck
+./gradlew phase4M4CursorProtectionCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -1027,6 +1039,17 @@ owner appearing before the late-PUT provider delete. This gate still does not ru
 snapshot GC、object inventory、registration retirement、production runtime composition or the real-service M4 final
 scenarios. The ordinary gate passed on 2026-07-16.
 
+`phase4M4CursorProtectionCheck` extends checkpoint U with checkpoint V. It audits the exact captured ACTIVE cursor
+authority、guarded replayable PUT before every provider attempt、ACTIVE physical-root plus bounded pending proof、
+`prepareWrite -> cursor CAS -> completeWrite` visibility ordering、permanent-before-pending-release and
+lease-before-range-IO. Focused tests prove owner/root drift blocks upload、cursor-CAS response loss is repaired from
+the live snapshot reference、read/decode failures still release the durable lease、collision never overwrites bytes
+and borrowed stores/managers are not closed by the snapshot store. It also compiles the migrated real-S3 and real
+Oxia/S3 source sets and verifies production provider/runtime ownership. This gate does not implement legacy
+physical-root/cursor inventory backfill、`CursorSnapshotGcScanner` candidate/deletion logic、broker activation barrier、
+object inventory、registration retirement or production deletion. The ordinary gate plus
+`cursorS3IntegrationTest` and `cursorM2IntegrationTest --rerun-tasks` passed on 2026-07-16.
+
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.
 It also proves live-reference root/protection backfill, all-shard lifecycle recovery with empty object listing, 10,000
@@ -1071,10 +1094,10 @@ nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionRefV1.java
 nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCoordinator.java
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationGuard.java
 nereus-managed-ledger/.../NereusManagedLedger.java
-nereus-managed-ledger/.../NereusManagedLedgerRuntime.java
+nereus-managed-ledger/.../NereusManagedLedgerRuntime.java             checkpoint V read-pin ownership/accessor
 
 nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java
-nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java
+nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoint V cursor physical/protection/pin wiring
 ```
 
 ### 7.2 Local Pulsar fork artifacts

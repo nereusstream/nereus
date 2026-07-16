@@ -8,6 +8,8 @@ import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.DeleteOptions;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
@@ -25,9 +27,14 @@ import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.TrimOptions;
+import com.nereusstream.core.physical.ObjectProtection;
+import com.nereusstream.core.physical.ObjectProtectionOwner;
+import com.nereusstream.core.physical.PhysicalObjectIdentity;
+import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.metadata.oxia.FakeCursorMetadataStore;
 import com.nereusstream.metadata.oxia.FakeManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
+import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.ProjectionCreateRequest;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.CursorScanPage;
@@ -37,6 +44,7 @@ import com.nereusstream.metadata.oxia.VersionedCursorState;
 import com.nereusstream.metadata.oxia.WatchRegistration;
 import com.nereusstream.metadata.oxia.records.CursorRetentionRecord;
 import com.nereusstream.metadata.oxia.records.CursorStateRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
 import java.nio.ByteBuffer;
 import java.time.Clock;
@@ -594,7 +602,10 @@ final class CursorStorageTestSupport {
         }
 
         @Override
-        public CompletableFuture<CursorSnapshotReference> write(CursorSnapshotWriteRequest request) {
+        public CompletableFuture<CursorSnapshotPublication> prepareWrite(
+                CursorSnapshotWriteRequest request,
+                CursorSnapshotWriteAuthority authority) {
+            authority.requireMatches(request);
             String snapshotId = String.format("%032x", ids.incrementAndGet());
             CursorSnapshotCodecV1.EncodedSnapshot encoded = CursorSnapshotCodecV1.encode(
                     request, snapshotId, config);
@@ -603,7 +614,7 @@ final class CursorStorageTestSupport {
             byte[] bytes = new byte[encoded.payload().remaining()];
             encoded.payload().get(bytes);
             objects.put(key, bytes);
-            return CompletableFuture.completedFuture(new CursorSnapshotReference(
+            CursorSnapshotReference reference = new CursorSnapshotReference(
                     key,
                     snapshotId,
                     request.identity().cursorGeneration(),
@@ -613,7 +624,46 @@ final class CursorStorageTestSupport {
                     encoded.storageChecksum(),
                     encoded.formatCrc32c(),
                     1,
-                    request.createdAtMillis()));
+                    request.createdAtMillis());
+            PhysicalObjectIdentity object = PhysicalObjectIdentity.create(
+                    key,
+                    Optional.empty(),
+                    PhysicalObjectKind.CURSOR_SNAPSHOT,
+                    bytes.length,
+                    encoded.storageChecksum(),
+                    Optional.empty(),
+                    Optional.empty());
+            ObjectProtection pending = new ObjectProtection(
+                    object,
+                    new ObjectProtectionIdentity(
+                            object.objectKeyHash(),
+                            ObjectProtectionType.CURSOR_SNAPSHOT_PENDING,
+                            snapshotId),
+                    new ObjectProtectionOwner(
+                            "/test/cursor-snapshot/" + request.identity().cursorNameHash(),
+                            authority.currentRoot().metadataVersion(),
+                            new Checksum(ChecksumType.SHA256, "a".repeat(64))),
+                    1,
+                    request.createdAtMillis(),
+                    Math.addExact(request.createdAtMillis(), 1),
+                    1,
+                    new Checksum(ChecksumType.SHA256, "b".repeat(64)));
+            return CompletableFuture.completedFuture(new CursorSnapshotPublication(
+                    request, authority, reference, object, pending));
+        }
+
+        @Override
+        public CompletableFuture<Void> completeWrite(
+                CursorSnapshotPublication publication,
+                VersionedCursorState publishedRoot) {
+            if (publishedRoot.value().snapshotReference().isEmpty()
+                    || !publishedRoot.value().snapshotReference()
+                            .orElseThrow()
+                            .equals(publication.reference().toMetadataRecord())) {
+                return CompletableFuture.failedFuture(new IllegalArgumentException(
+                        "published root does not contain the prepared snapshot"));
+            }
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override

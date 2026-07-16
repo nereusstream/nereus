@@ -5,6 +5,7 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.metadata.oxia.CursorIds;
+import com.nereusstream.metadata.oxia.records.CursorSnapshotReferenceRecord;
 import java.util.Objects;
 
 /** Strict immutable reference to one full cursor ack-state snapshot object. */
@@ -35,5 +36,20 @@ public record CursorSnapshotReference(
         if (formatVersion != 1 || createdAtMillis < 0) {
             throw new IllegalArgumentException("cursor snapshot format or timestamp is invalid");
         }
+    }
+
+    public CursorSnapshotReferenceRecord toMetadataRecord() {
+        return new CursorSnapshotReferenceRecord(
+                objectKey.value(),
+                snapshotId,
+                cursorGeneration,
+                sourceMutationSequence,
+                baseMarkDeleteOffset,
+                objectLength,
+                storageChecksum.type().name(),
+                storageChecksum.value(),
+                formatCrc32c,
+                formatVersion,
+                createdAtMillis);
     }
 }
