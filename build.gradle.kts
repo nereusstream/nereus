@@ -838,14 +838,14 @@ tasks.register("phase4M4DestructiveRecoveryCheck") {
 
 tasks.register<Exec>("checkPhase4M4GenerationRetirementContractSurface") {
     group = "verification"
-    description = "Audit canonical generation/source routing, typed handlers, and exact source-plan freezing."
+    description = "Audit canonical generation/source routing, typed handlers, and healthy replacement-bound source plans."
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-phase4-m4-generation-retirement-contract-surface.sh")
 }
 
 tasks.register("phase4M4GenerationRetirementCheck") {
     group = "verification"
-    description = "Verify exact generation-zero source deletion and higher-generation retirement recovery."
+    description = "Verify exact source deletion, NRC1 replacement health, and higher-generation retirement recovery."
     dependsOn("phase4M4DestructiveRecoveryCheck")
     dependsOn("checkPhase4M4GenerationRetirementContractSurface")
     dependsOn("checkPhase4Documentation")

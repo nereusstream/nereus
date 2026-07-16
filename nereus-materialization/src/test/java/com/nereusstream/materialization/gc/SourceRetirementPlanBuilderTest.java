@@ -10,9 +10,11 @@ import com.nereusstream.api.EntryIndexLocation;
 import com.nereusstream.api.EntryIndexRef;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
@@ -23,16 +25,26 @@ import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.metadata.oxia.AppendRecoveryCommitEncoding;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.F4Keyspace;
+import com.nereusstream.metadata.oxia.GenerationIndexDigests;
+import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.GenerationZeroIndexEncoding;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
+import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.RecoveryCheckpointRootDigests;
+import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex;
+import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
+import com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
+import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
@@ -45,6 +57,8 @@ import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointDirectory;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointEntry;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointFormatV1;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointObject;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointPublication;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointPublicationPage;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteRequest;
 import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
@@ -53,6 +67,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -69,9 +84,11 @@ class SourceRetirementPlanBuilderTest {
         AtomicReference<VersionedGenerationZeroMarker> marker = new AtomicReference<>(
                 fixture.marker());
         AtomicInteger rootReads = new AtomicInteger();
+        AtomicInteger physicalRootReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
                 generationStore(fixture, rootReads, false),
+                physicalStore(fixture, physicalRootReads, false),
                 sourceStore(fixture, marker),
                 checkpointCodec(fixture),
                 PhysicalGcConfig.defaults());
@@ -89,9 +106,11 @@ class SourceRetirementPlanBuilderTest {
                         fixture.marker().key(),
                         fixture.commit().key());
         assertThat(rootReads).hasValue(4);
+        assertThat(physicalRootReads).hasValue(4);
         assertThat(builder.reload(fixture.candidate(), removals).join())
                 .isEqualTo(removals);
         assertThat(rootReads).hasValue(6);
+        assertThat(physicalRootReads).hasValue(6);
 
         marker.set(new VersionedGenerationZeroMarker(
                 fixture.marker().key(),
@@ -114,6 +133,7 @@ class SourceRetirementPlanBuilderTest {
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
                 generationStore(fixture, rootReads, true),
+                physicalStore(fixture, new AtomicInteger(), false),
                 sourceStore(fixture, new AtomicReference<>(fixture.marker())),
                 checkpointCodec(fixture),
                 PhysicalGcConfig.defaults());
@@ -125,6 +145,88 @@ class SourceRetirementPlanBuilderTest {
     }
 
     @Test
+    void quarantinedReplacementIndexCannotAuthorizeSourceRetirement() {
+        Fixture fixture = fixture();
+        Fixture quarantined = fixture.withReplacementIndex(
+                generationWithLifecycle(
+                        fixture.replacementIndex(),
+                        GenerationLifecycle.QUARANTINED,
+                        "target-corrupt"));
+        AtomicInteger physicalReads = new AtomicInteger();
+        SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
+                CLUSTER,
+                generationStore(quarantined, new AtomicInteger(), false),
+                physicalStore(quarantined, physicalReads, false),
+                sourceStore(quarantined, new AtomicReference<>(quarantined.marker())),
+                checkpointCodec(quarantined),
+                PhysicalGcConfig.defaults());
+
+        assertThatThrownBy(() -> builder.build(quarantined.candidate()).join())
+                .hasRootCauseMessage(
+                        "generation-zero source has no current healthy NRC1 replacement");
+        assertThat(physicalReads).hasValue(0);
+    }
+
+    @Test
+    void markedReplacementRootCannotAuthorizeSourceRetirement() {
+        Fixture fixture = fixture();
+        Fixture marked = fixture.withReplacementRoot(
+                markedRoot(fixture.replacementRoot()));
+        SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
+                CLUSTER,
+                generationStore(marked, new AtomicInteger(), false),
+                physicalStore(marked, new AtomicInteger(), false),
+                sourceStore(marked, new AtomicReference<>(marked.marker())),
+                checkpointCodec(marked),
+                PhysicalGcConfig.defaults());
+
+        assertThatThrownBy(() -> builder.build(marked.candidate()).join())
+                .hasRootCauseMessage(
+                        "generation-zero source has no current healthy NRC1 replacement");
+    }
+
+    @Test
+    void replacementIndexChangeDuringFreezeRejectsThePlan() {
+        Fixture fixture = fixture();
+        AtomicInteger indexReads = new AtomicInteger();
+        SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
+                CLUSTER,
+                generationStore(
+                        fixture,
+                        new AtomicInteger(),
+                        false,
+                        indexReads,
+                        true),
+                physicalStore(fixture, new AtomicInteger(), false),
+                sourceStore(fixture, new AtomicReference<>(fixture.marker())),
+                checkpointCodec(fixture),
+                PhysicalGcConfig.defaults());
+
+        assertThatThrownBy(() -> builder.build(fixture.candidate()).join())
+                .hasRootCauseMessage(
+                        "healthy NRC1 replacement index changed while source facts were frozen");
+        assertThat(indexReads).hasValue(2);
+    }
+
+    @Test
+    void replacementRootChangeDuringFreezeRejectsThePlan() {
+        Fixture fixture = fixture();
+        AtomicInteger physicalReads = new AtomicInteger();
+        SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
+                CLUSTER,
+                generationStore(fixture, new AtomicInteger(), false),
+                physicalStore(fixture, physicalReads, true),
+                sourceStore(fixture, new AtomicReference<>(fixture.marker())),
+                checkpointCodec(fixture),
+                PhysicalGcConfig.defaults());
+
+        assertThatThrownBy(() -> builder.build(fixture.candidate()).join())
+                .hasRootCauseMessage(
+                        "healthy NRC1 replacement root changed while source facts were frozen");
+        assertThat(physicalReads).hasValue(2);
+    }
+
+    @Test
     void revalidatorRejectsAnUnboundExtraSourceRemoval() {
         Fixture fixture = fixture();
         VersionedGenerationZeroCommit unbound = commitWithId(
@@ -132,6 +234,7 @@ class SourceRetirementPlanBuilderTest {
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
                 generationStore(fixture, new AtomicInteger(), false),
+                physicalStore(fixture, new AtomicInteger(), false),
                 sourceStore(
                         fixture,
                         new AtomicReference<>(fixture.marker()),
@@ -174,6 +277,7 @@ class SourceRetirementPlanBuilderTest {
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
                 generationStore(conflicting, new AtomicInteger(), false),
+                physicalStore(conflicting, new AtomicInteger(), false),
                 sourceStore(conflicting, new AtomicReference<>(conflicting.marker())),
                 checkpointCodec(conflicting),
                 PhysicalGcConfig.defaults());
@@ -264,6 +368,90 @@ class SourceRetirementPlanBuilderTest {
                 canonicalSha,
                 9,
                 sha('c'));
+        ObjectSliceReadTarget replacementTarget = replacementTarget();
+        var encodedReplacement = ReadTargetCodecRegistry.phase15().encode(
+                replacementTarget);
+        String publicationId = "p".repeat(52);
+        GenerationIndexRecord replacementValue = new GenerationIndexRecord(
+                1,
+                STREAM.value(),
+                ReadView.COMMITTED.wireId(),
+                0,
+                12,
+                1,
+                publicationId,
+                "task-source-plan",
+                GenerationLifecycle.COMMITTED,
+                sha('3').value(),
+                sha('4').value(),
+                encodedReplacement,
+                encodedReplacement.identityChecksumValue(),
+                sha('4').value(),
+                PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                12,
+                12,
+                1,
+                12,
+                0,
+                12,
+                1,
+                1,
+                List.of(),
+                CommitSliceRequest.emptyProjectionIdentity(),
+                1,
+                2,
+                "",
+                2,
+                6);
+        String replacementKey = new F4Keyspace(CLUSTER).generationIndexKey(
+                STREAM, ReadView.COMMITTED, 12, 1);
+        VersionedGenerationIndex replacementIndex = new VersionedGenerationIndex(
+                replacementKey,
+                replacementValue,
+                replacementValue.metadataVersion(),
+                GenerationIndexDigests.durableValueSha256(
+                        replacementValue.withMetadataVersion(0)));
+        GenerationIndexRecord embeddedReplacement = replacementValue.withMetadataVersion(0);
+        byte[] publicationBytes = new GenerationIndexRecordCodecV1().encode(
+                embeddedReplacement);
+        RecoveryCheckpointPublication publication = new RecoveryCheckpointPublication(
+                1,
+                new PublicationId(publicationId),
+                new OffsetRange(0, 12),
+                ByteBuffer.wrap(publicationBytes),
+                GenerationIndexDigests.canonicalRecordSha256(embeddedReplacement));
+        ObjectKeyHash replacementHash = ObjectKeyHash.from(
+                replacementTarget.objectKey());
+        PhysicalObjectRootRecord replacementRootValue = new PhysicalObjectRootRecord(
+                1,
+                replacementHash.value(),
+                replacementTarget.objectKey().value(),
+                replacementTarget.objectId().value(),
+                PhysicalObjectKind.COMMITTED_COMPACTED.wireId(),
+                100,
+                ChecksumType.CRC32C.name(),
+                "55667788",
+                "",
+                "",
+                PhysicalObjectLifecycle.ACTIVE,
+                1,
+                1,
+                1,
+                "",
+                "",
+                0,
+                0,
+                0,
+                0,
+                0,
+                "",
+                "",
+                4);
+        VersionedPhysicalObjectRoot replacementRoot = new VersionedPhysicalObjectRoot(
+                new F4Keyspace(CLUSTER).physicalRootKey(replacementHash),
+                replacementRootValue,
+                replacementRootValue.metadataVersion(),
+                sha('5'));
         RecoveryCheckpointWriteRequest header = new RecoveryCheckpointWriteRequest(
                 CLUSTER,
                 STREAM,
@@ -384,13 +572,36 @@ class SourceRetirementPlanBuilderTest {
                 30,
                 30);
         return new Fixture(
-                index, marker, commit, root, checkpoint, entry, candidate);
+                index,
+                marker,
+                commit,
+                replacementIndex,
+                replacementRoot,
+                publication,
+                root,
+                checkpoint,
+                entry,
+                candidate);
     }
 
     private static GenerationMetadataStore generationStore(
             Fixture fixture,
             AtomicInteger rootReads,
             boolean loseRootOnFinalReload) {
+        return generationStore(
+                fixture,
+                rootReads,
+                loseRootOnFinalReload,
+                new AtomicInteger(),
+                false);
+    }
+
+    private static GenerationMetadataStore generationStore(
+            Fixture fixture,
+            AtomicInteger rootReads,
+            boolean loseRootOnFinalReload,
+            AtomicInteger indexReads,
+            boolean changeIndexOnFinalReload) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -402,7 +613,9 @@ class SourceRetirementPlanBuilderTest {
                         case "scanIndex" -> CompletableFuture.completedFuture(
                                 new GenerationScanPage(
                                         args[2] == ReadView.COMMITTED
-                                                ? List.of(fixture.index())
+                                                ? List.of(
+                                                        fixture.index(),
+                                                        fixture.replacementIndex())
                                                 : List.of(),
                                         Optional.empty()));
                         case "getRecoveryRoot" -> {
@@ -412,10 +625,61 @@ class SourceRetirementPlanBuilderTest {
                                             ? Optional.empty()
                                             : Optional.of(fixture.root()));
                         }
-                        case "getCandidateByKey" -> CompletableFuture.completedFuture(
-                                fixture.index().key().equals(args[3])
-                                        ? Optional.of(fixture.index())
-                                        : Optional.empty());
+                        case "getIndex" -> {
+                            int read = indexReads.incrementAndGet();
+                            VersionedGenerationIndex value =
+                                    changeIndexOnFinalReload && read > 1
+                                            ? generationWithLifecycle(
+                                                    fixture.replacementIndex(),
+                                                    GenerationLifecycle.QUARANTINED,
+                                                    "target-changed")
+                                            : fixture.replacementIndex();
+                            yield CompletableFuture.completedFuture(
+                                    replacementIdentity(fixture).equals(args[1])
+                                            ? Optional.of(value)
+                                            : Optional.empty());
+                        }
+                        case "getCandidateByKey" -> {
+                            String key = (String) args[3];
+                            if (fixture.index().key().equals(key)) {
+                                yield CompletableFuture.completedFuture(
+                                        Optional.of(fixture.index()));
+                            }
+                            yield CompletableFuture.completedFuture(
+                                    fixture.replacementIndex().key().equals(key)
+                                            ? Optional.of(fixture.replacementIndex())
+                                            : Optional.empty());
+                        }
+                        case "close" -> null;
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    };
+                });
+    }
+
+    private static PhysicalObjectMetadataStore physicalStore(
+            Fixture fixture,
+            AtomicInteger rootReads,
+            boolean changeOnFinalReload) {
+        return (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
+                PhysicalObjectMetadataStore.class.getClassLoader(),
+                new Class<?>[] {PhysicalObjectMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return objectMethod(proxy, method.getName(), args);
+                    }
+                    return switch (method.getName()) {
+                        case "getRoot" -> {
+                            int read = rootReads.incrementAndGet();
+                            VersionedPhysicalObjectRoot value =
+                                    changeOnFinalReload && read > 1
+                                            ? markedRoot(fixture.replacementRoot())
+                                            : fixture.replacementRoot();
+                            yield CompletableFuture.completedFuture(
+                                    new ObjectKeyHash(value.value().objectKeyHash())
+                                                    .equals(args[1])
+                                            ? Optional.of(value)
+                                            : Optional.empty());
+                        }
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
@@ -474,9 +738,22 @@ class SourceRetirementPlanBuilderTest {
                                 fixture.checkpoint());
                         case "findCommitCoveringOffset" -> CompletableFuture.completedFuture(
                                 Optional.of(fixture.entry()));
+                        case "scanPublications" -> CompletableFuture.completedFuture(
+                                new RecoveryCheckpointPublicationPage(
+                                        List.of(fixture.publication()),
+                                        OptionalInt.empty()));
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
                 });
+    }
+
+    private static GenerationIndexIdentity replacementIdentity(Fixture fixture) {
+        GenerationIndexRecord value = fixture.replacementIndex().value();
+        return new GenerationIndexIdentity(
+                STREAM,
+                ReadView.COMMITTED,
+                value.offsetEnd(),
+                value.generation());
     }
 
     private static Object objectMethod(Object proxy, String name, Object[] args) {
@@ -509,6 +786,109 @@ class SourceRetirementPlanBuilderTest {
                 100,
                 new Checksum(ChecksumType.CRC32C, "11223344"),
                 entryIndex);
+    }
+
+    private static ObjectSliceReadTarget replacementTarget() {
+        EntryIndexRef entryIndex = new EntryIndexRef(
+                EntryIndexLocation.INLINE,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(new byte[] {4, 5, 6}),
+                0,
+                0,
+                new Checksum(ChecksumType.CRC32C, "05060708"));
+        return new ObjectSliceReadTarget(
+                1,
+                new ObjectId("replacement-object"),
+                new ObjectKey("objects/replacement-object"),
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                "NEREUS_COMPACTED_PARQUET_V1",
+                PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                "slice-replacement",
+                0,
+                100,
+                new Checksum(ChecksumType.CRC32C, "55667788"),
+                entryIndex);
+    }
+
+    private static VersionedPhysicalObjectRoot markedRoot(
+            VersionedPhysicalObjectRoot source) {
+        PhysicalObjectRootRecord value = source.value();
+        PhysicalObjectRootRecord changed = new PhysicalObjectRootRecord(
+                value.schemaVersion(),
+                value.objectKeyHash(),
+                value.objectKey(),
+                value.objectId(),
+                value.objectKindId(),
+                value.objectLength(),
+                value.storageChecksumType(),
+                value.storageChecksumValue(),
+                value.contentSha256(),
+                value.etag(),
+                PhysicalObjectLifecycle.MARKED,
+                Math.addExact(value.lifecycleEpoch(), 1),
+                value.createdAtMillis(),
+                value.orphanNotBeforeMillis(),
+                "m".repeat(52),
+                sha('6').value(),
+                10,
+                20,
+                0,
+                0,
+                0,
+                "",
+                "",
+                Math.addExact(source.metadataVersion(), 1));
+        return new VersionedPhysicalObjectRoot(
+                source.key(),
+                changed,
+                changed.metadataVersion(),
+                sha('6'));
+    }
+
+    private static VersionedGenerationIndex generationWithLifecycle(
+            VersionedGenerationIndex source,
+            GenerationLifecycle lifecycle,
+            String reason) {
+        GenerationIndexRecord value = source.value();
+        long version = Math.addExact(source.metadataVersion(), 1);
+        GenerationIndexRecord changed = new GenerationIndexRecord(
+                value.schemaVersion(),
+                value.streamId(),
+                value.readViewId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.generation(),
+                value.publicationId(),
+                value.taskId(),
+                lifecycle,
+                value.sourceSetSha256(),
+                value.policySha256(),
+                value.readTarget(),
+                value.targetIdentitySha256(),
+                value.materializationPolicySha256(),
+                value.payloadFormat(),
+                value.sourceRecordCount(),
+                value.outputRecordCount(),
+                value.entryCount(),
+                value.logicalBytes(),
+                value.cumulativeSizeAtStart(),
+                value.cumulativeSizeAtEnd(),
+                value.firstCommitVersion(),
+                value.lastCommitVersion(),
+                value.schemaRefs(),
+                value.projectionRef(),
+                value.createdAtMillis(),
+                value.committedAtMillis(),
+                reason,
+                Math.addExact(value.stateChangedAtMillis(), 1),
+                version);
+        return new VersionedGenerationIndex(
+                source.key(),
+                changed,
+                version,
+                GenerationIndexDigests.durableValueSha256(
+                        changed.withMetadataVersion(0)));
     }
 
     private static StreamCommitTargetRecord withReadTargetIdentity(
@@ -614,13 +994,55 @@ class SourceRetirementPlanBuilderTest {
             VersionedGenerationZeroIndex index,
             VersionedGenerationZeroMarker marker,
             VersionedGenerationZeroCommit commit,
+            VersionedGenerationIndex replacementIndex,
+            VersionedPhysicalObjectRoot replacementRoot,
+            RecoveryCheckpointPublication publication,
             VersionedRecoveryCheckpointRoot root,
             RecoveryCheckpointObject checkpoint,
             RecoveryCheckpointEntry entry,
             GcCandidate candidate) {
         private Fixture withEntry(RecoveryCheckpointEntry replacement) {
             return new Fixture(
-                    index, marker, commit, root, checkpoint, replacement, candidate);
+                    index,
+                    marker,
+                    commit,
+                    replacementIndex,
+                    replacementRoot,
+                    publication,
+                    root,
+                    checkpoint,
+                    replacement,
+                    candidate);
+        }
+
+        private Fixture withReplacementIndex(
+                VersionedGenerationIndex replacement) {
+            return new Fixture(
+                    index,
+                    marker,
+                    commit,
+                    replacement,
+                    replacementRoot,
+                    publication,
+                    root,
+                    checkpoint,
+                    entry,
+                    candidate);
+        }
+
+        private Fixture withReplacementRoot(
+                VersionedPhysicalObjectRoot replacement) {
+            return new Fixture(
+                    index,
+                    marker,
+                    commit,
+                    replacementIndex,
+                    replacement,
+                    publication,
+                    root,
+                    checkpoint,
+                    entry,
+                    candidate);
         }
     }
 }

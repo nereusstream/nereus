@@ -22,8 +22,9 @@
 > higher-generation `DRAINING -> RETIRED` handler，以及每个 destructive batch/physical-delete fence 的 root +
 > journal reauthentication。Checkpoint O 进一步实现 legacy/generic marker/commit exact-key inverse、两个
 > response-loss-safe typed handler，以及把 NRC1/source commit/index/marker 绑定为三条 removal 的
-> `SourceRetirementPlanBuilder`/exact-key revalidator；healthy replacement physical-root proof、higher-generation
-> pre-drain、production runtime 与最终删除开关仍保持关闭
+> `SourceRetirementPlanBuilder`/exact-key revalidator。Checkpoint P 已把每条 NRC1 source entry 继续绑定到至少
+> 一个当前 exact `COMMITTED` higher index 和另一个 `ACTIVE` physical root，并在冻结结束重读两者；
+> higher-generation pre-drain、production runtime 与最终删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
 >
@@ -687,9 +688,26 @@ removal；它也实现 `GcPlanMetadataRevalidator`，逐 key 返回当前 author
 marker/version drift、key/value alias、NRC1 canonical commit 不同或不属于 candidate 的额外 source removal
 均 fail closed；每次 exact list 命中后都会从 candidate index 重新构造完整三元组，而不是把 key 存在当权限。
 
-Checkpoint O 仍是 ordinary foundation：NRC1 publication 所指 healthy higher index/physical root 的完整
-eligibility proof、`COMMITTED/QUARANTINED -> DRAINING`、future/global domains、runtime composition、cursor/root/
-audit retirement 与 final M4 gate 仍待实现，因此 production deletion 未开启。
+Checkpoint O 在该边界仍只是 ordinary foundation；它本身没有证明 NRC1 publication 的 current index/root
+健康性，也未启用 production deletion。
+
+### 6.18 F4-M4 healthy NRC1 replacement checkpoint
+
+Checkpoint P 完成 generation-zero source 的 §9.1 replacement 分支。Planner 按 entry 中 1–8 个 canonical
+publication-table index 逐项读取；每一行必须严格 round-trip `GenerationIndexRecordCodecV1`、匹配 raw-record
+SHA、同一 stream/`COMMITTED` view、publication/generation/range/commit/cumulative coverage，并保留
+`metadataVersion=0`。随后它从 Oxia 重读该行的 exact higher-generation key，要求当前 record 仍为
+`COMMITTED`、所有字段只按当前 Oxia version 水合、durable-envelope SHA 与 NRC1 bytes 一致。
+
+候选 index 的 `ObjectSliceReadTarget` 必须指向被删除对象之外的 immutable object；其 exact physical root
+必须存在、key/hash/id/kind/slice bounds 一致且 lifecycle 为 `ACTIVE`。失效的 current index 或 root 只淘汰
+该 publication 候选，所有 1–8 个候选都失效才 veto；畸形/非 canonical NRC1 则作为 metadata invariant
+立即失败。选中 replacement 后，planner 读取 source commit/marker，再精确重读 replacement index/root 和
+recovery root，任何 version、digest、lifecycle/epoch 或 identity 漂移都使计划失败。`reload` 的 candidate-
+bound reproof 会重新执行同一闭环，因此 journal removal 的 key 存在不能替代健康性证明。
+
+Checkpoint P 仍未执行 higher-generation `COMMITTED/QUARANTINED -> DRAINING`，也未完成 future/global
+domains、runtime composition、cursor/root/audit retirement 或 final M4 gate；production deletion 继续关闭。
 
 ## 7. Milestones
 
@@ -699,7 +717,7 @@ audit retirement 与 final M4 gate 仍待实现，因此 production deletion 未
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint O, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、affected-stream generation/append/materialization/projection/cursor domains、root-authenticated journal/destructive recovery、generation-index/source typed handlers and NRC1-bound generation-zero source-plan freezing are implemented/tested；healthy replacement/root eligibility、higher pre-drain、future sentinel/ownerless-global proof、runtime composition、cursor/root/audit completion and final gate pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint P, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、affected-stream generation/append/materialization/projection/cursor domains、root-authenticated journal/destructive recovery、generation-index/source typed handlers、candidate-bound generation-zero source-plan freezing and current COMMITTED-index/ACTIVE-root replacement proof are implemented/tested；higher pre-drain、future sentinel/ownerless-global proof、runtime composition、cursor/root/audit completion and final gate pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

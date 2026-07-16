@@ -97,6 +97,13 @@ require_literal "findCommitCoveringOffset" "$source_planner"
 require_literal "canonicalCommitRecordSha256" "$source_planner"
 require_literal "getRecoveryRoot(cluster, stream)" "$source_planner"
 require_literal "recovery root changed while source facts were frozen" "$source_planner"
+require_literal "PhysicalObjectMetadataStore" "$source_planner"
+require_literal "scanPublications" "$source_planner"
+require_literal "GenerationIndexDigests.canonicalRecordSha256" "$source_planner"
+require_literal "PhysicalObjectLifecycle.ACTIVE" "$source_planner"
+require_literal "generation-zero source has no current healthy NRC1 replacement" "$source_planner"
+require_literal "healthy NRC1 replacement index changed while source facts were frozen" "$source_planner"
+require_literal "healthy NRC1 replacement root changed while source facts were frozen" "$source_planner"
 
 if rg -Fq -- "deleteIndex(" "$repo_root/$higher_handler"; then
     echo "higher-generation retirement must preserve a RETIRED audit record instead of deleting the index" >&2
@@ -117,10 +124,14 @@ require_literal "commitDeleteAndRestartUseOnlyTheJournaledExactKey" "$source_han
 require_literal "freezesIndexMarkerAndCheckpointReplacedCommitThenReloadsExactFacts" "$source_planner_test"
 require_literal "checkpointEntryWithAnotherCanonicalCommitCannotAuthorizeSourceRetirement" "$source_planner_test"
 require_literal "revalidatorRejectsAnUnboundExtraSourceRemoval" "$source_planner_test"
+require_literal "quarantinedReplacementIndexCannotAuthorizeSourceRetirement" "$source_planner_test"
+require_literal "markedReplacementRootCannotAuthorizeSourceRetirement" "$source_planner_test"
+require_literal "replacementIndexChangeDuringFreezeRejectsThePlan" "$source_planner_test"
+require_literal "replacementRootChangeDuringFreezeRejectsThePlan" "$source_planner_test"
 require_literal "journalIsReauthenticatedBeforeEveryMetadataBatch" "$coordinator_test"
 require_literal "finalJournalReloadFencesPhysicalHeadAndDelete" "$coordinator_test"
 require_literal "phase4M4GenerationRetirementCheck" "build.gradle.kts"
 require_literal "phase4M4GenerationRetirementCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
-echo "Phase 4 M4 canonical generation/source retirement planning and authenticated destructive batches verified."
+echo "Phase 4 M4 healthy NRC1-bound generation/source retirement planning and authenticated destructive batches verified."

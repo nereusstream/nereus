@@ -317,9 +317,31 @@ freezes three independent journal removals. A final exact recovery-root reload f
 
 The builder also implements the exact-key `GcPlanMetadataRevalidator` surface. An exact key list is necessary but not
 sufficient：after reload it rebuilds every source triple from candidate-owned generation indexes and rejects any
-unbound extra marker/commit removal. This checkpoint does not yet claim
-complete source eligibility：healthy NRC1 publication target/physical-root proof and the earlier higher-generation
-transition into `DRAINING` remain required before runtime composition.
+unbound extra marker/commit removal. At checkpoint O, healthy NRC1 publication target/physical-root proof and the
+earlier higher-generation transition into `DRAINING` still remained required before runtime composition.
+
+### 1.15 F4-M4 healthy recovery replacement checkpoint
+
+Checkpoint P extends that same proof rather than adding a second correctness owner. For each selected commit entry,
+`SourceRetirementPlanBuilder` resolves its bounded 1–8 `coveringPublicationIndexes` through exact one-row NRC1 reads.
+The embedded generation record must round-trip the V1 codec、reproduce its raw-record SHA and table identity、belong
+to the same stream/`COMMITTED` view、remain `COMMITTED` at encoded `metadataVersion=0`, and cover the source offset、
+commit-version and cumulative-size boundaries. Malformed bytes or an identity/coverage contradiction are checkpoint
+corruption and fail immediately.
+
+The canonical row is then joined to the current `GenerationMetadataStore.getIndex` value. The exact derived key、all
+record fields hydrated only with the current Oxia version, and canonical durable-envelope SHA must match. Its decoded
+`ObjectSliceReadTarget` must name an object other than the retirement candidate；the exact
+`PhysicalObjectMetadataStore.getRoot` value must be `ACTIVE` and match root key/hash、object key/id/kind and slice
+bounds. A missing、QUARANTINED/DRAINING/currently changed index or non-ACTIVE/missing target root makes only that
+publication unavailable, so another referenced row may still satisfy the entry；no available row is a retryable
+eligibility veto.
+
+Before returning source removals, the selected index and physical-root wrappers are reloaded byte-for-byte, followed
+by the existing exact recovery-root reload. Revalidation reconstructs the same proof from NRC1 again, so index/root
+lifecycle、version、epoch、identity or digest drift cannot be hidden behind unchanged removal keys. Checkpoint P
+completes the generation-zero healthy-replacement branch only；higher-generation pre-drain and the below-trim branch
+remain separate lifecycle/eligibility work before runtime composition.
 
 ## 2. Keyspace
 

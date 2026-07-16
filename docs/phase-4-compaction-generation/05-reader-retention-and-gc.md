@@ -130,9 +130,10 @@ snapshot construction into core and adds affected-stream F2 projection-generatio
 exact stored authority digests. Checkpoint M adds the root-authenticated DELETING recovery skeleton；checkpoint N adds
 canonical generation-index routing plus generation-zero delete/higher-generation RETIRED handlers and reauthenticates
 root+journal at every destructive batch. Checkpoint O adds exact-key generation-zero marker/commit handlers and
-NRC1-bound source triple freezing/revalidation. Healthy replacement index/physical-root eligibility、higher pre-drain、
-future-sentinel、ownerless global domains、cursor completion and runtime composition remain planned；therefore
-production deletion is still disabled.
+NRC1-bound source triple freezing/revalidation. Checkpoint P additionally requires a current exact COMMITTED NRC1
+replacement index plus its matching ACTIVE physical root and revalidates both after source reads. Higher pre-drain、
+below-trim eligibility、future-sentinel、ownerless global domains、cursor completion and runtime composition remain
+planned；therefore production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1172,10 +1173,21 @@ after all source reads and implements `GcPlanMetadataRevalidator` as closed type
 legacy/generic inverse routing、response-loss cuts、root drift、a different canonical NRC1 commit and rejection of an
 otherwise-existing source removal that cannot be reconstructed from a candidate-owned generation index.
 
-This is still not the complete §9.1 eligibility proof：the NRC1 publication target must next be tied to a current
-healthy COMMITTED index and ACTIVE physical root, and higher-generation source records still need their earlier
-`COMMITTED/QUARANTINED -> DRAINING` transition. Checkpoint O therefore remains ordinary evidence and does not enable
-production runtime deletion.
+Checkpoint P closes the generation-zero healthy-replacement half of §9.1. The planner resolves each bounded NRC1
+publication reference independently, strictly decodes and hashes its canonical `GenerationIndexRecord`, then accepts
+it only when the current exact Oxia index is still `COMMITTED` with the same canonical durable envelope. The decoded
+target must name another physical object whose exact root is `ACTIVE` and matches object key/hash/id/kind plus slice
+bounds. Missing、quarantined/draining/drifted current values make that publication unavailable；malformed or
+non-canonical checkpoint evidence is an invariant failure. At least one referenced publication must remain healthy.
+
+After reading the exact source commit and marker, the planner reloads the selected current index/root wrappers and
+then the recovery root. Its `GcPlanMetadataRevalidator` reconstructs this complete candidate-bound proof again rather
+than accepting unchanged removal keys. Focused tests freeze success and reject a QUARANTINED replacement index、a
+MARKED replacement root、index/root drift during freeze、root drift and unbound source removals.
+
+This still is not the complete §9.1 implementation：higher-generation source records need their earlier
+`COMMITTED/QUARANTINED -> DRAINING` transition, and the completed-trim alternative must be wired before production
+runtime deletion. Checkpoint P therefore remains ordinary evidence.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.
