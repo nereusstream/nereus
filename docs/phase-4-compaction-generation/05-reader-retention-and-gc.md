@@ -1118,10 +1118,17 @@ entries, scans exactly the expected counts, recomputes the v2 digest and creates
 a present manifest and reconstructs a count- and digest-verified snapshot. Entry/manifest response loss converges by
 exact reload, while a missing、extra、conflicting or cross-attempt entry fails closed.
 
-The collector does not yet receive this service, so its MARK path does not yet prove PREPARE-before-MARK and no
-DELETING recovery path consumes the snapshot. The storage primitive is durable, but it is not independently a
-correctness owner or deletion authority；the destructive path remains disabled until root-authenticated wiring and
-recovery are implemented and gated.
+The collector now requires this service. Before activation acquisition、ACTIVE-root reload or `markCas`, it seals and
+field-by-field authenticates the journal against the candidate facts and computed digest；a PREPARE error leaves the
+root ACTIVE. `advanceToDeleteIntent` authenticates the sealed snapshot once before drain work and again after the
+final exact MARKED-root reload, immediately before activation revalidation and the intent CAS. A missing or mismatched
+journal therefore leaves the root MARKED. `phase4M4RetirementJournalCheck` freezes these orderings and the two-load
+contract in addition to store/writer restart and response-loss behavior.
+
+This finishes the journal protocol through durable DELETING intent, not destructive recovery. No coordinator yet
+uses the journal to classify/delete source metadata after a partial retirement, and the storage primitive is not an
+independent correctness owner or deletion authority；the destructive path remains disabled until DELETING recovery
+and exact physical deletion are implemented and gated.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.

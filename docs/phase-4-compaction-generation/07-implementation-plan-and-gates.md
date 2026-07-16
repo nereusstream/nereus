@@ -76,7 +76,8 @@ projection-generation plus cursor-snapshot domains. Future-sentinel domains、ow
 retirement/destructive coordination and runtime composition remain pending. Checkpoint L's protocol foundation adds
 the reference-set-v2 compact domain proof and validated retirement manifest/protection/removal records/codecs. Its
 durable-store slice now adds fixed-depth object/attempt keyspace、production/fake create/scan parity and a
-manifest-last seal/load service；collector PREPARE-before-MARK wiring and destructive recovery remain pending.
+manifest-last seal/load service. Mandatory collector injection now seals/authenticates it before MARK and reloads it
+at drain admission and the final delete-intent fence；destructive DELETING recovery remains pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -595,8 +596,8 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > projection-generation/cursor-snapshot domains) are implemented；runtime composition、future-sentinel and
 > ownerless-global domains、retirement/delete coordinators
 > and physical/cursor GC completion remain before F4-M4 can be called complete or final-gated. Checkpoint L's
-> retirement-journal schema/digest and durable store/writer are implemented；collector authentication/wiring and
-> DELETING recovery are still required before the journal protocol is complete.
+> retirement-journal schema/digest、durable store/writer and PREPARE-before-MARK/final-intent authentication are
+> implemented and ordinary-gated；DELETING recovery is still required before M4 is complete.
 
 ### 6.1 Production artifacts
 
@@ -730,7 +731,7 @@ gc/PhysicalGcMarkStatus.java                              implemented checkpoint
 gc/PhysicalGcMarkResult.java                              implemented checkpoint I
 gc/PhysicalGcAdvanceStatus.java                           implemented checkpoint I
 gc/PhysicalGcAdvanceResult.java                           implemented checkpoint I
-gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint I fence only
+gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint I fence, extended L journal auth
 gc/PhysicalObjectRootVisitor.java                         implemented checkpoint I
 gc/PhysicalObjectRootScanResult.java                      implemented checkpoint I
 gc/PhysicalObjectRootScanner.java                         implemented checkpoint I
@@ -787,7 +788,7 @@ GenerationReferenceDomainTest                             implemented checkpoint
 AppendRecoveryReferenceDomainTest                         implemented checkpoint J
 MaterializationReferenceDomainTest                        implemented checkpoint J
 ManagedLedgerGenerationProtocolTest                       implemented checkpoint K marker/CAS authority
-PhysicalObjectGarbageCollectorTest                         implemented checkpoint I fence/lost-response tests
+PhysicalObjectGarbageCollectorTest                         checkpoint I fence, extended L PREPARE/final-load tests
 PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
 PhysicalGcConfigTest                                      implemented checkpoint H
@@ -830,6 +831,7 @@ retirement.
 ./gradlew phase4M4RootFenceCheck
 ./gradlew phase4M4ReferenceDomainsCheck
 ./gradlew phase4M4ManagedLedgerDomainsCheck
+./gradlew phase4M4RetirementJournalCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -904,12 +906,14 @@ ownerless fail-closed behavior. The module-boundary gate rejects a managed-ledge
 is checkpoint-K evidence only：the M5 activation record/registration barrier, future sentinel/ownerless-global proof、
 source retirement、physical deletion and runtime composition remain absent.
 
-Checkpoint L now includes the protocol foundation and a durable-store slice. Module tests prove codec/factory round
+`phase4M4RetirementJournalCheck` extends checkpoint K with the protocol foundation and durable journal path. Module
+tests prove codec/factory round
 trips、record contradictions、full-snapshot/compact-proof digest equality、fixed-depth keyspace and production/fake
 store parity、page-size-one restart reload、manifest-last sealing, create-response-loss convergence and no manifest
-when an entry is missing. This is not yet a new milestone gate：`phase4M4RetirementJournalCheck` must not be added or
-cited until the collector requires the exact sealed snapshot before MARK and tests that every PREPARE failure leaves
-the root ACTIVE. No deletion enablement follows merely from the implemented writer.
+when an entry is missing. Collector tests prove exact PREPARE completes before activation/root CAS, every PREPARE
+failure leaves the root ACTIVE, both drain admission and final intent fence reload the same root-authenticated
+snapshot, and a missing final snapshot leaves the root MARKED. This is checkpoint-L ordinary evidence only：it stops
+at DELETING intent and does not enable source/protection/metadata/object deletion or replace the M4 final gate.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

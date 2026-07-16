@@ -808,3 +808,21 @@ tasks.register("phase4M4ManagedLedgerDomainsCheck") {
     dependsOn(":nereus-managed-ledger:check")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M4RetirementJournalContractSurface") {
+    group = "verification"
+    description = "Audit manifest-last retirement journal persistence and PREPARE-before-MARK fencing."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-retirement-journal-contract-surface.sh")
+}
+
+tasks.register("phase4M4RetirementJournalCheck") {
+    group = "verification"
+    description = "Verify root-authenticated journal sealing, restart reload, and fail-closed intent admission."
+    dependsOn("phase4M4ManagedLedgerDomainsCheck")
+    dependsOn("checkPhase4M4RetirementJournalContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-materialization:check")
+}

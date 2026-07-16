@@ -2,10 +2,12 @@
 package com.nereusstream.materialization.gc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationActivationSubject;
@@ -18,6 +20,7 @@ import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.materialization.MaterializationDeadline;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedObjectProtection;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
@@ -114,10 +117,46 @@ class PhysicalObjectGarbageCollectorTest {
         assertThat(store.getRoot(CLUSTER, candidate.object().objectKeyHash()).join()
                         .orElseThrow().value().lifecycle())
                 .isEqualTo(PhysicalObjectLifecycle.MARKED);
+        assertThat(store.getRetirementManifest(
+                        CLUSTER, candidate.object().objectKeyHash(), ATTEMPT_ID)
+                .join())
+                .isPresent();
         assertThat(activation.requireCalls.get()).isEqualTo(1);
         assertThat(activation.revalidateCalls.get()).isEqualTo(1);
         assertThat(projection.snapshotCalls.get()).isEqualTo(1);
         assertThat(generation.snapshotCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void journalPrepareFailureLeavesRootActiveBeforeActivationOrMark() {
+        PhysicalGcConfig config = config(true, false);
+        FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();
+        MutableClock clock = new MutableClock(1_000);
+        VersionedPhysicalObjectRoot active = createActiveRoot(store);
+        TrackingActivationGuard activation = new TrackingActivationGuard();
+        GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(
+                config,
+                scheduler,
+                List.of(
+                        new TrackingDomain("generation-v1"),
+                        new TrackingDomain("projection-generation-v1")));
+        PhysicalObjectGarbageCollector collector = collector(
+                config,
+                store,
+                clock,
+                activation,
+                (candidate, expected) -> CompletableFuture.completedFuture(expected),
+                registry,
+                new FailingRetirementJournal());
+
+        assertThatThrownBy(() -> collector.mark(
+                        candidate(config, active, query(active)), List.of(), List.of())
+                .join()).hasRootCauseMessage("injected journal prepare failure");
+
+        assertThat(activation.requireCalls.get()).isZero();
+        assertThat(store.getRoot(CLUSTER, activeIdentity(active).objectKeyHash()).join()
+                        .orElseThrow().value().lifecycle())
+                .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
     }
 
     @Test
@@ -201,6 +240,74 @@ class PhysicalObjectGarbageCollectorTest {
         assertThat(deleting.value().referenceSetSha256())
                 .isEqualTo(plan.referenceSetSha256().value());
         assertThat(activation.revalidateCalls.get()).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void deleteIntentReloadsExactJournalAtAdmissionAndFinalFence() {
+        PhysicalGcConfig config = config(true, false);
+        FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();
+        MutableClock clock = new MutableClock(1_000);
+        VersionedPhysicalObjectRoot active = createActiveRoot(store);
+        TrackingRetirementJournal journal = new TrackingRetirementJournal(
+                new DefaultGcRetirementJournal(CLUSTER, store, config), 0);
+        PhysicalObjectGarbageCollector collector = collector(
+                config,
+                store,
+                clock,
+                new TrackingActivationGuard(),
+                (candidate, expected) -> CompletableFuture.completedFuture(expected),
+                new GcReferenceDomainRegistry(
+                        config,
+                        scheduler,
+                        List.of(
+                                new TrackingDomain("generation-v1"),
+                                new TrackingDomain("projection-generation-v1"))),
+                journal);
+        GcPlan plan = collector.mark(
+                        candidate(config, active, query(active)), List.of(), List.of())
+                .join().plan().orElseThrow();
+        clock.setMillis(12_001);
+
+        PhysicalGcAdvanceResult result = collector.advanceToDeleteIntent(plan).join();
+
+        assertThat(result.status()).isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
+        assertThat(journal.prepareCalls.get()).isEqualTo(1);
+        assertThat(journal.loadCalls.get()).isEqualTo(2);
+    }
+
+    @Test
+    void journalDisappearanceAtFinalFenceLeavesRootMarked() {
+        PhysicalGcConfig config = config(true, false);
+        FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();
+        MutableClock clock = new MutableClock(1_000);
+        VersionedPhysicalObjectRoot active = createActiveRoot(store);
+        TrackingRetirementJournal journal = new TrackingRetirementJournal(
+                new DefaultGcRetirementJournal(CLUSTER, store, config), 2);
+        PhysicalObjectGarbageCollector collector = collector(
+                config,
+                store,
+                clock,
+                new TrackingActivationGuard(),
+                (candidate, expected) -> CompletableFuture.completedFuture(expected),
+                new GcReferenceDomainRegistry(
+                        config,
+                        scheduler,
+                        List.of(
+                                new TrackingDomain("generation-v1"),
+                                new TrackingDomain("projection-generation-v1"))),
+                journal);
+        GcPlan plan = collector.mark(
+                        candidate(config, active, query(active)), List.of(), List.of())
+                .join().plan().orElseThrow();
+        clock.setMillis(12_001);
+
+        assertThatThrownBy(() -> collector.advanceToDeleteIntent(plan).join())
+                .hasRootCauseMessage(
+                        "sealed GC retirement journal is missing for the MARKED root");
+        assertThat(journal.loadCalls.get()).isEqualTo(2);
+        assertThat(store.getRoot(CLUSTER, plan.candidate().object().objectKeyHash()).join()
+                        .orElseThrow().value().lifecycle())
+                .isEqualTo(PhysicalObjectLifecycle.MARKED);
     }
 
     @Test
@@ -408,6 +515,24 @@ class PhysicalObjectGarbageCollectorTest {
             TrackingActivationGuard activation,
             GcPlanMetadataRevalidator metadataRevalidator,
             GcReferenceDomainRegistry registry) {
+        return collector(
+                config,
+                store,
+                clock,
+                activation,
+                metadataRevalidator,
+                registry,
+                new DefaultGcRetirementJournal(CLUSTER, store, config));
+    }
+
+    private PhysicalObjectGarbageCollector collector(
+            PhysicalGcConfig config,
+            FakePhysicalObjectMetadataStore store,
+            MutableClock clock,
+            TrackingActivationGuard activation,
+            GcPlanMetadataRevalidator metadataRevalidator,
+            GcReferenceDomainRegistry registry,
+            GcRetirementJournal retirementJournal) {
         return new PhysicalObjectGarbageCollector(
                 CLUSTER,
                 config,
@@ -415,6 +540,7 @@ class PhysicalObjectGarbageCollectorTest {
                 registry,
                 activation,
                 metadataRevalidator,
+                retirementJournal,
                 () -> ATTEMPT_ID,
                 clock,
                 scheduler);
@@ -621,6 +747,77 @@ class PhysicalObjectGarbageCollectorTest {
                 GcCandidate candidate,
                 List<GcPlannedMetadataRemoval> expectedRemovals) {
             return CompletableFuture.completedFuture(matches ? expectedRemovals : List.of());
+        }
+    }
+
+    private static final class FailingRetirementJournal implements GcRetirementJournal {
+        @Override
+        public CompletableFuture<GcRetirementJournalSnapshot> prepare(
+                String gcAttemptId,
+                GcCandidate candidate,
+                List<GcReferenceSnapshot> domainSnapshots,
+                List<GcPlannedProtectionRemoval> plannedProtectionRemovals,
+                List<GcPlannedMetadataRemoval> plannedMetadataRemovals,
+                Checksum referenceSetSha256,
+                long createdAtMillis,
+                MaterializationDeadline deadline) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("injected journal prepare failure"));
+        }
+
+        @Override
+        public CompletableFuture<Optional<GcRetirementJournalSnapshot>> load(
+                ObjectKeyHash object,
+                String gcAttemptId,
+                MaterializationDeadline deadline) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+    }
+
+    private static final class TrackingRetirementJournal implements GcRetirementJournal {
+        private final GcRetirementJournal delegate;
+        private final int disappearAtLoad;
+        private final AtomicInteger prepareCalls = new AtomicInteger();
+        private final AtomicInteger loadCalls = new AtomicInteger();
+
+        private TrackingRetirementJournal(
+                GcRetirementJournal delegate, int disappearAtLoad) {
+            this.delegate = delegate;
+            this.disappearAtLoad = disappearAtLoad;
+        }
+
+        @Override
+        public CompletableFuture<GcRetirementJournalSnapshot> prepare(
+                String gcAttemptId,
+                GcCandidate candidate,
+                List<GcReferenceSnapshot> domainSnapshots,
+                List<GcPlannedProtectionRemoval> plannedProtectionRemovals,
+                List<GcPlannedMetadataRemoval> plannedMetadataRemovals,
+                Checksum referenceSetSha256,
+                long createdAtMillis,
+                MaterializationDeadline deadline) {
+            prepareCalls.incrementAndGet();
+            return delegate.prepare(
+                    gcAttemptId,
+                    candidate,
+                    domainSnapshots,
+                    plannedProtectionRemovals,
+                    plannedMetadataRemovals,
+                    referenceSetSha256,
+                    createdAtMillis,
+                    deadline);
+        }
+
+        @Override
+        public CompletableFuture<Optional<GcRetirementJournalSnapshot>> load(
+                ObjectKeyHash object,
+                String gcAttemptId,
+                MaterializationDeadline deadline) {
+            int call = loadCalls.incrementAndGet();
+            if (call == disappearAtLoad) {
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+            return delegate.load(object, gcAttemptId, deadline);
         }
     }
 

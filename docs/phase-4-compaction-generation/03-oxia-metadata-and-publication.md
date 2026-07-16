@@ -1197,6 +1197,12 @@ and `FakePhysicalObjectMetadataStore` share create-or-reload equality, immutable
 page-bound and continuation-scope tests. The manifest is still evidence only；the collector must authenticate it
 against the matching root before any retirement side effect.
 
+That collector binding is implemented through mandatory `GcRetirementJournal` injection. `mark` cannot invoke its
+ACTIVE-to-MARKED CAS until `prepare` has returned a fully scanned snapshot matching the exact candidate、attempt、query、
+domain proofs、planned removals and digest. Drain admission and the final MARKED-to-DELETING fence each reload that
+same snapshot. The store API still exposes no journal-derived deletion authority: a journal without the matching root
+cannot advance lifecycle, and a matching root without its journal remains MARKED.
+
 `F4MetadataCodecs` is registered in `MetadataRecordCodecFactory` only after the generation capability code is present.
 Old binaries see an unknown record type and fail closed；they never reinterpret it as generation zero.
 

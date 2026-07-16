@@ -1,6 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.materialization.gc;
 
+import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKeyHash;
@@ -34,8 +35,9 @@ import java.util.function.Function;
 /**
  * Establishes and drains the physical-root deletion fence.
  *
- * <p>This checkpoint stops at the durable DELETING intent. Metadata retirement and object deletion are later
- * coordinator stages and cannot be invoked through this class yet.
+ * <p>A root can enter MARKED only after its exact retirement journal is sealed, and the same journal is reloaded at
+ * drain admission and immediately before DELETING. This checkpoint still stops at the durable DELETING intent;
+ * metadata retirement and object deletion are later coordinator stages and cannot be invoked through this class.
  */
 public final class PhysicalObjectGarbageCollector {
     public static final String PROJECTION_REFERENCE_DOMAIN = "projection-generation-v1";
@@ -47,6 +49,7 @@ public final class PhysicalObjectGarbageCollector {
     private final GcReferenceDomainRegistry referenceDomains;
     private final GenerationProtocolActivationGuard activationGuard;
     private final GcPlanMetadataRevalidator metadataRevalidator;
+    private final GcRetirementJournal retirementJournal;
     private final GcIdGenerator attemptIds;
     private final Clock clock;
     private final ScheduledExecutorService scheduler;
@@ -58,6 +61,7 @@ public final class PhysicalObjectGarbageCollector {
             GcReferenceDomainRegistry referenceDomains,
             GenerationProtocolActivationGuard activationGuard,
             GcPlanMetadataRevalidator metadataRevalidator,
+            GcRetirementJournal retirementJournal,
             GcIdGenerator attemptIds,
             Clock clock,
             ScheduledExecutorService scheduler) {
@@ -68,6 +72,8 @@ public final class PhysicalObjectGarbageCollector {
         this.activationGuard = Objects.requireNonNull(activationGuard, "activationGuard");
         this.metadataRevalidator = Objects.requireNonNull(
                 metadataRevalidator, "metadataRevalidator");
+        this.retirementJournal = Objects.requireNonNull(
+                retirementJournal, "retirementJournal");
         this.attemptIds = Objects.requireNonNull(attemptIds, "attemptIds");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -167,7 +173,8 @@ public final class PhysicalObjectGarbageCollector {
                 config.operationTimeout(), scheduler);
         CompletableFuture<PhysicalGcAdvanceResult> result = loadExactMarked(plan, deadline)
                 .thenCompose(optionalRoot -> optionalRoot.<CompletableFuture<PhysicalGcAdvanceResult>>map(root ->
-                                acquireActivationProof(plan, deadline)
+                                loadExactRetirementJournal(plan, deadline)
+                                        .thenCompose(ignored -> acquireActivationProof(plan, deadline))
                                         .thenCompose(proof -> drainAndEnterIntent(
                                                 plan, root, proof, now, deadline)))
                         .orElseGet(() -> CompletableFuture.completedFuture(
@@ -192,8 +199,30 @@ public final class PhysicalObjectGarbageCollector {
                 collection.snapshots(),
                 plannedProtectionRemovals,
                 plannedMetadataRemovals);
-        return acquireActivationProof(collection, deadline).thenCompose(proof ->
-                deadline.bound(
+        return deadline.bound(
+                        () -> retirementJournal.prepare(
+                                attemptId,
+                                candidate,
+                                collection.snapshots(),
+                                plannedProtectionRemovals,
+                                plannedMetadataRemovals,
+                                digest,
+                                markedAtMillis,
+                                deadline),
+                        "prepare sealed GC retirement journal before mark")
+                .thenApply(journal -> {
+                    requireExactRetirementJournal(
+                            journal,
+                            candidate,
+                            attemptId,
+                            collection.snapshots(),
+                            plannedProtectionRemovals,
+                            plannedMetadataRemovals,
+                            digest);
+                    return journal;
+                })
+                .thenCompose(ignored -> acquireActivationProof(collection, deadline))
+                .thenCompose(proof -> deadline.bound(
                                 () -> metadataStore.getRoot(
                                         cluster, candidate.object().objectKeyHash()),
                                 "reload ACTIVE physical root before mark")
@@ -367,10 +396,12 @@ public final class PhysicalObjectGarbageCollector {
                                                                                 PhysicalGcAdvanceStatus
                                                                                         .ROOT_CHANGED));
                                                             }
-                                                            return deadline.bound(
+                                                            return loadExactRetirementJournal(
+                                                                            plan, deadline)
+                                                                    .thenCompose(ignored -> deadline.bound(
                                                                             () -> activationGuard.revalidate(
                                                                                     proof),
-                                                                            "revalidate physical-delete activation before delete intent")
+                                                                            "revalidate physical-delete activation before delete intent"))
                                                                     .thenCompose(ignored -> deletingCas(
                                                                             plan,
                                                                             optional.orElseThrow(),
@@ -479,6 +510,53 @@ public final class PhysicalObjectGarbageCollector {
                                 cluster, plan.candidate().object().objectKeyHash()),
                         "reload MARKED physical root")
                 .thenApply(optional -> optional.filter(root -> exactMarkedPlan(plan, root)));
+    }
+
+    private CompletableFuture<GcRetirementJournalSnapshot> loadExactRetirementJournal(
+            GcPlan plan, MaterializationDeadline deadline) {
+        return deadline.bound(
+                        () -> retirementJournal.load(
+                                plan.candidate().object().objectKeyHash(),
+                                plan.gcAttemptId(),
+                                deadline),
+                        "load exact sealed GC retirement journal")
+                .thenApply(optional -> {
+                    GcRetirementJournalSnapshot journal = optional.orElseThrow(() -> invariant(
+                            "sealed GC retirement journal is missing for the MARKED root"));
+                    requireExactRetirementJournal(
+                            journal,
+                            plan.candidate(),
+                            plan.gcAttemptId(),
+                            plan.domainSnapshots(),
+                            plan.plannedProtectionRemovals(),
+                            plan.plannedMetadataRemovals(),
+                            plan.referenceSetSha256());
+                    return journal;
+                });
+    }
+
+    private static void requireExactRetirementJournal(
+            GcRetirementJournalSnapshot journal,
+            GcCandidate candidate,
+            String attemptId,
+            List<GcReferenceSnapshot> snapshots,
+            List<GcPlannedProtectionRemoval> protections,
+            List<GcPlannedMetadataRemoval> metadataRemovals,
+            Checksum referenceSetSha256) {
+        List<GcDomainSnapshotProof> proofs = snapshots.stream()
+                .map(GcDomainSnapshotProof::from)
+                .toList();
+        if (!journal.object().equals(candidate.object().objectKeyHash())
+                || !journal.gcAttemptId().equals(attemptId)
+                || !journal.queryIdentitySha256().equals(
+                        candidate.referenceQuery().queryIdentitySha256())
+                || !journal.domainProofs().equals(proofs)
+                || !journal.plannedProtectionRemovals().equals(protections)
+                || !journal.plannedMetadataRemovals().equals(metadataRemovals)
+                || !journal.referenceSetSha256().equals(referenceSetSha256)) {
+            throw invariant(
+                    "sealed GC retirement journal does not match the root-authenticated plan");
+        }
     }
 
     private CompletableFuture<Boolean> metadataStillMatches(
