@@ -28,7 +28,10 @@ production_artifacts=(
     GenerationZeroCommitRetirementHandler.java
     HigherGenerationIndexRetirementHandler.java
     RecoveryReplacementVerifier.java
+    CompletedTrimRetirementVerifier.java
     HigherGenerationRecoveryCoverageVerifier.java
+    TopicCompactedReplacementVerifier.java
+    HigherGenerationRetirementEligibilityVerifier.java
     HigherGenerationPreDrainCoordinator.java
     HigherGenerationPreDrainResult.java
     HigherGenerationPreDrainStatus.java
@@ -67,6 +70,9 @@ commit_handler="nereus-materialization/src/main/java/com/nereusstream/materializ
 source_planner="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/SourceRetirementPlanBuilder.java"
 replacement_verifier="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/RecoveryReplacementVerifier.java"
 higher_coverage="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/HigherGenerationRecoveryCoverageVerifier.java"
+completed_trim="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/CompletedTrimRetirementVerifier.java"
+topic_replacement="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/TopicCompactedReplacementVerifier.java"
+higher_eligibility="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/HigherGenerationRetirementEligibilityVerifier.java"
 pre_drain="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/HigherGenerationPreDrainCoordinator.java"
 source_store="nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/retirement/OxiaJavaSourceRetirementMetadataStore.java"
 coordinator="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/SourceRetirementCoordinator.java"
@@ -107,13 +113,16 @@ require_literal "findCommitCoveringOffset" "$source_planner"
 require_literal "canonicalCommitRecordSha256" "$source_planner"
 require_literal "getRecoveryRoot(cluster, stream)" "$source_planner"
 require_literal "recovery root changed while source facts were frozen" "$source_planner"
-require_literal "higherCoverage.prove" "$source_planner"
+require_literal "higherEligibility.prove" "$source_planner"
+require_literal "completedTrim.proveIfCompleted" "$source_planner"
 require_literal "scanPublications" "$replacement_verifier"
 require_literal "GenerationIndexDigests.canonicalRecordSha256" "$replacement_verifier"
 require_literal "PhysicalObjectLifecycle.ACTIVE" "$replacement_verifier"
 require_literal 'source + " source has no current healthy NRC1 replacement"' "$replacement_verifier"
-require_literal "healthy NRC1 replacement index changed while source facts were frozen" "$replacement_verifier"
-require_literal "healthy NRC1 replacement root changed while source facts were frozen" "$replacement_verifier"
+require_literal 'revalidate(expected, "healthy NRC1 replacement")' "$replacement_verifier"
+require_literal 'revalidate(expected, "healthy same-view replacement")' "$replacement_verifier"
+require_literal 'label + " index changed while source facts were frozen"' "$replacement_verifier"
+require_literal 'label + " root changed while source facts were frozen"' "$replacement_verifier"
 require_literal "record.generation() <= requirement.minimumGenerationExclusive()" "$replacement_verifier"
 
 require_literal "TOPIC_COMPACTED higher-generation retirement requires a view-specific replacement proof" "$higher_coverage"
@@ -121,11 +130,21 @@ require_literal "higher-generation source is not an exact tiling of NRC1 commit 
 require_literal "higher-generation NRC1 tiling does not reproduce source counts or schemas" "$higher_coverage"
 require_literal "higher-generation source changed while coverage was frozen" "$higher_coverage"
 
+require_literal "proveIfCompleted" "$completed_trim"
+require_literal "completed trim changed while retirement facts were frozen" "$completed_trim"
+require_literal "recovery root changed while below-trim facts were frozen" "$completed_trim"
+require_literal "loadCurrentHealthy" "$replacement_verifier"
+require_literal "TOPIC_COMPACTED source has no current healthy same-view replacement" "$topic_replacement"
+require_literal "revalidateSameView" "$topic_replacement"
+require_literal "trim.proveIfCompleted" "$higher_eligibility"
+require_literal "topicCompacted.prove" "$higher_eligibility"
+
 require_literal "physical-gc-pre-drain:" "$pre_drain"
 require_literal "GenerationLifecycle.COMMITTED" "$pre_drain"
 require_literal "GenerationLifecycle.QUARANTINED" "$pre_drain"
 require_literal "GenerationLifecycle.DRAINING" "$pre_drain"
-require_literal "coverage.prove" "$pre_drain"
+require_literal "eligibility.prove" "$pre_drain"
+require_literal "HigherGenerationPreDrainResult.notEligibleYet()" "$pre_drain"
 require_literal "candidate physical root changed before higher-generation pre-drain" "$pre_drain"
 require_literal "higher-generation source changed after uncertain pre-drain CAS" "$pre_drain"
 
@@ -160,10 +179,17 @@ require_literal "alreadyDrainingSourceStillRequiresCurrentHealthyCoverage" "$pre
 require_literal "incompleteNrc1TilingCountsVetoBeforeTheSourceCas" "$pre_drain_test"
 require_literal "dryRunReturnsBeforeAnyMetadataOrRootRead" "$pre_drain_test"
 require_literal "drainingHigherRemovalPlannerReprovesCoverageBeforeFreezing" "$pre_drain_test"
+require_literal "topicCompactedSourceUsesAHealthySameViewReplacement" "$pre_drain_test"
+require_literal "drainingTopicRemovalPlannerReprovesTheSameViewReplacement" "$pre_drain_test"
+require_literal "completedTrimDrainsTopicSourceWithoutReplacementOrCheckpointReads" "$pre_drain_test"
+require_literal "completedTrimDriftVetoesBeforeTheSourceCas" "$pre_drain_test"
+require_literal "sourceRetirementGraceReturnsBeforeAnyMetadataOrRootRead" "$pre_drain_test"
+require_literal "completedTrimAuthorizesGenerationZeroWithoutAHealthyReplacement" "$source_planner_test"
+require_literal "completedTrimDriftRejectsGenerationZeroBeforeReplacementReads" "$source_planner_test"
 require_literal "journalIsReauthenticatedBeforeEveryMetadataBatch" "$coordinator_test"
 require_literal "finalJournalReloadFencesPhysicalHeadAndDelete" "$coordinator_test"
 require_literal "phase4M4GenerationRetirementCheck" "build.gradle.kts"
 require_literal "phase4M4GenerationRetirementCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 
-echo "Phase 4 M4 NRC1-bound source retirement, COMMITTED-view higher pre-drain, and authenticated destructive batches verified."
+echo "Phase 4 M4 view-specific/below-trim source eligibility, higher pre-drain, and authenticated destructive batches verified."

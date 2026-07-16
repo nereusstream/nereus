@@ -88,6 +88,14 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/gc/
   GenerationZeroMarkerRetirementHandler.java
   GenerationZeroCommitRetirementHandler.java
   HigherGenerationIndexRetirementHandler.java
+  CompletedTrimRetirementVerifier.java
+  RecoveryReplacementVerifier.java
+  HigherGenerationRecoveryCoverageVerifier.java
+  TopicCompactedReplacementVerifier.java
+  HigherGenerationRetirementEligibilityVerifier.java
+  HigherGenerationPreDrainCoordinator.java
+  HigherGenerationPreDrainResult.java
+  HigherGenerationPreDrainStatus.java
   SourceRetirementPlanBuilder.java
   PhysicalRootTombstoneRetirementCoordinator.java
   TombstoneRetirementResult.java
@@ -133,9 +141,11 @@ root+journal at every destructive batch. Checkpoint O adds exact-key generation-
 NRC1-bound source triple freezing/revalidation. Checkpoint P additionally requires a current exact COMMITTED NRC1
 replacement index plus its matching ACTIVE physical root and revalidates both after source reads. Checkpoint Q adds
 COMMITTED-view whole-range NRC1/count/schema proof and response-loss-safe higher-generation
-`COMMITTED/QUARANTINED -> DRAINING`, then repeats that proof when a DRAINING removal is frozen. TOPIC_COMPACTED
-view-specific proof、below-trim eligibility、future-sentinel、ownerless global domains、cursor completion and runtime
-composition remain planned；therefore production deletion is still disabled.
+`COMMITTED/QUARANTINED -> DRAINING`, then repeats that proof when a DRAINING removal is frozen. Checkpoint R adds
+exact completed-trim eligibility for generation-zero and either higher view、strictly newer current
+TOPIC_COMPACTED/ACTIVE same-view replacement eligibility, and a zero-read `sourceRetirementGrace` admission fence.
+Future-sentinel、ownerless global domains、cursor/root/audit completion and runtime composition remain planned；
+therefore production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1007,12 +1017,15 @@ exception policies remain admission/backpressure behavior and do not authorize p
 
 An old physical index reference is retireable when either：
 
-1. its entire range is below completed L0 trim and the stable recovery root no longer needs its primary target；or
-2. a healthy higher `COMMITTED` generation fully covers it, the recovery checkpoint records replacement evidence and
-   append-replay/index-repair no longer needs the old target。
+1. its entire range is below completed L0 trim and the exact source、stream snapshot and recovery-root version set
+   remains unchanged through the retirement proof；or
+2. for a `COMMITTED` source, a healthy strictly newer `COMMITTED` generation fully covers it, the recovery checkpoint
+   records replacement evidence and append-replay/index-repair no longer needs the old target；or
+3. for a `TOPIC_COMPACTED` source, a healthy strictly newer current `TOPIC_COMPACTED` generation fully covers its
+   offset、commit-version and cumulative-size bounds with the same payload/projection identity。
 
-Partial overlap is insufficient. `TOPIC_COMPACTED` never covers a committed source. A quarantined/draining replacement
-does not count.
+Partial overlap is insufficient. `TOPIC_COMPACTED` never covers a committed source and COMMITTED NRC1 evidence never
+covers a topic-compacted source. A quarantined/draining replacement does not count.
 
 ### 9.2 Whole-object eligibility
 
@@ -1194,9 +1207,18 @@ recovery root and source. Only then may the coordinator CAS `COMMITTED/QUARANTIN
 ACTIVE candidate-root fence. A DRAINING source must pass the same proof again when the removal plan freezes it, so a
 later replacement/index/root degradation blocks MARK/DELETE planning.
 
-This is still not the complete §9.1 implementation：NRC1 COMMITTED recovery facts cannot authorize a
-TOPIC_COMPACTED source, and the completed-trim alternative remains unwired. Checkpoint Q therefore remains ordinary
-evidence and does not enable production deletion.
+Checkpoint R completes the remaining §9.1 source-eligibility branches. `CompletedTrimRetirementVerifier` requires the
+whole source range below the current L0 trim, freezes the exact source、full `StreamMetadataSnapshot` and optional
+recovery-root wrapper, then rereads all three. Generation-zero uses that proof as the alternative to checkpoint P's
+healthy NRC1 replacement；higher COMMITTED and TOPIC_COMPACTED sources use it before consulting view-specific
+replacement facts.
+
+For an untrimmed TOPIC_COMPACTED source, `TopicCompactedReplacementVerifier` performs a bounded same-view scan and
+selects a strictly newer current COMMITTED index whose range、commit-version、cumulative-size、payload and projection
+cover the source. Its target must be another object with the exact topic-compacted physical format and an
+`ACTIVE/TOPIC_COMPACTED` root. The selected index/root and source are reread before the proof returns；a DRAINING
+removal-plan reproof repeats the same checks. This closes source eligibility only；the global-domain/runtime/final-GC
+gates below remain mandatory, so production deletion stays disabled.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.
@@ -1208,13 +1230,15 @@ resolvers ignore it even before object mark. It becomes `RETIRED` after physical
 reference keeps shared bytes but this generation ref is removed. Generation-zero frozen records have no lifecycle；
 the physical root mark and exact pin post-check provide the same new-reader fence.
 
-Checkpoint Q implements the first transition for replacement-backed COMMITTED-view sources. It writes
-`physical-gc-pre-drain:{candidateId}` only after whole-range recovery/replacement proof and an unchanged candidate-root
-fence；CAS response loss accepts only the exact replacement、the unchanged original or the same immutable publication
-already in DRAINING. Checkpoint N implements the second `DRAINING -> RETIRED` transition. Its restart marker is
+Checkpoint Q implements the first transition for replacement-backed COMMITTED-view sources. Checkpoint R extends the
+same transition to completed-trim sources in either view and replacement-backed TOPIC_COMPACTED sources. Before any
+L0、generation、checkpoint or root read, the coordinator returns `NOT_ELIGIBLE_YET` while candidate
+`notBeforeMillis` has not passed. It writes `physical-gc-pre-drain:{candidateId}` only after the selected exact
+eligibility proof and an unchanged candidate-root fence；CAS response loss accepts only the exact replacement、the
+unchanged original or the same immutable publication already in DRAINING. Checkpoint N implements the second
+`DRAINING -> RETIRED` transition. Its restart marker is
 `physical-gc:{gcAttemptId}:{referenceSetSha256}` with `stateChangedAtMillis == deleteStartedAtMillis`; any other
-RETIRED value is drift, not idempotent success. TOPIC_COMPACTED and completed-trim first-transition paths remain
-pending.
+RETIRED value is drift, not idempotent success.
 
 ### 9.5 Fallback grace
 

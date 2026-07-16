@@ -16,7 +16,9 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
@@ -28,8 +30,10 @@ import com.nereusstream.metadata.oxia.GenerationIndexDigests;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.RecoveryCheckpointRootDigests;
+import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
@@ -38,11 +42,14 @@ import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
+import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
+import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointCodecV1;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointDirectory;
@@ -61,11 +68,13 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -205,6 +214,7 @@ class HigherGenerationPreDrainCoordinatorTest {
         StoreState state = new StoreState(fixture);
         HigherGenerationPreDrainCoordinator coordinator = new HigherGenerationPreDrainCoordinator(
                 CLUSTER,
+                l0Store(state),
                 generationStore(state, false),
                 physicalStore(state, false),
                 checkpointCodec(state),
@@ -218,6 +228,35 @@ class HigherGenerationPreDrainCoordinatorTest {
         assertThat(result.status())
                 .isEqualTo(HigherGenerationPreDrainStatus.MUTATION_DISABLED);
         assertThat(state.scanCalls).hasValue(0);
+        assertThat(state.l0Reads).hasValue(0);
+        assertThat(state.candidateRootReads).hasValue(0);
+    }
+
+    @Test
+    void sourceRetirementGraceReturnsBeforeAnyMetadataOrRootRead() {
+        Fixture fixture = fixture(GenerationLifecycle.COMMITTED);
+        StoreState state = new StoreState(fixture);
+        GcCandidate source = fixture.candidate();
+        GcCandidate future = new GcCandidate(
+                source.candidateId(),
+                source.object(),
+                source.referenceQuery(),
+                source.discoveryEvidenceSha256(),
+                source.rootState(),
+                source.rootMetadataVersion(),
+                source.rootLifecycleEpoch(),
+                source.discoveredAtMillis(),
+                101);
+
+        HigherGenerationPreDrainResult result = coordinator(
+                        fixture, state, false, false)
+                .preDrain(future)
+                .join();
+
+        assertThat(result.status())
+                .isEqualTo(HigherGenerationPreDrainStatus.NOT_ELIGIBLE_YET);
+        assertThat(state.scanCalls).hasValue(0);
+        assertThat(state.l0Reads).hasValue(0);
         assertThat(state.candidateRootReads).hasValue(0);
     }
 
@@ -227,6 +266,7 @@ class HigherGenerationPreDrainCoordinatorTest {
         StoreState state = new StoreState(fixture);
         SourceRetirementPlanBuilder planner = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                l0Store(state),
                 generationStore(state, false),
                 physicalStore(state, false),
                 sourceStore(),
@@ -244,6 +284,114 @@ class HigherGenerationPreDrainCoordinatorTest {
         assertThat(state.publicationReads).hasValueGreaterThanOrEqualTo(2);
     }
 
+    @Test
+    void topicCompactedSourceUsesAHealthySameViewReplacement() {
+        Fixture fixture = fixture(
+                ReadView.TOPIC_COMPACTED,
+                GenerationLifecycle.COMMITTED);
+        StoreState state = new StoreState(fixture);
+
+        HigherGenerationPreDrainResult result = coordinator(
+                        fixture, state, false, false)
+                .preDrain(fixture.candidate())
+                .join();
+
+        assertThat(result.transitionedCount()).isEqualTo(1);
+        assertThat(result.drainingIndexes()).singleElement().satisfies(index -> {
+            assertThat(index.value().readViewId())
+                    .isEqualTo(ReadView.TOPIC_COMPACTED.wireId());
+            assertThat(index.value().lifecycle())
+                    .isEqualTo(GenerationLifecycle.DRAINING);
+        });
+        assertThat(state.openCalls).hasValue(0);
+        assertThat(state.publicationReads).hasValue(0);
+        assertThat(state.replacementRootReads).hasValueGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void topicCompactedMarkedReplacementVetoesBeforeTheSourceCas() {
+        Fixture base = fixture(
+                ReadView.TOPIC_COMPACTED,
+                GenerationLifecycle.COMMITTED);
+        Fixture fixture = base.withReplacementRoot(
+                markedRoot(base.replacementRoot()));
+        StoreState state = new StoreState(fixture);
+
+        assertThatThrownBy(() -> coordinator(fixture, state, false, false)
+                        .preDrain(fixture.candidate())
+                        .join())
+                .hasRootCauseMessage(
+                        "TOPIC_COMPACTED source has no current healthy same-view replacement");
+        assertThat(state.casCalls).hasValue(0);
+    }
+
+    @Test
+    void drainingTopicRemovalPlannerReprovesTheSameViewReplacement() {
+        Fixture fixture = fixture(
+                ReadView.TOPIC_COMPACTED,
+                GenerationLifecycle.DRAINING);
+        StoreState state = new StoreState(fixture);
+        SourceRetirementPlanBuilder planner = new SourceRetirementPlanBuilder(
+                CLUSTER,
+                l0Store(state),
+                generationStore(state, false),
+                physicalStore(state, false),
+                sourceStore(),
+                checkpointCodec(state),
+                enabledConfig());
+
+        List<GcPlannedMetadataRemoval> removals = planner.build(
+                fixture.candidate()).join();
+
+        assertThat(removals).containsExactly(new GcPlannedMetadataRemoval(
+                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
+                state.source.get().key(),
+                state.source.get().metadataVersion(),
+                state.source.get().durableValueSha256()));
+        assertThat(state.openCalls).hasValue(0);
+        assertThat(state.replacementRootReads).hasValueGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void completedTrimDrainsTopicSourceWithoutReplacementOrCheckpointReads() {
+        Fixture base = fixture(
+                ReadView.TOPIC_COMPACTED,
+                GenerationLifecycle.COMMITTED);
+        Fixture fixture = base.withReplacementRoot(
+                markedRoot(base.replacementRoot()));
+        StoreState state = new StoreState(fixture);
+        state.streamSnapshot.set(snapshot(12));
+
+        HigherGenerationPreDrainResult result = coordinator(
+                        fixture, state, false, false)
+                .preDrain(fixture.candidate())
+                .join();
+
+        assertThat(result.transitionedCount()).isEqualTo(1);
+        assertThat(state.casCalls).hasValue(1);
+        assertThat(state.openCalls).hasValue(0);
+        assertThat(state.publicationReads).hasValue(0);
+        assertThat(state.replacementRootReads).hasValue(0);
+    }
+
+    @Test
+    void completedTrimDriftVetoesBeforeTheSourceCas() {
+        Fixture fixture = fixture(
+                ReadView.TOPIC_COMPACTED,
+                GenerationLifecycle.COMMITTED);
+        StoreState state = new StoreState(fixture);
+        state.streamSnapshot.set(snapshot(12));
+        state.loseCompletedTrimOnRevalidation.set(true);
+
+        assertThatThrownBy(() -> coordinator(fixture, state, false, false)
+                        .preDrain(fixture.candidate())
+                        .join())
+                .hasRootCauseMessage(
+                        "completed trim changed while retirement facts were frozen");
+        assertThat(state.casCalls).hasValue(0);
+        assertThat(state.replacementRootReads).hasValue(0);
+    }
+
     private HigherGenerationPreDrainCoordinator coordinator(
             Fixture fixture,
             StoreState state,
@@ -251,6 +399,7 @@ class HigherGenerationPreDrainCoordinatorTest {
             boolean changeCandidateRootAtFinalFence) {
         return new HigherGenerationPreDrainCoordinator(
                 CLUSTER,
+                l0Store(state),
                 generationStore(state, loseCasResponse),
                 physicalStore(state, changeCandidateRootAtFinalFence),
                 checkpointCodec(state),
@@ -260,17 +409,26 @@ class HigherGenerationPreDrainCoordinatorTest {
     }
 
     private static Fixture fixture(GenerationLifecycle sourceLifecycle) {
+        return fixture(ReadView.COMMITTED, sourceLifecycle);
+    }
+
+    private static Fixture fixture(
+            ReadView view,
+            GenerationLifecycle sourceLifecycle) {
         ObjectSliceReadTarget sourceTarget = target(
+                view,
                 "source-object",
                 "objects/source-object",
                 "11223344");
         ObjectSliceReadTarget replacementTarget = target(
+                view,
                 "replacement-object",
                 "objects/replacement-object",
                 "55667788");
         VersionedGenerationIndex source = generation(
-                1, "p".repeat(52), sourceTarget, sourceLifecycle, 5);
+                view, 1, "p".repeat(52), sourceTarget, sourceLifecycle, 5);
         VersionedGenerationIndex replacement = generation(
+                view,
                 2,
                 "q".repeat(52),
                 replacementTarget,
@@ -384,10 +542,17 @@ class HigherGenerationPreDrainCoordinatorTest {
                 sha('d'));
 
         VersionedPhysicalObjectRoot candidateRoot = activeRoot(
-                sourceTarget, PhysicalObjectKind.COMMITTED_COMPACTED, 3, sha('e'));
+                sourceTarget,
+                view == ReadView.COMMITTED
+                        ? PhysicalObjectKind.COMMITTED_COMPACTED
+                        : PhysicalObjectKind.TOPIC_COMPACTED,
+                3,
+                sha('e'));
         VersionedPhysicalObjectRoot replacementRoot = activeRoot(
                 replacementTarget,
-                PhysicalObjectKind.COMMITTED_COMPACTED,
+                view == ReadView.COMMITTED
+                        ? PhysicalObjectKind.COMMITTED_COMPACTED
+                        : PhysicalObjectKind.TOPIC_COMPACTED,
                 4,
                 sha('f'));
         PhysicalObjectIdentity object = PhysicalObjectIdentity.from(
@@ -421,6 +586,7 @@ class HigherGenerationPreDrainCoordinatorTest {
     }
 
     private static VersionedGenerationIndex generation(
+            ReadView view,
             long generation,
             String publicationId,
             ObjectSliceReadTarget target,
@@ -439,7 +605,7 @@ class HigherGenerationPreDrainCoordinatorTest {
         GenerationIndexRecord value = new GenerationIndexRecord(
                 1,
                 STREAM.value(),
-                ReadView.COMMITTED.wireId(),
+                view.wireId(),
                 0,
                 12,
                 generation,
@@ -468,7 +634,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 lifecycle == GenerationLifecycle.COMMITTED ? 2 : 3,
                 metadataVersion);
         String key = new F4Keyspace(CLUSTER).generationIndexKey(
-                STREAM, ReadView.COMMITTED, 12, generation);
+                STREAM, view, 12, generation);
         return new VersionedGenerationIndex(
                 key,
                 value,
@@ -549,6 +715,7 @@ class HigherGenerationPreDrainCoordinatorTest {
     }
 
     private static ObjectSliceReadTarget target(
+            ReadView view,
             String objectId,
             String objectKey,
             String checksum) {
@@ -565,7 +732,9 @@ class HigherGenerationPreDrainCoordinatorTest {
                 new ObjectId(objectId),
                 new ObjectKey(objectKey),
                 ObjectType.STREAM_COMPACTED_OBJECT,
-                "NEREUS_COMPACTED_PARQUET_V1",
+                view == ReadView.COMMITTED
+                        ? "NEREUS_COMPACTED_PARQUET_V1"
+                        : "NEREUS_TOPIC_COMPACTED_PARQUET_V1",
                 PayloadFormat.PULSAR_ENTRY_BATCH.name(),
                 "slice-" + objectId,
                 0,
@@ -645,6 +814,51 @@ class HigherGenerationPreDrainCoordinatorTest {
                 source.key(), changed, version, sha('4'));
     }
 
+    private static OxiaMetadataStore l0Store(StoreState state) {
+        return (OxiaMetadataStore) Proxy.newProxyInstance(
+                OxiaMetadataStore.class.getClassLoader(),
+                new Class<?>[] {OxiaMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return objectMethod(proxy, method.getName(), args);
+                    }
+                    return switch (method.getName()) {
+                        case "getStreamSnapshot" -> {
+                            int read = state.l0Reads.incrementAndGet();
+                            StreamMetadataSnapshot snapshot = state.streamSnapshot.get();
+                            if (state.loseCompletedTrimOnRevalidation.get()
+                                    && read > 1) {
+                                snapshot = snapshot(Math.subtractExact(
+                                        snapshot.trim().trimOffset(), 1));
+                            }
+                            yield CompletableFuture.completedFuture(
+                                    snapshot);
+                        }
+                        case "close" -> null;
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    };
+                });
+    }
+
+    private static StreamMetadataSnapshot snapshot(long trimOffset) {
+        long version = 7;
+        return new StreamMetadataSnapshot(
+                new StreamMetadataRecord(
+                        STREAM.value(),
+                        "persistent://tenant/ns/pre-drain",
+                        "pre-drain-name-hash",
+                        StreamState.ACTIVE.name(),
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        Map.of(),
+                        1,
+                        1,
+                        version),
+                new CommittedEndOffsetRecord(
+                        STREAM.value(), 12, 12, 1, version),
+                new TrimRecord(
+                        STREAM.value(), trimOffset, "test", 2, version));
+    }
+
     private static GenerationMetadataStore generationStore(
             StoreState state,
             boolean loseCasResponse) {
@@ -658,9 +872,11 @@ class HigherGenerationPreDrainCoordinatorTest {
                     return switch (method.getName()) {
                         case "scanIndex" -> {
                             state.scanCalls.incrementAndGet();
+                            ReadView sourceView = ReadView.fromWireId(
+                                    state.source.get().value().readViewId());
                             yield CompletableFuture.completedFuture(
                                     new GenerationScanPage(
-                                            args[2] == ReadView.COMMITTED
+                                            args[2] == sourceView
                                                     ? List.of(
                                                             state.source.get(),
                                                             state.replacement.get())
@@ -750,6 +966,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                             }
                             VersionedPhysicalObjectRoot replacement =
                                     state.replacementRoot.get();
+                            state.replacementRootReads.incrementAndGet();
                             yield CompletableFuture.completedFuture(
                                     object.value().equals(
                                                     replacement.value().objectKeyHash())
@@ -879,10 +1096,15 @@ class HigherGenerationPreDrainCoordinatorTest {
         private final AtomicReference<VersionedGenerationIndex> replacement;
         private final AtomicReference<VersionedPhysicalObjectRoot> candidateRoot;
         private final AtomicReference<VersionedPhysicalObjectRoot> replacementRoot;
+        private final AtomicReference<StreamMetadataSnapshot> streamSnapshot;
+        private final AtomicBoolean loseCompletedTrimOnRevalidation =
+                new AtomicBoolean();
+        private final AtomicInteger l0Reads = new AtomicInteger();
         private final AtomicInteger scanCalls = new AtomicInteger();
         private final AtomicInteger openCalls = new AtomicInteger();
         private final AtomicInteger publicationReads = new AtomicInteger();
         private final AtomicInteger candidateRootReads = new AtomicInteger();
+        private final AtomicInteger replacementRootReads = new AtomicInteger();
         private final AtomicInteger casCalls = new AtomicInteger();
 
         private StoreState(Fixture fixture) {
@@ -891,6 +1113,7 @@ class HigherGenerationPreDrainCoordinatorTest {
             replacement = new AtomicReference<>(fixture.replacement());
             candidateRoot = new AtomicReference<>(fixture.candidateRoot());
             replacementRoot = new AtomicReference<>(fixture.replacementRoot());
+            streamSnapshot = new AtomicReference<>(snapshot(0));
         }
     }
 

@@ -7,6 +7,7 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
@@ -14,6 +15,7 @@ import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
+import com.nereusstream.materialization.MaterializationPolicy;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationIndexDigests;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
@@ -203,49 +205,126 @@ final class RecoveryReplacementVerifier {
                     || !index.durableValueSha256().equals(expectedDigest)) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
-            ObjectSliceReadTarget target = embedded.target();
-            ObjectKeyHash object = ObjectKeyHash.from(target.objectKey());
-            if (object.equals(query.object().objectKeyHash())
-                    || query.object().objectId()
-                            .map(target.objectId()::equals)
-                            .orElse(false)) {
+            return loadHealthyRoot(query, index, embedded.target());
+        });
+    }
+
+    CompletableFuture<Optional<HealthyReplacement>> loadCurrentHealthy(
+            GcReferenceQuery query,
+            VersionedGenerationIndex current) {
+        Objects.requireNonNull(query, "query");
+        Objects.requireNonNull(current, "current");
+        GenerationIndexRecord value = current.value();
+        ReadView view;
+        ObjectSliceReadTarget target;
+        try {
+            view = ReadView.fromWireId(value.readViewId());
+            ReadTarget decoded = TARGET_CODECS.decode(value.readTarget());
+            if (!(decoded instanceof ObjectSliceReadTarget objectTarget)) {
+                throw invariant("current generation replacement is not an object slice");
+            }
+            target = objectTarget;
+        } catch (NereusException failure) {
+            throw failure;
+        } catch (RuntimeException failure) {
+            throw invariant("current generation replacement target cannot be decoded");
+        }
+        String expectedKey = keys.generationIndexKey(
+                new StreamId(value.streamId()),
+                view,
+                value.offsetEnd(),
+                value.generation());
+        Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(
+                value.withMetadataVersion(0));
+        if (!current.key().equals(expectedKey)
+                || value.lifecycle() != GenerationLifecycle.COMMITTED
+                || !current.durableValueSha256().equals(expectedDigest)) {
+            throw invariant("current generation replacement wrapper is non-canonical");
+        }
+        GenerationIndexIdentity identity = new GenerationIndexIdentity(
+                new StreamId(value.streamId()),
+                view,
+                value.offsetEnd(),
+                value.generation());
+        return generations.getIndex(cluster, identity).thenCompose(reloaded -> {
+            if (!reloaded.equals(Optional.of(current))) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
-            return physicalObjects.getRoot(cluster, object).thenApply(optionalRoot -> {
-                if (optionalRoot.isEmpty()) {
-                    return Optional.empty();
+            return loadHealthyRoot(query, current, target);
+        });
+    }
+
+    private CompletableFuture<Optional<HealthyReplacement>> loadHealthyRoot(
+            GcReferenceQuery query,
+            VersionedGenerationIndex index,
+            ObjectSliceReadTarget target) {
+        ObjectKeyHash object = ObjectKeyHash.from(target.objectKey());
+        if (object.equals(query.object().objectKeyHash())
+                || query.object().objectId()
+                        .map(target.objectId()::equals)
+                        .orElse(false)) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        return physicalObjects.getRoot(cluster, object).thenApply(optionalRoot -> {
+            if (optionalRoot.isEmpty()) {
+                return Optional.empty();
+            }
+            VersionedPhysicalObjectRoot root = optionalRoot.orElseThrow();
+            PhysicalObjectIdentity physical;
+            try {
+                physical = PhysicalObjectIdentity.from(root.value());
+            } catch (RuntimeException failure) {
+                throw invariant("generation replacement physical root is malformed");
+            }
+            long requiredEnd = Math.addExact(
+                    target.objectOffset(), target.objectLength());
+            ReadView view = ReadView.fromWireId(index.value().readViewId());
+            if (target.objectType() == ObjectType.STREAM_COMPACTED_OBJECT
+                    && !target.physicalFormat().equals(
+                            view == ReadView.COMMITTED
+                                    ? MaterializationPolicy.COMMITTED_FORMAT
+                                    : MaterializationPolicy.TOPIC_COMPACTED_FORMAT)) {
+                return Optional.empty();
+            }
+            PhysicalObjectKind expectedKind = switch (target.objectType()) {
+                case MULTI_STREAM_WAL_OBJECT -> {
+                    if (view != ReadView.COMMITTED) {
+                        throw invariant("TOPIC_COMPACTED replacement cannot target an Object-WAL slice");
+                    }
+                    yield PhysicalObjectKind.OBJECT_WAL;
                 }
-                VersionedPhysicalObjectRoot root = optionalRoot.orElseThrow();
-                PhysicalObjectIdentity physical;
-                try {
-                    physical = PhysicalObjectIdentity.from(root.value());
-                } catch (RuntimeException failure) {
-                    throw invariant("NRC1 replacement physical root is malformed");
-                }
-                long requiredEnd = Math.addExact(
-                        target.objectOffset(), target.objectLength());
-                PhysicalObjectKind expectedKind = switch (target.objectType()) {
-                    case MULTI_STREAM_WAL_OBJECT -> PhysicalObjectKind.OBJECT_WAL;
-                    case STREAM_COMPACTED_OBJECT -> PhysicalObjectKind.COMMITTED_COMPACTED;
-                    default -> throw invariant(
-                            "NRC1 source-retirement replacement object type is unsupported");
-                };
-                if (!root.key().equals(keys.physicalRootKey(object))
-                        || root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
-                        || !physical.objectKey().equals(target.objectKey())
-                        || physical.objectId().isEmpty()
-                        || !physical.objectId().orElseThrow().equals(target.objectId())
-                        || physical.kind() != expectedKind
-                        || requiredEnd > physical.objectLength()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new HealthyReplacement(index, root));
-            });
+                case STREAM_COMPACTED_OBJECT -> view == ReadView.COMMITTED
+                        ? PhysicalObjectKind.COMMITTED_COMPACTED
+                        : PhysicalObjectKind.TOPIC_COMPACTED;
+                default -> throw invariant(
+                        "source-retirement replacement object type is unsupported");
+            };
+            if (!root.key().equals(keys.physicalRootKey(object))
+                    || root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                    || !physical.objectKey().equals(target.objectKey())
+                    || physical.objectId().isEmpty()
+                    || !physical.objectId().orElseThrow().equals(target.objectId())
+                    || physical.kind() != expectedKind
+                    || requiredEnd > physical.objectLength()) {
+                return Optional.empty();
+            }
+            return Optional.of(new HealthyReplacement(index, root));
         });
     }
 
     CompletableFuture<Void> revalidate(HealthyReplacement expected) {
+        return revalidate(expected, "healthy NRC1 replacement");
+    }
+
+    CompletableFuture<Void> revalidateSameView(HealthyReplacement expected) {
+        return revalidate(expected, "healthy same-view replacement");
+    }
+
+    private CompletableFuture<Void> revalidate(
+            HealthyReplacement expected,
+            String label) {
         Objects.requireNonNull(expected, "expected");
+        requireText(label, "label");
         GenerationIndexRecord value = expected.index().value();
         GenerationIndexIdentity identity = new GenerationIndexIdentity(
                 new StreamId(value.streamId()),
@@ -255,14 +334,14 @@ final class RecoveryReplacementVerifier {
         return generations.getIndex(cluster, identity).thenCompose(index -> {
             if (!index.equals(Optional.of(expected.index()))) {
                 return CompletableFuture.failedFuture(condition(
-                        "healthy NRC1 replacement index changed while source facts were frozen"));
+                        label + " index changed while source facts were frozen"));
             }
             ObjectKeyHash object = new ObjectKeyHash(
                     expected.root().value().objectKeyHash());
             return physicalObjects.getRoot(cluster, object).thenAccept(root -> {
                 if (!root.equals(Optional.of(expected.root()))) {
                     throw condition(
-                            "healthy NRC1 replacement root changed while source facts were frozen");
+                            label + " root changed while source facts were frozen");
                 }
             });
         });

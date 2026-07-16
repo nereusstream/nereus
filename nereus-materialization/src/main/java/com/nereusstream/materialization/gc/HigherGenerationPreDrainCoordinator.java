@@ -17,6 +17,7 @@ import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
@@ -52,10 +53,11 @@ public final class HigherGenerationPreDrainCoordinator {
     private final Clock clock;
     private final ScheduledExecutorService scheduler;
     private final F4Keyspace keys;
-    private final HigherGenerationRecoveryCoverageVerifier coverage;
+    private final HigherGenerationRetirementEligibilityVerifier eligibility;
 
     public HigherGenerationPreDrainCoordinator(
             String cluster,
+            OxiaMetadataStore l0,
             GenerationMetadataStore generations,
             PhysicalObjectMetadataStore physicalObjects,
             RecoveryCheckpointCodecV1 checkpoints,
@@ -63,6 +65,7 @@ public final class HigherGenerationPreDrainCoordinator {
             Clock clock,
             ScheduledExecutorService scheduler) {
         this.cluster = requireText(cluster, "cluster");
+        Objects.requireNonNull(l0, "l0");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.physicalObjects = Objects.requireNonNull(physicalObjects, "physicalObjects");
         Objects.requireNonNull(checkpoints, "checkpoints");
@@ -76,12 +79,27 @@ public final class HigherGenerationPreDrainCoordinator {
                 physicalObjects,
                 checkpoints,
                 config);
-        this.coverage = new HigherGenerationRecoveryCoverageVerifier(
+        CompletedTrimRetirementVerifier trim = new CompletedTrimRetirementVerifier(
                 cluster,
-                generations,
-                checkpoints,
-                replacements,
-                config);
+                l0,
+                generations);
+        HigherGenerationRecoveryCoverageVerifier committed =
+                new HigherGenerationRecoveryCoverageVerifier(
+                        cluster,
+                        generations,
+                        checkpoints,
+                        replacements,
+                        config);
+        TopicCompactedReplacementVerifier topicCompacted =
+                new TopicCompactedReplacementVerifier(
+                        cluster,
+                        generations,
+                        replacements,
+                        config);
+        this.eligibility = new HigherGenerationRetirementEligibilityVerifier(
+                trim,
+                committed,
+                topicCompacted);
     }
 
     public CompletableFuture<HigherGenerationPreDrainResult> preDrain(
@@ -99,6 +117,10 @@ public final class HigherGenerationPreDrainCoordinator {
         if (!config.mutationsAllowed()) {
             return CompletableFuture.completedFuture(
                     HigherGenerationPreDrainResult.disabled());
+        }
+        if (nonNegativeNow() < exact.notBeforeMillis()) {
+            return CompletableFuture.completedFuture(
+                    HigherGenerationPreDrainResult.notEligibleYet());
         }
         MaterializationDeadline deadline = new MaterializationDeadline(
                 config.operationTimeout(), scheduler);
@@ -244,8 +266,8 @@ public final class HigherGenerationPreDrainCoordinator {
                     "matching higher-generation index has an unsupported pre-drain lifecycle"));
         }
         return deadline.bound(
-                        () -> coverage.prove(candidate.referenceQuery(), source),
-                        "prove higher-generation recovery replacement coverage")
+                        () -> eligibility.prove(candidate.referenceQuery(), source),
+                        "prove higher-generation retirement eligibility")
                 .thenCompose(proof -> {
                     if (lifecycle == GenerationLifecycle.DRAINING) {
                         draining.add(source);
@@ -278,7 +300,7 @@ public final class HigherGenerationPreDrainCoordinator {
 
     private CompletableFuture<TransitionResult> transition(
             GcCandidate candidate,
-            HigherGenerationRecoveryCoverageVerifier.CoverageProof proof,
+            HigherGenerationRetirementEligibilityVerifier.EligibilityProof proof,
             MaterializationDeadline deadline) {
         VersionedGenerationIndex source = proof.source();
         GenerationIndexRecord replacement = draining(

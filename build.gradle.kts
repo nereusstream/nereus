@@ -838,14 +838,14 @@ tasks.register("phase4M4DestructiveRecoveryCheck") {
 
 tasks.register<Exec>("checkPhase4M4GenerationRetirementContractSurface") {
     group = "verification"
-    description = "Audit typed source retirement and COMMITTED-view higher-generation pre-drain fencing."
+    description = "Audit typed source retirement and view-specific/below-trim higher-generation pre-drain fencing."
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-phase4-m4-generation-retirement-contract-surface.sh")
 }
 
 tasks.register("phase4M4GenerationRetirementCheck") {
     group = "verification"
-    description = "Verify exact source deletion, NRC1 replacement health, higher pre-drain, and retirement recovery."
+    description = "Verify exact source deletion, view-specific/below-trim eligibility, higher pre-drain, and retirement recovery."
     dependsOn("phase4M4DestructiveRecoveryCheck")
     dependsOn("checkPhase4M4GenerationRetirementContractSurface")
     dependsOn("checkPhase4Documentation")

@@ -16,7 +16,9 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
@@ -32,8 +34,10 @@ import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.GenerationZeroIndexEncoding;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.RecoveryCheckpointRootDigests;
+import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
@@ -43,11 +47,14 @@ import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
+import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
+import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.metadata.oxia.retirement.GenericCommittedAppendIdentity;
 import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import com.nereusstream.metadata.oxia.retirement.VersionedGenerationZeroCommit;
@@ -66,6 +73,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
@@ -87,6 +95,7 @@ class SourceRetirementPlanBuilderTest {
         AtomicInteger physicalRootReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(fixture, rootReads, false),
                 physicalStore(fixture, physicalRootReads, false),
                 sourceStore(fixture, marker),
@@ -132,6 +141,7 @@ class SourceRetirementPlanBuilderTest {
         AtomicInteger rootReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(fixture, rootReads, true),
                 physicalStore(fixture, new AtomicInteger(), false),
                 sourceStore(fixture, new AtomicReference<>(fixture.marker())),
@@ -155,6 +165,7 @@ class SourceRetirementPlanBuilderTest {
         AtomicInteger physicalReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(quarantined, new AtomicInteger(), false),
                 physicalStore(quarantined, physicalReads, false),
                 sourceStore(quarantined, new AtomicReference<>(quarantined.marker())),
@@ -174,6 +185,7 @@ class SourceRetirementPlanBuilderTest {
                 markedRoot(fixture.replacementRoot()));
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(marked, new AtomicInteger(), false),
                 physicalStore(marked, new AtomicInteger(), false),
                 sourceStore(marked, new AtomicReference<>(marked.marker())),
@@ -186,11 +198,59 @@ class SourceRetirementPlanBuilderTest {
     }
 
     @Test
+    void completedTrimAuthorizesGenerationZeroWithoutAHealthyReplacement() {
+        Fixture base = fixture();
+        Fixture marked = base.withReplacementRoot(
+                markedRoot(base.replacementRoot()));
+        AtomicInteger physicalReads = new AtomicInteger();
+        SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
+                CLUSTER,
+                l0Store(12, new AtomicInteger(), false),
+                generationStore(marked, new AtomicInteger(), false),
+                physicalStore(marked, physicalReads, false),
+                sourceStore(marked, new AtomicReference<>(marked.marker())),
+                checkpointCodec(marked),
+                PhysicalGcConfig.defaults());
+
+        List<GcPlannedMetadataRemoval> removals = builder.build(
+                marked.candidate()).join();
+
+        assertThat(removals).extracting(GcPlannedMetadataRemoval::removalType)
+                .containsExactlyInAnyOrder(
+                        GenerationZeroIndexRetirementHandler.REMOVAL_TYPE,
+                        GenerationZeroMarkerRetirementHandler.REMOVAL_TYPE,
+                        GenerationZeroCommitRetirementHandler.REMOVAL_TYPE);
+        assertThat(physicalReads).hasValue(0);
+    }
+
+    @Test
+    void completedTrimDriftRejectsGenerationZeroBeforeReplacementReads() {
+        Fixture fixture = fixture();
+        AtomicInteger trimReads = new AtomicInteger();
+        AtomicInteger physicalReads = new AtomicInteger();
+        SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
+                CLUSTER,
+                l0Store(12, trimReads, true),
+                generationStore(fixture, new AtomicInteger(), false),
+                physicalStore(fixture, physicalReads, false),
+                sourceStore(fixture, new AtomicReference<>(fixture.marker())),
+                checkpointCodec(fixture),
+                PhysicalGcConfig.defaults());
+
+        assertThatThrownBy(() -> builder.build(fixture.candidate()).join())
+                .hasRootCauseMessage(
+                        "completed trim changed while retirement facts were frozen");
+        assertThat(trimReads).hasValue(2);
+        assertThat(physicalReads).hasValue(0);
+    }
+
+    @Test
     void replacementIndexChangeDuringFreezeRejectsThePlan() {
         Fixture fixture = fixture();
         AtomicInteger indexReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(
                         fixture,
                         new AtomicInteger(),
@@ -214,6 +274,7 @@ class SourceRetirementPlanBuilderTest {
         AtomicInteger physicalReads = new AtomicInteger();
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(fixture, new AtomicInteger(), false),
                 physicalStore(fixture, physicalReads, true),
                 sourceStore(fixture, new AtomicReference<>(fixture.marker())),
@@ -233,6 +294,7 @@ class SourceRetirementPlanBuilderTest {
                 fixture.commit(), "unbound-commit", 11, sha('f'));
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(fixture, new AtomicInteger(), false),
                 physicalStore(fixture, new AtomicInteger(), false),
                 sourceStore(
@@ -276,6 +338,7 @@ class SourceRetirementPlanBuilderTest {
         Fixture conflicting = fixture.withEntry(differentEntry);
         SourceRetirementPlanBuilder builder = new SourceRetirementPlanBuilder(
                 CLUSTER,
+                untrimmedL0(),
                 generationStore(conflicting, new AtomicInteger(), false),
                 physicalStore(conflicting, new AtomicInteger(), false),
                 sourceStore(conflicting, new AtomicReference<>(conflicting.marker())),
@@ -745,6 +808,55 @@ class SourceRetirementPlanBuilderTest {
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
                 });
+    }
+
+    private static OxiaMetadataStore untrimmedL0() {
+        return l0Store(0, new AtomicInteger(), false);
+    }
+
+    private static OxiaMetadataStore l0Store(
+            long trimOffset,
+            AtomicInteger reads,
+            boolean changeOnFinalReload) {
+        return (OxiaMetadataStore) Proxy.newProxyInstance(
+                OxiaMetadataStore.class.getClassLoader(),
+                new Class<?>[] {OxiaMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return objectMethod(proxy, method.getName(), args);
+                    }
+                    return switch (method.getName()) {
+                        case "getStreamSnapshot" -> {
+                            int read = reads.incrementAndGet();
+                            long currentTrim = changeOnFinalReload && read > 1
+                                    ? Math.subtractExact(trimOffset, 1)
+                                    : trimOffset;
+                            yield CompletableFuture.completedFuture(
+                                    snapshot(currentTrim));
+                        }
+                        case "close" -> null;
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    };
+                });
+    }
+
+    private static StreamMetadataSnapshot snapshot(long trimOffset) {
+        long version = 11;
+        return new StreamMetadataSnapshot(
+                new StreamMetadataRecord(
+                        STREAM.value(),
+                        "persistent://tenant/ns/source-plan",
+                        "source-plan-name-hash",
+                        StreamState.ACTIVE.name(),
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        Map.of(),
+                        1,
+                        1,
+                        version),
+                new CommittedEndOffsetRecord(
+                        STREAM.value(), 12, 12, 1, version),
+                new TrimRecord(
+                        STREAM.value(), trimOffset, "test", 2, version));
     }
 
     private static GenerationIndexIdentity replacementIdentity(Fixture fixture) {

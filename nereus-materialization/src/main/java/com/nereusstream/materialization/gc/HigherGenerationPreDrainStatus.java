@@ -5,5 +5,6 @@ package com.nereusstream.materialization.gc;
 public enum HigherGenerationPreDrainStatus {
     DRAINING_READY,
     NO_MATCHING_INDEX,
+    NOT_ELIGIBLE_YET,
     MUTATION_DISABLED
 }

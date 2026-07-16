@@ -37,6 +37,10 @@ public record HigherGenerationPreDrainResult(
         return empty(HigherGenerationPreDrainStatus.NO_MATCHING_INDEX);
     }
 
+    static HigherGenerationPreDrainResult notEligibleYet() {
+        return empty(HigherGenerationPreDrainStatus.NOT_ELIGIBLE_YET);
+    }
+
     private static HigherGenerationPreDrainResult empty(
             HigherGenerationPreDrainStatus status) {
         return new HigherGenerationPreDrainResult(status, List.of(), 0, 0);

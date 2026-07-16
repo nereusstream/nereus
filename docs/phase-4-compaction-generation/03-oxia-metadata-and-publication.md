@@ -367,6 +367,31 @@ NRC1 currently records COMMITTED recovery facts, so a `TOPIC_COMPACTED` source f
 proof requirement instead of borrowing COMMITTED evidence. The completed-trim alternative also remains pending.
 Consequently checkpoint Q does not yet authorize production runtime composition or physical deletion.
 
+### 1.17 F4-M4 completed-trim and TOPIC_COMPACTED eligibility checkpoint
+
+Checkpoint R adds an exact L0 metadata dependency to source retirement without transferring correctness to a cache or
+watch. `CompletedTrimRetirementVerifier` reads `OxiaMetadataStore.getStreamSnapshot(cluster, stream)` and accepts only
+when the source's whole `[offsetStart, offsetEnd)` is below `TrimRecord.trimOffset`. It freezes the full
+`StreamMetadataSnapshot` rather than only the scalar trim offset, together with the exact source wrapper and optional
+`VersionedRecoveryCheckpointRoot`; all facts are reread byte-for-byte before the proof returns. Canonical source keys
+are reconstructed for generation zero and for either higher-generation view. A changed source、snapshot or root is a
+retryable condition failure, while contradictory stream identities are invariant failures.
+
+For an untrimmed TOPIC_COMPACTED higher source, `TopicCompactedReplacementVerifier` scans only that stream's
+TOPIC_COMPACTED generation namespace with the configured page/authority bounds. A candidate is eligible only when its
+canonical current wrapper remains `COMMITTED`, has a strictly higher generation, completely covers the source's
+offset/commit-version/cumulative-size interval and keeps the same payload/projection identity. Its decoded target must
+use `NEREUS_TOPIC_COMPACTED_PARQUET_V1`, identify an object other than the deletion candidate, and resolve to an exact
+`ACTIVE/TOPIC_COMPACTED` physical root. Deterministic selection prefers the highest generation and then the narrowest
+cover；the selected index/root and source are reread before returning.
+
+`HigherGenerationRetirementEligibilityVerifier` chooses completed trim first, otherwise NRC1 recovery coverage for
+COMMITTED or same-view replacement for TOPIC_COMPACTED. `SourceRetirementPlanBuilder` uses the same selector when a
+DRAINING source is frozen/reloaded, and generation zero uses completed trim as the alternative to a current NRC1
+replacement. `HigherGenerationPreDrainCoordinator` checks candidate `notBeforeMillis` before opening any of these
+stores, so source-retirement grace has a zero-read negative path. These exact per-source facts close §9.1 eligibility；
+they do not replace the still-pending global-domain、runtime-composition or final destructive gates.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

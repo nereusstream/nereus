@@ -86,8 +86,10 @@ NRC1/source/index/marker-bound generation-zero plan builder plus exact-key reval
 canonical publication resolution、current exact COMMITTED index binding、another-object ACTIVE physical-root proof and
 final exact index/root reload. Checkpoint Q adds a shared replacement verifier、COMMITTED-view whole-source NRC1 tiling
 and response-loss-safe higher-generation `COMMITTED/QUARANTINED -> DRAINING`, with DRAINING plan-time reproof.
-TOPIC_COMPACTED/below-trim eligibility、future/global domains、runtime composition and the remaining M4 passes are
-pending.
+Checkpoint R adds exact completed-trim eligibility for generation-zero and either higher view、current strictly newer
+TOPIC_COMPACTED/ACTIVE same-view replacement proof, and a pre-read source-retirement grace fence；all three higher
+eligibility branches are repeated at DRAINING plan time. Future/global domains、runtime composition and the remaining
+M4 passes are pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -736,11 +738,14 @@ gc/HigherGenerationIndexRetirementHandler.java           implemented checkpoint 
 gc/GenerationZeroMarkerRetirementHandler.java            implemented checkpoint O
 gc/GenerationZeroCommitRetirementHandler.java            implemented checkpoint O
 gc/RecoveryReplacementVerifier.java                      implemented checkpoint Q shared NRC1/current-root proof
+gc/CompletedTrimRetirementVerifier.java                  implemented checkpoint R exact L0/source/root proof
 gc/HigherGenerationRecoveryCoverageVerifier.java         implemented checkpoint Q whole-range proof
-gc/HigherGenerationPreDrainCoordinator.java              implemented checkpoint Q lifecycle fence
-gc/HigherGenerationPreDrainResult.java                   implemented checkpoint Q
-gc/HigherGenerationPreDrainStatus.java                   implemented checkpoint Q
-gc/SourceRetirementPlanBuilder.java                      extended checkpoint Q DRAINING reproof
+gc/TopicCompactedReplacementVerifier.java                implemented checkpoint R same-view proof
+gc/HigherGenerationRetirementEligibilityVerifier.java    implemented checkpoint R proof selector
+gc/HigherGenerationPreDrainCoordinator.java              extended checkpoint R grace/view/trim fence
+gc/HigherGenerationPreDrainResult.java                   extended checkpoint R
+gc/HigherGenerationPreDrainStatus.java                   extended checkpoint R
+gc/SourceRetirementPlanBuilder.java                      extended checkpoint R trim/view DRAINING reproof
 gc/GenerationRetirementOperations.java                   implemented N, source seams extended O
 gc/GcIdGenerator.java                                    implemented checkpoint H
 gc/SecureGcIdGenerator.java                              implemented checkpoint H
@@ -830,8 +835,8 @@ DefaultGcRetirementJournalTest                           implemented checkpoint 
 SourceRetirementCoordinatorTest                          implemented checkpoint M initial recovery cuts
 GenerationIndexRetirementHandlerTest                     implemented checkpoint N response-loss cuts
 GenerationZeroSourceRetirementHandlerTest                implemented checkpoint O response-loss cuts
-SourceRetirementPlanBuilderTest                          extended checkpoint Q DRAINING whole-range reproof
-HigherGenerationPreDrainCoordinatorTest                  implemented checkpoint Q lifecycle/restart/race cuts
+SourceRetirementPlanBuilderTest                          extended checkpoint R completed-trim proof/reproof
+HigherGenerationPreDrainCoordinatorTest                  extended checkpoint R view/trim/grace/race cuts
 PhysicalObjectRootScannerTest                              implemented checkpoint I
 PhysicalRootTombstoneRetirementTest
 LatePutAfterTombstoneTest
@@ -960,7 +965,7 @@ absent object under matching authority、same-record `DELETED` restart, and miss
 The gate does not yet claim production source-metadata handlers, protection/metadata response-loss coverage, runtime
 composition, future-sentinel/ownerless-global domains, cursor completion or final M4 deletion enablement.
 
-`phase4M4GenerationRetirementCheck` extends checkpoint M through checkpoints N/P. API/metadata tests freeze canonical
+`phase4M4GenerationRetirementCheck` extends checkpoint M through checkpoint R. API/metadata tests freeze canonical
 inverse key decoding、encoded stream ids、both view namespaces、fixed depth/current-cluster round trips, plus exact-key
 legacy/generic marker/commit value-to-key reconstruction. Handler tests prove exact generation-zero index/marker/
 commit deletion、delete-response-loss absence classification、DRAINING-only higher retirement、attempt+reference-set-
@@ -977,8 +982,12 @@ count/schema tiling, a strictly newer current COMMITTED/ACTIVE replacement for e
 root/source reload before candidate-root-fenced `COMMITTED/QUARANTINED -> DRAINING`. Tests cover both source
 lifecycles、already-DRAINING reproof、dry-run zero reads、incomplete tiling、replacement-root drift、candidate-root final
 fence and CAS response loss；the source planner repeats the proof before freezing a DRAINING removal.
-TOPIC_COMPACTED/below-trim eligibility、future/global domains、runtime composition、cursor/root/audit retirement and
-the final M4 gate remain pending.
+Checkpoint R adds the exact completed-trim alternative for generation-zero and either higher view, including
+source/full-stream-snapshot/recovery-root rereads. For untrimmed TOPIC_COMPACTED sources it requires a strictly newer
+current same-view index that covers offset/commit/cumulative bounds with matching payload/projection, plus another-
+object `ACTIVE/TOPIC_COMPACTED` root and final index/root/source reload. Tests cover successful same-view pre-drain and
+DRAINING plan reproof、MARKED replacement veto、trim success/drift and a grace result before any metadata/root read.
+Future/global domains、runtime composition、cursor/root/audit retirement and the final M4 gate remain pending.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

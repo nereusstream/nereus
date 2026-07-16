@@ -18,6 +18,7 @@ import com.nereusstream.metadata.oxia.GenerationCandidateKeyIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
@@ -47,8 +48,8 @@ import java.util.concurrent.CompletableFuture;
  * <p>This builder never turns a visible higher generation into DRAINING. It can freeze a higher
  * index only after a separate eligibility transition has already made it non-readable. For
  * generation zero it additionally proves that the recovery root selected an NRC1 entry carrying
- * the exact source commit and at least one current COMMITTED/ACTIVE replacement before admitting
- * index, marker, and commit-node removals.
+ * the exact source commit, then requires either completed trim or at least one current
+ * COMMITTED/ACTIVE replacement before admitting index, marker, and commit-node removals.
  */
 public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalidator {
     private static final List<ReadView> VIEWS = List.of(
@@ -64,16 +65,19 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
     private final F4Keyspace f4Keys;
     private final OxiaKeyspace l0Keys;
     private final RecoveryReplacementVerifier replacements;
-    private final HigherGenerationRecoveryCoverageVerifier higherCoverage;
+    private final CompletedTrimRetirementVerifier completedTrim;
+    private final HigherGenerationRetirementEligibilityVerifier higherEligibility;
 
     public SourceRetirementPlanBuilder(
             String cluster,
+            OxiaMetadataStore l0,
             GenerationMetadataStore generations,
             PhysicalObjectMetadataStore physicalObjects,
             SourceRetirementMetadataStore sources,
             RecoveryCheckpointCodecV1 checkpoints,
             PhysicalGcConfig config) {
         this.cluster = requireText(cluster, "cluster");
+        Objects.requireNonNull(l0, "l0");
         this.generations = Objects.requireNonNull(generations, "generations");
         Objects.requireNonNull(physicalObjects, "physicalObjects");
         this.sources = Objects.requireNonNull(sources, "sources");
@@ -87,12 +91,27 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                 physicalObjects,
                 checkpoints,
                 config);
-        this.higherCoverage = new HigherGenerationRecoveryCoverageVerifier(
+        this.completedTrim = new CompletedTrimRetirementVerifier(
                 cluster,
-                generations,
-                checkpoints,
-                replacements,
-                config);
+                l0,
+                generations);
+        HigherGenerationRecoveryCoverageVerifier committed =
+                new HigherGenerationRecoveryCoverageVerifier(
+                        cluster,
+                        generations,
+                        checkpoints,
+                        replacements,
+                        config);
+        TopicCompactedReplacementVerifier topicCompacted =
+                new TopicCompactedReplacementVerifier(
+                        cluster,
+                        generations,
+                        replacements,
+                        config);
+        this.higherEligibility = new HigherGenerationRetirementEligibilityVerifier(
+                completedTrim,
+                committed,
+                topicCompacted);
     }
 
     /** Builds one canonical process-local removal set for an ACTIVE affected-stream candidate. */
@@ -241,7 +260,7 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
             add = freezeGenerationZero(query, zero).thenAccept(removals::addAll);
         } else if (candidate instanceof VersionedGenerationIndex higher
                 && higher.value().lifecycle() == GenerationLifecycle.DRAINING) {
-            add = higherCoverage.prove(query, higher).thenAccept(ignored -> removals.add(
+            add = higherEligibility.prove(query, higher).thenAccept(ignored -> removals.add(
                     removal(
                             HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
                             higher)));
@@ -287,14 +306,12 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                     .thenCompose(evidence -> {
                         RecoveryCheckpointEntry entry = evidence.entry();
                         requireEntryMatchesIndex(entry, zero.value());
-                        return replacements.select(
+                        return proveGenerationZeroEligibility(
                                         query,
                                         stream,
-                                        evidence.checkpoint(),
-                                        entry,
-                                        RecoveryReplacementVerifier.ReplacementRequirement
-                                                .generationZero(zero.value()))
-                                .thenCompose(replacement -> {
+                                        zero,
+                                        evidence)
+                                .thenCompose(eligibility -> {
                                     String commitKey = l0Keys.streamCommitKey(
                                             stream,
                                             entry.commitId());
@@ -315,8 +332,8 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                                                                             "generation-zero committed marker is absent before planning"));
                                                             requireMarkerMatches(
                                                                     commit, marker);
-                                                            return replacements.revalidate(
-                                                                            replacement)
+                                                            return revalidateGenerationZeroEligibility(
+                                                                            eligibility)
                                                                     .thenCompose(ignored ->
                                                                             generations.getRecoveryRoot(
                                                                                     cluster,
@@ -347,6 +364,35 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                                 });
                     });
         });
+    }
+
+    private CompletableFuture<GenerationZeroEligibility> proveGenerationZeroEligibility(
+            GcReferenceQuery query,
+            StreamId stream,
+            VersionedGenerationZeroIndex zero,
+            CheckpointCommitEvidence evidence) {
+        return completedTrim.proveIfCompleted(zero).thenCompose(trim -> {
+            if (trim.isPresent()) {
+                return CompletableFuture.completedFuture(
+                        GenerationZeroEligibility.trim(trim.orElseThrow()));
+            }
+            return replacements.select(
+                            query,
+                            stream,
+                            evidence.checkpoint(),
+                            evidence.entry(),
+                            RecoveryReplacementVerifier.ReplacementRequirement
+                                    .generationZero(zero.value()))
+                    .thenApply(GenerationZeroEligibility::replacement);
+        });
+    }
+
+    private CompletableFuture<Void> revalidateGenerationZeroEligibility(
+            GenerationZeroEligibility eligibility) {
+        if (eligibility.trim().isPresent()) {
+            return completedTrim.revalidate(eligibility.trim().orElseThrow());
+        }
+        return replacements.revalidate(eligibility.replacement().orElseThrow());
     }
 
     private CompletableFuture<List<GcPlannedMetadataRemoval>> reloadOne(
@@ -415,7 +461,7 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                         return CompletableFuture.failedFuture(condition(
                                 "higher-generation candidate is no longer DRAINING"));
                     }
-                    return higherCoverage.prove(query, higher).thenCompose(ignored -> {
+                    return higherEligibility.prove(query, higher).thenCompose(ignored -> {
                         reproved.add(removal(
                                 HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
                                 higher));
@@ -638,6 +684,33 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
         private CheckpointCommitEvidence {
             Objects.requireNonNull(checkpoint, "checkpoint");
             Objects.requireNonNull(entry, "entry");
+        }
+    }
+
+    private record GenerationZeroEligibility(
+            Optional<CompletedTrimRetirementVerifier.CompletedTrimProof> trim,
+            Optional<RecoveryReplacementVerifier.HealthyReplacement> replacement) {
+        private GenerationZeroEligibility {
+            trim = Objects.requireNonNull(trim, "trim");
+            replacement = Objects.requireNonNull(replacement, "replacement");
+            if (trim.isPresent() == replacement.isPresent()) {
+                throw new IllegalArgumentException(
+                        "generation-zero retirement requires exactly one eligibility proof");
+            }
+        }
+
+        private static GenerationZeroEligibility trim(
+                CompletedTrimRetirementVerifier.CompletedTrimProof proof) {
+            return new GenerationZeroEligibility(
+                    Optional.of(Objects.requireNonNull(proof, "proof")),
+                    Optional.empty());
+        }
+
+        private static GenerationZeroEligibility replacement(
+                RecoveryReplacementVerifier.HealthyReplacement proof) {
+            return new GenerationZeroEligibility(
+                    Optional.empty(),
+                    Optional.of(Objects.requireNonNull(proof, "proof")));
         }
     }
 

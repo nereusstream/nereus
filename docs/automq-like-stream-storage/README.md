@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint Q，尚未实现端到端 async 执行路径
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint R，尚未实现端到端 async 执行路径
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
 
@@ -33,8 +33,8 @@ Already present：
   reader/protection handshakes（implemented and ordinary/Docker-backed final-gated）。
 - F4-M2 committed-generation resolver/read path and restart-safe publication, plus F4-M3 planner/task/worker/service、
   exact-source protection、Parquet/NTC1 formats and terminal workflow-metadata retirement（final-gated）。
-- F4-M4 through checkpoint Q：NRC1/protected append/recovery、root/journal fencing、typed source retirement and
-  COMMITTED-view higher-generation pre-drain. New strict
+- F4-M4 through checkpoint R：NRC1/protected append/recovery、root/journal fencing、typed source retirement、
+  completed-trim/COMMITTED/TOPIC_COMPACTED eligibility and grace-fenced higher-generation pre-drain. New strict
   appends now establish `REACHABLE_APPEND` before head CAS and `VISIBLE_GENERATION` before success；the async
   acknowledgement branch remains disabled。
 
@@ -42,7 +42,7 @@ Not present：
 
 - core branch implementing `WAL_DURABLE` success；
 - BookKeeper WAL writer/reader/location types；
-- production-composed TOPIC_COMPACTED/below-trim source retirement and physical/cursor GC completion；
+- production-composed global-domain source retirement and physical/cursor/root/audit GC completion；
 - primary-WAL retention gate、lag backpressure and recovery daemon/runtime composition；
 - async-profile broker admission、`WAL_DURABLE` completion branch and task-loss/read-repair production wiring；
 - mixed primary target resolver。
