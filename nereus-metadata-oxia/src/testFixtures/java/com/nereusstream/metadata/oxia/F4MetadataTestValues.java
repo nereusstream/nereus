@@ -16,7 +16,10 @@ import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
@@ -36,6 +39,7 @@ import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
 import com.nereusstream.metadata.oxia.records.ReadTargetRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
+import com.nereusstream.metadata.oxia.records.ReferenceDomainVersionRecord;
 import com.nereusstream.metadata.oxia.records.SourceGenerationRecord;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
@@ -105,6 +109,81 @@ public final class F4MetadataTestValues {
 
     public static GenerationIndexRecord topicCompactedGeneration() {
         return generation(GenerationLifecycle.COMMITTED, ReadView.TOPIC_COMPACTED, true);
+    }
+
+    public static List<ReferenceDomainVersionRecord> referenceDomains() {
+        return List.of(
+                new ReferenceDomainVersionRecord("append-recovery-v1", 1),
+                new ReferenceDomainVersionRecord("cursor-snapshot-v1", 1),
+                new ReferenceDomainVersionRecord("future-catalog-sentinel-v1", 1),
+                new ReferenceDomainVersionRecord("generation-v1", 1),
+                new ReferenceDomainVersionRecord("materialization-v1", 1),
+                new ReferenceDomainVersionRecord("projection-generation-v1", 1));
+    }
+
+    public static GenerationProtocolActivationRecord preparedActivation() {
+        return new GenerationProtocolActivationRecord(
+                1,
+                1,
+                GenerationProtocolActivationLifecycle.PREPARED,
+                false,
+                false,
+                false,
+                0,
+                referenceDomains(),
+                GenerationBackfillProofRecord.incomplete(0),
+                GenerationBackfillProofRecord.incomplete(0),
+                GenerationBackfillProofRecord.incomplete(0),
+                "",
+                PROCESS,
+                100,
+                0,
+                100,
+                0);
+    }
+
+    public static GenerationProtocolActivationRecord publicationActivation() {
+        return new GenerationProtocolActivationRecord(
+                1,
+                1,
+                GenerationProtocolActivationLifecycle.ACTIVE,
+                true,
+                false,
+                false,
+                7,
+                referenceDomains(),
+                GenerationBackfillProofRecord.incomplete(7),
+                GenerationBackfillProofRecord.incomplete(7),
+                GenerationBackfillProofRecord.incomplete(7),
+                "",
+                PROCESS,
+                100,
+                150,
+                150,
+                0);
+    }
+
+    public static GenerationProtocolActivationRecord deletionActivation() {
+        GenerationBackfillProofRecord complete = new GenerationBackfillProofRecord(
+                ATTEMPT, 8, HASH_A, true, 175);
+        return new GenerationProtocolActivationRecord(
+                1,
+                1,
+                GenerationProtocolActivationLifecycle.ACTIVE,
+                true,
+                true,
+                true,
+                8,
+                referenceDomains(),
+                complete,
+                new GenerationBackfillProofRecord(CLAIM, 8, HASH_B, true, 176),
+                new GenerationBackfillProofRecord(PUBLICATION, 8, HASH_C, true, 177),
+                HASH_D,
+                PROCESS,
+                100,
+                150,
+                180,
+                0);
     }
 
     private static GenerationIndexRecord generation(

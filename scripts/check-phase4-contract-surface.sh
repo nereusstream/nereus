@@ -79,8 +79,8 @@ for artifact in "${test_artifacts[@]}"; do
 done
 
 golden="$repo_root/nereus-metadata-oxia/src/test/resources/com/nereusstream/metadata/oxia/codec/f4-metadata-codec-golden.properties"
-if [[ "$(rg -c '^[^#[:space:]][^=]*=' "$golden")" != "46" ]]; then
-    echo "Phase 4 metadata golden must freeze exactly 46 lifecycle/optional/journal vectors" >&2
+if [[ "$(rg -c '^[^#[:space:]][^=]*=' "$golden")" != "49" ]]; then
+    echo "Phase 4 metadata golden must freeze exactly 49 lifecycle/optional/journal/activation vectors" >&2
     exit 1
 fi
 

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.nereusstream.metadata.oxia.F4MetadataTestValues;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
@@ -74,6 +75,18 @@ class F4MetadataCodecGoldenTest {
                 "generation.topic-compacted",
                 F4MetadataTestValues.topicCompactedGeneration(),
                 GenerationIndexRecord.class));
+        values.add(sample(
+                "activation.prepared",
+                F4MetadataTestValues.preparedActivation(),
+                GenerationProtocolActivationRecord.class));
+        values.add(sample(
+                "activation.publication",
+                F4MetadataTestValues.publicationActivation(),
+                GenerationProtocolActivationRecord.class));
+        values.add(sample(
+                "activation.deletion",
+                F4MetadataTestValues.deletionActivation(),
+                GenerationProtocolActivationRecord.class));
         values.add(sample(
                 "registration.full",
                 F4MetadataTestValues.registration(F4MetadataTestValues.STREAM, 7),

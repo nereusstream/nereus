@@ -7,8 +7,11 @@ import static com.nereusstream.metadata.oxia.F4MetadataTestValues.STREAM;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.ReadView;
+import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
@@ -165,6 +168,30 @@ class F4RecordValidationTest {
                         0))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not canonical");
+    }
+
+    @Test
+    void rejectsActivationBackfillFactsFromAFutureReadinessEpoch() {
+        assertThatThrownBy(() -> new GenerationProtocolActivationRecord(
+                        1,
+                        1,
+                        GenerationProtocolActivationLifecycle.ACTIVE,
+                        true,
+                        false,
+                        false,
+                        7,
+                        F4MetadataTestValues.referenceDomains(),
+                        GenerationBackfillProofRecord.incomplete(8),
+                        GenerationBackfillProofRecord.incomplete(7),
+                        GenerationBackfillProofRecord.incomplete(7),
+                        "",
+                        F4MetadataTestValues.PROCESS,
+                        100,
+                        150,
+                        150,
+                        0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot be newer");
     }
 
     private static GenerationIndexRecord generationLifecycle(

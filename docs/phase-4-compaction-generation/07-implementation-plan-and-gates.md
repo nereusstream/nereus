@@ -22,7 +22,7 @@ final gates on 2026-07-15；the following foundation parts are implemented and c
   generation-index/task create recovery with immutable identity checks；
 - `GenerationMetadataTransitions` guards closed index/task lifecycles、the publication-before-allocation task shape、
   monotonic checkpoint/registration/recovery progress and immutable retention boundaries；
-- 46 frozen F4 metadata envelope vectors cover every lifecycle/optional branch and retirement-journal record；focused real Oxia covers slash-aware
+- 49 frozen F4 metadata envelope vectors cover every lifecycle/optional branch、retirement-journal and activation record；focused real Oxia covers slash-aware
   fixed-depth ranges、restart、CAS、pagination and conditional metadata delete；
 - M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
@@ -89,7 +89,9 @@ and response-loss-safe higher-generation `COMMITTED/QUARANTINED -> DRAINING`, wi
 Checkpoint R adds exact completed-trim eligibility for generation-zero and either higher view、current strictly newer
 TOPIC_COMPACTED/ACTIVE same-view replacement proof, and a pre-read source-retirement grace fence；all three higher
 eligibility branches are repeated at DRAINING plan time. Future/global domains、runtime composition and the remaining
-M4 passes are pending.
+M4 passes are pending. Checkpoint S adds the durable cluster generation-activation record/codec/exact-key store、
+read-only lookup、PREPARED bootstrap、monotonic CAS guard and frozen lifecycle/capability vectors. It is authority
+foundation only：backfill coordinators、future sentinel、ownerless-global proof and runtime activation remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -828,8 +830,9 @@ PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
 PhysicalGcConfigTest                                      implemented checkpoint H
 GcPlanTest                                                implemented checkpoint H
-F4MetadataCodecGoldenTest                                extended checkpoint L foundation (46 vectors)
-F4RecordValidationTest                                   extended checkpoint L foundation
+F4MetadataCodecGoldenTest                                extended checkpoint S activation foundation (49 vectors)
+F4RecordValidationTest                                   extended checkpoint S activation contradictions
+GenerationProtocolActivationStoreContractTest            implemented checkpoint S exact-key/CAS contract
 GcRetirementJournalMetadataStoreContractTest             implemented checkpoint L durable-store parity
 DefaultGcRetirementJournalTest                           implemented checkpoint L seal/reload/crash cuts
 SourceRetirementCoordinatorTest                          implemented checkpoint M initial recovery cuts
@@ -874,6 +877,7 @@ retirement.
 ./gradlew phase4M4RetirementJournalCheck
 ./gradlew phase4M4DestructiveRecoveryCheck
 ./gradlew phase4M4GenerationRetirementCheck
+./gradlew phase4M4ActivationMetadataCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -989,6 +993,13 @@ object `ACTIVE/TOPIC_COMPACTED` root and final index/root/source reload. Tests c
 DRAINING plan reproof、MARKED replacement veto、trim success/drift and a grace result before any metadata/root read.
 Future/global domains、runtime composition、cursor/root/audit retirement and the final M4 gate remain pending.
 
+`phase4M4ActivationMetadataCheck` extends the ordinary checkpoint chain with checkpoint S's single-key cluster
+authority foundation. It audits the exact key/partition、record fields and contradictions、explicit codec registration、
+monotonic transition guard、production Oxia create/CAS/reload behavior and three frozen golden vectors. The focused
+contract test proves two runtime adapters converge on one PREPARED value, then advance publication and deletion facts
+without accepting stale versions or domain/capability regression. This gate does not execute any backfill、install the
+future sentinel、prove ownerless global absence or enable production capability bits.
+
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.
 It also proves live-reference root/protection backfill, all-shard lifecycle recovery with empty object listing, 10,000
@@ -1010,13 +1021,15 @@ nereus-core/.../backpressure/MaterializationLagGate.java
 
 nereus-metadata-oxia/.../ManagedLedgerGenerationProtocol.java       protocol/CAS foundation implemented K
 nereus-metadata-oxia/.../ManagedLedgerProtocolProperties.java       composed property validator implemented K
-nereus-metadata-oxia/.../GenerationProtocolActivationRecord.java
-nereus-metadata-oxia/.../ReferenceDomainVersionRecord.java
-nereus-metadata-oxia/.../GenerationBackfillProofRecord.java
-nereus-metadata-oxia/.../VersionedGenerationProtocolActivation.java
-nereus-metadata-oxia/.../GenerationProtocolActivationStore.java
-nereus-metadata-oxia/.../OxiaJavaGenerationProtocolActivationStore.java
-nereus-metadata-oxia/.../codec/GenerationProtocolActivationRecordCodecV1.java
+nereus-metadata-oxia/.../GenerationProtocolActivationLifecycle.java       implemented checkpoint S
+nereus-metadata-oxia/.../GenerationProtocolActivationRecord.java          implemented checkpoint S
+nereus-metadata-oxia/.../ReferenceDomainVersionRecord.java                 implemented checkpoint S
+nereus-metadata-oxia/.../GenerationBackfillProofRecord.java                implemented checkpoint S
+nereus-metadata-oxia/.../VersionedGenerationProtocolActivation.java        implemented checkpoint S
+nereus-metadata-oxia/.../GenerationProtocolActivationStore.java            implemented checkpoint S foundation
+nereus-metadata-oxia/.../GenerationProtocolActivationTransitions.java      implemented checkpoint S
+nereus-metadata-oxia/.../OxiaJavaGenerationProtocolActivationStore.java    implemented checkpoint S production
+nereus-metadata-oxia/.../codec/GenerationProtocolActivationRecordCodecV1.java implemented checkpoint S
 nereus-metadata-oxia/.../ManagedLedgerProjectionMetadataStore.java   exact lookup/marker CAS implemented K
 nereus-metadata-oxia/.../ProjectionMetadataStoreCore.java            exact lookup/marker CAS implemented K
 nereus-metadata-oxia/.../records/TopicProjectionRecord.java          composed marker validation implemented K

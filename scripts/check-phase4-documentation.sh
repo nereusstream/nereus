@@ -23,7 +23,7 @@ for path in "${lock_docs[@]}"; do
     require_literal "$current_pulsar_lock" "$path"
 done
 
-require_literal "46 个 F4 frozen envelope vectors" "docs/phase-4-compaction-generation/README.md"
+require_literal "activation schema 的 49 个 envelope vectors" "docs/phase-4-compaction-generation/README.md"
 require_literal "GcRetirementManifestRecord" \
     "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
 require_literal "PREPARE RETIREMENT JOURNAL" \
@@ -59,6 +59,8 @@ require_literal "phase4M4ReferenceDomainsCheck" \
 require_literal "phase4M4ManagedLedgerDomainsCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M4RetirementJournalCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M4ActivationMetadataCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "F4-M4 NRC1 object-protocol checkpoint" \
     "docs/phase-4-compaction-generation/README.md"

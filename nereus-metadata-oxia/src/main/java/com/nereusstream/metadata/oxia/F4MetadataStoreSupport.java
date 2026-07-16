@@ -8,6 +8,7 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
@@ -220,6 +221,8 @@ final class F4MetadataStoreSupport {
             metadataVersion = record.metadataVersion();
         } else if (value instanceof GenerationIndexRecord record) {
             metadataVersion = record.metadataVersion();
+        } else if (value instanceof GenerationProtocolActivationRecord record) {
+            metadataVersion = record.metadataVersion();
         } else if (value instanceof MaterializationStreamRegistrationRecord record) {
             metadataVersion = record.metadataVersion();
         } else if (value instanceof MaterializationTaskRecord record) {
@@ -256,6 +259,8 @@ final class F4MetadataStoreSupport {
         if (value instanceof GenerationSequenceRecord record) {
             hydrated = record.withMetadataVersion(version);
         } else if (value instanceof GenerationIndexRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof GenerationProtocolActivationRecord record) {
             hydrated = record.withMetadataVersion(version);
         } else if (value instanceof MaterializationStreamRegistrationRecord record) {
             hydrated = record.withMetadataVersion(version);

@@ -854,3 +854,20 @@ tasks.register("phase4M4GenerationRetirementCheck") {
     dependsOn(":nereus-metadata-oxia:check")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M4ActivationMetadataContractSurface") {
+    group = "verification"
+    description = "Audit the durable generation-protocol activation metadata foundation."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-activation-metadata-contract-surface.sh")
+}
+
+tasks.register("phase4M4ActivationMetadataCheck") {
+    group = "verification"
+    description = "Verify the exact cluster activation record, codec, monotonic CAS, and frozen vectors."
+    dependsOn("phase4M4GenerationRetirementCheck")
+    dependsOn("checkPhase4M4ActivationMetadataContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-metadata-oxia:check")
+}

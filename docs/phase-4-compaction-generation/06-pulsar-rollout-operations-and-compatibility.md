@@ -402,6 +402,8 @@ public record VersionedGenerationProtocolActivation(
         Checksum durableValueSha256) { }
 
 public interface GenerationProtocolActivationStore extends AutoCloseable {
+    CompletableFuture<Optional<VersionedGenerationProtocolActivation>> get(
+            String cluster);
     CompletableFuture<VersionedGenerationProtocolActivation> getOrCreate(
             String cluster);
     CompletableFuture<VersionedGenerationProtocolActivation> compareAndSet(
@@ -411,10 +413,17 @@ public interface GenerationProtocolActivationStore extends AutoCloseable {
 }
 ```
 
+Checkpoint S implements this record、codec and exact-key production store. The `get` operation is deliberately
+non-creating because GC/reference-domain evaluation must never manufacture rollout authority while checking it.
+Concurrent PREPARED creation converges on the existing exact record, and compare-and-set recovery accepts only the
+exact desired replacement reloaded at a later metadata version. Broker capability collection、the three backfill
+executors、future sentinel and runtime activation guard remain later rollout work.
+
 Schema/protocol are `1`. Domain pairs are canonical sorted/unique, non-empty and capped at 32. Run/broker ids are
 random 128-bit lowercase base32；coverage/capability digests are lowercase SHA-256. An incomplete backfill has empty
 run/digest、zero completion time but still records the readiness epoch being attempted；a complete proof has all
-fields present and its epoch equals the record's broker epoch. `metadataVersion` is zero on wire and hydrated from
+fields present and its epoch equals the record's broker epoch. No proof may name an epoch newer than the record's
+broker epoch. `metadataVersion` is zero on wire and hydrated from
 Oxia. The version wrapper follows document 03's exact key/version/durable-value-digest contract.
 
 Allowed durable changes are `PREPARED -> ACTIVE`, false-to-true capability bits, replacement of a backfill proof by a
@@ -432,9 +441,9 @@ proof before operations resume. `ACTIVE` requires：
 - object-store list/delete capability probe passed before delete bit is enabled。
 
 Publication and deletion bits are separate. Higher generation may be admitted while physical delete remains disabled.
-`physicalDeleteEnabled` additionally requires both physical-root and cursor-snapshot proofs complete and the non-empty
-object-store capability digest. `cursorSnapshotDeleteEnabled` can remain false while ordinary source deletion is also
-kept false；V1 does not permit partially enabling physical deletion for a subset of object kinds.
+`physicalDeleteEnabled` additionally requires stream-registration、physical-root and cursor-snapshot proofs complete
+and the non-empty object-store capability digest. `cursorSnapshotDeleteEnabled` can remain false while ordinary source
+deletion is also kept false；V1 does not permit partially enabling physical deletion for a subset of object kinds.
 
 ## 5. Rolling Upgrade / Downgrade
 

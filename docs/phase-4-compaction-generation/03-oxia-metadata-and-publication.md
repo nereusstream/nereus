@@ -276,9 +276,10 @@ by authoritative reload；a different identity or any other state drift fails cl
 property replacement preserve the composed marker rules.
 
 `CursorMetadataDigests` supplies exact F3 envelope SHA-256 for `CursorRetentionRecord` and `CursorStateRecord` so the
-cursor domain binds drain revalidation to durable bytes rather than decoded-field subsets. This checkpoint does not
-create the M5 `GenerationProtocolActivationRecord`, registration coordinator or broker activation guard；therefore
-the marker API and domains are implemented foundations, not production activation or delete authority.
+cursor domain binds drain revalidation to durable bytes rather than decoded-field subsets. Checkpoint K itself did not
+create the M5 cluster authority. Checkpoint S now provides the durable `GenerationProtocolActivationRecord`、codec and
+exact-key/CAS store foundation, but the registration backfill coordinator and broker activation guard remain pending；
+therefore the marker API and domains still are not production activation or delete authority.
 
 ### 1.13 F4-M4 generation-index retirement checkpoint
 
@@ -363,9 +364,10 @@ proof and an exact candidate-root version/epoch/identity fence. The deterministi
 and an immutable publication already drained by a concurrent attempt. An existing `DRAINING` record is not trusted by
 lifecycle alone：both the coordinator and `SourceRetirementPlanBuilder` re-run the current recovery/replacement proof.
 
-NRC1 currently records COMMITTED recovery facts, so a `TOPIC_COMPACTED` source fails with an explicit view-specific-
-proof requirement instead of borrowing COMMITTED evidence. The completed-trim alternative also remains pending.
-Consequently checkpoint Q does not yet authorize production runtime composition or physical deletion.
+NRC1 currently records COMMITTED recovery facts, so checkpoint Q correctly failed a `TOPIC_COMPACTED` source with an
+explicit view-specific-proof requirement instead of borrowing COMMITTED evidence. Checkpoint R closes that branch with
+the same-view verifier and adds the completed-trim alternative. Neither checkpoint authorizes production runtime
+composition or physical deletion.
 
 ### 1.17 F4-M4 completed-trim and TOPIC_COMPACTED eligibility checkpoint
 
@@ -391,6 +393,21 @@ DRAINING source is frozen/reloaded, and generation zero uses completed trim as t
 replacement. `HigherGenerationPreDrainCoordinator` checks candidate `notBeforeMillis` before opening any of these
 stores, so source-retirement grace has a zero-read negative path. These exact per-source facts close §9.1 eligibility；
 they do not replace the still-pending global-domain、runtime-composition or final destructive gates.
+
+### 1.18 F4-M4 generation-protocol activation metadata foundation
+
+Checkpoint S implements the exact cluster key already frozen in §2 and document 06. The explicit V1 codec is registered
+in `F4MetadataCodecs` and hydrated through `F4MetadataStoreSupport`; prepared、publication-only and deletion-ready
+records are frozen as distinct envelope golden vectors. `GenerationProtocolActivationStore.get` is intentionally
+read-only so a future GC sentinel cannot create authority while proving absence. `getOrCreate` may create only the
+canonical PREPARED record and converges concurrent creators by reloading the single exact key.
+
+`compareAndSet` requires metadataVersion zero in the replacement, validates the current exact wrapper and applies a
+closed monotonic transition guard before version-CAS. Protocol identity、activating run、prepared time、ACTIVE time、
+readiness epoch and capability bits cannot regress. A completed backfill is immutable within one readiness epoch；
+changing an object-store capability proof requires a newer epoch. Lost CAS response converges only when authoritative
+reload equals the exact desired durable value at a later version. This foundation does not run registration/root/cursor
+backfills and does not enable any capability bit.
 
 ## 2. Keyspace
 

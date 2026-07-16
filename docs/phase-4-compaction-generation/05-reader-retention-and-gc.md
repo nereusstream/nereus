@@ -896,6 +896,12 @@ The durable cluster generation-activation record stores the exact required domai
 fails F4 readiness if its registered set differs. Future 6 must atomically add its capability/domain before writing a
 catalog reference；F4 never interprets absence of a plugin as absence of references.
 
+Checkpoint S implements this record/codec/exact-key store and its monotonic CAS authority, including a read-only `get`
+that future GC scans can use without bootstrapping cluster state. It also freezes three backfill-proof slots、the broker
+readiness epoch and V1's all-or-nothing physical/cursor deletion rule. It does not yet provide the sentinel or global
+stream enumeration：until the backfill coordinators, exact installed-domain comparison and ownerless scans land, an
+ownerless query remains incomplete+veto and production deletion remains disabled.
+
 `projection-generation-v1` makes the per-topic downgrade fence usable by protocol-neutral GC. For each affected
 stream, the implemented proof requires one of：the exact current identity is `DELETED`；the exact current live identity
 has `nereus.generation-protocol=1`；or the current topic identity is strictly newer in both incarnation and storage

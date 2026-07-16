@@ -2,6 +2,7 @@
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
@@ -22,6 +23,8 @@ public final class F4MetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
             registered(GenerationSequenceRecord.class, new GenerationSequenceRecordCodecV1()),
             registered(GenerationIndexRecord.class, new GenerationIndexRecordCodecV1()),
+            registered(GenerationProtocolActivationRecord.class,
+                    new GenerationProtocolActivationRecordCodecV1()),
             registered(MaterializationStreamRegistrationRecord.class,
                     new MaterializationStreamRegistrationRecordCodecV1()),
             registered(MaterializationTaskRecord.class, new MaterializationTaskRecordCodecV1()),
