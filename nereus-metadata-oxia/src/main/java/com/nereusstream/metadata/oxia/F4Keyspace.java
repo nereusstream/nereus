@@ -22,6 +22,7 @@ import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -202,6 +203,38 @@ public final class F4Keyspace {
         return physicalObjectPrefix(object) + "/protections";
     }
 
+    public String gcRetirementManifestKey(ObjectKeyHash object, String gcAttemptId) {
+        return gcRetirementAttemptPrefix(object, gcAttemptId) + "/manifest";
+    }
+
+    public String gcRetirementProtectionKey(
+            ObjectKeyHash object, String gcAttemptId, String protectionKey) {
+        return gcRetirementProtectionPrefix(object, gcAttemptId)
+                + "/"
+                + sha256Hex("protection\0" + requireText(protectionKey, "protectionKey"));
+    }
+
+    public String gcRetirementProtectionPrefix(ObjectKeyHash object, String gcAttemptId) {
+        return gcRetirementAttemptPrefix(object, gcAttemptId) + "/protections";
+    }
+
+    public String gcRetirementRemovalKey(
+            ObjectKeyHash object, String gcAttemptId, String removalKey) {
+        return gcRetirementRemovalPrefix(object, gcAttemptId)
+                + "/"
+                + sha256Hex("removal\0" + requireText(removalKey, "removalKey"));
+    }
+
+    public String gcRetirementRemovalPrefix(ObjectKeyHash object, String gcAttemptId) {
+        return gcRetirementAttemptPrefix(object, gcAttemptId) + "/removals";
+    }
+
+    public String gcRetirementAttemptPrefix(ObjectKeyHash object, String gcAttemptId) {
+        return physicalObjectPrefix(object)
+                + "/gc-retirement/"
+                + KeyComponentCodec.encodeComponent(requireBase32Id(gcAttemptId, "gcAttemptId"));
+    }
+
     public String readerPrefix(ObjectKeyHash object) {
         return physicalObjectPrefix(object) + "/readers";
     }
@@ -230,6 +263,10 @@ public final class F4Keyspace {
         } catch (NoSuchAlgorithmException error) {
             throw new IllegalStateException("SHA-256 is unavailable", error);
         }
+    }
+
+    private static String sha256Hex(String value) {
+        return HexFormat.of().formatHex(sha256(value));
     }
 
     private static String twoDigit(int value) {
@@ -265,5 +302,21 @@ public final class F4Keyspace {
             throw new IllegalArgumentException(name + " cannot be blank");
         }
         return value;
+    }
+
+    private static String requireBase32Id(String value, String name) {
+        String exact = requireText(value, name);
+        if (exact.length() < 26 || exact.length() > 128) {
+            throw new IllegalArgumentException(name + " must encode at least 128 bits and be bounded");
+        }
+        for (int index = 0; index < exact.length(); index++) {
+            char character = exact.charAt(index);
+            if (!((character >= 'a' && character <= 'z')
+                    || (character >= '2' && character <= '7'))) {
+                throw new IllegalArgumentException(
+                        name + " must be lowercase base32 without padding");
+            }
+        }
+        return exact;
     }
 }

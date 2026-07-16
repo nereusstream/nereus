@@ -3,6 +3,9 @@ package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
@@ -305,6 +308,165 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
     }
 
     @Override
+    public CompletableFuture<Optional<VersionedGcRetirementManifest>> getRetirementManifest(
+            String cluster, ObjectKeyHash object, String gcAttemptId) {
+        F4Keyspace keys = new F4Keyspace(cluster);
+        ObjectKeyHash exactObject = Objects.requireNonNull(object, "object");
+        return support.get(
+                        keys.gcRetirementManifestKey(exactObject, gcAttemptId),
+                        keys.physicalObjectPartitionKey(exactObject),
+                        GcRetirementManifestRecord.class)
+                .thenApply(value -> value.map(item -> retirementManifest(keys, item)));
+    }
+
+    @Override
+    public CompletableFuture<VersionedGcRetirementManifest> createRetirementManifest(
+            String cluster, GcRetirementManifestRecord manifest) {
+        GcRetirementManifestRecord value = Objects.requireNonNull(manifest, "manifest");
+        ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
+        F4Keyspace keys = new F4Keyspace(cluster);
+        CompletableFuture<VersionedGcRetirementManifest> create = support.create(
+                        keys.gcRetirementManifestKey(object, value.gcAttemptId()),
+                        keys.physicalObjectPartitionKey(object),
+                        value,
+                        GcRetirementManifestRecord.class)
+                .thenApply(item -> retirementManifest(keys, item));
+        return create.handle((created, failure) -> {
+            if (failure == null) {
+                return CompletableFuture.completedFuture(created);
+            }
+            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                return F4MetadataStoreSupport.<VersionedGcRetirementManifest>failed(
+                        F4MetadataStoreSupport.unwrap(failure));
+            }
+            return getRetirementManifest(cluster, object, value.gcAttemptId())
+                    .thenApply(existing -> {
+                        VersionedGcRetirementManifest result = existing.orElseThrow(
+                                () -> F4MetadataStoreSupport.invariant(
+                                        "GC retirement manifest disappeared after create conflict"));
+                        if (!result.value().withMetadataVersion(0).equals(value)) {
+                            throw F4MetadataStoreSupport.invariant(
+                                    "GC retirement manifest identity conflict");
+                        }
+                        return result;
+                    });
+        }).thenCompose(Function.identity());
+    }
+
+    @Override
+    public CompletableFuture<VersionedGcRetirementProtection> createRetirementProtection(
+            String cluster, GcRetirementProtectionRecord protection) {
+        GcRetirementProtectionRecord value = Objects.requireNonNull(protection, "protection");
+        ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
+        F4Keyspace keys = new F4Keyspace(cluster);
+        String key = keys.gcRetirementProtectionKey(
+                object, value.gcAttemptId(), value.protectionKey());
+        CompletableFuture<VersionedGcRetirementProtection> create = support.create(
+                        key,
+                        keys.physicalObjectPartitionKey(object),
+                        value,
+                        GcRetirementProtectionRecord.class)
+                .thenApply(item -> retirementProtection(keys, item));
+        return create.handle((created, failure) -> {
+            if (failure == null) {
+                return CompletableFuture.completedFuture(created);
+            }
+            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                return F4MetadataStoreSupport.<VersionedGcRetirementProtection>failed(
+                        F4MetadataStoreSupport.unwrap(failure));
+            }
+            return readRetirementProtection(keys, object, value)
+                    .thenApply(existing -> {
+                        VersionedGcRetirementProtection result = existing.orElseThrow(
+                                () -> F4MetadataStoreSupport.invariant(
+                                        "GC retirement protection disappeared after create conflict"));
+                        if (!result.value().withMetadataVersion(0).equals(value)) {
+                            throw F4MetadataStoreSupport.invariant(
+                                    "GC retirement protection identity conflict");
+                        }
+                        return result;
+                    });
+        }).thenCompose(Function.identity());
+    }
+
+    @Override
+    public CompletableFuture<VersionedGcRetirementRemoval> createRetirementRemoval(
+            String cluster, GcRetirementRemovalRecord removal) {
+        GcRetirementRemovalRecord value = Objects.requireNonNull(removal, "removal");
+        ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
+        F4Keyspace keys = new F4Keyspace(cluster);
+        String key = keys.gcRetirementRemovalKey(object, value.gcAttemptId(), value.removalKey());
+        CompletableFuture<VersionedGcRetirementRemoval> create = support.create(
+                        key,
+                        keys.physicalObjectPartitionKey(object),
+                        value,
+                        GcRetirementRemovalRecord.class)
+                .thenApply(item -> retirementRemoval(keys, item));
+        return create.handle((created, failure) -> {
+            if (failure == null) {
+                return CompletableFuture.completedFuture(created);
+            }
+            if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                return F4MetadataStoreSupport.<VersionedGcRetirementRemoval>failed(
+                        F4MetadataStoreSupport.unwrap(failure));
+            }
+            return readRetirementRemoval(keys, object, value)
+                    .thenApply(existing -> {
+                        VersionedGcRetirementRemoval result = existing.orElseThrow(
+                                () -> F4MetadataStoreSupport.invariant(
+                                        "GC retirement removal disappeared after create conflict"));
+                        if (!result.value().withMetadataVersion(0).equals(value)) {
+                            throw F4MetadataStoreSupport.invariant(
+                                    "GC retirement removal identity conflict");
+                        }
+                        return result;
+                    });
+        }).thenCompose(Function.identity());
+    }
+
+    @Override
+    public CompletableFuture<GcRetirementProtectionScanPage> scanRetirementProtections(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        F4Keyspace keys = new F4Keyspace(cluster);
+        return scanObjectPrefix(
+                keys,
+                object,
+                F4ScanKind.GC_RETIREMENT_PROTECTION,
+                keys.gcRetirementProtectionPrefix(object, gcAttemptId),
+                1,
+                continuation,
+                limit,
+                GcRetirementProtectionRecord.class,
+                item -> retirementProtection(keys, item),
+                GcRetirementProtectionScanPage::new);
+    }
+
+    @Override
+    public CompletableFuture<GcRetirementRemovalScanPage> scanRetirementRemovals(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        F4Keyspace keys = new F4Keyspace(cluster);
+        return scanObjectPrefix(
+                keys,
+                object,
+                F4ScanKind.GC_RETIREMENT_REMOVAL,
+                keys.gcRetirementRemovalPrefix(object, gcAttemptId),
+                1,
+                continuation,
+                limit,
+                GcRetirementRemovalRecord.class,
+                item -> retirementRemoval(keys, item),
+                GcRetirementRemovalScanPage::new);
+    }
+
+    @Override
     public void close() {
         support.close();
     }
@@ -330,6 +492,30 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
                 .thenApply(value -> value.map(item -> protection(keys, item)));
     }
 
+    private CompletableFuture<Optional<VersionedGcRetirementProtection>> readRetirementProtection(
+            F4Keyspace keys,
+            ObjectKeyHash object,
+            GcRetirementProtectionRecord protection) {
+        return support.get(
+                        keys.gcRetirementProtectionKey(
+                                object, protection.gcAttemptId(), protection.protectionKey()),
+                        keys.physicalObjectPartitionKey(object),
+                        GcRetirementProtectionRecord.class)
+                .thenApply(value -> value.map(item -> retirementProtection(keys, item)));
+    }
+
+    private CompletableFuture<Optional<VersionedGcRetirementRemoval>> readRetirementRemoval(
+            F4Keyspace keys,
+            ObjectKeyHash object,
+            GcRetirementRemovalRecord removal) {
+        return support.get(
+                        keys.gcRetirementRemovalKey(
+                                object, removal.gcAttemptId(), removal.removalKey()),
+                        keys.physicalObjectPartitionKey(object),
+                        GcRetirementRemovalRecord.class)
+                .thenApply(value -> value.map(item -> retirementRemoval(keys, item)));
+    }
+
     private <R, V, P> CompletableFuture<P> scanObjectPrefix(
             F4Keyspace keys,
             ObjectKeyHash object,
@@ -343,7 +529,7 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
             java.util.function.BiFunction<List<V>, Optional<F4ScanToken>, P> pageFactory) {
         F4MetadataStoreSupport.requirePageLimit(limit);
         String prefix = F4MetadataStoreSupport.prefixStart(base);
-        String scope = support.scopeSha256(kind.name() + "\0" + object.value());
+        String scope = support.scopeSha256(kind.name() + "\0" + object.value() + "\0" + base);
         F4ScanToken token = support.validateToken(continuation, keys.cluster(), kind, scope, prefix);
         String from = token == null
                 ? F4MetadataStoreSupport.fixedDepthStart(base, descendantSegments)
@@ -393,6 +579,47 @@ public final class OxiaJavaPhysicalObjectMetadataStore implements PhysicalObject
             throw F4MetadataStoreSupport.invariant("protection key/value identity mismatch");
         }
         return new VersionedObjectProtection(item.key(), value, item.version(), item.durableSha256());
+    }
+
+    private static VersionedGcRetirementManifest retirementManifest(
+            F4Keyspace keys,
+            F4MetadataStoreSupport.Decoded<GcRetirementManifestRecord> item) {
+        GcRetirementManifestRecord value = item.value();
+        ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
+        if (!item.key().equals(keys.gcRetirementManifestKey(object, value.gcAttemptId()))) {
+            throw F4MetadataStoreSupport.invariant(
+                    "GC retirement manifest key/value identity mismatch");
+        }
+        return new VersionedGcRetirementManifest(
+                item.key(), value, item.version(), item.durableSha256());
+    }
+
+    private static VersionedGcRetirementProtection retirementProtection(
+            F4Keyspace keys,
+            F4MetadataStoreSupport.Decoded<GcRetirementProtectionRecord> item) {
+        GcRetirementProtectionRecord value = item.value();
+        ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
+        if (!item.key().equals(keys.gcRetirementProtectionKey(
+                object, value.gcAttemptId(), value.protectionKey()))) {
+            throw F4MetadataStoreSupport.invariant(
+                    "GC retirement protection key/value identity mismatch");
+        }
+        return new VersionedGcRetirementProtection(
+                item.key(), value, item.version(), item.durableSha256());
+    }
+
+    private static VersionedGcRetirementRemoval retirementRemoval(
+            F4Keyspace keys,
+            F4MetadataStoreSupport.Decoded<GcRetirementRemovalRecord> item) {
+        GcRetirementRemovalRecord value = item.value();
+        ObjectKeyHash object = new ObjectKeyHash(value.objectKeyHash());
+        if (!item.key().equals(keys.gcRetirementRemovalKey(
+                object, value.gcAttemptId(), value.removalKey()))) {
+            throw F4MetadataStoreSupport.invariant(
+                    "GC retirement removal key/value identity mismatch");
+        }
+        return new VersionedGcRetirementRemoval(
+                item.key(), value, item.version(), item.durableSha256());
     }
 
     private static ObjectKeyHash hashForShard(int shard) {

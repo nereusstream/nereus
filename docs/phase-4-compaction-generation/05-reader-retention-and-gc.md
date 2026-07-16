@@ -1110,10 +1110,18 @@ through checkpoint K are not production-composed, and no production coordinator 
 delete primitives. A missing key or lost metadata-delete response must eventually be resolved under the unchanged
 DELETING root, never accepted from absence alone.
 
-Checkpoint L's current foundation changes the canonical digest to protocol v2 and adds the validated manifest、domain
-proof、protection/removal records plus explicit binary-v1 codecs and frozen vectors. The Oxia keyspace/store、seal/load
-implementation and collector's PREPARE-before-MARK wiring are not yet implemented, so no current runtime writes or
-consumes this journal and the destructive path remains disabled.
+Checkpoint L's protocol foundation changes the canonical digest to protocol v2 and adds the validated manifest、domain
+proof、protection/removal records plus explicit binary-v1 codecs and frozen vectors. Its durable-store slice is also
+implemented：`F4Keyspace` derives fixed-depth object/attempt/typed-entry keys；production and fake metadata stores
+provide exact create-or-reload plus bounded token-scoped scans；`DefaultGcRetirementJournal.prepare` writes all
+entries, scans exactly the expected counts, recomputes the v2 digest and creates the manifest last. `load` accepts only
+a present manifest and reconstructs a count- and digest-verified snapshot. Entry/manifest response loss converges by
+exact reload, while a missing、extra、conflicting or cross-attempt entry fails closed.
+
+The collector does not yet receive this service, so its MARK path does not yet prove PREPARE-before-MARK and no
+DELETING recovery path consumes the snapshot. The storage primitive is durable, but it is not independently a
+correctness owner or deletion authority；the destructive path remains disabled until root-authenticated wiring and
+recovery are implemented and gated.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.

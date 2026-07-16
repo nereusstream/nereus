@@ -3,6 +3,9 @@ package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
@@ -47,6 +50,32 @@ public interface PhysicalObjectMetadataStore extends AutoCloseable {
 
     CompletableFuture<ObjectProtectionScanPage> scanProtections(
             String cluster, ObjectKeyHash object, Optional<F4ScanToken> continuation, int limit);
+
+    CompletableFuture<Optional<VersionedGcRetirementManifest>> getRetirementManifest(
+            String cluster, ObjectKeyHash object, String gcAttemptId);
+
+    CompletableFuture<VersionedGcRetirementManifest> createRetirementManifest(
+            String cluster, GcRetirementManifestRecord manifest);
+
+    CompletableFuture<VersionedGcRetirementProtection> createRetirementProtection(
+            String cluster, GcRetirementProtectionRecord protection);
+
+    CompletableFuture<VersionedGcRetirementRemoval> createRetirementRemoval(
+            String cluster, GcRetirementRemovalRecord removal);
+
+    CompletableFuture<GcRetirementProtectionScanPage> scanRetirementProtections(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit);
+
+    CompletableFuture<GcRetirementRemovalScanPage> scanRetirementRemovals(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit);
 
     @Override
     void close();

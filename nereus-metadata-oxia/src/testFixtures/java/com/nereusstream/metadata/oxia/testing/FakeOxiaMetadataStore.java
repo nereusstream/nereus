@@ -47,6 +47,8 @@ import com.nereusstream.metadata.oxia.AppendRecoveryTailCursor;
 import com.nereusstream.metadata.oxia.AppendRecoveryTailPage;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.GcRetirementProtectionScanPage;
+import com.nereusstream.metadata.oxia.GcRetirementRemovalScanPage;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.ObjectProtectionScanPage;
@@ -70,6 +72,9 @@ import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedObjectProtection;
+import com.nereusstream.metadata.oxia.VersionedGcRetirementManifest;
+import com.nereusstream.metadata.oxia.VersionedGcRetirementProtection;
+import com.nereusstream.metadata.oxia.VersionedGcRetirementRemoval;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.VersionedReaderLease;
 import com.nereusstream.metadata.oxia.Phase1ObjectManifestValidator;
@@ -82,6 +87,9 @@ import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.CommittedAppendRecord;
 import com.nereusstream.metadata.oxia.records.CommittedSliceRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.ObjectManifestRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
@@ -1882,6 +1890,52 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
             Optional<F4ScanToken> continuation,
             int limit) {
         return physicalObjects.scanProtections(cluster, object, continuation, limit);
+    }
+
+    @Override
+    public CompletableFuture<Optional<VersionedGcRetirementManifest>> getRetirementManifest(
+            String cluster, ObjectKeyHash object, String gcAttemptId) {
+        return physicalObjects.getRetirementManifest(cluster, object, gcAttemptId);
+    }
+
+    @Override
+    public CompletableFuture<VersionedGcRetirementManifest> createRetirementManifest(
+            String cluster, GcRetirementManifestRecord manifest) {
+        return physicalObjects.createRetirementManifest(cluster, manifest);
+    }
+
+    @Override
+    public CompletableFuture<VersionedGcRetirementProtection> createRetirementProtection(
+            String cluster, GcRetirementProtectionRecord protection) {
+        return physicalObjects.createRetirementProtection(cluster, protection);
+    }
+
+    @Override
+    public CompletableFuture<VersionedGcRetirementRemoval> createRetirementRemoval(
+            String cluster, GcRetirementRemovalRecord removal) {
+        return physicalObjects.createRetirementRemoval(cluster, removal);
+    }
+
+    @Override
+    public CompletableFuture<GcRetirementProtectionScanPage> scanRetirementProtections(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        return physicalObjects.scanRetirementProtections(
+                cluster, object, gcAttemptId, continuation, limit);
+    }
+
+    @Override
+    public CompletableFuture<GcRetirementRemovalScanPage> scanRetirementRemovals(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        return physicalObjects.scanRetirementRemovals(
+                cluster, object, gcAttemptId, continuation, limit);
     }
 
     @Override

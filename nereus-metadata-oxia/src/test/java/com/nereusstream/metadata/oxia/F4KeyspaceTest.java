@@ -95,6 +95,29 @@ class F4KeyspaceTest {
     }
 
     @Test
+    void retirementJournalUsesAttemptScopedHashedSourceKeysInTheObjectPartition() {
+        ObjectKeyHash hash = ObjectKeyHash.from(new ObjectKey("cluster/objects/example"));
+        String attempt = "a".repeat(26);
+        String base = "/nereus/clusters/test-cluster/physical-objects/v1/246/objects/"
+                + hash.value()
+                + "/gc-retirement/"
+                + attempt;
+
+        assertThat(keys.gcRetirementManifestKey(hash, attempt))
+                .isEqualTo(base + "/manifest");
+        assertThat(keys.gcRetirementProtectionPrefix(hash, attempt))
+                .isEqualTo(base + "/protections");
+        assertThat(keys.gcRetirementProtectionKey(hash, attempt, "/protections/source"))
+                .isEqualTo(base
+                        + "/protections/1eee441a0857bd4edfa9cb787d78162970583693aae2ec2c15f34d3753852dc6");
+        assertThat(keys.gcRetirementRemovalKey(hash, attempt, "/source/index"))
+                .isEqualTo(base
+                        + "/removals/d7b6f51ee326a90d121524a1597870129b33425636f298a263c1ff557bab3a15");
+        assertThatThrownBy(() -> keys.gcRetirementManifestKey(hash, "not/base32"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void activationAndStreamKeysCannotSharePartitions() {
         assertThat(keys.generationProtocolActivationKey())
                 .isEqualTo("/nereus/clusters/test-cluster/capabilities/generation-v1/activation");

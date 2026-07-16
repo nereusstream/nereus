@@ -5,6 +5,9 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.metadata.oxia.codec.F4MetadataCodecs;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
@@ -27,6 +30,9 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
     private final Map<String, VersionedPhysicalObjectRoot> roots = new HashMap<>();
     private final Map<String, VersionedReaderLease> leases = new HashMap<>();
     private final Map<String, VersionedObjectProtection> protections = new HashMap<>();
+    private final Map<String, VersionedGcRetirementManifest> retirementManifests = new HashMap<>();
+    private final Map<String, VersionedGcRetirementProtection> retirementProtections = new HashMap<>();
+    private final Map<String, VersionedGcRetirementRemoval> retirementRemovals = new HashMap<>();
     private long nextVersion = 1;
     private boolean closed;
 
@@ -185,7 +191,8 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         F4MetadataStoreSupport.requirePageLimit(limit);
         F4Keyspace keys = new F4Keyspace(cluster);
         String prefix = F4MetadataStoreSupport.prefixStart(keys.readerPrefix(object));
-        String scope = sha256(F4ScanKind.READER_LEASE.name() + "\0" + object.value());
+        String scope = sha256(
+                F4ScanKind.READER_LEASE.name() + "\0" + object.value() + "\0" + keys.readerPrefix(object));
         List<VersionedReaderLease> values = page(
                 leases.values(), VersionedReaderLease::key, prefix, continuation,
                 cluster, F4ScanKind.READER_LEASE, scope, limit);
@@ -259,7 +266,11 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
         F4MetadataStoreSupport.requirePageLimit(limit);
         F4Keyspace keys = new F4Keyspace(cluster);
         String prefix = F4MetadataStoreSupport.prefixStart(keys.protectionPrefix(object));
-        String scope = sha256(F4ScanKind.OBJECT_PROTECTION.name() + "\0" + object.value());
+        String scope = sha256(F4ScanKind.OBJECT_PROTECTION.name()
+                + "\0"
+                + object.value()
+                + "\0"
+                + keys.protectionPrefix(object));
         List<VersionedObjectProtection> values = page(
                 protections.values(), VersionedObjectProtection::key, prefix, continuation,
                 cluster, F4ScanKind.OBJECT_PROTECTION, scope, limit);
@@ -267,6 +278,161 @@ public class FakePhysicalObjectMetadataStore implements PhysicalObjectMetadataSt
                 values,
                 continuation(values, VersionedObjectProtection::key, cluster,
                         F4ScanKind.OBJECT_PROTECTION, scope, prefix, limit)));
+    }
+
+    @Override
+    public synchronized CompletableFuture<Optional<VersionedGcRetirementManifest>> getRetirementManifest(
+            String cluster, ObjectKeyHash object, String gcAttemptId) {
+        ensureOpen();
+        String key = new F4Keyspace(cluster).gcRetirementManifestKey(object, gcAttemptId);
+        return completed(Optional.ofNullable(retirementManifests.get(key)));
+    }
+
+    @Override
+    public synchronized CompletableFuture<VersionedGcRetirementManifest> createRetirementManifest(
+            String cluster, GcRetirementManifestRecord manifest) {
+        ensureOpen();
+        F4Keyspace keys = new F4Keyspace(cluster);
+        ObjectKeyHash object = new ObjectKeyHash(manifest.objectKeyHash());
+        String key = keys.gcRetirementManifestKey(object, manifest.gcAttemptId());
+        VersionedGcRetirementManifest existing = retirementManifests.get(key);
+        if (existing != null) {
+            if (!existing.value().withMetadataVersion(0).equals(manifest)) {
+                return failed(F4MetadataStoreSupport.invariant(
+                        "GC retirement manifest identity conflict"));
+            }
+            return completed(existing);
+        }
+        long version = nextVersion++;
+        GcRetirementManifestRecord value = manifest.withMetadataVersion(version);
+        VersionedGcRetirementManifest created = new VersionedGcRetirementManifest(
+                key, value, version, durable(value, GcRetirementManifestRecord.class));
+        retirementManifests.put(key, created);
+        return completed(created);
+    }
+
+    @Override
+    public synchronized CompletableFuture<VersionedGcRetirementProtection> createRetirementProtection(
+            String cluster, GcRetirementProtectionRecord protection) {
+        ensureOpen();
+        F4Keyspace keys = new F4Keyspace(cluster);
+        ObjectKeyHash object = new ObjectKeyHash(protection.objectKeyHash());
+        String key = keys.gcRetirementProtectionKey(
+                object, protection.gcAttemptId(), protection.protectionKey());
+        VersionedGcRetirementProtection existing = retirementProtections.get(key);
+        if (existing != null) {
+            if (!existing.value().withMetadataVersion(0).equals(protection)) {
+                return failed(F4MetadataStoreSupport.invariant(
+                        "GC retirement protection identity conflict"));
+            }
+            return completed(existing);
+        }
+        long version = nextVersion++;
+        GcRetirementProtectionRecord value = protection.withMetadataVersion(version);
+        VersionedGcRetirementProtection created = new VersionedGcRetirementProtection(
+                key, value, version, durable(value, GcRetirementProtectionRecord.class));
+        retirementProtections.put(key, created);
+        return completed(created);
+    }
+
+    @Override
+    public synchronized CompletableFuture<VersionedGcRetirementRemoval> createRetirementRemoval(
+            String cluster, GcRetirementRemovalRecord removal) {
+        ensureOpen();
+        F4Keyspace keys = new F4Keyspace(cluster);
+        ObjectKeyHash object = new ObjectKeyHash(removal.objectKeyHash());
+        String key = keys.gcRetirementRemovalKey(
+                object, removal.gcAttemptId(), removal.removalKey());
+        VersionedGcRetirementRemoval existing = retirementRemovals.get(key);
+        if (existing != null) {
+            if (!existing.value().withMetadataVersion(0).equals(removal)) {
+                return failed(F4MetadataStoreSupport.invariant(
+                        "GC retirement removal identity conflict"));
+            }
+            return completed(existing);
+        }
+        long version = nextVersion++;
+        GcRetirementRemovalRecord value = removal.withMetadataVersion(version);
+        VersionedGcRetirementRemoval created = new VersionedGcRetirementRemoval(
+                key, value, version, durable(value, GcRetirementRemovalRecord.class));
+        retirementRemovals.put(key, created);
+        return completed(created);
+    }
+
+    @Override
+    public synchronized CompletableFuture<GcRetirementProtectionScanPage> scanRetirementProtections(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        ensureOpen();
+        F4MetadataStoreSupport.requirePageLimit(limit);
+        F4Keyspace keys = new F4Keyspace(cluster);
+        String base = keys.gcRetirementProtectionPrefix(object, gcAttemptId);
+        String prefix = F4MetadataStoreSupport.prefixStart(base);
+        String scope = sha256(F4ScanKind.GC_RETIREMENT_PROTECTION.name()
+                + "\0"
+                + object.value()
+                + "\0"
+                + base);
+        List<VersionedGcRetirementProtection> values = page(
+                retirementProtections.values(),
+                VersionedGcRetirementProtection::key,
+                prefix,
+                continuation,
+                cluster,
+                F4ScanKind.GC_RETIREMENT_PROTECTION,
+                scope,
+                limit);
+        return completed(new GcRetirementProtectionScanPage(
+                values,
+                continuation(
+                        values,
+                        VersionedGcRetirementProtection::key,
+                        cluster,
+                        F4ScanKind.GC_RETIREMENT_PROTECTION,
+                        scope,
+                        prefix,
+                        limit)));
+    }
+
+    @Override
+    public synchronized CompletableFuture<GcRetirementRemovalScanPage> scanRetirementRemovals(
+            String cluster,
+            ObjectKeyHash object,
+            String gcAttemptId,
+            Optional<F4ScanToken> continuation,
+            int limit) {
+        ensureOpen();
+        F4MetadataStoreSupport.requirePageLimit(limit);
+        F4Keyspace keys = new F4Keyspace(cluster);
+        String base = keys.gcRetirementRemovalPrefix(object, gcAttemptId);
+        String prefix = F4MetadataStoreSupport.prefixStart(base);
+        String scope = sha256(F4ScanKind.GC_RETIREMENT_REMOVAL.name()
+                + "\0"
+                + object.value()
+                + "\0"
+                + base);
+        List<VersionedGcRetirementRemoval> values = page(
+                retirementRemovals.values(),
+                VersionedGcRetirementRemoval::key,
+                prefix,
+                continuation,
+                cluster,
+                F4ScanKind.GC_RETIREMENT_REMOVAL,
+                scope,
+                limit);
+        return completed(new GcRetirementRemovalScanPage(
+                values,
+                continuation(
+                        values,
+                        VersionedGcRetirementRemoval::key,
+                        cluster,
+                        F4ScanKind.GC_RETIREMENT_REMOVAL,
+                        scope,
+                        prefix,
+                        limit)));
     }
 
     public synchronized Optional<VersionedReaderLease> readerLease(

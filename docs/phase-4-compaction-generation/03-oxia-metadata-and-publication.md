@@ -1189,6 +1189,14 @@ type/key/version/envelope SHA. Each entry has an independent Oxia metadata versi
 manifest must be created only after all sharded entries have been scanned and verified；these codecs do not themselves
 grant deletion authority, and a consumer must bind the manifest to the matching MARKED/DELETING physical root.
 
+The durable-store slice is implemented by object/attempt-scoped `F4Keyspace.gcRetirement*` paths. Protection/removal
+leaf names are SHA-256 of a type-tagged source key, so slash-bearing source paths do not change fixed scan depth and a
+same source key cannot alias the two entry kinds. `PhysicalObjectMetadataStore` exposes manifest `get/create`, exact
+entry `create`, and independently token-scoped paged protection/removal scans. `OxiaJavaPhysicalObjectMetadataStore`
+and `FakePhysicalObjectMetadataStore` share create-or-reload equality, immutable identity conflict, attempt isolation,
+page-bound and continuation-scope tests. The manifest is still evidence only；the collector must authenticate it
+against the matching root before any retirement side effect.
+
 `F4MetadataCodecs` is registered in `MetadataRecordCodecFactory` only after the generation capability code is present.
 Old binaries see an unknown record type and fail closed；they never reinterpret it as generation zero.
 

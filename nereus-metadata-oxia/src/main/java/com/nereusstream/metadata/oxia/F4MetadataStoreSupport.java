@@ -9,6 +9,9 @@ import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
@@ -233,6 +236,12 @@ final class F4MetadataStoreSupport {
             metadataVersion = record.metadataVersion();
         } else if (value instanceof ObjectProtectionRecord record) {
             metadataVersion = record.metadataVersion();
+        } else if (value instanceof GcRetirementManifestRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof GcRetirementProtectionRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof GcRetirementRemovalRecord record) {
+            metadataVersion = record.metadataVersion();
         } else {
             throw new IllegalArgumentException("unsupported F4 record type: " + value.getClass());
         }
@@ -263,6 +272,12 @@ final class F4MetadataStoreSupport {
         } else if (value instanceof ObjectReaderLeaseRecord record) {
             hydrated = record.withMetadataVersion(version);
         } else if (value instanceof ObjectProtectionRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof GcRetirementManifestRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof GcRetirementProtectionRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof GcRetirementRemovalRecord record) {
             hydrated = record.withMetadataVersion(version);
         } else {
             throw new IllegalArgumentException("unsupported F4 record type: " + value.getClass());
