@@ -1169,6 +1169,9 @@ F4 records use existing `MetadataRecordEnvelope(NRM1, binary-v1)` and a new `F4M
 | `PhysicalObjectRootRecord` | `PhysicalObjectRootRecordCodecV1` | `1 / 1` |
 | `ObjectReaderLeaseRecord` | `ObjectReaderLeaseRecordCodecV1` | `1 / 1` |
 | `ObjectProtectionRecord` | `ObjectProtectionRecordCodecV1` | `1 / 1` |
+| `GcRetirementManifestRecord` | `GcRetirementManifestRecordCodecV1` | `1 / 1` |
+| `GcRetirementProtectionRecord` | `GcRetirementProtectionRecordCodecV1` | `1 / 1` |
+| `GcRetirementRemovalRecord` | `GcRetirementRemovalRecordCodecV1` | `1 / 1` |
 | `GenerationProtocolActivationRecord` | `GenerationProtocolActivationRecordCodecV1` | `1 / 1` |
 
 `F4Binary` follows `F3Binary`：big-endian numeric fields、strict UTF-8、length/count before bytes、canonical map/list
@@ -1178,6 +1181,13 @@ through `ReadTargetCodecRegistry`, not Java serialization.
 
 Each codec writes fields in record declaration order. Collection elements use their declared record field order.
 Changing order/type/requiredness requires schema V2, new golden bytes and a rollout capability update.
+
+The three GC retirement records are recovery evidence for one physical-object GC attempt. The manifest fixes
+reference-set protocol `2`、query SHA、canonical domain snapshot proofs、entry counts and final digest. Protection
+entries retain the full exact `ObjectProtectionRecord` plus its source key/version/envelope SHA；other removals retain
+type/key/version/envelope SHA. Each entry has an independent Oxia metadata version for create/reload identity. The
+manifest must be created only after all sharded entries have been scanned and verified；these codecs do not themselves
+grant deletion authority, and a consumer must bind the manifest to the matching MARKED/DELETING physical root.
 
 `F4MetadataCodecs` is registered in `MetadataRecordCodecFactory` only after the generation capability code is present.
 Old binaries see an unknown record type and fail closed；they never reinterpret it as generation zero.

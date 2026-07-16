@@ -23,7 +23,13 @@ for path in "${lock_docs[@]}"; do
     require_literal "$current_pulsar_lock" "$path"
 done
 
-require_literal "43 frozen envelope vectors" "docs/phase-4-compaction-generation/README.md"
+require_literal "46 个 F4 frozen envelope vectors" "docs/phase-4-compaction-generation/README.md"
+require_literal "GcRetirementManifestRecord" \
+    "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
+require_literal "PREPARE RETIREMENT JOURNAL" \
+    "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
+require_literal "Checkpoint L's protocol foundation" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "publication id before allocating a generation" \
     "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
 require_literal "GenerationMetadataTransitions" \
@@ -93,4 +99,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus current M4 checkpoints, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus current M4 checkpoints/journal foundation, source lock, gates, and local links verified."

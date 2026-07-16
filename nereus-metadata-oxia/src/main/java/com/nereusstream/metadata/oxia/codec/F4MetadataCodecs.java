@@ -3,6 +3,9 @@ package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
@@ -27,7 +30,10 @@ public final class F4MetadataCodecs {
             registered(RecoveryCheckpointRootRecord.class, new RecoveryCheckpointRootRecordCodecV1()),
             registered(PhysicalObjectRootRecord.class, new PhysicalObjectRootRecordCodecV1()),
             registered(ObjectReaderLeaseRecord.class, new ObjectReaderLeaseRecordCodecV1()),
-            registered(ObjectProtectionRecord.class, new ObjectProtectionRecordCodecV1())));
+            registered(ObjectProtectionRecord.class, new ObjectProtectionRecordCodecV1()),
+            registered(GcRetirementManifestRecord.class, new GcRetirementManifestRecordCodecV1()),
+            registered(GcRetirementProtectionRecord.class, new GcRetirementProtectionRecordCodecV1()),
+            registered(GcRetirementRemovalRecord.class, new GcRetirementRemovalRecordCodecV1())));
 
     private F4MetadataCodecs() {
     }

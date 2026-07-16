@@ -22,7 +22,7 @@ final gates on 2026-07-15；the following foundation parts are implemented and c
   generation-index/task create recovery with immutable identity checks；
 - `GenerationMetadataTransitions` guards closed index/task lifecycles、the publication-before-allocation task shape、
   monotonic checkpoint/registration/recovery progress and immutable retention boundaries；
-- 43 frozen F4 metadata envelope vectors cover every lifecycle/optional branch；focused real Oxia covers slash-aware
+- 46 frozen F4 metadata envelope vectors cover every lifecycle/optional branch and retirement-journal record；focused real Oxia covers slash-aware
   fixed-depth ranges、restart、CAS、pagination and conditional metadata delete；
 - M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
@@ -66,14 +66,16 @@ target protection and the `GenerationReadResolver` terminal repair seam. Runtime
 remain. Checkpoint G now adds exact read-before-delete generation-zero source and Phase 1 object-audit metadata
 adapters、committed-marker capture、legacy/generic encoding separation and a borrowed get/delete-only shared-Oxia
 bridge. Checkpoint H adds strict GC configuration、ACTIVE-root candidates and bounded canonical plans whose complete
-domain/protection/metadata-key facts can be recomputed after restart. Checkpoint I adds canonical exact-domain
+domain/protection/metadata-key facts can be recomputed before destructive retirement. Checkpoint I adds canonical exact-domain
 aggregation、mandatory metadata-fact reload、recoverable ACTIVE/MARKED/DELETING fencing and full 256-shard metadata
 root enumeration. It stops at durable delete intent；no source/protection/audit/object delete path is enabled by
 checkpoints G–I. Checkpoint J adds query-bound stateless revalidation、exact reference-to-removal binding and the
 affected-stream generation、append-recovery and materialization reference domains. Checkpoint K adds the core shared
 bounded snapshot builder、composed managed-ledger generation-marker/exact-stream-authority APIs, and affected-stream
 projection-generation plus cursor-snapshot domains. Future-sentinel domains、ownerless global absence proof、
-retirement/destructive coordination and runtime composition remain pending.
+retirement/destructive coordination and runtime composition remain pending. Checkpoint L's protocol foundation adds
+the reference-set-v2 compact domain proof and validated retirement manifest/protection/removal records/codecs；its
+Oxia journal store、manifest-last sealing and collector wiring remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -591,7 +593,8 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > (core bounded snapshot builder、managed-ledger marker/exact projection authority and affected-stream
 > projection-generation/cursor-snapshot domains) are implemented；runtime composition、future-sentinel and
 > ownerless-global domains、retirement/delete coordinators
-> and physical/cursor GC completion remain before F4-M4 can be called complete or final-gated.
+> and physical/cursor GC completion remain before F4-M4 can be called complete or final-gated. Checkpoint L's
+> retirement-journal schema/digest foundation is implemented, but the durable journal protocol is not yet complete.
 
 ### 6.1 Production artifacts
 
@@ -663,6 +666,13 @@ retirement/ObjectAuditRetirementStore.java               implemented checkpoint 
 retirement/OxiaJavaObjectAuditRetirementStore.java       implemented checkpoint G
 retirement/VersionedObjectManifestAudit.java             implemented checkpoint G
 retirement/VersionedObjectReferencesAudit.java           implemented checkpoint G
+records/GcDomainSnapshotProofRecord.java                 implemented checkpoint L foundation
+records/GcRetirementManifestRecord.java                  implemented checkpoint L foundation
+records/GcRetirementProtectionRecord.java                implemented checkpoint L foundation
+records/GcRetirementRemovalRecord.java                   implemented checkpoint L foundation
+codec/GcRetirementManifestRecordCodecV1.java             implemented checkpoint L foundation
+codec/GcRetirementProtectionRecordCodecV1.java           implemented checkpoint L foundation
+codec/GcRetirementRemovalRecordCodecV1.java              implemented checkpoint L foundation
 ManagedLedgerProtocolProperties.java                     implemented checkpoint K composed marker validator
 ManagedLedgerGenerationProtocol.java                     implemented checkpoint K monotonic marker foundation
 ManagedLedgerStreamProjection.java                       implemented checkpoint K exact stream authority view
@@ -689,6 +699,7 @@ gc/GcCandidateRootState.java                             implemented checkpoint 
 gc/GcPlan.java                                           implemented checkpoint H
 gc/GcPlannedProtectionRemoval.java                       implemented checkpoint H
 gc/GcPlannedMetadataRemoval.java                         implemented checkpoint H
+gc/GcDomainSnapshotProof.java                            implemented checkpoint L foundation
 gc/GcIdGenerator.java                                    implemented checkpoint H
 gc/SecureGcIdGenerator.java                              implemented checkpoint H
 gc/GcReferenceDomainVersion.java                         implemented checkpoint I
@@ -768,6 +779,8 @@ PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
 PhysicalGcConfigTest                                      implemented checkpoint H
 GcPlanTest                                                implemented checkpoint H
+F4MetadataCodecGoldenTest                                extended checkpoint L foundation (46 vectors)
+F4RecordValidationTest                                   extended checkpoint L foundation
 PhysicalObjectRootScannerTest                              implemented checkpoint I
 PhysicalRootTombstoneRetirementTest
 LatePutAfterTombstoneTest
@@ -875,6 +888,13 @@ retention/cursor scans、live snapshot-root veto、pending-retention and project
 ownerless fail-closed behavior. The module-boundary gate rejects a managed-ledger -> materialization dependency. This
 is checkpoint-K evidence only：the M5 activation record/registration barrier, future sentinel/ownerless-global proof、
 source retirement、physical deletion and runtime composition remain absent.
+
+Checkpoint L's currently committed foundation is intentionally smaller than a new milestone gate. It freezes
+reference-set protocol v2 and the three journal envelopes, and module tests prove codec/factory round trips、record
+contradictions and equality between the full-snapshot and compact-proof digest paths. A future
+`phase4M4RetirementJournalCheck` must not be added or cited until fixed-depth keyspace/store parity、manifest-last
+sealing/reload and PREPARE-before-MARK failure tests exist；there is currently no durable journal writer or deletion
+enablement behind these records.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

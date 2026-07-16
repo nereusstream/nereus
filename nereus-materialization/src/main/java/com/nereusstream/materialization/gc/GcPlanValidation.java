@@ -3,7 +3,6 @@ package com.nereusstream.materialization.gc;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.core.physical.GcAuthorityToken;
 import com.nereusstream.core.physical.GcReference;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
@@ -24,6 +23,9 @@ final class GcPlanValidation {
     static final Comparator<GcReferenceSnapshot> DOMAIN_ORDER = Comparator
             .comparing(GcReferenceSnapshot::domainId)
             .thenComparingInt(GcReferenceSnapshot::protocolVersion);
+    static final Comparator<GcDomainSnapshotProof> DOMAIN_PROOF_ORDER = Comparator
+            .comparing(GcDomainSnapshotProof::domainId)
+            .thenComparingInt(GcDomainSnapshotProof::protocolVersion);
     static final Comparator<GcPlannedProtectionRemoval> PROTECTION_ORDER = Comparator
             .comparing(value -> value.protection().key());
     static final Comparator<GcPlannedMetadataRemoval> METADATA_ORDER = Comparator
@@ -86,35 +88,53 @@ final class GcPlanValidation {
             List<GcReferenceSnapshot> domainSnapshots,
             List<GcPlannedProtectionRemoval> protections,
             List<GcPlannedMetadataRemoval> metadataRemovals) {
-        DigestWriter writer = new DigestWriter("nereus-gc-reference-set-v1");
-        writer.checksum(query.queryIdentitySha256());
-        writer.int32(domainSnapshots.size());
-        for (GcReferenceSnapshot snapshot : domainSnapshots) {
-            writer.text(snapshot.domainId());
-            writer.int32(snapshot.protocolVersion());
-            writer.checksum(snapshot.queryIdentitySha256());
-            writer.bool(snapshot.complete());
-            writer.bool(snapshot.veto());
-            writer.int64(snapshot.authorityCount());
-            writer.int64(snapshot.referenceCount());
-            writer.int32(snapshot.authorities().size());
-            for (GcAuthorityToken authority : snapshot.authorities()) {
-                writer.text(authority.authorityKey());
-                writer.int64(authority.metadataVersion());
-                writer.checksum(authority.identitySha256());
+        Objects.requireNonNull(query, "query");
+        List<GcDomainSnapshotProof> proofs = domainSnapshots.stream()
+                .map(GcDomainSnapshotProof::from)
+                .toList();
+        return referenceSetSha256(
+                query.queryIdentitySha256(), proofs, protections, metadataRemovals);
+    }
+
+    static Checksum referenceSetSha256(
+            Checksum queryIdentitySha256,
+            List<GcDomainSnapshotProof> domainProofs,
+            List<GcPlannedProtectionRemoval> protections,
+            List<GcPlannedMetadataRemoval> metadataRemovals) {
+        Checksum query = GcReferenceQuery.requireSha256(
+                queryIdentitySha256, "queryIdentitySha256");
+        List<GcDomainSnapshotProof> proofs = canonical(
+                domainProofs,
+                DOMAIN_PROOF_ORDER,
+                MAX_REFERENCE_DOMAINS,
+                "domainProofs");
+        for (GcDomainSnapshotProof proof : proofs) {
+            if (!proof.queryIdentitySha256().equals(query)) {
+                throw new IllegalArgumentException(
+                        "domain proof belongs to another GC reference query");
             }
-            writer.int32(snapshot.references().size());
-            for (GcReference reference : snapshot.references()) {
-                writer.text(reference.referenceType());
-                writer.text(reference.referenceId());
-                writer.text(reference.ownerKey());
-                writer.int64(reference.ownerMetadataVersion());
-                writer.checksum(reference.ownerIdentitySha256());
-            }
-            writer.checksum(snapshot.snapshotSha256());
         }
-        writer.int32(protections.size());
-        for (GcPlannedProtectionRemoval removal : protections) {
+        List<GcPlannedProtectionRemoval> exactProtections = canonicalAllowEmpty(
+                protections,
+                PROTECTION_ORDER,
+                PhysicalGcConfig.MAX_DOMAIN_VALUES,
+                "protections");
+        List<GcPlannedMetadataRemoval> exactMetadataRemovals = canonicalAllowEmpty(
+                metadataRemovals,
+                METADATA_ORDER,
+                PhysicalGcConfig.MAX_DOMAIN_VALUES,
+                "metadataRemovals");
+        DigestWriter writer = new DigestWriter("nereus-gc-reference-set-v2");
+        writer.checksum(query);
+        writer.int32(proofs.size());
+        for (GcDomainSnapshotProof proof : proofs) {
+            writer.text(proof.domainId());
+            writer.int32(proof.protocolVersion());
+            writer.checksum(proof.queryIdentitySha256());
+            writer.checksum(proof.snapshotSha256());
+        }
+        writer.int32(exactProtections.size());
+        for (GcPlannedProtectionRemoval removal : exactProtections) {
             ObjectProtectionRecord protection = removal.protection().value();
             writer.text(removal.protection().key());
             writer.int64(removal.protection().metadataVersion());
@@ -129,8 +149,8 @@ final class GcPlanValidation {
             writer.int64(protection.createdAtMillis());
             writer.int64(protection.expiresAtMillis());
         }
-        writer.int32(metadataRemovals.size());
-        for (GcPlannedMetadataRemoval removal : metadataRemovals) {
+        writer.int32(exactMetadataRemovals.size());
+        for (GcPlannedMetadataRemoval removal : exactMetadataRemovals) {
             writer.text(removal.removalType());
             writer.text(removal.key());
             writer.int64(removal.metadataVersion());
@@ -174,10 +194,6 @@ final class GcPlanValidation {
                 throw new IllegalStateException("SHA-256 is unavailable", failure);
             }
             text(domain);
-        }
-
-        private void bool(boolean value) {
-            digest.update((byte) (value ? 1 : 0));
         }
 
         private void int32(int value) {

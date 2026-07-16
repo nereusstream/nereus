@@ -79,10 +79,14 @@ for artifact in "${test_artifacts[@]}"; do
 done
 
 golden="$repo_root/nereus-metadata-oxia/src/test/resources/com/nereusstream/metadata/oxia/codec/f4-metadata-codec-golden.properties"
-if [[ "$(rg -c '^[^#[:space:]][^=]*=' "$golden")" != "43" ]]; then
-    echo "Phase 4 metadata golden must freeze exactly 43 lifecycle/optional vectors" >&2
+if [[ "$(rg -c '^[^#[:space:]][^=]*=' "$golden")" != "46" ]]; then
+    echo "Phase 4 metadata golden must freeze exactly 46 lifecycle/optional/journal vectors" >&2
     exit 1
 fi
+
+for record in GcRetirementManifestRecord GcRetirementProtectionRecord GcRetirementRemovalRecord; do
+    require_basename "$record.java" "main"
+done
 
 require_literal "publishingTaskWithoutGeneration" \
     "nereus-metadata-oxia/src/testFixtures/java/com/nereusstream/metadata/oxia/F4MetadataTestValues.java"

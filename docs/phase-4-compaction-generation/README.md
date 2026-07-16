@@ -33,7 +33,7 @@ create/root/owner post-check、same-key owner transfer、owner-authorized releas
 metadata checkpoint 还新增了全分片内存 Oxia backend、generation/registration/physical-root/conditional-delete
 store contract tests、record contradiction tests，以及 production/fake 共用的 physical-root lifecycle transition validator；
 generation index/task 的 create-response-loss recovery 会核对 immutable identity，checkpoint 同版本则核对 policy digest。
-当前又冻结了覆盖全部 lifecycle/optional branch 的 43 frozen envelope vectors，并把 generation index、task、
+当前 registry 已冻结覆盖全部 lifecycle/optional branch 及 retirement-journal schema 的 46 个 envelope vectors，并把 generation index、task、
 checkpoint、retention stats、stream registration 和 recovery root 的 ordinary CAS identity/monotonic transition
 guards 接入 production adapter。真实 Oxia gate 进一步验证了 slash-aware fixed-depth key ranges、restart、CAS、
 pagination 和 conditional metadata delete；pinned LocalStack gate 验证了 guarded upload 必须同时等待 SDK response
@@ -309,7 +309,8 @@ legal physical-root lifecycle/epoch transitions. Production and fake physical st
 validator, so test doubles cannot admit a state change rejected by the Oxia adapter. Production ranges use Oxia's
 slash-aware fixed-depth bounds rather than Java-string trailing-slash successors.
 
-All ten F4 record families now have 43 frozen envelope vectors covering every lifecycle and optional branch. The
+M1 froze ten F4 record families and 43 envelope vectors；checkpoint L extends the current registry to thirteen families
+and 46 vectors with the retirement-journal schema. The
 stream-scoped production adapter reloads the exact expected version before applying closed index/task transitions、
 monotonic checkpoint/registration progress、immutable retention boundaries and monotonic recovery-root publication.
 The task durable shape explicitly represents `PUBLISHING(publicationId, generation=empty)` before the same-state CAS
@@ -503,14 +504,22 @@ eligibility；重启后可从 exact `MARKED` wrapper 建立 `MARKED_RECOVERY` ca
 不猜测 MARK 前 version。Plan 只接受 canonical sorted/unique、配置有界、同 query 的 complete/non-veto domain snapshots，
 且 protection 必须属于 candidate object/root epoch。每个 protection removal 冻结完整 owner/value、Oxia
 version 和 durable-envelope SHA；其他 metadata removal 冻结 type/key/version/envelope SHA。
-`referenceSetSha256` 直接提交这些 exact removal facts 和每个 domain 的完整 authority/reference 事实；它不包含
+`referenceSetSha256` protocol v2 直接提交这些 exact removal facts、query identity，以及每个 domain 的
+`(id, version, query SHA, snapshot SHA)`；domain snapshot SHA 已提交完整 authority/reference 事实。它不包含
 随机 candidate id 或进程时间。MARK 前可计算同一
 digest，MARK 后 `fromMarkedRoot` 只接受 exact attempt/digest/object、递增 metadata version 和 `epoch + 1`，所以
-进程重启只能从 authoritative facts 重建，而不能反序列化第二份 correctness state。
+进程重启只能从 root 认证的 exact facts 重建。`GcPlan` 仍不持久化；但 DELETING 会逐项删除 source metadata，
+因此进入 MARK 前必须先密封一份 sharded retirement journal。它只保存恢复证据，不能脱离同 object/attempt/digest
+的 MARKED/DELETING root 自行授权删除。
 
 `phase4M4GcPlanCheck` 覆盖配置关系、毫秒/overflow、128-bit entropy、canonical order、domain truncation/veto、
 跨对象 protection、root attempt/digest mismatch 和重建稳定性。该 checkpoint 仍没有 domain 实现、root CAS、
 metadata retirement 调用或 object delete；physical deletion 继续完全关闭。
+
+Checkpoint L 当前只完成 journal protocol foundation：`GcDomainSnapshotProof`、manifest/protection/removal records、
+三种 binary-v1 codecs、46 个 F4 frozen envelope vectors，以及 snapshot/full-fact 与 compact-proof digest 等价测试。
+Oxia keyspace/store、manifest-last sealing、PREPARE-before-MARK 接线及 DELETING recovery coordinator 尚未实现，
+所以这不是 durable journal 或删除路径已启用的声明。
 
 ### 6.12 F4-M4 reference-domain and root-fence checkpoint
 

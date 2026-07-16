@@ -18,6 +18,10 @@ import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationOutputRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationPolicyRecord;
@@ -441,6 +445,47 @@ public final class F4MetadataTestValues {
                 1,
                 100,
                 pending ? 200 : 0,
+                0);
+    }
+
+    public static GcRetirementManifestRecord gcRetirementManifest() {
+        return new GcRetirementManifestRecord(
+                1,
+                physicalRoot(PhysicalObjectLifecycle.ACTIVE).objectKeyHash(),
+                ATTEMPT,
+                GcRetirementManifestRecord.REFERENCE_SET_PROTOCOL_VERSION,
+                HASH_A,
+                List.of(new GcDomainSnapshotProofRecord(
+                        "projection-generation-v1", 1, HASH_A, HASH_B)),
+                1,
+                1,
+                HASH_C,
+                300,
+                0);
+    }
+
+    public static GcRetirementProtectionRecord gcRetirementProtection() {
+        ObjectProtectionRecord protection = protection(ObjectProtectionType.VISIBLE_GENERATION);
+        return new GcRetirementProtectionRecord(
+                1,
+                protection.objectKeyHash(),
+                ATTEMPT,
+                "/protections/f4/visible-generation",
+                protection.metadataVersion(),
+                HASH_C,
+                protection,
+                0);
+    }
+
+    public static GcRetirementRemovalRecord gcRetirementRemoval() {
+        return new GcRetirementRemovalRecord(
+                1,
+                physicalRoot(PhysicalObjectLifecycle.ACTIVE).objectKeyHash(),
+                ATTEMPT,
+                "generation-index",
+                "/source/index/f4",
+                4,
+                HASH_D,
                 0);
     }
 }

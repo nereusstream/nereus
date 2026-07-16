@@ -7,6 +7,9 @@ import com.nereusstream.metadata.oxia.F4MetadataTestValues;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
@@ -125,6 +128,18 @@ class F4MetadataCodecGoldenTest {
                     F4MetadataTestValues.protection(type),
                     ObjectProtectionRecord.class));
         }
+        values.add(sample(
+                "gc-retirement.manifest",
+                F4MetadataTestValues.gcRetirementManifest(),
+                GcRetirementManifestRecord.class));
+        values.add(sample(
+                "gc-retirement.protection",
+                F4MetadataTestValues.gcRetirementProtection(),
+                GcRetirementProtectionRecord.class));
+        values.add(sample(
+                "gc-retirement.removal",
+                F4MetadataTestValues.gcRetirementRemoval(),
+                GcRetirementRemovalRecord.class));
         return List.copyOf(values);
     }
 

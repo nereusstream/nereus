@@ -696,6 +696,12 @@ public record GcPlannedMetadataRemoval(
         String key,
         long metadataVersion,
         Checksum durableValueSha256) { }
+
+public record GcDomainSnapshotProof(
+        String domainId,
+        int protocolVersion,
+        Checksum queryIdentitySha256,
+        Checksum snapshotSha256) { }
 ```
 
 Candidate/attempt ids are random 128-bit lowercase base32 and never authorize deletion. Candidate construction
@@ -703,15 +709,63 @@ uses either the exact ACTIVE root version/epoch (`ACTIVE_DISCOVERY`) or the curr
 (`MARKED_RECOVERY`) and hashes the root、manifest/inventory evidence and affected stream
 set. Plan lists are canonical sorted/unique and bounded by `PhysicalGcConfig`; every planned protection retains its
 exact key、full owner/value、root epoch、Oxia version and durable-envelope SHA, while every other metadata removal
-retains a canonical type/key/version/envelope SHA. `referenceSetSha256` hashes those full facts plus every complete
-domain authority/reference set, not merely removal identities. A same-key protection owner/version change therefore
-changes the digest and invalidates drain. The marked
+retains a canonical type/key/version/envelope SHA. `referenceSetSha256` protocol v2 hashes the query identity、the
+ordered `(domainId, protocolVersion, queryIdentitySha256, snapshotSha256)` proofs and those full removal facts. Each
+`snapshotSha256` already commits the complete domain authority/reference set、counts and complete/veto bits, so the
+compact proof is equivalent to copying the unbounded set into the root digest while remaining restart-recoverable. A
+same-key protection owner/version change or any domain snapshot change therefore changes the digest and invalidates
+drain. The marked
 root version/epoch are filled only from the successful `ACTIVE -> MARKED` CAS. After restart, recovery uses the
 current MARKED metadata version/epoch directly and never guesses the prior ACTIVE Oxia version or assumes versions are
 consecutive. Every domain reference must also match one planned metadata removal by exact owner key、Oxia version and
 durable identity SHA；a reference that is merely hashed but whose owner would survive deletion invalidates the plan.
-A plan is process-local and is always reconstructed from the root digest after restart；serializing it would create a
-second correctness owner.
+`GcPlan` remains process-local. Before MARK, however, its destructive recovery facts are copied into a sealed durable
+retirement journal because source metadata can disappear one key at a time after DELETING. The journal is evidence,
+not a second correctness owner：only a physical root in MARKED/DELETING with the same object、attempt and
+`referenceSetSha256` authorizes its use.
+
+The persisted binary-v1 journal schema is deliberately sharded instead of embedding an unbounded plan in one Oxia
+value：
+
+```java
+public record GcRetirementManifestRecord(
+        int schemaVersion,
+        String objectKeyHash,
+        String gcAttemptId,
+        int referenceSetProtocolVersion,       // exactly 2
+        String queryIdentitySha256,
+        List<GcDomainSnapshotProofRecord> domainProofs, // canonical, <= 32
+        int protectionCount,
+        int metadataRemovalCount,              // each count <= 100_000
+        String referenceSetSha256,
+        long createdAtMillis,
+        long metadataVersion) { }
+
+public record GcRetirementProtectionRecord(
+        int schemaVersion,
+        String objectKeyHash,
+        String gcAttemptId,
+        String protectionKey,
+        long protectionMetadataVersion,
+        String protectionDurableValueSha256,
+        ObjectProtectionRecord protection,
+        long metadataVersion) { }
+
+public record GcRetirementRemovalRecord(
+        int schemaVersion,
+        String objectKeyHash,
+        String gcAttemptId,
+        String removalType,
+        String removalKey,
+        long removalMetadataVersion,
+        String removalDurableValueSha256,
+        long metadataVersion) { }
+```
+
+Entry keys are deterministic hashes of the source key within the physical-object shard and attempt subtree. Writers
+create/verify every entry first, scan the exact fixed-depth prefixes, recompute protocol-v2 digest and counts, and only
+then create the manifest. Thus presence of a manifest means the complete fact set was sealed；loose entries from a
+crashed pre-MARK attempt grant no authority and may be swept later.
 
 Checkpoint H implements these three values and `SecureGcIdGenerator`. `GcPlan.computeReferenceSetSha256` is the
 pre-MARK digest operation；`GcPlan.fromMarkedRoot` accepts only the exact MARK response/reload carrying that digest and
@@ -976,10 +1030,18 @@ DISCOVER
       DomainValidatedDeletionSubject(exactGcReferenceQuery,
           projectionDomainSnapshotSha256), false)
   classify planned visible/recovery protections vs veto protections
-  compute canonical referenceSetSha256 from keys/versions/owner tokens
+  compute canonical protocol-v2 referenceSetSha256 from compact domain proofs
+    plus exact protection/removal facts
+
+PREPARE RETIREMENT JOURNAL
+  under object shard + attempt, create-or-verify one exact record per protection/removal
+  scan the complete fixed-depth entry prefixes and reject missing/extra/duplicate facts
+  recompute query/domain-proof/count/referenceSet identities from the scanned entries
+  create manifest last, then reload and verify its exact stored envelope
 
 MARK
   require now >= candidate.notBefore
+  require the exact sealed journal for object + attempt + referenceSetSha256
   revalidate activation proof
   CAS root ACTIVE -> MARKED(
       new epoch, attemptId, digest,
@@ -1000,7 +1062,8 @@ DELETE INTENT
   CAS MARKED -> DELETING preserving attempt/digest
 
 METADATA RETIREMENT
-  conditionally delete/retire every planned F4 index key
+  load the root-authenticated journal; never reconstruct a shrinking plan from remaining source keys
+  conditionally delete/retire every journaled F4 index key
   through SourceRetirementMetadataStore, conditionally delete exact generation-zero
     index + committed-slice/committed-append marker + checkpoint-replaced commit node
   conditionally remove planned visible/recovery protection keys
@@ -1016,9 +1079,12 @@ PHYSICAL DELETE
   emit bounded structured audit log/metrics; DELETED root is the durable outcome
 ```
 
-The root stores only the canonical digest, not an unbounded reference list. Recovery recomputes the set from
-authoritative metadata and requires the same digest before continuing. Conditional metadata deletion makes partial
-progress discoverable. `sourceRetirementGrace` and `drainGrace` are intentionally not interchangeable：the former is
+The root stores only the canonical digest, not an unbounded reference list. Before destructive work, recovery requires
+the manifest object/attempt/digest to match that root and recomputes the digest from the journal entries. It also
+revalidates still-live source facts while they remain；after a conditional delete succeeds, the journal preserves the
+original version/SHA needed to classify a retry as exact progress rather than treating absence as permission. Journal
+cleanup occurs only after the DELETED outcome/tombstone policy permits it. `sourceRetirementGrace` and `drainGrace`
+are intentionally not interchangeable：the former is
 part of candidate eligibility and preserves fallback/recovery policy before MARK；the latter starts at the successful
 MARK and gives pre-existing readers/protection handshakes time to drain after new admissions are fenced.
 
@@ -1043,6 +1109,11 @@ and `DELETING -> DELETED` are still pending；the five affected-stream storage/p
 through checkpoint K are not production-composed, and no production coordinator currently reaches the checkpoint-G
 delete primitives. A missing key or lost metadata-delete response must eventually be resolved under the unchanged
 DELETING root, never accepted from absence alone.
+
+Checkpoint L's current foundation changes the canonical digest to protocol v2 and adds the validated manifest、domain
+proof、protection/removal records plus explicit binary-v1 codecs and frozen vectors. The Oxia keyspace/store、seal/load
+implementation and collector's PREPARE-before-MARK wiring are not yet implemented, so no current runtime writes or
+consumes this journal and the destructive path remains disabled.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.

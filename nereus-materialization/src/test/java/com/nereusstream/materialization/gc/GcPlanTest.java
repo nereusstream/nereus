@@ -103,6 +103,37 @@ class GcPlanTest {
     }
 
     @Test
+    void referenceSetV2CanBeRecomputedFromCompactAuthenticatedDomainProofs() {
+        PhysicalGcConfig config = PhysicalGcConfig.defaults();
+        VersionedPhysicalObjectRoot active = activeRoot();
+        GcReferenceQuery query = query(PhysicalObjectIdentity.from(active.value()));
+        GcCandidate candidate = candidate(config, active, query);
+        List<GcReferenceSnapshot> snapshots = List.of(
+                snapshot(query, "generation-v1", List.of(authority("/a", 1))));
+        List<GcPlannedProtectionRemoval> protections = List.of(protection(
+                candidate.object().objectKeyHash(), 1, 9, SHA_A));
+        List<GcPlannedMetadataRemoval> removals = List.of(metadata(
+                "/metadata/generation-a", 12, SHA_A));
+
+        Checksum fromSnapshots = GcPlan.computeReferenceSetSha256(
+                config, candidate, snapshots, protections, removals);
+        Checksum fromProofs = GcPlanValidation.referenceSetSha256(
+                query.queryIdentitySha256(),
+                snapshots.stream().map(GcDomainSnapshotProof::from).toList(),
+                protections,
+                removals);
+
+        assertThat(fromProofs).isEqualTo(fromSnapshots);
+        assertThatThrownBy(() -> GcPlanValidation.referenceSetSha256(
+                        SHA_B,
+                        snapshots.stream().map(GcDomainSnapshotProof::from).toList(),
+                        protections,
+                        removals))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("another GC reference query");
+    }
+
+    @Test
     void everyDomainReferenceRequiresAnExactPlannedRemoval() {
         PhysicalGcConfig config = PhysicalGcConfig.defaults();
         VersionedPhysicalObjectRoot active = activeRoot();

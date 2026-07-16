@@ -10,6 +10,10 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationSequenceRecord;
+import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
@@ -101,6 +105,66 @@ class F4RecordValidationTest {
                         200,
                         0))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsRetirementJournalIdentityCountAndOrderingContradictions() {
+        GcRetirementManifestRecord manifest = F4MetadataTestValues.gcRetirementManifest();
+        GcDomainSnapshotProofRecord proof = manifest.domainProofs().getFirst();
+        assertThatThrownBy(() -> new GcRetirementManifestRecord(
+                        1,
+                        manifest.objectKeyHash(),
+                        manifest.gcAttemptId(),
+                        1,
+                        manifest.queryIdentitySha256(),
+                        manifest.domainProofs(),
+                        manifest.protectionCount(),
+                        manifest.metadataRemovalCount(),
+                        manifest.referenceSetSha256(),
+                        manifest.createdAtMillis(),
+                        0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be 2");
+        assertThatThrownBy(() -> new GcRetirementManifestRecord(
+                        1,
+                        manifest.objectKeyHash(),
+                        manifest.gcAttemptId(),
+                        GcRetirementManifestRecord.REFERENCE_SET_PROTOCOL_VERSION,
+                        manifest.queryIdentitySha256(),
+                        List.of(proof, proof),
+                        manifest.protectionCount(),
+                        manifest.metadataRemovalCount(),
+                        manifest.referenceSetSha256(),
+                        manifest.createdAtMillis(),
+                        0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sorted and unique");
+
+        GcRetirementProtectionRecord protection = F4MetadataTestValues.gcRetirementProtection();
+        assertThatThrownBy(() -> new GcRetirementProtectionRecord(
+                        1,
+                        protection.objectKeyHash(),
+                        protection.gcAttemptId(),
+                        protection.protectionKey(),
+                        protection.protectionMetadataVersion() + 1,
+                        protection.protectionDurableValueSha256(),
+                        protection.protection(),
+                        0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("object/version identity");
+
+        GcRetirementRemovalRecord removal = F4MetadataTestValues.gcRetirementRemoval();
+        assertThatThrownBy(() -> new GcRetirementRemovalRecord(
+                        1,
+                        removal.objectKeyHash(),
+                        removal.gcAttemptId(),
+                        "Generation Index",
+                        removal.removalKey(),
+                        removal.removalMetadataVersion(),
+                        removal.removalDurableValueSha256(),
+                        0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not canonical");
     }
 
     private static GenerationIndexRecord generationLifecycle(
