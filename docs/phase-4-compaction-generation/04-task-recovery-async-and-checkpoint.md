@@ -966,6 +966,27 @@ When ordinary resolve finds no index at a committed offset：
 
 F4 configuration reserves separate repair concurrency so a materialization backlog cannot starve read-after-write.
 
+#### 9.3.1 Implemented checkpoint AD boundary
+
+Checkpoint AD implements the core boundary without prematurely enabling it in the broker runtime：
+
+- `Phase4StorageProfileResolver` accepts the exact matrix in §9.1 and still rejects all BookKeeper profiles before IO；
+- the existing `AppendCoordinator` protected-intent/root/`REACHABLE_APPEND`/head sequence is unchanged；
+- after a proved stable head, `AsyncObjectWalAppendCoordinator` returns immediately for `WAL_DURABLE` and launches
+  generation-zero materialization plus `VISIBLE_GENERATION` protection under an independent timeout；
+- strict durability waits for that exact protection and propagates its failure；
+- detached failure does not suspend the append lane or revoke the already returned stable offset；
+- `GenerationZeroRepairScanner` reconstructs only root-stable live-tail generation zero and never regenerates an
+  NRC1-retired primary target；
+- `ReadAfterStableCommitRepair` is injectable as the live branch of `CheckpointDerivedIndexRepairer`, so a committed
+  index gap receives physical protection before re-resolve；
+- both Object-WAL profiles are accepted by the F4 `GenerationReadResolver`.
+
+Legacy `DefaultStreamStorage` constructors continue to install `Phase15StorageProfileResolver`. The new explicit
+resolver constructor is an integration seam, not a rollout switch. Production remains disabled until the exact
+registration/topic-marker activation proof and materialization lag gate execute before primary object preparation,
+and until the provider installs the F4 generation resolver/checkpoint composite/scanner lifecycle.
+
 ### 9.4 Lag/backpressure
 
 Signals：

@@ -43,6 +43,8 @@ import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublis
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.lifecycle.StreamLifecycleCoordinator;
+import com.nereusstream.core.profile.Phase15StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolver;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.ReadResolver;
@@ -187,12 +189,43 @@ public final class DefaultStreamStorage implements StreamStorage {
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver,
             TrimMetricsObserver trimMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                recoverySearcher,
+                new Phase15StorageProfileResolver(),
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    /**
+     * Explicit profile-resolver seam used by the Phase 4 runtime after registration, activation, and lag admission
+     * have been composed ahead of primary IO.
+     */
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
         Objects.requireNonNull(walObjectReader, "walObjectReader");
         Objects.requireNonNull(physicalReferences, "physicalReferences");
         Objects.requireNonNull(recoverySearcher, "recoverySearcher");
+        Objects.requireNonNull(profileResolver, "profileResolver");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
@@ -205,6 +238,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 appendSessionManager,
                 physicalReferences,
                 recoverySearcher,
+                profileResolver,
                 clock,
                 callbackExecutor);
         ReadResolver readResolver = new ReadResolver(

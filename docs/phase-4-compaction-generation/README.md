@@ -57,7 +57,11 @@
 > registration proof 已完成且 domain set 完全匹配时才做 bounded CAS；并发冲突/响应丢失从 durable ACTIVE
 > reload 收敛，final readiness drift 使调用失败但旧 epoch ACTIVE 仍被 guard 阻断。Broker 的零失败 backfill
 > promise 在 proof 完成后等待该 activation；失败 report 或默认关闭状态不调用 controller。具体 mutation call sites、
-> cursor snapshot candidate/deletion scanner、object inventory、
+> Checkpoint AD 又落地 Phase 4 Object-WAL execution matrix、protected-head 后的 `WAL_DURABLE` ack cut、独立
+> deadline/single-flight generation-zero 后台修复、restart/live-tail scanner 和 protected read-after-commit
+> repair。旧 `DefaultStreamStorage` 构造路径仍固定使用 Phase 1.5 resolver；只有显式 Phase 4 composition seam
+> 才接受 async profile，因此 registration/topic-marker/lag admission 尚未接到 primary IO 前时，production
+> provider 不会误开该路径。cursor snapshot candidate/deletion scanner、object inventory、
 > registration retirement、其余 materialization/GC runtime composition 与最终删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
@@ -1091,6 +1095,39 @@ proof、publication-only fields、existing ACTIVE monotonicity、condition-confl
 post-CAS readiness invalidation、domain drift，以及 broker 对成功/失败/disabled backfill 的 exact sequencing。
 Gate 已于 2026-07-16 通过。
 
+### 6.32 F4-M5 async Object-WAL acknowledgement and protected repair checkpoint
+
+Checkpoint AD 落地 `Phase4StorageProfileResolver` 的 frozen matrix：同步 Object-WAL 只接受
+`WAL_DURABLE_AND_INDEX_COMMITTED`；异步 Object-WAL 同时接受 `WAL_DURABLE` 与 strict durability；所有
+BookKeeper profile 在 adapter gate 前继续于 primary IO 前拒绝。`AppendCoordinator` 的 legacy constructors
+仍注入 `Phase15StorageProfileResolver`，`DefaultStreamStorage` 只新增显式 resolver seam，避免单凭 durable
+enum/property 就把未完成的 broker admission 当作 production enablement。
+
+`AsyncObjectWalAppendCoordinator` 现在把 protected stable head 作为 `WAL_DURABLE` success boundary，并以独立
+timeout 在 detached single-flight 中执行
+`materializeGenerationZero -> VISIBLE_GENERATION protection`。secondary failure 只累计为 repair failure，不会
+撤销已经返回的 exact stable offsets；strict durability 则继续等待同一 exact protection。普通 append 与
+`recoverAppend` 共享该 cut，close 会在 admitted append drain 后停止新 background work，并在剩余 shutdown
+budget 内 best-effort 等待；未完成工作仍由 durable scanner 收敛。
+
+`GenerationZeroRepairScanner` 对 recovery-root double-read 后的 bounded live tail 水合 exact generic commit，
+绑定 observed head reachability，跳过 fully trimmed commits，并为每条 materialized index 建立 permanent
+`VISIBLE_GENERATION` protection。它明确拒绝从 NRC1-covered offset 重建已退休 generation-zero target；
+`CheckpointDerivedIndexRepairer` 新增 injectable live repairer seam，production composition 可以用
+`ReadAfterStableCommitRepair` 处理 live tail，再保留既有 NRC1 higher-generation restore path。
+`GenerationReadResolver` 因此接受两个 Object-WAL profile，但 default `DefaultStreamStorage` 仍未切换到 F4
+generation resolver。
+
+聚焦测试覆盖 detached work 尚未开始即返回、strict protection wait、secondary protection failure 不撤销 ack、
+真实 facade append 在 gen-0 materialization 挂起时仍只于 protected head 后返回、恢复后 exact protection
+存在、restart scanner、trim-wins 和 read-after-commit repair。`phase4M5AsyncObjectWalCheck` 是 checkpoint AD
+ordinary gate；它继承 checkpoint AC 的完整 rollout gate，再运行 core 回归、module/docs audit 和本
+checkpoint contract-surface audit。
+
+该 checkpoint 仍不是 async production activation：exact registration/topic marker proof 和
+`MaterializationLagGate` 必须在 primary upload 前接入，runtime 还必须装配 F4 generation reader、checkpoint
+repairer、scanner/service lifecycle，之后 Pulsar 才能把 async topic policy 映射到显式 Phase 4 resolver。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -1100,7 +1137,7 @@ Gate 已于 2026-07-16 通过。
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；checkpoints AA–AC supply durable registration proof、publication activation and exact deletion admission validation, while cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining runtime composition and final gate remain pending |
-| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；mutation call sites、async/profile/retention/admin wiring remain |
+| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；pre-IO activation/lag admission、production F4 read/runtime composition、retention/admin wiring remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：

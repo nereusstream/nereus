@@ -114,7 +114,10 @@ projection-domain delete admission and the disabled-by-default Pulsar first-acti
 Checkpoint AC adds the product-owned publication coordinator、proof-gated
 `PREPARED -> ACTIVE(publication=true, deletion=false)` CAS、bounded conflict/lost-response recovery、final readiness
 revalidation and broker sequencing after a zero-failure durable backfill proof. The task/index/checkpoint/trim/delete
-mutation call sites remain pending.
+mutation call sites remain pending. Checkpoint AD adds the opt-in Phase 4 Object-WAL profile matrix、protected-head
+`WAL_DURABLE` acknowledgement boundary、independently bounded generation-zero repair、root-stable restart scanner and
+protected read-after-commit live repair. Legacy runtime constructors remain Phase 1.5-only；pre-IO activation/lag
+admission and production F4 reader/scanner composition remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1106,10 +1109,10 @@ bounded audit metadata only after the long grace, while a stale first/retried PU
 ### 7.1 Nereus production artifacts
 
 ```text
-nereus-core/.../profile/Phase4StorageProfileResolver.java
-nereus-core/.../append/AsyncObjectWalAppendCoordinator.java
-nereus-core/.../recovery/GenerationZeroRepairScanner.java
-nereus-core/.../read/ReadAfterStableCommitRepair.java
+nereus-core/.../profile/Phase4StorageProfileResolver.java             implemented checkpoint AD
+nereus-core/.../append/AsyncObjectWalAppendCoordinator.java          implemented checkpoint AD
+nereus-core/.../recovery/GenerationZeroRepairScanner.java            implemented checkpoint AD
+nereus-core/.../read/ReadAfterStableCommitRepair.java                implemented checkpoint AD
 nereus-core/.../backpressure/MaterializationLagGate.java
 
 nereus-metadata-oxia/.../ManagedLedgerGenerationProtocol.java       protocol/CAS foundation implemented K
@@ -1182,11 +1185,11 @@ pulsar-broker-common/.../ServiceConfiguration.java                      extended
 Nereus：
 
 ```text
-Phase4StorageProfileResolverTest
-AsyncObjectWalAppendCoordinatorTest
-AsyncAppendPhysicalProtectionTest
-AsyncReadAfterCommitRepairTest
-GenerationZeroRepairScannerTest
+Phase4StorageProfileResolverTest                                    implemented checkpoint AD
+AsyncObjectWalAppendCoordinatorTest                                 implemented checkpoint AD
+AsyncAppendPhysicalProtectionTest                                   implemented checkpoint AD
+AsyncReadAfterCommitRepairTest                                      implemented checkpoint AD
+GenerationZeroRepairScannerTest                                     implemented checkpoint AD
 MaterializationLagGateTest
 ManagedLedgerGenerationProtocolTest                         implemented K protocol/CAS foundation
 ManagedLedgerGenerationProjectionRefV1GoldenTest
@@ -1235,6 +1238,7 @@ NereusGenerationProtocolBrokerTest
 ./gradlew phase4M5RegistrationProofCheck
 ./gradlew phase4M5ActivationGuardCheck
 ./gradlew phase4M5PublicationActivationCheck
+./gradlew phase4M5AsyncObjectWalCheck
 ./gradlew phase4M5Check
 ./gradlew phase4M5FinalCheck --rerun-tasks
 ```
@@ -1308,6 +1312,15 @@ record. Cached readiness and ACTIVE authority are revalidated after CAS. Broker 
 coordinator only when the report is zero-failure and the explicit switch is true；disabled/failure reports never call
 it, and activation failure fails the returned promise. This gate does not set a topic marker or admit any
 task/index/checkpoint/trim/delete mutation. It passed on 2026-07-16.
+
+`phase4M5AsyncObjectWalCheck` is the checkpoint-AD precursor. It inherits the complete checkpoint-AC rollout chain,
+then audits and tests the core-only opt-in Phase 4 Object-WAL execution boundary. The gate proves that legacy
+constructors still install `Phase15StorageProfileResolver`、BookKeeper profiles remain rejected before IO、
+`WAL_DURABLE` returns only after protected stable head but before generation-zero completion、strict durability waits
+for exact `VISIBLE_GENERATION` protection、secondary failure cannot revoke an acknowledgement、restart/live read
+repair materializes and protects the exact reachable commit、trim wins without creating a new index, and
+NRC1-covered offsets are not regenerated as generation zero. It does not install the resolver in the production
+provider, create the first topic marker, apply lag admission, or claim async Pulsar policy support.
 
 ## 8. F4-M6 — Final Acceptance
 

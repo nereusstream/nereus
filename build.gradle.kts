@@ -1178,3 +1178,20 @@ tasks.register("phase4M5PublicationActivationCheck") {
     dependsOn(":nereus-managed-ledger:check")
     dependsOn(":nereus-pulsar-adapter:check")
 }
+
+tasks.register<Exec>("checkPhase4M5AsyncObjectWalContractSurface") {
+    group = "verification"
+    description = "Audit the opt-in async Object-WAL acknowledgement and protected generation-zero repair surface."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m5-async-object-wal-contract-surface.sh")
+}
+
+tasks.register("phase4M5AsyncObjectWalCheck") {
+    group = "verification"
+    description = "Verify checkpoint AD async Object-WAL acknowledgement and protected read/restart repair."
+    dependsOn("phase4M5PublicationActivationCheck")
+    dependsOn("checkPhase4M5AsyncObjectWalContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+}

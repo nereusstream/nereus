@@ -83,7 +83,7 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
     private final ObjectReadPinManager pinManager;
     private final ObjectProtectionManager protections;
     private final GenerationProtocolActivationGuard activationGuard;
-    private final MetadataGenerationIndexRepairer liveRepairer;
+    private final GenerationIndexRepairer liveRepairer;
     private final int maxLiveCommits;
     private final int livePageSize;
     private final Clock clock;
@@ -100,6 +100,37 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
             ObjectReadPinManager pinManager,
             ObjectProtectionManager protections,
             GenerationProtocolActivationGuard activationGuard,
+            int maxLiveCommits,
+            int livePageSize,
+            Clock clock) {
+        this(
+                cluster,
+                l0Store,
+                generationStore,
+                physicalStore,
+                walker,
+                codec,
+                pinManager,
+                protections,
+                activationGuard,
+                new MetadataGenerationIndexRepairer(
+                        cluster, l0Store, maxLiveCommits),
+                maxLiveCommits,
+                livePageSize,
+                clock);
+    }
+
+    public CheckpointDerivedIndexRepairer(
+            String cluster,
+            OxiaMetadataStore l0Store,
+            GenerationMetadataStore generationStore,
+            PhysicalObjectMetadataStore physicalStore,
+            AnchorAwareCommitWalker walker,
+            RecoveryCheckpointCodecV1 codec,
+            ObjectReadPinManager pinManager,
+            ObjectProtectionManager protections,
+            GenerationProtocolActivationGuard activationGuard,
+            GenerationIndexRepairer liveRepairer,
             int maxLiveCommits,
             int livePageSize,
             Clock clock) {
@@ -124,8 +155,8 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
         }
         this.maxLiveCommits = maxLiveCommits;
         this.livePageSize = livePageSize;
-        this.liveRepairer = new MetadataGenerationIndexRepairer(
-                this.cluster, this.l0Store, maxLiveCommits);
+        this.liveRepairer = Objects.requireNonNull(
+                liveRepairer, "liveRepairer");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 

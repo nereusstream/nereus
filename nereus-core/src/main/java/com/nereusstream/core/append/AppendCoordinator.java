@@ -92,7 +92,8 @@ public final class AppendCoordinator implements AutoCloseable {
     private final GenerationZeroIndexMaterializer indexMaterializer;
     private final GenerationZeroPhysicalReferencePublisher physicalReferences;
     private final AppendRecoverySearcher recoverySearcher;
-    private final StorageProfileResolver profileResolver = new Phase15StorageProfileResolver();
+    private final StorageProfileResolver profileResolver;
+    private final AsyncObjectWalAppendCoordinator appendCompletionCoordinator;
     private final ConcurrentHashMap<StreamId, StreamLane> lanes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<AppendAttemptId, Attempt> retainedAttempts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<AppendAttemptId, TerminalAttempt> terminalAttempts = new ConcurrentHashMap<>();
@@ -131,12 +132,35 @@ public final class AppendCoordinator implements AutoCloseable {
             AppendRecoverySearcher recoverySearcher,
             Clock clock,
             Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                sessionManager,
+                physicalReferences,
+                recoverySearcher,
+                new Phase15StorageProfileResolver(),
+                clock,
+                callbackExecutor);
+    }
+
+    public AppendCoordinator(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            AppendSessionManager sessionManager,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            Clock clock,
+            Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
         this.recoverySearcher = Objects.requireNonNull(recoverySearcher, "recoverySearcher");
+        this.profileResolver = Objects.requireNonNull(profileResolver, "profileResolver");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.writerRunIdHash = DeterministicIds.stableHashComponent(config.processRunId());
@@ -150,6 +174,11 @@ public final class AppendCoordinator implements AutoCloseable {
         this.retainedAttemptPermits = new Semaphore(config.maxRetainedAppendAttempts());
         this.stableCommitter = new MetadataStableAppendCommitter(config.cluster(), metadataStore);
         this.indexMaterializer = new MetadataGenerationZeroIndexMaterializer(config.cluster(), metadataStore);
+        this.appendCompletionCoordinator = new AsyncObjectWalAppendCoordinator(
+                indexMaterializer,
+                physicalReferences,
+                config.appendRecoveryAttemptTimeout(),
+                callbackExecutor);
         this.recoveryScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "nereus-append-recovery");
             thread.setDaemon(true);
@@ -425,17 +454,13 @@ public final class AppendCoordinator implements AutoCloseable {
                 .thenCompose(stable -> {
                     attempt.markHeadKnownCommitted();
                     return deadline.bound(
-                            () -> indexMaterializer.materialize(stable.reachableAppend()),
+                            () -> appendCompletionCoordinator.completeAfterStableCommit(
+                                    stable,
+                                    attempt.options().durabilityLevel(),
+                                    deadline.remaining()),
                             AppendOutcome.KNOWN_COMMITTED,
-                            "materialize recovered generation-zero index");
-                })
-                .thenCompose(materialized -> deadline.bound(
-                        () -> physicalReferences.protectVisibleIndex(
-                                materialized,
-                                deadline.remaining()),
-                        AppendOutcome.KNOWN_COMMITTED,
-                        "protect recovered visible generation-zero index"))
-                .thenApply(protectedIndex -> protectedIndex.materialized().committedAppend());
+                            "complete recovered append durability boundary");
+                });
     }
 
     private AppendResult finishRecovery(Attempt attempt, AppendResult result, Throwable error) {
@@ -736,22 +761,18 @@ public final class AppendCoordinator implements AutoCloseable {
                             AppendOutcome.MAY_HAVE_COMMITTED,
                             "commit protected stream head");
                 });
-        CompletableFuture<CommittedAppend> strictCommit = commitFuture
+        CompletableFuture<CommittedAppend> completedCommit = commitFuture
                 .thenCompose(stable -> {
                     attempt.markHeadKnownCommitted();
                     return attempt.deadline().bound(
-                            () -> indexMaterializer.materialize(stable.reachableAppend()),
+                            () -> appendCompletionCoordinator.completeAfterStableCommit(
+                                    stable,
+                                    attempt.options().durabilityLevel(),
+                                    attempt.deadline().remaining()),
                             AppendOutcome.KNOWN_COMMITTED,
-                            "materialize generation-zero index");
-                })
-                .thenCompose(materialized -> attempt.deadline().bound(
-                        () -> physicalReferences.protectVisibleIndex(
-                                materialized,
-                                attempt.deadline().remaining()),
-                        AppendOutcome.KNOWN_COMMITTED,
-                        "protect visible generation-zero index"))
-                .thenApply(protectedIndex -> protectedIndex.materialized().committedAppend());
-        return strictCommit.handleAsync((commitResult, error) -> {
+                            "complete append durability boundary");
+                });
+        return completedCommit.handleAsync((commitResult, error) -> {
             if (error != null) {
                 NereusException failure = normalizeAppendFailure(error, attempt.outcome());
                 if (failure.code() == ErrorCode.FENCED_APPEND) {
@@ -947,6 +968,12 @@ public final class AppendCoordinator implements AutoCloseable {
                     break;
                 }
             }
+        }
+        appendCompletionCoordinator.stopBackgroundAdmission();
+        long remaining = graceNanos - (System.nanoTime() - start);
+        if (remaining > 0) {
+            appendCompletionCoordinator.awaitBackgroundRepairs(
+                    Duration.ofNanos(remaining));
         }
     }
 

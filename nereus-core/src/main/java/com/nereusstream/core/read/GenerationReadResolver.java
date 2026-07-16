@@ -565,11 +565,11 @@ public final class GenerationReadResolver {
                     state == StreamState.CREATING,
                     "stream state does not admit generation reads");
         }
-        if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT) {
+        if (!profile.usesObjectWal()) {
             throw new NereusException(
                     ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
                     false,
-                    "F4-M2 reads require OBJECT_WAL_SYNC_OBJECT");
+                    "F4 generation reads require an Object-WAL profile");
         }
         if (offset < snapshot.trim().trimOffset()) {
             throw new NereusException(

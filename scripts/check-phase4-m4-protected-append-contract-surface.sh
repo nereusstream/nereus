@@ -45,6 +45,7 @@ production_artifacts=(
     GenerationZeroPhysicalReferencePublisher.java
     DefaultGenerationZeroPhysicalReferencePublisher.java
     GenerationZeroProtectionIdentities.java
+    AsyncObjectWalAppendCoordinator.java
 )
 
 for artifact in "${production_artifacts[@]}"; do
@@ -68,9 +69,22 @@ require_ordered \
     "nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java" \
     '"prepare stable append intent"' \
     '"protect stable append before head"' \
-    '"commit protected stream head"' \
+    '"commit protected stream head"'
+
+require_ordered \
+    "nereus-core/src/main/java/com/nereusstream/core/append/AsyncObjectWalAppendCoordinator.java" \
     '"materialize generation-zero index"' \
     '"protect visible generation-zero index"'
+
+require_literal "appendCompletionCoordinator.completeAfterStableCommit" \
+    "nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java"
+completion_calls="$(rg -F "appendCompletionCoordinator.completeAfterStableCommit" \
+    "$repo_root/nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java" \
+    | wc -l | tr -d ' ')"
+if [[ "$completion_calls" != "2" ]]; then
+    echo "ordinary append and append recovery must both enter the protected generation-zero completion boundary" >&2
+    exit 1
+fi
 
 require_literal "prepareStableAppend" \
     "nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/OxiaMetadataStore.java"

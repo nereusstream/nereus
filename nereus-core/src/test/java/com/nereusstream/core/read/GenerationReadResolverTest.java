@@ -216,6 +216,34 @@ class GenerationReadResolverTest {
         selected.release().join();
     }
 
+    @Test
+    void asyncObjectWalProfileUsesTheSameCommittedGenerationResolver() {
+        GenerationStoreState store = new GenerationStoreState(
+                List.of(generationZero(1)));
+        GenerationReadResolver resolver = new GenerationReadResolver(
+                CLUSTER,
+                l0Store(StorageProfile.OBJECT_WAL_ASYNC_OBJECT),
+                store.proxy(),
+                GenerationIndexValidator.phase15Targets(),
+                readers(true),
+                GenerationReadResolverTest::identity,
+                new TestPinManager(),
+                1_000,
+                CLOCK,
+                Runnable::run);
+
+        PinnedResolvedRange selected = resolver.resolve(
+                        STREAM,
+                        0,
+                        ReadView.COMMITTED,
+                        Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().generation()).isZero();
+        selected.release().join();
+    }
+
     private static GenerationReadResolver resolver(
             GenerationStoreState store,
             TestPinManager pins,
@@ -270,13 +298,17 @@ class GenerationReadResolverTest {
     }
 
     private static OxiaMetadataStore l0Store() {
+        return l0Store(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
+
+    private static OxiaMetadataStore l0Store(StorageProfile profile) {
         StreamMetadataSnapshot snapshot = new StreamMetadataSnapshot(
                 new StreamMetadataRecord(
                         STREAM.value(),
                         "persistent://tenant/ns/topic",
                         "hash",
                         StreamState.ACTIVE.name(),
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        profile.name(),
                         Map.of(),
                         1,
                         1,
