@@ -147,8 +147,9 @@ The reader revalidates the exact versioned root during pin admission and after t
 restarts the complete proof at most eight times. `AppendCoordinator` receives the terminal search through an explicit
 `AppendRecoverySearcher` seam. A checkpoint hit is already a current-root reachability proof and does not recreate
 the historical generation-zero target；a live hit retains the existing protected recovery sequence. The existing
-default storage constructors still select the live-only adapter until F4 runtime composition explicitly injects the
-checkpoint reader, and no metadata retirement is enabled by this checkpoint.
+compatibility storage constructors still select the live-only adapter. Checkpoint AF's production provider now uses
+the explicit Phase 4 constructor and injects the checkpoint reader together with generation-aware read repair；no
+metadata retirement is enabled merely by that read composition.
 
 ### 1.7 F4-M4 checkpoint-derived index repair checkpoint
 
@@ -167,8 +168,8 @@ private retry signal and restarts from snapshot/walk；an already-trimmed target
 write. A concurrent identical restore is idempotent；a different value at the same final key is an invariant violation.
 
 `GenerationReadResolver` now accepts a `GenerationIndexRepairer`. Its compatibility constructor installs
-`MetadataGenerationIndexRepairer` for live commits；F4 runtime composition must explicitly inject the checkpoint-aware
-implementation. After either repair source reports terminal success, resolver performs a new authoritative index
+`MetadataGenerationIndexRepairer` for live commits；checkpoint AF's production runtime explicitly injects the
+checkpoint-aware implementation. After either repair source reports terminal success, resolver performs a new authoritative index
 scan and the existing physical read-pin revalidation. Repair evidence never becomes a parallel visibility domain.
 
 ### 1.8 F4-M4 exact retirement metadata checkpoint

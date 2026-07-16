@@ -513,9 +513,10 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 > checkpoint Y adds stable generation-capable broker readiness and checkpoint Z adds canonical bounded cold-topic
 > registration traversal/report；checkpoint AA adds the durable registration proof and checkpoint AB adds exact
 > generation activation proof/revalidation plus the default-off first-marker switch；checkpoint AC adds proof-gated
-> publication-only cluster ACTIVE orchestration and broker proof-to-activation sequencing；mutation callers、topic
-> marker、cursor snapshot candidate/deletion scanning、inventory/remaining runtime composition and
-> production deletion remain disabled.
+> publication-only cluster ACTIVE orchestration and broker proof-to-activation sequencing；checkpoints AD–AF add the
+> protected async Object-WAL acknowledgement/read-repair path、pre-I/O proof/lag admission and coupled production
+> replay/source-repair/materialization runtime. Cursor snapshot candidate/deletion scanning、inventory、registration
+> retirement、destructive GC composition and production deletion remain disabled.
 
 An object is deletable only when all relevant conditions are true：
 

@@ -53,9 +53,12 @@ checkpoints、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral
 workflow-metadata retirement，以及 topic-compaction COMMITTED-source bootstrap、tagged-v1 key encoding、
 sorted-spill two-pass engine/worker/publication focused tests 已落地。`phase4M3Check` 与真实
 Oxia/LocalStack-backed `phase4M3FinalCheck --rerun-tasks` 已于 2026-07-15 通过；
-F4-M3 已 final-gated。M4 正在实现：NRC1 object-protocol 的 streaming writer、strict reader、attempt/key
-identity 与 canonical metadata verifier 已落地并有 focused tests；root publication、retention/GC 及 M5–M6
-的 async profile 与最终兼容门禁仍不可用。
+F4-M3 已 final-gated。M4/M5 正在实现：NRC1 recovery、retirement/GC fences、generation
+registration/readiness/activation、protected async Object-WAL acknowledgement、pre-I/O materialization-lag
+admission，以及 coupled production generation-aware read/repair/materialization runtime 已落地到 checkpoint
+AF；local Pulsar fork 也已映射 exact sync/async first-create profile 和 bounded materialization config。Sync
+仍是默认，async 仍受 durable activation proof 约束；retention/admin、cursor snapshot deletion、object
+inventory、registration retirement、physical GC 和 M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

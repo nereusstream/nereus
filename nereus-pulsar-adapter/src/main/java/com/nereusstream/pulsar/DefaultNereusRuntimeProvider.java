@@ -6,12 +6,17 @@ import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.backpressure.MaterializationLagGate;
+import com.nereusstream.core.backpressure.MaterializationLagThresholds;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.physical.GcReferenceDomainConfig;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectReadPinManager;
+import com.nereusstream.core.read.ReadMetricsObserver;
+import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.managedledger.NereusManagedLedgerRuntime;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
@@ -29,6 +34,7 @@ import com.nereusstream.managedledger.generation.DefaultManagedLedgerMaterializa
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
+import com.nereusstream.managedledger.generation.ManagedLedgerAsyncAppendAdmissionGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.managedledger.retention.ProjectionGenerationReferenceDomain;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
@@ -63,7 +69,6 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
     private static final String WRITER_VERSION = "nereus-pulsar-f2";
     private static final Duration PENDING_PROTECTION_DURATION = Duration.ofMinutes(5);
     private static final Duration READER_LEASE_DURATION = Duration.ofMinutes(2);
-    private static final Duration MAXIMUM_CLOCK_SKEW = Duration.ofSeconds(5);
     private static final Duration ORPHAN_GRACE = Duration.ofDays(1);
     private static final GcReferenceDomainConfig ACTIVATION_REFERENCE_CONFIG =
             new GcReferenceDomainConfig(256, 100_000, 100_000);
@@ -99,6 +104,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         CursorMetadataStore cursorMetadataStore = null;
         ScheduledExecutorService scheduler = null;
         ExecutorService callbackExecutor = null;
+        ExecutorService workerExecutor = null;
+        Phase4ObjectWalRuntime phase4Runtime = null;
         StreamStorage streamStorage = null;
         CursorSnapshotStore cursorSnapshotStore = null;
         CursorRetentionCoordinator cursorRetentionCoordinator = null;
@@ -117,7 +124,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     streamConfig.cluster(),
                     physicalMetadataStore,
                     PENDING_PROTECTION_DURATION,
-                    MAXIMUM_CLOCK_SKEW,
+                    configuration.materialization().maximumClockSkew(),
                     ORPHAN_GRACE,
                     clock);
             objectReadPinManager = new DefaultObjectReadPinManager(
@@ -126,7 +133,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             "f4-reader/" + streamConfig.processRunId()),
                     physicalMetadataStore,
                     READER_LEASE_DURATION,
-                    MAXIMUM_CLOCK_SKEW,
+                    configuration.materialization().maximumClockSkew(),
                     ORPHAN_GRACE,
                     clock);
             projectionStore = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
@@ -192,18 +199,70 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             callbackExecutor = Executors.newFixedThreadPool(
                     Math.min(Runtime.getRuntime().availableProcessors(), 8),
                     daemonFactory("nereus-f2-callback"));
-            streamStorage = new DefaultStreamStorage(
-                    streamConfig,
-                    l0MetadataStore,
-                    new DefaultWalObjectWriter(objectStore, WRITER_VERSION, clock),
-                    new DefaultWalObjectReader(objectStore),
+            workerExecutor = Executors.newFixedThreadPool(
+                    Math.addExact(
+                            configuration.materialization()
+                                    .maxConcurrentWorkers(),
+                            2),
+                    daemonFactory("nereus-f4-worker"));
+            DefaultWalObjectReader walObjectReader =
+                    new DefaultWalObjectReader(objectStore);
+            GenerationZeroPhysicalReferencePublisher physicalReferences =
                     new DefaultGenerationZeroPhysicalReferencePublisher(
                             streamConfig.cluster(),
                             l0MetadataStore,
                             physicalMetadataStore,
-                            objectProtectionManager),
+                            objectProtectionManager);
+            phase4Runtime = new Phase4ObjectWalRuntime(
+                    streamConfig.cluster(),
+                    streamConfig.processRunId(),
+                    streamConfig,
+                    configuration.materialization(),
+                    l0MetadataStore,
+                    generationMetadataStore,
+                    physicalMetadataStore,
+                    objectStore,
+                    walObjectReader,
+                    physicalReferences,
+                    objectProtectionManager,
+                    objectReadPinManager,
+                    generationProtocolActivationGuard,
+                    scheduler,
+                    workerExecutor,
+                    callbackExecutor,
+                    clock);
+            var lagConfig = configuration.materialization();
+            MaterializationLagGate lagGate =
+                    new MaterializationLagGate(
+                            phase4Runtime.lagSnapshotReader(),
+                            new MaterializationLagThresholds(
+                                    lagConfig.lagThrottleRecords(),
+                                    lagConfig.lagRejectRecords(),
+                                    lagConfig.lagThrottleBytes(),
+                                    lagConfig.lagRejectBytes(),
+                                    lagConfig.lagRejectAge(),
+                                    lagConfig.lagThrottleDelay()),
+                            scheduler);
+            ManagedLedgerAsyncAppendAdmissionGuard appendAdmissionGuard =
+                    new ManagedLedgerAsyncAppendAdmissionGuard(
+                            streamConfig.cluster(),
+                            projectionStore,
+                            generationProtocolActivationGuard,
+                            lagGate);
+            streamStorage = new DefaultStreamStorage(
+                    streamConfig,
+                    l0MetadataStore,
+                    new DefaultWalObjectWriter(objectStore, WRITER_VERSION, clock),
+                    walObjectReader,
+                    physicalReferences,
+                    phase4Runtime.appendRecoverySearcher(),
+                    phase4Runtime.profileResolver(),
+                    appendAdmissionGuard,
+                    phase4Runtime.readComponents(),
                     clock,
-                    callbackExecutor);
+                    callbackExecutor,
+                    ReadMetricsObserver.noop(),
+                    TrimMetricsObserver.noop());
             CursorStorageConfig cursorConfig = configuration.cursorStorage();
             CursorProtocolActivationGuard activationGuard = cursorProtocolActivationGuard(context);
             cursorSnapshotStore = new DefaultCursorSnapshotStore(
@@ -244,6 +303,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorConfig,
                     clock,
                     scheduler);
+            phase4Runtime.start();
             return new NereusManagedLedgerRuntime(
                     streamStorage,
                     projectionStore,
@@ -259,6 +319,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     generationRegistrationBackfillProofCoordinator,
                     generationProtocolActivationCoordinator,
                     generationProtocolActivationGuard,
+                    phase4Runtime,
                     objectReadPinManager,
                     objectProtectionManager,
                     physicalMetadataStore,
@@ -279,6 +340,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorRetentionCoordinator,
                     cursorSnapshotStore,
                     cursorMetadataStore,
+                    phase4Runtime,
                     generationProtocolActivationStore,
                     generationMetadataStore,
                     projectionStore,
@@ -292,6 +354,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     sharedOxiaRuntime);
             shutdown(callbackExecutor);
             shutdown(scheduler);
+            shutdown(workerExecutor);
             if (failure instanceof Exception exception) {
                 throw exception;
             }

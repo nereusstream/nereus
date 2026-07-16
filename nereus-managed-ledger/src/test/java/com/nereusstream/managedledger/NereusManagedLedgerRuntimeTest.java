@@ -117,6 +117,12 @@ class NereusManagedLedgerRuntimeTest {
                         () -> CompletableFuture.completedFuture(null);
         GenerationProtocolActivationGuard generationActivationGuard =
                 allowGenerationActivation();
+        AutoCloseable materializationRuntime =
+                proxy(
+                        AutoCloseable.class,
+                        "materialization-runtime",
+                        closes,
+                        false);
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
@@ -132,6 +138,7 @@ class NereusManagedLedgerRuntimeTest {
                 proofCoordinator,
                 activationCoordinator,
                 generationActivationGuard,
+                materializationRuntime,
                 readPins,
                 proxy(AutoCloseable.class, "protection", closes, false),
                 proxy(AutoCloseable.class, "physical", closes, false),
@@ -153,6 +160,8 @@ class NereusManagedLedgerRuntimeTest {
                 .isSameAs(activationCoordinator);
         assertThat(runtime.generationProtocolActivationGuard())
                 .isSameAs(generationActivationGuard);
+        assertThat(runtime.materializationRuntime())
+                .isSameAs(materializationRuntime);
         runtime.close();
 
         assertThat(closes).containsExactly(
@@ -160,6 +169,7 @@ class NereusManagedLedgerRuntimeTest {
                 "cursor-retention",
                 "cursor-snapshot",
                 "cursor-metadata",
+                "materialization-runtime",
                 "generation-activation",
                 "generation",
                 "projection",

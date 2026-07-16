@@ -25,8 +25,10 @@ projection-generation/cursor-snapshot domains are implemented over exact F2/F3 a
 match one exact planned metadata removal；active task/live-tail and non-DRAINING higher-generation references veto.
 The collector stops at durable delete intent and deliberately exposes no metadata/protection/object delete call；
 typed source destructive recovery and the separate DELETED-root/Phase 1 audit-retirement coordinator are now
-implemented, but runtime composition、backfill/broker guard、cursor snapshot GC、object inventory and registration
-retirement remain target work. Package、class and method names
+implemented. Checkpoints X–AF additionally deliver durable registration/backfill/activation、the protected async
+Object-WAL boundary and the coupled production generation-aware read/replay/source-repair/materialization runtime.
+Cursor snapshot GC、object inventory、registration retirement、destructive GC composition and retention/admin remain
+target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 

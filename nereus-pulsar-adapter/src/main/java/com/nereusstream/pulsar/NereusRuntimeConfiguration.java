@@ -4,10 +4,12 @@ package com.nereusstream.pulsar;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.NereusManagedLedgerFactoryConfig;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
+import java.nio.file.Path;
 import java.util.Objects;
 
 /** Fully typed configuration mapped by the broker before any runtime resource is created. */
@@ -18,7 +20,8 @@ public record NereusRuntimeConfiguration(
         NereusManagedLedgerFactoryConfig managedLedger,
         ProjectionMetadataStoreConfig projectionMetadata,
         CursorMetadataStoreConfig cursorMetadata,
-        CursorStorageConfig cursorStorage) {
+        CursorStorageConfig cursorStorage,
+        MaterializationConfig materialization) {
     public NereusRuntimeConfiguration(
             OxiaClientConfiguration oxia,
             ObjectStoreConfiguration objectStore,
@@ -32,7 +35,27 @@ public record NereusRuntimeConfiguration(
                 managedLedger,
                 projectionMetadata,
                 CursorMetadataStoreConfig.defaults(),
-                CursorStorageConfig.defaults());
+                CursorStorageConfig.defaults(),
+                defaultMaterialization(streamStorage));
+    }
+
+    public NereusRuntimeConfiguration(
+            OxiaClientConfiguration oxia,
+            ObjectStoreConfiguration objectStore,
+            StreamStorageConfig streamStorage,
+            NereusManagedLedgerFactoryConfig managedLedger,
+            ProjectionMetadataStoreConfig projectionMetadata,
+            CursorMetadataStoreConfig cursorMetadata,
+            CursorStorageConfig cursorStorage) {
+        this(
+                oxia,
+                objectStore,
+                streamStorage,
+                managedLedger,
+                projectionMetadata,
+                cursorMetadata,
+                cursorStorage,
+                defaultMaterialization(streamStorage));
     }
 
     public NereusRuntimeConfiguration {
@@ -43,6 +66,7 @@ public record NereusRuntimeConfiguration(
         Objects.requireNonNull(projectionMetadata, "projectionMetadata");
         Objects.requireNonNull(cursorMetadata, "cursorMetadata");
         Objects.requireNonNull(cursorStorage, "cursorStorage");
+        Objects.requireNonNull(materialization, "materialization");
         if (oxia.maxCommitChainScan() != streamStorage.maxCommitChainScan()) {
             throw new IllegalArgumentException("Oxia and StreamStorage maxCommitChainScan must match");
         }
@@ -81,5 +105,54 @@ public record NereusRuntimeConfiguration(
         if (cursorStorage.cursorSnapshotOperationTimeout().compareTo(managedLedger.closeTimeout()) > 0) {
             throw new IllegalArgumentException("cursor snapshot timeout must fit managed-ledger close timeout");
         }
+        if (materialization.maxConcurrentWorkers()
+                > streamStorage.maxConcurrentObjectReads()) {
+            throw new IllegalArgumentException(
+                    "materialization workers exceed core object-read concurrency");
+        }
+        long materializationReadBytes;
+        try {
+            materializationReadBytes = Math.multiplyExact(
+                    materialization.sourceReadPageBytes(),
+                    materialization.maxConcurrentWorkers());
+        } catch (ArithmeticException failure) {
+            throw new IllegalArgumentException(
+                    "materialization read-buffer requirement overflows",
+                    failure);
+        }
+        if (materializationReadBytes
+                > streamStorage.maxReadBufferBytes()) {
+            throw new IllegalArgumentException(
+                    "materialization worker reads exceed the core read-buffer budget");
+        }
+        if (objectStore.requestTimeout()
+                        .compareTo(materialization.operationTimeout())
+                > 0) {
+            throw new IllegalArgumentException(
+                    "object-store timeout must fit the materialization operation deadline");
+        }
+        if (materialization.closeTimeout()
+                        .compareTo(managedLedger.closeTimeout())
+                > 0) {
+            throw new IllegalArgumentException(
+                    "materialization close timeout must fit managed-ledger close timeout");
+        }
+    }
+
+    private static MaterializationConfig defaultMaterialization(
+            StreamStorageConfig streamStorage) {
+        Objects.requireNonNull(streamStorage, "streamStorage");
+        String temporary = System.getProperty("java.io.tmpdir");
+        if (temporary == null || temporary.isBlank()) {
+            throw new IllegalArgumentException(
+                    "java.io.tmpdir is required for the compatibility materialization configuration");
+        }
+        Path staging = Path.of(
+                        temporary,
+                        "nereus-materialization",
+                        streamStorage.processRunId())
+                .toAbsolutePath()
+                .normalize();
+        return MaterializationConfig.defaults(staging);
     }
 }

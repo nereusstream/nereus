@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -118,8 +118,11 @@ mutation call sites remain pending. Checkpoint AD adds the opt-in Phase 4 Object
 `WAL_DURABLE` acknowledgement boundary、independently bounded generation-zero repair、root-stable restart scanner and
 protected read-after-commit live repair. Checkpoint AE adds exact F2 sync/async profile round-trip、per-stream-lane
 pre-IO activation/marker proof and final revalidation、authoritative records/bytes/age lag measurement and
-throttle/reject semantics. Legacy runtime constructors remain Phase 1.5-only；production provider/Pulsar config and F4
-reader/scanner/service composition remain pending.
+throttle/reject semantics. Checkpoint AF atomically installs the Phase 4 resolver、pre-IO guard、
+generation-aware read/failure handler、NRC1 replay/index repair、generation-zero repair-before-plan and owned
+materialization service in `DefaultNereusRuntimeProvider`；the local Pulsar fork maps exact sync/async first-create
+profile and the complete bounded materialization configuration. Legacy constructors remain Phase 1.5-only, sync is
+still the default, and async remains activation-proof gated.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1121,7 +1124,11 @@ nereus-core/.../backpressure/MaterializationLagSnapshot.java          implemente
 nereus-core/.../backpressure/MaterializationLagSnapshotReader.java    implemented checkpoint AE
 nereus-core/.../backpressure/MaterializationLagThresholds.java        implemented checkpoint AE
 nereus-core/.../backpressure/MaterializationLagGate.java              implemented checkpoint AE
+nereus-core/.../read/Phase4ReadComponents.java                        implemented checkpoint AF atomic read seam
+nereus-core/.../DefaultStreamStorage.java                              extended checkpoint AF coupled append/read composition
 nereus-materialization/.../DefaultMaterializationLagSnapshotReader.java implemented checkpoint AE
+nereus-materialization/.../MaterializationSourceRepairer.java         implemented checkpoint AF
+nereus-materialization/.../RegisteredMaterializationStreamScanner.java extended checkpoint AF repair-before-plan
 
 nereus-metadata-oxia/.../ManagedLedgerGenerationProtocol.java       protocol/CAS foundation implemented K
 nereus-metadata-oxia/.../ManagedLedgerProtocolProperties.java       composed property validator implemented K
@@ -1157,12 +1164,13 @@ nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationCo
 nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationProtocolActivationCoordinator.java checkpoint AC ACTIVE CAS
 nereus-managed-ledger/.../NereusManagedLedger.java
 nereus-managed-ledger/.../NereusManagedLedgerOpenCoordinator.java     checkpoint X return-before-registration, extended Z inspect/ensure
-nereus-managed-ledger/.../NereusManagedLedgerRuntime.java             checkpoints X/AA–AC generation-store, proof, coordinator and guard ownership
+nereus-managed-ledger/.../NereusManagedLedgerRuntime.java             checkpoints X/AA–AC plus AF materialization lifecycle ownership
 
-nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java
+nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java              extended checkpoint AF MaterializationConfig/cross-validation
 nereus-pulsar-adapter/.../NereusRuntimeContext.java                   checkpoints AA/AB readiness provider and first-activation switch
 nereus-pulsar-adapter/.../NereusGenerationProtocolReferenceDomains.java checkpoint AA exact six-domain set
-nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoints X/AA–AC registration, proof, coordinator and guard wiring
+nereus-pulsar-adapter/.../Phase4ObjectWalRuntime.java                  implemented checkpoint AF owned production composition
+nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoints X/AA–AC plus AF resolver/read/repair/service wiring
 ```
 
 ### 7.2 Local Pulsar fork artifacts
@@ -1183,10 +1191,11 @@ pulsar-broker/.../nereus/NereusResolvedTopicFeatures.java
 pulsar-broker/.../nereus/NereusTopicFeatureResolver.java
 pulsar-broker/.../nereus/NereusTopicFeatureValidator.java
 pulsar-broker/.../nereus/NereusManagedLedgerStorage.java               extended checkpoints AA–AC proof, switch and proof-to-ACTIVE sequencing
-pulsar-broker/.../nereus/NereusBrokerStorageConfiguration.java         extended checkpoint AB typed activation switch
+pulsar-broker/.../nereus/NereusBrokerStorageConfiguration.java         extended checkpoint AF exact profile/materialization mapping
 pulsar-broker/.../service/persistent/PersistentTopic.java
 pulsar-broker/.../admin/impl/PersistentTopicsBase.java
-pulsar-broker-common/.../ServiceConfiguration.java                      extended checkpoint AB disabled-by-default switch
+pulsar-broker-common/.../ServiceConfiguration.java                      extended checkpoint AF profile/materialization defaults
+conf/broker.conf                                                        extended checkpoint AF operator reference
 ```
 
 ### 7.3 Focused tests
@@ -1202,6 +1211,8 @@ GenerationZeroRepairScannerTest                                     implemented 
 MaterializationLagGateTest                                          implemented checkpoint AE
 DefaultMaterializationLagSnapshotReaderTest                         implemented checkpoint AE
 ManagedLedgerAsyncAppendAdmissionGuardTest                          implemented checkpoint AE
+RegisteredMaterializationStreamScannerTest                          extended checkpoint AF repair-before-plan ordering
+Phase4ObjectWalRuntimeTest                                          implemented checkpoint AF owned composition/lifecycle
 ManagedLedgerGenerationProtocolTest                         implemented K protocol/CAS foundation
 ManagedLedgerGenerationProjectionRefV1GoldenTest
 ManagedLedgerMaterializationRegistrationCoordinatorTest    implemented checkpoint X identity/hint/response-loss/drift
@@ -1228,7 +1239,7 @@ NereusGenerationProtocolCapabilityTest                    implemented checkpoint
 NereusCursorProtocolCapabilityTest                        extended checkpoint Y
 NereusStorageBindingCapabilityTest                        extended checkpoint Y
 NereusGenerationRegistrationBackfillTest                  implemented checkpoint Z order/concurrency/digest/drift, extended AA proof admission
-NereusBrokerStorageConfigurationTest                      extended checkpoint AB activation-switch mapping/default
+NereusBrokerStorageConfigurationTest                      extended checkpoint AF exact profile/config/default/rejection
 NereusManagedLedgerStorageGenerationActivationTest        implemented checkpoint AC success/failure/disabled sequencing
 NereusTopicFeatureResolverF4Test
 NereusTopicFeatureValidatorF4Test
@@ -1267,7 +1278,7 @@ does not modify the local Pulsar fork, advertise generation capability, activate
 topics, or publish a cluster backfill proof. The ordinary gate passed with `--rerun-tasks` on 2026-07-16.
 
 `phase4M5GenerationCapabilityCheck` is the checkpoint-Y precursor. It consumes the exact clean local fork
-`master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`, audits the capability/readiness/invalidation surface, publishes
+`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, audits the capability/readiness/invalidation surface, publishes
 the existing Nereus F2 development composite, and runs broker spotless、checkstyle plus focused generation/cursor/
 binding suites. The readiness identity is domain-separated SHA-256 over sorted persistent broker registry keys、
 advertised broker ids、start timestamps and sorted required protocol pairs；the frozen two-broker fixture yields
@@ -1278,7 +1289,7 @@ registration backfill proof、activate a topic marker or enable publication/dele
 on 2026-07-16.
 
 `phase4M5RegistrationBackfillCheck` is the checkpoint-Z precursor. It consumes the current exact clean local fork
-`master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`, publishes the Nereus development composite, audits the product
+`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, publishes the Nereus development composite, audits the product
 candidate and broker traversal/config/lifecycle surfaces, and runs managed-ledger plus Pulsar spotless、checkstyle and
 focused suites. The traversal never loads/owns a topic；it sorts tenants/namespaces/topics, processes one namespace at
 a time, batches topic work under the configured concurrency, captures strict NPR1 projection identity, performs
@@ -1298,7 +1309,7 @@ and rejects standalone advance after deletion enablement. The gate covers lost C
 invalidation after CAS. It does not activate a topic marker or enable publication/deletion. It passed on 2026-07-16.
 
 `phase4M5ActivationGuardCheck` is the checkpoint-AB precursor. It consumes the exact clean local fork
-`master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`, publishes the current development composite and runs
+`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, publishes the current development composite and runs
 core/managed-ledger/adapter checks plus broker-common/broker spotless、checkstyle and
 `NereusBrokerStorageConfigurationTest`. The managed-ledger guard requires one exact ACTIVE cluster record carrying
 the current readiness epoch、complete stream-registration proof and the canonical six-domain set whose frozen digest
@@ -1311,7 +1322,7 @@ gate does not advance the cluster record to ACTIVE and does not yet install the 
 async publication、logical trim and physical deletion remain unavailable. It passed on 2026-07-16.
 
 `phase4M5PublicationActivationCheck` is the checkpoint-AC precursor. It consumes the exact clean local fork
-`master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`, publishes the current development composite and runs
+`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, publishes the current development composite and runs
 core/managed-ledger/adapter checks plus broker spotless、checkstyle、
 `NereusGenerationRegistrationBackfillTest` and
 `NereusManagedLedgerStorageGenerationActivationTest`. The product coordinator makes no first write while the switch
@@ -1340,8 +1351,16 @@ lag from rebuilt current-policy COMMITTED coverage rather than tasks/checkpoint 
 pre-I/O admission、one-delay remeasurement、records/bytes/age rejection、disabled thresholds、projection/profile
 contradictions、proof revalidation、exact live-tail bytes/age and ahead-checkpoint rejection. On 2026-07-16 the full
 `:nereus-core:test :nereus-metadata-oxia:test :nereus-managed-ledger:test :nereus-materialization:test` regression
-passed. A named checkpoint-AE gate, production provider composition and locked Pulsar profile/config tests remain for
-the next checkpoint.
+passed.
+
+Checkpoint AF completes the production composition cut. `Phase4ObjectWalRuntime` owns the shared read-target
+registry、checkpoint replay/index repair、generation-zero source repair、lag reader and background materialization
+service；`DefaultNereusRuntimeProvider` installs it together with the async admission guard and passes the exact read
+components into `DefaultStreamStorage`. The runtime starts before broker storage is returned and closes before
+generation/Oxia/ObjectStore resources. The locked Pulsar mapper persists only exact sync/async Object-WAL profile
+names, constructs the complete validated `MaterializationConfig`, appends processRunId to the staging base and keeps
+sync as the default. Focused Nereus module tests and `NereusBrokerStorageConfigurationTest` passed on 2026-07-16.
+Retention/admin and destructive GC composition remain outside this checkpoint.
 
 ## 8. F4-M6 — Final Acceptance
 

@@ -825,8 +825,8 @@ Initial product defaults keep active mutation off：
 | `nereusMaterializationTargetObjectBytes` | `268435456` | `<= 1 GiB` |
 | `nereusMaterializationTargetRowGroupRecords` | `8192` | `<= 65536` |
 | `nereusMaterializationCompression` | `ZSTD` | exactly `ZSTD` or `UNCOMPRESSED` |
-| `nereusMaterializationStagingDirectory` | deployment-set | absolute owner-only local directory；not durable truth |
-| `nereusMaterializationMaxStagingBytes` | `2147483648` | global worker staging semaphore；`>= target object bytes` |
+| `nereusMaterializationStagingDirectory` | `${java.io.tmpdir}/nereus-materialization` | absolute owner-only local base；runtime appends processRunId；not durable truth |
+| `nereusMaterializationMaxStagingBytes` | `2147483648` | global worker staging semaphore；covers both target object and recovery-checkpoint maxima |
 | `nereusObjectUploadChunkBytes` | `1048576` | `[64 KiB, 8 MiB]`；backpressure-aware streaming upload |
 | `nereusObjectPutMaxAttempts` | `3` | total guarded provider transmissions；`[1, 10]` |
 | `nereusObjectPutRetryMinMillis` | `100` | positive first-retry full-jitter cap |
@@ -846,17 +846,17 @@ Initial product defaults keep active mutation off：
 | `nereusGcDrainGraceSeconds` | `300` | lease + skew lower bound |
 | `nereusPendingProtectionSeconds` | `300` | bounded checkpoint/snapshot publication intent；operation + skew lower bound |
 | `nereusSourceRetirementGraceSeconds` | `3600` | fallback/checkpoint grace |
-| `nereusAppendReplayGraceSeconds` | `3600` | protects live commit evidence during checkpoint retirement |
+| `nereusAppendReplayGraceSeconds` | `21600` | protects live commit evidence during checkpoint retirement |
 | `nereusMaterializationMetadataAuditGraceSeconds` | `86400` | terminal task/index audit retention；`>= source retirement grace` |
 | `nereusOrphanGraceSeconds` | `86400` | no young orphan deletion |
 | `nereusGcTombstoneAuditGraceSeconds` | `604800` | `>= metadata audit + orphan grace` and beyond every stale PUT/owner lifetime |
 | `nereusRecoveryCheckpointMaxEntries` | `1000000` | NRC1 cap |
 | `nereusRecoveryCheckpointMaxBytes` | `1073741824` | NRC1 cap |
-| `nereusMaterializationLagThrottleRecords` | deployment-set | zero disables threshold |
-| `nereusMaterializationLagRejectRecords` | deployment-set | zero disables；otherwise > throttle |
-| `nereusMaterializationLagThrottleBytes` | deployment-set | zero disables threshold |
-| `nereusMaterializationLagRejectBytes` | deployment-set | zero disables；otherwise > throttle |
-| `nereusMaterializationLagRejectAgeSeconds` | deployment-set | zero disables；otherwise positive |
+| `nereusMaterializationLagThrottleRecords` | `1000000` | zero disables threshold |
+| `nereusMaterializationLagRejectRecords` | `10000000` | zero disables；otherwise > throttle |
+| `nereusMaterializationLagThrottleBytes` | `1073741824` | zero disables threshold |
+| `nereusMaterializationLagRejectBytes` | `8589934592` | zero disables；otherwise > throttle |
+| `nereusMaterializationLagRejectAgeSeconds` | `600` | zero disables；otherwise positive |
 | `nereusMaterializationLagThrottleDelayMillis` | `25` | positive；one bounded delay followed by exact remeasurement |
 | `nereusRetentionStatsScanPageSize` | `512` | positive and `<= 512` |
 | `nereusRetentionMaxConcurrentPlans` | `4` | positive；at most one executing per stream |
@@ -867,10 +867,12 @@ Initial product defaults keep active mutation off：
 Secrets and object-store credentials remain on the existing resolver path. Config logs redact secret refs/tokens and
 do not log object keys at info level.
 
-Checkpoint AE has implemented the product-neutral `MaterializationConfig.lagThrottleDelay` and core/managed-ledger
-admission seam. The properties in this table are still a rollout target until
-`NereusBrokerStorageConfiguration` and `DefaultNereusRuntimeProvider` map them into the Phase 4 resolver、exact lag
-reader and guard；absence of that composition must keep async topic policy disabled.
+Checkpoint AF maps the Object-WAL subset of this table through
+`NereusBrokerStorageConfiguration` into the production `MaterializationConfig` and installs the Phase 4 resolver、
+exact lag reader/guard、generation-aware read/repair and materialization lifecycle through
+`DefaultNereusRuntimeProvider`. The default remains `OBJECT_WAL_SYNC_OBJECT`; the async value is exact-name only,
+first-create only and still requires the durable activation/marker proof before primary IO. Retention/GC-specific
+properties below the materialization boundary remain rollout targets until their services are composed.
 
 ## 12. Operations and Status
 

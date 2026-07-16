@@ -49,6 +49,7 @@ import com.nereusstream.core.profile.StorageProfileResolver;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.ReadResolver;
+import com.nereusstream.core.read.Phase4ReadComponents;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimCoordinator;
@@ -61,6 +62,7 @@ import com.nereusstream.objectstore.wal.WalObjectWriter;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -252,6 +254,70 @@ public final class DefaultStreamStorage implements StreamStorage {
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver,
             TrimMetricsObserver trimMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                Optional.empty(),
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    /**
+     * Complete Phase 4 storage seam. Append enablement and generation-aware read/repair are installed as one unit.
+     */
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Phase4ReadComponents readComponents,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                Optional.of(Objects.requireNonNull(
+                        readComponents, "readComponents")),
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    private DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Optional<Phase4ReadComponents> readComponents,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
@@ -260,6 +326,7 @@ public final class DefaultStreamStorage implements StreamStorage {
         Objects.requireNonNull(recoverySearcher, "recoverySearcher");
         Objects.requireNonNull(profileResolver, "profileResolver");
         Objects.requireNonNull(appendAdmissionGuard, "appendAdmissionGuard");
+        Objects.requireNonNull(readComponents, "readComponents");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
@@ -282,12 +349,22 @@ public final class DefaultStreamStorage implements StreamStorage {
                 clock,
                 readMetricsObserver,
                 callbackExecutor);
-        this.readCoordinator = new ReadCoordinator(
-                config,
-                readResolver,
-                walObjectReader,
-                readMetricsObserver,
-                callbackExecutor);
+        this.readCoordinator = readComponents
+                .map(components -> new ReadCoordinator(
+                        config,
+                        readResolver,
+                        components.resolver(),
+                        components.readers(),
+                        components.failureHandler(),
+                        components.retryPolicy(),
+                        readMetricsObserver,
+                        callbackExecutor))
+                .orElseGet(() -> new ReadCoordinator(
+                        config,
+                        readResolver,
+                        walObjectReader,
+                        readMetricsObserver,
+                        callbackExecutor));
         this.trimCoordinator = new TrimCoordinator(
                 config,
                 metadataStore,

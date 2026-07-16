@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4")
+    .orElse("148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -225,6 +225,7 @@ val phase2PublishedModules = listOf(
     ":nereus-metadata-oxia",
     ":nereus-object-store",
     ":nereus-managed-ledger",
+    ":nereus-materialization",
     ":nereus-pulsar-adapter",
 )
 

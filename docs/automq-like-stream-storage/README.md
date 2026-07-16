@@ -1,7 +1,7 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AE；
-> core pre-I/O async admission 已实现，production provider/Pulsar policy wiring 尚未完成
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AF；
+> production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
 
@@ -39,24 +39,28 @@ Already present：
   generation-activation metadata authority foundation，plus activation-gated future sentinel and five ownerless-global
   reference domains. New strict appends now establish `REACHABLE_APPEND` before head CAS and `VISIBLE_GENERATION`
   before success；registration/backfill/readiness/activation proofs and physical/cursor live-reference backfill are
-  implemented, while the remaining runtime composition stays disabled.
+  implemented.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative
   materialization-lag throttle/reject logic before primary Object-WAL preparation or upload.
+- F4-M5 checkpoint AF：`DefaultNereusRuntimeProvider` atomically installs that resolver/admission seam with the
+  generation-aware read path、NRC1 replay/index repair、generation-zero source repair and owned background
+  materialization service. Pulsar maps exact sync/async first-create profiles and the complete bounded
+  materialization configuration; sync remains the default and async remains proof-gated.
 
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
 - production-composed global-domain source retirement and physical/cursor/root/audit GC completion；
-- primary-WAL retention gate and complete recovery/materialization/GC daemon composition；
-- production provider/Pulsar configuration wiring for the implemented async admission and lag reader；
+- primary-WAL retention gate and destructive GC daemon composition；
+- retention policy/admin integration、cursor-snapshot candidate/deletion、object inventory and registration retirement；
 - mixed primary target resolver。
 
-The explicit Phase 4 resolver/guard can execute async Object-WAL in focused composition, but legacy constructors and
-the current production provider still install the sync-only boundary. Merely creating async metadata or setting a
-broker property therefore does not enable the profile；the broker path must remain fail closed until provider,
-configuration and topic-policy wiring install the exact guard.
+The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default
+still does not bypass rollout safety：it affects only first-create projections, and every async append must obtain and
+revalidate the durable generation activation/marker proof before primary IO. Existing topics retain their stored
+profile.
 
 Phase 4 的首个执行范围只是 `OBJECT_WAL_ASYNC_OBJECT`。该 profile 仍在 success 前完成
 primary Object WAL upload 和 stable head commit；后台化的是 secondary/read-optimized generation。

@@ -74,6 +74,7 @@ class RegisteredMaterializationStreamScannerTest {
         TaskRecoveryScanner recoveryScanner = new TaskRecoveryScanner(taskStore, recovery, 1);
         AtomicInteger readinessChecks = new AtomicInteger();
         AtomicInteger revalidations = new AtomicInteger();
+        AtomicInteger sourceRepairs = new AtomicInteger();
         GenerationProtocolActivationGuard guard = countingGuard(readinessChecks, revalidations);
         RegisteredMaterializationStreamScanner scanner = new RegisteredMaterializationStreamScanner(
                 CLUSTER,
@@ -81,7 +82,18 @@ class RegisteredMaterializationStreamScannerTest {
                         MaterializationPlannerTestSupport.snapshot(0, 4)),
                 generations,
                 guard,
-                planner,
+                streamId -> {
+                    sourceRepairs.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                (streamId, range, exactPolicy, maxTasks) -> {
+                    assertThat(sourceRepairs.get()).isPositive();
+                    return planner.plan(
+                            streamId,
+                            range,
+                            exactPolicy,
+                            maxTasks);
+                },
                 taskStore,
                 recovery,
                 recoveryScanner,
@@ -115,6 +127,7 @@ class RegisteredMaterializationStreamScannerTest {
         assertThat(dispatched).hasSize(2).allMatch(task -> task.equals(dispatched.get(0)));
         assertThat(readinessChecks).hasValue(2);
         assertThat(revalidations.get()).isGreaterThanOrEqualTo(3);
+        assertThat(sourceRepairs).hasValue(2);
     }
 
     @Test

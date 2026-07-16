@@ -55,6 +55,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private ManagedLedgerGenerationProtocolActivationCoordinator
             generationProtocolActivationCoordinator;
     private GenerationProtocolActivationGuard generationProtocolActivationGuard;
+    private AutoCloseable materializationRuntime;
     private final ObjectReadPinManager objectReadPinManager;
     private final AutoCloseable objectProtectionManager;
     private final AutoCloseable physicalMetadataStore;
@@ -252,6 +253,69 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                 cursorStorage,
                 cursorStorageConfig,
                 cursorProtocolActivationGuard,
+                generationProtocolActivationStore,
+                generationRegistrationBackfillProofCoordinator,
+                generationProtocolActivationCoordinator,
+                generationProtocolActivationGuard,
+                null,
+                objectReadPinManager,
+                objectProtectionManager,
+                physicalMetadataStore,
+                l0MetadataStore,
+                sharedOxiaRuntime,
+                objectStore,
+                objectStoreProvider,
+                scheduler,
+                callbackExecutor,
+                config,
+                cluster,
+                processRunId,
+                writerId);
+    }
+
+    public NereusManagedLedgerRuntime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            GenerationMetadataStore generationMetadataStore,
+            ManagedLedgerMaterializationRegistrationCoordinator
+                    materializationRegistrationCoordinator,
+            CursorMetadataStore cursorMetadataStore,
+            CursorSnapshotStore cursorSnapshotStore,
+            CursorRetentionCoordinator cursorRetentionCoordinator,
+            CursorStorage cursorStorage,
+            CursorStorageConfig cursorStorageConfig,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            GenerationProtocolActivationStore generationProtocolActivationStore,
+            ManagedLedgerGenerationRegistrationBackfillProofCoordinator
+                    generationRegistrationBackfillProofCoordinator,
+            ManagedLedgerGenerationProtocolActivationCoordinator
+                    generationProtocolActivationCoordinator,
+            GenerationProtocolActivationGuard generationProtocolActivationGuard,
+            AutoCloseable materializationRuntime,
+            ObjectReadPinManager objectReadPinManager,
+            AutoCloseable objectProtectionManager,
+            AutoCloseable physicalMetadataStore,
+            OxiaMetadataStore l0MetadataStore,
+            SharedOxiaClientRuntime sharedOxiaRuntime,
+            ObjectStore objectStore,
+            ObjectStoreProvider objectStoreProvider,
+            ScheduledExecutorService scheduler,
+            ExecutorService callbackExecutor,
+            NereusManagedLedgerFactoryConfig config,
+            String cluster,
+            String processRunId,
+            String writerId) {
+        this(
+                streamStorage,
+                projectionStore,
+                generationMetadataStore,
+                materializationRegistrationCoordinator,
+                cursorMetadataStore,
+                cursorSnapshotStore,
+                cursorRetentionCoordinator,
+                cursorStorage,
+                cursorStorageConfig,
+                cursorProtocolActivationGuard,
                 objectReadPinManager,
                 objectProtectionManager,
                 physicalMetadataStore,
@@ -280,6 +344,25 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                 Objects.requireNonNull(
                         generationProtocolActivationGuard,
                         "generationProtocolActivationGuard");
+        this.materializationRuntime = materializationRuntime;
+        requireDistinctOptionalResource(
+                materializationRuntime,
+                streamStorage,
+                projectionStore,
+                generationMetadataStore,
+                cursorMetadataStore,
+                cursorSnapshotStore,
+                cursorRetentionCoordinator,
+                cursorStorage,
+                objectReadPinManager,
+                objectProtectionManager,
+                physicalMetadataStore,
+                l0MetadataStore,
+                sharedOxiaRuntime,
+                objectStore,
+                objectStoreProvider,
+                scheduler,
+                callbackExecutor);
     }
 
     public StreamStorage streamStorage() {
@@ -338,6 +421,14 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         return generationProtocolActivationCoordinator;
     }
 
+    public AutoCloseable materializationRuntime() {
+        if (materializationRuntime == null) {
+            throw new IllegalStateException(
+                    "this runtime was assembled without the Phase 4 materialization runtime");
+        }
+        return materializationRuntime;
+    }
+
     public ObjectReadPinManager objectReadPinManager() {
         if (objectReadPinManager == null) {
             throw new IllegalStateException(
@@ -393,6 +484,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         closeOne(cursorRetentionCoordinator, failures);
         closeOne(cursorSnapshotStore, failures);
         closeOne(cursorMetadataStore, failures);
+        closeOneIfPresent(materializationRuntime, failures);
         closeOneIfPresent(generationProtocolActivationStore, failures);
         closeOne(generationMetadataStore, failures);
         closeOne(projectionStore, failures);
@@ -434,6 +526,20 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         for (Object resource : resources) {
             if (identities.put(resource, Boolean.TRUE) != null) {
                 throw new IllegalArgumentException("runtime-owned resource identities must be distinct");
+            }
+        }
+    }
+
+    private static void requireDistinctOptionalResource(
+            Object candidate,
+            Object... existing) {
+        if (candidate == null) {
+            return;
+        }
+        for (Object resource : existing) {
+            if (candidate == resource) {
+                throw new IllegalArgumentException(
+                        "materialization runtime must have a distinct owned identity");
             }
         }
     }

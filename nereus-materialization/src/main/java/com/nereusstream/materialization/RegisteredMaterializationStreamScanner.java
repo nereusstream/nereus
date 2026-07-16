@@ -35,6 +35,7 @@ public final class RegisteredMaterializationStreamScanner {
     private final OxiaMetadataStore l0Metadata;
     private final GenerationMetadataStore generations;
     private final GenerationProtocolActivationGuard activationGuard;
+    private final MaterializationSourceRepairer sourceRepairer;
     private final MaterializationPlanner planner;
     private final MaterializationTaskStore tasks;
     private final MaterializationTaskRecovery recovery;
@@ -60,10 +61,44 @@ public final class RegisteredMaterializationStreamScanner {
             MaterializationPolicy policy,
             int registryPageSize,
             int maxTasksPerPlan) {
+        this(
+                cluster,
+                l0Metadata,
+                generations,
+                activationGuard,
+                MaterializationSourceRepairer.noOp(),
+                planner,
+                tasks,
+                recovery,
+                recoveryScanner,
+                checkpoints,
+                metadataRetirer,
+                policy,
+                registryPageSize,
+                maxTasksPerPlan);
+    }
+
+    public RegisteredMaterializationStreamScanner(
+            String cluster,
+            OxiaMetadataStore l0Metadata,
+            GenerationMetadataStore generations,
+            GenerationProtocolActivationGuard activationGuard,
+            MaterializationSourceRepairer sourceRepairer,
+            MaterializationPlanner planner,
+            MaterializationTaskStore tasks,
+            MaterializationTaskRecovery recovery,
+            TaskRecoveryScanner recoveryScanner,
+            MaterializationCheckpointReconciler checkpoints,
+            TerminalWorkflowMetadataRetirer metadataRetirer,
+            MaterializationPolicy policy,
+            int registryPageSize,
+            int maxTasksPerPlan) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Metadata = Objects.requireNonNull(l0Metadata, "l0Metadata");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.activationGuard = Objects.requireNonNull(activationGuard, "activationGuard");
+        this.sourceRepairer = Objects.requireNonNull(
+                sourceRepairer, "sourceRepairer");
         this.planner = Objects.requireNonNull(planner, "planner");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.recovery = Objects.requireNonNull(recovery, "recovery");
@@ -194,7 +229,10 @@ public final class RegisteredMaterializationStreamScanner {
             Accumulator accumulator) {
         accumulator.registrationsAdmitted++;
         MaterializationTaskMutationGuard mutationGuard = () -> activationGuard.revalidate(proof);
-        return recoveryScanner.scan(streamId, mutationGuard).thenCompose(recovered -> {
+        return sourceRepairer.repair(streamId)
+                .thenCompose(ignored -> recoveryScanner.scan(
+                        streamId, mutationGuard))
+                .thenCompose(recovered -> {
             accumulator.existingTasksRecovered = Math.addExact(
                     accumulator.existingTasksRecovered, recovered.scannedTasks());
             long trim = snapshot.trim().trimOffset();
@@ -224,7 +262,7 @@ public final class RegisteredMaterializationStreamScanner {
                                     Math.addExact(
                                             retired.retentionStatsRetired(),
                                             retired.checkpointsRetired()))));
-        });
+                });
     }
 
     private CompletableFuture<Void> createAndRecover(
