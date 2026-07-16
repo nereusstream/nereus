@@ -31,7 +31,7 @@ protocol/table state = projection
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
-| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1–M3 final-gated；M4 NRC1 object protocol (streaming writer、strict reader、canonical metadata verifier) landed；root/retirement/GC pending | Continue F4-M4 protected append、root publication、anchor-aware recovery and GC |
+| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1–M3 final-gated；M4 through checkpoint Q implements NRC1/recovery、root/journal fences、typed source retirement and COMMITTED-view higher pre-drain；production deletion remains disabled | Complete TOPIC_COMPACTED/below-trim retirement、global domains、runtime composition and final M4 gates |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |

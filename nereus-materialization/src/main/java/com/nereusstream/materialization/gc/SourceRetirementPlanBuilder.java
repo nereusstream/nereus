@@ -5,22 +5,16 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
-import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
-import com.nereusstream.core.physical.PhysicalObjectIdentity;
-import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationCandidateKeyIdentity;
-import com.nereusstream.metadata.oxia.GenerationIndexDigests;
-import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
@@ -30,13 +24,9 @@ import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex;
-import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
-import com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
-import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
-import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
 import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
@@ -45,15 +35,10 @@ import com.nereusstream.metadata.oxia.retirement.VersionedGenerationZeroMarker;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointCodecV1;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointEntry;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointObject;
-import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointPublication;
-import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteRequest;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -73,14 +58,13 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
 
     private final String cluster;
     private final GenerationMetadataStore generations;
-    private final PhysicalObjectMetadataStore physicalObjects;
     private final SourceRetirementMetadataStore sources;
     private final RecoveryCheckpointCodecV1 checkpoints;
     private final PhysicalGcConfig config;
     private final F4Keyspace f4Keys;
     private final OxiaKeyspace l0Keys;
-    private final GenerationIndexRecordCodecV1 generationCodec =
-            new GenerationIndexRecordCodecV1();
+    private final RecoveryReplacementVerifier replacements;
+    private final HigherGenerationRecoveryCoverageVerifier higherCoverage;
 
     public SourceRetirementPlanBuilder(
             String cluster,
@@ -91,12 +75,24 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
             PhysicalGcConfig config) {
         this.cluster = requireText(cluster, "cluster");
         this.generations = Objects.requireNonNull(generations, "generations");
-        this.physicalObjects = Objects.requireNonNull(physicalObjects, "physicalObjects");
+        Objects.requireNonNull(physicalObjects, "physicalObjects");
         this.sources = Objects.requireNonNull(sources, "sources");
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.config = Objects.requireNonNull(config, "config");
         this.f4Keys = new F4Keyspace(cluster);
         this.l0Keys = new OxiaKeyspace(cluster);
+        this.replacements = new RecoveryReplacementVerifier(
+                cluster,
+                generations,
+                physicalObjects,
+                checkpoints,
+                config);
+        this.higherCoverage = new HigherGenerationRecoveryCoverageVerifier(
+                cluster,
+                generations,
+                checkpoints,
+                replacements,
+                config);
     }
 
     /** Builds one canonical process-local removal set for an ACTIVE affected-stream candidate. */
@@ -245,9 +241,10 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
             add = freezeGenerationZero(query, zero).thenAccept(removals::addAll);
         } else if (candidate instanceof VersionedGenerationIndex higher
                 && higher.value().lifecycle() == GenerationLifecycle.DRAINING) {
-            removals.add(removal(
-                    HigherGenerationIndexRetirementHandler.REMOVAL_TYPE, higher));
-            add = CompletableFuture.completedFuture(null);
+            add = higherCoverage.prove(query, higher).thenAccept(ignored -> removals.add(
+                    removal(
+                            HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
+                            higher)));
         } else {
             // The generation reference domain will veto every still-readable matching record.
             add = CompletableFuture.completedFuture(null);
@@ -275,7 +272,8 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                             content,
                             config.operationTimeout())
                     .thenCompose(checkpoint -> {
-                        requireCheckpointIdentity(stream, reference, checkpoint);
+                        replacements.requireCheckpointIdentity(
+                                stream, reference, checkpoint);
                         return checkpoints.findCommitCoveringOffset(
                                         checkpoint,
                                         zero.value().offsetStart(),
@@ -289,13 +287,13 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                     .thenCompose(evidence -> {
                         RecoveryCheckpointEntry entry = evidence.entry();
                         requireEntryMatchesIndex(entry, zero.value());
-                        return selectHealthyReplacement(
+                        return replacements.select(
                                         query,
                                         stream,
-                                        zero.value(),
                                         evidence.checkpoint(),
                                         entry,
-                                        0)
+                                        RecoveryReplacementVerifier.ReplacementRequirement
+                                                .generationZero(zero.value()))
                                 .thenCompose(replacement -> {
                                     String commitKey = l0Keys.streamCommitKey(
                                             stream,
@@ -317,7 +315,7 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                                                                             "generation-zero committed marker is absent before planning"));
                                                             requireMarkerMatches(
                                                                     commit, marker);
-                                                            return revalidateHealthyReplacement(
+                                                            return replacements.revalidate(
                                                                             replacement)
                                                                     .thenCompose(ignored ->
                                                                             generations.getRecoveryRoot(
@@ -349,189 +347,6 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                                 });
                     });
         });
-    }
-
-    private CompletableFuture<HealthyReplacement> selectHealthyReplacement(
-            GcReferenceQuery query,
-            StreamId stream,
-            OffsetIndexEntry sourceIndex,
-            RecoveryCheckpointObject checkpoint,
-            RecoveryCheckpointEntry entry,
-            int cursor) {
-        if (cursor == entry.coveringPublicationIndexes().size()) {
-            return CompletableFuture.failedFuture(condition(
-                    "generation-zero source has no current healthy NRC1 replacement"));
-        }
-        int publicationIndex = entry.coveringPublicationIndexes().get(cursor);
-        return checkpoints.scanPublications(
-                        checkpoint,
-                        OptionalInt.of(publicationIndex),
-                        1,
-                        config.operationTimeout())
-                .thenCompose(page -> {
-                    if (page.values().size() != 1) {
-                        return CompletableFuture.failedFuture(invariant(
-                                "NRC1 publication index did not resolve exactly one row"));
-                    }
-                    EmbeddedReplacement embedded = decodeReplacement(
-                            stream, sourceIndex, page.values().get(0));
-                    return loadHealthyReplacement(query, embedded).thenCompose(optional ->
-                            optional.<CompletableFuture<HealthyReplacement>>map(
-                                            CompletableFuture::completedFuture)
-                                    .orElseGet(() -> selectHealthyReplacement(
-                                            query,
-                                            stream,
-                                            sourceIndex,
-                                            checkpoint,
-                                            entry,
-                                            cursor + 1)));
-                });
-    }
-
-    private EmbeddedReplacement decodeReplacement(
-            StreamId stream,
-            OffsetIndexEntry sourceIndex,
-            RecoveryCheckpointPublication publication) {
-        byte[] canonical = bytes(publication.canonicalGenerationIndexRecord());
-        GenerationIndexRecord record;
-        try {
-            record = generationCodec.decode(canonical);
-        } catch (RuntimeException failure) {
-            throw invariant("cannot decode NRC1 source-retirement replacement index");
-        }
-        long sourceCumulativeStart = Math.subtractExact(
-                sourceIndex.cumulativeSize(), sourceIndex.logicalBytes());
-        if (!Arrays.equals(canonical, generationCodec.encode(record))
-                || !GenerationIndexDigests.canonicalRecordSha256(record)
-                        .equals(publication.generationIndexRecordSha256())
-                || record.metadataVersion() != 0
-                || record.lifecycle() != GenerationLifecycle.COMMITTED
-                || record.readViewId() != ReadView.COMMITTED.wireId()
-                || !record.streamId().equals(stream.value())
-                || record.generation() != publication.generation()
-                || !record.publicationId().equals(publication.publicationId().value())
-                || record.offsetStart() != publication.coverage().startOffset()
-                || record.offsetEnd() != publication.coverage().endOffset()
-                || record.offsetStart() > sourceIndex.offsetStart()
-                || record.offsetEnd() < sourceIndex.offsetEnd()
-                || record.firstCommitVersion() > sourceIndex.commitVersion()
-                || record.lastCommitVersion() < sourceIndex.commitVersion()
-                || record.cumulativeSizeAtStart() > sourceCumulativeStart
-                || record.cumulativeSizeAtEnd() < sourceIndex.cumulativeSize()
-                || !record.targetIdentitySha256().equals(
-                        record.readTarget().identityChecksumValue())) {
-            throw invariant(
-                    "NRC1 replacement index is non-canonical or does not cover the source commit");
-        }
-        ReadTarget decoded;
-        try {
-            decoded = TARGET_CODECS.decode(record.readTarget());
-        } catch (RuntimeException failure) {
-            throw invariant("cannot decode NRC1 source-retirement replacement target");
-        }
-        if (!(decoded instanceof ObjectSliceReadTarget target)) {
-            throw invariant("NRC1 source-retirement replacement is not an object slice");
-        }
-        GenerationIndexIdentity identity = new GenerationIndexIdentity(
-                stream,
-                ReadView.COMMITTED,
-                record.offsetEnd(),
-                record.generation());
-        String key = f4Keys.generationIndexKey(
-                stream,
-                ReadView.COMMITTED,
-                record.offsetEnd(),
-                record.generation());
-        return new EmbeddedReplacement(record, identity, key, target);
-    }
-
-    private CompletableFuture<Optional<HealthyReplacement>> loadHealthyReplacement(
-            GcReferenceQuery query,
-            EmbeddedReplacement embedded) {
-        return generations.getIndex(cluster, embedded.identity()).thenCompose(optionalIndex -> {
-            if (optionalIndex.isEmpty()) {
-                return CompletableFuture.completedFuture(Optional.empty());
-            }
-            VersionedGenerationIndex index = optionalIndex.orElseThrow();
-            GenerationIndexRecord expected = embedded.record().withMetadataVersion(
-                    index.metadataVersion());
-            Checksum expectedDigest = GenerationIndexDigests.durableValueSha256(
-                    embedded.record());
-            if (!index.key().equals(embedded.key())
-                    || !index.value().equals(expected)
-                    || !index.durableValueSha256().equals(expectedDigest)) {
-                return CompletableFuture.completedFuture(Optional.empty());
-            }
-            ObjectSliceReadTarget target = embedded.target();
-            ObjectKeyHash object = ObjectKeyHash.from(target.objectKey());
-            if (object.equals(query.object().objectKeyHash())
-                    || query.object().objectId()
-                            .map(target.objectId()::equals)
-                            .orElse(false)) {
-                return CompletableFuture.completedFuture(Optional.empty());
-            }
-            return physicalObjects.getRoot(cluster, object).thenApply(optionalRoot -> {
-                if (optionalRoot.isEmpty()) {
-                    return Optional.empty();
-                }
-                VersionedPhysicalObjectRoot root = optionalRoot.orElseThrow();
-                PhysicalObjectIdentity physical;
-                try {
-                    physical = PhysicalObjectIdentity.from(root.value());
-                } catch (RuntimeException failure) {
-                    throw invariant("NRC1 replacement physical root is malformed");
-                }
-                long requiredEnd = Math.addExact(
-                        target.objectOffset(), target.objectLength());
-                PhysicalObjectKind expectedKind = switch (target.objectType()) {
-                    case MULTI_STREAM_WAL_OBJECT -> PhysicalObjectKind.OBJECT_WAL;
-                    case STREAM_COMPACTED_OBJECT -> PhysicalObjectKind.COMMITTED_COMPACTED;
-                    default -> throw invariant(
-                            "NRC1 source-retirement replacement object type is unsupported");
-                };
-                if (!root.key().equals(f4Keys.physicalRootKey(object))
-                        || root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
-                        || !physical.objectKey().equals(target.objectKey())
-                        || physical.objectId().isEmpty()
-                        || !physical.objectId().orElseThrow().equals(target.objectId())
-                        || physical.kind() != expectedKind
-                        || requiredEnd > physical.objectLength()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new HealthyReplacement(index, root));
-            });
-        });
-    }
-
-    private CompletableFuture<Void> revalidateHealthyReplacement(
-            HealthyReplacement expected) {
-        GenerationIndexRecord value = expected.index().value();
-        GenerationIndexIdentity identity = new GenerationIndexIdentity(
-                new StreamId(value.streamId()),
-                ReadView.fromWireId(value.readViewId()),
-                value.offsetEnd(),
-                value.generation());
-        return generations.getIndex(cluster, identity).thenCompose(index -> {
-            if (!index.equals(Optional.of(expected.index()))) {
-                return CompletableFuture.failedFuture(condition(
-                        "healthy NRC1 replacement index changed while source facts were frozen"));
-            }
-            ObjectKeyHash object = new ObjectKeyHash(
-                    expected.root().value().objectKeyHash());
-            return physicalObjects.getRoot(cluster, object).thenAccept(root -> {
-                if (!root.equals(Optional.of(expected.root()))) {
-                    throw condition(
-                            "healthy NRC1 replacement root changed while source facts were frozen");
-                }
-            });
-        });
-    }
-
-    private static byte[] bytes(ByteBuffer value) {
-        ByteBuffer copy = value.asReadOnlyBuffer();
-        byte[] result = new byte[copy.remaining()];
-        copy.get(result);
-        return result;
     }
 
     private CompletableFuture<List<GcPlannedMetadataRemoval>> reloadOne(
@@ -600,11 +415,13 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
                         return CompletableFuture.failedFuture(condition(
                                 "higher-generation candidate is no longer DRAINING"));
                     }
-                    reproved.add(removal(
-                            HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
-                            higher));
-                    return reproveCandidateBindings(
-                            query, expected, index + 1, reproved);
+                    return higherCoverage.prove(query, higher).thenCompose(ignored -> {
+                        reproved.add(removal(
+                                HigherGenerationIndexRetirementHandler.REMOVAL_TYPE,
+                                higher));
+                        return reproveCandidateBindings(
+                                query, expected, index + 1, reproved);
+                    });
                 });
     }
 
@@ -716,37 +533,6 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
         return matching.get(0);
     }
 
-    private void requireCheckpointIdentity(
-            StreamId stream,
-            RecoveryCheckpointReferenceRecord reference,
-            RecoveryCheckpointObject checkpoint) {
-        RecoveryCheckpointWriteRequest header = checkpoint.header();
-        if (!checkpoint.objectId().equals(new ObjectId(reference.objectId()))
-                || !checkpoint.objectKey().equals(new ObjectKey(reference.objectKey()))
-                || checkpoint.objectLength() != reference.objectLength()
-                || !checkpoint.contentSha256().value().equals(reference.contentSha256())
-                || !header.cluster().equals(cluster)
-                || !header.streamId().equals(stream)
-                || header.checkpointSequence() != reference.checkpointSequence()
-                || !header.checkpointAttemptId().equals(reference.checkpointAttemptId())
-                || header.coverage().startOffset() != reference.coveredStartOffset()
-                || header.coverage().endOffset() != reference.coveredEndOffset()
-                || header.firstCommitVersion() != reference.firstCommitVersion()
-                || header.lastCommitVersion() != reference.lastCommitVersion()
-                || header.cumulativeSizeAtStart() != reference.cumulativeSizeAtStart()
-                || header.cumulativeSizeAtEnd() != reference.cumulativeSizeAtEnd()
-                || !header.firstCommitId().equals(reference.firstCommitId())
-                || !header.lastCommitId().equals(reference.lastCommitId())
-                || !header.sourceHeadCommitId().equals(reference.sourceHeadCommitId())
-                || header.sourceHeadCommitVersion() != reference.sourceHeadCommitVersion()
-                || !header.projectionIdentitySha256().value().equals(
-                        reference.projectionIdentitySha256())
-                || header.expectedEntryCount() != reference.commitEntryCount()
-                || header.expectedPublicationCount() != reference.publicationCount()) {
-            throw invariant("verified recovery checkpoint does not match its root reference");
-        }
-    }
-
     private static void requireEntryMatchesIndex(
             RecoveryCheckpointEntry entry,
             OffsetIndexEntry index) {
@@ -855,25 +641,4 @@ public final class SourceRetirementPlanBuilder implements GcPlanMetadataRevalida
         }
     }
 
-    private record EmbeddedReplacement(
-            GenerationIndexRecord record,
-            GenerationIndexIdentity identity,
-            String key,
-            ObjectSliceReadTarget target) {
-        private EmbeddedReplacement {
-            Objects.requireNonNull(record, "record");
-            Objects.requireNonNull(identity, "identity");
-            requireText(key, "key");
-            Objects.requireNonNull(target, "target");
-        }
-    }
-
-    private record HealthyReplacement(
-            VersionedGenerationIndex index,
-            VersionedPhysicalObjectRoot root) {
-        private HealthyReplacement {
-            Objects.requireNonNull(index, "index");
-            Objects.requireNonNull(root, "root");
-        }
-    }
 }

@@ -343,6 +343,30 @@ lifecycle、version、epoch、identity or digest drift cannot be hidden behind u
 completes the generation-zero healthy-replacement branch only；higher-generation pre-drain and the below-trim branch
 remain separate lifecycle/eligibility work before runtime composition.
 
+### 1.16 F4-M4 COMMITTED-view higher-generation pre-drain checkpoint
+
+Checkpoint Q reuses `RecoveryReplacementVerifier` as the only NRC1-to-current-index/root correctness path. A
+`HigherGenerationRecoveryCoverageVerifier` starts at the exact higher source's offset、first commit version and
+cumulative size, selects the one recovery-root reference covering each cursor, opens its strict NRC1 object and walks
+one commit entry at a time. Entries must tile the full source range and predecessor chain without a gap or overlap；
+their canonical generic commit envelopes must reproduce payload/projection identity and the final source
+record/entry/logical-byte/schema totals. Every entry must name at least one current `COMMITTED` replacement whose
+generation is strictly greater than the source generation and whose target remains on another `ACTIVE` physical root.
+The verifier bounds entries and unique replacement facts, then reloads every selected index/root、the recovery root and
+the exact source wrapper.
+
+`HigherGenerationPreDrainCoordinator` scans the affected-stream generation namespaces with the same bounded paging
+contract, verifies canonical stream/view/key identity and matches object key plus optional object id. A matching
+`PREPARED` record is a veto；`COMMITTED` and `QUARANTINED` records may CAS to `DRAINING` only after the whole-range
+proof and an exact candidate-root version/epoch/identity fence. The deterministic reason is
+`physical-gc-pre-drain:{candidateId}`；lost responses reload and distinguish the exact replacement、unchanged source
+and an immutable publication already drained by a concurrent attempt. An existing `DRAINING` record is not trusted by
+lifecycle alone：both the coordinator and `SourceRetirementPlanBuilder` re-run the current recovery/replacement proof.
+
+NRC1 currently records COMMITTED recovery facts, so a `TOPIC_COMPACTED` source fails with an explicit view-specific-
+proof requirement instead of borrowing COMMITTED evidence. The completed-trim alternative also remains pending.
+Consequently checkpoint Q does not yet authorize production runtime composition or physical deletion.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples

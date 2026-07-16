@@ -131,9 +131,11 @@ exact stored authority digests. Checkpoint M adds the root-authenticated DELETIN
 canonical generation-index routing plus generation-zero delete/higher-generation RETIRED handlers and reauthenticates
 root+journal at every destructive batch. Checkpoint O adds exact-key generation-zero marker/commit handlers and
 NRC1-bound source triple freezing/revalidation. Checkpoint P additionally requires a current exact COMMITTED NRC1
-replacement index plus its matching ACTIVE physical root and revalidates both after source reads. Higher pre-drain、
-below-trim eligibility、future-sentinel、ownerless global domains、cursor completion and runtime composition remain
-planned；therefore production deletion is still disabled.
+replacement index plus its matching ACTIVE physical root and revalidates both after source reads. Checkpoint Q adds
+COMMITTED-view whole-range NRC1/count/schema proof and response-loss-safe higher-generation
+`COMMITTED/QUARANTINED -> DRAINING`, then repeats that proof when a DRAINING removal is frozen. TOPIC_COMPACTED
+view-specific proof、below-trim eligibility、future-sentinel、ownerless global domains、cursor completion and runtime
+composition remain planned；therefore production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1185,9 +1187,16 @@ then the recovery root. Its `GcPlanMetadataRevalidator` reconstructs this comple
 than accepting unchanged removal keys. Focused tests freeze success and reject a QUARANTINED replacement index、a
 MARKED replacement root、index/root drift during freeze、root drift and unbound source removals.
 
-This still is not the complete §9.1 implementation：higher-generation source records need their earlier
-`COMMITTED/QUARANTINED -> DRAINING` transition, and the completed-trim alternative must be wired before production
-runtime deletion. Checkpoint P therefore remains ordinary evidence.
+Checkpoint Q completes the replacement-backed COMMITTED-view half of higher-generation §9.1 eligibility. The
+pre-drain verifier walks the source's whole NRC1 range and predecessor chain, reproduces its count/size/schema facts,
+requires a strictly newer current COMMITTED/ACTIVE replacement for every entry, and reloads all replacement facts、
+recovery root and source. Only then may the coordinator CAS `COMMITTED/QUARANTINED -> DRAINING` under an unchanged
+ACTIVE candidate-root fence. A DRAINING source must pass the same proof again when the removal plan freezes it, so a
+later replacement/index/root degradation blocks MARK/DELETE planning.
+
+This is still not the complete §9.1 implementation：NRC1 COMMITTED recovery facts cannot authorize a
+TOPIC_COMPACTED source, and the completed-trim alternative remains unwired. Checkpoint Q therefore remains ordinary
+evidence and does not enable production deletion.
 
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.
@@ -1199,9 +1208,13 @@ resolvers ignore it even before object mark. It becomes `RETIRED` after physical
 reference keeps shared bytes but this generation ref is removed. Generation-zero frozen records have no lifecycle；
 the physical root mark and exact pin post-check provide the same new-reader fence.
 
-The implemented checkpoint-N handler performs only the second `DRAINING -> RETIRED` transition. Its restart marker is
+Checkpoint Q implements the first transition for replacement-backed COMMITTED-view sources. It writes
+`physical-gc-pre-drain:{candidateId}` only after whole-range recovery/replacement proof and an unchanged candidate-root
+fence；CAS response loss accepts only the exact replacement、the unchanged original or the same immutable publication
+already in DRAINING. Checkpoint N implements the second `DRAINING -> RETIRED` transition. Its restart marker is
 `physical-gc:{gcAttemptId}:{referenceSetSha256}` with `stateChangedAtMillis == deleteStartedAtMillis`; any other
-RETIRED value is drift, not idempotent success. The earlier DRAINING transition remains source-plan construction work.
+RETIRED value is drift, not idempotent success. TOPIC_COMPACTED and completed-trim first-transition paths remain
+pending.
 
 ### 9.5 Fallback grace
 

@@ -102,10 +102,11 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4 的 NRC1 object protocol 已开始实现：spill-backed streaming writer、strict
-directory/range reader、attempt/key identity、body/content SHA 与 canonical metadata verifier 已有 focused
-evidence。其后的 M4 checkpoint B 已实现 protected generation-zero append/recovery 与 production
-shared-Oxia physical-protection wiring；recovery-root、anchor-aware retirement/GC 及 M5-M6 仍是 target。
+Oxia/LocalStack final gates。M4 through checkpoint Q 已实现 NRC1 protocol、protected generation-zero append、
+recovery-root/replay/index repair、bounded GC plan/root/journal fence、root-authenticated destructive skeleton、typed
+generation-zero source retirement，以及 COMMITTED-view whole-range higher-generation pre-drain/reproof。
+TOPIC_COMPACTED/below-trim retirement、global domains、runtime composition、cursor/root/audit completion 及 M5-M6
+仍是 target；production deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -116,8 +117,8 @@ alias。
 - `WAL_DURABLE` fast boundary 和 async materialization profile（F4-M0 已设计；M3 planner/recovery、
   exact-source worker、checkpoint/service building blocks 已实现，但 profile 尚未启用）；
 - KoP、routing、production topic-compaction admission、lakehouse、advanced Pulsar semantics；
-- Future 4 physical retirement/GC and async materialization remain unavailable until F4-M4–M6 are implemented；
-  the M4 NRC1/protected-append checkpoints alone do not enable them. Later tracks remain north-star designs；Future 3 and
+- Future 4 production physical retirement/GC and async materialization remain unavailable until F4-M4–M6 are implemented；
+  the in-progress M4 checkpoints alone do not enable them. Later tracks remain north-star designs；Future 3 and
   F4-M1–M3 are implemented/final-gated。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
@@ -317,10 +318,10 @@ flowchart TB
 | Module | Target responsibility | Current status (2026-07-15) |
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented |
-| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete and F4 physical lease/protection/reference SPI implemented；M4 recovery-root/GC coordination planned |
+| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete and F4 physical lease/protection/reference SPI implemented；M4 recovery/root/GC consumers are in progress through checkpoint Q |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay、F4-M1–M3 metadata/publication gates and M4 exact protected-append proof adapter implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
-| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated including format/planner/task recovery/exact-source worker/protection/checkpoint/service、Pulsar exact-byte round trip、topic SPI/registry、terminal workflow retirement and COMMITTED-source/tagged-v1/sorted-spill topic engine/publication；M4 GC pending；depends on core, never the reverse |
+| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint Q implements NRC1/recovery、root/journal fences、typed source retirement and COMMITTED-view higher pre-drain, while production composition/final GC remains pending；depends on core, never the reverse |
 | `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；projection、ledger/factory、append/read/lifecycle、durable cursor/retention、10k scale、rollout/limit/reset and F4 snapshot inventory boundaries complete |
 | `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider implemented；fork binding/admission/capability/policy guards、unloaded binding-aware admin validation and M6 real two-broker acceptance complete |
 | `nereus-kop-adapter` | Kafka projection | marker only |
