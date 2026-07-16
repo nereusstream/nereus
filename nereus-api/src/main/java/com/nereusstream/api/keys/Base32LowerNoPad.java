@@ -39,4 +39,41 @@ final class Base32LowerNoPad {
         }
         return result.toString();
     }
+
+    static byte[] decode(String value) {
+        byte[] result = new byte[value.length() * 5 / 8];
+        int outputIndex = 0;
+        int buffer = 0;
+        int bits = 0;
+        for (int index = 0; index < value.length(); index++) {
+            int decoded = decode(value.charAt(index));
+            if (decoded < 0) {
+                throw new IllegalArgumentException("base32 value contains a non-canonical character");
+            }
+            buffer = (buffer << 5) | decoded;
+            bits += 5;
+            if (bits >= 8) {
+                bits -= 8;
+                result[outputIndex++] = (byte) ((buffer >>> bits) & 0xff);
+                buffer &= (1 << bits) - 1;
+            }
+        }
+        if (bits > 0 && buffer != 0) {
+            throw new IllegalArgumentException("base32 value has non-zero trailing bits");
+        }
+        if (outputIndex != result.length) {
+            throw new IllegalArgumentException("base32 value has an invalid length");
+        }
+        return result;
+    }
+
+    private static int decode(char value) {
+        if (value >= 'a' && value <= 'z') {
+            return value - 'a';
+        }
+        if (value >= '2' && value <= '7') {
+            return value - '2' + 26;
+        }
+        return -1;
+    }
 }

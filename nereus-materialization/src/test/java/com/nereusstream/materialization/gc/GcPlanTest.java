@@ -183,6 +183,15 @@ class GcPlanTest {
                         List.of(metadata("/metadata/generation-a", 12, SHA_B))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exact planned metadata removal");
+        assertThatThrownBy(() -> GcPlan.computeReferenceSetSha256(
+                        config,
+                        candidate,
+                        List.of(snapshot),
+                        List.of(),
+                        List.of(new GcPlannedMetadataRemoval(
+                                "another-type", "/metadata/generation-a", 12, SHA_A))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact planned metadata removal");
     }
 
     @Test

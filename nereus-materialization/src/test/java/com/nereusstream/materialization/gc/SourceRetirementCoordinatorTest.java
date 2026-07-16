@@ -141,16 +141,96 @@ class SourceRetirementCoordinatorTest {
                 .isEqualTo(PhysicalObjectLifecycle.DELETING);
     }
 
+    @Test
+    void journalIsReauthenticatedBeforeEveryMetadataBatch() {
+        GcPlannedMetadataRemoval first = new GcPlannedMetadataRemoval(
+                "test-removal", "/indexes/a", 7, sha('e'));
+        GcPlannedMetadataRemoval second = new GcPlannedMetadataRemoval(
+                "test-removal", "/indexes/b", 8, sha('f'));
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(List.of(first, second));
+        Fixture fixture = fixture(snapshot, true);
+        DisappearingJournal journal = new DisappearingJournal(snapshot, 2);
+        AtomicInteger retireCalls = new AtomicInteger();
+        GcMetadataRetirementHandler handler = new GcMetadataRetirementHandler() {
+            @Override
+            public String removalType() {
+                return "test-removal";
+            }
+
+            @Override
+            public CompletableFuture<GcMetadataRetirementOutcome> retire(
+                    GcMetadataRetirementContext context,
+                    GcPlannedMetadataRemoval removal,
+                    MaterializationDeadline deadline) {
+                retireCalls.incrementAndGet();
+                return CompletableFuture.completedFuture(
+                        GcMetadataRetirementOutcome.RETIRED);
+            }
+        };
+
+        assertThatThrownBy(() -> coordinator(
+                        enabledConfig(1),
+                        fixture.store(),
+                        journal,
+                        new GcMetadataRetirementRegistry(List.of(handler)),
+                        fixture.objectStore())
+                .resume(fixture.root())
+                .join())
+                .hasRootCauseMessage(
+                        "DELETING root is missing its sealed retirement journal");
+
+        assertThat(journal.loadCalls).hasValue(3);
+        assertThat(retireCalls).hasValue(1);
+        assertThat(fixture.objectStore().headCalls).hasValue(0);
+        assertThat(fixture.objectStore().deleteCalls).hasValue(0);
+    }
+
+    @Test
+    void finalJournalReloadFencesPhysicalHeadAndDelete() {
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(List.of());
+        Fixture fixture = fixture(snapshot, true);
+        DisappearingJournal journal = new DisappearingJournal(snapshot, 3);
+
+        assertThatThrownBy(() -> coordinator(
+                        enabledConfig(),
+                        fixture.store(),
+                        journal,
+                        new GcMetadataRetirementRegistry(List.of()),
+                        fixture.objectStore())
+                .resume(fixture.root())
+                .join())
+                .hasRootCauseMessage(
+                        "DELETING root is missing its sealed retirement journal");
+
+        assertThat(journal.loadCalls).hasValue(4);
+        assertThat(fixture.objectStore().headCalls).hasValue(0);
+        assertThat(fixture.objectStore().deleteCalls).hasValue(0);
+    }
+
     private SourceRetirementCoordinator coordinator(
             FakePhysicalObjectMetadataStore store,
             GcRetirementJournal journal,
             ExactObjectStore objectStore) {
-        return new SourceRetirementCoordinator(
-                CLUSTER,
+        return coordinator(
                 enabledConfig(),
                 store,
                 journal,
                 new GcMetadataRetirementRegistry(List.of()),
+                objectStore);
+    }
+
+    private SourceRetirementCoordinator coordinator(
+            PhysicalGcConfig config,
+            FakePhysicalObjectMetadataStore store,
+            GcRetirementJournal journal,
+            GcMetadataRetirementRegistry retirements,
+            ExactObjectStore objectStore) {
+        return new SourceRetirementCoordinator(
+                CLUSTER,
+                config,
+                store,
+                journal,
+                retirements,
                 objectStore,
                 Clock.fixed(Instant.ofEpochMilli(500), ZoneOffset.UTC),
                 scheduler);
@@ -246,13 +326,17 @@ class SourceRetirementCoordinatorTest {
     }
 
     private static PhysicalGcConfig enabledConfig() {
+        return enabledConfig(PhysicalGcConfig.defaults().maxConcurrentDeletes());
+    }
+
+    private static PhysicalGcConfig enabledConfig(int maxConcurrentDeletes) {
         PhysicalGcConfig defaults = PhysicalGcConfig.defaults();
         return new PhysicalGcConfig(
                 true,
                 false,
                 defaults.metadataScanPageSize(),
                 defaults.objectListPageSize(),
-                defaults.maxConcurrentDeletes(),
+                maxConcurrentDeletes,
                 defaults.maxStreamsPerCandidate(),
                 defaults.maxAuthoritiesPerDomainSnapshot(),
                 defaults.maxReferencesPerDomainSnapshot(),
@@ -305,6 +389,43 @@ class SourceRetirementCoordinatorTest {
                 String gcAttemptId,
                 MaterializationDeadline deadline) {
             return CompletableFuture.completedFuture(snapshot);
+        }
+    }
+
+    private static final class DisappearingJournal implements GcRetirementJournal {
+        private final GcRetirementJournalSnapshot snapshot;
+        private final int successfulLoads;
+        private final AtomicInteger loadCalls = new AtomicInteger();
+
+        private DisappearingJournal(
+                GcRetirementJournalSnapshot snapshot,
+                int successfulLoads) {
+            this.snapshot = snapshot;
+            this.successfulLoads = successfulLoads;
+        }
+
+        @Override
+        public CompletableFuture<GcRetirementJournalSnapshot> prepare(
+                String gcAttemptId,
+                GcCandidate candidate,
+                List<GcReferenceSnapshot> domainSnapshots,
+                List<GcPlannedProtectionRemoval> plannedProtectionRemovals,
+                List<GcPlannedMetadataRemoval> plannedMetadataRemovals,
+                Checksum referenceSetSha256,
+                long createdAtMillis,
+                MaterializationDeadline deadline) {
+            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+
+        @Override
+        public CompletableFuture<Optional<GcRetirementJournalSnapshot>> load(
+                ObjectKeyHash object,
+                String gcAttemptId,
+                MaterializationDeadline deadline) {
+            return CompletableFuture.completedFuture(
+                    loadCalls.incrementAndGet() <= successfulLoads
+                            ? Optional.of(snapshot)
+                            : Optional.empty());
         }
     }
 

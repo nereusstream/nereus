@@ -73,11 +73,15 @@ checkpoints G–I. Checkpoint J adds query-bound stateless revalidation、exact 
 affected-stream generation、append-recovery and materialization reference domains. Checkpoint K adds the core shared
 bounded snapshot builder、composed managed-ledger generation-marker/exact-stream-authority APIs, and affected-stream
 projection-generation plus cursor-snapshot domains. Future-sentinel domains、ownerless global absence proof、
-retirement/destructive coordination and runtime composition remain pending. Checkpoint L's protocol foundation adds
+retirement planning and runtime composition remain pending. Checkpoint L's protocol foundation adds
 the reference-set-v2 compact domain proof and validated retirement manifest/protection/removal records/codecs. Its
 durable-store slice now adds fixed-depth object/attempt keyspace、production/fake create/scan parity and a
 manifest-last seal/load service. Mandatory collector injection now seals/authenticates it before MARK and reloads it
-at drain admission and the final delete-intent fence；destructive DELETING recovery remains pending.
+at drain admission and the final delete-intent fence. Checkpoint M adds the root-authenticated DELETING recovery、
+typed dispatch seam、journaled protection removal、exact object delete and DELETED convergence. Checkpoint N adds
+strict generation-index restart routing、exact generation-zero conditional deletion、higher-generation
+`DRAINING -> RETIRED` recovery and root+journal reauthentication at every destructive batch/final object fence.
+Source marker/commit planning、future/global domains、runtime composition and the remaining M4 passes are pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -682,6 +686,8 @@ VersionedGcRetirementRemoval.java                        implemented checkpoint 
 GcRetirementProtectionScanPage.java                      implemented checkpoint L durable-store slice
 GcRetirementRemovalScanPage.java                         implemented checkpoint L durable-store slice
 F4Keyspace.gcRetirement*                                 implemented checkpoint L durable-store slice
+F4Keyspace.parseGenerationIndexKey                       implemented checkpoint N strict restart router
+GenerationCandidateKeyIdentity.java                     implemented checkpoint N strict restart router
 PhysicalObjectMetadataStore retirement-journal API       implemented checkpoint L durable-store slice
 OxiaJavaPhysicalObjectMetadataStore journal methods      implemented checkpoint L durable-store slice
 ManagedLedgerProtocolProperties.java                     implemented checkpoint K composed marker validator
@@ -718,6 +724,9 @@ gc/GcMetadataRetirementContext.java                      implemented checkpoint 
 gc/GcMetadataRetirementHandler.java                      implemented checkpoint M dispatch foundation
 gc/GcMetadataRetirementOutcome.java                      implemented checkpoint M dispatch foundation
 gc/GcMetadataRetirementRegistry.java                     implemented checkpoint M dispatch foundation
+gc/GenerationZeroIndexRetirementHandler.java             implemented checkpoint N
+gc/HigherGenerationIndexRetirementHandler.java           implemented checkpoint N
+gc/GenerationRetirementOperations.java                   implemented checkpoint N focused seams
 gc/GcIdGenerator.java                                    implemented checkpoint H
 gc/SecureGcIdGenerator.java                              implemented checkpoint H
 gc/GcReferenceDomainVersion.java                         implemented checkpoint I
@@ -804,6 +813,7 @@ F4RecordValidationTest                                   extended checkpoint L f
 GcRetirementJournalMetadataStoreContractTest             implemented checkpoint L durable-store parity
 DefaultGcRetirementJournalTest                           implemented checkpoint L seal/reload/crash cuts
 SourceRetirementCoordinatorTest                          implemented checkpoint M initial recovery cuts
+GenerationIndexRetirementHandlerTest                     implemented checkpoint N response-loss cuts
 PhysicalObjectRootScannerTest                              implemented checkpoint I
 PhysicalRootTombstoneRetirementTest
 LatePutAfterTombstoneTest
@@ -840,6 +850,7 @@ retirement.
 ./gradlew phase4M4ManagedLedgerDomainsCheck
 ./gradlew phase4M4RetirementJournalCheck
 ./gradlew phase4M4DestructiveRecoveryCheck
+./gradlew phase4M4GenerationRetirementCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -930,6 +941,15 @@ deadline, and the exact attempt alone can CAS `DELETING -> DELETED`. Focused tes
 absent object under matching authority、same-record `DELETED` restart, and missing-journal failure before object access.
 The gate does not yet claim production source-metadata handlers, protection/metadata response-loss coverage, runtime
 composition, future-sentinel/ownerless-global domains, cursor completion or final M4 deletion enablement.
+
+`phase4M4GenerationRetirementCheck` extends checkpoint M with checkpoint N's strict type-owned generation-index
+actions. API/metadata tests freeze canonical inverse key decoding、encoded stream ids、both view namespaces、fixed
+depth and current-cluster round trips. Handler tests prove exact generation-zero deletion、delete-response-loss
+absence classification、DRAINING-only higher retirement、attempt+reference-set-bound deterministic RETIRED recovery、
+CAS-response-loss convergence and drift rejection. Plan tests require reference/removal type equality. Coordinator
+tests force `maxConcurrentDeletes=1`, remove the journal before batch two or the physical fence, and prove no later
+handler/object call occurs. This remains ordinary checkpoint-N evidence：marker/commit-node source-plan actions、
+future/global domains、runtime composition、cursor/root/audit retirement and the final M4 gate remain pending.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

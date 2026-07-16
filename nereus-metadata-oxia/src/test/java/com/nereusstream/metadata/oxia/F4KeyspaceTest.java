@@ -38,6 +38,35 @@ class F4KeyspaceTest {
     }
 
     @Test
+    void strictGenerationIndexRouterRoundTripsEveryViewAndEncodedStream() {
+        StreamId encodedStream = new StreamId("tenant/ns/stream");
+        String generationZero = keys.generationIndexKey(
+                encodedStream, ReadView.COMMITTED, 12, 0);
+        String higher = keys.generationIndexKey(
+                encodedStream, ReadView.TOPIC_COMPACTED, 12, 3);
+
+        assertThat(keys.parseGenerationIndexKey(generationZero))
+                .isEqualTo(new GenerationCandidateKeyIdentity(
+                        encodedStream, ReadView.COMMITTED, 12, 0));
+        assertThat(keys.parseGenerationIndexKey(higher))
+                .isEqualTo(new GenerationCandidateKeyIdentity(
+                        encodedStream, ReadView.TOPIC_COMPACTED, 12, 3));
+
+        assertThatThrownBy(() -> keys.parseGenerationIndexKey(
+                        generationZero.replace("/offset-index/", "/views/v1/topic-compacted/offset-index/")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.parseGenerationIndexKey(
+                        higher + "/extra"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.parseGenerationIndexKey(
+                        higher.replace("0000000000000000012", "12")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new F4Keyspace("other-cluster")
+                        .parseGenerationIndexKey(higher))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void rangeUpperBoundIncludesEverySuffixEvenAtLongMaxValue() {
         String from = keys.generationIndexScanFrom(streamId, ReadView.COMMITTED, Long.MAX_VALUE);
         String to = keys.generationIndexScanToAfterEnd(streamId, ReadView.COMMITTED, Long.MAX_VALUE);

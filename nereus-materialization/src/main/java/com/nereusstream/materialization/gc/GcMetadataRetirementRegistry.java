@@ -46,6 +46,10 @@ public final class GcMetadataRetirementRegistry {
         Objects.requireNonNull(context, "context");
         GcPlannedMetadataRemoval exactRemoval = Objects.requireNonNull(removal, "removal");
         Objects.requireNonNull(deadline, "deadline");
+        if (!context.journal().plannedMetadataRemovals().contains(exactRemoval)) {
+            return CompletableFuture.failedFuture(invariant(
+                    "metadata retirement is not present in the authenticated journal"));
+        }
         GcMetadataRetirementHandler handler = handlers.get(exactRemoval.removalType());
         if (handler == null) {
             return CompletableFuture.failedFuture(invariant(

@@ -174,6 +174,7 @@ final class GcPlanValidation {
             for (GcReference reference : snapshot.references()) {
                 GcPlannedMetadataRemoval removal = removalsByKey.get(reference.ownerKey());
                 if (removal == null
+                        || !removal.removalType().equals(reference.referenceType())
                         || removal.metadataVersion() != reference.ownerMetadataVersion()
                         || !removal.durableValueSha256().equals(
                                 reference.ownerIdentitySha256())) {

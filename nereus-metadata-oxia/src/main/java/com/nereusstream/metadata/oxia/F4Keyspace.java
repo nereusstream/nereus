@@ -106,6 +106,52 @@ public final class F4Keyspace {
         return streamPrefix(streamId) + "/views/v1/topic-compacted/offset-index";
     }
 
+    /** Strict restart router for a journaled generation-index key. */
+    public GenerationCandidateKeyIdentity parseGenerationIndexKey(String suppliedKey) {
+        String key = requireText(suppliedKey, "generationIndexKey");
+        String streamsPrefix = oxia.prefix() + "/streams/";
+        if (!key.startsWith(streamsPrefix)) {
+            throw new IllegalArgumentException("generation index key belongs to another cluster namespace");
+        }
+        String remainder = key.substring(streamsPrefix.length());
+        int streamEnd = remainder.indexOf('/');
+        if (streamEnd <= 0) {
+            throw new IllegalArgumentException("generation index key is missing its stream component");
+        }
+        StreamId stream = new StreamId(KeyComponentCodec.decodeComponent(
+                remainder.substring(0, streamEnd)));
+        String suffix = remainder.substring(streamEnd + 1);
+        String committedPrefix = "offset-index/";
+        String topicCompactedPrefix = "views/v1/topic-compacted/offset-index/";
+        ReadView view;
+        String identity;
+        if (suffix.startsWith(committedPrefix)) {
+            view = ReadView.COMMITTED;
+            identity = suffix.substring(committedPrefix.length());
+        } else if (suffix.startsWith(topicCompactedPrefix)) {
+            view = ReadView.TOPIC_COMPACTED;
+            identity = suffix.substring(topicCompactedPrefix.length());
+        } else {
+            throw new IllegalArgumentException("generation index key has an unknown view namespace");
+        }
+        int separator = identity.indexOf('/');
+        if (separator <= 0
+                || separator == identity.length() - 1
+                || identity.indexOf('/', separator + 1) >= 0) {
+            throw new IllegalArgumentException("generation index key has an invalid identity depth");
+        }
+        long offsetEnd = KeyComponentCodec.decodeNonNegativeLong(
+                identity.substring(0, separator));
+        long generation = KeyComponentCodec.decodeNonNegativeLong(
+                identity.substring(separator + 1));
+        GenerationCandidateKeyIdentity decoded = new GenerationCandidateKeyIdentity(
+                stream, view, offsetEnd, generation);
+        if (!generationIndexKey(stream, view, offsetEnd, generation).equals(key)) {
+            throw new IllegalArgumentException("generation index key is not canonical");
+        }
+        return decoded;
+    }
+
     public String generationIndexScanFrom(StreamId streamId, ReadView view, long offsetEndInclusive) {
         return generationIndexPrefix(streamId, view)
                 + "/"

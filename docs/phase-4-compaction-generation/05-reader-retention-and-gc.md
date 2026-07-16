@@ -121,9 +121,10 @@ root scan. It stops before every source/protection/audit/object delete and is no
 reference domains arrive in checkpoint J for affected-stream generation、append recovery and materialization facts,
 including query-bound stateless revalidation and exact reference/removal binding. Checkpoint K moves bounded canonical
 snapshot construction into core and adds affected-stream F2 projection-generation plus F3 cursor-snapshot domains over
-exact stored authority digests. Future-sentinel and ownerless global domains、source retirement planning、DELETING
-recovery/destructive coordinators、cursor completion and physical deletion remain planned；therefore no object
-deletion is enabled by these checkpoints.
+exact stored authority digests. Checkpoint M adds the root-authenticated DELETING recovery skeleton；checkpoint N adds
+canonical generation-index routing plus generation-zero delete/higher-generation RETIRED handlers and reauthenticates
+root+journal at every destructive batch. Future-sentinel、ownerless global domains、source marker/commit planning、
+cursor completion and runtime composition remain planned；therefore production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1106,9 +1107,10 @@ the bounded candidate/plan/digest values. Checkpoint I implements registry colle
 Candidate discovery and typed metadata-plan construction remain owned by later source/orphan/cursor coordinators.
 The future-catalog sentinel、ownerless-global domain variants and production runtime composition remain pending；the
 five affected-stream storage/projection/cursor domains implemented through checkpoint K are not production-composed.
-Checkpoint M now supplies the first DELETING-recovery coordinator, but production type-owned source-metadata handlers
-still do not reach the checkpoint-G delete primitives. A missing key or lost metadata-delete response must eventually
-be resolved under the unchanged DELETING root, never accepted from absence alone.
+Checkpoint M supplies the first DELETING-recovery coordinator and checkpoint N reaches the checkpoint-G
+generation-zero-index delete primitive plus higher-index CAS. Marker/commit-node typed actions and their planner are
+still pending. A missing key or lost metadata-delete response is resolved only under the unchanged DELETING
+root/journal, never accepted from absence alone.
 
 Checkpoint L's protocol foundation changes the canonical digest to protocol v2 and adds the validated manifest、domain
 proof、protection/removal records plus explicit binary-v1 codecs and frozen vectors. Its durable-store slice is also
@@ -1135,6 +1137,21 @@ convergence and missing-journal failure before object access. Production handler
 families, response-loss crash cuts for every metadata/protection/root CAS, runtime composition and the final M4 gate
 remain pending, so this checkpoint does not enable production deletion.
 
+Checkpoint N supplies the first production metadata handlers reached by that registry. A sealed removal of type
+`generation-zero-index` is routed by strict canonical key decoding, reloaded through `GenerationMetadataStore`, and
+conditionally deleted through `SourceRetirementMetadataStore` only when key、version and stored-envelope SHA still
+match. A `generation-index` removal must name the exact `DRAINING` higher record；the handler CASes it to `RETIRED`
+while preserving every immutable publication field and binds the terminal reason to attempt + reference-set digest.
+Lost delete/CAS responses reload the exact key under the same DELETING root/journal and accept only absent or that
+deterministic replacement. The plan validator additionally requires removal type to equal the reference type.
+
+`SourceRetirementCoordinator` now reloads the exact DELETING wrapper and the identical sealed journal before every
+metadata/protection batch, before physical object access, after uncertain protection/object responses, and before the
+final DELETED CAS. The DELETING wrapper comparison includes Oxia version and durable-envelope SHA；journal comparison
+includes manifest and every entry wrapper. If either disappears or changes, later batches/object HEAD are not issued.
+Generation-zero marker/commit-node actions and the planner that freezes them are the next source-retirement slice；
+checkpoint N remains ordinary evidence and does not enable production runtime deletion.
+
 If a process crashes after `DELETING`, another process resumes; the object never becomes readable again. If it crashes
 after physical delete before root CAS, HEAD/`ALREADY_ABSENT` plus exact root identity completes `DELETED`.
 
@@ -1144,6 +1161,10 @@ For an F4 index selected for retirement, the coordinator first CASes `COMMITTED/
 resolvers ignore it even before object mark. It becomes `RETIRED` after physical delete or after another active object
 reference keeps shared bytes but this generation ref is removed. Generation-zero frozen records have no lifecycle；
 the physical root mark and exact pin post-check provide the same new-reader fence.
+
+The implemented checkpoint-N handler performs only the second `DRAINING -> RETIRED` transition. Its restart marker is
+`physical-gc:{gcAttemptId}:{referenceSetSha256}` with `stateChangedAtMillis == deleteStartedAtMillis`; any other
+RETIRED value is drift, not idempotent success. The earlier DRAINING transition remains source-plan construction work.
 
 ### 9.5 Fallback grace
 

@@ -280,6 +280,25 @@ cursor domain binds drain revalidation to durable bytes rather than decoded-fiel
 create the M5 `GenerationProtocolActivationRecord`, registration coordinator or broker activation guard；therefore
 the marker API and domains are implemented foundations, not production activation or delete authority.
 
+### 1.13 F4-M4 generation-index retirement checkpoint
+
+Checkpoint N closes the restart-routing gap between the generic retirement journal and the focused generation stores.
+The journal deliberately persists canonical key/version/envelope facts rather than duplicating the process-local
+`GcReferenceQuery.affectedStreams`; after process loss, a type-owned handler must therefore recover routing from its
+own frozen key family. `KeyComponentCodec.decodeComponent/decodeNonNegativeLong` are strict inverses：invalid base32、
+invalid UTF-8、non-zero trailing bits、unsafe raw components、wrong-width/overflowing decimals and any value whose
+encode round trip differs are rejected. `F4Keyspace.parseGenerationIndexKey` accepts only the current cluster's exact
+COMMITTED or TOPIC_COMPACTED fixed-depth namespace and returns `GenerationCandidateKeyIdentity`；generation zero is
+legal only in COMMITTED. The generic destructive coordinator never parses stream/view semantics.
+
+The two registered removal types are frozen as `generation-zero-index` and `generation-index`. The first reloads the
+legacy/generic candidate through `GenerationMetadataStore.getCandidateByKey`, requires exact key/Oxia version/stored
+envelope SHA and delegates conditional deletion to the checkpoint-G focused adapter. The second accepts only the exact
+journaled `DRAINING` higher index and uses ordinary guarded CAS to preserve the record as `RETIRED`; its deterministic
+reason binds GC attempt plus reference-set digest and its timestamp is the physical delete-intent timestamp. Absence
+or a lost response is classified only under the same root-authenticated journal. This checkpoint still does not
+construct marker/commit-node removal entries or compose a production GC runtime.
+
 ## 2. Keyspace
 
 All keys use a new `F4Keyspace` delegating common stream/object components to `OxiaKeyspace`. Human-readable examples
@@ -339,6 +358,7 @@ public final class F4Keyspace {
     public String generationSequenceKey(StreamId streamId, ReadView view);
     public String generationIndexKey(
             StreamId streamId, ReadView view, long offsetEnd, long generation);
+    public GenerationCandidateKeyIdentity parseGenerationIndexKey(String key);
     public String generationIndexPrefix(StreamId streamId, ReadView view);
     public String generationIndexScanFrom(StreamId streamId, ReadView view, long offsetEndInclusive);
     public String generationIndexScanToAfterEnd(
@@ -362,6 +382,10 @@ public final class F4Keyspace {
     public String readerPrefix(ObjectKeyHash object);
 }
 ```
+
+`GenerationCandidateKeyIdentity` carries `(StreamId, ReadView, offsetEnd, generation)` and is accepted only when
+rebuilding the key with `generationIndexKey` yields byte-for-byte equality. This is a restart router for one closed
+key family, not a generic Oxia path parser or deletion API.
 
 Oxia orders hierarchical keys with slash-aware semantics, so scan bounds must not use a Java-string successor of a
 trailing slash. `generationIndexScanToAfterEnd` and `retentionStatsScanToAfterEnd` use the next fixed-width offset

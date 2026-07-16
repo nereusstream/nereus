@@ -41,6 +41,26 @@ class KeyComponentCodecTest {
     }
 
     @Test
+    void strictDecodeRoundTripsRawEncodedAndUnicodeComponents() {
+        assertThat(KeyComponentCodec.decodeComponent("tenant_ns.topic-0"))
+                .isEqualTo("tenant_ns.topic-0");
+        assertThat(KeyComponentCodec.decodeComponent("b32-orsw4ylooqxw44y"))
+                .isEqualTo("tenant/ns");
+        String unicode = "租户/主题";
+        assertThat(KeyComponentCodec.decodeComponent(KeyComponentCodec.encodeComponent(unicode)))
+                .isEqualTo(unicode);
+
+        assertThatThrownBy(() -> KeyComponentCodec.decodeComponent("not/canonical"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KeyComponentCodec.decodeComponent("b32-A"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KeyComponentCodec.decodeComponent("b32-b"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KeyComponentCodec.decodeComponent("b32-a"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void nonNegativeLongUsesLexicographicallySortableFixedWidthDecimal() {
         assertThat(KeyComponentCodec.encodeNonNegativeLong(0))
                 .isEqualTo("0000000000000000000");
@@ -51,6 +71,20 @@ class KeyComponentCodecTest {
         assertThat(KeyComponentCodec.encodeNonNegativeLong(Long.MAX_VALUE))
                 .isEqualTo("9223372036854775807");
         assertThatThrownBy(() -> KeyComponentCodec.encodeNonNegativeLong(-1))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void strictLongDecodeRequiresTheFrozenWidthAndCanonicalRange() {
+        assertThat(KeyComponentCodec.decodeNonNegativeLong("0000000000000000010"))
+                .isEqualTo(10);
+        assertThat(KeyComponentCodec.decodeNonNegativeLong("9223372036854775807"))
+                .isEqualTo(Long.MAX_VALUE);
+        assertThatThrownBy(() -> KeyComponentCodec.decodeNonNegativeLong("10"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KeyComponentCodec.decodeNonNegativeLong("00000000000000000a0"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> KeyComponentCodec.decodeNonNegativeLong("9223372036854775808"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

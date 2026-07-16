@@ -835,3 +835,22 @@ tasks.register("phase4M4DestructiveRecoveryCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M4GenerationRetirementContractSurface") {
+    group = "verification"
+    description = "Audit canonical generation-index routing and type-owned retirement handlers."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-generation-retirement-contract-surface.sh")
+}
+
+tasks.register("phase4M4GenerationRetirementCheck") {
+    group = "verification"
+    description = "Verify exact generation-zero deletion and higher-generation retirement recovery."
+    dependsOn("phase4M4DestructiveRecoveryCheck")
+    dependsOn("checkPhase4M4GenerationRetirementContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-api:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-materialization:check")
+}

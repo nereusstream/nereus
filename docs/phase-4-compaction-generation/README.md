@@ -16,8 +16,11 @@
 > production/fake store parity、manifest-last seal/load service 与 collector PREPARE-before-MARK/final reload
 > 也已实现。首个 root-authenticated destructive-recovery checkpoint 进一步加入 typed metadata-retirement
 > registry、journal-driven protection retirement、exact HEAD/delete 与 restart-safe `DELETING -> DELETED` CAS；
-> 正常删除、已缺失对象和缺失 journal 的零副作用失败已有聚焦测试。production source-metadata handler、
-> runtime composition、future-sentinel 与 ownerless global domains、cursor GC 与 F4-M5–M6 尚未实现
+> 正常删除、已缺失对象和缺失 journal 的零副作用失败已有聚焦测试。完整 source metadata planning、
+> runtime composition、future-sentinel 与 ownerless global domains、cursor GC 与 F4-M5–M6 尚未实现。随后
+> checkpoint N 已接入 canonical generation-index restart router、exact generation-zero conditional delete、
+> higher-generation `DRAINING -> RETIRED` handler，以及每个 destructive batch/physical-delete fence 的 root +
+> journal reauthentication；marker/commit-node plan construction 与 production runtime 仍保持关闭
 >
 > 设计基线日期：2026-07-14
 >
@@ -632,6 +635,38 @@ authority、projection recreation/derived-repair crash cut、F3 paged roots、pe
 module boundary 与 ownerless fail-closed。Future catalog sentinel/global enumeration、source plan construction、
 DELETING side effects 和 runtime composition 仍未开放。
 
+### 6.15 F4-M4 root-authenticated destructive recovery checkpoint
+
+Checkpoint M 实现 `SourceRetirementCoordinator`、closed `GcMetadataRetirementRegistry` 与显式 deletion result。
+入口只接受 `DELETING/DELETED` root；disabled/dry-run 在任何读取前返回。可变路径先重读 exact root 和 sealed
+journal，拒绝未注册 removal type，然后按 bounded batch 调用 type-owned handler、条件删除 journaled protection、
+重扫 protection、对 immutable object 做 exact HEAD/delete，最后只允许同一 attempt CAS
+`DELETING -> DELETED`。对象已缺失只在 root/journal authority 仍精确匹配时作为幂等进度；相同 `DELETED`
+record 的 scanner restart 不会错误地再要求 epoch 增长。`phase4M4DestructiveRecoveryCheck` 覆盖正常删除、
+already-absent、missing journal、unknown removal type 与 restart，但 checkpoint M 尚未提供 production typed
+source handler，也未开放 runtime composition。
+
+### 6.16 F4-M4 generation-index retirement checkpoint
+
+Checkpoint N 为 sealed journal 中已经存在的 generation-index removal 实现两个 production handler。
+`KeyComponentCodec` 新增 strict inverse；`F4Keyspace.parseGenerationIndexKey` 只接受当前 cluster、固定深度、
+canonical stream component、19-digit offset/generation 与 round-trip 完全相同的 COMMITTED/TOPIC_COMPACTED key。
+因此 restart 不依赖丢失的 process-local affected-stream cache，也不允许 generic coordinator 猜 key layout。
+
+`GenerationZeroIndexRetirementHandler` 重读 exact legacy/generic candidate，要求 key、Oxia version、stored-envelope
+SHA 与 journal 完全相同，然后通过 focused `SourceRetirementMetadataStore` 条件删除 generation-zero index；
+delete response loss 只有在同一 root/journal 下重读为 absent 才收敛。`HigherGenerationIndexRetirementHandler`
+只接受 journaled `DRAINING` record，CAS 为保留 immutable publication identity 的 `RETIRED` audit record；
+`stateReason` 绑定 GC attempt 和完整 reference-set digest，`stateChangedAt` 固定为 delete-intent time，所以 CAS
+response loss 和进程重启只能识别该 exact replacement。reference/removal validation 现在也要求
+`referenceType == removalType`，避免同 key 的错误 handler 路由。
+
+Coordinator 同时收紧为每个 metadata/protection batch、uncertain protection/object response、physical HEAD/delete
+前和最终 DELETED CAS 前重读 exact DELETING wrapper 与 byte-for-byte 相同的 sealed journal。聚焦测试证明 journal
+在第二批或 physical fence 消失时不会继续下一次 mutation/object access。`phase4M4GenerationRetirementCheck`
+冻结这些规则；generation-zero marker/commit-node typed actions、source plan construction、future/global domains、
+runtime composition 和 final M4 gate 仍待实现。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -640,7 +675,7 @@ DELETING side effects 和 runtime composition 仍未开放。
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint L, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、affected-stream generation/append/materialization/projection/cursor domains、composed generation-marker authority and root-authenticated manifest-last retirement journal are implemented/tested；future sentinel/ownerless-global proof、runtime composition、DELETING retirement/delete and cursor GC completion pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint N, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、affected-stream generation/append/materialization/projection/cursor domains、root-authenticated journal/destructive recovery and generation-index retirement handlers are implemented/tested；marker/commit source planning、future sentinel/ownerless-global proof、runtime composition、cursor/root/audit completion and final gate pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | planned |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

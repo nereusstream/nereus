@@ -14,6 +14,9 @@
 
 package com.nereusstream.api.keys;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
@@ -33,11 +36,60 @@ public final class KeyComponentCodec {
         return ENCODED_PREFIX + Base32LowerNoPad.encode(value.getBytes(StandardCharsets.UTF_8));
     }
 
+    /** Strict inverse used only by type-owned durable-key routers. */
+    public static String decodeComponent(String value) {
+        Objects.requireNonNull(value, "value");
+        if (!value.startsWith(ENCODED_PREFIX)) {
+            if (!isAllowedRawComponent(value)) {
+                throw new IllegalArgumentException("raw key component is not canonical");
+            }
+            return value;
+        }
+        byte[] bytes = Base32LowerNoPad.decode(value.substring(ENCODED_PREFIX.length()));
+        final String decoded;
+        try {
+            decoded = StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException failure) {
+            throw new IllegalArgumentException("encoded key component is not valid UTF-8", failure);
+        }
+        if (!encodeComponent(decoded).equals(value)) {
+            throw new IllegalArgumentException("encoded key component is not canonical");
+        }
+        return decoded;
+    }
+
     public static String encodeNonNegativeLong(long value) {
         if (value < 0) {
             throw new IllegalArgumentException("value must be non-negative");
         }
         return String.format(Locale.ROOT, "%019d", value);
+    }
+
+    public static long decodeNonNegativeLong(String value) {
+        Objects.requireNonNull(value, "value");
+        if (value.length() != 19) {
+            throw new IllegalArgumentException("encoded long must contain exactly 19 digits");
+        }
+        for (int index = 0; index < value.length(); index++) {
+            if (value.charAt(index) < '0' || value.charAt(index) > '9') {
+                throw new IllegalArgumentException("encoded long contains a non-decimal character");
+            }
+        }
+        final long decoded;
+        try {
+            decoded = Long.parseLong(value);
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException("encoded long exceeds the signed long range", failure);
+        }
+        if (!encodeNonNegativeLong(decoded).equals(value)) {
+            throw new IllegalArgumentException("encoded long is not canonical");
+        }
+        return decoded;
     }
 
     private static boolean isAllowedRawComponent(String value) {

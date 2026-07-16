@@ -31,6 +31,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /** Restart-safe destructive recovery for one root that already carries durable DELETING intent. */
@@ -154,24 +155,20 @@ public final class SourceRetirementCoordinator {
         GcMetadataRetirementContext context = new GcMetadataRetirementContext(root, journal);
         RetirementCounts counts = new RetirementCounts();
         return retireMetadata(context, journal.plannedMetadataRemovals(), counts, deadline)
-                .thenCompose(ignored -> reloadExactDeleting(root, deadline))
-                .thenCompose(reloaded -> reloaded
-                        .<CompletableFuture<Void>>map(exact -> retireProtections(
-                                exact,
-                                journal.plannedProtectionRemovals(),
-                                counts,
-                                deadline))
-                        .orElseGet(() -> CompletableFuture.failedFuture(invariant(
-                                "DELETING root changed during metadata retirement"))))
-                .thenCompose(ignored -> reloadExactDeleting(root, deadline))
-                .thenCompose(reloaded -> reloaded
-                        .<CompletableFuture<VersionedPhysicalObjectRoot>>map(
-                                CompletableFuture::completedFuture)
-                        .orElseGet(() -> CompletableFuture.failedFuture(invariant(
-                                "DELETING root changed before physical deletion"))))
-                .thenCompose(exact -> deletePhysicalObject(exact, deadline)
+                .thenCompose(ignored -> reauthenticateContext(context, deadline))
+                .thenCompose(authenticated -> retireProtections(
+                        authenticated,
+                        journal.plannedProtectionRemovals(),
+                        counts,
+                        deadline))
+                .thenCompose(ignored -> reauthenticateContext(context, deadline))
+                .thenCompose(authenticated -> deletePhysicalObject(authenticated, deadline)
                         .thenCompose(objectStatus -> completeDeletedRoot(
-                                exact, objectStatus, counts, now, deadline)));
+                                authenticated,
+                                objectStatus,
+                                counts,
+                                now,
+                                deadline)));
     }
 
     private CompletableFuture<Void> retireMetadata(
@@ -179,9 +176,12 @@ public final class SourceRetirementCoordinator {
             List<GcPlannedMetadataRemoval> removals,
             RetirementCounts counts,
             MaterializationDeadline deadline) {
-        return runBatches(
+        return runAuthenticatedBatches(
+                context,
                 removals,
-                removal -> metadataRetirements.retire(context, removal, deadline)
+                deadline,
+                (authenticated, removal) -> metadataRetirements.retire(
+                                authenticated, removal, deadline)
                         .thenAccept(outcome -> {
                             if (outcome == GcMetadataRetirementOutcome.RETIRED) {
                                 counts.metadataRetired.incrementAndGet();
@@ -192,10 +192,11 @@ public final class SourceRetirementCoordinator {
     }
 
     private CompletableFuture<Void> retireProtections(
-            VersionedPhysicalObjectRoot root,
+            GcMetadataRetirementContext context,
             List<GcPlannedProtectionRemoval> planned,
             RetirementCounts counts,
             MaterializationDeadline deadline) {
+        VersionedPhysicalObjectRoot root = context.deletingRoot();
         return scanProtections(new ObjectKeyHash(root.value().objectKeyHash()), deadline)
                 .thenCompose(current -> {
                     Map<String, GcPlannedProtectionRemoval> expected = new HashMap<>();
@@ -217,25 +218,30 @@ public final class SourceRetirementCoordinator {
                     }
                     Map<String, VersionedObjectProtection> currentByKey = new HashMap<>();
                     current.forEach(value -> currentByKey.put(value.key(), value));
-                    return runBatches(planned, removal -> {
-                        VersionedObjectProtection value = currentByKey.get(
-                                removal.protection().key());
-                        if (value == null) {
-                            counts.protectionsAbsent.incrementAndGet();
-                            return CompletableFuture.completedFuture(null);
-                        }
-                        return deleteProtection(root, removal, deadline)
-                                .thenAccept(outcome -> {
-                                    if (outcome == GcMetadataRetirementOutcome.RETIRED) {
-                                        counts.protectionsRetired.incrementAndGet();
-                                    } else {
-                                        counts.protectionsAbsent.incrementAndGet();
-                                    }
-                                });
-                    });
+                    return runAuthenticatedBatches(
+                            context, planned, deadline, (authenticated, removal) -> {
+                                VersionedObjectProtection value = currentByKey.get(
+                                        removal.protection().key());
+                                if (value == null) {
+                                    counts.protectionsAbsent.incrementAndGet();
+                                    return CompletableFuture.completedFuture(null);
+                                }
+                                return deleteProtection(authenticated, removal, deadline)
+                                        .thenAccept(outcome -> {
+                                            if (outcome
+                                                    == GcMetadataRetirementOutcome.RETIRED) {
+                                                counts.protectionsRetired.incrementAndGet();
+                                            } else {
+                                                counts.protectionsAbsent.incrementAndGet();
+                                            }
+                                        });
+                            });
                 })
-                .thenCompose(ignored -> scanProtections(
-                        new ObjectKeyHash(root.value().objectKeyHash()), deadline))
+                .thenCompose(ignored -> reauthenticateContext(context, deadline))
+                .thenCompose(authenticated -> scanProtections(
+                        new ObjectKeyHash(
+                                authenticated.deletingRoot().value().objectKeyHash()),
+                        deadline))
                 .thenAccept(remaining -> {
                     if (!remaining.isEmpty()) {
                         throw invariant(
@@ -245,7 +251,7 @@ public final class SourceRetirementCoordinator {
     }
 
     private CompletableFuture<GcMetadataRetirementOutcome> deleteProtection(
-            VersionedPhysicalObjectRoot root,
+            GcMetadataRetirementContext context,
             GcPlannedProtectionRemoval removal,
             MaterializationDeadline deadline) {
         VersionedObjectProtection planned = removal.protection();
@@ -260,29 +266,27 @@ public final class SourceRetirementCoordinator {
                         GcMetadataRetirementOutcome.RETIRED);
             }
             Throwable original = unwrap(failure);
-            return reloadExactDeleting(root, deadline).thenCompose(exact -> {
-                if (exact.isEmpty()) {
-                    return CompletableFuture.failedFuture(original);
-                }
-                return findProtection(identity.object(), planned.key(), deadline)
-                        .thenCompose(current -> {
-                            if (current.isEmpty()) {
-                                return CompletableFuture.completedFuture(
-                                        GcMetadataRetirementOutcome.ALREADY_ABSENT);
-                            }
-                            if (current.orElseThrow().equals(planned)) {
-                                return CompletableFuture.failedFuture(original);
-                            }
-                            return CompletableFuture.failedFuture(invariant(
-                                    "object protection changed after uncertain delete"));
-                        });
-            });
+            return reauthenticateContext(context, deadline)
+                    .thenCompose(authenticated -> findProtection(
+                            identity.object(), planned.key(), deadline))
+                    .thenCompose(current -> {
+                        if (current.isEmpty()) {
+                            return CompletableFuture.completedFuture(
+                                    GcMetadataRetirementOutcome.ALREADY_ABSENT);
+                        }
+                        if (current.orElseThrow().equals(planned)) {
+                            return CompletableFuture.failedFuture(original);
+                        }
+                        return CompletableFuture.failedFuture(invariant(
+                                "object protection changed after uncertain delete"));
+                    });
         }).thenCompose(Function.identity());
     }
 
     private CompletableFuture<DeleteObjectResult.Status> deletePhysicalObject(
-            VersionedPhysicalObjectRoot root,
+            GcMetadataRetirementContext context,
             MaterializationDeadline deadline) {
+        VersionedPhysicalObjectRoot root = context.deletingRoot();
         PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
         return headExact(object, deadline).thenCompose(head -> {
             if (head.isEmpty()) {
@@ -307,25 +311,23 @@ public final class SourceRetirementCoordinator {
                     return CompletableFuture.completedFuture(result.status());
                 }
                 Throwable original = unwrap(failure);
-                return reloadExactDeleting(root, deadline).thenCompose(exact -> {
-                    if (exact.isEmpty()) {
-                        return CompletableFuture.failedFuture(original);
-                    }
-                    return headExact(object, deadline).thenCompose(reloaded -> reloaded.isEmpty()
-                            ? CompletableFuture.completedFuture(
-                                    DeleteObjectResult.Status.ALREADY_ABSENT)
-                            : CompletableFuture.failedFuture(original));
-                });
+                return reauthenticateContext(context, deadline)
+                        .thenCompose(authenticated -> headExact(object, deadline))
+                        .thenCompose(reloaded -> reloaded.isEmpty()
+                                ? CompletableFuture.completedFuture(
+                                        DeleteObjectResult.Status.ALREADY_ABSENT)
+                                : CompletableFuture.failedFuture(original));
             }).thenCompose(Function.identity());
         });
     }
 
     private CompletableFuture<PhysicalGcDeletionResult> completeDeletedRoot(
-            VersionedPhysicalObjectRoot deletingRoot,
+            GcMetadataRetirementContext context,
             DeleteObjectResult.Status objectStatus,
             RetirementCounts counts,
             long observedNow,
             MaterializationDeadline deadline) {
+        VersionedPhysicalObjectRoot deletingRoot = context.deletingRoot();
         return reloadExactDeleting(deletingRoot, deadline).thenCompose(optional -> {
             if (optional.isEmpty()) {
                 return deadline.bound(
@@ -342,41 +344,44 @@ public final class SourceRetirementCoordinator {
                                         PhysicalGcDeletionStatus.ROOT_CHANGED)));
             }
             VersionedPhysicalObjectRoot exact = optional.orElseThrow();
-            long deletedAt = Math.max(observedNow, exact.value().deleteStartedAtMillis());
-            PhysicalObjectRootRecord replacement = deleted(exact.value(), deletedAt);
-            CompletableFuture<VersionedPhysicalObjectRoot> cas = deadline.bound(
-                    () -> metadataStore.compareAndSetRoot(
-                            cluster, replacement, exact.metadataVersion()),
-                    "CAS DELETING physical root to DELETED");
-            return cas.handle((deleted, failure) -> {
-                if (failure == null) {
-                    return CompletableFuture.completedFuture(result(
-                            deleted, objectStatus, counts));
-                }
-                Throwable original = unwrap(failure);
-                return deadline.bound(
-                                () -> metadataStore.getRoot(
-                                        cluster,
-                                        new ObjectKeyHash(
-                                                exact.value().objectKeyHash())),
-                                "reload physical root after uncertain DELETED CAS")
-                        .thenCompose(reloaded -> {
-                            if (reloaded.isPresent()
-                                    && exactReplacement(
-                                            reloaded.orElseThrow(), replacement)) {
-                                return CompletableFuture.completedFuture(result(
-                                        reloaded.orElseThrow(), objectStatus, counts));
-                            }
-                            if (reloaded.isPresent()
-                                    && exactDeletingAttempt(
-                                            exact, reloaded.orElseThrow())) {
-                                return CompletableFuture.failedFuture(original);
-                            }
-                            return CompletableFuture.completedFuture(
-                                    PhysicalGcDeletionResult.simple(
-                                            PhysicalGcDeletionStatus.ROOT_CHANGED));
-                        });
-            }).thenCompose(Function.identity());
+            return loadExactJournal(exact, deadline).thenCompose(reloadedJournal -> {
+                requireSameJournal(context.journal(), reloadedJournal);
+                long deletedAt = Math.max(observedNow, exact.value().deleteStartedAtMillis());
+                PhysicalObjectRootRecord replacement = deleted(exact.value(), deletedAt);
+                CompletableFuture<VersionedPhysicalObjectRoot> cas = deadline.bound(
+                        () -> metadataStore.compareAndSetRoot(
+                                cluster, replacement, exact.metadataVersion()),
+                        "CAS DELETING physical root to DELETED");
+                return cas.handle((deleted, failure) -> {
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(result(
+                                deleted, objectStatus, counts));
+                    }
+                    Throwable original = unwrap(failure);
+                    return deadline.bound(
+                                    () -> metadataStore.getRoot(
+                                            cluster,
+                                            new ObjectKeyHash(
+                                                    exact.value().objectKeyHash())),
+                                    "reload physical root after uncertain DELETED CAS")
+                            .thenCompose(reloaded -> {
+                                if (reloaded.isPresent()
+                                        && exactReplacement(
+                                                reloaded.orElseThrow(), replacement)) {
+                                    return CompletableFuture.completedFuture(result(
+                                            reloaded.orElseThrow(), objectStatus, counts));
+                                }
+                                if (reloaded.isPresent()
+                                        && exactDeletingAttempt(
+                                                exact, reloaded.orElseThrow())) {
+                                    return CompletableFuture.failedFuture(original);
+                                }
+                                return CompletableFuture.completedFuture(
+                                        PhysicalGcDeletionResult.simple(
+                                                PhysicalGcDeletionStatus.ROOT_CHANGED));
+                            });
+                }).thenCompose(Function.identity());
+            });
         });
     }
 
@@ -492,23 +497,41 @@ public final class SourceRetirementCoordinator {
                         exactDeletingAttempt(expected, root)));
     }
 
-    private <T> CompletableFuture<Void> runBatches(
+    private CompletableFuture<GcMetadataRetirementContext> reauthenticateContext(
+            GcMetadataRetirementContext expected,
+            MaterializationDeadline deadline) {
+        return reloadExactDeleting(expected.deletingRoot(), deadline)
+                .thenCompose(reloaded -> reloaded
+                        .<CompletableFuture<GcMetadataRetirementContext>>map(root ->
+                                loadExactJournal(root, deadline).thenApply(journal -> {
+                                    requireSameJournal(expected.journal(), journal);
+                                    return new GcMetadataRetirementContext(root, journal);
+                                }))
+                        .orElseGet(() -> CompletableFuture.failedFuture(invariant(
+                                "DELETING root changed during destructive recovery"))));
+    }
+
+    private <T> CompletableFuture<Void> runAuthenticatedBatches(
+            GcMetadataRetirementContext context,
             List<T> values,
-            Function<T, CompletableFuture<?>> operation) {
+            MaterializationDeadline deadline,
+            BiFunction<GcMetadataRetirementContext, T, CompletableFuture<?>> operation) {
         int batchSize = Math.min(config.maxConcurrentDeletes(), 1_000);
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (int start = 0; start < values.size(); start += batchSize) {
             int from = start;
             int to = Math.min(values.size(), start + batchSize);
-            chain = chain.thenCompose(ignored -> {
-                List<CompletableFuture<?>> batch = new ArrayList<>(to - from);
-                for (T value : values.subList(from, to)) {
-                    batch.add(Objects.requireNonNull(
-                            operation.apply(value), "retirement operation future"));
-                }
-                return CompletableFuture.allOf(
-                        batch.toArray(CompletableFuture[]::new));
-            });
+            chain = chain.thenCompose(ignored -> reauthenticateContext(context, deadline))
+                    .thenCompose(authenticated -> {
+                        List<CompletableFuture<?>> batch = new ArrayList<>(to - from);
+                        for (T value : values.subList(from, to)) {
+                            batch.add(Objects.requireNonNull(
+                                    operation.apply(authenticated, value),
+                                    "retirement operation future"));
+                        }
+                        return CompletableFuture.allOf(
+                                batch.toArray(CompletableFuture[]::new));
+                    });
         }
         return chain;
     }
@@ -525,11 +548,23 @@ public final class SourceRetirementCoordinator {
         }
     }
 
+    private static void requireSameJournal(
+            GcRetirementJournalSnapshot expected,
+            GcRetirementJournalSnapshot actual) {
+        if (!expected.manifest().equals(actual.manifest())
+                || !expected.protectionEntries().equals(actual.protectionEntries())
+                || !expected.removalEntries().equals(actual.removalEntries())) {
+            throw invariant("sealed retirement journal changed during destructive recovery");
+        }
+    }
+
     private static boolean exactDeletingAttempt(
             VersionedPhysicalObjectRoot expected,
             VersionedPhysicalObjectRoot actual) {
         return actual.value().lifecycle() == PhysicalObjectLifecycle.DELETING
                 && exactAttemptIdentity(expected, actual)
+                && actual.metadataVersion() == expected.metadataVersion()
+                && actual.durableValueSha256().equals(expected.durableValueSha256())
                 && actual.value().lifecycleEpoch() == expected.value().lifecycleEpoch()
                 && actual.value().deleteStartedAtMillis()
                         == expected.value().deleteStartedAtMillis();
