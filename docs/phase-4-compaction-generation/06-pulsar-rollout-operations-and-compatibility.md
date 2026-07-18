@@ -964,6 +964,12 @@ candidate. The same checkpoint fixes inventory pagination to honor only the exac
 progress；base64 physical order is deliberately not projected into a cross-page logical-order promise. Actual Pulsar
 ownership transfer, unload and two-broker failover remain M6 evidence.
 
+Checkpoint AX exercises the next scale boundary below the broker bridge. A writer process persists 1,001 roots in one
+physical shard plus one in every other shard to real four-shard Oxia and exits. A fresh process then starts every
+shard from an empty continuation and proves bounded `64`-entry pagination covers all 1,256 exact identities once.
+This removes the single-page-per-shard assumption without claiming Pulsar ownership transfer or the remaining
+10,000-root/failure certification.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

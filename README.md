@@ -347,6 +347,14 @@ actionable tasks（2 executed、36 up-to-date）通过，完整 AS–AW source s
 `phase4M4AllShardRecoveryCheck` 也已于 2026-07-18 在 Java 21、Docker 28.5.2 和 locked Pulsar
 `c59da789e88df2b57829de3277c60194b44fceb6` 上通过（154 actionable tasks，73 executed、81 up-to-date），
 其两组串行 locked-Pulsar 验证为 141/141 和 138/138 executed。
+Checkpoint AX 继续关闭 M6 的 physical-root scale fixture：首进程向真实四分片 Oxia 持久化 1,256 个 ACTIVE
+root，其中 shard 0 精确 1,001 个、其余 255 个 shard 各一个；首进程关闭后，新进程从每个 shard 的空
+continuation 重新扫描。`metadataScanPageSize=64` 下热点 shard 精确读取 16 页，其余 shard 各一页，全部
+1,256 个 identity 无重复、无遗漏。聚焦真实服务方法已于 2026-07-18 在 Java 21、Docker 28.5.2 下通过
+（47 actionable tasks，2 executed、45 up-to-date），完整 AS–AX source set 随后以 47/47 executed tasks 通过；
+`phase4M4RootScaleCheck` 也已于 2026-07-18 在 Java 21、Docker 28.5.2 和 locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6` 上通过（155 actionable tasks，70 executed、85 up-to-date），
+其两组串行 locked-Pulsar 验证为 141/141 和 138/138 executed。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

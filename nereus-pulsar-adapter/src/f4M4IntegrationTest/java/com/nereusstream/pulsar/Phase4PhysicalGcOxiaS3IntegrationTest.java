@@ -25,6 +25,7 @@ import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionAc
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationResult;
 import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.materialization.gc.PhysicalGcConfig;
+import com.nereusstream.materialization.gc.PhysicalObjectRootScanner;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.F4Keyspace;
@@ -90,10 +91,12 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -104,6 +107,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -605,6 +609,79 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
+    @Test
+    void freshProcessPaginatesOneThousandOneRootsInOneShardAndEveryOtherShard()
+            throws Exception {
+        MutableClock clock = new MutableClock(6_000_000);
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "f4-m4-root-scale-" + suffix;
+        String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
+        createBucket(bucket);
+        ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "root-scale");
+        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
+                READINESS_EPOCH, sha256("broker-set/root-scale/" + suffix), 2);
+        PhysicalGcConfig gcConfig = physicalGcConfig();
+        List<TargetObject> expected;
+
+        try (Process first = Process.open(
+                cluster,
+                "w".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("root-scale-first"),
+                clock,
+                StoreDecorator.identity())) {
+            expected = first.createPhysicalRootScaleFixture();
+            assertThat(expected).hasSize(1_256);
+            assertThat(expected.stream().filter(target -> rootShard(target.hash()) == 0))
+                    .hasSize(1_001);
+            for (int shard = 1; shard < PhysicalObjectRootScanner.ROOT_SHARDS; shard++) {
+                int exactShard = shard;
+                assertThat(expected.stream()
+                                .filter(target -> rootShard(target.hash()) == exactShard))
+                        .hasSize(1);
+            }
+        }
+
+        AtomicIntegerArray pageCalls =
+                new AtomicIntegerArray(PhysicalObjectRootScanner.ROOT_SHARDS);
+        try (Process recovered = Process.open(
+                cluster,
+                "x".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("root-scale-recovered"),
+                clock,
+                StoreDecorator.identity(),
+                PhysicalStoreDecorator.auditRootScalePagination(pageCalls));
+                PhysicalObjectRootScanner scanner = new PhysicalObjectRootScanner(
+                        cluster, gcConfig, recovered.physical, recovered.scheduler)) {
+            Set<String> visited = new HashSet<>();
+            var result = scanner.scan(root -> {
+                        assertThat(visited.add(root.value().objectKeyHash())).isTrue();
+                        return CompletableFuture.completedFuture(null);
+                    })
+                    .get(180, TimeUnit.SECONDS);
+
+            assertThat(result.totalRoots()).isEqualTo(1_256);
+            assertThat(result.activeRoots()).isEqualTo(1_256);
+            assertThat(result.markedRoots()).isZero();
+            assertThat(result.deletingRoots()).isZero();
+            assertThat(result.deletedRoots()).isZero();
+            assertThat(result.quarantinedRoots()).isZero();
+            assertThat(visited)
+                    .containsExactlyInAnyOrderElementsOf(expected.stream()
+                            .map(target -> target.hash().value())
+                            .toList());
+            assertThat(pageCalls.get(0)).isEqualTo(16);
+            for (int shard = 1; shard < PhysicalObjectRootScanner.ROOT_SHARDS; shard++) {
+                assertThat(pageCalls.get(shard)).isEqualTo(1);
+            }
+        }
+    }
+
     private Path stagingDirectory(String name) throws Exception {
         Path path = Files.createDirectories(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
@@ -1005,6 +1082,60 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             return List.copyOf(targets);
         }
 
+        private List<TargetObject> createPhysicalRootScaleFixture() {
+            int[] rootsPerShard = new int[PhysicalObjectRootScanner.ROOT_SHARDS];
+            ArrayList<TargetObject> targets = new ArrayList<>(1_256);
+            for (long nonce = 0; targets.size() < 1_256; nonce++) {
+                ObjectKey key = new ObjectKey(
+                        "objects/f4/physical-root-scale/" + cluster + "/" + nonce);
+                ObjectKeyHash hash = ObjectKeyHash.from(key);
+                int shard = rootShard(hash);
+                int required = shard == 0 ? 1_001 : 1;
+                if (rootsPerShard[shard] >= required) {
+                    continue;
+                }
+                rootsPerShard[shard]++;
+                targets.add(new TargetObject(key, hash));
+            }
+
+            long now = clock.millis();
+            for (int first = 0; first < targets.size(); first += 64) {
+                int end = Math.min(first + 64, targets.size());
+                CompletableFuture<?>[] writes = new CompletableFuture<?>[end - first];
+                for (int index = first; index < end; index++) {
+                    TargetObject target = targets.get(index);
+                    PhysicalObjectRootRecord root = new PhysicalObjectRootRecord(
+                            1,
+                            target.hash().value(),
+                            target.key().value(),
+                            "",
+                            PhysicalObjectKind.COMMITTED_COMPACTED.wireId(),
+                            1,
+                            ChecksumType.CRC32C.name(),
+                            "00000000",
+                            "",
+                            "",
+                            PhysicalObjectLifecycle.ACTIVE,
+                            1,
+                            now,
+                            now,
+                            "",
+                            "",
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            "",
+                            "",
+                            0);
+                    writes[index - first] = physical.createRoot(cluster, root);
+                }
+                CompletableFuture.allOf(writes).join();
+            }
+            return List.copyOf(targets);
+        }
+
         private TargetObject createOwnerlessCompactedObjectForShard(int requiredShard) {
             for (int nonce = 0; ; nonce++) {
                 byte[] payload = ("phase4-m4-ownerless/" + cluster + "/"
@@ -1277,6 +1408,37 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                         }
                         if (race.matches(method, arguments)) {
                             return race.execute(raw, method, arguments);
+                        }
+                        return invokeDelegate(raw, method, arguments);
+                    });
+        }
+
+        static PhysicalStoreDecorator auditRootScalePagination(
+                AtomicIntegerArray pageCalls) {
+            return raw -> (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
+                    PhysicalObjectMetadataStore.class.getClassLoader(),
+                    new Class<?>[] {PhysicalObjectMetadataStore.class},
+                    (proxy, method, arguments) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return proxyObjectMethod(
+                                    proxy,
+                                    method,
+                                    arguments,
+                                    "root-scale physical metadata store");
+                        }
+                        if (method.getName().equals("close")) {
+                            return null;
+                        }
+                        if (method.getName().equals("scanRoots")
+                                && arguments != null
+                                && arguments.length == 4
+                                && arguments[1] instanceof Integer shard
+                                && arguments[2] instanceof Optional<?> continuation) {
+                            int call = pageCalls.incrementAndGet(shard);
+                            if ((call == 1) != continuation.isEmpty()) {
+                                return CompletableFuture.failedFuture(new AssertionError(
+                                        "each shard must start with an empty continuation and advance opaquely"));
+                            }
                         }
                         return invokeDelegate(raw, method, arguments);
                     });

@@ -1757,6 +1757,13 @@ continuation traverses that physical order, which need not be logical-key order.
 any per-page-canonical order returned behind a changing opaque token, while exact prefix mismatch or a repeated
 non-terminal token fails closed. This matches the object-store contract and keeps recovery independent of LIST.
 
+Checkpoint AX tests the authoritative metadata scan at its hot-shard pagination bound. One process writes 1,001
+ACTIVE roots whose frozen hashes map to physical shard 0 and one root in every other shard through real four-shard
+Oxia, then closes. A new process starts every shard with an empty continuation and the production page size of 64.
+Its scanner reads shard 0 in exactly 16 pages and all other shards in one page each, visiting the complete set of
+1,256 immutable hashes exactly once. This is bounded metadata enumeration evidence；it neither consults object LIST
+nor transfers a cursor or registry from the writer process.
+
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.
 

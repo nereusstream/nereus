@@ -579,6 +579,11 @@ inventory cursor is opaque；it authorizes only the next discovery page and cann
 key order. Exact prefix mismatch or a repeated non-terminal token fails closed, while root/journal recovery proceeds
 entirely from Oxia authority.
 
+Checkpoint AX proves that authority remains bounded and complete after a process boundary when one root shard exceeds
+a page. A writer persists 1,001 roots in one shard plus one in every other shard and exits；a fresh scanner begins
+each shard with an empty continuation and visits all 1,256 immutable identities exactly once using 64-entry pages.
+The continuation is scan progress only；neither process memory nor object inventory becomes commit or deletion truth.
+
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the
 Phase 1 object-reference record, manifest and finally the exact-version root. Every actual provider PUT/retry first

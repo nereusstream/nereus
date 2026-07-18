@@ -1296,6 +1296,28 @@ tasks.register("phase4M4AllShardRecoveryCheck") {
     dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
 }
 
+tasks.register<Exec>("checkPhase4M4RootScaleContractSurface") {
+    group = "verification"
+    description = "Audit the real-Oxia 1,001-root hot-shard pagination and fresh-process scale fixture."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-root-scale-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4RootScaleCheck") {
+    group = "verification"
+    description = "Verify checkpoint AX scans 1,001 roots in one shard plus every other root shard after restart."
+    dependsOn("phase4M4AllShardRecoveryCheck")
+    dependsOn("checkPhase4M4RootScaleContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1306,7 +1328,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4AllShardRecoveryCheck")
+    dependsOn("phase4M4RootScaleCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

@@ -214,6 +214,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M4 checkpoint AW**：一个全新 runtime 在 object LIST 恒空时，仅凭 Oxia root/sealed journal
   恢复覆盖全部 256 shard 的 128 MARKED + 128 DELETING 对象；同时冻结 opaque continuation 只表示
   翻页进度、不推导跨页 logical-key 顺序的 inventory 合同。
+- **F4-M4 checkpoint AX**：首进程向真实四分片 Oxia 写入一个热点 physical shard 的 1,001 个 root 与其余
+  255 个 shard 各一个后退出；全新 scanner 从空 continuation 以 64 条/page 无重复、无遗漏地读取全部
+  1,256 个 immutable identity 的 bounded pagination scale checkpoint。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

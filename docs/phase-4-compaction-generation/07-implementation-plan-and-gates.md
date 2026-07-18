@@ -127,8 +127,10 @@ replacement reload and never repeats the LocalStack DELETE. Checkpoint AV forces
 race the same MARKED root and proves one durable DELETING intent plus idempotent exact-delete convergence. The
 checkpoint AW fixture then recovers 128 MARKED and 128 DELETING roots across all 256 physical shards in a fresh
 runtime with every object LIST forced empty. It also aligns inventory progress with the frozen opaque-token contract
-instead of inferring cross-page logical order. The remaining real-service two-broker/scale/failure matrix remains
-pending.
+instead of inferring cross-page logical order. Checkpoint AX then closes the 1,001-root hot-shard scale fixture against
+real four-shard Oxia：a fresh process scans 1,256 roots from empty continuations in 16 bounded pages for shard 0 and one
+page for each other shard, with no duplicate or omitted identity. The remaining real-service two-broker/scale/failure
+matrix remains pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -1055,6 +1057,7 @@ retirement.
 ./gradlew phase4M4PhysicalGcConfigCheck
 ./gradlew phase4M4ObjectStoreCapabilityCheck
 ./gradlew phase4M4Check
+./gradlew phase4M4RootScaleCheck
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
 
@@ -1395,9 +1398,29 @@ audit. It passed on 2026-07-18 under Java 21 and Docker 28.5.2 against locked Pu
 `master@c59da789e88df2b57829de3277c60194b44fceb6`；the root build reported 154 actionable tasks（73 executed、81 up-to-
 date）, and the two serialized locked-Pulsar builds executed 141/141 and 138/138 tasks.
 
-Checkpoint AW is still not `phase4M4FinalCheck`. It closes item 47's all-shard/empty-list recovery portion only；the
-one-shard and 10,000-root scale bounds, source/protection deletion cuts, late PUT/tombstone races and actual broker
-ownership/failover remain mandatory.
+Checkpoint AW is still not `phase4M4FinalCheck`. It closes item 47's all-shard/empty-list recovery portion only. At
+AW, the one-shard and 10,000-root scale bounds, source/protection deletion cuts, late PUT/tombstone races and actual
+broker ownership/failover remained mandatory；AX below closes the one-shard scale line.
+
+`phase4M4RootScaleCheck` is checkpoint AX. Its first independently assembled process persists 1,256 ACTIVE physical
+roots through the production four-shard Oxia adapter：exactly 1,001 hashes map to shard 0 and one maps to every other
+physical shard. The fixture batches only the writes；it does not replace the store, scanner or continuation contract
+with an in-memory implementation. That process closes before the reader is built.
+
+The second process starts `PhysicalObjectRootScanner` with empty per-shard continuations and
+`metadataScanPageSize=64`. A metadata proxy audits only calls while delegating every read to real Oxia：the first call
+for each shard must be empty, later calls must carry a continuation, shard 0 must take exactly 16 pages and every
+other shard exactly one. The scanner returns 1,256 ACTIVE roots and a set equality check proves every immutable hash
+appears once. The focused method passed on 2026-07-18 under Java 21 and Docker 28.5.2 with 47 actionable tasks（2
+executed、45 up-to-date）；the complete AS–AX real-service source set then passed with 47/47 executed tasks. The
+aggregate composes AW, that source set, materialization checks and the dedicated AX audit. It passed on 2026-07-18
+under Java 21 and Docker 28.5.2 against locked Pulsar
+`master@c59da789e88df2b57829de3277c60194b44fceb6`；the root build reported 155 actionable tasks（70 executed、85 up-to-
+date）, and the two serialized locked-Pulsar builds executed 141/141 and 138/138 tasks.
+
+Checkpoint AX is still not `phase4M4FinalCheck`. It closes the `1,001 physical roots in one shard plus at least one
+root in every other physical shard` scale line only；the 10,000-root tombstone/cursor limits, source/protection delete
+cuts, late PUT/tombstone races and actual broker ownership/failover remain mandatory.
 
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration
 
