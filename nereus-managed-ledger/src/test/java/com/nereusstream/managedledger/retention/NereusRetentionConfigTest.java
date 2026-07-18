@@ -24,6 +24,20 @@ class NereusRetentionConfigTest {
                         9, 2, 3))
                 .isEqualTo(new RetentionPolicySnapshot(
                         9, 120_000, 3L << 20));
+        RetentionPolicySnapshot canonical =
+                RetentionPolicySnapshot.fromCanonicalMinutesAndMebibytes(
+                        2,
+                        3);
+        assertThat(canonical.retentionTimeMillis()).isEqualTo(120_000);
+        assertThat(canonical.retentionSizeBytes()).isEqualTo(3L << 20);
+        assertThat(RetentionPolicySnapshot.fromCanonicalMinutesAndMebibytes(
+                        2,
+                        3))
+                .isEqualTo(canonical);
+        assertThat(RetentionPolicySnapshot.fromCanonicalMinutesAndMebibytes(
+                        3,
+                        2).policyVersion())
+                .isNotEqualTo(canonical.policyVersion());
 
         assertThatThrownBy(() -> new RetentionPolicySnapshot(1, 0, -1))
                 .isInstanceOf(IllegalArgumentException.class);

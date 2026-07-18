@@ -37,6 +37,7 @@ import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistra
 import com.nereusstream.managedledger.generation.ManagedLedgerAsyncAppendAdmissionGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.managedledger.retention.ProjectionGenerationReferenceDomain;
+import com.nereusstream.managedledger.retention.NereusRetentionRuntime;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
@@ -110,6 +111,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         CursorSnapshotStore cursorSnapshotStore = null;
         CursorRetentionCoordinator cursorRetentionCoordinator = null;
         CursorStorage cursorStorage = null;
+        NereusRetentionRuntime retentionRuntime = null;
         try {
             objectStoreProvider = instantiateObjectStoreProvider(
                     configuration.objectStore().providerClassName(), context.pluginClassLoader());
@@ -303,6 +305,16 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorConfig,
                     clock,
                     scheduler);
+            retentionRuntime = new NereusRetentionRuntime(
+                    streamConfig.cluster(),
+                    l0MetadataStore,
+                    generationMetadataStore,
+                    cursorStorage,
+                    cursorRetentionCoordinator,
+                    generationProtocolActivationGuard,
+                    configuration.retention(),
+                    clock,
+                    daemonFactory("nereus-f4-retention"));
             phase4Runtime.start();
             return new NereusManagedLedgerRuntime(
                     streamStorage,
@@ -320,6 +332,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     generationProtocolActivationCoordinator,
                     generationProtocolActivationGuard,
                     phase4Runtime,
+                    retentionRuntime,
                     objectReadPinManager,
                     objectProtectionManager,
                     physicalMetadataStore,
@@ -336,6 +349,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         } catch (Throwable failure) {
             closeAfterFailure(
                     failure,
+                    retentionRuntime,
                     cursorStorage,
                     cursorRetentionCoordinator,
                     cursorSnapshotStore,

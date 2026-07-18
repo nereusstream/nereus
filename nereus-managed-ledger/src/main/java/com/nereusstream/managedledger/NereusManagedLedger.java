@@ -8,8 +8,10 @@ import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.core.capability.LiveProjectionSubject;
 import com.nereusstream.managedledger.callbacks.SerialCallbackLane;
 import com.nereusstream.managedledger.callbacks.CallbackDispatcher;
 import com.nereusstream.managedledger.config.ManagedLedgerConfigValidator;
@@ -22,11 +24,14 @@ import com.nereusstream.managedledger.cursor.InitialCursorPosition;
 import com.nereusstream.managedledger.entry.EncodedAppend;
 import com.nereusstream.managedledger.entry.PulsarEntryCodec;
 import com.nereusstream.managedledger.errors.OperationContext;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjectionRefV1;
 import com.nereusstream.managedledger.projection.F2L0RequestFactory;
 import com.nereusstream.managedledger.projection.PositionProjection;
 import com.nereusstream.managedledger.projection.ProjectionValidationException;
 import com.nereusstream.managedledger.projection.StreamPositionBounds;
 import com.nereusstream.managedledger.projection.VirtualLedgerProjection;
+import com.nereusstream.managedledger.retention.NereusManagedLedgerRetentionService;
+import com.nereusstream.managedledger.retention.RetentionPolicySnapshot;
 import com.nereusstream.managedledger.snapshot.StreamSnapshotTracker;
 import com.nereusstream.managedledger.snapshot.TailPollCoordinator;
 import com.nereusstream.managedledger.stats.NereusManagedLedgerStats;
@@ -100,6 +105,9 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     private final CursorOwnerSession cursorOwnerSession;
     private final NereusManagedLedgerOwnershipGuard ownershipGuard;
     private volatile CursorRetentionView cursorRetention;
+    private final AtomicReference<RetentionPolicySnapshot> retentionPolicy =
+            new AtomicReference<>();
+    private final NereusManagedLedgerRetentionService retentionService;
     private final VirtualLedgerProjection projection;
     private final StreamSnapshotTracker snapshots;
     private final PulsarEntryCodec entryCodec;
@@ -152,6 +160,8 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         this.tailPoll = new TailPollCoordinator(
                 runtime.scheduler(), runtime.config().tailPollInterval(),
                 this::refreshMetadata, this::currentMetadata);
+        this.retentionService = createRetentionService(
+                result.topicProjection());
         this.state = switch (result.streamMetadata().state()) {
             case ACTIVE -> LocalState.OPEN;
             case SEALED -> LocalState.SEALED;
@@ -181,6 +191,20 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
 
     CursorRetentionView cursorRetention() {
         return cursorRetention;
+    }
+
+    /** Installs the exact effective product policy derived from one authoritative Pulsar policy snapshot. */
+    public void installRetentionPolicy(RetentionPolicySnapshot policy) {
+        RetentionPolicySnapshot exact = Objects.requireNonNull(policy, "policy");
+        if (!runtime.hasRetentionRuntime()) {
+            throw new IllegalStateException(
+                    "this managed ledger runtime has no Phase 4 retention composition");
+        }
+        retentionPolicy.set(exact);
+    }
+
+    public Optional<RetentionPolicySnapshot> retentionPolicy() {
+        return Optional.ofNullable(retentionPolicy.get());
     }
 
     @Override
@@ -235,6 +259,87 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     public void setConfig(ManagedLedgerConfig newConfig) {
         ManagedLedgerConfigValidator.captureForOperation(newConfig);
         config = newConfig;
+    }
+
+    @Override
+    public void trimConsumedLedgersInBackground(CompletableFuture<?> promise) {
+        CompletableFuture<?> exactPromise = Objects.requireNonNull(
+                promise,
+                "promise");
+        final CompletableFuture<?> trim;
+        try {
+            if (retentionService == null) {
+                throw new NereusException(
+                        ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                        false,
+                        "Phase 4 logical retention is not installed in this runtime");
+            }
+            trim = runtime.retentionRuntime().trim(
+                    projection.streamId(),
+                    retentionService,
+                    "pulsar-managed-ledger-retention");
+        } catch (Throwable failure) {
+            completeRetentionPromise(exactPromise, failure);
+            return;
+        }
+        trim.whenComplete((ignored, failure) ->
+                completeRetentionPromise(exactPromise, failure));
+    }
+
+    private NereusManagedLedgerRetentionService createRetentionService(
+            TopicProjectionRecord record) {
+        if (!runtime.hasRetentionRuntime()) {
+            return null;
+        }
+        ManagedLedgerGenerationProjectionRefV1 reference =
+                new ManagedLedgerGenerationProjectionRefV1(
+                        record.managedLedgerName(),
+                        record.projectionIdentity());
+        LiveProjectionSubject subject = new LiveProjectionSubject(
+                projection.streamId(),
+                reference.toProjectionRef(),
+                reference.projectionIdentitySha256());
+        return runtime.retentionRuntime().createService(
+                projection.streamId(),
+                subject,
+                ownershipGuard,
+                this::snapshotRetentionPolicy,
+                cursorOwnerSession,
+                view -> cursorRetention = view);
+    }
+
+    private CompletableFuture<RetentionPolicySnapshot> snapshotRetentionPolicy(
+            StreamId streamId) {
+        if (!projection.streamId().equals(
+                Objects.requireNonNull(streamId, "streamId"))) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "retention policy requested for another stream"));
+        }
+        RetentionPolicySnapshot current = retentionPolicy.get();
+        if (current == null) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.METADATA_UNAVAILABLE,
+                    true,
+                    "authoritative Pulsar retention policy is not installed"));
+        }
+        return CompletableFuture.completedFuture(current);
+    }
+
+    private void completeRetentionPromise(
+            CompletableFuture<?> promise,
+            Throwable failure) {
+        CallbackDispatcher.execute(runtime.callbackExecutor(), () -> {
+            if (failure == null) {
+                promise.complete(null);
+            } else {
+                promise.completeExceptionally(map(
+                        unwrap(failure),
+                        "trimConsumedLedgers",
+                        false));
+            }
+        });
     }
 
     @Override

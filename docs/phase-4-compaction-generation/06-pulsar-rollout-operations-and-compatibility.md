@@ -52,8 +52,10 @@ snapshot on every attempt.
 
 Checkpoint AG implements and validates this value type with defaults `128 / 8 / 1024 / 30s / 30s`, together with the
 exact policy snapshot、candidate/token values and planner/service contracts. The planner currently enforces the page
-and operation-timeout bounds. The shared per-stream coalescing lane and runtime configuration mapping that enforce
-the concurrency/queue/close bounds remain pending.
+and operation-timeout bounds. Checkpoint AH implements the shared per-stream coalescing lane and runtime composition
+that enforce concurrency/queue/whole-operation-timeout/close bounds. The Pulsar product defaults are deliberately
+`512 / 4 / 1024 / 60s / 120s` and are mapped from five restart-required broker fields；the product-neutral defaults
+remain unchanged for standalone/test composition.
 
 `NereusBrokerStorageConfiguration` builds `MaterializationConfig.committedPolicy` through
 `MaterializationPolicyFactory.losslessCommitted(...)`. The factory fixes id `nereus-committed-default`, view/task/
@@ -136,9 +138,12 @@ and bounded materialization service as `Phase4ObjectWalRuntime`, then installs i
 resources. This composition still does not install physical GC.
 
 Checkpoint AG implements `DefaultRetentionCandidatePlanner` and `NereusManagedLedgerRetentionService` as tested
-product-neutral components. It deliberately stops before this ownership graph：the provider does not yet construct a
-policy provider、shared retention lane or per-ledger retention service, and the Pulsar fork does not yet route policy/
-admin calls to it.
+product-neutral components. Checkpoint AH adds `NereusRetentionRuntime` to this ownership graph after cursor storage/
+retention construction. It owns the process-wide bounded lane and creates a policy-provider-backed service for every
+writable `NereusManagedLedger`; runtime close drains it before cursor/generation/Oxia resources. The facade override
+routes `trimConsumedLedgersInBackground` through this runtime and completes after F3 durable logical trim. The Pulsar
+fork still does not install the exact effective topic `RetentionPolicies` snapshot or admit loaded/unloaded
+`TRIM_TOPIC`, so the production route fails closed until the next policy/admin checkpoint.
 
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive

@@ -99,6 +99,10 @@ public final class NereusManagedLedgerRetentionService {
                 });
     }
 
+    StreamId streamId() {
+        return streamId;
+    }
+
     private CompletableFuture<PreparedTrim> prepare(int attempt) {
         if (attempt >= MAX_PREPARE_ATTEMPTS) {
             return CompletableFuture.failedFuture(new NereusException(

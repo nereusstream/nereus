@@ -139,6 +139,7 @@ class NereusManagedLedgerRuntimeTest {
                 activationCoordinator,
                 generationActivationGuard,
                 materializationRuntime,
+                null,
                 readPins,
                 proxy(AutoCloseable.class, "protection", closes, false),
                 proxy(AutoCloseable.class, "physical", closes, false),

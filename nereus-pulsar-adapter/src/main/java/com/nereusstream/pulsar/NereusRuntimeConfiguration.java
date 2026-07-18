@@ -4,6 +4,7 @@ package com.nereusstream.pulsar;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.NereusManagedLedgerFactoryConfig;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.managedledger.retention.NereusRetentionConfig;
 import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
@@ -21,7 +22,8 @@ public record NereusRuntimeConfiguration(
         ProjectionMetadataStoreConfig projectionMetadata,
         CursorMetadataStoreConfig cursorMetadata,
         CursorStorageConfig cursorStorage,
-        MaterializationConfig materialization) {
+        MaterializationConfig materialization,
+        NereusRetentionConfig retention) {
     public NereusRuntimeConfiguration(
             OxiaClientConfiguration oxia,
             ObjectStoreConfiguration objectStore,
@@ -36,7 +38,8 @@ public record NereusRuntimeConfiguration(
                 projectionMetadata,
                 CursorMetadataStoreConfig.defaults(),
                 CursorStorageConfig.defaults(),
-                defaultMaterialization(streamStorage));
+                defaultMaterialization(streamStorage),
+                NereusRetentionConfig.defaults());
     }
 
     public NereusRuntimeConfiguration(
@@ -55,7 +58,29 @@ public record NereusRuntimeConfiguration(
                 projectionMetadata,
                 cursorMetadata,
                 cursorStorage,
-                defaultMaterialization(streamStorage));
+                defaultMaterialization(streamStorage),
+                NereusRetentionConfig.defaults());
+    }
+
+    public NereusRuntimeConfiguration(
+            OxiaClientConfiguration oxia,
+            ObjectStoreConfiguration objectStore,
+            StreamStorageConfig streamStorage,
+            NereusManagedLedgerFactoryConfig managedLedger,
+            ProjectionMetadataStoreConfig projectionMetadata,
+            CursorMetadataStoreConfig cursorMetadata,
+            CursorStorageConfig cursorStorage,
+            MaterializationConfig materialization) {
+        this(
+                oxia,
+                objectStore,
+                streamStorage,
+                managedLedger,
+                projectionMetadata,
+                cursorMetadata,
+                cursorStorage,
+                materialization,
+                NereusRetentionConfig.defaults());
     }
 
     public NereusRuntimeConfiguration {
@@ -67,6 +92,7 @@ public record NereusRuntimeConfiguration(
         Objects.requireNonNull(cursorMetadata, "cursorMetadata");
         Objects.requireNonNull(cursorStorage, "cursorStorage");
         Objects.requireNonNull(materialization, "materialization");
+        Objects.requireNonNull(retention, "retention");
         if (oxia.maxCommitChainScan() != streamStorage.maxCommitChainScan()) {
             throw new IllegalArgumentException("Oxia and StreamStorage maxCommitChainScan must match");
         }
@@ -136,6 +162,18 @@ public record NereusRuntimeConfiguration(
                 > 0) {
             throw new IllegalArgumentException(
                     "materialization close timeout must fit managed-ledger close timeout");
+        }
+        if (retention.operationTimeout().compareTo(retention.closeTimeout()) > 0) {
+            throw new IllegalArgumentException(
+                    "retention operation timeout must fit retention close timeout");
+        }
+        if (retention.closeTimeout().compareTo(managedLedger.closeTimeout()) > 0) {
+            throw new IllegalArgumentException(
+                    "retention close timeout must fit managed-ledger close timeout");
+        }
+        if (retention.maxQueuedPlans() > managedLedger.maxPendingCallbacks()) {
+            throw new IllegalArgumentException(
+                    "retention queue exceeds managed-ledger callback capacity");
         }
     }
 

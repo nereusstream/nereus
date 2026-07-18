@@ -1021,8 +1021,10 @@ every captured authority before entering F3's pending protocol.
 Checkpoint AG implements this product-neutral surface. `RetentionPolicySnapshot.fromMinutesAndMebibytes` uses checked
 unit conversion；`NereusRetentionConfig` accepts a stats page size in `[1, 512]`、positive plan/queue bounds and
 positive millisecond-representable operation/close timeouts. Its current defaults are `128 / 8 / 1024 / 30s / 30s`.
-The active planner consumes `statsScanPageSize` and `operationTimeout`；the shared coalescing lane that will enforce
-`maxConcurrentPlans`/`maxQueuedPlans` remains part of the later production composition checkpoint.
+The active planner consumes `statsScanPageSize` and `operationTimeout`. Checkpoint AH implements the shared process
+lane that enforces `maxConcurrentPlans`/`maxQueuedPlans` against the lifetime of the returned async operation, not
+merely its launch. Same-stream triggers coalesce onto one admitted root operation while caller completions remain
+independent；queue overflow、whole-operation timeout and forced close fail with typed errors.
 
 `DefaultRetentionCandidatePlanner` captures one `Clock.millis()` per attempt, scans at most 4,096 canonical stats
 tokens, verifies each token's exact source-index key/version/durable SHA and COMMITTED-view range/commit/cumulative

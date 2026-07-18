@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="bce3422a94edf01c483c15063c6879254b3ff03f"
+current_pulsar_lock="68093ba53388c4cdbe6516a35391451646820c71"
 
 require_literal() {
     local literal="$1"
@@ -86,6 +86,10 @@ require_literal "phase4M5AsyncObjectWalCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M5RetentionPlannerCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M5RetentionRuntimeCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M5RetentionRuntimeCheck" \
+    "build.gradle.kts"
 require_literal "Checkpoint U" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint V" \
@@ -112,17 +116,23 @@ require_literal "Checkpoint AF" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AG" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AH" \
+    "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AG implements that exact order" \
+    "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
+require_literal "Checkpoint AH implements the shared process" \
     "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
 require_literal "Checkpoint AG implements and validates this value type" \
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
-require_literal "checkpoint-AG stable retention planner" \
+require_literal "Checkpoint AH implements the shared per-stream coalescing lane" \
+    "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
+require_literal "checkpoints AG–AH retention planner" \
     "docs/design/nereus-overall-architecture.md"
-require_literal "M5 through AG" \
+require_literal "M5 through AH" \
     "docs/design/nereus-design-index.md"
-require_literal "M5 through checkpoint AG" \
+require_literal "M5 through checkpoint AH" \
     "docs/design/nereus-future4-compaction-generation.md"
-require_literal "M5 through checkpoint AG" \
+require_literal "M5 through checkpoint AH" \
     "docs/automq-like-stream-storage/README.md"
 require_literal "ManagedLedgerMaterializationRegistrationCandidate" \
     "docs/phase-4-compaction-generation/README.md"
@@ -173,4 +183,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through W and M5 through AG, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through W and M5 through AH, source lock, gates, and local links verified."

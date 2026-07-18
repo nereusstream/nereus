@@ -628,6 +628,10 @@ stable candidate planning 和 ownership/activation/final-authority gated F3 logi
 调用 L0 trim，也不会等待 physical GC；Pulsar retention policy/admin mapping、shared bounded plan lane 和
 managed-ledger production installation 尚未实现。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 through checkpoint AG 也不声称 production physical GC、
+M5 checkpoint AH 已实现 shared bounded/coalescing retention lane、whole-operation timeout/close、per-ledger
+production service/facade routing，以及 Pulsar typed retention config mapping。Exact effective topic policy snapshot
+和 `TRIM_TOPIC` admission 尚未接入，因此该 route 继续 fail closed。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 through checkpoint AH 也不声称 production physical GC、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

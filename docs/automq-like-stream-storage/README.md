@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AG；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AH；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -51,14 +51,17 @@ Already present：
 - F4-M5 checkpoint AG：exact policy/config/evidence values、source-index-verified stable retention planning and the
   ownership/activation/final-authority gated F3 logical-trim delegation are implemented. Missing/incomplete/stale
   evidence can only stop or reduce a candidate, and the returned promise never waits for physical GC.
+- F4-M5 checkpoint AH：the shared bounded/coalescing retention lane、whole-operation timeout/close、per-ledger
+  service/facade installation and Pulsar typed retention config mapping are implemented. Exact effective topic policy
+  and admin admission remain fail-closed.
 
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
 - production-composed global-domain source retirement and physical/cursor/root/audit GC completion；
 - primary-WAL retention gate and destructive GC daemon composition；
-- Pulsar retention policy/admin mapping、shared bounded retention lane、managed-ledger service installation、
-  cursor-snapshot candidate/deletion、object inventory and registration retirement；
+- Pulsar exact retention policy/admin activation、cursor-snapshot candidate/deletion、object inventory and
+  registration retirement；
 - mixed primary target resolver。
 
 The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default

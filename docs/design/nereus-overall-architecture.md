@@ -125,8 +125,9 @@ restart/read repair 和 per-stream pre-I/O proof/lag admission；checkpoint AF �
 read/repair、NRC1 replay、source repair 和 materialization service 原子装配进 production provider，并映射 exact
 Pulsar sync/async profile 与 materialization config。Checkpoint AG 又实现 product-neutral exact retention
 policy/config/evidence values、source-index-verified stable candidate planner 和 ownership-safe F3 logical-trim
-service。Pulsar retention policy/admin mapping、shared bounded plan lane、managed-ledger production installation、
-cursor snapshot candidate/deletion scanning、object inventory、registration retirement、destructive GC composition
+service。Checkpoint AH 继续实现 shared bounded/coalescing plan lane、whole-operation timeout/close、managed-ledger
+production installation/facade route 与 exact typed Pulsar config mapping。Pulsar effective retention policy/admin
+activation、cursor snapshot candidate/deletion scanning、object inventory、registration retirement、destructive GC composition
 和 M6 仍是 target；production deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
@@ -343,8 +344,8 @@ flowchart TB
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay、F4-M1–M3 metadata/publication gates、M4 protected-append/activation foundations and checkpoint-X canonical projection-ref encoder implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
 | `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint W implements NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、ownerless-global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier and all-shard physical/cursor live-reference backfill；checkpoint AF composes source repair plus the non-destructive production materialization lifecycle, while final GC remains pending；depends on core, never the reverse |
-| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、durable registration/proof/activation、pre-I/O async admission、checkpoint-AF materialization runtime ownership and checkpoint-AG stable retention planner/F3 trim service foundation complete；production retention installation remains pending |
-| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership and checkpoint-AF coupled Object-WAL read-repair/materialization composition with typed config mapping implemented；exact retention policy/admin mapping and destructive GC composition remain pending |
+| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、durable registration/proof/activation、pre-I/O async admission、checkpoint-AF materialization runtime ownership and checkpoints AG–AH retention planner/F3 trim/shared-lane/per-ledger facade installation complete；exact policy activation remains pending |
+| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership、checkpoint-AF coupled Object-WAL composition and checkpoint-AH retention runtime/config mapping implemented；exact retention policy/admin mapping and destructive GC composition remain pending |
 | `nereus-kop-adapter` | Kafka projection | marker only |
 
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、

@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`bce3422a94edf01c483c15063c6879254b3ff03f`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`68093ba53388c4cdbe6516a35391451646820c71`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -125,8 +125,9 @@ profile and the complete bounded materialization configuration. Legacy construct
 still the default, and async remains activation-proof gated. Checkpoint AG implements the product-neutral logical
 retention correctness slice：checked exact Pulsar policy values、bounded config/evidence values、a stable
 source-index-verified candidate planner and an ownership/activation-gated service whose only mutation is the F3
-`CursorRetentionCoordinator.requestTrim` protocol. Pulsar policy/admin mapping、the shared bounded/coalescing plan
-lane and production managed-ledger composition remain pending.
+`CursorRetentionCoordinator.requestTrim` protocol. Checkpoint AH adds the shared bounded/coalescing execution lane、
+whole-operation timeout/close、production runtime/per-ledger facade composition and five exact Pulsar broker config
+fields. Exact effective topic-policy snapshot mapping and loaded/unloaded `TRIM_TOPIC` admission remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1234,6 +1235,8 @@ GenerationActivationCompatibilityTest
 RetentionCandidatePlannerTest                              implemented checkpoint AG OR/strict-time/stale-source/drift
 NereusRetentionConfigTest                                 implemented checkpoint AG policy/config boundaries
 NereusManagedLedgerRetentionTest                          implemented checkpoint AG order/no-op/lost-owner callback
+NereusRetentionExecutionLaneTest                          implemented checkpoint AH coalescing/concurrency/queue/timeout/close
+NereusRuntimeConfigurationRetentionTest                   implemented checkpoint AH cross-layer timeout/queue bounds
 NereusManagedLedgerGenerationReadTest
 NereusRuntimeF4CompositionTest
 NereusRuntimeF4ConfigurationCrossValidationTest
@@ -1246,7 +1249,7 @@ NereusGenerationProtocolCapabilityTest                    implemented checkpoint
 NereusCursorProtocolCapabilityTest                        extended checkpoint Y
 NereusStorageBindingCapabilityTest                        extended checkpoint Y
 NereusGenerationRegistrationBackfillTest                  implemented checkpoint Z order/concurrency/digest/drift, extended AA proof admission
-NereusBrokerStorageConfigurationTest                      extended checkpoint AF exact profile/config/default/rejection
+NereusBrokerStorageConfigurationTest                      extended checkpoint AF exact profile/config and AH retention defaults/rejection
 NereusManagedLedgerStorageGenerationActivationTest        implemented checkpoint AC success/failure/disabled sequencing
 NereusTopicFeatureResolverF4Test
 NereusTopicFeatureValidatorF4Test
@@ -1269,6 +1272,7 @@ NereusGenerationProtocolBrokerTest
 ./gradlew phase4M5PublicationActivationCheck
 ./gradlew phase4M5AsyncObjectWalCheck
 ./gradlew phase4M5RetentionPlannerCheck
+./gradlew phase4M5RetentionRuntimeCheck
 ./gradlew phase4M5Check
 ./gradlew phase4M5FinalCheck --rerun-tasks
 ```
@@ -1381,6 +1385,19 @@ vetoes、head/policy/owner drift、exact call order、no-op and ownership loss a
 mapping、production runtime installation、shared queue/concurrency enforcement and physical GC remain outside this
 checkpoint. The gate passed on 2026-07-18 under Java 21 against locked Pulsar
 `master@bce3422a94edf01c483c15063c6879254b3ff03f`.
+
+Checkpoint AH implements the next production boundary. `NereusRetentionExecutionLane` holds a fixed concurrency slot
+until the returned async service operation completes, bounds queued streams, coalesces one admitted operation per
+stream, mirrors independent caller completions, applies a whole-operation timeout and drains/fails admitted work on
+close. `NereusRetentionRuntime` owns that lane and constructs the exact AG service for each writable ledger；
+`NereusManagedLedgerRuntime` closes it before cursor/generation resources, and `NereusManagedLedger` installs the
+service and routes `trimConsumedLedgersInBackground` through it. The Pulsar fork maps page/concurrency/queue/operation/
+close values with defaults `512 / 4 / 1024 / 60s / 120s`; product-neutral defaults remain
+`128 / 8 / 1024 / 30s / 30s`. The exact effective `RetentionPolicies` snapshot and admin admission are deliberately
+still absent, so the route fails closed and no physical-delete capability is enabled.
+`phase4M5RetentionRuntimeCheck` passed on 2026-07-18 under Java 21 against locked Pulsar
+`master@68093ba53388c4cdbe6516a35391451646820c71` (151 tasks), including all inherited gates、module checks、contract/
+documentation audits and the focused Pulsar formatting/style/test chain.
 
 ## 8. F4-M6 — Final Acceptance
 

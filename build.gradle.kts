@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("bce3422a94edf01c483c15063c6879254b3ff03f")
+    .orElse("68093ba53388c4cdbe6516a35391451646820c71")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1212,4 +1212,50 @@ tasks.register("phase4M5RetentionPlannerCheck") {
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-managed-ledger:check")
+}
+
+tasks.register<Exec>("checkPhase4M5RetentionRuntimeContractSurface") {
+    group = "verification"
+    description = "Audit the bounded retention lane, production ledger wiring, and Pulsar config mapping."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-retention-runtime-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M5RetentionRuntimePulsarCheck") {
+    group = "verification"
+    description = "Run the locked Pulsar logical-retention configuration formatting, style, and focused test."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M5RetentionPlannerCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker-common:spotlessJavaCheck",
+        ":pulsar-broker-common:checkstyleMain",
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBrokerStorageConfigurationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M5RetentionRuntimeCheck") {
+    group = "verification"
+    description = "Verify checkpoint AH bounded retention execution and production configuration composition."
+    dependsOn("phase4M5RetentionPlannerCheck")
+    dependsOn("checkPhase4M5RetentionRuntimeContractSurface")
+    dependsOn("phase4M5RetentionRuntimePulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-pulsar-adapter:check")
 }

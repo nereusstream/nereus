@@ -12,6 +12,7 @@ import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.retention.NereusRetentionRuntime;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
@@ -56,6 +57,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             generationProtocolActivationCoordinator;
     private GenerationProtocolActivationGuard generationProtocolActivationGuard;
     private AutoCloseable materializationRuntime;
+    private NereusRetentionRuntime retentionRuntime;
     private final ObjectReadPinManager objectReadPinManager;
     private final AutoCloseable objectProtectionManager;
     private final AutoCloseable physicalMetadataStore;
@@ -258,6 +260,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                 generationProtocolActivationCoordinator,
                 generationProtocolActivationGuard,
                 null,
+                null,
                 objectReadPinManager,
                 objectProtectionManager,
                 physicalMetadataStore,
@@ -292,6 +295,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                     generationProtocolActivationCoordinator,
             GenerationProtocolActivationGuard generationProtocolActivationGuard,
             AutoCloseable materializationRuntime,
+            NereusRetentionRuntime retentionRuntime,
             ObjectReadPinManager objectReadPinManager,
             AutoCloseable objectProtectionManager,
             AutoCloseable physicalMetadataStore,
@@ -345,7 +349,9 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                         generationProtocolActivationGuard,
                         "generationProtocolActivationGuard");
         this.materializationRuntime = materializationRuntime;
+        this.retentionRuntime = retentionRuntime;
         requireDistinctOptionalResource(
+                "materialization runtime",
                 materializationRuntime,
                 streamStorage,
                 projectionStore,
@@ -354,6 +360,26 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                 cursorSnapshotStore,
                 cursorRetentionCoordinator,
                 cursorStorage,
+                objectReadPinManager,
+                objectProtectionManager,
+                physicalMetadataStore,
+                l0MetadataStore,
+                sharedOxiaRuntime,
+                objectStore,
+                objectStoreProvider,
+                scheduler,
+                callbackExecutor);
+        requireDistinctOptionalResource(
+                "retention runtime",
+                retentionRuntime,
+                streamStorage,
+                projectionStore,
+                generationMetadataStore,
+                cursorMetadataStore,
+                cursorSnapshotStore,
+                cursorRetentionCoordinator,
+                cursorStorage,
+                materializationRuntime,
                 objectReadPinManager,
                 objectProtectionManager,
                 physicalMetadataStore,
@@ -429,6 +455,18 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         return materializationRuntime;
     }
 
+    public NereusRetentionRuntime retentionRuntime() {
+        if (retentionRuntime == null) {
+            throw new IllegalStateException(
+                    "this runtime was assembled without the Phase 4 retention runtime");
+        }
+        return retentionRuntime;
+    }
+
+    public boolean hasRetentionRuntime() {
+        return retentionRuntime != null;
+    }
+
     public ObjectReadPinManager objectReadPinManager() {
         if (objectReadPinManager == null) {
             throw new IllegalStateException(
@@ -480,6 +518,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         }
         long executorDeadlineNanos = deadlineNanos(config.closeTimeout());
         List<Throwable> failures = new ArrayList<>();
+        closeOneIfPresent(retentionRuntime, failures);
         closeOne(cursorStorage, failures);
         closeOne(cursorRetentionCoordinator, failures);
         closeOne(cursorSnapshotStore, failures);
@@ -531,6 +570,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     }
 
     private static void requireDistinctOptionalResource(
+            String field,
             Object candidate,
             Object... existing) {
         if (candidate == null) {
@@ -539,7 +579,7 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         for (Object resource : existing) {
             if (candidate == resource) {
                 throw new IllegalArgumentException(
-                        "materialization runtime must have a distinct owned identity");
+                        field + " must have a distinct owned identity");
             }
         }
     }
