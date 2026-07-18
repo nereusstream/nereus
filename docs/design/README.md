@@ -76,8 +76,11 @@ checkpoint AW 进一步让全新 runtime 在 LIST 恒空时恢复覆盖 256 shar
 DELETED root 经过持久化 first-absence 与独立 orphan window 两轮生产扫描，按 references → manifest → root
 顺序退休，并修复 materialization/S3 cancelled deadline timer 在高基数成功请求后滞留的问题；checkpoint AZ
 再以 10,000 个同步候选证明 scanner 的迭代 future chain 无递归 stack 增长，并在 10,000 durable cursor roots +
-10,000 objects 上保留 9,997 个 current reference，只删除 old、expired CAS-lost 和 deleted-cursor 三类对象。
-当前 broker safe defaults 不启动该服务；剩余 destructive/failure 矩阵与 M4/M6 最终兼容门禁仍未完成。
+10,000 objects 上保留 9,997 个 current reference，只删除 old、expired CAS-lost 和 deleted-cursor 三类对象；
+checkpoint BA 再覆盖 journaled source/protection 删除后的 process loss 和 protection 删除已生效但响应丢失，
+fresh coordinator/runtime 只从同一 DELETING root、sealed journal 与 exact planned absence 继续，真实 LocalStack
+对象在全部前置阶段完成前保持存在。当前 broker safe defaults 不启动该服务；late-PUT/tombstone、实际
+two-broker destructive/failure 矩阵与 M4/M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

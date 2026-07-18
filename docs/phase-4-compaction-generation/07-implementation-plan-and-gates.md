@@ -133,8 +133,9 @@ page for each other shard, with no duplicate or omitted identity. Checkpoint AY 
 dual-window retirement fixture with bounded 32-entry pages、one-at-a-time production coordinator visitation、Phase 1
 audit cleanup/root-last CAS and remove-on-cancel production deadline schedulers. Checkpoint AZ closes the separate
 10,000-cursor-root line with stack-bounded 10,000-candidate visitation plus exact live/old/CAS-lost/deleted-cursor
-classification and central restart-safe deletion. The remaining real-service two-broker/failure matrix remains
-pending.
+classification and central restart-safe deletion. Checkpoint BA closes journaled source/protection post-delete
+process cuts and an applied-protection-delete response-loss cut in both the central coordinator and a fresh real
+Oxia/LocalStack runtime. The late-PUT/tombstone and real two-broker failure matrix remains pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -1478,6 +1479,33 @@ run passed on 2026-07-18 under Java 21、Docker 28.5.2 and locked Pulsar
 serialized locked-Pulsar builds executed 141/141 and 138/138 tasks. Checkpoint AZ closes required scenario 20 and the
 `10,000 durable cursor roots for one stream` scale fixture. It is still not `phase4M4FinalCheck`：source/protection
 delete cuts、the complete late PUT/tombstone race matrix and actual Pulsar two-broker ownership/unload/failover remain
+mandatory.
+
+`phase4M4SourceProtectionCutCheck` is checkpoint BA. The deterministic layer adds three named methods to
+`SourceRetirementCoordinatorTest`：one stops after the exact journaled metadata removal and before protection
+retirement；one stops after the exact protection removal and before object HEAD；one applies the protection delete but
+loses its response. At both process cuts the root remains the same DELETING wrapper, object HEAD/DELETE counts remain
+zero and only the already-completed exact journal entry is absent. A newly assembled coordinator reloads the same
+sealed journal, reports that entry as already absent, conditionally finishes the remaining removal and performs one
+identity-bound object DELETE. The response-loss path reauthenticates the root/journal and scans the exact protection
+scope to absence before proceeding in the same attempt.
+
+The real-service method `freshProcessRecoversJournaledMetadataAndProtectionPostDeleteCuts` writes two exact objects,
+ACTIVE roots/protections and manifest-last journals to LocalStack and four-shard Oxia, transitions both roots to
+DELETING, and leaves two distinct durable post-cut states：the source removal is already absent while its protection
+remains；the second protection is already absent while its object remains. An armed root-scan failure prevents the
+setup runtime from consuming the fixtures before process close. A fresh runtime recovers both roots from Oxia, applies
+the remaining protection delete through real Oxia but receives an injected retriable timeout, proves exact absence,
+deletes both LocalStack objects and commits both DELETED roots. The focused method passed on 2026-07-19 under Java 21
+and Docker 28.5.2 with 38 actionable tasks（2 executed、36 up-to-date）in 15 seconds.
+
+The BA aggregate composes AZ, materialization/adapter checks, the complete F4-M4 real-service source set,
+source/module/document audits and `checkPhase4M4SourceProtectionCutContractSurface`. BA closes the source/protection
+post-delete process-cut and protection response-loss items from the destructive matrix. Its `--rerun-tasks` run passed
+on 2026-07-19 under Java 21、Docker 28.5.2 and locked Pulsar
+`master@c59da789e88df2b57829de3277c60194b44fceb6` in 3m49s：the root build executed 158/158 tasks and the two
+serialized locked-Pulsar builds executed 141/141 and 138/138 tasks. It is still not `phase4M4FinalCheck`：the complete
+late first/retried PUT versus tombstone-retirement matrix and actual Pulsar two-broker ownership/unload/failover remain
 mandatory.
 
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration

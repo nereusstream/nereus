@@ -12,13 +12,20 @@ import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
 import com.nereusstream.materialization.MaterializationDeadline;
+import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
+import com.nereusstream.metadata.oxia.VersionedGcRetirementProtection;
 import com.nereusstream.metadata.oxia.VersionedGcRetirementManifest;
 import com.nereusstream.metadata.oxia.VersionedGcRetirementRemoval;
+import com.nereusstream.metadata.oxia.VersionedObjectProtection;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.GcDomainSnapshotProofRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementManifestRecord;
+import com.nereusstream.metadata.oxia.records.GcRetirementProtectionRecord;
 import com.nereusstream.metadata.oxia.records.GcRetirementRemovalRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
+import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.objectstore.DeleteObjectOptions;
@@ -37,6 +44,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -207,6 +215,111 @@ class SourceRetirementCoordinatorTest {
         assertThat(fixture.objectStore().deleteCalls).hasValue(0);
     }
 
+    @Test
+    void restartAfterMetadataDeleteBeforeProtectionRetirementFinishesExactJournal() {
+        FailNextRootReadStore store = new FailNextRootReadStore(
+                "injected process loss after metadata deletion");
+        GcPlannedMetadataRemoval metadata = new GcPlannedMetadataRemoval(
+                "test-removal", "/indexes/source-a", 7, sha('e'));
+        GcPlannedProtectionRemoval protection = createProtection(store);
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(
+                List.of(metadata), List.of(protection));
+        Fixture fixture = fixture(store, snapshot, true);
+        RestartableMetadataHandler handler = new RestartableMetadataHandler(
+                metadata, store::failNextRootRead);
+        GcMetadataRetirementRegistry retirements =
+                new GcMetadataRetirementRegistry(List.of(handler));
+
+        assertThatThrownBy(() -> coordinator(
+                        enabledConfig(),
+                        store,
+                        fixture.journal(),
+                        retirements,
+                        fixture.objectStore())
+                .resume(fixture.root())
+                .join())
+                .hasRootCauseMessage("injected process loss after metadata deletion");
+
+        assertThat(handler.exists()).isFalse();
+        assertThat(handler.deleteCalls()).isEqualTo(1);
+        assertThat(currentProtections(store)).containsExactly(protection.protection());
+        assertDeletingAndObjectPresent(fixture);
+
+        VersionedPhysicalObjectRoot deleting = currentRoot(store);
+        PhysicalGcDeletionResult recovered = coordinator(
+                        enabledConfig(),
+                        store,
+                        fixture.journal(),
+                        retirements,
+                        fixture.objectStore())
+                .resume(deleting)
+                .join();
+
+        assertThat(recovered.status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
+        assertThat(recovered.metadataRetired()).isZero();
+        assertThat(recovered.metadataAlreadyAbsent()).isEqualTo(1);
+        assertThat(recovered.protectionsRetired()).isEqualTo(1);
+        assertThat(recovered.protectionsAlreadyAbsent()).isZero();
+        assertThat(handler.deleteCalls()).isEqualTo(1);
+        assertThat(currentProtections(store)).isEmpty();
+        assertThat(fixture.objectStore().exists).isFalse();
+        assertThat(fixture.objectStore().deleteCalls).hasValue(1);
+    }
+
+    @Test
+    void restartAfterProtectionDeleteBeforeObjectDeleteFinishesExactJournal() {
+        CutAfterProtectionDeleteStore store = new CutAfterProtectionDeleteStore();
+        GcPlannedProtectionRemoval protection = createProtection(store);
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(
+                List.of(), List.of(protection));
+        Fixture fixture = fixture(store, snapshot, true);
+
+        assertThatThrownBy(() -> coordinator(
+                        store, fixture.journal(), fixture.objectStore())
+                .resume(fixture.root())
+                .join())
+                .hasRootCauseMessage("injected process loss after protection deletion");
+
+        assertThat(store.deleteCalls()).isEqualTo(1);
+        assertThat(currentProtections(store)).isEmpty();
+        assertDeletingAndObjectPresent(fixture);
+
+        VersionedPhysicalObjectRoot deleting = currentRoot(store);
+        PhysicalGcDeletionResult recovered = coordinator(
+                        store, fixture.journal(), fixture.objectStore())
+                .resume(deleting)
+                .join();
+
+        assertThat(recovered.status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
+        assertThat(recovered.protectionsRetired()).isZero();
+        assertThat(recovered.protectionsAlreadyAbsent()).isEqualTo(1);
+        assertThat(store.deleteCalls()).isEqualTo(1);
+        assertThat(fixture.objectStore().exists).isFalse();
+        assertThat(fixture.objectStore().deleteCalls).hasValue(1);
+    }
+
+    @Test
+    void lostProtectionDeleteResponseProvesAbsenceBeforeDeletingObject() {
+        LostProtectionDeleteResponseStore store = new LostProtectionDeleteResponseStore();
+        GcPlannedProtectionRemoval protection = createProtection(store);
+        GcRetirementJournalSnapshot snapshot = journalSnapshot(
+                List.of(), List.of(protection));
+        Fixture fixture = fixture(store, snapshot, true);
+
+        PhysicalGcDeletionResult result = coordinator(
+                        store, fixture.journal(), fixture.objectStore())
+                .resume(fixture.root())
+                .join();
+
+        assertThat(result.status()).isEqualTo(PhysicalGcDeletionStatus.DELETED);
+        assertThat(result.protectionsRetired()).isZero();
+        assertThat(result.protectionsAlreadyAbsent()).isEqualTo(1);
+        assertThat(store.deleteCalls()).isEqualTo(1);
+        assertThat(currentProtections(store)).isEmpty();
+        assertThat(fixture.objectStore().exists).isFalse();
+        assertThat(fixture.objectStore().deleteCalls).hasValue(1);
+    }
+
     private SourceRetirementCoordinator coordinator(
             FakePhysicalObjectMetadataStore store,
             GcRetirementJournal journal,
@@ -243,7 +356,13 @@ class SourceRetirementCoordinatorTest {
     private static Fixture fixture(
             GcRetirementJournalSnapshot snapshot,
             boolean objectExists) {
-        FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();
+        return fixture(new FakePhysicalObjectMetadataStore(), snapshot, objectExists);
+    }
+
+    private static Fixture fixture(
+            FakePhysicalObjectMetadataStore store,
+            GcRetirementJournalSnapshot snapshot,
+            boolean objectExists) {
         VersionedPhysicalObjectRoot root = store.createRoot(
                         CLUSTER, deletingRoot(snapshot.referenceSetSha256()))
                 .join();
@@ -256,11 +375,36 @@ class SourceRetirementCoordinatorTest {
 
     private static GcRetirementJournalSnapshot journalSnapshot(
             List<GcPlannedMetadataRemoval> removals) {
+        return journalSnapshot(removals, List.of());
+    }
+
+    private static GcRetirementJournalSnapshot journalSnapshot(
+            List<GcPlannedMetadataRemoval> removals,
+            List<GcPlannedProtectionRemoval> protections) {
         Checksum query = sha('a');
         GcDomainSnapshotProof proof = new GcDomainSnapshotProof(
                 "generation-v1", 1, query, sha('c'));
         Checksum referenceSet = GcPlanValidation.referenceSetSha256(
-                query, List.of(proof), List.of(), removals);
+                query, List.of(proof), protections, removals);
+        List<VersionedGcRetirementProtection> protectionEntries = protections.stream()
+                .map(removal -> {
+                    VersionedObjectProtection protection = removal.protection();
+                    GcRetirementProtectionRecord value = new GcRetirementProtectionRecord(
+                            1,
+                            ObjectKeyHash.from(OBJECT_KEY).value(),
+                            ATTEMPT_ID,
+                            protection.key(),
+                            protection.metadataVersion(),
+                            protection.durableValueSha256().value(),
+                            protection.value(),
+                            1);
+                    return new VersionedGcRetirementProtection(
+                            "/journal/protection/" + protection.key(),
+                            value,
+                            1,
+                            sha('f'));
+                })
+                .toList();
         List<VersionedGcRetirementRemoval> entries = removals.stream()
                 .map(removal -> {
                     GcRetirementRemovalRecord value = new GcRetirementRemovalRecord(
@@ -287,14 +431,58 @@ class SourceRetirementCoordinatorTest {
                         proof.protocolVersion(),
                         proof.queryIdentitySha256().value(),
                         proof.snapshotSha256().value())),
-                0,
+                protectionEntries.size(),
                 entries.size(),
                 referenceSet.value(),
                 100,
                 1);
         VersionedGcRetirementManifest manifest = new VersionedGcRetirementManifest(
                 "/journal/manifest", value, 1, sha('d'));
-        return new GcRetirementJournalSnapshot(manifest, List.of(), entries);
+        return new GcRetirementJournalSnapshot(manifest, protectionEntries, entries);
+    }
+
+    private static GcPlannedProtectionRemoval createProtection(
+            FakePhysicalObjectMetadataStore store) {
+        ObjectProtectionRecord value = new ObjectProtectionRecord(
+                1,
+                ObjectKeyHash.from(OBJECT_KEY).value(),
+                ObjectProtectionType.VISIBLE_GENERATION.wireId(),
+                "generation-a",
+                "/owners/generation-a",
+                7,
+                sha('c').value(),
+                1,
+                50,
+                0,
+                0);
+        return new GcPlannedProtectionRemoval(
+                store.createProtection(CLUSTER, value).join());
+    }
+
+    private static List<VersionedObjectProtection> currentProtections(
+            FakePhysicalObjectMetadataStore store) {
+        return store.scanProtections(
+                        CLUSTER,
+                        ObjectKeyHash.from(OBJECT_KEY),
+                        Optional.<F4ScanToken>empty(),
+                        100)
+                .join()
+                .values();
+    }
+
+    private static VersionedPhysicalObjectRoot currentRoot(
+            FakePhysicalObjectMetadataStore store) {
+        return store.getRoot(CLUSTER, ObjectKeyHash.from(OBJECT_KEY))
+                .join()
+                .orElseThrow();
+    }
+
+    private static void assertDeletingAndObjectPresent(Fixture fixture) {
+        assertThat(currentRoot(fixture.store()).value().lifecycle())
+                .isEqualTo(PhysicalObjectLifecycle.DELETING);
+        assertThat(fixture.objectStore().exists).isTrue();
+        assertThat(fixture.objectStore().headCalls).hasValue(0);
+        assertThat(fixture.objectStore().deleteCalls).hasValue(0);
     }
 
     private static PhysicalObjectRootRecord deletingRoot(Checksum referenceSet) {
@@ -426,6 +614,124 @@ class SourceRetirementCoordinatorTest {
                     loadCalls.incrementAndGet() <= successfulLoads
                             ? Optional.of(snapshot)
                             : Optional.empty());
+        }
+    }
+
+    private static final class RestartableMetadataHandler
+            implements GcMetadataRetirementHandler {
+        private final GcPlannedMetadataRemoval expected;
+        private final Runnable afterDelete;
+        private final AtomicBoolean exists = new AtomicBoolean(true);
+        private final AtomicInteger deleteCalls = new AtomicInteger();
+
+        private RestartableMetadataHandler(
+                GcPlannedMetadataRemoval expected,
+                Runnable afterDelete) {
+            this.expected = expected;
+            this.afterDelete = afterDelete;
+        }
+
+        @Override
+        public String removalType() {
+            return expected.removalType();
+        }
+
+        @Override
+        public CompletableFuture<GcMetadataRetirementOutcome> retire(
+                GcMetadataRetirementContext context,
+                GcPlannedMetadataRemoval removal,
+                MaterializationDeadline deadline) {
+            if (!expected.equals(removal)) {
+                return CompletableFuture.failedFuture(
+                        new AssertionError("metadata removal changed across restart"));
+            }
+            if (!exists.compareAndSet(true, false)) {
+                return CompletableFuture.completedFuture(
+                        GcMetadataRetirementOutcome.ALREADY_ABSENT);
+            }
+            deleteCalls.incrementAndGet();
+            afterDelete.run();
+            return CompletableFuture.completedFuture(GcMetadataRetirementOutcome.RETIRED);
+        }
+
+        private boolean exists() {
+            return exists.get();
+        }
+
+        private int deleteCalls() {
+            return deleteCalls.get();
+        }
+    }
+
+    private static class FailNextRootReadStore extends FakePhysicalObjectMetadataStore {
+        private final String failureMessage;
+        private final AtomicBoolean failNextRootRead = new AtomicBoolean();
+
+        private FailNextRootReadStore(String failureMessage) {
+            this.failureMessage = failureMessage;
+        }
+
+        protected final void failNextRootRead() {
+            if (!failNextRootRead.compareAndSet(false, true)) {
+                throw new AssertionError("root-read failure was already armed");
+            }
+        }
+
+        @Override
+        public synchronized CompletableFuture<Optional<VersionedPhysicalObjectRoot>> getRoot(
+                String cluster,
+                ObjectKeyHash object) {
+            if (failNextRootRead.compareAndSet(true, false)) {
+                return CompletableFuture.failedFuture(new RuntimeException(failureMessage));
+            }
+            return super.getRoot(cluster, object);
+        }
+    }
+
+    private static final class CutAfterProtectionDeleteStore
+            extends FailNextRootReadStore {
+        private final AtomicInteger deleteCalls = new AtomicInteger();
+
+        private CutAfterProtectionDeleteStore() {
+            super("injected process loss after protection deletion");
+        }
+
+        @Override
+        public synchronized CompletableFuture<Void> deleteProtection(
+                String cluster,
+                ObjectProtectionIdentity protection,
+                long expectedVersion) {
+            return super.deleteProtection(cluster, protection, expectedVersion)
+                    .thenRun(() -> {
+                        deleteCalls.incrementAndGet();
+                        failNextRootRead();
+                    });
+        }
+
+        private int deleteCalls() {
+            return deleteCalls.get();
+        }
+    }
+
+    private static final class LostProtectionDeleteResponseStore
+            extends FakePhysicalObjectMetadataStore {
+        private final AtomicInteger deleteCalls = new AtomicInteger();
+
+        @Override
+        public synchronized CompletableFuture<Void> deleteProtection(
+                String cluster,
+                ObjectProtectionIdentity protection,
+                long expectedVersion) {
+            return super.deleteProtection(cluster, protection, expectedVersion)
+                    .thenCompose(ignored -> {
+                        deleteCalls.incrementAndGet();
+                        return CompletableFuture.failedFuture(
+                                new RuntimeException("injected protection delete response loss"));
+                    });
+        }
+
+        private int deleteCalls() {
+            return deleteCalls.get();
         }
     }
 

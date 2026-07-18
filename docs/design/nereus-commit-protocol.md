@@ -598,6 +598,14 @@ DELETING may the old、expired CAS-lost and deleted-cursor objects be removed. T
 roots and permanent protections remain unchanged, so classification scale does not move the linearization point out
 of the underlying F3/F4 authorities.
 
+Checkpoint BA proves destructive source/protection progress is likewise a durable fact, not a callback. After an
+exact journaled metadata or protection removal, a process may disappear with the same DELETING root and object bytes
+still present. A fresh coordinator accepts only that planned key's absence under the byte-identical sealed journal,
+reauthenticates before each remaining phase and preserves metadata -> protection -> object -> DELETED-root ordering.
+The real Oxia/LocalStack fixture also applies a conditional protection delete and loses its response；only an unchanged
+root/journal plus exact protection-scope absence authorizes subsequent object access. No setup-process future, count or
+inventory cursor is inherited by recovery.
+
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the
 Phase 1 object-reference record, manifest and finally the exact-version root. Every actual provider PUT/retry first

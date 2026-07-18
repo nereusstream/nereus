@@ -1364,6 +1364,29 @@ tasks.register("phase4M4CursorGcScaleCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register<Exec>("checkPhase4M4SourceProtectionCutContractSurface") {
+    group = "verification"
+    description = "Audit restart-safe source/protection retirement cuts and applied-delete response loss."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-source-protection-cut-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4SourceProtectionCutCheck") {
+    group = "verification"
+    description = "Verify checkpoint BA resumes exact DELETING journals after source/protection deletion cuts."
+    dependsOn("phase4M4CursorGcScaleCheck")
+    dependsOn("checkPhase4M4SourceProtectionCutContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+    dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1374,7 +1397,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4CursorGcScaleCheck")
+    dependsOn("phase4M4SourceProtectionCutCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

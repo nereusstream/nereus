@@ -125,6 +125,13 @@
 > live/current references plus old、expired CAS-lost pending and deleted-cursor candidates, then drives all three
 > candidates through MARK、restart reconstruction、final full-inventory revalidation、protection retirement and exact
 > object DELETE while the current object/root/protection remain live.
+> Checkpoint BA closes the journaled source/protection retirement process-cut line. Deterministic coordinator tests
+> stop after an exact metadata removal and after an exact protection removal while the root remains DELETING and the
+> object remains present, then assemble a fresh coordinator that accepts only journaled absence and completes the
+> remaining stages. A separate applied-protection-delete/lost-response case reauthenticates the same root/journal and
+> proves exact absence before object access. The real Oxia/LocalStack fixture persists two sealed-journal DELETING
+> roots at those post-delete cuts, stops the setup scanner, opens an independent runtime, injects one successful Oxia
+> protection delete with a lost response and converges both immutable objects to DELETED/absent.
 >
 > 设计基线日期：2026-07-14
 >
@@ -133,7 +140,7 @@
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
 > `master@c59da789e88df2b57829de3277c60194b44fceb6`
 
-> 实现状态日期：2026-07-18
+> 实现状态日期：2026-07-19
 
 F4-M1 已经落地 API/metadata/object-store 基础、guarded/replayable object IO，以及 core 的物理对象
 identity、GC reference-domain proof value、generation activation proof contract 和 durable reader pin handshake。
@@ -1441,6 +1448,36 @@ the two serialized locked-Pulsar builds executed 141/141 and 138/138 tasks. AZ c
 deletion cuts、the complete late PUT/tombstone race matrix and actual two-broker ownership/unload/failover evidence
 remain mandatory.
 
+### 6.25r F4-M4 source/protection retirement process-cut checkpoint
+
+Checkpoint BA adds three exact central-coordinator methods. The metadata-cut method conditionally removes one
+journaled source record, injects process loss at the next root read and proves the DELETING root, protection and object
+are unchanged；a fresh coordinator sees the exact metadata key already absent, removes only the journaled protection
+and then deletes the object. The protection-cut method applies the exact protection delete and loses the process before
+the following root/journal reauthentication；restart treats only that journaled key as already absent and performs one
+object DELETE. The third method loses the response after the protection delete has applied；the same attempt reloads
+the unchanged DELETING root and sealed journal, scans the exact protection scope to absence and only then reaches HEAD/
+DELETE. Every fixture asserts that object HEAD/DELETE is untouched at the injected pre-object cut.
+
+`freshProcessRecoversJournaledMetadataAndProtectionPostDeleteCuts` carries the same states through real services. The
+setup process writes two LocalStack objects, their ACTIVE roots/protections and manifest-last retirement journals to
+four-shard Oxia, then transitions both roots to DELETING. One journal includes an exact already-retired
+`generation-zero-index` removal while its protection remains；the other has its journaled protection conditionally
+removed while the object remains. Root scans are then failed to model process stop without allowing the setup runtime
+to consume either cut. An independently assembled runtime recovers both solely from Oxia root/journal authority. Its
+remaining protection delete succeeds in Oxia but returns an injected timeout；exact absence recovery permits both
+identity-bound LocalStack DELETEs and both roots become DELETED, with no protection left.
+
+The deterministic materialization suite and the focused real-service method pass under Java 21；the latter uses Docker
+28.5.2 and completed 38 actionable tasks（2 executed、36 up-to-date）in 15 seconds on 2026-07-19.
+`phase4M4SourceProtectionCutCheck` composes checkpoint AZ, affected module checks, the complete F4-M4 real-service
+source set, source/module/document audits and the dedicated BA static contract. BA closes the source/protection
+post-delete process-cut and protection response-loss line. Its `--rerun-tasks` aggregate passed on 2026-07-19 under
+Java 21、Docker 28.5.2 and locked Pulsar `master@c59da789e88df2b57829de3277c60194b44fceb6` in 3m49s：the root
+build executed 158/158 tasks and the two serialized locked-Pulsar builds executed 141/141 and 138/138 tasks. It
+remains short of `phase4M4FinalCheck`：the complete late PUT/tombstone race matrix and actual Pulsar two-broker
+ownership/unload/failover evidence remain mandatory.
+
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
 Checkpoint X 关闭 cold-topic backfill 开始前必须先关闭的新写前沿。`ProjectionIdentity` 现在拥有共享的
@@ -1739,7 +1776,7 @@ four-suite broker invocation passed 129 tasks.
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AZ, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement、non-overlapping metadata-first periodic runtime、exact broker typed physical-GC configuration、configured-scope canary、atomic proof composition/delete activation、provider/Pulsar wiring、restart scope-digest fencing、one shared ownerless-reference interpretation、the first real Oxia/LocalStack wrong-scope/empty-list/lost-DELETE-response restart slice、real post-DELETE/pre-DELETED-root-CAS independent-process recovery、applied-DELETED-CAS response-loss exact reload without repeated DELETE、two independent worker runtimes contending/converging on one durable intent、mixed MARKED/DELETING recovery across all 256 root shards with opaque LIST progress、fresh-process 1,001-root hot-shard pagination over 1,256 real Oxia roots、10,000 DELETED-root dual-window/audit/root-last retirement with bounded cancelled-deadline memory and exact 10,000-cursor-root live/old/CAS-lost/deleted-cursor classification/deletion are implemented/tested；checkpoint AF separately composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while the remaining real-service destructive matrix and final gate remain pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint BA, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement、non-overlapping metadata-first periodic runtime、exact broker typed physical-GC configuration、configured-scope canary、atomic proof composition/delete activation、provider/Pulsar wiring、restart scope-digest fencing、one shared ownerless-reference interpretation、the first real Oxia/LocalStack wrong-scope/empty-list/lost-DELETE-response restart slice、real post-DELETE/pre-DELETED-root-CAS independent-process recovery、applied-DELETED-CAS response-loss exact reload without repeated DELETE、two independent worker runtimes contending/converging on one durable intent、mixed MARKED/DELETING recovery across all 256 root shards with opaque LIST progress、fresh-process 1,001-root hot-shard pagination over 1,256 real Oxia roots、10,000 DELETED-root dual-window/audit/root-last retirement、exact 10,000-cursor-root live/old/CAS-lost/deleted-cursor classification/deletion and restart-safe journaled source/protection post-delete cuts with applied-delete response loss are implemented/tested；checkpoint AF separately composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while the late-PUT/tombstone and real two-broker destructive matrix plus final gate remain pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；physical GC composition and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

@@ -372,6 +372,16 @@ current bytes/root/protection 保持可见。Java 21 聚焦测试已于 2026-07-
 `phase4M4CursorGcScaleCheck --rerun-tasks` 同日在 Java 21、Docker 28.5.2 与 locked Pulsar
 `c59da789e88df2b57829de3277c60194b44fceb6` 上以 3m49s 通过（root 157/157 executed；两组串行
 locked-Pulsar 验证为 141/141 和 138/138 executed）。
+Checkpoint BA 继续关闭 source/protection retirement 的 post-delete process cuts：中央协调器测试分别在
+journaled metadata 已删除、journaled protection 已删除后注入进程丢失，证明 DELETING root 与对象保持不变，
+再由全新协调器从 exact absence 继续；另一个用例让 protection 条件删除已生效但响应丢失，只在 root/journal
+重认证和 exact protection-scope 缺失后才访问对象。真实 Oxia/LocalStack 用例持久化两个 sealed-journal
+DELETING root，停止 setup scanner，再由独立 runtime 恢复；其中剩余 protection 的真实 Oxia 删除返回注入
+timeout，最终两个 exact LocalStack 对象各安全删除、两个 root 均为 DELETED。聚焦真实服务方法已于
+2026-07-19 在 Java 21、Docker 28.5.2 下以 38 actionable tasks（2 executed、36 up-to-date）在 15 秒内通过；
+完整 `phase4M4SourceProtectionCutCheck --rerun-tasks` 同日在 Java 21、Docker 28.5.2 与 locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6` 上以 3m49s 通过（root 158/158 executed；两组串行
+locked-Pulsar 验证为 141/141 和 138/138 executed）。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

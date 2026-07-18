@@ -1788,6 +1788,22 @@ intent, retires their exact old protections and performs exactly three identity-
 object remains and its representative ACTIVE root/permanent protection is untouched. This closes the 10,000-root
 cursor scale requirement without turning listing or the projection layer into deletion authority.
 
+Checkpoint BA tests the destructive retirement phase boundaries themselves. Three deterministic coordinator methods
+authenticate one sealed journal, then stop immediately after a journaled metadata removal or after a journaled
+protection removal while the exact root remains DELETING and object HEAD/DELETE has not started. A fresh coordinator
+accepts an absent key only when it is the same planned removal, reauthenticates the unchanged root/journal before every
+remaining batch and completes protection-before-object ordering. The third method applies the conditional protection
+delete but loses its response；the coordinator reloads the same root/journal and exact protection scope, treats only
+proved absence as progress and then deletes the object.
+
+The real-service method persists two manifest-last journals and DELETING roots to four-shard Oxia. Its first post-cut
+state has one exact `generation-zero-index` removal already absent and the journaled protection still present；its
+second has the journaled protection already absent and the LocalStack object still present. The setup process blocks
+all subsequent root scans before closing. A separately assembled runtime recovers both from metadata authority, loses
+the response after the remaining Oxia protection delete has applied, proves absence and performs the two exact object
+deletes. Both roots converge to DELETED and both protection scopes are empty. This closes the source/protection
+post-delete process cuts without treating a process callback or an absent unjournaled key as correctness authority.
+
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.
 
@@ -1850,6 +1866,8 @@ identities under configured privacy policy.
 | recovery root advances while source plan waits | digest/version changes；recompute, possibly safer |
 | higher generation quarantined during source retirement | coverage veto；no delete |
 | metadata index delete partially succeeds | DELETING root blocks reads；recovery conditionally finishes |
+| process stops after journaled source/protection delete | exact DELETING root + sealed journal accept only the planned absent key, then resume the remaining ordered stages |
+| protection delete succeeds, response lost | root/journal reauthentication plus exact protection-scope absence permits object access；present/drifted protection fails |
 | object delete succeeds, response lost | root-shard scan rediscovers exact DELETING root；HEAD absent completes idempotently |
 | stopped writer retries PUT while tombstone retires | owner/root pre-PUT validation or final owner scan loses；the old key is never recreated |
 | audit-record delete succeeds, response lost | exact unchanged DELETED root plus missing audit key completes that step；root remains until final CAS |

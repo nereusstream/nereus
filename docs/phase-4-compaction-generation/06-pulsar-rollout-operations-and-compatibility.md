@@ -984,6 +984,14 @@ objects through the production MARK/restart/revalidate/DELETING/protection-retir
 leaves no cancelled deadline tasks. This closes the cursor inventory/classification/deletion scale assumption；it
 does not replace the remaining Pulsar two-broker ownership、unload and failover evidence.
 
+Checkpoint BA exercises the source/protection destructive phase cuts below the broker bridge. Deterministic tests
+stop after each journaled removal while the durable root remains DELETING and the object remains present；a new
+coordinator resumes only from the same sealed journal. The real Oxia/LocalStack process fixture persists post-source-
+delete and post-protection-delete states, prevents the setup lifecycle from consuming them, then opens an independent
+runtime. One remaining Oxia protection delete applies but returns a timeout；exact root/journal and protection-absence
+reload permits both object deletes and both roots converge to DELETED. This is restart and response-loss evidence for
+the storage runtime, not the still-required Pulsar two-broker ownership、unload or failover gate.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation
