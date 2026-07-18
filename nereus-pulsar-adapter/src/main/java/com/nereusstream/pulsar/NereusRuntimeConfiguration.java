@@ -6,6 +6,7 @@ import com.nereusstream.managedledger.NereusManagedLedgerFactoryConfig;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.retention.NereusRetentionConfig;
 import com.nereusstream.materialization.MaterializationConfig;
+import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
@@ -23,7 +24,8 @@ public record NereusRuntimeConfiguration(
         CursorMetadataStoreConfig cursorMetadata,
         CursorStorageConfig cursorStorage,
         MaterializationConfig materialization,
-        NereusRetentionConfig retention) {
+        NereusRetentionConfig retention,
+        PhysicalGcConfig physicalGc) {
     public NereusRuntimeConfiguration(
             OxiaClientConfiguration oxia,
             ObjectStoreConfiguration objectStore,
@@ -39,7 +41,8 @@ public record NereusRuntimeConfiguration(
                 CursorMetadataStoreConfig.defaults(),
                 CursorStorageConfig.defaults(),
                 defaultMaterialization(streamStorage),
-                NereusRetentionConfig.defaults());
+                NereusRetentionConfig.defaults(),
+                PhysicalGcConfig.defaults());
     }
 
     public NereusRuntimeConfiguration(
@@ -59,7 +62,8 @@ public record NereusRuntimeConfiguration(
                 cursorMetadata,
                 cursorStorage,
                 defaultMaterialization(streamStorage),
-                NereusRetentionConfig.defaults());
+                NereusRetentionConfig.defaults(),
+                PhysicalGcConfig.defaults());
     }
 
     public NereusRuntimeConfiguration(
@@ -80,7 +84,32 @@ public record NereusRuntimeConfiguration(
                 cursorMetadata,
                 cursorStorage,
                 materialization,
-                NereusRetentionConfig.defaults());
+                NereusRetentionConfig.defaults(),
+                PhysicalGcConfig.defaults());
+    }
+
+    /** Compatibility constructor retained while broker-side physical-GC config mapping remains default-off. */
+    public NereusRuntimeConfiguration(
+            OxiaClientConfiguration oxia,
+            ObjectStoreConfiguration objectStore,
+            StreamStorageConfig streamStorage,
+            NereusManagedLedgerFactoryConfig managedLedger,
+            ProjectionMetadataStoreConfig projectionMetadata,
+            CursorMetadataStoreConfig cursorMetadata,
+            CursorStorageConfig cursorStorage,
+            MaterializationConfig materialization,
+            NereusRetentionConfig retention) {
+        this(
+                oxia,
+                objectStore,
+                streamStorage,
+                managedLedger,
+                projectionMetadata,
+                cursorMetadata,
+                cursorStorage,
+                materialization,
+                retention,
+                PhysicalGcConfig.defaults());
     }
 
     public NereusRuntimeConfiguration {
@@ -93,6 +122,7 @@ public record NereusRuntimeConfiguration(
         Objects.requireNonNull(cursorStorage, "cursorStorage");
         Objects.requireNonNull(materialization, "materialization");
         Objects.requireNonNull(retention, "retention");
+        Objects.requireNonNull(physicalGc, "physicalGc");
         if (oxia.maxCommitChainScan() != streamStorage.maxCommitChainScan()) {
             throw new IllegalArgumentException("Oxia and StreamStorage maxCommitChainScan must match");
         }
@@ -174,6 +204,28 @@ public record NereusRuntimeConfiguration(
         if (retention.maxQueuedPlans() > managedLedger.maxPendingCallbacks()) {
             throw new IllegalArgumentException(
                     "retention queue exceeds managed-ledger callback capacity");
+        }
+        physicalGc.validateAgainst(streamStorage, materialization);
+        if (!physicalGc.maximumClockSkew().equals(materialization.maximumClockSkew())) {
+            throw new IllegalArgumentException(
+                    "physical GC and materialization maximumClockSkew must match");
+        }
+        if (objectStore.requestTimeout().compareTo(physicalGc.operationTimeout()) > 0) {
+            throw new IllegalArgumentException(
+                    "object-store timeout must fit the physical-GC operation deadline");
+        }
+        if (physicalGc.operationTimeout().compareTo(physicalGc.closeTimeout()) > 0) {
+            throw new IllegalArgumentException(
+                    "physical-GC operation timeout must fit its close timeout");
+        }
+        if (physicalGc.closeTimeout().compareTo(managedLedger.closeTimeout()) > 0) {
+            throw new IllegalArgumentException(
+                    "physical-GC close timeout must fit managed-ledger close timeout");
+        }
+        if (cursorStorage.cursorRecordsPerStreamMax()
+                > com.nereusstream.managedledger.retention.CursorSnapshotGcScanner.MAX_INVENTORY_VALUES) {
+            throw new IllegalArgumentException(
+                    "cursor inventory exceeds the physical-GC complete-scan bound");
         }
     }
 

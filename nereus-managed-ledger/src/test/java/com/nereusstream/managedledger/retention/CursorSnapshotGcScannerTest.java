@@ -125,6 +125,57 @@ class CursorSnapshotGcScannerTest {
     }
 
     @Test
+    void reconstructsTheExactCandidateEvidenceFromMarkedRootAfterRestart() {
+        try (Context context = new Context(temporaryDirectory.resolve("marked-recovery"))) {
+            VersionedCursorState cursor = context.createCursor("subscription-a");
+            Snapshot snapshot = context.createSnapshot("subscription-a", SNAPSHOT_1);
+            context.createProtection(
+                    cursor,
+                    snapshot,
+                    ObjectProtectionType.CURSOR_SNAPSHOT_ROOT,
+                    0);
+            CursorSnapshotGcScanner scanner = context.scanner(context.configuration(10));
+            ArrayList<CursorSnapshotGcScanner.Candidate> discovered = new ArrayList<>();
+            scanner.scan(
+                            context.ledger,
+                            candidate -> {
+                                discovered.add(candidate);
+                                return java.util.concurrent.CompletableFuture.completedFuture(null);
+                            })
+                    .join();
+            CursorSnapshotGcScanner.Candidate active = discovered.get(0);
+
+            VersionedPhysicalObjectRoot marked = context.mark(snapshot.root());
+            context.clock.setMillis(context.clock.millis() + 17_000);
+            CursorSnapshotGcScanner.Candidate recovered = scanner
+                    .recoverMarked(context.ledger, marked)
+                    .join()
+                    .orElseThrow();
+
+            assertThat(recovered.sourceRoot()).isEqualTo(marked);
+            assertThat(recovered.sourceRoot().value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            assertThat(recovered.discoveredAtMillis())
+                    .isGreaterThan(active.discoveredAtMillis());
+            assertThat(recovered.discoveryEvidenceSha256())
+                    .isEqualTo(active.discoveryEvidenceSha256());
+            assertThat(recovered.referenceQuery()).isEqualTo(active.referenceQuery());
+            assertThat(recovered.plannedProtectionRemovals())
+                    .isEqualTo(active.plannedProtectionRemovals());
+            assertThat(scanner.revalidate(recovered).join()).isTrue();
+
+            context.changeCursorOwner(cursor);
+            CursorSnapshotGcScanner.Candidate drifted = scanner
+                    .recoverMarked(context.ledger, marked)
+                    .join()
+                    .orElseThrow();
+            assertThat(drifted.discoveryEvidenceSha256())
+                    .isNotEqualTo(active.discoveryEvidenceSha256());
+            assertThat(drifted.referenceQuery()).isNotEqualTo(active.referenceQuery());
+        }
+    }
+
+    @Test
     void pendingProtectionBlocksUntilExpiryPlusClockSkewIsStrictlyPast() {
         try (Context context = new Context(temporaryDirectory.resolve("pending"))) {
             VersionedCursorState cursor = context.createCursor("subscription-a");

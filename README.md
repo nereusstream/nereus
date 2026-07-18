@@ -225,14 +225,23 @@ Pulsar facts，最终 mutation authority 仍由 product activation/ownership/F3 
 保持关闭，因此 AI 仍不等于 Phase 4 完成。Checkpoint AJ 现已实现 strict NCS key inverse、完整 bounded
 retention/cursor/object/protection inventory、canonical `CURSOR_SNAPSHOT_CANDIDATE` evidence，以及中央 GC 在第二次
 drain 后、DELETING intent 前调用的完整重验证。普通 owner/root/list/protection drift 会 unmark，读取失败保留
-MARKED 重试；scanner 本身没有 root CAS、protection removal 或 object delete。生产 scheduling、coverage/delete
-activation、candidate-to-plan/runtime composition 仍未启用。
+MARKED 重试；scanner 本身没有 root CAS、protection removal 或 object delete。Checkpoint AK 又把 evidence
+归一化为可跨 `ACTIVE -> MARKED` 和进程重启重建的 durable facts，增加 exact MARKED drift rollback，并通过
+`CursorSnapshotGcExecutor` 将 candidate 接入中央 mark/drain/revalidate/DELETING/source-retirement 链。
+`Phase4PhysicalGcRuntime` 已把 exact six domains、journal、collector 和 executor 交给 production provider/
+managed-ledger runtime 统一持有和关闭；但它不调度 root/registration pass，现有 broker bridge 仍只提供
+`enabled=false, dryRun=true` 的兼容默认值。Coverage/delete activation、object inventory、registration retirement
+和 broker GC 参数映射仍未启用，因此启动 broker 不会触发 destructive work。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
 `phase4M4CursorSnapshotGcCheck --rerun-tasks` 已于 2026-07-18 在 Java 21、locked Pulsar
 `330eeeb3fa9903ed0123c2a0e261d403c32f0a59` 上通过；root build 与继承的 nested Pulsar regression 均报告
 138 个 actionable tasks。
+`phase4M4CursorGcExecutionCheck` 覆盖 checkpoint AK 的 restart reconstruction、exact rollback、cursor-only
+execution adapter、six-domain runtime composition、safe-default config 和 runtime close ownership；该 gate 已于
+2026-07-18 在 Java 21、locked Pulsar `330eeeb3fa9903ed0123c2a0e261d403c32f0a59` 上通过，root build
+执行 139 个 actionable tasks，继承的 nested Pulsar regression 报告 138 个 actionable tasks。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

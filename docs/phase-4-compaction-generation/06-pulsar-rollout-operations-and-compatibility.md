@@ -893,8 +893,16 @@ Checkpoint AF maps the Object-WAL subset of this table through
 `NereusBrokerStorageConfiguration` into the production `MaterializationConfig` and installs the Phase 4 resolver、
 exact lag reader/guard、generation-aware read/repair and materialization lifecycle through
 `DefaultNereusRuntimeProvider`. The default remains `OBJECT_WAL_SYNC_OBJECT`; the async value is exact-name only,
-first-create only and still requires the durable activation/marker proof before primary IO. Retention/GC-specific
-properties below the materialization boundary remain rollout targets until their services are composed.
+first-create only and still requires the durable activation/marker proof before primary IO. Checkpoints AH–AI map the
+retention values；the physical-GC-specific properties below the materialization boundary remain rollout targets.
+
+Checkpoint AK composes the product-side cursor physical-GC executor、six reference domains、durable journal and
+source-retirement coordinator in `Phase4PhysicalGcRuntime`, and `NereusManagedLedgerRuntime` owns/closes it before
+cursor and shared stores. `NereusRuntimeConfiguration` now carries a cross-validated `PhysicalGcConfig`; its
+compatibility constructors deliberately use `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). The current
+Pulsar bridge still takes that compatibility path：it does not map the table's physical-GC properties and the runtime
+does not schedule physical-root or registration scans. Therefore broker startup cannot MARK or DELETE, and the
+rollout sequence above remains unchanged until mapping、scheduling、coverage proofs and activation are implemented.
 
 ## 12. Operations and Status
 

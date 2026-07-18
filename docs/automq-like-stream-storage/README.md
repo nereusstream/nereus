@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AJ、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AK、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -42,7 +42,10 @@ Already present：
   implemented.
 - F4-M4 checkpoint AJ：the cursor-snapshot path now has strict key inversion、complete bounded
   retention/root/object/protection inventory、canonical candidate evidence and a post-drain final revalidation seam
-  in the single central GC fence. It remains read-only and production deletion remains disabled.
+  in the single central GC fence.
+- F4-M4 checkpoint AK：candidate evidence is restart-reconstructable across `ACTIVE -> MARKED`; the explicit cursor
+  executor now uses the six-domain central GC/journal/source-retirement chain, and the provider owns that runtime.
+  No periodic scan is scheduled, broker GC config is not mapped and safe defaults keep production deletion disabled.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative

@@ -579,9 +579,12 @@ strict NPR1 projection identity、protocol-neutral projection authority capture�
 commit/index/cursor owner protection handshake、最终 authority revalidation 和双 activation-proof CAS 收口。
 Checkpoint AJ further implements strict cursor-snapshot key inversion、complete bounded retention/root/object/
 protection inventory、canonical candidate evidence and post-drain final revalidation in the central GC fence.
-Broker cold-topic registration proof is now implemented by the M5 checkpoints below；cursor scanner scheduling、
-MARK/delete composition、object inventory、registration retirement、remaining materialization/GC runtime composition
-和 final M4 gate 仍待完成；production deletion 保持关闭。
+Checkpoint AK normalizes that evidence so an exact MARKED root can reconstruct the same plan after process restart,
+adds exact drift rollback, and composes the cursor path through mark/drain/revalidate/DELETING/source retirement with
+all six reference domains、the durable journal and owned provider/runtime lifecycle. Broker cold-topic registration
+proof is now implemented by the M5 checkpoints below；periodic physical-root/registration scheduling、object inventory、
+registration retirement、broker GC configuration mapping、delete activation 和 final M4 gate 仍待完成；production
+deletion 保持关闭且兼容默认值仍为 `enabled=false, dryRun=true`。
 
 M5 checkpoint X 已进一步实现共享 canonical projection-ref encoder、exact durable registration
 create/refresh/final revalidation、topic create/open/recreate return barrier，以及 production shared generation-store
@@ -635,6 +638,6 @@ production service/facade routing，以及 Pulsar typed retention config mapping
 immutable effective retention/backlog snapshot、stable generation readiness、registration-backed marker admission、
 post-activation policy reload 和 loaded/unloaded/partition-child `TRIM_TOPIC` route；physical deletion 仍关闭。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AJ 和 M5 through checkpoint AI 也不声称 production physical GC、
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AK 和 M5 through checkpoint AI 也不声称 production physical GC、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

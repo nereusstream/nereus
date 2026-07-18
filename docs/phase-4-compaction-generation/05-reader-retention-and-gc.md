@@ -166,8 +166,10 @@ current-root-owned bounded pending protection、cursor-CAS visibility、permanen
 lease；a hydrate/read repairs permanent protection after cursor-CAS response loss. Physical-root backfill、object
 inventory、registration retirement and the remaining materialization/GC runtime composition remain planned.
 Checkpoint W subsequently implements physical/cursor live-reference backfill, and checkpoint AJ implements read-only
-cursor snapshot candidate discovery plus post-drain full revalidation；scanner scheduling、MARK/delete composition and
-activation remain planned，so production deletion is still disabled.
+cursor snapshot candidate discovery plus post-drain full revalidation. Checkpoint AK makes that evidence
+restart-reconstructable, adds exact drift rollback and composes the cursor path into the central six-domain
+mark/drain/DELETING/source-retirement runtime. Periodic root/registration scheduling、object inventory、registration
+retirement、broker config mapping and activation remain planned，so production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1518,18 +1520,28 @@ Permanent protections are removable only against the complete current cursor-roo
 removable only strictly after `expiresAt + maximumClockSkew`. Unknown age、missing root、non-ACTIVE root、identity
 mismatch、foreign protection and malformed keys are counted but never emitted.
 
-The scanner binds retention/root/live-reference facts、the exact listing、ACTIVE physical-root version/digest and
+The scanner binds retention/live-reference facts、the exact listing、the normalized ACTIVE owner lifecycle epoch and
 every planned protection version/digest into `CURSOR_SNAPSHOT_CANDIDATE` evidence, then invokes one asynchronous
-visitor at a time under one whole-pass deadline. After the central collector has marked and drained the root,
-`revalidate(candidate)` repeats the complete list/retention/root/protection cut, accepts only the exact ACTIVE root or
-its one-epoch MARKED successor, and returns false for ordinary owner/root/list/reference drift. The new
+visitor at a time under one whole-pass deadline. Discovery time、root metadata version and the transient ACTIVE wrapper
+digest are deliberately excluded because an exact `ACTIVE -> MARKED` transition must remain reconstructable after a
+fresh process starts. After the central collector has marked and drained the root, `revalidate(candidate)` repeats the
+complete list/retention/root/protection cut, accepts only the exact ACTIVE root or its one-epoch MARKED successor, and
+returns false for ordinary owner/root/list/reference drift. The new
 `PhysicalObjectGarbageCollector.FinalCandidateRevalidator` runs this callback after its second reader/protection/
 metadata drain and immediately before the final root/journal/activation fence；false rolls MARKED back to ACTIVE,
 while a failed/incomplete revalidation leaves MARKED for retry. This preserves one deletion correctness owner.
 
-Checkpoint AJ still does not schedule the scanner、mark a candidate、remove protections、call object deletion、publish
-the cursor-snapshot GC coverage bit or enable physical-delete activation. Those production-composition and rollout
-steps remain required before cursor snapshot deletion is available.
+Checkpoint AK implements `recoverMarked` and the exact conditional `unmarkDrifted` rollback. Its
+`CursorSnapshotGcExecutor` constructs the canonical candidate/plan, invokes the central mark/drain/final-revalidation
+fence, then resumes journal-authenticated protection and exact-object retirement from DELETING. A restart can recover
+MARKED without in-memory discovery state or resume DELETING without object-store listing. Changed complete evidence
+cannot reuse the old digest and is unmarked without deleting bytes；an uncertain scan remains MARKED.
+
+`Phase4PhysicalGcRuntime` composes the executor with all six domains and is owned by the production provider/runtime,
+but it intentionally contains no periodic scheduler. The existing broker mapping also continues to construct
+`PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). Root/registration scheduling、the cursor-snapshot
+coverage bit、broker GC knob mapping、object inventory、registration retirement and physical-delete activation remain
+required before production cursor snapshot deletion is available.
 
 ## 11. Orphan Discovery
 

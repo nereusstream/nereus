@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.NereusManagedLedgerFactoryConfig;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
+import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
@@ -24,6 +25,8 @@ class NereusRuntimeConfigurationCursorTest {
 
         assertThat(configuration.cursorMetadata()).isEqualTo(CursorMetadataStoreConfig.defaults());
         assertThat(configuration.cursorStorage()).isEqualTo(CursorStorageConfig.defaults());
+        assertThat(configuration.physicalGc()).isEqualTo(PhysicalGcConfig.defaults());
+        assertThat(configuration.physicalGc().mutationsAllowed()).isFalse();
     }
 
     @Test

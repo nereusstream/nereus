@@ -151,6 +151,80 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
     }
 
     /**
+     * Reconstructs one cursor candidate from an exact MARKED root after process restart.
+     *
+     * <p>The returned query/evidence is identical to the ACTIVE discovery form when every durable cursor,
+     * listing, protection, and normalized root-owner fact is unchanged. Ordinary inventory/root drift returns
+     * {@link Optional#empty()}; backend, decode, and configured-limit failures propagate so callers never turn an
+     * incomplete pass into deletion authority.
+     */
+    public CompletableFuture<Optional<Candidate>> recoverMarked(
+            CursorLedgerIdentity ledger,
+            VersionedPhysicalObjectRoot markedRoot) {
+        Objects.requireNonNull(ledger, "ledger");
+        VersionedPhysicalObjectRoot marked = Objects.requireNonNull(markedRoot, "markedRoot");
+        if (marked.value().lifecycle() != PhysicalObjectLifecycle.MARKED
+                || PhysicalObjectIdentity.from(marked.value()).kind()
+                        != PhysicalObjectKind.CURSOR_SNAPSHOT) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "cursor snapshot GC recovery requires a MARKED cursor-snapshot root"));
+        }
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(
+                    closed("cursor snapshot GC recovery rejected after close"));
+        }
+        if (!scanning.compareAndSet(false, true)) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("a cursor snapshot GC scan is already running"));
+        }
+        if (closed.get()) {
+            scanning.set(false);
+            return CompletableFuture.failedFuture(
+                    closed("cursor snapshot GC recovery raced close"));
+        }
+        final long now;
+        try {
+            now = nonNegativeNow();
+        } catch (Throwable failure) {
+            scanning.set(false);
+            return CompletableFuture.failedFuture(failure);
+        }
+        OperationDeadline deadline = new OperationDeadline(config.operationTimeout(), scheduler);
+        PhysicalObjectIdentity object = PhysicalObjectIdentity.from(marked.value());
+        CompletableFuture<Optional<Candidate>> result = loadInventory(ledger, deadline)
+                .thenCompose(optional -> {
+                    if (optional.isEmpty()) {
+                        return CompletableFuture.completedFuture(Optional.empty());
+                    }
+                    InventoryCut cut = optional.orElseThrow();
+                    ListedObject listed = cut.listedObjects().get(object.objectKey());
+                    if (cut.inventory().deletionVetoed()
+                            || listed == null
+                            || !cut.inventory().unreferencedCandidates().contains(object.objectKey())) {
+                        return CompletableFuture.completedFuture(Optional.empty());
+                    }
+                    return bound(
+                                    deadline,
+                                    () -> physicalMetadataStore.getRoot(
+                                            cluster, object.objectKeyHash()),
+                                    "reload MARKED cursor snapshot physical root")
+                            .thenCompose(current -> {
+                                if (current.isEmpty()
+                                        || !current.orElseThrow().equals(marked)) {
+                                    return CompletableFuture.completedFuture(Optional.empty());
+                                }
+                                return evaluateRoot(cut, listed, marked, now, true, deadline)
+                                        .thenApply(CandidateDecision::candidate);
+                            });
+                });
+        result.whenComplete((ignored, failure) -> {
+            deadline.close();
+            scanning.set(false);
+        });
+        return result;
+    }
+
+    /**
      * Repeats the full list/retention/cursor/protection cut for one marked candidate.
      *
      * <p>Ordinary authority or inventory drift returns {@code false}. Backend/decode/limit failures propagate so the
@@ -192,8 +266,8 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                                     "reload cursor snapshot physical root")
                             .thenCompose(root -> {
                                 if (root.isEmpty()
-                                        || !sameActiveOrMarkedSuccessor(
-                                                candidate.activeRoot(), root.orElseThrow())) {
+                                        || !sameCandidateRoot(
+                                                candidate.sourceRoot(), root.orElseThrow())) {
                                     return CompletableFuture.completedFuture(false);
                                 }
                                 return scanProtections(
@@ -205,7 +279,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                                         .thenApply(protections -> {
                                             Optional<List<VersionedObjectProtection>> safe = safeProtections(
                                                     candidate.parsedKey(),
-                                                    candidate.activeRoot(),
+                                                    candidate.sourceRoot(),
                                                     streamId(candidate.ledger()),
                                                     latest.cursorRoots(),
                                                     protections,
@@ -219,9 +293,8 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                                                     candidate.ledger(),
                                                     latest.inventory(),
                                                     candidate.listedObject(),
-                                                    candidate.activeRoot(),
+                                                    candidate.sourceRoot(),
                                                     protections,
-                                                    candidate.discoveredAtMillis(),
                                                     candidate.notBeforeMillis());
                                             GcReferenceQuery query = GcReferenceQuery.create(
                                                     GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE,
@@ -274,6 +347,25 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             ListedObject listed,
             long now,
             OperationDeadline deadline) {
+        return bound(
+                        deadline,
+                        () -> physicalMetadataStore.getRoot(
+                                cluster, com.nereusstream.api.ObjectKeyHash.from(listed.key())),
+                        "load cursor snapshot physical root")
+                .thenCompose(optionalRoot -> optionalRoot
+                        .<CompletableFuture<CandidateDecision>>map(root ->
+                                evaluateRoot(cut, listed, root, now, false, deadline))
+                        .orElseGet(() -> CompletableFuture.completedFuture(
+                                CandidateDecision.blocked(Block.MISSING_ROOT))));
+    }
+
+    private CompletableFuture<CandidateDecision> evaluateRoot(
+            InventoryCut cut,
+            ListedObject listed,
+            VersionedPhysicalObjectRoot root,
+            long now,
+            boolean recoveringMarked,
+            OperationDeadline deadline) {
         final CursorSnapshotKeys.ParsedSnapshotKey parsed;
         try {
             parsed = CursorSnapshotKeys.parse(cluster, cut.ledger(), listed.key());
@@ -287,77 +379,67 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
         if (listingNotBefore.isEmpty() || now < listingNotBefore.orElseThrow()) {
             return CompletableFuture.completedFuture(CandidateDecision.blocked(Block.TOO_YOUNG));
         }
-        return bound(
-                        deadline,
-                        () -> physicalMetadataStore.getRoot(
-                                cluster, com.nereusstream.api.ObjectKeyHash.from(listed.key())),
-                        "load cursor snapshot physical root")
-                .thenCompose(optionalRoot -> {
-                    if (optionalRoot.isEmpty()) {
-                        return CompletableFuture.completedFuture(
-                                CandidateDecision.blocked(Block.MISSING_ROOT));
+        PhysicalObjectLifecycle requiredLifecycle = recoveringMarked
+                ? PhysicalObjectLifecycle.MARKED
+                : PhysicalObjectLifecycle.ACTIVE;
+        if (root.value().lifecycle() != requiredLifecycle
+                || PhysicalObjectIdentity.from(root.value()).kind()
+                        != PhysicalObjectKind.CURSOR_SNAPSHOT) {
+            return CompletableFuture.completedFuture(
+                    CandidateDecision.blocked(Block.ROOT_STATE));
+        }
+        PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
+        if (!listingMatches(object, listed)) {
+            return CompletableFuture.completedFuture(
+                    CandidateDecision.blocked(Block.IDENTITY_MISMATCH));
+        }
+        long notBefore = Math.max(
+                root.value().orphanNotBeforeMillis(), listingNotBefore.orElseThrow());
+        if (now < root.value().createdAtMillis() || now < notBefore) {
+            return CompletableFuture.completedFuture(
+                    CandidateDecision.blocked(Block.TOO_YOUNG));
+        }
+        return scanProtections(
+                        object.objectKeyHash(),
+                        Optional.empty(),
+                        new ArrayList<>(),
+                        null,
+                        deadline)
+                .thenApply(protections -> {
+                    Optional<List<VersionedObjectProtection>> safe = safeProtections(
+                            parsed,
+                            root,
+                            streamId(cut.ledger()),
+                            cut.cursorRoots(),
+                            protections,
+                            now);
+                    if (safe.isEmpty()) {
+                        return CandidateDecision.blocked(Block.PROTECTION);
                     }
-                    VersionedPhysicalObjectRoot root = optionalRoot.orElseThrow();
-                    if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
-                            || PhysicalObjectIdentity.from(root.value()).kind()
-                                    != PhysicalObjectKind.CURSOR_SNAPSHOT) {
-                        return CompletableFuture.completedFuture(
-                                CandidateDecision.blocked(Block.ROOT_STATE));
-                    }
-                    PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
-                    if (!listingMatches(object, listed)) {
-                        return CompletableFuture.completedFuture(
-                                CandidateDecision.blocked(Block.IDENTITY_MISMATCH));
-                    }
-                    long notBefore = Math.max(
-                            root.value().orphanNotBeforeMillis(), listingNotBefore.orElseThrow());
-                    if (now < root.value().createdAtMillis() || now < notBefore) {
-                        return CompletableFuture.completedFuture(
-                                CandidateDecision.blocked(Block.TOO_YOUNG));
-                    }
-                    return scanProtections(
-                                    object.objectKeyHash(),
-                                    Optional.empty(),
-                                    new ArrayList<>(),
-                                    null,
-                                    deadline)
-                            .thenApply(protections -> {
-                                Optional<List<VersionedObjectProtection>> safe = safeProtections(
-                                        parsed,
-                                        root,
-                                        streamId(cut.ledger()),
-                                        cut.cursorRoots(),
-                                        protections,
-                                        now);
-                                if (safe.isEmpty()) {
-                                    return CandidateDecision.blocked(Block.PROTECTION);
-                                }
-                                Checksum evidence = evidence(
-                                        cut.ledger(),
-                                        cut.inventory(),
-                                        listed,
-                                        root,
-                                        protections,
-                                        now,
-                                        notBefore);
-                                GcReferenceQuery query = GcReferenceQuery.create(
-                                        GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE,
-                                        object,
-                                        List.of(streamId(cut.ledger())),
-                                        evidence);
-                                return CandidateDecision.eligible(new Candidate(
-                                        cut.ledger(),
-                                        cut.inventory(),
-                                        parsed,
-                                        listed,
-                                        root,
-                                        safe.orElseThrow(),
-                                        object,
-                                        query,
-                                        evidence,
-                                        now,
-                                        notBefore));
-                            });
+                    Checksum evidence = evidence(
+                            cut.ledger(),
+                            cut.inventory(),
+                            listed,
+                            root,
+                            protections,
+                            notBefore);
+                    GcReferenceQuery query = GcReferenceQuery.create(
+                            GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE,
+                            object,
+                            List.of(streamId(cut.ledger())),
+                            evidence);
+                    return CandidateDecision.eligible(new Candidate(
+                            cut.ledger(),
+                            cut.inventory(),
+                            parsed,
+                            listed,
+                            root,
+                            safe.orElseThrow(),
+                            object,
+                            query,
+                            evidence,
+                            now,
+                            notBefore));
                 });
     }
 
@@ -548,7 +630,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
 
     private Optional<List<VersionedObjectProtection>> safeProtections(
             CursorSnapshotKeys.ParsedSnapshotKey parsed,
-            VersionedPhysicalObjectRoot activeRoot,
+            VersionedPhysicalObjectRoot sourceRoot,
             StreamId streamId,
             List<VersionedCursorState> cursorRoots,
             List<VersionedObjectProtection> protections,
@@ -569,8 +651,8 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             }
             previous = protection.key();
             var value = protection.value();
-            if (!value.objectKeyHash().equals(activeRoot.value().objectKeyHash())
-                    || value.rootLifecycleEpoch() != activeRoot.value().lifecycleEpoch()
+            if (!value.objectKeyHash().equals(sourceRoot.value().objectKeyHash())
+                    || value.rootLifecycleEpoch() != activeLifecycleEpoch(sourceRoot)
                     || !value.referenceId().equals(parsed.snapshotId())) {
                 return Optional.empty();
             }
@@ -615,23 +697,33 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                 && object.etag().equals(listed.etag());
     }
 
-    private static boolean sameActiveOrMarkedSuccessor(
-            VersionedPhysicalObjectRoot active,
+    private static boolean sameCandidateRoot(
+            VersionedPhysicalObjectRoot source,
             VersionedPhysicalObjectRoot current) {
-        if (!PhysicalObjectIdentity.from(active.value()).equals(
+        if (!PhysicalObjectIdentity.from(source.value()).equals(
                 PhysicalObjectIdentity.from(current.value()))) {
             return false;
         }
-        if (current.equals(active)) {
+        if (current.equals(source)) {
             return true;
         }
-        return active.value().lifecycle() == PhysicalObjectLifecycle.ACTIVE
+        return source.value().lifecycle() == PhysicalObjectLifecycle.ACTIVE
                 && current.value().lifecycle() == PhysicalObjectLifecycle.MARKED
                 && current.value().lifecycleEpoch()
-                        == Math.addExact(active.value().lifecycleEpoch(), 1)
-                && current.value().createdAtMillis() == active.value().createdAtMillis()
+                        == Math.addExact(source.value().lifecycleEpoch(), 1)
+                && current.value().createdAtMillis() == source.value().createdAtMillis()
                 && current.value().orphanNotBeforeMillis()
-                        == active.value().orphanNotBeforeMillis();
+                        == source.value().orphanNotBeforeMillis();
+    }
+
+    private static long activeLifecycleEpoch(
+            VersionedPhysicalObjectRoot root) {
+        return switch (root.value().lifecycle()) {
+            case ACTIVE -> root.value().lifecycleEpoch();
+            case MARKED -> Math.subtractExact(root.value().lifecycleEpoch(), 1);
+            default -> throw new IllegalArgumentException(
+                    "cursor snapshot candidate root must be ACTIVE or MARKED");
+        };
     }
 
     private Checksum evidence(
@@ -640,7 +732,6 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             ListedObject listed,
             VersionedPhysicalObjectRoot root,
             List<VersionedObjectProtection> protections,
-            long discoveredAtMillis,
             long notBeforeMillis) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -681,9 +772,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             Instant modified = listed.lastModified().orElseThrow();
             number(digest, modified.getEpochSecond());
             number(digest, modified.getNano());
-            number(digest, root.metadataVersion());
-            text(digest, root.durableValueSha256().value());
-            number(digest, root.value().lifecycleEpoch());
+            number(digest, activeLifecycleEpoch(root));
             number(digest, root.value().createdAtMillis());
             number(digest, root.value().orphanNotBeforeMillis());
             text(digest, PhysicalObjectIdentity.from(root.value()).identitySha256().value());
@@ -702,7 +791,6 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                 number(digest, value.createdAtMillis());
                 number(digest, value.expiresAtMillis());
             }
-            number(digest, discoveredAtMillis);
             number(digest, notBeforeMillis);
             return new Checksum(
                     ChecksumType.SHA256,
@@ -853,7 +941,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             CursorSnapshotInventory inventory,
             CursorSnapshotKeys.ParsedSnapshotKey parsedKey,
             ListedObject listedObject,
-            VersionedPhysicalObjectRoot activeRoot,
+            VersionedPhysicalObjectRoot sourceRoot,
             List<VersionedObjectProtection> plannedProtectionRemovals,
             PhysicalObjectIdentity object,
             GcReferenceQuery referenceQuery,
@@ -865,7 +953,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             Objects.requireNonNull(inventory, "inventory");
             Objects.requireNonNull(parsedKey, "parsedKey");
             Objects.requireNonNull(listedObject, "listedObject");
-            Objects.requireNonNull(activeRoot, "activeRoot");
+            Objects.requireNonNull(sourceRoot, "sourceRoot");
             plannedProtectionRemovals = List.copyOf(Objects.requireNonNull(
                     plannedProtectionRemovals, "plannedProtectionRemovals"));
             Objects.requireNonNull(object, "object");
@@ -875,8 +963,9 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
             if (!inventory.ledger().equals(ledger)
                     || inventory.deletionVetoed()
                     || !inventory.unreferencedCandidates().contains(listedObject.key())
-                    || activeRoot.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
-                    || !PhysicalObjectIdentity.from(activeRoot.value()).equals(object)
+                    || (sourceRoot.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                            && sourceRoot.value().lifecycle() != PhysicalObjectLifecycle.MARKED)
+                    || !PhysicalObjectIdentity.from(sourceRoot.value()).equals(object)
                     || object.kind() != PhysicalObjectKind.CURSOR_SNAPSHOT
                     || !object.objectKey().equals(listedObject.key())
                     || referenceQuery.kind() != GcReferenceQueryKind.CURSOR_SNAPSHOT_CANDIDATE
@@ -885,8 +974,8 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                     || !referenceQuery.affectedStreams().equals(List.of(streamId(ledger)))) {
                 throw new IllegalArgumentException("cursor snapshot GC candidate facts are inconsistent");
             }
-            if (discoveredAtMillis < activeRoot.value().createdAtMillis()
-                    || notBeforeMillis < activeRoot.value().orphanNotBeforeMillis()) {
+            if (discoveredAtMillis < sourceRoot.value().createdAtMillis()
+                    || notBeforeMillis < sourceRoot.value().orphanNotBeforeMillis()) {
                 throw new IllegalArgumentException("cursor snapshot GC candidate timestamps are invalid");
             }
             String previous = null;

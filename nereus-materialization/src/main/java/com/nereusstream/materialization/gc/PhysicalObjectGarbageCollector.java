@@ -160,6 +160,82 @@ public final class PhysicalObjectGarbageCollector {
     }
 
     /**
+     * Releases an exact restart-discovered MARKED root when its original plan can no longer be reconstructed.
+     *
+     * <p>This is a fail-safe rollback only: it never enters delete intent and conditionally changes only the exact
+     * supplied MARKED wrapper back to ACTIVE. An uncertain CAS response is resolved by reloading that same wrapper.
+     */
+    public CompletableFuture<PhysicalGcAdvanceResult> unmarkDrifted(
+            VersionedPhysicalObjectRoot discoveredRoot) {
+        VersionedPhysicalObjectRoot discovered = Objects.requireNonNull(
+                discoveredRoot, "discoveredRoot");
+        if (discovered.value().lifecycle() != PhysicalObjectLifecycle.MARKED) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "drift rollback requires an exact MARKED root"));
+        }
+        if (!config.enabled()) {
+            return CompletableFuture.completedFuture(
+                    PhysicalGcAdvanceResult.simple(PhysicalGcAdvanceStatus.DISABLED));
+        }
+        if (config.dryRun()) {
+            return CompletableFuture.completedFuture(
+                    PhysicalGcAdvanceResult.simple(PhysicalGcAdvanceStatus.DRY_RUN));
+        }
+        MaterializationDeadline deadline = new MaterializationDeadline(
+                config.operationTimeout(), scheduler);
+        ObjectKeyHash object = new ObjectKeyHash(discovered.value().objectKeyHash());
+        CompletableFuture<PhysicalGcAdvanceResult> result = deadline.bound(
+                        () -> metadataStore.getRoot(cluster, object),
+                        "reload drifted MARKED physical root")
+                .thenCompose(optional -> {
+                    if (optional.isEmpty()
+                            || !optional.orElseThrow().equals(discovered)) {
+                        return CompletableFuture.completedFuture(
+                                PhysicalGcAdvanceResult.simple(
+                                        PhysicalGcAdvanceStatus.ROOT_CHANGED));
+                    }
+                    PhysicalObjectRootRecord replacement = active(discovered.value());
+                    CompletableFuture<VersionedPhysicalObjectRoot> cas = deadline.bound(
+                            () -> metadataStore.compareAndSetRoot(
+                                    cluster, replacement, discovered.metadataVersion()),
+                            "CAS unreconstructable MARKED physical root back to ACTIVE");
+                    return cas.handle((active, failure) -> {
+                        if (failure == null) {
+                            return CompletableFuture.completedFuture(
+                                    PhysicalGcAdvanceResult.withRoot(
+                                            PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED,
+                                            active));
+                        }
+                        Throwable original = unwrap(failure);
+                        return deadline.bound(
+                                        () -> metadataStore.getRoot(cluster, object),
+                                        "reload physical root after uncertain recovery unmark CAS")
+                                .handle((reloaded, reloadFailure) -> {
+                                    if (reloadFailure != null) {
+                                        original.addSuppressed(unwrap(reloadFailure));
+                                        throw propagate(original);
+                                    }
+                                    if (reloaded.isPresent()
+                                            && exactReplacement(
+                                                    reloaded.orElseThrow(), replacement)) {
+                                        return PhysicalGcAdvanceResult.withRoot(
+                                                PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED,
+                                                reloaded.orElseThrow());
+                                    }
+                                    if (reloaded.isPresent()
+                                            && reloaded.orElseThrow().equals(discovered)) {
+                                        throw propagate(original);
+                                    }
+                                    return PhysicalGcAdvanceResult.simple(
+                                            PhysicalGcAdvanceStatus.ROOT_CHANGED);
+                                });
+                    }).thenCompose(Function.identity());
+                });
+        result.whenComplete((ignored, failure) -> deadline.close());
+        return result;
+    }
+
+    /**
      * Advances one sealed plan only after a candidate-kind-specific final inventory revalidation.
      *
      * <p>The callback runs after both reader/protection/metadata drain passes and immediately before

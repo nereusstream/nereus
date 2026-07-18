@@ -221,8 +221,22 @@ The central `PhysicalObjectGarbageCollector` now accepts a candidate-kind-specif
 callback only after the second reader/protection/metadata drain and before the final MARKED root、sealed journal and
 activation revalidation. The cursor callback repeats the complete inventory and accepts only unchanged retention/
 cursor/list/protection authority plus the exact one-epoch MARKED successor. Ordinary drift unmarks；an incomplete or
-failed read leaves MARKED for restart-safe retry. Scanner scheduling、candidate-to-plan adapter composition、coverage
-activation and all deletion calls remain target runtime work after checkpoint AJ.
+failed read leaves MARKED for restart-safe retry.
+
+Checkpoint AK closes the restart cut after MARK. Candidate evidence now excludes discovery time and the transient
+ACTIVE metadata wrapper；it binds a normalized ACTIVE owner epoch plus immutable object/list/authority/protection
+facts. `recoverMarked` repeats the complete inventory against the exact one-epoch MARKED successor and reconstructs
+the same query when those facts are unchanged. Complete fact drift produces another digest and
+`unmarkDrifted` conditionally restores only that exact MARKED root to ACTIVE；incomplete/backend/limit failure leaves
+MARKED for later retry.
+
+`CursorSnapshotGcExecutor` translates the scanner's protections into the canonical plan and is the only adapter for
+`mark -> drain/final revalidation -> DELETING -> SourceRetirementCoordinator.resume`. It can independently recover an
+exact MARKED or DELETING root after restart. `Phase4PhysicalGcRuntime` composes that adapter with the durable journal、
+empty cursor metadata-retirement registry and all six reference domains, and production managed-ledger ownership now
+closes this runtime before the cursor and shared stores. No root/registration scanner is scheduled yet；broker config
+mapping、coverage/delete activation、object inventory and registration retirement remain target work. Safe defaults
+therefore still perform no deletion.
 
 Full M4–M6 target construction：
 

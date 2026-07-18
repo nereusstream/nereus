@@ -491,6 +491,39 @@ class PhysicalObjectGarbageCollectorTest {
     }
 
     @Test
+    void restartCanConditionallyUnmarkAnUnreconstructableExactRoot() {
+        LostRootCasResponseStore store = new LostRootCasResponseStore(
+                PhysicalObjectLifecycle.ACTIVE);
+        PhysicalGcConfig config = config(true, false);
+        MutableClock clock = new MutableClock(1_000);
+        VersionedPhysicalObjectRoot active = createActiveRoot(store);
+        PhysicalObjectGarbageCollector collector = collector(
+                config,
+                store,
+                clock,
+                new TrackingDomain("projection-generation-v1"),
+                new TrackingDomain("generation-v1"));
+        GcPlan plan = collector.mark(
+                        candidate(config, active, query(active)),
+                        List.of(),
+                        List.of())
+                .join().plan().orElseThrow();
+        VersionedPhysicalObjectRoot marked = store.getRoot(
+                        CLUSTER, plan.candidate().object().objectKeyHash())
+                .join().orElseThrow();
+
+        PhysicalGcAdvanceResult result = collector.unmarkDrifted(marked).join();
+
+        assertThat(result.status())
+                .isEqualTo(PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED);
+        assertThat(result.root().orElseThrow().value().lifecycle())
+                .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+        assertThat(result.root().orElseThrow().value().lifecycleEpoch())
+                .isEqualTo(marked.value().lifecycleEpoch() + 1);
+        assertThat(result.root().orElseThrow().value().gcAttemptId()).isEmpty();
+    }
+
+    @Test
     void deleteIntentLostResponseAndMarkedRestartBothConvergeWithoutDeletingAnything() {
         LostRootCasResponseStore store = new LostRootCasResponseStore(PhysicalObjectLifecycle.DELETING);
         PhysicalGcConfig config = config(true, false);

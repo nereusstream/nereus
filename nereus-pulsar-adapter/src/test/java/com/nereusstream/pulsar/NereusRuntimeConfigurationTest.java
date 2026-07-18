@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.managedledger.NereusManagedLedgerFactoryConfig;
+import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
@@ -39,6 +40,75 @@ class NereusRuntimeConfigurationTest {
                 projection(1_024)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("object-store timeout");
+    }
+
+    @Test
+    void rejectsPhysicalGcClockAndCloseBudgetDrift() {
+        NereusRuntimeConfiguration base = new NereusRuntimeConfiguration(
+                oxia(10_000, 1_024),
+                objectStore(Duration.ofSeconds(30)),
+                stream(10_000, 10_000, 1_024, 1_024),
+                managed(10_000, 1_024, 1_024),
+                projection(1_024));
+
+        assertThatThrownBy(() -> withPhysical(
+                        base,
+                        physical(
+                                Duration.ofSeconds(4),
+                                Duration.ofSeconds(30),
+                                Duration.ofSeconds(30))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maximumClockSkew");
+        assertThatThrownBy(() -> withPhysical(
+                        base,
+                        physical(
+                                Duration.ofSeconds(5),
+                                Duration.ofSeconds(31),
+                                Duration.ofSeconds(30))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("operation timeout");
+    }
+
+    private static NereusRuntimeConfiguration withPhysical(
+            NereusRuntimeConfiguration base,
+            PhysicalGcConfig physicalGc) {
+        return new NereusRuntimeConfiguration(
+                base.oxia(),
+                base.objectStore(),
+                base.streamStorage(),
+                base.managedLedger(),
+                base.projectionMetadata(),
+                base.cursorMetadata(),
+                base.cursorStorage(),
+                base.materialization(),
+                base.retention(),
+                physicalGc);
+    }
+
+    private static PhysicalGcConfig physical(
+            Duration maximumClockSkew,
+            Duration operationTimeout,
+            Duration closeTimeout) {
+        PhysicalGcConfig defaults = PhysicalGcConfig.defaults();
+        return new PhysicalGcConfig(
+                defaults.enabled(),
+                defaults.dryRun(),
+                defaults.metadataScanPageSize(),
+                defaults.objectListPageSize(),
+                defaults.maxConcurrentDeletes(),
+                defaults.maxStreamsPerCandidate(),
+                defaults.maxAuthoritiesPerDomainSnapshot(),
+                defaults.maxReferencesPerDomainSnapshot(),
+                defaults.scanInterval(),
+                defaults.readerLeaseDuration(),
+                defaults.readerLeaseRenewInterval(),
+                maximumClockSkew,
+                defaults.drainGrace(),
+                defaults.pendingProtectionDuration(),
+                defaults.orphanGrace(),
+                defaults.tombstoneAuditGrace(),
+                operationTimeout,
+                closeTimeout);
     }
 
     private static OxiaClientConfiguration oxia(int scan, int pending) {

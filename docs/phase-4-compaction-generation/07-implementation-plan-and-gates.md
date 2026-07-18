@@ -100,7 +100,10 @@ the all-64-shard physical-root/cursor-root live-reference backfill、exact commi
 stable final revalidation and response-loss-safe dual activation proofs. Broker registration backfill proof/barrier、
 object inventory、registration retirement and the remaining materialization/GC runtime composition remain pending.
 Checkpoint AJ adds complete bounded cursor-snapshot candidate discovery plus the post-drain final-inventory callback；
-its scheduling、MARK/delete adapter and activation bit remain pending. Checkpoint X starts M5 by adding the exact durable
+checkpoint AK makes its evidence restart-reconstructable, adds exact drift rollback and composes the cursor executor、
+six domains、journal and source-retirement lifecycle under the production provider. Periodic physical-root/registration
+scheduling、object inventory、registration retirement、broker GC config mapping and activation remain pending.
+Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
 binding/cursor/generation two-stable-snapshot barrier、deterministic broker-incarnation readiness epoch/full digest
@@ -645,10 +648,12 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > of all five reference domains. Checkpoint U implements persisted dual-absence DELETED-root/Phase 1 audit retirement.
 > Checkpoint V implements the guarded/protected/pinned cursor-snapshot new-write frontier and its production
 > physical/protection/read-pin wiring. Checkpoint W implements strict NPR1 projection authority and the stable
-> physical-root/cursor-root live-reference backfill plus dual activation proofs. Broker registration proof/barrier、
+> physical-root/cursor-root live-reference backfill plus dual activation proofs.
 > Checkpoint AJ now implements complete bounded cursor-snapshot candidate discovery and the post-drain full-inventory
-> callback immediately before delete intent. Scanner scheduling、MARK/delete composition、the cursor coverage bit、object
-> inventory、registration retirement、remaining materialization/GC runtime composition、real-service destructive
+> callback immediately before delete intent. Checkpoint AK adds restart-stable evidence/recovery、exact MARKED rollback
+> and the cursor mark/drain/DELETING/source-retirement adapter in a provider-owned six-domain runtime. Periodic
+> physical-root/registration scheduling、the cursor coverage bit、object inventory、registration retirement、broker
+> physical-GC config mapping/activation、real-service destructive
 > scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
@@ -816,7 +821,7 @@ gc/PhysicalGcMarkStatus.java                              implemented checkpoint
 gc/PhysicalGcMarkResult.java                              implemented checkpoint I
 gc/PhysicalGcAdvanceStatus.java                           implemented checkpoint I
 gc/PhysicalGcAdvanceResult.java                           implemented checkpoint I
-gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint I fence, extended L journal auth/AJ final candidate callback
+gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint I fence, extended L journal auth/AJ callback/AK exact rollback
 gc/PhysicalObjectRootVisitor.java                         implemented checkpoint I
 gc/PhysicalObjectRootScanResult.java                      implemented checkpoint I
 gc/PhysicalObjectRootScanner.java                         implemented checkpoint I
@@ -841,7 +846,7 @@ gc/GcMetricsObserver.java
 
 ```text
 retention/CursorSnapshotReferenceDomain.java             implemented K affected, extended T ownerless
-retention/CursorSnapshotGcScanner.java                         implemented checkpoint AJ read-only discovery/revalidation
+retention/CursorSnapshotGcScanner.java                    implemented AJ discovery/revalidation, extended AK marked recovery
 retention/ProjectionGenerationReferenceDomain.java       implemented K affected, extended T ownerless
 cursor/CursorSnapshotWriteAuthority.java                  implemented checkpoint V
 cursor/CursorSnapshotPublication.java                     implemented checkpoint V
@@ -850,6 +855,16 @@ cursor/DefaultCursorSnapshotStore.java                    implemented checkpoint
 cursor/CursorSnapshotInventory.java             unchanged authority semantics
 generation/ManagedLedgerGenerationProjectionRefV1.java   implemented checkpoint W strict NPR1 + golden identity
 generation/ManagedLedgerGenerationProjectionAuthorityReader.java implemented checkpoint W binding/topic capture
+```
+
+`nereus-pulsar-adapter` / managed-ledger runtime ownership：
+
+```text
+CursorSnapshotGcExecutor.java                            implemented checkpoint AK mark/recover/retire adapter
+Phase4PhysicalGcRuntime.java                             implemented checkpoint AK six-domain owned composition
+NereusRuntimeConfiguration.java                         extended checkpoint AK typed safe-default PhysicalGcConfig
+DefaultNereusRuntimeProvider.java                       extended checkpoint AK physical-GC runtime installation
+NereusManagedLedgerRuntime.java                         extended checkpoint AK close-first optional ownership
 ```
 
 ### 6.2 Focused tests
@@ -904,12 +919,14 @@ LatePutAfterTombstoneTest                                  implemented checkpoin
 CursorSnapshotStoreTest                                   extended checkpoint V protection/read-pin/response-loss
 CursorStorageOxiaS3IntegrationTest                        migrated checkpoint V real Oxia/S3 protocol
 DefaultCursorSnapshotStoreLocalStackIntegrationTest       migrated checkpoint V real S3 restart/collision protocol
-NereusManagedLedgerRuntimeTest                            extended checkpoint V F4 resource ownership
+NereusManagedLedgerRuntimeTest                            extended checkpoint AK physical-GC close-first ownership
 ManagedLedgerGenerationProjectionRefV1Test                implemented checkpoint W NPR1/authority drift
 PhysicalRootBackfillCoordinatorTest                       implemented checkpoint W data/cursor/response-loss paths
 MultiStreamWalRetirementTest
 GenerationRetirementFallbackTest
-CursorSnapshotGcScannerTest                                   implemented checkpoint AJ
+CursorSnapshotGcScannerTest                              implemented AJ, extended AK restart reconstruction
+PhysicalObjectGarbageCollectorTest                       extended checkpoint AK exact unmark recovery
+CursorSnapshotGcExecutorTest                             implemented checkpoint AK restart/execute/drift paths
 CursorSnapshotGcRaceTest
 CursorSnapshotReferenceDomainTest                         implemented K, extended T ownerless
 ProjectionGenerationReferenceDomainTest                   implemented K, extended T ownerless
@@ -946,6 +963,7 @@ retirement.
 ./gradlew phase4M4CursorProtectionCheck
 ./gradlew phase4M4PhysicalRootBackfillCheck
 ./gradlew phase4M4CursorSnapshotGcCheck
+./gradlew phase4M4CursorGcExecutionCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -1126,6 +1144,20 @@ run the real-service M4 final scenarios.
 The aggregate gate passed with `--rerun-tasks` on 2026-07-18 under Java 21 against locked Pulsar
 `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`; the root build and inherited nested Pulsar regression each
 reported 138 actionable tasks.
+
+`phase4M4CursorGcExecutionCheck` extends checkpoint AJ with checkpoint AK. It rejects ephemeral discovery time and
+ACTIVE-wrapper metadata from candidate evidence, proves exact MARKED reconstruction after a fresh scanner process,
+and checks that complete drift conditionally unmarks while uncertain inventory retains MARKED. It audits the explicit
+`mark -> drain/final revalidation -> DELETING -> source retirement` adapter, restart from MARKED or DELETING, the exact
+six-domain registry、durable journal、empty cursor metadata-retirement registry、typed physical-GC configuration and
+provider/managed-ledger ownership. Focused tests complete the exact protection/object deletion path only under an
+explicit enabled non-dry-run test configuration and prove changed authority never deletes bytes. The production
+runtime intentionally schedules no scan, and the existing broker bridge still supplies `enabled=false, dryRun=true`；
+this gate does not publish coverage/delete bits, map broker GC knobs, inventory missing-root objects, retire stream
+registrations or satisfy the real-service destructive final scenarios.
+The aggregate gate passed with `--rerun-tasks` on 2026-07-18 under Java 21 against locked Pulsar
+`master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`; the root build executed 139 actionable tasks and the inherited
+nested Pulsar regression reported 138 actionable tasks.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

@@ -112,6 +112,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         CursorRetentionCoordinator cursorRetentionCoordinator = null;
         CursorStorage cursorStorage = null;
         NereusRetentionRuntime retentionRuntime = null;
+        Phase4PhysicalGcRuntime physicalGcRuntime = null;
         try {
             objectStoreProvider = instantiateObjectStoreProvider(
                     configuration.objectStore().providerClassName(), context.pluginClassLoader());
@@ -315,6 +316,20 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     configuration.retention(),
                     clock,
                     daemonFactory("nereus-f4-retention"));
+            physicalGcRuntime = new Phase4PhysicalGcRuntime(
+                    streamConfig.cluster(),
+                    configuration.physicalGc(),
+                    cursorConfig,
+                    l0MetadataStore,
+                    generationMetadataStore,
+                    projectionStore,
+                    cursorMetadataStore,
+                    physicalMetadataStore,
+                    generationProtocolActivationStore,
+                    generationProtocolActivationGuard,
+                    objectStore,
+                    scheduler,
+                    clock);
             phase4Runtime.start();
             return new NereusManagedLedgerRuntime(
                     streamStorage,
@@ -333,6 +348,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     generationProtocolActivationGuard,
                     phase4Runtime,
                     retentionRuntime,
+                    physicalGcRuntime,
                     objectReadPinManager,
                     objectProtectionManager,
                     physicalMetadataStore,
@@ -349,6 +365,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         } catch (Throwable failure) {
             closeAfterFailure(
                     failure,
+                    physicalGcRuntime,
                     retentionRuntime,
                     cursorStorage,
                     cursorRetentionCoordinator,

@@ -123,6 +123,11 @@ class NereusManagedLedgerRuntimeTest {
                         "materialization-runtime",
                         closes,
                         false);
+        AutoCloseable physicalGcRuntime = proxy(
+                AutoCloseable.class,
+                "physical-gc-runtime",
+                closes,
+                false);
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
@@ -140,6 +145,7 @@ class NereusManagedLedgerRuntimeTest {
                 generationActivationGuard,
                 materializationRuntime,
                 null,
+                physicalGcRuntime,
                 readPins,
                 proxy(AutoCloseable.class, "protection", closes, false),
                 proxy(AutoCloseable.class, "physical", closes, false),
@@ -163,9 +169,12 @@ class NereusManagedLedgerRuntimeTest {
                 .isSameAs(generationActivationGuard);
         assertThat(runtime.materializationRuntime())
                 .isSameAs(materializationRuntime);
+        assertThat(runtime.physicalGcRuntime()).isSameAs(physicalGcRuntime);
+        assertThat(runtime.hasPhysicalGcRuntime()).isTrue();
         runtime.close();
 
         assertThat(closes).containsExactly(
+                "physical-gc-runtime",
                 "cursor-storage",
                 "cursor-retention",
                 "cursor-snapshot",
