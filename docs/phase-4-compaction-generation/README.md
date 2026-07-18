@@ -101,7 +101,9 @@
 > Checkpoint AP adds the exact configured-scope delete canary；checkpoint AQ composes registration/physical/cursor
 > coverage and capability evidence into one atomic dual-bit activation；checkpoint AR installs that coordinator in the
 > provider/runtime/factory and locked Pulsar sequence, and fences mutating startup/restart recovery by the exact local
-> capability digest. Safe defaults still perform none of these mutations.
+> capability digest. Checkpoint AS makes the activation guard and GC registry consume one exact ownerless-reference
+> assembly, then proves one destructive/restart slice against real Oxia and LocalStack. Safe defaults still perform
+> none of these mutations.
 >
 > 设计基线日期：2026-07-14
 >
@@ -1177,8 +1179,9 @@ CAS response converges only from exact durable authority. Final success reloads 
 
 At checkpoint AQ this coordinator was not yet exposed through `NereusManagedLedgerFactory`, did not start the
 physical-GC lifecycle after activation and did not gate restart recovery on the local expected capability digest.
-Checkpoint AR below closes those product-composition gaps；real Oxia/LocalStack destructive/scale evidence remains
-mandatory before the milestone is final-gated.
+Checkpoint AR below closes those product-composition gaps. Checkpoint AS then closes the first real-service
+activation/restart-recovery slice；the remaining destructive/scale matrix remains mandatory before the milestone is
+final-gated.
 
 ### 6.25i F4-M4 production deletion composition and restart-scope checkpoint
 
@@ -1209,6 +1212,33 @@ startup recovery and mismatch failure, plus locked Pulsar formatting/style/focus
 147 root actionable tasks；its serialized Pulsar configuration and deletion-activation builds passed with 141 and
 129 actionable tasks respectively. It is still an ordinary checkpoint：the real Oxia/LocalStack
 destructive restart、response-loss、multi-broker and scale matrix remains the F4-M4/M6 final-gate requirement.
+
+### 6.25j F4-M4 real-service activation/restart recovery checkpoint
+
+Checkpoint AS removes a correctness split that checkpoint AR still permitted. The activation guard previously owned
+a projection domain with an unsupported ownerless-global scope and fixed bounds, while the physical-GC registry built
+a separate registered-stream global scope from broker configuration. A clear durable backfill could therefore be
+accepted by activation but rejected forever during operation revalidation. `Phase4GcReferenceDomainAssembly` now
+constructs one `RegisteredStreamGcGlobalReferenceScope` and one `ProjectionGenerationReferenceDomain` from the exact
+`PhysicalGcConfig.referenceDomainConfig()`；`DefaultNereusRuntimeProvider` gives that exact projection instance to
+`ManagedLedgerGenerationProtocolActivationGuard` and the exact assembly to `Phase4PhysicalGcRuntime`. The canonical
+metadata-domain list is also mapped once through `NereusGenerationProtocolReferenceDomains.currentGcV1()`.
+
+`Phase4PhysicalGcOxiaS3IntegrationTest` runs against four-shard `oxia/oxia:0.16.3` and pinned
+`localstack/localstack:4.14.0` S3. One process persists publication-only authority and an ownerless compacted object,
+proves lifecycle startup is deferred, then executes real physical/cursor coverage backfill plus configured-scope
+canary and atomically activates both deletion bits. After the object root reaches durable MARKED, an independent
+runtime with a different logical S3 prefix is rejected non-retryably with `METADATA_INVARIANT_VIOLATION` without
+changing the root. A correct-scope process then recovers with inventory LIST forced empty；the wrapper performs the
+real target DELETE but loses its first response, and recovery confirms HEAD absence before converging the durable root
+to DELETED. The focused Testcontainers task passed on 2026-07-18 under Java 21 and Docker 28.5.2 with 38 executed
+tasks. The aggregate gate subsequently passed against locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6` with 141 actionable tasks（68 executed）。
+
+`phase4M4PhysicalDeletionIntegrationCheck` composes the AR gate、the shared-assembly contract audit、documentation/
+module/source-lock checks and that real-service task. Checkpoint AS is not `phase4M4FinalCheck`：process death after
+DELETE、two workers/brokers、checkpoint/index/source deletion followed by read repair、all 256 root shards、cursor and
+tombstone scale limits、late PUT resurrection and the rest of the failure matrix remain required.
 
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
@@ -1508,7 +1538,7 @@ four-suite broker invocation passed 129 tasks.
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AR, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement、non-overlapping metadata-first periodic runtime、exact broker typed physical-GC configuration、configured-scope canary、atomic proof composition/delete activation、provider/Pulsar wiring and restart scope-digest fencing are implemented/tested；checkpoint AF separately composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while real-service scale/destructive evidence and the final gate remain pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AS, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement、non-overlapping metadata-first periodic runtime、exact broker typed physical-GC configuration、configured-scope canary、atomic proof composition/delete activation、provider/Pulsar wiring、restart scope-digest fencing、one shared ownerless-reference interpretation and the first real Oxia/LocalStack wrong-scope/empty-list/lost-DELETE-response restart slice are implemented/tested；checkpoint AF separately composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while the remaining real-service scale/destructive matrix and final gate remain pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；physical GC composition and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

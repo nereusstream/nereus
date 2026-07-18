@@ -200,6 +200,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M4 checkpoint AR**：把 AQ 接入 provider/runtime/factory 与 locked Pulsar 零失败 backfill 顺序，并用
   同一 configured-scope digest 同时约束 operation guard、activation 和 mutating startup/DELETING recovery 的
   ordinary checkpoint；默认 `enabled=false, dryRun=true` 仍不调用 destructive path。
+- **F4-M4 checkpoint AS**：让 activation guard 与 physical-GC registry 共享同一 registered-stream global
+  scope、configured reference bounds 和 projection-domain instance，并以真实四分片 Oxia + pinned LocalStack
+  证明 publication-only defer、双 bit activation、wrong-scope restart fencing、empty-LIST MARKED recovery 和
+  lost successful DELETE response 收敛到 DELETED 的 real-service checkpoint；它仍不是 M4 final scale/failure gate。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

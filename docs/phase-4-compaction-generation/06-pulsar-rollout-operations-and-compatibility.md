@@ -930,6 +930,14 @@ the lifecycle only after durable dual delete bits、all proofs、the exact six-d
 Absent/publication-only authority defers startup, while a durable scope/domain mismatch fails before MARKED/DELETING
 recovery.
 
+Checkpoint AS removes the remaining interpretation split inside that composition. The provider creates one
+`Phase4GcReferenceDomainAssembly` whose registered-stream global scope、configured reference bounds and projection
+domain are passed by exact instance to both the generation activation guard and `Phase4PhysicalGcRuntime`. A real
+four-shard Oxia + pinned LocalStack fixture then proves publication-only deferral、W/AP-backed atomic activation、
+wrong logical S3 prefix rejection before MARKED recovery, and correct-scope ownerless recovery when inventory LIST is
+empty and the first successful target DELETE response is lost. HEAD absence is the recovery fact and the durable root
+reaches DELETED；the broker safe defaults remain unchanged and this is not the complete multi-broker/scale final gate.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

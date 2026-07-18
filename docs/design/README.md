@@ -62,8 +62,10 @@ slices，checkpoints AL–AM 已实现 current-writer object inventory/missing-r
 retirement；checkpoint AN 已装配 metadata-first root/registration/inventory lifecycle 和恢复路由；checkpoint AO
 已完成 typed physical-GC broker config mapping，并统一 provider 的 protection/lease/orphan timing 来源；checkpoint
 AP 又实现 configured-scope guarded PUT/HEAD/LIST/exact-DELETE capability probe 和非 secret deterministic digest。
-当前 broker safe defaults 不启动该服务；coverage 与 capability proof 的产品组合/持久化、delete activation 和
-M6 最终兼容门禁仍未完成。
+Checkpoint AQ 已原子组合 coverage/capability proof 和双 deletion bits，AR 已接入 provider/Pulsar 并加入 exact
+scope restart fence；checkpoint AS 又统一 activation guard/GC registry 的 ownerless reference-domain assembly，
+并以真实 Oxia/LocalStack 验证 wrong-scope 拒绝、empty-LIST MARKED recovery 和 lost DELETE response 收敛。
+当前 broker safe defaults 不启动该服务；剩余 destructive/scale 矩阵与 M4/M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

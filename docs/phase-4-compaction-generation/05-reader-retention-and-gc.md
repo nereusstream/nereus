@@ -172,8 +172,11 @@ restart-reconstructable, adds exact drift rollback and composes the cursor path 
 mark/drain/DELETING/source-retirement runtime. Checkpoint AL adds current-writer object inventory and exact old
 missing-root registration. Checkpoint AM adds proof-driven stream-registration retirement and its exact managed-ledger
 F3 authority. Checkpoint AN composes a non-overlapping metadata-first 256-root-shard/64-registration-shard/inventory
-lifecycle and exact ACTIVE/MARKED/DELETING/DELETED routing. Broker config mapping、coverage/delete activation and the
-real-service final gate remain planned，so the safe-default production bridge still schedules no pass or deletion.
+lifecycle and exact ACTIVE/MARKED/DELETING/DELETED routing. Checkpoints AO–AR add broker config mapping、coverage/
+capability proof、atomic delete activation and provider/Pulsar restart fencing. Checkpoint AS makes activation and GC
+consume the exact same ownerless global/projection domain assembly and proves one real Oxia/LocalStack restart/delete-
+response-loss slice. The remaining scale/failure final gate is still planned，and the safe-default production bridge
+still schedules no pass or deletion.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -957,8 +960,12 @@ Checkpoint S implements this record/codec/exact-key store and its monotonic CAS 
 that GC scans use without bootstrapping cluster state. It also freezes three backfill-proof slots、the broker readiness
 epoch and V1's all-or-nothing physical/cursor deletion rule. Checkpoint T adds exact installed-domain comparison、
 sentinel and full ownerless scans. W adds physical/cursor backfill；AP proves configured-scope capability；AQ atomically
-composes them into dual-bit authority；AR installs provider/Pulsar activation and exact-scope restart fencing. Safe
-defaults still keep production deletion disabled, and the real-service destructive final gate remains pending.
+composes them into dual-bit authority；AR installs provider/Pulsar activation and exact-scope restart fencing.
+Checkpoint AS constructs one `Phase4GcReferenceDomainAssembly` from the typed config and passes its exact
+`RegisteredStreamGcGlobalReferenceScope`/`ProjectionGenerationReferenceDomain` interpretation to both activation
+revalidation and the GC registry. Its real Oxia/LocalStack fixture proves ownerless MARKED recovery is independent of
+object LIST and converges after a successful DELETE response is lost. Safe defaults still keep production deletion
+disabled, and the remaining real-service destructive/scale final matrix remains pending.
 
 `projection-generation-v1` makes the per-topic downgrade fence usable by protocol-neutral GC. For each affected
 stream, the implemented proof requires one of：the exact current identity is `DELETED`；the exact current live identity
@@ -1697,6 +1704,15 @@ returns immediately for `enabled=false`, starts audit-only passes for `enabled &
 `enabled && !dryRun` first requires checkpoint-AR exact durable domain/scope authority. Publication-only rollout
 therefore defers the loop, while a durable wrong-scope record fails before restart recovery. With the mapped
 `enabled=false, dryRun=true` defaults, broker startup schedules no lifecycle pass.
+
+Checkpoint AS tightens that boundary to exact instance-level assembly. `DefaultNereusRuntimeProvider` creates one
+`Phase4GcReferenceDomainAssembly` from `PhysicalGcConfig.referenceDomainConfig()`；the activation guard receives its
+exact projection domain and `Phase4PhysicalGcRuntime` receives the same assembly, so neither fixed bounds nor
+`GcGlobalReferenceScope.unsupported()` can silently reinterpret an ownerless result. The four-shard Oxia + pinned
+LocalStack test persists an ownerless compacted root as MARKED, rejects an independent wrong-prefix runtime with
+`METADATA_INVARIANT_VIOLATION`, then starts a correct-scope runtime with empty inventory results and loses the first
+successful target DELETE response. The object is absent by HEAD and the durable root reaches DELETED. This evidence
+does not cover the later multi-worker、all-shard and scale matrix.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

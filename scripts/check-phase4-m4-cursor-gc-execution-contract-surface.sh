@@ -24,6 +24,7 @@ reject_literal() {
 scanner="nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention/CursorSnapshotGcScanner.java"
 collector="nereus-materialization/src/main/java/com/nereusstream/materialization/gc/PhysicalObjectGarbageCollector.java"
 executor="nereus-pulsar-adapter/src/main/java/com/nereusstream/pulsar/CursorSnapshotGcExecutor.java"
+assembly="nereus-pulsar-adapter/src/main/java/com/nereusstream/pulsar/Phase4GcReferenceDomainAssembly.java"
 runtime="nereus-pulsar-adapter/src/main/java/com/nereusstream/pulsar/Phase4PhysicalGcRuntime.java"
 provider="nereus-pulsar-adapter/src/main/java/com/nereusstream/pulsar/DefaultNereusRuntimeProvider.java"
 configuration="nereus-pulsar-adapter/src/main/java/com/nereusstream/pulsar/NereusRuntimeConfiguration.java"
@@ -36,6 +37,7 @@ for path in \
     "$scanner" \
     "$collector" \
     "$executor" \
+    "$assembly" \
     "$runtime" \
     "$provider" \
     "$configuration" \
@@ -70,7 +72,10 @@ require_literal "new CursorSnapshotReferenceDomain(" "$runtime"
 require_literal "new FutureCatalogSentinelDomain(" "$runtime"
 require_literal "new GenerationReferenceDomain(" "$runtime"
 require_literal "new MaterializationReferenceDomain(" "$runtime"
-require_literal "new ProjectionGenerationReferenceDomain(" "$runtime"
+require_literal "Phase4GcReferenceDomainAssembly referenceDomains" "$runtime"
+require_literal "exactReferenceDomains.projectionDomain()" "$runtime"
+require_literal "exactProjectionReferenceDomain);" "$runtime"
+require_literal "new ProjectionGenerationReferenceDomain(" "$assembly"
 require_literal "new GenerationZeroIndexRetirementHandler(" "$runtime"
 require_literal "new GenerationZeroCommitRetirementHandler(" "$runtime"
 require_literal "new GenerationZeroMarkerRetirementHandler(" "$runtime"
@@ -83,6 +88,8 @@ require_literal "PhysicalGcConfig physicalGc" "$configuration"
 require_literal "PhysicalGcConfig.defaults()" "$configuration"
 require_literal "physicalGc.validateAgainst(streamStorage, materialization)" "$configuration"
 require_literal "new Phase4PhysicalGcRuntime(" "$provider"
+require_literal "Phase4GcReferenceDomainAssembly.create(" "$provider"
+require_literal "gcReferenceDomains," "$provider"
 require_literal "physicalGcRuntime" "$owner"
 require_literal "closeOneIfPresent(physicalGcRuntime, failures)" "$owner"
 

@@ -1190,6 +1190,27 @@ tasks.register("phase4M4PhysicalDeletionActivationCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register<Exec>("checkPhase4M4PhysicalDeletionIntegrationContractSurface") {
+    group = "verification"
+    description = "Audit shared ownerless reference-domain assembly and the real Oxia/LocalStack recovery fixture."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-physical-deletion-integration-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4PhysicalDeletionIntegrationCheck") {
+    group = "verification"
+    description = "Verify checkpoint AS real Oxia/LocalStack activation, scope fencing, and destructive restart recovery."
+    dependsOn("phase4M4PhysicalDeletionActivationCheck")
+    dependsOn("checkPhase4M4PhysicalDeletionIntegrationContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1200,7 +1221,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4PhysicalDeletionActivationCheck")
+    dependsOn("phase4M4PhysicalDeletionIntegrationCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

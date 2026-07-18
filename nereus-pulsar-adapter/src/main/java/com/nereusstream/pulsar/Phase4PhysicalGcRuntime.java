@@ -41,7 +41,6 @@ import com.nereusstream.materialization.gc.PhysicalGcLifecycleService;
 import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.materialization.gc.PhysicalObjectGarbageCollector;
 import com.nereusstream.materialization.gc.PhysicalObjectRootScanner;
-import com.nereusstream.materialization.gc.RegisteredStreamGcGlobalReferenceScope;
 import com.nereusstream.materialization.gc.SecureGcIdGenerator;
 import com.nereusstream.materialization.gc.SourceRetirementCoordinator;
 import com.nereusstream.materialization.gc.StreamRegistrationRetirementCoordinator;
@@ -101,6 +100,7 @@ public final class Phase4PhysicalGcRuntime
             CursorMetadataStore cursors,
             PhysicalObjectMetadataStore physicalMetadata,
             GenerationProtocolActivationStore activationStore,
+            Phase4GcReferenceDomainAssembly referenceDomains,
             GenerationProtocolActivationGuard activationGuard,
             GenerationCapabilityReadinessProvider readinessProvider,
             ObjectProtectionManager objectProtectionManager,
@@ -130,6 +130,11 @@ public final class Phase4PhysicalGcRuntime
                 physicalMetadata, "physicalMetadata");
         GenerationProtocolActivationStore exactActivationStore = Objects.requireNonNull(
                 activationStore, "activationStore");
+        Phase4GcReferenceDomainAssembly exactReferenceDomains = Objects.requireNonNull(
+                referenceDomains, "referenceDomains");
+        GcGlobalReferenceScope exactGlobalScope = exactReferenceDomains.globalScope();
+        ProjectionGenerationReferenceDomain exactProjectionReferenceDomain =
+                exactReferenceDomains.projectionDomain();
         GenerationProtocolActivationGuard exactActivationGuard = Objects.requireNonNull(
                 activationGuard, "activationGuard");
         GenerationCapabilityReadinessProvider exactReadinessProvider = Objects.requireNonNull(
@@ -163,28 +168,19 @@ public final class Phase4PhysicalGcRuntime
         this.objectAuditRetirement = exactObjectAudit;
 
         List<GcReferenceDomainVersion> installedDomains =
-                NereusGenerationProtocolReferenceDomains.currentV1().stream()
-                        .map(value -> new GcReferenceDomainVersion(
-                                value.domainId(), value.protocolVersion()))
-                        .toList();
-        GcGlobalReferenceScope globalScope = new RegisteredStreamGcGlobalReferenceScope(
-                exactCluster,
-                exactActivationStore,
-                exactGenerations,
-                installedDomains,
-                exactConfig.referenceDomainConfig());
+                NereusGenerationProtocolReferenceDomains.currentGcV1();
         List<GcReferenceDomain> domains = List.of(
                 new AppendRecoveryReferenceDomain(
                         exactCluster,
                         exactL0,
                         exactGenerations,
                         exactConfig,
-                        globalScope),
+                        exactGlobalScope),
                 new CursorSnapshotReferenceDomain(
                         exactCluster,
                         exactCursors,
                         exactConfig.referenceDomainConfig(),
-                        globalScope),
+                        exactGlobalScope),
                 new FutureCatalogSentinelDomain(
                         exactCluster,
                         exactActivationStore,
@@ -194,17 +190,13 @@ public final class Phase4PhysicalGcRuntime
                         exactCluster,
                         exactGenerations,
                         exactConfig,
-                        globalScope),
+                        exactGlobalScope),
                 new MaterializationReferenceDomain(
                         exactCluster,
                         exactGenerations,
                         exactConfig,
-                        globalScope),
-                new ProjectionGenerationReferenceDomain(
-                        exactCluster,
-                        exactProjections,
-                        exactConfig.referenceDomainConfig(),
-                        globalScope));
+                        exactGlobalScope),
+                exactProjectionReferenceDomain);
         GcReferenceDomainRegistry registry = new GcReferenceDomainRegistry(
                 exactConfig, exactScheduler, domains);
         if (!registry.requiredDomains().equals(installedDomains)) {

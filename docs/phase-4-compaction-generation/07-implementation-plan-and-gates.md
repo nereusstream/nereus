@@ -118,7 +118,9 @@ backfills, runs the configured-scope canary and atomically installs its digest w
 Pulsar composition、restart scope-digest gating and the real-service final gate were still pending at AQ. Checkpoint AR
 now installs the coordinator through runtime/factory and the locked Pulsar zero-failure sequence, shares one expected
 scope digest with the operation guard, and prevents mutating startup/DELETING recovery unless durable scope and domain
-authority are exact. The real-service final gate remains pending.
+authority are exact. Checkpoint AS creates one exact registered-stream global/projection reference-domain assembly for
+both activation revalidation and GC, and proves the first real Oxia/LocalStack activation、wrong-scope、empty-list and
+lost-DELETE-response restart slice. The remaining real-service multi-worker/scale/failure matrix remains pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -676,8 +678,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > provider consume the same cross-validated lease/protection/orphan values. Checkpoint AP implements the real
 > configured-scope object-store capability probe without persisting or activating its digest. Product composition of
 > Checkpoint AQ composes cursor/physical coverage plus capability proof into atomic physical-delete activation.
-> Checkpoint AR installs that path in provider/Pulsar and exact-scope restart fencing. Real-service destructive
-> scenarios and the final M4 gate remain before F4-M4 can be called complete.
+> Checkpoint AR installs that path in provider/Pulsar and exact-scope restart fencing. Checkpoint AS unifies the
+> activation/GC ownerless-reference interpretation and proves one real Oxia/LocalStack destructive restart slice.
+> The remaining destructive/scale scenarios and final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
 > identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
@@ -913,9 +916,10 @@ CursorSnapshotGcExecutor.java                            implemented checkpoint 
 Phase4ObjectInventoryFamilies.java                       implemented checkpoint AL exact five-family registry
 Phase4PhysicalRootLifecycleRouter.java                   implemented checkpoint AN total root-state routing
 Phase4PhysicalGcStartupGate.java                         implemented checkpoint AR exact durable scope/domain restart fence
-Phase4PhysicalGcRuntime.java                             implemented checkpoint AK/AN lifecycle, extended AR activation/start ownership
+Phase4GcReferenceDomainAssembly.java                     implemented checkpoint AS exact shared ownerless interpretation
+Phase4PhysicalGcRuntime.java                             implemented checkpoint AK/AN lifecycle, extended AS shared-domain activation/start ownership
 NereusRuntimeConfiguration.java                         extended checkpoint AO broker-mapped PhysicalGcConfig validation
-DefaultNereusRuntimeProvider.java                       extended checkpoint AR one shared capability probe/digest composition
+DefaultNereusRuntimeProvider.java                       extended checkpoint AS one shared capability/reference-domain composition
 NereusManagedLedgerRuntime.java                         extended checkpoint AR typed physical-delete activation exposure
 NereusManagedLedgerFactory.java                         extended checkpoint AR broker-safe activation method
 DefaultPhase4PhysicalDeletionActivationCoordinator.java implemented checkpoint AQ ordered proof composition/atomic CAS
@@ -936,6 +940,7 @@ Phase4PhysicalDeletionActivationCoordinatorTest          implemented checkpoint 
 Phase4PhysicalGcStartupGateTest                          implemented checkpoint AR defer/exact-scope/domain-drift cuts
 ManagedLedgerGenerationProtocolActivationGuardTest       extended checkpoint AR wrong-scope deletion rejection
 NereusManagedLedgerStorageGenerationActivationTest       extended checkpoint AR strict ordering/failure propagation
+Phase4PhysicalGcOxiaS3IntegrationTest                    implemented checkpoint AS real activation/scope/restart/lost-DELETE recovery
 MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
 RecoveryCheckpointBuilderTest
@@ -1309,7 +1314,20 @@ root actionable tasks；the explicitly serialized Pulsar configuration and delet
 141 and 129 actionable tasks respectively. This ordinary gate does not replace the real Oxia/LocalStack
 destructive restart、response-loss、multi-broker and scale final gate.
 
-Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
+`phase4M4PhysicalDeletionIntegrationCheck` is checkpoint AS, the first real-service destructive/restart gate slice.
+Its contract audit requires `Phase4GcReferenceDomainAssembly` to build the registered-stream global scope and
+projection domain from the exact typed bounds, requires the provider to pass that projection instance to activation
+and the same assembly to GC, and rejects a provider-local unsupported ownerless scope. The dedicated Testcontainers
+source set pins four-shard `oxia/oxia:0.16.3` and `localstack/localstack:4.14.0` S3 without Docker auto-disable. It
+proves publication-only startup deferral、real W coverage/AP canary plus atomic activation、ownerless ACTIVE -> MARKED,
+non-retryable wrong-prefix restart fencing, and correct-scope MARKED recovery with object LIST forced empty. The real
+target DELETE succeeds but its first response is lost；HEAD absence drives durable DELETED convergence. The focused
+task passed on 2026-07-18 under Java 21 and Docker 28.5.2 with 38 executed tasks. The aggregate gate composes the AR
+gate、this real-service task、the AS contract audit and documentation/module/source-lock checks；it passed against
+locked Pulsar `c59da789e88df2b57829de3277c60194b44fceb6` with 141 actionable tasks（68 executed）。
+
+Checkpoint AS is deliberately not `phase4M4FinalCheck`. The final gate extends real Oxia + LocalStack across two
+independent workers/brokers. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.
 It also proves live-reference root/protection backfill, all-shard lifecycle recovery with empty object listing, 10,000
 cursor roots, snapshot listing, process-death lease expiry and multi-stream object veto. It additionally proves that

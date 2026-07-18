@@ -10,7 +10,6 @@ import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.backpressure.MaterializationLagGate;
 import com.nereusstream.core.backpressure.MaterializationLagThresholds;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
-import com.nereusstream.core.physical.GcReferenceDomainConfig;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -36,7 +35,6 @@ import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocol
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerAsyncAppendAdmissionGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
-import com.nereusstream.managedledger.retention.ProjectionGenerationReferenceDomain;
 import com.nereusstream.managedledger.retention.NereusRetentionRuntime;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
@@ -73,8 +71,6 @@ import java.util.concurrent.atomic.AtomicLong;
 /** Production Object-WAL/Oxia runtime assembly used by the hybrid broker storage provider. */
 public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider {
     private static final String WRITER_VERSION = "nereus-pulsar-f2";
-    private static final GcReferenceDomainConfig ACTIVATION_REFERENCE_CONFIG =
-            new GcReferenceDomainConfig(256, 100_000, 100_000);
 
     @Override
     public NereusManagedLedgerRuntime create(
@@ -171,6 +167,13 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                                             + streamConfig.processRunId()),
                             NereusGenerationProtocolReferenceDomains
                                     .currentV1());
+            Phase4GcReferenceDomainAssembly gcReferenceDomains =
+                    Phase4GcReferenceDomainAssembly.create(
+                            streamConfig.cluster(),
+                            physicalGcConfig,
+                            generationProtocolActivationStore,
+                            generationMetadataStore,
+                            projectionStore);
             generationRegistrationBackfillProofCoordinator =
                     new DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
                             streamConfig.cluster(),
@@ -201,10 +204,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             projectionStore,
                             l0MetadataStore,
                             generationMetadataStore,
-                            new ProjectionGenerationReferenceDomain(
-                                    streamConfig.cluster(),
-                                    projectionStore,
-                                    ACTIVATION_REFERENCE_CONFIG),
+                            gcReferenceDomains.projectionDomain(),
                             clock);
             materializationRegistrationCoordinator =
                     new DefaultManagedLedgerMaterializationRegistrationCoordinator(
@@ -344,6 +344,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorMetadataStore,
                     physicalMetadataStore,
                     generationProtocolActivationStore,
+                    gcReferenceDomains,
                     generationProtocolActivationGuard,
                     context.generationCapabilityReadinessProvider(),
                     objectProtectionManager,

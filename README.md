@@ -305,6 +305,16 @@ gate；`enabled && !dryRun` 的 runtime 只有在 durable delete bits、exact si
 零失败 broker registration backfill 先等待 publication ACTIVE，再仅在 physical-GC mutation switch 打开时运行
 AQ 并等待 lifecycle start；默认配置仍不运行 canary、不设置 delete bits、不启动 GC。真实 Oxia/LocalStack
 destructive/restart/scale final gate 仍未完成。
+Checkpoint AS 修正了 activation guard 与 physical-GC runtime 对 ownerless references 的解释分叉：provider
+现在只构造一份 `Phase4GcReferenceDomainAssembly`，把同一 registered-stream global scope、同一 configured
+reference bounds 和同一 projection domain 交给 activation revalidation 与 GC registry。新增真实四分片 Oxia
+`0.16.3` + LocalStack S3 `4.14.0` fixture 证明 publication-only authority 不启动 mutation、W backfill/AP canary
+后原子打开双 deletion bits、错误 bucket-prefix scope 在恢复 MARKED root 前 non-retryable 拒绝，以及正确 scope
+的新进程在 object LIST 被强制为空且首个成功 DELETE 响应丢失时仍以 HEAD absence 收敛到 durable DELETED。
+这只是首个真实 destructive/restart slice；process-death、multi-broker、checkpoint/source/index read-repair、
+all-shard 与规模矩阵仍属于 M4/M6 final gate。`phase4M4PhysicalDeletionIntegrationCheck` 已于 2026-07-18
+在 Java 21、Docker 28.5.2 和 locked Pulsar `c59da789e88df2b57829de3277c60194b44fceb6` 上通过
+（141 actionable tasks，68 executed）。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。
