@@ -73,6 +73,8 @@ import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointCodecV1;
 import com.nereusstream.objectstore.compacted.CompactedObjectFormatV1;
 import com.nereusstream.objectstore.compacted.CompactedObjectWriteRequest;
 import io.oxia.testcontainers.OxiaContainer;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -97,6 +99,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -239,6 +242,91 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
+    @Test
+    void processRestartAfterDeleteBeforeDeletedRootCasRecoversDurableDeletingIntent()
+            throws Exception {
+        MutableClock clock = new MutableClock(2_000_000);
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "f4-m4-post-delete-" + suffix;
+        String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
+        createBucket(bucket);
+        ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "post-delete");
+        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
+                READINESS_EPOCH, sha256("broker-set/post-delete/" + suffix), 1);
+        PhysicalGcConfig gcConfig = physicalGcConfig();
+        TargetObject target;
+
+        try (Process first = Process.open(
+                cluster,
+                "f".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("post-delete-first"),
+                clock,
+                StoreDecorator.identity())) {
+            first.seedPublication();
+            target = first.createOwnerlessCompactedObject();
+
+            ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
+                            "g".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .join();
+            assertThat(activation.status())
+                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            first.runtime.lifecycleService().scanNow().join();
+            assertThat(first.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            first.assertObjectPresent(target);
+        }
+
+        clock.advance(Duration.ofMinutes(7));
+        AtomicBoolean targetDeleteCompleted = new AtomicBoolean();
+        AtomicBoolean crashInjected = new AtomicBoolean();
+        CompletableFuture<Void> crashObserved = new CompletableFuture<>();
+        try (Process interrupted = Process.open(
+                cluster,
+                "h".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("post-delete-interrupted"),
+                clock,
+                raw -> new TargetDeleteTrackingObjectStore(
+                        raw, target.key(), targetDeleteCompleted),
+                PhysicalStoreDecorator.failBeforeDeletedRootCas(
+                        target.hash(),
+                        targetDeleteCompleted,
+                        crashInjected,
+                        crashObserved))) {
+            interrupted.runtime.start();
+            crashObserved.get(30, TimeUnit.SECONDS);
+
+            assertThat(targetDeleteCompleted).isTrue();
+            assertThat(crashInjected).isTrue();
+            assertThat(interrupted.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETING);
+            interrupted.assertObjectAbsent(target);
+        }
+
+        try (Process recovered = Process.open(
+                cluster,
+                "i".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("post-delete-recovered"),
+                clock,
+                StoreDecorator.identity())) {
+            recovered.runtime.start();
+            recovered.runtime.lifecycleService().scanNow().join();
+
+            assertThat(recovered.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            recovered.assertObjectAbsent(target);
+        }
+    }
+
     private Path stagingDirectory(String name) throws Exception {
         Path path = Files.createDirectories(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
@@ -374,6 +462,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         private final SharedOxiaClientRuntime oxiaRuntime;
         private final OxiaMetadataStore l0;
         private final GenerationMetadataStore generations;
+        private final PhysicalObjectMetadataStore rawPhysical;
         private final PhysicalObjectMetadataStore physical;
         private final ManagedLedgerProjectionMetadataStore projections;
         private final CursorMetadataStore cursors;
@@ -392,7 +481,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 PhysicalGcConfig gcConfig,
                 Path stagingDirectory,
                 MutableClock clock,
-                StoreDecorator decorator) throws Exception {
+                StoreDecorator decorator,
+                PhysicalStoreDecorator physicalDecorator) throws Exception {
             this.cluster = cluster;
             this.processRunId = processRunId;
             this.clock = clock;
@@ -407,8 +497,9 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             l0 = OxiaJavaClientMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, clock);
             generations = OxiaJavaGenerationMetadataStore.usingSharedRuntime(
                     oxia, oxiaRuntime, clock);
-            physical = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
+            rawPhysical = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
                     oxia, oxiaRuntime, clock);
+            physical = physicalDecorator.decorate(rawPhysical);
             projections = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                     oxia,
                     oxiaRuntime,
@@ -496,6 +587,28 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 Path stagingDirectory,
                 MutableClock clock,
                 StoreDecorator decorator) throws Exception {
+            return open(
+                    cluster,
+                    processRunId,
+                    objectStoreConfiguration,
+                    readiness,
+                    gcConfig,
+                    stagingDirectory,
+                    clock,
+                    decorator,
+                    PhysicalStoreDecorator.identity());
+        }
+
+        private static Process open(
+                String cluster,
+                String processRunId,
+                ObjectStoreConfiguration objectStoreConfiguration,
+                GenerationCapabilityReadiness readiness,
+                PhysicalGcConfig gcConfig,
+                Path stagingDirectory,
+                MutableClock clock,
+                StoreDecorator decorator,
+                PhysicalStoreDecorator physicalDecorator) throws Exception {
             return new Process(
                     cluster,
                     processRunId,
@@ -504,7 +617,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     gcConfig,
                     stagingDirectory,
                     clock,
-                    decorator);
+                    decorator,
+                    physicalDecorator);
         }
 
         private void seedPublication() {
@@ -617,6 +731,18 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             assertThat(head.objectLength()).isPositive();
         }
 
+        private void assertObjectAbsent(TargetObject target) {
+            assertThatThrownBy(() -> objectStore
+                            .headObject(target.key(), new HeadObjectOptions(REQUEST_TIMEOUT))
+                            .join())
+                    .satisfies(failure -> {
+                        Throwable exact = unwrap(failure);
+                        assertThat(exact).isInstanceOf(NereusException.class);
+                        assertThat(((NereusException) exact).code())
+                                .isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
+                    });
+        }
+
         @Override
         public void close() {
             if (!closed.compareAndSet(false, true)) {
@@ -627,7 +753,7 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             activations.close();
             cursors.close();
             projections.close();
-            physical.close();
+            rawPhysical.close();
             generations.close();
             l0.close();
             oxiaRuntime.close();
@@ -669,22 +795,57 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
-    private static final class EmptyInventoryLostDeleteResponseObjectStore
-            implements ObjectStore {
-        private final ObjectStore delegate;
-        private final ObjectKey target;
-        private final AtomicBoolean deleteResponseLost;
-        private final AtomicInteger emptyListCalls;
+    @FunctionalInterface
+    private interface PhysicalStoreDecorator {
+        PhysicalObjectMetadataStore decorate(PhysicalObjectMetadataStore raw);
 
-        private EmptyInventoryLostDeleteResponseObjectStore(
-                ObjectStore delegate,
-                ObjectKey target,
-                AtomicBoolean deleteResponseLost,
-                AtomicInteger emptyListCalls) {
+        static PhysicalStoreDecorator identity() {
+            return raw -> raw;
+        }
+
+        static PhysicalStoreDecorator failBeforeDeletedRootCas(
+                ObjectKeyHash target,
+                AtomicBoolean targetDeleteCompleted,
+                AtomicBoolean crashInjected,
+                CompletableFuture<Void> crashObserved) {
+            return raw -> (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
+                    PhysicalObjectMetadataStore.class.getClassLoader(),
+                    new Class<?>[] {PhysicalObjectMetadataStore.class},
+                    (proxy, method, arguments) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return proxyObjectMethod(
+                                    proxy,
+                                    method,
+                                    arguments,
+                                    "post-DELETE physical metadata store");
+                        }
+                        if (method.getName().equals("close")) {
+                            return null;
+                        }
+                        if (method.getName().equals("compareAndSetRoot")
+                                && arguments != null
+                                && arguments.length == 3
+                                && arguments[1] instanceof PhysicalObjectRootRecord replacement
+                                && replacement.objectKeyHash().equals(target.value())
+                                && replacement.lifecycle() == PhysicalObjectLifecycle.DELETED
+                                && targetDeleteCompleted.get()
+                                && crashInjected.compareAndSet(false, true)) {
+                            crashObserved.complete(null);
+                            return CompletableFuture.failedFuture(new NereusException(
+                                    ErrorCode.STORAGE_CLOSED,
+                                    false,
+                                    "injected process death after target DELETE before DELETED root CAS"));
+                        }
+                        return invokeDelegate(raw, method, arguments);
+                    });
+        }
+    }
+
+    private abstract static class ForwardingObjectStore implements ObjectStore {
+        protected final ObjectStore delegate;
+
+        private ForwardingObjectStore(ObjectStore delegate) {
             this.delegate = delegate;
-            this.target = target;
-            this.deleteResponseLost = deleteResponseLost;
-            this.emptyListCalls = emptyListCalls;
         }
 
         @Override
@@ -724,6 +885,69 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 ObjectKeyPrefix prefix,
                 Optional<String> continuationToken,
                 ListObjectsOptions options) {
+            return delegate.listObjects(prefix, continuationToken, options);
+        }
+
+        @Override
+        public CompletableFuture<DeleteObjectResult> deleteObject(
+                ObjectKey key, DeleteObjectOptions options) {
+            return delegate.deleteObject(key, options);
+        }
+
+        @Override
+        public void close() {
+            // The process fixture owns and closes the delegate exactly once.
+        }
+    }
+
+    private static final class TargetDeleteTrackingObjectStore
+            extends ForwardingObjectStore {
+        private final ObjectKey target;
+        private final AtomicBoolean targetDeleteCompleted;
+
+        private TargetDeleteTrackingObjectStore(
+                ObjectStore delegate,
+                ObjectKey target,
+                AtomicBoolean targetDeleteCompleted) {
+            super(delegate);
+            this.target = target;
+            this.targetDeleteCompleted = targetDeleteCompleted;
+        }
+
+        @Override
+        public CompletableFuture<DeleteObjectResult> deleteObject(
+                ObjectKey key, DeleteObjectOptions options) {
+            return delegate.deleteObject(key, options).thenApply(result -> {
+                if (key.equals(target)) {
+                    targetDeleteCompleted.set(true);
+                }
+                return result;
+            });
+        }
+    }
+
+    private static final class EmptyInventoryLostDeleteResponseObjectStore
+            extends ForwardingObjectStore {
+        private final ObjectKey target;
+        private final AtomicBoolean deleteResponseLost;
+        private final AtomicInteger emptyListCalls;
+
+        private EmptyInventoryLostDeleteResponseObjectStore(
+                ObjectStore delegate,
+                ObjectKey target,
+                AtomicBoolean deleteResponseLost,
+                AtomicInteger emptyListCalls) {
+            super(delegate);
+            this.target = target;
+            this.deleteResponseLost = deleteResponseLost;
+            this.emptyListCalls = emptyListCalls;
+        }
+
+        @Override
+        public CompletableFuture<ListObjectsResult> listObjects(
+                ObjectKeyPrefix prefix,
+                Optional<String> continuationToken,
+                ListObjectsOptions options) {
             emptyListCalls.incrementAndGet();
             return CompletableFuture.completedFuture(
                     new ListObjectsResult(prefix, List.of(), Optional.empty()));
@@ -742,10 +966,27 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                 return CompletableFuture.completedFuture(result);
             });
         }
+    }
 
-        @Override
-        public void close() {
-            // The process fixture owns and closes the delegate exactly once.
+    private static Object proxyObjectMethod(
+            Object proxy,
+            Method method,
+            Object[] arguments,
+            String description) {
+        return switch (method.getName()) {
+            case "toString" -> description;
+            case "hashCode" -> System.identityHashCode(proxy);
+            case "equals" -> proxy == arguments[0];
+            default -> throw new UnsupportedOperationException(method.getName());
+        };
+    }
+
+    private static Object invokeDelegate(
+            Object delegate, Method method, Object[] arguments) throws Throwable {
+        try {
+            return method.invoke(delegate, arguments);
+        } catch (InvocationTargetException failure) {
+            throw failure.getCause();
         }
     }
 

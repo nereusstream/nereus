@@ -315,6 +315,14 @@ reference bounds 和同一 projection domain 交给 activation revalidation 与 
 all-shard 与规模矩阵仍属于 M4/M6 final gate。`phase4M4PhysicalDeletionIntegrationCheck` 已于 2026-07-18
 在 Java 21、Docker 28.5.2 和 locked Pulsar `c59da789e88df2b57829de3277c60194b44fceb6` 上通过
 （141 actionable tasks，68 executed）。
+Checkpoint AT 又关闭真实 DELETE 成功后、`DELETING -> DELETED` Oxia CAS 前的进程终止断点。Fixture 只在
+delegate S3 DELETE 已完成后拦截 exact target 的 DELETED-root CAS；旧进程退出时对象 HEAD 已不存在而 durable
+root/journal 仍为 DELETING。相同 scope 的独立新进程不使用旧回调或 LIST，直接由 256-shard root lifecycle
+路由重载 sealed journal、以 HEAD absence 作为幂等进度并 CAS 到 DELETED。该聚焦场景已在真实四分片 Oxia +
+LocalStack 上通过；其余 MARKED/metadata/protection/root-CAS cuts、双 worker/broker 和规模矩阵仍待完成。
+`phase4M4PostDeleteCrashRecoveryCheck` 已于 2026-07-18 在 Java 21、Docker 28.5.2 和 locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6` 上通过（151 actionable tasks，66 executed、85 up-to-date）；
+其中两组 pinned Pulsar source-set 验证分别为 132/132 和 129/129 executed。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

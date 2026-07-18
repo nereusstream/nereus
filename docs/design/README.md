@@ -64,7 +64,9 @@ retirement；checkpoint AN 已装配 metadata-first root/registration/inventory 
 AP 又实现 configured-scope guarded PUT/HEAD/LIST/exact-DELETE capability probe 和非 secret deterministic digest。
 Checkpoint AQ 已原子组合 coverage/capability proof 和双 deletion bits，AR 已接入 provider/Pulsar 并加入 exact
 scope restart fence；checkpoint AS 又统一 activation guard/GC registry 的 ownerless reference-domain assembly，
-并以真实 Oxia/LocalStack 验证 wrong-scope 拒绝、empty-LIST MARKED recovery 和 lost DELETE response 收敛。
+并以真实 Oxia/LocalStack 验证 wrong-scope 拒绝、empty-LIST MARKED recovery 和 lost DELETE response 收敛；
+checkpoint AT 又验证 real DELETE 后、DELETED-root CAS 前的 process loss 可由独立 runtime 从 durable DELETING
+authority 完成。
 当前 broker safe defaults 不启动该服务；剩余 destructive/scale 矩阵与 M4/M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

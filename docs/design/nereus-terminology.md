@@ -204,6 +204,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   scope、configured reference bounds 和 projection-domain instance，并以真实四分片 Oxia + pinned LocalStack
   证明 publication-only defer、双 bit activation、wrong-scope restart fencing、empty-LIST MARKED recovery 和
   lost successful DELETE response 收敛到 DELETED 的 real-service checkpoint；它仍不是 M4 final scale/failure gate。
+- **F4-M4 checkpoint AT**：在真实 target DELETE 已完成后、旧进程调用 `DELETING -> DELETED` Oxia CAS 前终止，
+  并由独立新 runtime 只凭 durable DELETING root、sealed journal 与 HEAD absence 收敛 DELETED 的 real-service
+  checkpoint；它关闭一个 process-death cut，但不代表 all-shard/multi-worker/scale failure matrix 已完成。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

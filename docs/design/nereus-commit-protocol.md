@@ -507,16 +507,16 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 ## 15. GC protocol
 
 > Status: In progress. Physical reference values/leases/protections、NRC1 recovery-root publication/replay/index repair、
-> typed source retirement、DELETED-root/Phase 1 audit retirement、guarded/protected/pinned cursor-snapshot new
-> writes and all-shard physical/cursor live-reference backfill are implemented through F4-M4 checkpoint W；
-> F4-M5 checkpoint X additionally closes exact durable registration before topic open/recreate return；
-> checkpoint Y adds stable generation-capable broker readiness and checkpoint Z adds canonical bounded cold-topic
-> registration traversal/report；checkpoint AA adds the durable registration proof and checkpoint AB adds exact
-> generation activation proof/revalidation plus the default-off first-marker switch；checkpoint AC adds proof-gated
-> publication-only cluster ACTIVE orchestration and broker proof-to-activation sequencing；checkpoints AD–AF add the
-> protected async Object-WAL acknowledgement/read-repair path、pre-I/O proof/lag admission and coupled production
-> replay/source-repair/materialization runtime. Cursor snapshot candidate/deletion scanning、inventory、registration
-> retirement、destructive GC composition and production deletion remain disabled.
+> typed source retirement、DELETED-root/Phase 1 audit retirement、guarded/protected/pinned cursor snapshots、all-shard
+> physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless execution、current-writer inventory、
+> registration-last retirement、metadata-first lifecycle、typed broker GC config、configured-scope capability proof、
+> atomic deletion activation、provider/Pulsar restart fencing and shared reference-domain interpretation are
+> implemented through F4-M4 checkpoint AT. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
+> response and post-DELETE/pre-DELETED-root-CAS independent recovery. F4-M5 checkpoints X–AI additionally implement
+> durable registration/readiness/activation、protected async Object-WAL acknowledgement/read repair、pre-I/O lag
+> admission、coupled materialization、stable retention planning/F3 trim delegation and exact Pulsar policy/admin
+> admission. Safe defaults keep physical deletion disabled；the explicit opt-in path and these restart slices exist,
+> while the remaining M4/M6 destructive/scale matrix is not final-gated.
 
 An object is deletable only when all relevant conditions are true：
 
@@ -554,6 +554,11 @@ ACTIVE physical root
 
 The 256-shard Oxia root scan is authoritative for lifecycle recovery, including `DELETING` after bytes disappear。
 Object list can discover missing-root/audit candidates but cannot prove absence of references。
+
+Checkpoint AT proves the concrete post-delete cut against real services：the old process receives a successful exact
+LocalStack DELETE, then stops before invoking the Oxia DELETED-root CAS. The durable root/journal remains DELETING and
+HEAD is absent. A separately assembled runtime discovers that root from Oxia, reloads the sealed attempt/digest and
+accepts absence idempotently before CASing DELETED；no LIST result or process-local callback crosses the boundary.
 
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the

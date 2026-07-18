@@ -175,8 +175,9 @@ F3 authority. Checkpoint AN composes a non-overlapping metadata-first 256-root-s
 lifecycle and exact ACTIVE/MARKED/DELETING/DELETED routing. Checkpoints AO–AR add broker config mapping、coverage/
 capability proof、atomic delete activation and provider/Pulsar restart fencing. Checkpoint AS makes activation and GC
 consume the exact same ownerless global/projection domain assembly and proves one real Oxia/LocalStack restart/delete-
-response-loss slice. The remaining scale/failure final gate is still planned，and the safe-default production bridge
-still schedules no pass or deletion.
+response-loss slice. Checkpoint AT additionally proves real post-DELETE/pre-DELETED-root-CAS process loss converges
+from durable DELETING authority in a fresh runtime. The remaining scale/failure final gate is still planned，and the
+safe-default production bridge still schedules no pass or deletion.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1713,6 +1714,14 @@ LocalStack test persists an ownerless compacted root as MARKED, rejects an indep
 `METADATA_INVARIANT_VIOLATION`, then starts a correct-scope runtime with empty inventory results and loses the first
 successful target DELETE response. The object is absent by HEAD and the durable root reaches DELETED. This evidence
 does not cover the later multi-worker、all-shard and scale matrix.
+
+Checkpoint AT isolates the next restart cut without weakening the production state machine. Its wrapper reports
+completion only after the real LocalStack target DELETE succeeds；only then does a metadata proxy reject the exact
+DELETED replacement before delegating to Oxia. The interrupted runtime therefore leaves S3 absent and the durable
+root/journal in DELETING. After that runtime closes, a separately constructed process discovers the root through the
+authoritative shard scan, reloads the sealed journal, HEADs absence and completes `DELETING -> DELETED`. No LIST、
+process-local future or candidate object crosses the process boundary. This proves the post-object-delete cut only；
+the other MARKED/metadata/protection/CAS kill points remain in the final matrix.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

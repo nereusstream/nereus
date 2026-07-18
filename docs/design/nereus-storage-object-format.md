@@ -8,7 +8,8 @@
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
 > checkpoints、topic-compaction neutral SPI/registry、COMMITTED-source bootstrap、tagged-v1 key encoding、
 > sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；F4-M3 ordinary/real-service
-> final gates 已于 2026-07-15 通过；
+> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint AT 已实现 opt-in physical-GC composition，并以
+> 真实 Oxia/LocalStack 验证 wrong-scope、empty-list/lost-response 与 post-DELETE/pre-root-CAS restart cuts；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -416,7 +417,8 @@ fresh attempt-addressed key, so this metadata bound never permits deleted-key re
 F4-M4 checkpoint U implements this with a durable first-absence timestamp/proof on the DELETED root、fresh
 reader/protection and ownerless-domain scans、late exact-byte cleanup、mismatched-byte quarantine and
 references-before-manifest-before-root conditional retirement. Production scheduling/delete activation remains
-disabled until the remaining M4 gates are complete.
+disabled under safe defaults；explicit `enabled && !dryRun` additionally requires exact durable coverage/capability/
+domain authority, while the remaining M4/M6 scale/failure matrix is not final-gated.
 Old incarnation projection mirrors are separately collectible only after current topic authority and every recovery/
 task/audit reference have moved away from their stream.
 

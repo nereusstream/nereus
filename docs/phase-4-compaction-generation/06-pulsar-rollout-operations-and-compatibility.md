@@ -938,6 +938,13 @@ wrong logical S3 prefix rejection before MARKED recovery, and correct-scope owne
 empty and the first successful target DELETE response is lost. HEAD absence is the recovery fact and the durable root
 reaches DELETED；the broker safe defaults remain unchanged and this is not the complete multi-broker/scale final gate.
 
+Checkpoint AT exercises the stricter process boundary after a confirmed real target DELETE but before the old runtime
+can invoke its DELETED-root CAS. The interrupted process leaves exact DELETING authority and an absent LocalStack key；
+a new independently assembled runtime with the same scope is admitted by the startup gate, discovers DELETING from
+the root shard, reauthenticates the sealed journal and completes DELETED from HEAD absence. Neither broker startup
+state nor object listing is transferred. This closes one required restart cut without claiming two-broker rollout or
+the remaining scale/failure matrix.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

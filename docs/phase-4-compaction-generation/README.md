@@ -103,7 +103,8 @@
 > provider/runtime/factory and locked Pulsar sequence, and fences mutating startup/restart recovery by the exact local
 > capability digest. Checkpoint AS makes the activation guard and GC registry consume one exact ownerless-reference
 > assembly, then proves one destructive/restart slice against real Oxia and LocalStack. Safe defaults still perform
-> none of these mutations.
+> none of these mutations. Checkpoint AT additionally proves an independent process recovers durable DELETING after
+> the real object DELETE completed but before the old process could CAS the root to DELETED.
 >
 > 设计基线日期：2026-07-14
 >
@@ -1236,9 +1237,34 @@ tasks. The aggregate gate subsequently passed against locked Pulsar
 `c59da789e88df2b57829de3277c60194b44fceb6` with 141 actionable tasks（68 executed）。
 
 `phase4M4PhysicalDeletionIntegrationCheck` composes the AR gate、the shared-assembly contract audit、documentation/
-module/source-lock checks and that real-service task. Checkpoint AS is not `phase4M4FinalCheck`：process death after
-DELETE、two workers/brokers、checkpoint/index/source deletion followed by read repair、all 256 root shards、cursor and
-tombstone scale limits、late PUT resurrection and the rest of the failure matrix remain required.
+module/source-lock checks and that real-service task. Checkpoint AS itself is not `phase4M4FinalCheck`：two
+workers/brokers、checkpoint/index/source deletion followed by read repair、all 256 root shards、cursor and tombstone
+scale limits、late PUT resurrection and the rest of the failure matrix remain required. Checkpoint AT below closes
+only the exact post-DELETE/pre-DELETED-root-CAS process-death cut.
+
+### 6.25k F4-M4 post-DELETE process-death recovery checkpoint
+
+Checkpoint AT extends the real Oxia/LocalStack fixture with
+`processRestartAfterDeleteBeforeDeletedRootCasRecoversDurableDeletingIntent`. The first process activates deletion and
+persists an ownerless compacted root through MARKED. After drain grace, a second process resumes that root；
+`TargetDeleteTrackingObjectStore` delegates the exact target DELETE to LocalStack and records completion only from the
+real SDK result. `PhysicalStoreDecorator.failBeforeDeletedRootCas` then matches only the same object hash's
+`PhysicalObjectLifecycle.DELETED` replacement, verifies that DELETE already completed and returns non-retryable
+`STORAGE_CLOSED` before invoking the Oxia CAS. A deterministic completion future replaces sleeps, so the fixture
+observes the cut with S3 HEAD absent and the durable root still DELETING.
+
+After that process closes, a third independent runtime using the same durable scope starts from Oxia authority. The
+metadata-first root scanner routes DELETING directly to `SourceRetirementCoordinator.resume`；the exact sealed journal
+is reauthenticated, the absent object is accepted only under that unchanged root/attempt/digest, and the root CAS
+converges to DELETED. No object LIST、old callback or process-local candidate is involved. The focused method passed on
+2026-07-18 under Java 21 and Docker 28.5.2 with 47 executed tasks.
+
+`phase4M4PostDeleteCrashRecoveryCheck` composes the AS gate、the dedicated AT contract audit and the same pinned real-
+service source set. It passed on 2026-07-18 under Java 21 and Docker 28.5.2 against locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6`；the root aggregate reported 151 actionable tasks（66 executed、85 up-to-
+date），while its two pinned Pulsar source-set builds executed 132/132 and 129/129 tasks. AT closes one mandatory
+process-death cut, not the full kill-point matrix：MARKED、journal/source/protection deletion、uncertain DELETED CAS、
+two-worker/broker、all-shard and scale evidence remain required.
 
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
@@ -1538,7 +1564,7 @@ four-suite broker invocation passed 129 tasks.
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AS, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement、non-overlapping metadata-first periodic runtime、exact broker typed physical-GC configuration、configured-scope canary、atomic proof composition/delete activation、provider/Pulsar wiring、restart scope-digest fencing、one shared ownerless-reference interpretation and the first real Oxia/LocalStack wrong-scope/empty-list/lost-DELETE-response restart slice are implemented/tested；checkpoint AF separately composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while the remaining real-service scale/destructive matrix and final gate remain pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AT, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement、non-overlapping metadata-first periodic runtime、exact broker typed physical-GC configuration、configured-scope canary、atomic proof composition/delete activation、provider/Pulsar wiring、restart scope-digest fencing、one shared ownerless-reference interpretation、the first real Oxia/LocalStack wrong-scope/empty-list/lost-DELETE-response restart slice and real post-DELETE/pre-DELETED-root-CAS independent-process recovery are implemented/tested；checkpoint AF separately composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while the remaining real-service scale/destructive matrix and final gate remain pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；physical GC composition and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

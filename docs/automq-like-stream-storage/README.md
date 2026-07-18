@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AS、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AT、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -72,6 +72,9 @@ Already present：
   configured bounds and projection-domain instance. A real four-shard Oxia + pinned LocalStack process sequence proves
   publication-only deferral、atomic activation、wrong-prefix restart rejection、empty-LIST MARKED recovery and real
   DELETE response-loss convergence to durable DELETED；the remaining destructive/scale matrix is not final-gated.
+- F4-M4 checkpoint AT：after a confirmed real target DELETE, the interrupted runtime is stopped before its
+  DELETED-root CAS. A fresh runtime reloads durable DELETING/sealed-journal authority and HEAD absence to converge
+  DELETED without inherited LIST/callback/candidate state；the remaining kill-point/scale matrix is not final-gated.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative
