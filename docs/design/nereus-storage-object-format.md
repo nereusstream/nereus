@@ -8,12 +8,13 @@
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
 > checkpoints、topic-compaction neutral SPI/registry、COMMITTED-source bootstrap、tagged-v1 key encoding、
 > sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；F4-M3 ordinary/real-service
-> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint BA 已实现 opt-in physical-GC composition，并以
+> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint BB 已实现 opt-in physical-GC composition，并以
 > 真实 Oxia/LocalStack 验证 wrong-scope、empty-list/lost-response、post-DELETE/pre-root-CAS restart 与 applied-
 > DELETED-CAS response-loss exact-reload cuts、two-worker shared-intent/idempotent-delete convergence，以及
 > 1,001-root hot-shard + all-shard 1,256-root real-Oxia bounded pagination，以及 10,000 DELETED-root
 > dual-window/audit/root-last bounded retirement，以及 10,000 cursor roots/objects 下 live、old、CAS-lost、
-> deleted-cursor 的 exact classification/protection retirement/object delete；
+> deleted-cursor 的 exact classification/protection retirement/object delete，以及 Object-WAL first/retry guarded
+> transmission、tombstone audit cuts 和 post-root external reappearance 的 missing-root registration/full grace；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 

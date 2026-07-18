@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint BA、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint BB、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -100,6 +100,12 @@ Already present：
   post-delete cuts, stops the setup scanner and lets an independent runtime recover；one applied protection delete
   loses its response and converges only after exact absence. The source/protection cut line is closed；late-PUT and
   actual two-broker ownership/unload/failover evidence remain pending.
+- F4-M4 checkpoint BB：Object-WAL provider retries now carry a durable session/root guard from append coordination to
+  every transmission. A DELETED root rejects attempt two before bytes；an expired old session sends no first attempt
+  and a newer epoch uses a fresh key. Tombstone tests inject exact bytes after references and manifest deletion, while
+  a real Oxia/LocalStack fixture recreates the same key after root retirement and proves missing-root inventory gives
+  it another full ownerless grace before MARK/delete. The late-PUT/tombstone line is closed；actual Pulsar two-broker
+  ownership/unload/failover evidence remains pending.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative

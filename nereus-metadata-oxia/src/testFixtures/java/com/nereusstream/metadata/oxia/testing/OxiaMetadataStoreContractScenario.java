@@ -14,6 +14,7 @@
 
 package com.nereusstream.metadata.oxia.testing;
 
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -63,10 +64,20 @@ public final class OxiaMetadataStoreContractScenario {
                 .join().streamId());
         require(streamId.equals(replayedId), "create-or-get must be deterministic");
 
-        AppendSessionRecord session = store.acquireAppendSession(
+        AppendSessionRecord acquiredSession = store.acquireAppendSession(
                 cluster,
                 streamId,
                 new AppendSessionOptions("contract-writer", Duration.ofSeconds(30), false)).join();
+        AppendSession capturedSession = appendSession(streamId, acquiredSession);
+        store.revalidateAppendSession(cluster, capturedSession).join();
+        AppendSessionRecord session = store.renewAppendSession(
+                cluster,
+                streamId,
+                acquiredSession.writerId(),
+                acquiredSession.epoch(),
+                acquiredSession.fencingToken(),
+                Duration.ofSeconds(30)).join();
+        store.revalidateAppendSession(cluster, capturedSession).join();
         CommitSliceRequest request = request(streamId, session, suffix);
         store.putObjectManifest(cluster, manifest(request)).join();
         CommitSliceResult committed = store.commitStreamSlice(cluster, request).join();
@@ -102,6 +113,18 @@ public final class OxiaMetadataStoreContractScenario {
                         && snapshot.metadataVersion() == snapshot.trim().metadataVersion(),
                 "stream snapshot views must share one head version");
         return new ContractResult(streamId, request.objectId(), committed.commitVersion());
+    }
+
+    private static AppendSession appendSession(
+            StreamId streamId,
+            AppendSessionRecord record) {
+        return new AppendSession(
+                streamId,
+                record.writerId(),
+                record.epoch(),
+                record.fencingToken(),
+                record.leaseVersion(),
+                record.expiresAtMillis());
     }
 
     private static CommitSliceRequest request(

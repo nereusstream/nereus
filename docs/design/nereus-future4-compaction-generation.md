@@ -4,7 +4,7 @@
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
-> F4-M4 through checkpoint BA and F4-M5 through checkpoint AI are in progress；F4-M6 pending
+> F4-M4 through checkpoint BB and F4-M5 through checkpoint AI are in progress；F4-M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -686,6 +686,12 @@ metadata/protection removal 后丢失进程，fresh instance 只按相同 DELETI
 继续；真实 Oxia/LocalStack 夹具持久化两个切点，独立 runtime 还会在 protection 删除已生效但响应丢失后重证
 exact absence，最后安全删除两个 immutable object。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint BA 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
+Checkpoint BB 再关闭 late-PUT/tombstone 线：Phase 1 Object-WAL 的每次 provider transmission 都重证 durable
+append session 与 absent-or-exact-ACTIVE root，旧 session/DELETED root 在发字节前拒绝 first/retry；references
+与 manifest 删除后的 exact late bytes 会被最终 proof 删除且保留 root。若外部 bytes 恰在 root 退休后重现，
+真实 Oxia/LocalStack 夹具证明 inventory 会重建新的 ACTIVE root、施加完整 ownerless grace，再进入常规
+MARK/drain/delete。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint BB 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

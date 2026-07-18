@@ -1478,6 +1478,25 @@ source-compatible for pre-F4 callers, but a source audit rejects their use from 
 `DefaultWalObjectWriter` after the F4 physical-reference hook is installed. Tombstone retirement cross-validation
 requires its grace to exceed this complete put deadline plus clock skew.
 
+Checkpoint BB makes the Object-WAL clause executable. `AppendCoordinator` converts the prepared `WalWriteResult`
+into the whole-object `PhysicalObjectIdentity` and passes one guard through `ObjectWalAppenderAdapter` and
+`DefaultWalObjectWriter` to the replayable object-store overload. The authorization sequence is exactly：
+
+```text
+revalidate captured append session S against the current ACTIVE stream head
+get physical root by ObjectKeyHash
+  allow absent, or require exact immutable identity and lifecycle ACTIVE
+revalidate S again
+return to the provider, which may now open/transmit this attempt's publisher
+```
+
+The read-only session proof requires a non-expired current lease and exact writer、epoch and fencing token；
+`current.leaseVersion >= captured.leaseVersion` permits a same-owner renewal but never extends the captured request
+or accepts a replaced owner. An expired session fails the first attempt before bytes；MARKED/DELETING/DELETED roots
+fence an initial or retry transmission under that key. A later acquired epoch prepares a new attempt-addressed WAL
+key. `ObjectWalGuardedUploadTest` verifies one successful first transmission followed by a DELETED-root retry fence,
+and separately zero stale transmissions after root-tombstone retirement followed by one fresh-key success.
+
 `ObjectStoreConfiguration` gains the non-null `ObjectPutRetryPolicy`. `maxAttempts` counts the initial provider
 transmission and is in `[1, 10]`；backoffs are positive, millisecond-representable and
 `minBackoff <= maxBackoff <= requestTimeout`. Attempt `n > 1` uses injected full jitter in

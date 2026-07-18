@@ -1387,6 +1387,33 @@ tasks.register("phase4M4SourceProtectionCutCheck") {
     dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
 }
 
+tasks.register<Exec>("checkPhase4M4LatePutTombstoneContractSurface") {
+    group = "verification"
+    description = "Audit guarded Object-WAL retries, every tombstone cut, and external-key reappearance recovery."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-late-put-tombstone-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4LatePutTombstoneCheck") {
+    group = "verification"
+    description = "Verify checkpoint BB rejects stale first/retried PUTs and reclaims external post-root bytes."
+    dependsOn("phase4M4SourceProtectionCutCheck")
+    dependsOn("checkPhase4GuardedObjectPut")
+    dependsOn("checkPhase4M4LatePutTombstoneContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+    dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1397,7 +1424,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4SourceProtectionCutCheck")
+    dependsOn("phase4M4LatePutTombstoneCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

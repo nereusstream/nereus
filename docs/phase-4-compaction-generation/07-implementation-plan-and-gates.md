@@ -135,7 +135,11 @@ audit cleanup/root-last CAS and remove-on-cancel production deadline schedulers.
 10,000-cursor-root line with stack-bounded 10,000-candidate visitation plus exact live/old/CAS-lost/deleted-cursor
 classification and central restart-safe deletion. Checkpoint BA closes journaled source/protection post-delete
 process cuts and an applied-protection-delete response-loss cut in both the central coordinator and a fresh real
-Oxia/LocalStack runtime. The late-PUT/tombstone and real two-broker failure matrix remains pending.
+Oxia/LocalStack runtime. Checkpoint BB closes the late first/retried PUT and tombstone-retirement matrix：Object-WAL
+provider attempts now revalidate the durable append session on both sides of the physical-root read；DELETED roots
+fence stale retries, audit-deletion cuts rediscover exact late bytes before root retirement, and a real
+Oxia/LocalStack object that reappears after root retirement re-enters inventory as a fresh ACTIVE ownerless root with
+another full grace. The actual Pulsar two-broker ownership/unload/failover matrix remains pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -702,7 +706,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > fresh-process 1,001-root hot-shard pagination against real Oxia. Checkpoint AY proves 10,000 DELETED-root dual-window
 > retirement and bounded deadline schedulers. Checkpoint AZ proves stack-bounded 10,000-candidate visitation and exact
 > 10,000-cursor-root live/old/CAS-lost/deleted-cursor classification/deletion. The remaining destructive/failure
-> scenarios and final M4 gate remain before F4-M4 can be called complete.
+> Checkpoint BA proves journaled source/protection post-delete recovery. Checkpoint BB proves guarded Object-WAL
+> first/retried transmissions、late exact PUT at both Phase 1 audit-removal cuts and real post-root external
+> reappearance through missing-root inventory. The actual two-broker ownership/unload/failover scenario and final M4
+> gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
 > identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
@@ -732,6 +739,8 @@ checkpoint/RecoveryCheckpointVerifier.java
 checkpoint/RecoveryCheckpointBinary.java                 package-private strict codec
 checkpoint/RecoveryCheckpointValidation.java             package-private value guard
 wal/WalObjectKeys.java                                   implemented checkpoint AL canonical builder/inverse
+wal/WalObjectWriter.java                                 extended checkpoint BB guarded upload contract
+wal/DefaultWalObjectWriter.java                          extended checkpoint BB provider-attempt guard wiring
 compacted/CompactedObjectFormatV1.java                   extended checkpoint AL ownerless strict inverse
 ```
 
@@ -741,7 +750,7 @@ compacted/CompactedObjectFormatV1.java                   extended checkpoint AL 
 append/StableAppendCommitter.java                 split prepare/protected commit
 append/GenerationZeroIndexMaterializer.java       return exact versioned index
 append/GenerationZeroPhysicalReferencePublisher.java
-append/DefaultGenerationZeroPhysicalReferencePublisher.java
+append/DefaultGenerationZeroPhysicalReferencePublisher.java extended checkpoint BB session/root upload authorization
 append/GenerationZeroProtectionIdentities.java            public backfill overloads checkpoint W
 append/ProtectedStableAppend.java
 append/ProtectedGenerationZero.java
@@ -757,8 +766,8 @@ capability/GenerationProjectionAuthorityReader.java   implemented checkpoint W p
 capability/GenerationProjectionAuthoritySnapshot.java implemented checkpoint W exact live/non-live authority capture
 capability/StreamRetirementReferenceAuthorityReader.java   implemented checkpoint AM protocol-neutral external-reference seam
 capability/StreamRetirementReferenceAuthoritySnapshot.java implemented checkpoint AM bounded exact authority capture
-OxiaMetadataStore                                prepare/commit prepared append
-OxiaJavaClientMetadataStore                      exact two-stage stable append
+OxiaMetadataStore                                prepare/commit prepared append, extended BB read-only session proof
+OxiaJavaClientMetadataStore                      exact two-stage stable append, extended BB session revalidation
 AppendRecoveryAnchor.java                        implemented checkpoint C foundation
 AppendRecoveryCommit.java                        implemented checkpoint C foundation
 AppendRecoveryTailCursor.java                    implemented checkpoint C foundation
@@ -962,7 +971,8 @@ Phase4PhysicalDeletionActivationCoordinatorTest          implemented checkpoint 
 Phase4PhysicalGcStartupGateTest                          implemented checkpoint AR defer/exact-scope/domain-drift cuts
 ManagedLedgerGenerationProtocolActivationGuardTest       extended checkpoint AR wrong-scope deletion rejection
 NereusManagedLedgerStorageGenerationActivationTest       extended checkpoint AR strict ordering/failure propagation
-Phase4PhysicalGcOxiaS3IntegrationTest                    extended checkpoint AV real activation/restart/response-loss/two-worker destructive convergence
+Phase4PhysicalGcOxiaS3IntegrationTest                    extended checkpoint BB post-root external reappearance/inventory/GC
+ObjectWalGuardedUploadTest                               implemented checkpoint BB first/retry transmission fencing
 MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
 RecoveryCheckpointBuilderTest
@@ -1001,8 +1011,8 @@ GenerationZeroSourceRetirementHandlerTest                implemented checkpoint 
 SourceRetirementPlanBuilderTest                          extended checkpoint R completed-trim proof/reproof
 HigherGenerationPreDrainCoordinatorTest                  extended checkpoint R view/trim/grace/race cuts
 PhysicalObjectRootScannerTest                              implemented checkpoint I
-PhysicalRootTombstoneRetirementTest                        implemented checkpoint U
-LatePutAfterTombstoneTest                                  implemented checkpoint U
+PhysicalRootTombstoneRetirementTest                        implemented U, extended BB exact/mismatch reappearance cuts
+LatePutAfterTombstoneTest                                  implemented U, extended BB reference/manifest late-PUT cuts
 CursorSnapshotStoreTest                                   extended checkpoint V protection/read-pin/response-loss
 CursorStorageOxiaS3IntegrationTest                        migrated checkpoint V real Oxia/S3 protocol
 DefaultCursorSnapshotStoreLocalStackIntegrationTest       migrated checkpoint V real S3 restart/collision protocol
@@ -1068,6 +1078,9 @@ retirement.
 ./gradlew phase4M4Check
 ./gradlew phase4M4RootScaleCheck
 ./gradlew phase4M4TombstoneScaleCheck
+./gradlew phase4M4CursorGcScaleCheck
+./gradlew phase4M4SourceProtectionCutCheck
+./gradlew phase4M4LatePutTombstoneCheck
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
 
@@ -1508,6 +1521,42 @@ serialized locked-Pulsar builds executed 141/141 and 138/138 tasks. It is still 
 late first/retried PUT versus tombstone-retirement matrix and actual Pulsar two-broker ownership/unload/failover remain
 mandatory.
 
+`phase4M4LatePutTombstoneCheck` is checkpoint BB. The production Object-WAL path no longer relies on the guarded S3
+primitive being used only by later F4 object writers. `AppendCoordinator` derives the exact whole-object
+`PhysicalObjectIdentity` from the prepared `WalWriteResult` and passes one `PutObjectAttemptGuard` through
+`ObjectWalAppenderAdapter` and `DefaultWalObjectWriter` into the replayable object-store overload. Therefore every
+provider-owned transmission, including an internal retry, reaches the F4 authorization closure before opening the
+next upload publisher.
+
+The closure uses the new read-only `OxiaMetadataStore.revalidateAppendSession` proof. It requires an ACTIVE stream,
+a non-expired current session, the same writer/epoch/fencing token and a current lease version at least as new as the
+captured one；same-owner renewals therefore remain valid without extending the captured request's lifetime. The
+physical publisher performs `session -> root -> session`：the root may be absent before initial registration or must
+be the exact same ACTIVE immutable identity. MARKED、DELETING、DELETED、QUARANTINED or a different identity returns
+non-retriable `FENCED_APPEND` before transmission. An expired session fails before the first transmission；a newly
+acquired epoch prepares a different attempt-addressed key.
+
+`ObjectWalGuardedUploadTest` drives that complete chain with a provider-retry fixture. Its first transmission succeeds,
+the exact root advances through ACTIVE/MARKED/DELETING to DELETED, and attempt two is rejected with one total
+transmission. A separate root-tombstone-retired fixture expires the captured session, proves zero transmissions for
+the stale first attempt, then acquires a newer epoch and uploads one fresh key. The shared fake/real Oxia contract also
+proves that a captured session remains valid across a same-owner lease renewal；the fake clock tests expiry and
+ownership transfer explicitly.
+
+The tombstone coordinator matrix now injects exact bytes after reference removal and after manifest removal. In both
+cases the final HEAD/owner/domain revalidation deletes the bytes, clears the dual-window observation and keeps the
+DELETED root；the existing tests retain exact first-window reappearance、mismatched-byte quarantine、owner appearance
+and delete-response-loss coverage. The real-service method
+`externallyReappearingBytesAfterRootRetirementReenterOwnerlessInventoryAndGc` lets both absence windows remove the
+root from four-shard Oxia, uploads the same key directly to LocalStack, and proves the inventory-last pass registers a
+fresh ACTIVE root. That root receives `passStart + orphanGrace + maximumClockSkew` as its new admission boundary,
+remains ACTIVE before it, and only afterward reaches MARKED and exact deletion. The focused core、metadata、
+materialization and real Oxia/LocalStack methods passed on 2026-07-19. The complete
+`phase4M4LatePutTombstoneCheck --rerun-tasks` aggregate passed the same day under Java 21、Docker 28.5.2 and locked
+Pulsar `master@c59da789e88df2b57829de3277c60194b44fceb6` in 3m56s with 159/159 root tasks executed；it is the
+executable checkpoint boundary. BB closes required scenario 52. It is still not `phase4M4FinalCheck`：actual Pulsar
+two-broker ownership、topic unload and failover evidence remains mandatory.
+
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration
 
 ### 7.1 Nereus production artifacts
@@ -1874,7 +1923,8 @@ The final gate must cover all of the following as named deterministic or real-se
     by the full orphan/head/recovery-domain proof；
 52. DELETED-root retirement requires two separated exact HEAD-absence observations, unchanged owner/domain proofs and
     versioned reference/manifest cleanup；a first or retried PUT at every cut is rejected or uses a fresh key, and
-    externally reappearing bytes return to the ownerless-orphan proof path。
+    externally reappearing bytes return to the ownerless-orphan proof path。Implemented/tested by checkpoint BB；the
+    aggregate gate is `phase4M4LatePutTombstoneCheck`.
 
 ### 8.2 Scale fixtures
 

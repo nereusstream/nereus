@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -219,6 +220,46 @@ class FakeOxiaMetadataStoreTest {
                 .join();
         assertThat(reacquired.epoch()).isEqualTo(sessionB.epoch() + 1);
         assertThat(reacquired.fencingToken()).isNotEqualTo(sessionB.fencingToken());
+    }
+
+    @Test
+    void guardedUploadSessionProofSurvivesRenewalButRejectsExpiryAndSteal() {
+        StreamId streamId = new StreamId(createStream(
+                new StreamName("guarded-upload-session-proof")).streamId());
+        AppendSessionRecord acquired = store.acquireAppendSession(
+                        CLUSTER,
+                        streamId,
+                        new AppendSessionOptions("writer-a", Duration.ofMillis(100), false))
+                .join();
+        AppendSession captured = appendSession(streamId, acquired);
+
+        store.revalidateAppendSession(CLUSTER, captured).join();
+        AppendSessionRecord renewed = store.renewAppendSession(
+                        CLUSTER,
+                        streamId,
+                        acquired.writerId(),
+                        acquired.epoch(),
+                        acquired.fencingToken(),
+                        Duration.ofMillis(200))
+                .join();
+        assertThat(renewed.leaseVersion()).isGreaterThan(captured.leaseVersion());
+        store.revalidateAppendSession(CLUSTER, captured).join();
+
+        clock.addAndGet(201);
+        assertNereusFailureWithoutAppendOutcome(
+                () -> store.revalidateAppendSession(CLUSTER, captured).join(),
+                ErrorCode.APPEND_SESSION_EXPIRED,
+                true);
+
+        store.acquireAppendSession(
+                        CLUSTER,
+                        streamId,
+                        new AppendSessionOptions("writer-b", Duration.ofMillis(100), true))
+                .join();
+        assertNereusFailureWithoutAppendOutcome(
+                () -> store.revalidateAppendSession(CLUSTER, captured).join(),
+                ErrorCode.FENCED_APPEND,
+                false);
     }
 
     @Test
@@ -1047,6 +1088,18 @@ class FakeOxiaMetadataStoreTest {
                 streamId,
                 new AppendSessionOptions(WRITER_ID, Duration.ofMillis(1_000), false))
                 .join();
+    }
+
+    private static AppendSession appendSession(
+            StreamId streamId,
+            AppendSessionRecord record) {
+        return new AppendSession(
+                streamId,
+                record.writerId(),
+                record.epoch(),
+                record.fencingToken(),
+                record.leaseVersion(),
+                record.expiresAtMillis());
     }
 
     private CommitSliceRequest request(

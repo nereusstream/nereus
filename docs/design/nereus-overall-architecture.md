@@ -1,7 +1,7 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4-M4 through checkpoint BA and F4-M5 through checkpoint AI are in progress，F4-M6 pending
-> 最近设计/实现同步：2026-07-18
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4-M4 through checkpoint BB and F4-M5 through checkpoint AI are in progress，F4-M6 pending
+> 最近设计/实现同步：2026-07-19
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
 ## 1. 摘要
@@ -102,7 +102,7 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4 through checkpoint BA 已实现 NRC1 protocol、protected generation-zero append、
+Oxia/LocalStack final gates。M4 through checkpoint BB 已实现 NRC1 protocol、protected generation-zero append、
 recovery-root/replay/index repair、bounded GC plan/root/journal fence、root-authenticated destructive skeleton、typed
 generation-zero source retirement，以及 completed-trim/COMMITTED/TOPIC_COMPACTED source eligibility 和
 grace-fenced higher-generation pre-drain/reproof，并增加 durable generation-activation authority、future sentinel
@@ -142,7 +142,10 @@ GC deletion while every current object/root/protection remains live. Checkpoint 
 retirement remains restart-safe after each journaled destructive cut：a fresh coordinator/runtime accepts only the
 exact planned absence under the same DELETING root and sealed journal. Its real Oxia/LocalStack fixture also loses the
 response after an applied protection delete, reauthenticates exact absence and completes two object deletes without
-inheriting setup-process memory. M5
+inheriting setup-process memory. Checkpoint BB then makes the remaining late-write contract executable：Object-WAL
+provider attempts revalidate the durable session before/after the physical-root read, DELETED roots fence retries
+before bytes, audit-delete cuts rediscover exact late bytes, and real post-root external reappearance returns through
+missing-root registration plus another full ownerless grace. M5
 checkpoint X 又实现 exact durable registration create/refresh/final
 revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、

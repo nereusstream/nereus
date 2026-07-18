@@ -785,6 +785,97 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
+    @Test
+    void externallyReappearingBytesAfterRootRetirementReenterOwnerlessInventoryAndGc()
+            throws Exception {
+        MutableClock clock = new MutableClock(System.currentTimeMillis());
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "f4-m4-external-reappearance-" + suffix;
+        String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
+        createBucket(bucket);
+        ObjectStoreConfiguration scope = objectStoreConfiguration(
+                bucket, "external-reappearance");
+        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
+                READINESS_EPOCH,
+                sha256("broker-set/external-reappearance/" + suffix),
+                1);
+        PhysicalGcConfig gcConfig = physicalGcConfig();
+
+        try (Process process = Process.open(
+                cluster,
+                "b".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("external-reappearance"),
+                clock,
+                StoreDecorator.identity())) {
+            process.seedPublication();
+            TargetObject target = process.createOwnerlessCompactedObject();
+            ManagedLedgerPhysicalDeletionActivationResult activation = process.runtime
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
+                            "c".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .join();
+            assertThat(activation.status())
+                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+
+            process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            assertThat(process.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            process.assertObjectPresent(target);
+
+            clock.advance(Duration.ofMinutes(7));
+            process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            assertThat(process.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            process.assertObjectAbsent(target);
+
+            clock.advance(Duration.ofDays(8));
+            process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            VersionedPhysicalObjectRoot firstAbsence = process.root(target);
+            assertThat(firstAbsence.value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(firstAbsence.value().tombstoneFirstAbsentAtMillis())
+                    .isEqualTo(clock.millis());
+
+            clock.advance(Duration.ofHours(26));
+            process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            assertThat(process.physical.getRoot(cluster, target.hash()).join()).isEmpty();
+            process.assertObjectAbsent(target);
+
+            process.recreateExactOwnerlessObject(target);
+            process.assertObjectPresent(target);
+            var registrationPass = process.runtime.lifecycleService()
+                    .scanNow()
+                    .get(120, TimeUnit.SECONDS);
+            assertThat(registrationPass.inventory().rootsRegistered()).isEqualTo(1);
+            VersionedPhysicalObjectRoot reentered = process.root(target);
+            assertThat(reentered.value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(reentered.value().orphanNotBeforeMillis())
+                    .isGreaterThan(clock.millis());
+            process.assertObjectPresent(target);
+
+            clock.advance(Duration.ofHours(24));
+            process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            assertThat(process.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            process.assertObjectPresent(target);
+
+            clock.advance(Duration.ofHours(2));
+            process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            assertThat(process.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            process.assertObjectPresent(target);
+
+            clock.advance(Duration.ofMinutes(7));
+            process.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            assertThat(process.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            process.assertObjectAbsent(target);
+        }
+    }
+
     private Path stagingDirectory(String name) throws Exception {
         Path path = Files.createDirectories(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
@@ -1175,6 +1266,23 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     0);
             physical.createRoot(cluster, root).join();
             return new TargetObject(key, ObjectKeyHash.from(key));
+        }
+
+        private void recreateExactOwnerlessObject(TargetObject target) {
+            byte[] payload = ("phase4-m4-ownerless/" + cluster)
+                    .getBytes(StandardCharsets.UTF_8);
+            PutObjectResult stored = objectStore.putObject(
+                            target.key(),
+                            ByteBuffer.wrap(payload),
+                            new PutObjectOptions(
+                                    "application/octet-stream",
+                                    Crc32cChecksums.checksum(payload),
+                                    true,
+                                    Map.of("nereus-integration", "f4-m4-external-reappearance"),
+                                    REQUEST_TIMEOUT))
+                    .join();
+            assertThat(stored.key()).isEqualTo(target.key());
+            assertThat(stored.objectLength()).isEqualTo(payload.length);
         }
 
         private VersionedPhysicalObjectRoot seedDeletingPostRetirementCut(

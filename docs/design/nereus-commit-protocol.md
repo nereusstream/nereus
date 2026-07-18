@@ -2,8 +2,9 @@
 
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
-> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；generation、
-> async/GC 已完成 F4-M0 code-level target design，但尚未实现；txn、catalog 仍为 target design。
+> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M3
+> 已 implementation/final-gated，F4-M4 through checkpoint BB 与 F4-M5 through checkpoint AI 正在实现；
+> txn、catalog 仍为 target design。
 
 ## 1. Purpose
 
@@ -118,10 +119,21 @@ misclassified as fencing；true stale epoch/token takes precedence over offset c
 append batches
   -> deterministic WAL layout and slice ids
   -> size/format validation
-  -> immutable object upload
+  -> derive exact whole-object identity
+  -> before every provider transmission:
+       revalidate durable append session
+       require physical root absent or exact ACTIVE
+       revalidate durable append session again
+  -> immutable object upload attempt
   -> storage checksum confirmation
   -> object manifest put/validate
 ```
+
+Checkpoint BB implements this guard in the production Object-WAL path. The captured session remains valid across a
+same-owner renewal only when writer/epoch/token are unchanged and the current lease version is newer；expiry or owner
+replacement rejects the transmission. A MARKED/DELETING/DELETED root rejects the same key before the first/retried
+provider bytes. If the old root tombstone has already retired, the old session still fences the stale attempt；a new
+epoch prepares a fresh process-run/sequence key. Provider-internal retries cannot use the unguarded overload.
 
 Manifest requirements before stream commit：
 

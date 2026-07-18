@@ -374,6 +374,18 @@ class PhysicalRootTombstoneRetirementTest {
         VersionedPhysicalObjectRoot currentRoot() {
             return store.getRoot(CLUSTER, OBJECT).join().orElseThrow();
         }
+
+        void reappearAfterReferenceRetirement() {
+            auditStore.afterReferenceDelete = () -> objectStore.exists = true;
+        }
+
+        void reappearAfterManifestRetirement() {
+            auditStore.afterManifestDelete = () -> objectStore.exists = true;
+        }
+
+        boolean auditsAbsent() {
+            return auditStore.references.isEmpty() && auditStore.manifest.isEmpty();
+        }
     }
 
     private enum DomainMode {
@@ -530,6 +542,8 @@ class PhysicalRootTombstoneRetirementTest {
         private Optional<VersionedObjectManifestAudit> manifest;
         private volatile boolean loseReferenceDeleteResponse;
         private volatile boolean loseManifestDeleteResponse;
+        private volatile Runnable afterReferenceDelete = () -> { };
+        private volatile Runnable afterManifestDelete = () -> { };
 
         private FakeAuditStore(List<String> mutationOrder, boolean populated) {
             this.mutationOrder = mutationOrder;
@@ -599,6 +613,7 @@ class PhysicalRootTombstoneRetirementTest {
                     .isEqualTo(expectedDurableValueSha256);
             references = Optional.empty();
             mutationOrder.add("references");
+            afterReferenceDelete.run();
             if (loseReferenceDeleteResponse) {
                 loseReferenceDeleteResponse = false;
                 return CompletableFuture.failedFuture(
@@ -619,6 +634,7 @@ class PhysicalRootTombstoneRetirementTest {
                     .isEqualTo(expectedDurableValueSha256);
             manifest = Optional.empty();
             mutationOrder.add("manifest");
+            afterManifestDelete.run();
             if (loseManifestDeleteResponse) {
                 loseManifestDeleteResponse = false;
                 return CompletableFuture.failedFuture(

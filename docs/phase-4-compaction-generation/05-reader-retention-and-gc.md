@@ -1462,6 +1462,17 @@ for Object WAL a never-reused process-run/sequence identity), hence a fresh obje
 tombstone grace and final owner scan, prevents a stopped process from resurrecting bytes after the audit tombstone is
 retired.
 
+Checkpoint BB makes every remaining late-write cut executable. `LatePutAfterTombstoneTest` injects exact bytes after
+the conditional references delete and after the manifest delete；the coordinator's final HEAD/handle/domain pass
+deletes them, clears the first-absence observation and retains the DELETED root. `ObjectWalGuardedUploadTest` covers
+the writer side：an Object-WAL provider retry revalidates the durable session and sees the DELETED root before its
+second transmission, while an expired session sends no first transmission after root retirement and must reacquire a
+new epoch/key. Finally, the real Oxia/LocalStack scenario removes the root, recreates the same key outside the writer,
+and proves the inventory-last pass registers a new ACTIVE root with a full
+`orphanGrace + maximumClockSkew` admission boundary. A scan before that boundary cannot MARK it；later scans repeat
+the ordinary ownerless proof、MARK/drain and exact delete. Thus guarded writers reject resurrection before a root
+cut, and external/uncooperative bytes after the cut re-enter root-authoritative GC rather than bypass it.
+
 ## 10. Cursor Snapshot GC
 
 ### 10.1 Rollout/backfill

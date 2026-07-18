@@ -95,9 +95,14 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
 
     @Override
     public CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject) {
-        return upload(
-                preparedObject,
-                (ignored, attempt) -> CompletableFuture.completedFuture(null));
+        Objects.requireNonNull(preparedObject, "preparedObject");
+        WalWriteResult result = preparedObject.result();
+        return objectStore.putObject(
+                        result.objectKey(),
+                        preparedObject.payload(),
+                        putOptions(preparedObject))
+                .thenApply(putResult -> verifyPutResult(result, putResult))
+                .exceptionally(DefaultWalObjectWriter::unwrapCompletionException);
     }
 
     @Override
@@ -107,12 +112,7 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
         Objects.requireNonNull(preparedObject, "preparedObject");
         Objects.requireNonNull(attemptGuard, "attemptGuard");
         WalWriteResult result = preparedObject.result();
-        PutObjectOptions options = new PutObjectOptions(
-                CONTENT_TYPE,
-                result.storageChecksum(),
-                true,
-                Map.of("objectChecksum", result.objectChecksum().value()),
-                preparedObject.uploadTimeout());
+        PutObjectOptions options = putOptions(preparedObject);
         ByteBufferObjectUpload source = new ByteBufferObjectUpload(
                 preparedObject.payload());
         CompletableFuture<PutObjectResult> upload;
@@ -127,6 +127,16 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
         return upload
                 .thenApply(putResult -> verifyPutResult(result, putResult))
                 .exceptionally(DefaultWalObjectWriter::unwrapCompletionException);
+    }
+
+    private static PutObjectOptions putOptions(PreparedWalObject preparedObject) {
+        WalWriteResult result = preparedObject.result();
+        return new PutObjectOptions(
+                CONTENT_TYPE,
+                result.storageChecksum(),
+                true,
+                Map.of("objectChecksum", result.objectChecksum().value()),
+                preparedObject.uploadTimeout());
     }
 
     private LayoutPlan plan(WalWriteRequest request) {
