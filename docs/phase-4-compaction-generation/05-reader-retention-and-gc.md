@@ -956,8 +956,9 @@ catalog reference；F4 never interprets absence of a plugin as absence of refere
 Checkpoint S implements this record/codec/exact-key store and its monotonic CAS authority, including a read-only `get`
 that GC scans use without bootstrapping cluster state. It also freezes three backfill-proof slots、the broker readiness
 epoch and V1's all-or-nothing physical/cursor deletion rule. Checkpoint T adds exact installed-domain comparison、
-sentinel and full ownerless scans. The actual backfill coordinators and broker/runtime activation are still pending, so
-production deletion remains disabled.
+sentinel and full ownerless scans. W adds physical/cursor backfill；AP proves configured-scope capability；AQ atomically
+composes them into dual-bit authority；AR installs provider/Pulsar activation and exact-scope restart fencing. Safe
+defaults still keep production deletion disabled, and the real-service destructive final gate remains pending.
 
 `projection-generation-v1` makes the per-topic downgrade fence usable by protocol-neutral GC. For each affected
 stream, the implemented proof requires one of：the exact current identity is `DELETED`；the exact current live identity
@@ -1691,8 +1692,11 @@ coalesces any number of hints during a pass into one immediate follow-up and oth
 `completion + scanInterval` (including after failure). `closeAsync()` rejects future starts/hints, cancels the pending
 timer and waits for the active source and target futures; at the close deadline it cancels both without shutting down
 borrowed executors. `Phase4PhysicalGcRuntime.close()` drains that service before closing its scanners and transferred
-source/audit retirement adapters. `DefaultNereusRuntimeProvider` invokes `start()` only for `config.enabled()`；with
-the currently mapped `enabled=false, dryRun=true` defaults, broker startup schedules no lifecycle pass.
+source/audit retirement adapters. `DefaultNereusRuntimeProvider` invokes the runtime startup boundary once；the runtime
+returns immediately for `enabled=false`, starts audit-only passes for `enabled && dryRun`, and under
+`enabled && !dryRun` first requires checkpoint-AR exact durable domain/scope authority. Publication-only rollout
+therefore defers the loop, while a durable wrong-scope record fails before restart recovery. With the mapped
+`enabled=false, dryRun=true` defaults, broker startup schedules no lifecycle pass.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

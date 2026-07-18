@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`c59da789e88df2b57829de3277c60194b44fceb6`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -115,7 +115,10 @@ response-loss absence convergence and idempotent cleanup produce one determinist
 the probe itself does not persist the digest or enable deletion. Checkpoint AQ adds the bounded product-owned
 coordinator that freezes ACTIVE/readiness/domain/registration authority, runs and verifies the two coverage
 backfills, runs the configured-scope canary and atomically installs its digest with both V1 delete bits. Provider and
-Pulsar composition、restart scope-digest gating and the real-service final gate remain pending.
+Pulsar composition、restart scope-digest gating and the real-service final gate were still pending at AQ. Checkpoint AR
+now installs the coordinator through runtime/factory and the locked Pulsar zero-failure sequence, shares one expected
+scope digest with the operation guard, and prevents mutating startup/DELETING recovery unless durable scope and domain
+authority are exact. The real-service final gate remains pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -672,7 +675,8 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > fixed-delay provider composition. Checkpoint AO maps the complete physical-GC broker configuration and makes the
 > provider consume the same cross-validated lease/protection/orphan values. Checkpoint AP implements the real
 > configured-scope object-store capability probe without persisting or activating its digest. Product composition of
-> the cursor/physical coverage proof、capability proof、physical-delete activation、real-service destructive
+> Checkpoint AQ composes cursor/physical coverage plus capability proof into atomic physical-delete activation.
+> Checkpoint AR installs that path in provider/Pulsar and exact-scope restart fencing. Real-service destructive
 > scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
@@ -904,14 +908,18 @@ generation/ManagedLedgerGenerationProjectionAuthorityReader.java implemented che
 ManagedLedgerPhysicalDeletionActivationCoordinator.java  implemented checkpoint AQ product boundary
 ManagedLedgerPhysicalDeletionActivationRequest.java      implemented checkpoint AQ bounded run/concurrency/deadline
 ManagedLedgerPhysicalDeletionActivationResult.java       implemented checkpoint AQ redacted final durable facts
+ManagedLedgerGenerationProtocolActivationGuard.java      extended checkpoint AR exact local-scope deletion proof
 CursorSnapshotGcExecutor.java                            implemented checkpoint AK mark/recover/retire adapter
 Phase4ObjectInventoryFamilies.java                       implemented checkpoint AL exact five-family registry
 Phase4PhysicalRootLifecycleRouter.java                   implemented checkpoint AN total root-state routing
-Phase4PhysicalGcRuntime.java                             implemented checkpoint AK six-domain composition, extended AN complete lifecycle ownership
+Phase4PhysicalGcStartupGate.java                         implemented checkpoint AR exact durable scope/domain restart fence
+Phase4PhysicalGcRuntime.java                             implemented checkpoint AK/AN lifecycle, extended AR activation/start ownership
 NereusRuntimeConfiguration.java                         extended checkpoint AO broker-mapped PhysicalGcConfig validation
-DefaultNereusRuntimeProvider.java                       extended checkpoint AO shared lease/protection/orphan consumption
-NereusManagedLedgerRuntime.java                         extended checkpoint AK close-first optional ownership
+DefaultNereusRuntimeProvider.java                       extended checkpoint AR one shared capability probe/digest composition
+NereusManagedLedgerRuntime.java                         extended checkpoint AR typed physical-delete activation exposure
+NereusManagedLedgerFactory.java                         extended checkpoint AR broker-safe activation method
 DefaultPhase4PhysicalDeletionActivationCoordinator.java implemented checkpoint AQ ordered proof composition/atomic CAS
+locked Pulsar NereusManagedLedgerStorage.java            extended checkpoint AR publication-then-delete sequencing
 ```
 
 ### 6.2 Focused tests
@@ -925,6 +933,9 @@ RecoveryCheckpointSparseDirectoryTest
 RecoveryCheckpointDomainValidationTest
 ObjectStoreDeleteCapabilityProbeTest                     implemented checkpoint AP lifecycle/digest/loss/cleanup
 Phase4PhysicalDeletionActivationCoordinatorTest          implemented checkpoint AQ order/drift/conflict/loss/atomicity
+Phase4PhysicalGcStartupGateTest                          implemented checkpoint AR defer/exact-scope/domain-drift cuts
+ManagedLedgerGenerationProtocolActivationGuardTest       extended checkpoint AR wrong-scope deletion rejection
+NereusManagedLedgerStorageGenerationActivationTest       extended checkpoint AR strict ordering/failure propagation
 MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
 RecoveryCheckpointBuilderTest
@@ -1286,6 +1297,17 @@ persist `objectStoreCapabilitySha256`, set either deletion bit or prove real S3/
 the next product-activation and final-service checkpoints. The aggregate gate passed on 2026-07-18 under Java 21
 against locked Pulsar `master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`；the root build reported 145 actionable
 tasks（69 executed）and the inherited focused Pulsar build reported 141 actionable tasks（all executed）.
+
+`phase4M4PhysicalDeletionActivationCheck` extends AQ with checkpoint AR. It audits the managed-ledger request/result
+surface, ordered W-backfill/AP-canary coordinator, atomic dual-bit CAS, shared provider capability digest、factory
+exposure and the three startup modes. Focused startup tests prove absent/publication-only authority defers mutation,
+exact durable scope resumes recovery, and scope/domain drift fails non-retryably. The locked Pulsar test freezes
+`zero failures -> publication -> optional physical activation` ordering, default/dry-run non-invocation and failure
+propagation through the original completion promise. The source boundary is
+`master@c59da789e88df2b57829de3277c60194b44fceb6`. The aggregate gate passed on 2026-07-18 under Java 21 with 147
+root actionable tasks；the explicitly serialized Pulsar configuration and deletion-activation builds passed with
+141 and 129 actionable tasks respectively. This ordinary gate does not replace the real Oxia/LocalStack
+destructive restart、response-loss、multi-broker and scale final gate.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

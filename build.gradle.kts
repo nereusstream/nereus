@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f")
+    .orElse("c59da789e88df2b57829de3277c60194b44fceb6")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1141,6 +1141,55 @@ tasks.register("phase4M4ObjectStoreCapabilityCheck") {
     dependsOn(":nereus-object-store:check")
 }
 
+tasks.register<Exec>("checkPhase4M4PhysicalDeletionActivationContractSurface") {
+    group = "verification"
+    description = "Audit ordered proof composition, atomic delete activation, and restart scope fencing."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-physical-deletion-activation-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M4PhysicalDeletionActivationPulsarCheck") {
+    group = "verification"
+    description = "Run locked Pulsar physical-deletion activation sequencing, formatting, style, and tests."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    // Both checkpoints invoke the same locked Pulsar checkout with --rerun-tasks.
+    // Keep them serialized so one build cannot remove class outputs while the other compiles.
+    mustRunAfter("phase4M4ObjectStoreCapabilityCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusManagedLedgerStorageGenerationActivationTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBrokerStorageConfigurationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M4PhysicalDeletionActivationCheck") {
+    group = "verification"
+    description = "Verify checkpoint AR product composition, atomic activation, and exact-scope restart recovery."
+    dependsOn("phase4M4ObjectStoreCapabilityCheck")
+    dependsOn("checkPhase4M4PhysicalDeletionActivationContractSurface")
+    dependsOn("phase4M4PhysicalDeletionActivationPulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1151,7 +1200,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4ObjectStoreCapabilityCheck")
+    dependsOn("phase4M4PhysicalDeletionActivationCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

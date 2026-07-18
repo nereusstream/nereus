@@ -10,6 +10,8 @@ import com.nereusstream.managedledger.config.ManagedLedgerOpenConfigView;
 import com.nereusstream.managedledger.errors.ManagedLedgerErrorMapper;
 import com.nereusstream.managedledger.errors.OperationContext;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCandidate;
+import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationRequest;
+import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationResult;
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.stats.NereusManagedLedgerFactoryStats;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
@@ -136,6 +138,21 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
             return runtime
                     .generationProtocolActivationCoordinator()
                     .activatePublication();
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    public CompletableFuture<ManagedLedgerPhysicalDeletionActivationResult>
+            activatePhysicalDeletion(
+                    ManagedLedgerPhysicalDeletionActivationRequest request) {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(factoryClosed());
+        }
+        try {
+            return runtime
+                    .physicalDeletionActivationCoordinator()
+                    .activate(request);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }

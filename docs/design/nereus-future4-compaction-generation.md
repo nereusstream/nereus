@@ -650,8 +650,10 @@ Checkpoint AP 已实现 configured-scope guarded PUT/exact HEAD/complete LIST/ex
 non-secret capability digest。Checkpoint AQ 已实现 product-owned bounded coordinator：冻结 exact
 ACTIVE/readiness/domain/registration authority，运行并核验 checkpoint-W backfill 与 AP canary，再以一个 CAS
 持久化 capability digest 并同时打开两个 V1 deletion bits；provider/Pulsar startup composition 与 restart
-scope-digest gate 仍未完成。
+scope-digest gate 在 AQ 尚未完成。Checkpoint AR 已把该 coordinator 接入 provider/runtime/factory 和 locked
+Pulsar 的零失败 registration-backfill 顺序，并用同一 configured-scope digest 约束 delete/trim guard 与
+mutating startup/DELETING recovery；默认配置仍不触发 destructive path。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AQ 和 M5 through checkpoint AI 也不声称 production physical GC、
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AR 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

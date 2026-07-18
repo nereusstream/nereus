@@ -275,6 +275,28 @@ class ManagedLedgerGenerationProtocolActivationGuardTest {
         }
     }
 
+    @Test
+    void physicalDeleteRejectsAuthorityForAnotherConfiguredObjectStoreScope() {
+        try (Fixture fixture = new Fixture()) {
+            GcReferenceQuery query = query(fixture.subject.streamId());
+            GcReferenceSnapshot exact = snapshot(query, false);
+            fixture.projectionDomain.snapshot = exact;
+            DomainValidatedDeletionSubject subject =
+                    new DomainValidatedDeletionSubject(
+                            query, exact.snapshotSha256());
+
+            fixture.installActivation(true, true);
+
+            assertConditionFailure(() -> fixture
+                    .guard(false, sha("88").value())
+                    .requireReady(
+                            GenerationOperation.PHYSICAL_DELETE,
+                            subject,
+                            false)
+                    .join());
+        }
+    }
+
     private static GcReferenceQuery query(StreamId streamId) {
         PhysicalObjectIdentity object =
                 PhysicalObjectIdentity.create(
@@ -429,15 +451,29 @@ class ManagedLedgerGenerationProtocolActivationGuardTest {
         }
 
         private ManagedLedgerGenerationProtocolActivationGuard
+                guard(boolean enabled, String capabilitySha256) {
+            return guard(enabled, generations, capabilitySha256);
+        }
+
+        private ManagedLedgerGenerationProtocolActivationGuard
                 guard(
                         boolean enabled,
                         GenerationMetadataStore generationStore) {
+            return guard(enabled, generationStore, sha("77").value());
+        }
+
+        private ManagedLedgerGenerationProtocolActivationGuard
+                guard(
+                        boolean enabled,
+                        GenerationMetadataStore generationStore,
+                        String capabilitySha256) {
             return new ManagedLedgerGenerationProtocolActivationGuard(
                     CLUSTER,
                     enabled,
                     readiness,
                     activations,
                     F4MetadataTestValues.referenceDomains(),
+                    capabilitySha256,
                     projections,
                     l0,
                     generationStore,

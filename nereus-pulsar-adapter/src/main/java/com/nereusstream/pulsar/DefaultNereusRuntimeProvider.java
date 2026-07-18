@@ -53,6 +53,8 @@ import com.nereusstream.metadata.oxia.retirement.OxiaJavaObjectAuditRetirementSt
 import com.nereusstream.metadata.oxia.retirement.OxiaJavaSourceRetirementMetadataStore;
 import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import com.nereusstream.objectstore.ObjectStore;
+import com.nereusstream.objectstore.DefaultObjectStoreDeleteCapabilityProbe;
+import com.nereusstream.objectstore.ObjectStoreDeleteCapabilityProbe;
 import com.nereusstream.objectstore.ObjectStoreProvider;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
@@ -86,6 +88,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
 
         ObjectStoreProvider objectStoreProvider = null;
         ObjectStore objectStore = null;
+        ObjectStoreDeleteCapabilityProbe objectStoreDeleteCapabilityProbe = null;
         SharedOxiaClientRuntime sharedOxiaRuntime = null;
         OxiaMetadataStore l0MetadataStore = null;
         PhysicalObjectMetadataStore physicalMetadataStore = null;
@@ -121,6 +124,9 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     configuration.objectStore().providerClassName(), context.pluginClassLoader());
             objectStore = objectStoreProvider.create(configuration.objectStore(), context.secretResolver());
             Clock clock = Clock.systemUTC();
+            objectStoreDeleteCapabilityProbe =
+                    new DefaultObjectStoreDeleteCapabilityProbe(
+                            objectStore, configuration.objectStore(), clock);
             sharedOxiaRuntime = SharedOxiaClientRuntime.connect(configuration.oxia(), clock);
             l0MetadataStore = OxiaJavaClientMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, clock);
@@ -190,6 +196,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             generationProtocolActivationStore,
                             NereusGenerationProtocolReferenceDomains
                                     .currentV1(),
+                            objectStoreDeleteCapabilityProbe
+                                    .expectedCapabilitySha256(),
                             projectionStore,
                             l0MetadataStore,
                             generationMetadataStore,
@@ -337,9 +345,13 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     physicalMetadataStore,
                     generationProtocolActivationStore,
                     generationProtocolActivationGuard,
+                    context.generationCapabilityReadinessProvider(),
+                    objectProtectionManager,
                     sourceRetirementMetadataStore,
                     objectAuditRetirementStore,
                     objectStore,
+                    objectStoreDeleteCapabilityProbe,
+                    configuration.objectStore().requestTimeout(),
                     phase4Runtime.checkpointCodec(),
                     scheduler,
                     callbackExecutor,
@@ -363,6 +375,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     generationProtocolActivationGuard,
                     phase4Runtime,
                     retentionRuntime,
+                    physicalGcRuntime,
                     physicalGcRuntime,
                     objectReadPinManager,
                     objectProtectionManager,

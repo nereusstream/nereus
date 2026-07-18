@@ -18,6 +18,7 @@ import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationCoordinator;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
@@ -128,6 +129,10 @@ class NereusManagedLedgerRuntimeTest {
                 "physical-gc-runtime",
                 closes,
                 false);
+        ManagedLedgerPhysicalDeletionActivationCoordinator
+                physicalDeletionActivationCoordinator = request ->
+                        CompletableFuture.failedFuture(
+                                new AssertionError("not invoked"));
         NereusManagedLedgerRuntime runtime = new NereusManagedLedgerRuntime(
                 proxy(StreamStorage.class, "stream", closes, false),
                 proxy(ManagedLedgerProjectionMetadataStore.class, "projection", closes, false),
@@ -146,6 +151,7 @@ class NereusManagedLedgerRuntimeTest {
                 materializationRuntime,
                 null,
                 physicalGcRuntime,
+                physicalDeletionActivationCoordinator,
                 readPins,
                 proxy(AutoCloseable.class, "protection", closes, false),
                 proxy(AutoCloseable.class, "physical", closes, false),
@@ -170,6 +176,8 @@ class NereusManagedLedgerRuntimeTest {
         assertThat(runtime.materializationRuntime())
                 .isSameAs(materializationRuntime);
         assertThat(runtime.physicalGcRuntime()).isSameAs(physicalGcRuntime);
+        assertThat(runtime.physicalDeletionActivationCoordinator())
+                .isSameAs(physicalDeletionActivationCoordinator);
         assertThat(runtime.hasPhysicalGcRuntime()).isTrue();
         runtime.close();
 

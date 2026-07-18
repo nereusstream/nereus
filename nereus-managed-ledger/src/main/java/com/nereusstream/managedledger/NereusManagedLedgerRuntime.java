@@ -12,6 +12,7 @@ import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProtocolActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistrationBackfillProofCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
+import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationCoordinator;
 import com.nereusstream.managedledger.retention.NereusRetentionRuntime;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
@@ -56,6 +57,8 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private ManagedLedgerGenerationProtocolActivationCoordinator
             generationProtocolActivationCoordinator;
     private GenerationProtocolActivationGuard generationProtocolActivationGuard;
+    private ManagedLedgerPhysicalDeletionActivationCoordinator
+            physicalDeletionActivationCoordinator;
     private AutoCloseable materializationRuntime;
     private NereusRetentionRuntime retentionRuntime;
     private AutoCloseable physicalGcRuntime;
@@ -74,6 +77,74 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
     private final String writerId;
     private final Semaphore callbackPermits;
     private final AtomicBoolean closed = new AtomicBoolean();
+
+    public NereusManagedLedgerRuntime(
+            StreamStorage streamStorage,
+            ManagedLedgerProjectionMetadataStore projectionStore,
+            GenerationMetadataStore generationMetadataStore,
+            ManagedLedgerMaterializationRegistrationCoordinator
+                    materializationRegistrationCoordinator,
+            CursorMetadataStore cursorMetadataStore,
+            CursorSnapshotStore cursorSnapshotStore,
+            CursorRetentionCoordinator cursorRetentionCoordinator,
+            CursorStorage cursorStorage,
+            CursorStorageConfig cursorStorageConfig,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            GenerationProtocolActivationStore generationProtocolActivationStore,
+            ManagedLedgerGenerationRegistrationBackfillProofCoordinator
+                    generationRegistrationBackfillProofCoordinator,
+            ManagedLedgerGenerationProtocolActivationCoordinator
+                    generationProtocolActivationCoordinator,
+            GenerationProtocolActivationGuard generationProtocolActivationGuard,
+            AutoCloseable materializationRuntime,
+            NereusRetentionRuntime retentionRuntime,
+            AutoCloseable physicalGcRuntime,
+            ObjectReadPinManager objectReadPinManager,
+            AutoCloseable objectProtectionManager,
+            AutoCloseable physicalMetadataStore,
+            OxiaMetadataStore l0MetadataStore,
+            SharedOxiaClientRuntime sharedOxiaRuntime,
+            ObjectStore objectStore,
+            ObjectStoreProvider objectStoreProvider,
+            ScheduledExecutorService scheduler,
+            ExecutorService callbackExecutor,
+            NereusManagedLedgerFactoryConfig config,
+            String cluster,
+            String processRunId,
+            String writerId) {
+        this(
+                streamStorage,
+                projectionStore,
+                generationMetadataStore,
+                materializationRegistrationCoordinator,
+                cursorMetadataStore,
+                cursorSnapshotStore,
+                cursorRetentionCoordinator,
+                cursorStorage,
+                cursorStorageConfig,
+                cursorProtocolActivationGuard,
+                generationProtocolActivationStore,
+                generationRegistrationBackfillProofCoordinator,
+                generationProtocolActivationCoordinator,
+                generationProtocolActivationGuard,
+                materializationRuntime,
+                retentionRuntime,
+                physicalGcRuntime,
+                null,
+                objectReadPinManager,
+                objectProtectionManager,
+                physicalMetadataStore,
+                l0MetadataStore,
+                sharedOxiaRuntime,
+                objectStore,
+                objectStoreProvider,
+                scheduler,
+                callbackExecutor,
+                config,
+                cluster,
+                processRunId,
+                writerId);
+    }
 
     public NereusManagedLedgerRuntime(
             StreamStorage streamStorage,
@@ -364,6 +435,8 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
             AutoCloseable materializationRuntime,
             NereusRetentionRuntime retentionRuntime,
             AutoCloseable physicalGcRuntime,
+            ManagedLedgerPhysicalDeletionActivationCoordinator
+                    physicalDeletionActivationCoordinator,
             ObjectReadPinManager objectReadPinManager,
             AutoCloseable objectProtectionManager,
             AutoCloseable physicalMetadataStore,
@@ -419,6 +492,8 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
         this.materializationRuntime = materializationRuntime;
         this.retentionRuntime = retentionRuntime;
         this.physicalGcRuntime = physicalGcRuntime;
+        this.physicalDeletionActivationCoordinator =
+                physicalDeletionActivationCoordinator;
         requireDistinctOptionalResource(
                 "materialization runtime",
                 materializationRuntime,
@@ -535,6 +610,15 @@ public final class NereusManagedLedgerRuntime implements AutoCloseable {
                     "this runtime was assembled without the F4 generation activation coordinator");
         }
         return generationProtocolActivationCoordinator;
+    }
+
+    public ManagedLedgerPhysicalDeletionActivationCoordinator
+            physicalDeletionActivationCoordinator() {
+        if (physicalDeletionActivationCoordinator == null) {
+            throw new IllegalStateException(
+                    "this runtime was assembled without the F4 physical deletion activation coordinator");
+        }
+        return physicalDeletionActivationCoordinator;
     }
 
     public AutoCloseable materializationRuntime() {

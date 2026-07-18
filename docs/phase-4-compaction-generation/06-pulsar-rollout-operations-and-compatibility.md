@@ -902,8 +902,8 @@ cursor and shared stores. `NereusRuntimeConfiguration` now carries a cross-valid
 compatibility constructors deliberately use `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). Checkpoint AL
 makes the inventory scanner an owned runtime component；listing remains audit/discovery input and exposes no MARK/delete
 path. Checkpoint AN adds the non-overlapping lifecycle service and provider startup hook: when and only when
-`PhysicalGcConfig.enabled()` is true, it runs complete physical-root routing/recovery, then complete registration
-retirement, then object inventory, using fixed delay after each pass. Checkpoint AO now maps all 17 explicit broker
+`PhysicalGcConfig.enabled()` is true, the runtime is eligible to run complete physical-root routing/recovery, then
+complete registration retirement, then object inventory, using fixed delay after each pass. Checkpoint AO now maps all 17 explicit broker
 properties through `NereusBrokerStorageConfiguration` into the cross-validated runtime value and makes the provider use
 that same value for pending protections、reader leases、clock skew and orphan grace. The mapped `enabled=false` default
 therefore starts no lifecycle pass, while `dryRun=true` remains the second independent mutation guard. Broker startup
@@ -920,6 +920,21 @@ Checkpoint AP intentionally exposes no broker startup hook：it neither runs che
 the digest/delete bits. Therefore an enabled non-dry-run broker configuration still lacks destructive authority until
 the product activation coordinator completes the same readiness epoch's backfills, executes this probe and advances
 both V1 delete bits atomically through the activation store.
+
+Checkpoint AQ implements that product-owned bounded transaction. Checkpoint AR installs it in production without
+making configuration itself authority. The provider constructs one configured-scope probe and passes the same
+expected digest to the generation operation guard、AQ coordinator and `Phase4PhysicalGcStartupGate`；the runtime owns
+checkpoint-W backfill and exposes activation through the managed-ledger runtime/factory. `enabled=false` starts
+nothing；`enabled=true, dryRun=true` may run non-mutating audit passes；`enabled=true, dryRun=false` starts or resumes
+the lifecycle only after durable dual delete bits、all proofs、the exact six-domain set and the local scope digest match.
+Absent/publication-only authority defers startup, while a durable scope/domain mismatch fails before MARKED/DELETING
+recovery.
+
+The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
+registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
+request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation
+publication and safe/default/dry-run physical config never call physical activation；either activation failure is
+propagated to the original backfill completion promise.
 
 ## 12. Operations and Status
 

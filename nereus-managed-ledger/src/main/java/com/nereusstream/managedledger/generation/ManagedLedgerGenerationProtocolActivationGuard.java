@@ -75,6 +75,7 @@ public final class ManagedLedgerGenerationProtocolActivationGuard
     private final GenerationProtocolActivationStore activations;
     private final List<ReferenceDomainVersionRecord> requiredDomains;
     private final Checksum referenceDomainSetSha256;
+    private final String expectedObjectStoreCapabilitySha256;
     private final ManagedLedgerProjectionMetadataStore projections;
     private final ManagedLedgerGenerationProjectionAuthorityReader projectionReader;
     private final ManagedLedgerProjectionKeyspace projectionKeys;
@@ -89,6 +90,7 @@ public final class ManagedLedgerGenerationProtocolActivationGuard
             GenerationCapabilityReadinessProvider readinessProvider,
             GenerationProtocolActivationStore activations,
             List<ReferenceDomainVersionRecord> requiredDomains,
+            String expectedObjectStoreCapabilitySha256,
             ManagedLedgerProjectionMetadataStore projections,
             OxiaMetadataStore l0,
             GenerationMetadataStore generations,
@@ -103,6 +105,9 @@ public final class ManagedLedgerGenerationProtocolActivationGuard
         this.requiredDomains = canonicalDomains(requiredDomains);
         this.referenceDomainSetSha256 =
                 referenceDomainSetSha256(this.requiredDomains);
+        this.expectedObjectStoreCapabilitySha256 = requireSha256(
+                expectedObjectStoreCapabilitySha256,
+                "expectedObjectStoreCapabilitySha256");
         this.projections = Objects.requireNonNull(
                 projections, "projections");
         this.projectionReader =
@@ -398,10 +403,10 @@ public final class ManagedLedgerGenerationProtocolActivationGuard
                         || value.cursorSnapshotBackfill()
                                         .brokerReadinessEpoch()
                                 != readiness.brokerReadinessEpoch()
-                        || value.objectStoreCapabilitySha256()
-                                .isEmpty())) {
+                        || !value.objectStoreCapabilitySha256()
+                                .equals(expectedObjectStoreCapabilitySha256))) {
             throw notReady(
-                    "generation physical deletion is not active for the current readiness epoch");
+                    "generation physical deletion is not active for the current readiness epoch and configured object-store scope");
         }
     }
 
@@ -668,6 +673,23 @@ public final class ManagedLedgerGenerationProtocolActivationGuard
             GenerationProtocolActivationRecord value) {
         return value.physicalDeleteEnabled()
                 && value.cursorSnapshotDeleteEnabled();
+    }
+
+    private static String requireSha256(String value, String field) {
+        Objects.requireNonNull(value, field);
+        if (value.length() != 64) {
+            throw new IllegalArgumentException(
+                    field + " must be lowercase SHA-256");
+        }
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (!((character >= '0' && character <= '9')
+                    || (character >= 'a' && character <= 'f'))) {
+                throw new IllegalArgumentException(
+                        field + " must be lowercase SHA-256");
+            }
+        }
+        return value;
     }
 
     private static List<ReferenceDomainVersionRecord> canonicalDomains(

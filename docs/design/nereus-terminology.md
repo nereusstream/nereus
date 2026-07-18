@@ -197,6 +197,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   physical-root/cursor-root coverage backfill 与 AP canary，再以单个 CAS 同时持久化 capability digest 和打开两个
   V1 deletion bits 的 product-owned coordinator checkpoint；它尚未接入 provider/Pulsar startup，production
   deletion 仍保持关闭。
+- **F4-M4 checkpoint AR**：把 AQ 接入 provider/runtime/factory 与 locked Pulsar 零失败 backfill 顺序，并用
+  同一 configured-scope digest 同时约束 operation guard、activation 和 mutating startup/DELETING recovery 的
+  ordinary checkpoint；默认 `enabled=false, dryRun=true` 仍不调用 destructive path。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

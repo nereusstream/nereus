@@ -110,7 +110,7 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Phase 4
-Pulsar source lock 已推进到 `master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`。M6 增加
+Pulsar source lock 已推进到 `master@c59da789e88df2b57829de3277c60194b44fceb6`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace admin route 静态审计。
@@ -298,6 +298,13 @@ capability digest 并打开两个 V1 deletion bits。readiness drift、失败 ba
 closed；CAS conflict 不重复 backfill/canary，lost response 只接受 reload 后的 exact durable authority，返回前再做
 readiness/activation 双重校验。AQ 目前仍是未接入 provider/Pulsar 启动路径的协议协调器；runtime scope-digest
 startup gate、broker composition 和真实 Oxia/LocalStack destructive/scale gate 仍待完成。
+Checkpoint AR 已把 AQ 接入 production provider/runtime/factory 和 locked Pulsar broker。Provider 只构造一份
+configured-scope probe，并把同一 expected digest 同时交给 deletion guard、activation coordinator 与 startup
+gate；`enabled && !dryRun` 的 runtime 只有在 durable delete bits、exact six-domain set 和本地 scope digest
+全部相等时才启动或恢复 `DELETING`，未激活时延后启动，scope/domain drift 则 non-retryable fail closed。
+零失败 broker registration backfill 先等待 publication ACTIVE，再仅在 physical-GC mutation switch 打开时运行
+AQ 并等待 lifecycle start；默认配置仍不运行 canary、不设置 delete bits、不启动 GC。真实 Oxia/LocalStack
+destructive/restart/scale final gate 仍未完成。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。
