@@ -59,7 +59,6 @@ import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Clock;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -72,9 +71,6 @@ import java.util.concurrent.atomic.AtomicLong;
 /** Production Object-WAL/Oxia runtime assembly used by the hybrid broker storage provider. */
 public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider {
     private static final String WRITER_VERSION = "nereus-pulsar-f2";
-    private static final Duration PENDING_PROTECTION_DURATION = Duration.ofMinutes(5);
-    private static final Duration READER_LEASE_DURATION = Duration.ofMinutes(2);
-    private static final Duration ORPHAN_GRACE = Duration.ofDays(1);
     private static final GcReferenceDomainConfig ACTIVATION_REFERENCE_CONFIG =
             new GcReferenceDomainConfig(256, 100_000, 100_000);
 
@@ -85,6 +81,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         Objects.requireNonNull(configuration, "configuration");
         Objects.requireNonNull(context, "context");
         StreamStorageConfig streamConfig = configuration.streamStorage();
+        var physicalGcConfig = configuration.physicalGc();
         requireIdentity(streamConfig);
 
         ObjectStoreProvider objectStoreProvider = null;
@@ -138,18 +135,18 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             objectProtectionManager = new DefaultObjectProtectionManager(
                     streamConfig.cluster(),
                     physicalMetadataStore,
-                    PENDING_PROTECTION_DURATION,
-                    configuration.materialization().maximumClockSkew(),
-                    ORPHAN_GRACE,
+                    physicalGcConfig.pendingProtectionDuration(),
+                    physicalGcConfig.maximumClockSkew(),
+                    physicalGcConfig.orphanGrace(),
                     clock);
             objectReadPinManager = new DefaultObjectReadPinManager(
                     streamConfig.cluster(),
                     DeterministicIds.stableHashComponent(
                             "f4-reader/" + streamConfig.processRunId()),
                     physicalMetadataStore,
-                    READER_LEASE_DURATION,
-                    configuration.materialization().maximumClockSkew(),
-                    ORPHAN_GRACE,
+                    physicalGcConfig.readerLeaseDuration(),
+                    physicalGcConfig.maximumClockSkew(),
+                    physicalGcConfig.orphanGrace(),
                     clock);
             projectionStore = ManagedLedgerProjectionMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, configuration.projectionMetadata(), clock);
@@ -289,7 +286,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     objectReadPinManager,
                     cursorConfig,
                     configuration.objectStore().requestTimeout(),
-                    PENDING_PROTECTION_DURATION,
+                    physicalGcConfig.pendingProtectionDuration(),
                     clock);
             CursorStateMachine stateMachine = new CursorStateMachine(cursorConfig);
             CursorStatePersistencePlanner persistencePlanner = new CursorStatePersistencePlanner(

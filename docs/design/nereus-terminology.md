@@ -185,6 +185,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M4 checkpoint AN**：把 complete physical-root scan/routing、complete registration retirement 和
   known-prefix inventory 严格串联，并加入 fixed-delay/non-overlap/restart recovery 的 ordinary checkpoint；它不
   表示 broker GC config、coverage proof 或 destructive activation 已启用。
+- **F4-M4 checkpoint AO**：把 17 项 bounded broker physical-GC properties 精确映射到 typed
+  `PhysicalGcConfig`，并让 provider 的 pending protection、reader lease、clock skew、orphan grace 只消费这一
+  份 cross-validated value 的 ordinary checkpoint；默认仍为 `enabled=false, dryRun=true`，配置本身不构成
+  coverage/capability proof 或 destructive activation authority。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

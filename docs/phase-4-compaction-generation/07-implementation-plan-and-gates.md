@@ -2,8 +2,8 @@
 
 ## 1. Current Status
 
-F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`330eeeb3fa9903ed0123c2a0e261d403c32f0a59`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
+`42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -107,8 +107,9 @@ registration-retirement coordinator and exact managed-ledger
 cursor/retention authority. Its ordinary gate now includes non-empty published-workflow and real NRC1 recovery-root
 owner/protection drain plus delete-response-loss cuts. Checkpoint AN adds complete 256-shard root routing/recovery、
 complete 64-shard registration retirement、inventory-last ordering, fixed-delay/non-overlap/hint coalescing and
-close-first runtime ownership. The current safe-default bridge still starts no pass；broker GC config mapping、coverage/
-delete activation and the real-service final gate remain pending.
+close-first runtime ownership. Checkpoint AO maps the complete bounded physical-GC broker configuration into the typed
+runtime and removes provider-local protection/lease/orphan timing constants. Safe defaults still start no pass；coverage/
+capability proof、delete activation and the real-service final gate remain pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -662,8 +663,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Checkpoint AM adds exact deleted-stream/projection/F3 authority capture, bounded workflow/root drain and
 > registration-last conditional retirement. Checkpoint AN adds the strict metadata-first physical-root/registration/
 > inventory pass, exhaustive root lifecycle routing, restart-safe generic ownerless execution and non-overlapping
-> fixed-delay provider composition. The cursor coverage bit、broker
-> physical-GC config mapping/activation、real-service destructive
+> fixed-delay provider composition. Checkpoint AO maps the complete physical-GC broker configuration and makes the
+> provider consume the same cross-validated lease/protection/orphan values. The cursor coverage bit、capability proof、
+> physical-delete activation、real-service destructive
 > scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
@@ -892,8 +894,8 @@ CursorSnapshotGcExecutor.java                            implemented checkpoint 
 Phase4ObjectInventoryFamilies.java                       implemented checkpoint AL exact five-family registry
 Phase4PhysicalRootLifecycleRouter.java                   implemented checkpoint AN total root-state routing
 Phase4PhysicalGcRuntime.java                             implemented checkpoint AK six-domain composition, extended AN complete lifecycle ownership
-NereusRuntimeConfiguration.java                         extended checkpoint AK typed safe-default PhysicalGcConfig
-DefaultNereusRuntimeProvider.java                       extended checkpoint AN enabled-only lifecycle startup
+NereusRuntimeConfiguration.java                         extended checkpoint AO broker-mapped PhysicalGcConfig validation
+DefaultNereusRuntimeProvider.java                       extended checkpoint AO shared lease/protection/orphan consumption
 NereusManagedLedgerRuntime.java                         extended checkpoint AK close-first optional ownership
 ```
 
@@ -1006,6 +1008,7 @@ retirement.
 ./gradlew phase4M4ObjectInventoryCheck
 ./gradlew phase4M4RegistrationRetirementCheck
 ./gradlew phase4M4LifecycleSchedulingCheck
+./gradlew phase4M4PhysicalGcConfigCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -1243,6 +1246,17 @@ The aggregate gate passed on 2026-07-18 under Java 21 against locked Pulsar
 `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`; the root build reported 133 actionable tasks（65 executed）and
 the inherited nested Pulsar regression reported 138 actionable tasks（3 executed）.
 
+`phase4M4PhysicalGcConfigCheck` extends checkpoint AN with checkpoint AO. It audits all 17 Pulsar broker fields and
+their safe defaults, the exact `NereusBrokerStorageConfiguration -> PhysicalGcConfig` mapping, constructor/cross-config
+bounds, and the provider's single-source use of pending-protection、reader-lease、clock-skew and orphan-grace values.
+Its locked Pulsar focused test proves default `enabled=false, dryRun=true`, explicit `enabled=true, dryRun=false`
+mutation admission, full value conversion, oversized page rejection and lease/operation-timeout rejection. The gate
+does not produce either coverage proof, does not certify the object-store delete capability, and cannot set activation
+delete bits；those remain separate durable authorities. The source boundary is
+`master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`. The aggregate gate passed on 2026-07-18 under Java 21；the root
+build reported 144 actionable tasks（63 executed）and the locked Pulsar focused/style build reported 141 actionable
+tasks（all executed）.
+
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.
 It also proves live-reference root/protection backfill, all-shard lifecycle recovery with empty object listing, 10,000
@@ -1311,11 +1325,11 @@ nereus-managed-ledger/.../NereusManagedLedger.java
 nereus-managed-ledger/.../NereusManagedLedgerOpenCoordinator.java     checkpoint X return-before-registration, extended Z inspect/ensure
 nereus-managed-ledger/.../NereusManagedLedgerRuntime.java             checkpoints X/AA–AC plus AF materialization lifecycle ownership
 
-nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java              extended checkpoint AF MaterializationConfig/cross-validation
+nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java              extended checkpoint AO PhysicalGcConfig broker mapping/cross-validation
 nereus-pulsar-adapter/.../NereusRuntimeContext.java                   checkpoints AA/AB readiness provider and first-activation switch
 nereus-pulsar-adapter/.../NereusGenerationProtocolReferenceDomains.java checkpoint AA exact six-domain set
 nereus-pulsar-adapter/.../Phase4ObjectWalRuntime.java                  implemented checkpoint AF owned production composition
-nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoints X/AA–AC plus AF resolver/read/repair/service wiring
+nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoints X/AA–AC/AF/AN/AO runtime and shared GC timing wiring
 ```
 
 ### 7.2 Local Pulsar fork artifacts
@@ -1336,10 +1350,10 @@ pulsar-broker/.../nereus/NereusResolvedTopicFeatures.java
 pulsar-broker/.../nereus/NereusTopicFeatureResolver.java
 pulsar-broker/.../nereus/NereusTopicFeatureValidator.java
 pulsar-broker/.../nereus/NereusManagedLedgerStorage.java               extended checkpoints AA–AC proof, switch and proof-to-ACTIVE sequencing
-pulsar-broker/.../nereus/NereusBrokerStorageConfiguration.java         extended checkpoint AF exact profile/materialization mapping
+pulsar-broker/.../nereus/NereusBrokerStorageConfiguration.java         extended checkpoint AO exact physical-GC mapping
 pulsar-broker/.../service/persistent/PersistentTopic.java
 pulsar-broker/.../admin/impl/PersistentTopicsBase.java
-pulsar-broker-common/.../ServiceConfiguration.java                      extended checkpoint AF profile/materialization defaults
+pulsar-broker-common/.../ServiceConfiguration.java                      extended checkpoint AO 17 physical-GC fields/safe defaults
 conf/broker.conf                                                        extended checkpoint AF operator reference
 ```
 
@@ -1387,7 +1401,7 @@ NereusGenerationProtocolCapabilityTest                    implemented checkpoint
 NereusCursorProtocolCapabilityTest                        extended checkpoint Y
 NereusStorageBindingCapabilityTest                        extended checkpoint Y
 NereusGenerationRegistrationBackfillTest                  implemented checkpoint Z order/concurrency/digest/drift, extended AA proof admission
-NereusBrokerStorageConfigurationTest                      extended checkpoint AF exact profile/config and AH retention defaults/rejection
+NereusBrokerStorageConfigurationTest                      extended checkpoint AO physical-GC defaults/mapping/rejection
 NereusManagedLedgerStorageGenerationActivationTest        implemented checkpoint AC success/failure/disabled sequencing
 NereusTopicFeatureResolverTest                            extended checkpoint AI exact precedence/copy/projection
 NereusTopicFeatureValidatorTest                           extended checkpoint AI retention/backlog matrix/overflow

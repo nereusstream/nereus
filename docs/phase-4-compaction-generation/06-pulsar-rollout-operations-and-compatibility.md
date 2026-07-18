@@ -894,20 +894,21 @@ Checkpoint AF maps the Object-WAL subset of this table through
 exact lag reader/guard、generation-aware read/repair and materialization lifecycle through
 `DefaultNereusRuntimeProvider`. The default remains `OBJECT_WAL_SYNC_OBJECT`; the async value is exact-name only,
 first-create only and still requires the durable activation/marker proof before primary IO. Checkpoints AH–AI map the
-retention values；the physical-GC-specific properties below the materialization boundary remain rollout targets.
+retention values；checkpoint AO maps the physical-GC-specific properties below the materialization boundary.
 
 Checkpoint AK composes the product-side cursor physical-GC executor、six reference domains、durable journal and
 source-retirement coordinator in `Phase4PhysicalGcRuntime`, and `NereusManagedLedgerRuntime` owns/closes it before
 cursor and shared stores. `NereusRuntimeConfiguration` now carries a cross-validated `PhysicalGcConfig`; its
-compatibility constructors deliberately use `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). The current
-Pulsar bridge still takes that compatibility path and does not map the table's physical-GC properties. Checkpoint AL
+compatibility constructors deliberately use `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). Checkpoint AL
 makes the inventory scanner an owned runtime component；listing remains audit/discovery input and exposes no MARK/delete
 path. Checkpoint AN adds the non-overlapping lifecycle service and provider startup hook: when and only when
 `PhysicalGcConfig.enabled()` is true, it runs complete physical-root routing/recovery, then complete registration
-retirement, then object inventory, using fixed delay after each pass. The current bridge's `enabled=false` default
+retirement, then object inventory, using fixed delay after each pass. Checkpoint AO now maps all 17 explicit broker
+properties through `NereusBrokerStorageConfiguration` into the cross-validated runtime value and makes the provider use
+that same value for pending protections、reader leases、clock skew and orphan grace. The mapped `enabled=false` default
 therefore starts no lifecycle pass, while `dryRun=true` remains the second independent mutation guard. Broker startup
-cannot MARK or DELETE until explicit property mapping、coverage proofs and activation are implemented, so the rollout
-sequence above remains unchanged.
+still cannot acquire physical-delete authority until coverage/capability proofs and monotonic activation are complete,
+so configuration alone cannot bypass the rollout sequence above.
 
 ## 12. Operations and Status
 

@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("330eeeb3fa9903ed0123c2a0e261d403c32f0a59")
+    .orElse("42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1071,6 +1071,55 @@ tasks.register("phase4M4LifecycleSchedulingCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register<Exec>("checkPhase4M4PhysicalGcConfigContractSurface") {
+    group = "verification"
+    description = "Audit exact broker physical-GC configuration mapping and provider consumption."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-physical-gc-config-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M4PhysicalGcConfigPulsarCheck") {
+    group = "verification"
+    description = "Run locked Pulsar physical-GC configuration formatting, style, and focused tests."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M4LifecycleSchedulingCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker-common:spotlessJavaCheck",
+        ":pulsar-broker-common:checkstyleMain",
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBrokerStorageConfigurationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M4PhysicalGcConfigCheck") {
+    group = "verification"
+    description = "Verify checkpoint AO exact broker GC mapping while coverage and physical deletion stay closed."
+    dependsOn("phase4M4LifecycleSchedulingCheck")
+    dependsOn("checkPhase4M4PhysicalGcConfigContractSurface")
+    dependsOn("phase4M4PhysicalGcConfigPulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1081,7 +1130,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4LifecycleSchedulingCheck")
+    dependsOn("phase4M4PhysicalGcConfigCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

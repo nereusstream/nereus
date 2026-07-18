@@ -59,8 +59,9 @@ admission，以及 coupled production generation-aware read/repair/materializati
 AF；local Pulsar fork 也已映射 exact sync/async first-create profile 和 bounded materialization config。Sync
 仍是默认，async 仍受 durable activation proof 约束；retention/admin 与 cursor snapshot execution 已有实现
 slices，checkpoints AL–AM 已实现 current-writer object inventory/missing-root registration 与 registration-last
-retirement；checkpoint AN 已装配 metadata-first root/registration/inventory lifecycle 和恢复路由。当前 broker
-safe defaults 不启动该服务；physical-GC config/coverage/delete activation 和 M6 最终兼容门禁仍未完成。
+retirement；checkpoint AN 已装配 metadata-first root/registration/inventory lifecycle 和恢复路由；checkpoint AO
+已完成 typed physical-GC broker config mapping，并统一 provider 的 protection/lease/orphan timing 来源。当前 broker
+safe defaults 不启动该服务；coverage/capability proof、delete activation 和 M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AN、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AO、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -54,7 +54,10 @@ Already present：
 - F4-M4 checkpoint AN：one enabled, non-overlapping fixed-delay lifecycle now runs a complete 256-shard physical-root
   route/recovery pass, then a complete 64-shard registration-retirement pass, then known-prefix inventory. MARKED and
   DELETING recovery is metadata-first and generic ownerless candidates reuse the central six-domain collector. The
-  current broker bridge still maps `enabled=false, dryRun=true`, so production startup schedules no pass.
+  safe defaults still map `enabled=false, dryRun=true`, so production startup schedules no pass.
+- F4-M4 checkpoint AO：Pulsar now maps all bounded physical-GC fields into the typed runtime, and the provider shares
+  those exact lease/protection/skew/orphan values across write、read-pin、cursor and GC paths. This adds no coverage or
+  object-store capability proof and cannot activate physical deletion.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative
@@ -75,7 +78,7 @@ Already present：
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
-- broker-mapped physical-GC configuration、coverage proof and destructive activation；
+- physical-root/cursor coverage proof、object-store capability proof and destructive activation；
 - primary-WAL retention gate and final real-service destructive/scale evidence；
 - mixed primary target resolver。
 

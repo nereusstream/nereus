@@ -31,7 +31,8 @@ Checkpoints AG–AI additionally deliver exact logical-retention planning/servic
 lane、production managed-ledger/facade installation and exact Pulsar retention/backlog policy plus loaded/unloaded
 admin admission. Checkpoints AJ–AN additionally implement cursor-snapshot discovery/execution、the current-writer
 known-prefix inventory and exact missing-root registration boundary、registration-last retirement and the strict
-metadata-first lifecycle. Broker physical-GC configuration/coverage/activation and the remaining destructive runtime remain target work. Package、class and method names
+metadata-first lifecycle. Checkpoint AO maps the exact bounded broker physical-GC configuration into that runtime；
+coverage/capability proof、physical-delete activation and the remaining destructive runtime remain target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 

@@ -95,15 +95,16 @@
 > cancels the active pass by close deadline without owning injected executors. Cursor ACTIVE/MARKED roots use exact F3
 > inventory；generic ownerless roots use the six-domain proof after a cheap protection admission；DELETING/DELETED use
 > sealed-journal/tombstone recovery. The provider starts this lifecycle only when typed GC is enabled. Coverage/delete
-> activation、broker physical-GC config mapping and the final deletion switch remain closed；the current broker bridge
-> still supplies `enabled=false, dryRun=true`, so default startup schedules no pass.
+> activation and the final deletion switch remain closed. Checkpoint AO maps all typed physical-GC broker inputs into
+> the runtime and removes provider-local lease/protection/orphan constants；the safe defaults remain
+> `enabled=false, dryRun=true`, so default startup schedules no pass and configuration is never deletion authority.
 >
 > 设计基线日期：2026-07-14
 >
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`
+> `master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`
 
 > 实现状态日期：2026-07-18
 
@@ -1102,6 +1103,33 @@ remain pending. The gate passed on 2026-07-18 under Java 21 against locked Pulsa
 `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`; the root build reported 133 actionable tasks（65 executed）and
 the inherited nested Pulsar regression reported 138 actionable tasks（3 executed）.
 
+### 6.25f F4-M4 broker physical-GC configuration checkpoint
+
+Checkpoint AO closes the broker-to-runtime configuration boundary without granting physical deletion. Pulsar
+`ServiceConfiguration` now owns 17 explicit fields for lifecycle enable/dry-run、reader lease/renew、scan interval、
+metadata/object page limits、delete concurrency、ownerless stream/domain/reference bounds、operation/close/drain
+deadlines and pending/orphan/tombstone grace. Defaults are operationally bounded but rollout-safe：
+`nereusPhysicalGcEnabled=false` and `nereusPhysicalGcDryRun=true` remain independent controls.
+
+`NereusBrokerStorageConfiguration.runtimeConfiguration` converts every seconds value to an exact positive/non-negative
+`Duration`, applies `PhysicalGcConfig.MAX_PAGE_SIZE`、`MAX_STREAMS_PER_CANDIDATE` and `MAX_DOMAIN_VALUES`, and then lets
+`NereusRuntimeConfiguration` enforce lease-renew、drain、operation-timeout、materialization grace and tombstone lifetime
+relationships before any Oxia/S3 client is constructed. Invalid values therefore fail broker initialization rather
+than partially starting a GC runtime.
+
+`DefaultNereusRuntimeProvider` now takes `configuration.physicalGc()` once and supplies its pending-protection、reader-
+lease、clock-skew and orphan-grace values to `DefaultObjectProtectionManager`、`DefaultObjectReadPinManager` and
+`DefaultCursorSnapshotStore`. The former hard-coded 5-minute/2-minute/1-day constants are removed, so the write,
+read-pin and GC interpretations cannot drift.
+
+`phase4M4PhysicalGcConfigCheck` freezes the Nereus/provider surface, all 17 Pulsar defaults and getters, exact typed
+mapping, safe-default/mutation semantics and invalid page/lease tests against locked Pulsar
+`master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`. This gate does not publish `physicalRootBackfill` or
+`cursorSnapshotBackfill`, does not prove object-store delete capability, and does not enable either durable deletion
+bit. Coverage proof、capability proof、monotonic destructive activation and the real Oxia/LocalStack destructive/scale
+gate remain mandatory. The AO gate passed on 2026-07-18 under Java 21；the root build reported 144 actionable tasks
+（63 executed）and the locked Pulsar focused/style build reported 141 actionable tasks（all executed）.
+
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
 Checkpoint X 关闭 cold-topic backfill 开始前必须先关闭的新写前沿。`ProjectionIdentity` 现在拥有共享的
@@ -1400,7 +1428,7 @@ four-suite broker invocation passed 129 tasks.
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AN, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement and non-overlapping metadata-first periodic runtime are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while broker GC config、coverage/physical-delete activation、real-service scale/destructive evidence and final gate remain pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AO, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless candidates、the explicit root lifecycle router、strict known-prefix missing-root inventory registration、registration-last deleted-stream retirement、non-overlapping metadata-first periodic runtime and exact broker typed physical-GC configuration are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while coverage/capability proof、physical-delete activation、real-service scale/destructive evidence and final gate remain pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；physical GC composition and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 
