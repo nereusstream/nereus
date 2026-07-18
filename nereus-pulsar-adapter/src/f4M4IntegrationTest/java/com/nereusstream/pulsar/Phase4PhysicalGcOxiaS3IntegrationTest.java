@@ -327,6 +327,105 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
+    @Test
+    void lostDeletedRootCasResponseReloadsExactDurableReplacementWithoutRepeatedDelete()
+            throws Exception {
+        MutableClock clock = new MutableClock(3_000_000);
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "f4-m4-lost-deleted-cas-" + suffix;
+        String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
+        createBucket(bucket);
+        ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "lost-deleted-cas");
+        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
+                READINESS_EPOCH, sha256("broker-set/lost-deleted-cas/" + suffix), 1);
+        PhysicalGcConfig gcConfig = physicalGcConfig();
+        TargetObject target;
+
+        try (Process first = Process.open(
+                cluster,
+                "j".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("lost-deleted-cas-first"),
+                clock,
+                StoreDecorator.identity())) {
+            first.seedPublication();
+            target = first.createOwnerlessCompactedObject();
+
+            ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
+                            "k".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .join();
+            assertThat(activation.status())
+                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            first.runtime.lifecycleService().scanNow().join();
+            assertThat(first.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            first.assertObjectPresent(target);
+        }
+
+        clock.advance(Duration.ofMinutes(7));
+        AtomicBoolean targetDeleteCompleted = new AtomicBoolean();
+        AtomicInteger targetDeleteCalls = new AtomicInteger();
+        AtomicBoolean deletedCasResponseLost = new AtomicBoolean();
+        AtomicBoolean exactDeletedReloadObserved = new AtomicBoolean();
+        try (Process uncertain = Process.open(
+                cluster,
+                "l".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("lost-deleted-cas-uncertain"),
+                clock,
+                raw -> new TargetDeleteTrackingObjectStore(
+                        raw,
+                        target.key(),
+                        targetDeleteCompleted,
+                        targetDeleteCalls),
+                PhysicalStoreDecorator.loseDeletedRootCasResponse(
+                        target.hash(),
+                        targetDeleteCompleted,
+                        deletedCasResponseLost,
+                        exactDeletedReloadObserved))) {
+            uncertain.runtime.start();
+            uncertain.runtime.lifecycleService().scanNow().join();
+
+            assertThat(targetDeleteCompleted).isTrue();
+            assertThat(deletedCasResponseLost).isTrue();
+            assertThat(exactDeletedReloadObserved).isTrue();
+            assertThat(targetDeleteCalls).hasValue(1);
+            assertThat(uncertain.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            uncertain.assertObjectAbsent(target);
+        }
+
+        AtomicBoolean restartedDeleteCompleted = new AtomicBoolean();
+        AtomicInteger restartedDeleteCalls = new AtomicInteger();
+        try (Process restarted = Process.open(
+                cluster,
+                "m".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("lost-deleted-cas-restarted"),
+                clock,
+                raw -> new TargetDeleteTrackingObjectStore(
+                        raw,
+                        target.key(),
+                        restartedDeleteCompleted,
+                        restartedDeleteCalls))) {
+            restarted.runtime.start();
+            restarted.runtime.lifecycleService().scanNow().join();
+
+            assertThat(restarted.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            restarted.assertObjectAbsent(target);
+            assertThat(restartedDeleteCompleted).isFalse();
+            assertThat(restartedDeleteCalls).hasValue(0);
+        }
+    }
+
     private Path stagingDirectory(String name) throws Exception {
         Path path = Files.createDirectories(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
@@ -839,6 +938,54 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                         return invokeDelegate(raw, method, arguments);
                     });
         }
+
+        static PhysicalStoreDecorator loseDeletedRootCasResponse(
+                ObjectKeyHash target,
+                AtomicBoolean targetDeleteCompleted,
+                AtomicBoolean deletedCasResponseLost,
+                AtomicBoolean exactDeletedReloadObserved) {
+            return raw -> (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
+                    PhysicalObjectMetadataStore.class.getClassLoader(),
+                    new Class<?>[] {PhysicalObjectMetadataStore.class},
+                    (proxy, method, arguments) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return proxyObjectMethod(
+                                    proxy,
+                                    method,
+                                    arguments,
+                                    "lost DELETED-root CAS response physical metadata store");
+                        }
+                        if (method.getName().equals("close")) {
+                            return null;
+                        }
+                        if (method.getName().equals("getRoot")
+                                && arguments != null
+                                && arguments.length == 2
+                                && target.equals(arguments[1])
+                                && deletedCasResponseLost.get()) {
+                            exactDeletedReloadObserved.set(true);
+                        }
+                        if (method.getName().equals("compareAndSetRoot")
+                                && arguments != null
+                                && arguments.length == 3
+                                && arguments[1] instanceof PhysicalObjectRootRecord replacement
+                                && replacement.objectKeyHash().equals(target.value())
+                                && replacement.lifecycle() == PhysicalObjectLifecycle.DELETED
+                                && targetDeleteCompleted.get()
+                                && !deletedCasResponseLost.get()) {
+                            CompletableFuture<?> applied = (CompletableFuture<?>)
+                                    invokeDelegate(raw, method, arguments);
+                            return applied.thenCompose(ignored -> {
+                                deletedCasResponseLost.set(true);
+                                return CompletableFuture.failedFuture(new NereusException(
+                                        ErrorCode.TIMEOUT,
+                                        true,
+                                        "injected response loss after successful DELETED root CAS"));
+                            });
+                        }
+                        return invokeDelegate(raw, method, arguments);
+                    });
+        }
     }
 
     private abstract static class ForwardingObjectStore implements ObjectStore {
@@ -904,19 +1051,32 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             extends ForwardingObjectStore {
         private final ObjectKey target;
         private final AtomicBoolean targetDeleteCompleted;
+        private final AtomicInteger targetDeleteCalls;
 
         private TargetDeleteTrackingObjectStore(
                 ObjectStore delegate,
                 ObjectKey target,
                 AtomicBoolean targetDeleteCompleted) {
+            this(delegate, target, targetDeleteCompleted, new AtomicInteger());
+        }
+
+        private TargetDeleteTrackingObjectStore(
+                ObjectStore delegate,
+                ObjectKey target,
+                AtomicBoolean targetDeleteCompleted,
+                AtomicInteger targetDeleteCalls) {
             super(delegate);
             this.target = target;
             this.targetDeleteCompleted = targetDeleteCompleted;
+            this.targetDeleteCalls = targetDeleteCalls;
         }
 
         @Override
         public CompletableFuture<DeleteObjectResult> deleteObject(
                 ObjectKey key, DeleteObjectOptions options) {
+            if (key.equals(target)) {
+                targetDeleteCalls.incrementAndGet();
+            }
             return delegate.deleteObject(key, options).thenApply(result -> {
                 if (key.equals(target)) {
                     targetDeleteCompleted.set(true);

@@ -122,7 +122,9 @@ authority are exact. Checkpoint AS creates one exact registered-stream global/pr
 both activation revalidation and GC, and proves the first real Oxia/LocalStack activation、wrong-scope、empty-list and
 lost-DELETE-response restart slice. Checkpoint AT proves another independent runtime resumes the exact durable
 DELETING root after the real object DELETE completes but before the old process invokes its DELETED-root CAS. The
-remaining real-service multi-worker/scale/failure matrix remains pending.
+checkpoint AU fixture then proves an applied DELETED-root Oxia CAS with a lost response converges through the exact
+replacement reload and never repeats the LocalStack DELETE. The remaining real-service multi-worker/scale/failure
+matrix remains pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -683,6 +685,7 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Checkpoint AR installs that path in provider/Pulsar and exact-scope restart fencing. Checkpoint AS unifies the
 > activation/GC ownerless-reference interpretation and proves one real Oxia/LocalStack destructive restart slice.
 > Checkpoint AT adds real post-DELETE/pre-DELETED-root-CAS process-death recovery from durable DELETING authority.
+> Checkpoint AU adds real applied-DELETED-root-CAS response-loss recovery and exact no-repeat-DELETE evidence.
 > The remaining destructive/scale scenarios and final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
@@ -943,7 +946,7 @@ Phase4PhysicalDeletionActivationCoordinatorTest          implemented checkpoint 
 Phase4PhysicalGcStartupGateTest                          implemented checkpoint AR defer/exact-scope/domain-drift cuts
 ManagedLedgerGenerationProtocolActivationGuardTest       extended checkpoint AR wrong-scope deletion rejection
 NereusManagedLedgerStorageGenerationActivationTest       extended checkpoint AR strict ordering/failure propagation
-Phase4PhysicalGcOxiaS3IntegrationTest                    extended checkpoint AT real activation/scope/lost-response/post-DELETE process recovery
+Phase4PhysicalGcOxiaS3IntegrationTest                    extended checkpoint AU real activation/scope/DELETE+DELETED-CAS response-loss/process recovery
 MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
 RecoveryCheckpointBuilderTest
@@ -1341,7 +1344,17 @@ sleep-based coordination. It passed on 2026-07-18 under Java 21 and Docker 28.5.
 `c59da789e88df2b57829de3277c60194b44fceb6`；the root build reported 151 actionable tasks（66 executed、85 up-to-
 date），and the two pinned Pulsar source-set builds executed 132/132 and 129/129 tasks.
 
-Checkpoint AT is deliberately not `phase4M4FinalCheck`. The final gate extends real Oxia + LocalStack across two
+`phase4M4DeletedCasResponseLossCheck` is checkpoint AU. Its real-service method first establishes the same activated
+MARKED ownerless root and waits through drain grace. A target wrapper records the exact LocalStack DELETE completion
+and count. The physical-store proxy delegates the matching DELETED replacement CAS to real Oxia and only after that
+future succeeds returns a retriable timeout. Production `completeDeletedRoot` follows its uncertain-CAS branch, reloads
+the exact durable replacement and completes without reissuing DELETE. A separately assembled runtime scans the same
+DELETED root and also issues no DELETE. The focused method passed on 2026-07-18 under Java 21 and Docker 28.5.2 with
+47 executed tasks. The AU aggregate adds a static ordering audit and passed on 2026-07-18 under Java 21 and Docker
+28.5.2 against locked Pulsar `c59da789e88df2b57829de3277c60194b44fceb6`；the root build reported 152 actionable
+tasks（67 executed、85 up-to-date），and the two pinned Pulsar source-set builds executed 141/141 and 138/138 tasks.
+
+Checkpoint AU is deliberately not `phase4M4FinalCheck`. The final gate extends real Oxia + LocalStack across two
 independent workers/brokers. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.
 It also proves live-reference root/protection backfill, all-shard lifecycle recovery with empty object listing, 10,000

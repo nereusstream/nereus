@@ -945,6 +945,12 @@ the root shard, reauthenticates the sealed journal and completes DELETED from HE
 state nor object listing is transferred. This closes one required restart cut without claiming two-broker rollout or
 the remaining scale/failure matrix.
 
+Checkpoint AU covers the next metadata-response boundary against the same real services. The old runtime receives a
+successful LocalStack DELETE, applies the exact DELETED-root CAS in Oxia, but receives an injected timeout instead of
+the CAS result. It reloads and accepts only the complete durable replacement, so object deletion is not repeated. A
+fresh runtime subsequently observes terminal DELETED and also performs zero target DELETE calls. This preserves the
+broker-facing activation contract while leaving multi-broker ownership/failover and scale certification pending.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

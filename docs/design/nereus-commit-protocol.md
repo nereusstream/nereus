@@ -511,8 +511,9 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 > physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless execution、current-writer inventory、
 > registration-last retirement、metadata-first lifecycle、typed broker GC config、configured-scope capability proof、
 > atomic deletion activation、provider/Pulsar restart fencing and shared reference-domain interpretation are
-> implemented through F4-M4 checkpoint AT. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
-> response and post-DELETE/pre-DELETED-root-CAS independent recovery. F4-M5 checkpoints X–AI additionally implement
+> implemented through F4-M4 checkpoint AU. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
+> response、post-DELETE/pre-DELETED-root-CAS independent recovery and applied-DELETED-CAS response-loss exact reload
+> without repeated DELETE. F4-M5 checkpoints X–AI additionally implement
 > durable registration/readiness/activation、protected async Object-WAL acknowledgement/read repair、pre-I/O lag
 > admission、coupled materialization、stable retention planning/F3 trim delegation and exact Pulsar policy/admin
 > admission. Safe defaults keep physical deletion disabled；the explicit opt-in path and these restart slices exist,
@@ -559,6 +560,12 @@ Checkpoint AT proves the concrete post-delete cut against real services：the ol
 LocalStack DELETE, then stops before invoking the Oxia DELETED-root CAS. The durable root/journal remains DELETING and
 HEAD is absent. A separately assembled runtime discovers that root from Oxia, reloads the sealed attempt/digest and
 accepts absence idempotently before CASing DELETED；no LIST result or process-local callback crosses the boundary.
+
+Checkpoint AU proves the uncertain metadata-commit cut：the exact DELETED replacement first commits in real Oxia, but
+the caller receives a retriable timeout. `completeDeletedRoot` reloads by object hash and accepts only that complete
+replacement under the same immutable identity/attempt/journal digest. It therefore returns success without replaying
+the LocalStack DELETE；a later independent runtime also performs no delete. A different or still-DELETING value cannot
+be interpreted as the successful CAS.
 
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the

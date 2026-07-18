@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4-M4 through checkpoint AT and F4-M5 through checkpoint AI are in progress，F4-M6 pending
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4-M4 through checkpoint AU and F4-M5 through checkpoint AI are in progress，F4-M6 pending
 > 最近设计/实现同步：2026-07-18
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -102,7 +102,7 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4 through checkpoint AT 已实现 NRC1 protocol、protected generation-zero append、
+Oxia/LocalStack final gates。M4 through checkpoint AU 已实现 NRC1 protocol、protected generation-zero append、
 recovery-root/replay/index repair、bounded GC plan/root/journal fence、root-authenticated destructive skeleton、typed
 generation-zero source retirement，以及 completed-trim/COMMITTED/TOPIC_COMPACTED source eligibility 和
 grace-fenced higher-generation pre-drain/reproof，并增加 durable generation-activation authority、future sentinel
@@ -125,7 +125,9 @@ guard and GC registry behind one registered-stream/global projection-domain asse
 deferral、wrong-scope restart rejection、empty-inventory MARKED recovery and lost successful DELETE response
 convergence against real Oxia/LocalStack；safe defaults still keep production deletion disabled and the remaining
 destructive/scale matrix is pending. Checkpoint AT additionally proves a new runtime completes durable DELETING after
-the real object DELETE but before the old process's DELETED-root CAS. M5
+the real object DELETE but before the old process's DELETED-root CAS. Checkpoint AU proves an applied real Oxia
+DELETED-root CAS with a lost response converges through exact replacement reload, with one LocalStack DELETE before
+and zero after an independent restart. M5
 checkpoint X 又实现 exact durable registration create/refresh/final
 revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、

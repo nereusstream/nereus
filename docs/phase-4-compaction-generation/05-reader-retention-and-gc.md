@@ -176,8 +176,10 @@ lifecycle and exact ACTIVE/MARKED/DELETING/DELETED routing. Checkpoints AO–AR 
 capability proof、atomic delete activation and provider/Pulsar restart fencing. Checkpoint AS makes activation and GC
 consume the exact same ownerless global/projection domain assembly and proves one real Oxia/LocalStack restart/delete-
 response-loss slice. Checkpoint AT additionally proves real post-DELETE/pre-DELETED-root-CAS process loss converges
-from durable DELETING authority in a fresh runtime. The remaining scale/failure final gate is still planned，and the
-safe-default production bridge still schedules no pass or deletion.
+from durable DELETING authority in a fresh runtime. Checkpoint AU proves an already-applied DELETED-root CAS whose
+response is lost converges through exact root reload with one physical DELETE, and that a subsequent fresh runtime
+does not delete again. The remaining scale/failure final gate is still planned，and the safe-default production bridge
+still schedules no pass or deletion.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1722,6 +1724,14 @@ root/journal in DELETING. After that runtime closes, a separately constructed pr
 authoritative shard scan, reloads the sealed journal, HEADs absence and completes `DELETING -> DELETED`. No LIST、
 process-local future or candidate object crosses the process boundary. This proves the post-object-delete cut only；
 the other MARKED/metadata/protection/CAS kill points remain in the final matrix.
+
+Checkpoint AU isolates the uncertain DELETED-root CAS cut. Its metadata proxy invokes the exact real Oxia CAS and
+waits for success before replacing the response with a retriable timeout. The production coordinator then executes
+its ordinary failure branch：reload the root by object hash, require the complete expected DELETED replacement and
+return success without restarting source retirement or object deletion. The fixture observes that reload before any
+test-side root read, counts exactly one LocalStack DELETE, and proves a later independently assembled runtime counts
+zero. A different root/attempt/replacement would remain `ROOT_CHANGED` or fail closed；response loss never authorizes
+a guessed transition.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

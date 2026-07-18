@@ -323,6 +323,14 @@ LocalStack 上通过；其余 MARKED/metadata/protection/root-CAS cuts、双 wor
 `phase4M4PostDeleteCrashRecoveryCheck` 已于 2026-07-18 在 Java 21、Docker 28.5.2 和 locked Pulsar
 `c59da789e88df2b57829de3277c60194b44fceb6` 上通过（151 actionable tasks，66 executed、85 up-to-date）；
 其中两组 pinned Pulsar source-set 验证分别为 132/132 和 129/129 executed。
+Checkpoint AU 继续关闭真实 Oxia `DELETING -> DELETED` CAS 已成功、但调用方未收到响应的 uncertain cut。
+Fixture 只在真实 CAS future 成功后返回 retriable timeout；production coordinator 随即 exact reload 同一
+root/attempt/replacement 并收敛，LocalStack target 只执行一次 DELETE。随后独立进程再次扫描 durable DELETED
+root，不重复 DELETE，也不依赖对象 LIST。该聚焦真实服务场景以 47/47 executed tasks 通过；
+`phase4M4DeletedCasResponseLossCheck` 也已于 2026-07-18 在 Java 21、Docker 28.5.2 和 locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6` 上通过（152 actionable tasks，67 executed、85 up-to-date），
+其中两组 pinned Pulsar source-set 验证为 141/141 和 138/138 executed。其他 metadata/protection/source kill
+points、双 worker/broker 和规模矩阵仍待完成。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

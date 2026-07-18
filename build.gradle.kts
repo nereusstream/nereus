@@ -1232,6 +1232,27 @@ tasks.register("phase4M4PostDeleteCrashRecoveryCheck") {
     dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
 }
 
+tasks.register<Exec>("checkPhase4M4DeletedCasResponseLossContractSurface") {
+    group = "verification"
+    description = "Audit exact reload after a real DELETED-root CAS applies but its response is lost."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-deleted-cas-response-loss-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4DeletedCasResponseLossCheck") {
+    group = "verification"
+    description = "Verify checkpoint AU real DELETED-root CAS response-loss convergence without repeated object DELETE."
+    dependsOn("phase4M4PostDeleteCrashRecoveryCheck")
+    dependsOn("checkPhase4M4DeletedCasResponseLossContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1242,7 +1263,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4PostDeleteCrashRecoveryCheck")
+    dependsOn("phase4M4DeletedCasResponseLossCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

@@ -8,8 +8,9 @@
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
 > checkpoints、topic-compaction neutral SPI/registry、COMMITTED-source bootstrap、tagged-v1 key encoding、
 > sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；F4-M3 ordinary/real-service
-> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint AT 已实现 opt-in physical-GC composition，并以
-> 真实 Oxia/LocalStack 验证 wrong-scope、empty-list/lost-response 与 post-DELETE/pre-root-CAS restart cuts；
+> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint AU 已实现 opt-in physical-GC composition，并以
+> 真实 Oxia/LocalStack 验证 wrong-scope、empty-list/lost-response、post-DELETE/pre-root-CAS restart 与 applied-
+> DELETED-CAS response-loss exact-reload cuts；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
