@@ -977,6 +977,13 @@ materialization scheduler and S3's request-deadline scheduler now remove cancell
 successful cuts do not retain one delayed task per historical operation. This is deterministic product-runtime
 evidence；actual Pulsar ownership transfer/unload and two-broker failover remain M6 work.
 
+Checkpoint AZ exercises the 10,000-cursor-root boundary below the broker bridge. The exact fixture pages 10,000 F3
+roots and 10,000 NCS objects, retains 9,997 current references and drives old、expired CAS-lost and deleted-cursor
+objects through the production MARK/restart/revalidate/DELETING/protection-retirement/DELETE chain. A separate
+10,000-candidate pass proves the scanner's synchronous completion path is stack-bounded, strictly sequential and
+leaves no cancelled deadline tasks. This closes the cursor inventory/classification/deletion scale assumption；it
+does not replace the remaining Pulsar two-broker ownership、unload and failover evidence.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

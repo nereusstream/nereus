@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AY、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AZ、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -90,7 +90,11 @@ Already present：
 - F4-M4 checkpoint AY：10,000 DELETED roots cross a durable first-absence pass and a separate orphan-window pass via
   the production scanner/coordinator；matching Phase 1 references、manifest and root retire in that order under
   32-entry pages and one-at-a-time visitation. Materialization/S3 cancelled deadline tasks are removed immediately.
-  The remaining cursor-10k、late-PUT and two-broker gates stay pending.
+  The remaining cursor-10k、late-PUT and two-broker gates stayed pending at AY.
+- F4-M4 checkpoint AZ：a stack-bounded pass visits 10,000 synchronous cursor-snapshot candidates sequentially, and a
+  second fixture pages exactly 10,000 durable cursor roots plus 10,000 objects. It preserves 9,997 current references
+  while old、expired CAS-lost pending and deleted-cursor candidates pass through the real central GC/restart/delete
+  chain. The cursor-10k line is closed；late-PUT/source-protection cuts and two-broker evidence remain pending.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative

@@ -590,6 +590,14 @@ window, repeats owner/HEAD authority, deletes Phase 1 references before manifest
 root last. Pages contain at most 32 roots and only one visitor is active. Cancelled materialization/S3 deadline tasks
 are removed immediately, so completed operations cannot become an implicit process-memory history.
 
+Checkpoint AZ proves the cursor projection does not become a correctness owner at the corresponding 10,000-root
+boundary. One iteratively assembled future chain visits 10,000 synchronous candidates without stack growth. The exact
+mixed fixture derives 9,997 live references and three historical candidates from versioned F3 retention/cursor roots,
+object listing and protections；only after central MARK、restart reconstruction、full post-drain recapture and durable
+DELETING may the old、expired CAS-lost and deleted-cursor objects be removed. The current cursor references, physical
+roots and permanent protections remain unchanged, so classification scale does not move the linearization point out
+of the underlying F3/F4 authorities.
+
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the
 Phase 1 object-reference record, manifest and finally the exact-version root. Every actual provider PUT/retry first

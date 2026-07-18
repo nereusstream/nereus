@@ -140,7 +140,7 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                     List<ObjectKey> candidates = cut.inventory().unreferencedCandidates().stream()
                             .sorted(Comparator.comparing(ObjectKey::value))
                             .toList();
-                    return visitCandidates(cut, candidates, 0, now, visitor, counts, deadline)
+                    return visitCandidates(cut, candidates, now, visitor, counts, deadline)
                             .thenApply(ignored -> counts.result(false, false));
                 });
         result.whenComplete((ignored, failure) -> {
@@ -313,20 +313,34 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
     private CompletableFuture<Void> visitCandidates(
             InventoryCut cut,
             List<ObjectKey> candidates,
-            int index,
             long now,
             CandidateVisitor visitor,
             Counts counts,
             OperationDeadline deadline) {
-        if (index == candidates.size()) {
-            return CompletableFuture.completedFuture(null);
+        CompletableFuture<Void> visits = CompletableFuture.completedFuture(null);
+        for (ObjectKey key : candidates) {
+            visits = visits.thenCompose(ignored -> visitCandidate(
+                    cut,
+                    cut.listedObjects().get(key),
+                    now,
+                    visitor,
+                    counts,
+                    deadline));
         }
-        ListedObject listed = cut.listedObjects().get(candidates.get(index));
+        return visits;
+    }
+
+    private CompletableFuture<Void> visitCandidate(
+            InventoryCut cut,
+            ListedObject listed,
+            long now,
+            CandidateVisitor visitor,
+            Counts counts,
+            OperationDeadline deadline) {
         return evaluate(cut, listed, now, deadline).thenCompose(decision -> {
             counts.add(decision.block());
             if (decision.candidate().isEmpty()) {
-                return visitCandidates(
-                        cut, candidates, index + 1, now, visitor, counts, deadline);
+                return CompletableFuture.completedFuture(null);
             }
             Candidate candidate = decision.candidate().orElseThrow();
             counts.eligibleCandidates = Math.addExact(counts.eligibleCandidates, 1);
@@ -334,11 +348,8 @@ public final class CursorSnapshotGcScanner implements AutoCloseable {
                             deadline,
                             () -> visitor.visit(candidate),
                             "visit cursor snapshot GC candidate " + candidate.listedObject().key().value())
-                    .thenCompose(ignored -> {
-                        counts.visitedCandidates = Math.addExact(counts.visitedCandidates, 1);
-                        return visitCandidates(
-                                cut, candidates, index + 1, now, visitor, counts, deadline);
-                    });
+                    .thenRun(() -> counts.visitedCandidates = Math.addExact(
+                            counts.visitedCandidates, 1));
         });
     }
 

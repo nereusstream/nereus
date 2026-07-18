@@ -1776,6 +1776,18 @@ third pass is empty. The fixture forces 32-value pagination and proves one visit
 a time, while both production deadline scheduler factories remove cancelled tasks and leave an empty queue after
 each pass. No per-root future/result collection is accumulated.
 
+Checkpoint AZ tests the independent cursor-snapshot cardinality and destructive classification boundary. One fixture
+gives `CursorSnapshotGcScanner` 10,000 unreferenced NCS objects and synchronous metadata/visitor futures；candidate
+sequencing is assembled iteratively, so the scanner visits every object exactly once with maximum concurrency one,
+without recursive stack growth or retained deadline tasks. A second fixture creates exactly 10,000 durable cursor
+roots and 10,000 listed objects, all under 256-entry pagination：9,997 are exact live/current references；the other
+three are an old replaced snapshot, an expired pending CAS-lost snapshot and a deleted-cursor snapshot whose deletion
+CAS cleared its reference. The production scanner/executor/collector/journal/source-retirement chain marks only those
+three, reconstructs them from MARKED after the drain window, repeats the full inventory immediately before delete
+intent, retires their exact old protections and performs exactly three identity-bound object deletes. Every current
+object remains and its representative ACTIVE root/permanent protection is untouched. This closes the 10,000-root
+cursor scale requirement without turning listing or the projection layer into deletion authority.
+
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.
 

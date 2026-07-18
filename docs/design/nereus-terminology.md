@@ -220,6 +220,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M4 checkpoint AY**：10,000 个 DELETED root 通过 production scanner/coordinator 先持久化 first-absence
   proof，再在独立 orphan window 后按 Phase 1 references、manifest、root-last 顺序退休；32-entry pagination、
   one-at-a-time visitation 与 remove-on-cancel deadline schedulers 共同冻结内存边界的 scale checkpoint。
+- **F4-M4 checkpoint AZ**：以 10,000 个同步 cursor-snapshot candidates 冻结 stack-bounded sequential visitor，
+  并在 exact 10,000 durable cursor roots + 10,000 objects 上证明 live/current、old、expired CAS-lost pending、
+  deleted-cursor 分类和 central restart-safe object deletion 的 scale checkpoint。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

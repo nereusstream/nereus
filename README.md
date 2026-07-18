@@ -363,6 +363,15 @@ root-last conditional retirement，第三轮扫描为空。生产 materializatio
 `phase4M4TombstoneScaleCheck` 同日在 Java 21、Docker 28.5.2 与 locked Pulsar
 `c59da789e88df2b57829de3277c60194b44fceb6` 上通过（root 156 actionable tasks，86 executed、70 up-to-date；
 两组串行 locked-Pulsar 验证为 141/141 和 138/138 executed）。
+Checkpoint AZ 继续关闭独立的 cursor-snapshot 规模线：首个夹具把 10,000 个对象全部变成候选，证明 scanner
+在同步完成 future 下仍以迭代 chain 单 visitor 顺序推进、不会递归增长 Java stack，且 deadline queue 为空；
+第二个夹具精确构造 10,000 个 durable cursor roots 和 10,000 个 NCS 对象，其中 9,997 个为 live/current，
+old、expired CAS-lost pending 和 deleted-cursor 各一个。生产 executor 将三者依次 MARK，在 drain window 后按
+restart 路径重建 plan、重扫完整 inventory、进入 DELETING、退休 exact protection 并各执行一次 DELETE；所有
+current bytes/root/protection 保持可见。Java 21 聚焦测试已于 2026-07-18 以 37/37 executed tasks 在 27 秒内通过；
+`phase4M4CursorGcScaleCheck --rerun-tasks` 同日在 Java 21、Docker 28.5.2 与 locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6` 上以 3m49s 通过（root 157/157 executed；两组串行
+locked-Pulsar 验证为 141/141 和 138/138 executed）。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

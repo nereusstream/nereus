@@ -74,8 +74,10 @@ checkpoint AW 进一步让全新 runtime 在 LIST 恒空时恢复覆盖 256 shar
 真实四分片 Oxia 证明首进程写入 1,001 个同 shard root 加其余每 shard 一个后，全新 scanner 从空 continuation
 以 16 个热点页加 255 个单页无重复、无遗漏地读取全部 1,256 个 identity；checkpoint AY 又让 10,000 个
 DELETED root 经过持久化 first-absence 与独立 orphan window 两轮生产扫描，按 references → manifest → root
-顺序退休，并修复 materialization/S3 cancelled deadline timer 在高基数成功请求后滞留的问题。
-当前 broker safe defaults 不启动该服务；剩余 destructive/scale 矩阵与 M4/M6 最终兼容门禁仍未完成。
+顺序退休，并修复 materialization/S3 cancelled deadline timer 在高基数成功请求后滞留的问题；checkpoint AZ
+再以 10,000 个同步候选证明 scanner 的迭代 future chain 无递归 stack 增长，并在 10,000 durable cursor roots +
+10,000 objects 上保留 9,997 个 current reference，只删除 old、expired CAS-lost 和 deleted-cursor 三类对象。
+当前 broker safe defaults 不启动该服务；剩余 destructive/failure 矩阵与 M4/M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

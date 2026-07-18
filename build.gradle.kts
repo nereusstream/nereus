@@ -1341,6 +1341,29 @@ tasks.register("phase4M4TombstoneScaleCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register<Exec>("checkPhase4M4CursorGcScaleContractSurface") {
+    group = "verification"
+    description = "Audit stack-bounded 10,000-candidate visitation and exact 10,000-root cursor-snapshot GC."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-cursor-gc-scale-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4CursorGcScaleCheck") {
+    group = "verification"
+    description = "Verify checkpoint AZ classifies and deletes live/old/CAS-lost/deleted-cursor snapshots at 10,000 roots."
+    dependsOn("phase4M4TombstoneScaleCheck")
+    dependsOn("checkPhase4M4CursorGcScaleContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1351,7 +1374,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4TombstoneScaleCheck")
+    dependsOn("phase4M4CursorGcScaleCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

@@ -4,7 +4,7 @@
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
-> F4-M4 through checkpoint AY and F4-M5 through checkpoint AI are in progress；F4-M6 pending
+> F4-M4 through checkpoint AZ and F4-M5 through checkpoint AI are in progress；F4-M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -676,6 +676,11 @@ Checkpoint AY 再关闭 10,000-DELETED-root 退休规模线：production scanner
 32-entry pagination、one-at-a-time visitation 和 remove-on-cancel materialization/S3 deadline scheduler 冻结
 高基数内存边界。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AY 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
+Checkpoint AZ 再关闭 10,000 cursor-root 规模线：一个 10,000-candidate pass 证明同步 future 下的迭代 visitor
+chain 不增长 Java stack；另一个 exact 10,000 roots + 10,000 objects 夹具保留 9,997 current reference，并让
+old、expired CAS-lost pending 和 deleted-cursor 三类候选通过 central MARK/restart/revalidate/DELETING/
+protection-retirement/DELETE 链，current bytes/root/protection 均保持不变。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AZ 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

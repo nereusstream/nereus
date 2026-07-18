@@ -131,8 +131,10 @@ instead of inferring cross-page logical order. Checkpoint AX then closes the 1,0
 real four-shard Oxia：a fresh process scans 1,256 roots from empty continuations in 16 bounded pages for shard 0 and one
 page for each other shard, with no duplicate or omitted identity. Checkpoint AY closes the 10,000-DELETED-root
 dual-window retirement fixture with bounded 32-entry pages、one-at-a-time production coordinator visitation、Phase 1
-audit cleanup/root-last CAS and remove-on-cancel production deadline schedulers. The remaining real-service
-two-broker/scale/failure matrix remains pending.
+audit cleanup/root-last CAS and remove-on-cancel production deadline schedulers. Checkpoint AZ closes the separate
+10,000-cursor-root line with stack-bounded 10,000-candidate visitation plus exact live/old/CAS-lost/deleted-cursor
+classification and central restart-safe deletion. The remaining real-service two-broker/failure matrix remains
+pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -695,7 +697,11 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Checkpoint AT adds real post-DELETE/pre-DELETED-root-CAS process-death recovery from durable DELETING authority.
 > Checkpoint AU adds real applied-DELETED-root-CAS response-loss recovery and exact no-repeat-DELETE evidence.
 > Checkpoint AV adds deterministic real two-worker DELETING-CAS contention and shared-intent delete convergence.
-> The remaining destructive/scale scenarios and final M4 gate remain before F4-M4 can be called complete.
+> Checkpoint AW adds fresh-process recovery across all 256 physical shards with empty listing. Checkpoint AX proves
+> fresh-process 1,001-root hot-shard pagination against real Oxia. Checkpoint AY proves 10,000 DELETED-root dual-window
+> retirement and bounded deadline schedulers. Checkpoint AZ proves stack-bounded 10,000-candidate visitation and exact
+> 10,000-cursor-root live/old/CAS-lost/deleted-cursor classification/deletion. The remaining destructive/failure
+> scenarios and final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
 > identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
@@ -1449,6 +1455,30 @@ up-to-date）, and the two serialized locked-Pulsar builds executed 141/141 and 
 Checkpoint AY is still not `phase4M4FinalCheck`. It closes the `10,000 DELETED roots age through two HEAD-absence
 windows` line only；the 10,000 cursor-root fixture, source/protection delete cuts, complete late PUT/tombstone races
 and actual broker ownership/failover remain mandatory.
+
+`phase4M4CursorGcScaleCheck` is checkpoint AZ. It first proves the scanner's maximum candidate cardinality itself：
+10,000 old NCS objects with exact ACTIVE roots and no live cursor reference are completely listed in 256-entry pages
+and delivered to a synchronous visitor. `CursorSnapshotGcScanner.visitCandidates` now assembles the sequential future
+chain in an ordinary loop instead of recursively calling `index + 1`, so all 10,000 candidates complete without Java
+stack growth, visitor concurrency remains one and every cancelled operation deadline is removed from the scheduler.
+
+The second fixture creates exactly 10,000 durable cursor roots for one stream and exactly 10,000 listed snapshot
+objects. It retains 9,997 current ACTIVE references and creates one candidate from each real historical state：old
+permanent protection after an ACTIVE root advances to a replacement snapshot、expired pending protection after the
+cursor-root CAS loses、and old permanent protection after a cursor deletion CAS clears the reference. Cursor and
+object inventory each use 40 pages. The first executor scan marks exactly those three candidates and stops at drain
+grace. After time advances, restart reconstruction repeats the complete inventory and central final revalidation for
+each MARKED root, enters durable DELETING, retires the exact protection and deletes the exact object once. All 9,997
+current objects remain, with an ACTIVE physical root and permanent protection, and the deadline queue is empty.
+
+The focused Java 21 run passed on 2026-07-18 with 37/37 executed tasks in 27 seconds. The aggregate gate composes AY,
+the affected module checks, source/module/document audits and the dedicated AZ static contract. Its `--rerun-tasks`
+run passed on 2026-07-18 under Java 21、Docker 28.5.2 and locked Pulsar
+`master@c59da789e88df2b57829de3277c60194b44fceb6` in 3m49s：the root build executed 157/157 tasks and the two
+serialized locked-Pulsar builds executed 141/141 and 138/138 tasks. Checkpoint AZ closes required scenario 20 and the
+`10,000 durable cursor roots for one stream` scale fixture. It is still not `phase4M4FinalCheck`：source/protection
+delete cuts、the complete late PUT/tombstone race matrix and actual Pulsar two-broker ownership/unload/failover remain
+mandatory.
 
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration
 
