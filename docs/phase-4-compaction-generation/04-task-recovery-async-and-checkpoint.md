@@ -194,8 +194,8 @@ ownerless queries. It still does not install them in `MaterializationRuntime` or
 
 Checkpoint U adds the standalone `DefaultPhysicalRootTombstoneRetirementCoordinator`. It consumes those ownerless
 domain proofs plus reader/protection absence, persists the separated HEAD-absence window and retires Phase 1 audits
-root-last. The class is production code but is still not scheduled or installed by `MaterializationRuntime`；the
-activation/backfill/runtime boundary therefore remains unchanged.
+root-last. At checkpoint U the class was not scheduled or installed by `MaterializationRuntime`；checkpoint AN now
+installs it behind the metadata-first physical-GC lifecycle router without changing the delete-activation boundary.
 
 F4-M4 checkpoint K adds the two affected-stream managed-ledger domains without changing that runtime boundary.
 `ProjectionGenerationReferenceDomain` reads the exact per-stream F2 binding and the current topic authority selected
@@ -233,13 +233,27 @@ MARKED for later retry.
 `CursorSnapshotGcExecutor` translates the scanner's protections into the canonical plan and is the only adapter for
 `mark -> drain/final revalidation -> DELETING -> SourceRetirementCoordinator.resume`. It can independently recover an
 exact MARKED or DELETING root after restart. `Phase4PhysicalGcRuntime` composes that adapter with the durable journal、
-empty cursor metadata-retirement registry and all six reference domains, and production managed-ledger ownership now
-closes this runtime before the cursor and shared stores. No root/registration scanner is scheduled yet；broker config
-mapping、coverage/delete activation and registration-retirement runtime composition remain target work. Checkpoint AL additionally installs
-the provider-owned known-prefix inventory scanner. It can register an old exact-HEAD object whose root is missing, but
-it is not scheduled and it cannot mark or delete objects；safe defaults therefore still perform no deletion.
-Checkpoint AM adds the bounded registration-retirement coordinator and exact F3 cursor/retention authority, including
-published-workflow and non-empty NRC1 owner/protection response-loss tests；the runtime still does not schedule it.
+all six reference domains and the complete metadata-retirement handler registry, and production managed-ledger
+ownership closes this runtime before the cursor and shared stores. Checkpoint AL additionally installs the
+provider-owned known-prefix inventory scanner. It can register an old exact-HEAD object whose root is missing, but it
+cannot itself mark or delete objects. Checkpoint AM adds the bounded registration-retirement coordinator and exact F3
+cursor/retention authority, including published-workflow and non-empty NRC1 owner/protection response-loss tests.
+
+Checkpoint AN installs those primitives as one metadata-first lifecycle. `PhysicalGcLifecyclePass.run()` first awaits
+one complete 256-shard `PhysicalObjectRootScanner` pass, then one complete 64-shard
+`StreamRegistrationRetirementScanner` pass, and only then invokes `ObjectInventoryScanner`; a failed stage prevents
+every later stage from starting. `Phase4PhysicalRootLifecycleRouter` dispatches ACTIVE cursor roots to at most one
+complete cursor scan per stream per pass, other ACTIVE roots to `OwnerlessObjectGcExecutor`, MARKED roots to exact
+cursor/ownerless recovery, DELETING roots directly to `SourceRetirementCoordinator.resume`, DELETED roots to the
+tombstone coordinator and QUARANTINED roots to no-op. The ownerless executor reconstructs its immutable-identity plan
+after restart and still delegates the mark/drain/final-proof/delete sequence to `PhysicalObjectGarbageCollector`.
+
+`DefaultPhysicalGcLifecycleService` starts with an immediate pass, forbids overlap, coalesces hints into at most one
+additional immediate pass and uses fixed delay measured after completion or failure. Close cancels scheduled work,
+waits for the active source and target futures and never closes borrowed executors. The provider calls `start()` only
+when `PhysicalGcConfig.enabled()` is true. The current broker bridge still supplies
+`PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`), so startup schedules no pass and performs no physical
+deletion；broker knob mapping、coverage/delete activation and final real-service evidence remain target work.
 
 Full M4–M6 target construction：
 

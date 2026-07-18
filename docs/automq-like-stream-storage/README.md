@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AM、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AN、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -45,14 +45,16 @@ Already present：
   in the single central GC fence.
 - F4-M4 checkpoint AK：candidate evidence is restart-reconstructable across `ACTIVE -> MARKED`; the explicit cursor
   executor now uses the six-domain central GC/journal/source-retirement chain, and the provider owns that runtime.
-  No periodic scan is scheduled, broker GC config is not mapped and safe defaults keep production deletion disabled.
+  At AK no periodic scan was scheduled；broker GC config remains unmapped and safe defaults keep deletion disabled.
 - F4-M4 checkpoint AL：all five current V1 writer prefixes have strict key inverses；the provider-owned inventory
-  scanner can register only grace-old exact-HEAD missing-root objects with another full grace. It has no delete path
-  and is not scheduled.
+  scanner can register only grace-old exact-HEAD missing-root objects with another full grace. It has no delete path.
 - F4-M4 checkpoint AM：the bounded deleted-stream retirement coordinator requires exact L0/projection/F3 authority,
   drains terminal owner protections and metadata, verifies an empty recovery tail, then conditionally deletes the
-  registration last. Its ordinary gate covers published-workflow and non-empty NRC1 response-loss cuts, but the pass
-  is not scheduled in production.
+  registration last. Its ordinary gate covers published-workflow and non-empty NRC1 response-loss cuts.
+- F4-M4 checkpoint AN：one enabled, non-overlapping fixed-delay lifecycle now runs a complete 256-shard physical-root
+  route/recovery pass, then a complete 64-shard registration-retirement pass, then known-prefix inventory. MARKED and
+  DELETING recovery is metadata-first and generic ownerless candidates reuse the central six-domain collector. The
+  current broker bridge still maps `enabled=false, dryRun=true`, so production startup schedules no pass.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative
@@ -73,10 +75,8 @@ Already present：
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
-- production-composed global-domain source retirement and physical/cursor/root/audit GC completion；
-- primary-WAL retention gate and destructive GC daemon composition；
-- production scheduling for cursor-snapshot/root/object-inventory work、registration retirement and physical-GC
-  activation；
+- broker-mapped physical-GC configuration、coverage proof and destructive activation；
+- primary-WAL retention gate and final real-service destructive/scale evidence；
 - mixed primary target resolver。
 
 The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default

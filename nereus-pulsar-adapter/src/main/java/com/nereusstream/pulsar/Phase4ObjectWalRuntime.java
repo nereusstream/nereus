@@ -84,6 +84,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
     private final AppendRecoverySearcher appendRecoverySearcher;
     private final GenerationZeroRepairScanner generationZeroRepairScanner;
     private final MaterializationLagSnapshotReader lagSnapshotReader;
+    private final RecoveryCheckpointCodecV1 checkpointCodec;
     private final MaterializationService materializationService;
     private final StagingFileManager stagingFiles;
     private final ExecutorService workerExecutor;
@@ -180,7 +181,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
         AnchorAwareCommitWalker walker =
                 new AnchorAwareCommitWalker(
                         exactCluster, exactL0, exactGenerations);
-        RecoveryCheckpointCodecV1 checkpointCodec =
+        this.checkpointCodec =
                 new DefaultRecoveryCheckpointCodecV1(
                         exactObjectStore,
                         stagingFiles,
@@ -191,7 +192,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactCluster,
                         exactGenerations,
                         walker,
-                        checkpointCodec,
+                        this.checkpointCodec,
                         exactReadPins,
                         exactClock);
         this.generationZeroRepairScanner =
@@ -211,7 +212,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactGenerations,
                         exactPhysical,
                         walker,
-                        checkpointCodec,
+                        this.checkpointCodec,
                         exactReadPins,
                         exactProtections,
                         exactActivation,
@@ -421,6 +422,14 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
     public MaterializationLagSnapshotReader
             lagSnapshotReader() {
         return lagSnapshotReader;
+    }
+
+    /** Borrowed by the physical-GC registration-retirement runtime and closed with this runtime's staging owner. */
+    public RecoveryCheckpointCodecV1 checkpointCodec() {
+        if (closed.get()) {
+            throw new IllegalStateException("Phase 4 Object-WAL runtime is closed");
+        }
+        return checkpointCodec;
     }
 
     public MaterializationService materializationService() {

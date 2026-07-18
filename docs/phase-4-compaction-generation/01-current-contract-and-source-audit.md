@@ -182,10 +182,9 @@ BookKeeper-ledger retention heuristic is meaningful for one immutable virtual le
 ## 4. M0 Gap Inventory and Required Owners
 
 The “current fact” column below is the frozen M0 input fact, not a claim about the latest checkpoint. Implemented
-closures are tracked in document 07；as of checkpoints AM/AI the generation/reader/task/publication/retention-rollout、
-cursor-snapshot execution、current-writer inventory and registration-retirement rows have implementation slices, while
-periodic lifecycle scheduling、registration-retirement runtime composition and physical-GC activation/final composition
-remain open.
+closures are tracked in document 07；as of checkpoints AN/AI the generation/reader/task/publication/retention-rollout、
+cursor/ownerless execution、current-writer inventory、registration retirement and metadata-first lifecycle rows have
+implementation slices, while broker physical-GC mapping、coverage/delete activation and final composition remain open.
 
 | Gap | Current fact | Phase 4 owner |
 | --- | --- | --- |

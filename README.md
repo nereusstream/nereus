@@ -229,19 +229,23 @@ MARKED 重试；scanner 本身没有 root CAS、protection removal 或 object de
 归一化为可跨 `ACTIVE -> MARKED` 和进程重启重建的 durable facts，增加 exact MARKED drift rollback，并通过
 `CursorSnapshotGcExecutor` 将 candidate 接入中央 mark/drain/revalidate/DELETING/source-retirement 链。
 `Phase4PhysicalGcRuntime` 已把 exact six domains、journal、collector 和 executor 交给 production provider/
-managed-ledger runtime 统一持有和关闭；但它不调度 root/registration pass，现有 broker bridge 仍只提供
-`enabled=false, dryRun=true` 的兼容默认值。Checkpoint AL 又加入当前五类 V1 writer prefix 的 strict key
+managed-ledger runtime 统一持有和关闭。Checkpoint AL 又加入当前五类 V1 writer prefix 的 strict key
 inverse 与 `ObjectInventoryScanner`：完整分页只把经过 age/skew、exact HEAD、CRC32C/length 和二次 root
 absence 验证的旧对象注册为 ACTIVE physical root，并为新 root 重置一整段 orphan grace；listing 从不授权
-删除，malformed/young/stale/mismatch/conflict 只计数。Scanner 由 runtime 持有但尚未调度。Coverage/delete
-activation、periodic root/registration/inventory scheduling 和 broker GC 参数映射仍未启用，因此启动
-broker 不会触发 destructive work。Checkpoint AM 已加入 proof-driven stream-registration retirement
+删除，malformed/young/stale/mismatch/conflict 只计数。Checkpoint AM 已加入 proof-driven stream-registration retirement
 foundation：只有精确 DELETED L0、non-live projection、完整且无引用的 F3 cursor/retention authority
 与 terminal/audit-grace-expired F4 workflow 事实同时成立时，才依次退休 owner protection、index/task、
-recovery root、checkpoint/stats/sequence，最后经过 exact recapture 删除 registration。该 coordinator 尚未
-接入 periodic runtime，注册退休也不会在 broker 启动后自动执行。对应 ordinary gate 现已覆盖真实 published
+recovery root、checkpoint/stats/sequence，最后经过 exact recapture 删除 registration。对应 ordinary gate 已覆盖真实 published
 workflow 的 task/two-index/three-protection drain，以及 non-empty NRC1 checkpoint-root/target protection 退休；
 所有 delete-response loss 均依赖 exact absence 收敛，physical root 在整个 registration-retirement 测试后仍保留。
+Checkpoint AN 进一步实现并接入 metadata-first lifecycle：每轮严格执行完整 256-shard physical-root recovery、
+完整 64-shard registration retirement、最后才做 known-prefix object inventory；整轮不重叠，hint 只合并一次
+立即重扫，失败后按 fixed delay 重试，close deadline 只取消本轮而不关闭借用 executor。Root router 将
+canonical cursor ACTIVE/MARKED 交给完整 F3 inventory/reconstruction，将无 owner 的普通 ACTIVE/MARKED 交给
+六域 global proof（有 durable protection 时先廉价跳过），DELETING 交给 sealed-journal recovery，DELETED
+交给 dual-absence tombstone retirement。Runtime 同时装配四类 source metadata handler、Phase 1 audit adapter
+和 checkpoint-AM coordinator。当前 broker bridge 仍只提供 `enabled=false, dryRun=true`，因此默认启动不会
+安排该 lifecycle，也不会触发 destructive work；broker GC 参数映射与 coverage/delete activation 仍未启用。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
@@ -261,6 +265,12 @@ grace blockers、published task/index owner-protection drain、non-empty NRC1 ro
 registration delete-response loss；它还断言 physical root 不被注册退休路径删除。该 gate 已于
 2026-07-18 在 Java 21、locked Pulsar `330eeeb3fa9903ed0123c2a0e261d403c32f0a59` 上通过；root build
 报告 132 个 actionable tasks（68 executed），nested Pulsar 报告 138 个（3 executed）。
+`phase4M4LifecycleSchedulingCheck` 覆盖 checkpoint AN 的 256/64-shard metadata-first pass 顺序、fixed-delay/
+coalescing/close lifecycle、ownerless protection admission 与 MARKED 重建、cursor/generic lifecycle router、
+完整 source/tombstone/registration runtime composition 和 provider 启动边界；当前 safe defaults 仍不启动该
+loop，gate 不代表 broker deletion activation。该 gate 已于 2026-07-18 在 Java 21、locked Pulsar
+`330eeeb3fa9903ed0123c2a0e261d403c32f0a59` 上通过；root build 报告 133 个 actionable tasks
+（65 executed），nested Pulsar 报告 138 个（3 executed）。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

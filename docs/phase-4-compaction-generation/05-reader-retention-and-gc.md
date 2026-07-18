@@ -171,8 +171,9 @@ cursor snapshot candidate discovery plus post-drain full revalidation. Checkpoin
 restart-reconstructable, adds exact drift rollback and composes the cursor path into the central six-domain
 mark/drain/DELETING/source-retirement runtime. Checkpoint AL adds current-writer object inventory and exact old
 missing-root registration. Checkpoint AM adds proof-driven stream-registration retirement and its exact managed-ledger
-F3 authority. Periodic root/registration/inventory scheduling、registration-retirement runtime composition、broker
-config mapping and activation remain planned，so production deletion is still disabled.
+F3 authority. Checkpoint AN composes a non-overlapping metadata-first 256-root-shard/64-registration-shard/inventory
+lifecycle and exact ACTIVE/MARKED/DELETING/DELETED routing. Broker config mapping、coverage/delete activation and the
+real-service final gate remain planned，so the safe-default production bridge still schedules no pass or deletion.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1540,11 +1541,12 @@ fence, then resumes journal-authenticated protection and exact-object retirement
 MARKED without in-memory discovery state or resume DELETING without object-store listing. Changed complete evidence
 cannot reuse the old digest and is unmarked without deleting bytes；an uncertain scan remains MARKED.
 
-`Phase4PhysicalGcRuntime` composes the executor with all six domains and is owned by the production provider/runtime,
-but it intentionally contains no periodic scheduler. The existing broker mapping also continues to construct
-`PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). Root/registration scheduling、the cursor-snapshot
-coverage bit、broker GC knob mapping、registration-retirement runtime composition and physical-delete activation remain
-required before production cursor snapshot deletion is available.
+`Phase4PhysicalGcRuntime` composes the executor with all six domains and is owned by the production provider/runtime.
+Checkpoint AN extends it with the lifecycle service、root/registration/inventory scanners、registration retirement、
+the complete source-metadata retirement registry and root-state router. The existing broker mapping continues to
+construct `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`), and the runtime calls the lifecycle service's
+`start()` only when `enabled` is true. The cursor-snapshot coverage bit、broker GC knob mapping and physical-delete
+activation remain required before production cursor snapshot deletion is available.
 
 ## 11. Orphan Discovery
 
@@ -1560,8 +1562,8 @@ ascending order with `metadataScanPageSize`, validates that the first key of eve
 the prior page, invokes only one visitor future at a time, and returns exact ACTIVE/MARKED/DELETING/DELETED/QUARANTINED
 counts. Per-page and per-visitor calls each receive a bounded operation deadline. An overlapping scan fails, visitor or
 metadata failure releases the admission flag for a later pass, and `close()` rejects new scans without closing the
-borrowed metadata store/scheduler. Lifecycle-specific routing、periodic scheduling and recovery coordinators are not
-yet runtime-composed；the scanner itself never consults object-store listing.
+borrowed metadata store/scheduler. Checkpoint AN supplies lifecycle-specific routing、fixed-delay scheduling and
+recovery composition；the scanner itself never consults object-store listing.
 
 Checkpoint AL implements `ObjectInventoryScanner` for the exact object-key families written by the current runtime：
 Object-WAL v1、COMMITTED compacted v1、TOPIC_COMPACTED v1、NRC1 recovery checkpoints and NCS1 cursor snapshots.
@@ -1588,9 +1590,9 @@ desired root record；a concurrent different root becomes `ROOT_CONFLICT`.
 Listing is eventually consistent audit/discovery input used mainly for bytes uploaded before any root CAS. It never
 proves absence, never produces a GC plan and the scanner contains no MARK、protection-retirement or object-delete
 operation. Missing `lastModified`、young/future timestamps、malformed keys、stale listing 404、HEAD/list mismatch and
-root conflict each receive an exact report outcome and no mutation. Unknown prefixes are never enumerated. The
-production runtime owns the scanner but does not schedule or invoke it yet；a single empty listing is never proof of
-orphanhood.
+root conflict each receive an exact report outcome and no mutation. Unknown prefixes are never enumerated. Checkpoint
+AN invokes it only after the complete root and registration passes of an enabled lifecycle；a single empty listing is
+never proof of orphanhood, and the current safe-default broker mapping does not start that lifecycle.
 
 ## 12. Stream-registration Retirement
 
@@ -1641,8 +1643,56 @@ F3 cursor/retention terminality and authority limits. They also exercise a real 
 higher indexes and three index/task-owned protections, plus a real NRC1 non-empty recovery root whose checkpoint and
 target protections retire before the root; protection/index/task/root/registration delete-response loss converges
 from exact absence while both physical roots remain present. `phase4M4RegistrationRetirementCheck` freezes this
-ordering and the fail-closed blocker matrix. Periodic runtime composition and the real-service final gate remain
-pending; production scheduling and delete activation are still disabled.
+ordering and the fail-closed blocker matrix. Checkpoint AN runtime-composes the coordinator after every complete root
+pass and before object inventory. The real-service final gate、broker configuration and delete activation remain
+pending; the current safe-default bridge keeps the composed lifecycle disabled.
+
+### 12.1 Checkpoint AN lifecycle composition
+
+`StreamRegistrationRetirementScanner.scan()` completely traverses registry shards `00..3f` in ascending order with
+`metadataScanPageSize`. Every page key must be the exact inverse of its decoded registration value and belong to the
+current shard; continuation must advance strictly. It invokes one coordinator future at a time, counts every exhaustive
+`StreamRegistrationRetirementStatus`, rejects overlap and closes without closing its borrowed store or scheduler.
+
+`PhysicalGcLifecyclePass` is a strict asynchronous chain rather than three independent timers:
+
+```text
+complete 256-shard physical-root scan and lifecycle routing
+  -> complete 64-shard registration-retirement scan
+    -> complete known-prefix object inventory
+```
+
+Failure or cancellation at one arrow prevents the next stage from starting. This preserves metadata-first recovery:
+MARKED、DELETING and DELETED roots converge even when listing is empty; registration removal remains a final metadata
+cleanup rather than deletion authority; listing can only recover an exact old object that has no root after both
+metadata scans completed.
+
+For one complete root pass, `Phase4PhysicalRootLifecycleRouter` creates fresh deduplication state and applies the
+following total routing table:
+
+| root lifecycle | route |
+|---|---|
+| `ACTIVE`, canonical NCS1 cursor key with stable historical binding | one `CursorSnapshotGcScanner` evaluation per stream |
+| `ACTIVE`, every other exact identity or unresolved cursor binding | `OwnerlessObjectGcExecutor.executeActive` |
+| `MARKED`, recoverable cursor evidence | `CursorSnapshotGcExecutor.recoverMarked` |
+| `MARKED`, every other exact identity | `OwnerlessObjectGcExecutor.recoverMarked` |
+| `DELETING` | `SourceRetirementCoordinator.resume` |
+| `DELETED` | `DefaultPhysicalRootTombstoneRetirementCoordinator.retire` |
+| `QUARANTINED` | no mutation |
+
+The generic ownerless executor derives candidate evidence from the immutable physical identity SHA, constructs an
+`OWNERLESS_ORPHAN_CANDIDATE` query and delegates every destructive transition to the central collector. A durable
+protection precheck may conservatively skip work, but absence from that precheck never authorizes deletion: the full
+reader/protection/metadata/domain proof and activation fence still run inside the collector. Restart from MARKED
+reconstructs the exact plan; complete drift unmarks, while incomplete/limit failure leaves MARKED.
+
+`DefaultPhysicalGcLifecycleService` starts immediately only after explicit `start()`, permits at most one active pass,
+coalesces any number of hints during a pass into one immediate follow-up and otherwise schedules the next attempt at
+`completion + scanInterval` (including after failure). `closeAsync()` rejects future starts/hints, cancels the pending
+timer and waits for the active source and target futures; at the close deadline it cancels both without shutting down
+borrowed executors. `Phase4PhysicalGcRuntime.close()` drains that service before closing its scanners and transferred
+source/audit retirement adapters. `DefaultNereusRuntimeProvider` invokes `start()` only for `config.enabled()`；with
+the currently mapped `enabled=false, dryRun=true` defaults, broker startup schedules no lifecycle pass.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

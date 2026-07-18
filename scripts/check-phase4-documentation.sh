@@ -142,6 +142,8 @@ require_literal "Checkpoint AL" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AM" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AN" \
+    "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AK closes the restart cut after MARK" \
     "docs/phase-4-compaction-generation/04-task-recovery-async-and-checkpoint.md"
 require_literal 'Checkpoint AK implements `recoverMarked`' \
@@ -150,12 +152,16 @@ require_literal "Checkpoint AK composes the product-side cursor physical-GC exec
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
 require_literal 'Checkpoint AL implements `ObjectInventoryScanner`' \
     "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
-require_literal "Checkpoint AL makes the inventory scanner an" \
+require_literal "makes the inventory scanner an owned runtime component" \
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
 require_literal 'Checkpoint AM implements `StreamRegistrationRetirementCoordinator`' \
     "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
 require_literal "F4-M4 registration-retirement gate checkpoint" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "F4-M4 metadata-first lifecycle scheduling checkpoint" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "phase4M4LifecycleSchedulingCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint AG implements that exact order" \
     "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
 require_literal "Checkpoint AH implements the shared process" \
@@ -168,13 +174,13 @@ require_literal "checkpoints AG–AI retention planner" \
     "docs/design/nereus-overall-architecture.md"
 require_literal "M5 through AI" \
     "docs/design/nereus-design-index.md"
-require_literal "M4 through AM" \
+require_literal "M4 through AN" \
     "docs/design/nereus-design-index.md"
 require_literal "M5 through checkpoint AI" \
     "docs/design/nereus-future4-compaction-generation.md"
 require_literal "M5 through checkpoint AI" \
     "docs/automq-like-stream-storage/README.md"
-require_literal "M4 through checkpoint AM" \
+require_literal "M4 through checkpoint AN" \
     "docs/automq-like-stream-storage/README.md"
 require_literal "ManagedLedgerMaterializationRegistrationCandidate" \
     "docs/phase-4-compaction-generation/README.md"
@@ -225,4 +231,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through AM and M5 through AI, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through AN and M5 through AI, source lock, gates, and local links verified."

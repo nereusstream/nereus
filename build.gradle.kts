@@ -1048,6 +1048,29 @@ tasks.register("phase4M4RegistrationRetirementCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register<Exec>("checkPhase4M4LifecycleSchedulingContractSurface") {
+    group = "verification"
+    description = "Audit metadata-first root/registration/inventory scheduling and lifecycle recovery routing."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-lifecycle-scheduling-contract-surface.sh")
+}
+
+tasks.register("phase4M4LifecycleSchedulingCheck") {
+    group = "verification"
+    description = "Verify non-overlapping periodic physical-GC passes with restart-safe lifecycle routing."
+    dependsOn("phase4M4RegistrationRetirementCheck")
+    dependsOn("checkPhase4M4LifecycleSchedulingContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1058,7 +1081,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4RegistrationRetirementCheck")
+    dependsOn("phase4M4LifecycleSchedulingCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

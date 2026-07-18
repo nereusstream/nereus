@@ -48,6 +48,10 @@ import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
+import com.nereusstream.metadata.oxia.retirement.ObjectAuditRetirementStore;
+import com.nereusstream.metadata.oxia.retirement.OxiaJavaObjectAuditRetirementStore;
+import com.nereusstream.metadata.oxia.retirement.OxiaJavaSourceRetirementMetadataStore;
+import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreProvider;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
@@ -88,6 +92,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         SharedOxiaClientRuntime sharedOxiaRuntime = null;
         OxiaMetadataStore l0MetadataStore = null;
         PhysicalObjectMetadataStore physicalMetadataStore = null;
+        SourceRetirementMetadataStore sourceRetirementMetadataStore = null;
+        ObjectAuditRetirementStore objectAuditRetirementStore = null;
         ObjectProtectionManager objectProtectionManager = null;
         ObjectReadPinManager objectReadPinManager = null;
         ManagedLedgerProjectionMetadataStore projectionStore = null;
@@ -123,6 +129,12 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     configuration.oxia(), sharedOxiaRuntime, clock);
             physicalMetadataStore = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, clock);
+            sourceRetirementMetadataStore =
+                    OxiaJavaSourceRetirementMetadataStore.usingSharedRuntime(
+                            configuration.oxia(), sharedOxiaRuntime);
+            objectAuditRetirementStore =
+                    OxiaJavaObjectAuditRetirementStore.usingSharedRuntime(
+                            configuration.oxia(), sharedOxiaRuntime);
             objectProtectionManager = new DefaultObjectProtectionManager(
                     streamConfig.cluster(),
                     physicalMetadataStore,
@@ -319,6 +331,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
             physicalGcRuntime = new Phase4PhysicalGcRuntime(
                     streamConfig.cluster(),
                     configuration.physicalGc(),
+                    configuration.materialization(),
                     cursorConfig,
                     l0MetadataStore,
                     generationMetadataStore,
@@ -327,10 +340,15 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     physicalMetadataStore,
                     generationProtocolActivationStore,
                     generationProtocolActivationGuard,
+                    sourceRetirementMetadataStore,
+                    objectAuditRetirementStore,
                     objectStore,
+                    phase4Runtime.checkpointCodec(),
                     scheduler,
+                    callbackExecutor,
                     clock);
             phase4Runtime.start();
+            physicalGcRuntime.start();
             return new NereusManagedLedgerRuntime(
                     streamStorage,
                     projectionStore,
@@ -378,6 +396,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     streamStorage,
                     objectReadPinManager,
                     objectProtectionManager,
+                    sourceRetirementMetadataStore,
+                    objectAuditRetirementStore,
                     physicalMetadataStore,
                     l0MetadataStore,
                     objectStore,

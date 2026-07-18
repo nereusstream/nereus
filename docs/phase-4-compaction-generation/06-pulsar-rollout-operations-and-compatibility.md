@@ -900,11 +900,14 @@ Checkpoint AK composes the product-side cursor physical-GC executor、six refere
 source-retirement coordinator in `Phase4PhysicalGcRuntime`, and `NereusManagedLedgerRuntime` owns/closes it before
 cursor and shared stores. `NereusRuntimeConfiguration` now carries a cross-validated `PhysicalGcConfig`; its
 compatibility constructors deliberately use `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). The current
-Pulsar bridge still takes that compatibility path：it does not map the table's physical-GC properties and the runtime
-does not schedule physical-root、object-inventory or registration scans. Checkpoint AL makes the inventory scanner an
-owned runtime component but adds no startup invocation：listing remains audit/discovery input and the scanner exposes
-no MARK/delete path. Therefore broker startup cannot MARK or DELETE, and the rollout sequence above remains unchanged
-until mapping、scheduling、coverage proofs and activation are implemented.
+Pulsar bridge still takes that compatibility path and does not map the table's physical-GC properties. Checkpoint AL
+makes the inventory scanner an owned runtime component；listing remains audit/discovery input and exposes no MARK/delete
+path. Checkpoint AN adds the non-overlapping lifecycle service and provider startup hook: when and only when
+`PhysicalGcConfig.enabled()` is true, it runs complete physical-root routing/recovery, then complete registration
+retirement, then object inventory, using fixed delay after each pass. The current bridge's `enabled=false` default
+therefore starts no lifecycle pass, while `dryRun=true` remains the second independent mutation guard. Broker startup
+cannot MARK or DELETE until explicit property mapping、coverage proofs and activation are implemented, so the rollout
+sequence above remains unchanged.
 
 ## 12. Operations and Status
 
