@@ -81,9 +81,13 @@
 > retain MARKED for retry；the managed-ledger scanner owns no mutation. Checkpoint AK now makes candidate evidence
 > restart-reconstructable across `ACTIVE -> MARKED`, adds exact drift rollback, composes the cursor candidate through
 > the six-domain collector/journal/drain/DELETING/source-retirement chain, and installs that owned runtime in the
-> production provider. Periodic root/registration scheduling、coverage/delete activation、object inventory、registration
-> retirement、broker physical-GC config mapping and the final deletion switch remain closed；the typed config still
-> defaults to `enabled=false, dryRun=true`
+> production provider. Checkpoint AL adds strict inverses for every current V1 writer prefix and a complete
+> known-prefix `ObjectInventoryScanner` that registers only old exact-HEAD missing-root objects, gives each new root a
+> second full orphan grace, converges create-response loss only through the exact desired root, and never treats
+> listing as deletion authority. The provider owns but does not schedule this scanner. Periodic
+> root/registration/inventory scheduling、coverage/delete activation、registration retirement、broker physical-GC config
+> mapping and the final deletion switch remain closed；the typed config still defaults to
+> `enabled=false, dryRun=true`
 >
 > 设计基线日期：2026-07-14
 >
@@ -818,13 +822,13 @@ COMMITTED NRC1 facts，也绝不让跨 view generation 互相覆盖。
 candidate-root final fence 与 response-loss-safe CAS；已经 DRAINING 的 higher source 和 generation-zero removal
 在 plan/reload 时重复各自 exact eligibility proof。
 
-Checkpoint R 是 source-eligibility 的 ordinary completion checkpoint，不是 M4 final gate。Checkpoint W 后
+Checkpoint R 是 source-eligibility 的 ordinary completion checkpoint，不是 M4 final gate。At the W/Z cut，
 future-sentinel、ownerless global absence proof、DELETED-root/Phase 1 audit retirement 与 live-reference
-physical/cursor-root backfill 已落地；checkpoint Z 又已实现 broker registration traversal/report。但 durable
-registration proof、cursor snapshot
-candidate/deletion scanner、object inventory、registration retirement、
-其余 materialization/GC runtime composition、real-service destructive scenarios 和 final M4 gate 仍待完成；
-production deletion 继续关闭。
+physical/cursor-root backfill 已落地，checkpoint Z 也已实现 broker registration traversal/report；durable
+registration proof、cursor snapshot candidate/execution、object inventory and runtime ownership were still missing.
+Checkpoints AA、AJ、AK and AL have since closed those ordinary slices. Periodic lifecycle scheduling、registration
+retirement、broker GC activation、real-service destructive scenarios 和 final M4 gate 仍待完成；production deletion
+继续关闭。
 
 ### 6.21 F4-M4 generation-protocol activation metadata foundation
 
@@ -999,6 +1003,36 @@ startup still performs no destructive work and production deletion remains disab
 `phase4M4CursorGcExecutionCheck --rerun-tasks` passed on 2026-07-18 under Java 21 against locked Pulsar
 `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`；the root build executed 139 actionable tasks and the inherited
 nested Pulsar regression reported 138 actionable tasks.
+
+### 6.25c F4-M4 object-inventory registration checkpoint
+
+Checkpoint AL closes the current-writer missing-root discovery boundary without granting object-store listing any
+deletion authority. `WalObjectKeys` now owns the canonical Object-WAL path builder and strict inverse while preserving
+the existing canonical-component `writerRunIdHash` contract；`RecoveryCheckpointFormatV1`、
+`CompactedObjectFormatV1` and `CursorSnapshotKeys` expose cluster/view-wide strict inverses. The product registry
+contains exactly five non-overlapping V1 families：Object-WAL、COMMITTED compacted、TOPIC_COMPACTED、NRC1 recovery
+checkpoint and NCS1 cursor snapshot. Unknown prefixes are not listed and malformed members of a known prefix cannot
+be promoted into metadata.
+
+`ObjectInventoryScanner` performs a complete ordered family/page pass with one bounded async operation at a time. It
+prechecks the physical root, requires listing age beyond `orphanGrace + maximumClockSkew`, performs exact HEAD and
+requires positive length plus CRC32C, then rechecks root absence. Disabled/dry-run mode reports `WOULD_REGISTER`；an
+enabled non-dry-run pass creates an exact ACTIVE root with listing `lastModified` as creation time and
+`passStart + orphanGrace + maximumClockSkew` as a second grace boundary. A lost create response succeeds only after
+the complete desired root reloads unchanged. Existing roots、young/missing-age objects、malformed keys、stale listing
+entries、HEAD mismatch and root conflict are exhaustively counted and never mutated by this pass.
+
+The scanner has no MARK、protection removal or object delete call. `Phase4PhysicalGcRuntime` owns and closes it, but
+does not schedule it；the broker bridge still installs `enabled=false, dryRun=true`. Consequently checkpoint AL does
+not change startup behavior or enable physical deletion. Periodic metadata-root/registration/inventory scheduling、
+registration retirement、broker GC mapping/coverage activation and real-service destructive M4 evidence remain.
+
+`phase4M4ObjectInventoryCheck` is the ordinary checkpoint gate. Its focused suites cover old exact-HEAD registration
+with a second grace, page-size-one outcome accounting, disabled/dry-run behavior, create-response-loss convergence,
+concurrent different-root classification, strict writer-key inverses and malformed-prefix-member rejection.
+The aggregate gate passed with `--rerun-tasks` on 2026-07-18 under Java 21 against locked Pulsar
+`master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`；the root build executed 131 actionable tasks and the inherited
+nested Pulsar regression reported 138 actionable tasks（3 executed、135 up-to-date inside that nested invocation）。
 
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
@@ -1298,7 +1332,7 @@ four-suite broker invocation passed 129 tasks.
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AK, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor candidates and the explicit cursor MARK/drain/DELETING/delete execution bridge are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while periodic physical-root/registration scheduling、object inventory、registration retirement、broker GC config、physical GC activation and final gate remain pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AL, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill、restart-reconstructable cursor candidates、the explicit cursor MARK/drain/DELETING/delete execution bridge and strict known-prefix missing-root inventory registration are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while periodic physical-root/registration/inventory scheduling、registration retirement、broker GC config、physical GC activation and final gate remain pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；physical GC composition and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

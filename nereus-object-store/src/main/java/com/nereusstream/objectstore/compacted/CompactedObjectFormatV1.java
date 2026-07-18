@@ -12,6 +12,7 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.keys.KeyComponentCodec;
+import com.nereusstream.objectstore.ObjectKeyPrefix;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -104,6 +105,14 @@ public final class CompactedObjectFormatV1 {
             "nereus.compaction.key.encoding");
 
     private CompactedObjectFormatV1() {
+    }
+
+    public static ObjectKeyPrefix prefix(String cluster, ReadView view) {
+        Objects.requireNonNull(view, "view");
+        return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(requireText(cluster, "cluster"))
+                + "/compacted/v1/"
+                + (view == ReadView.COMMITTED ? "committed" : "topic-compacted")
+                + "/");
     }
 
     public static MessageType schema(ReadView view) {
@@ -329,10 +338,88 @@ public final class CompactedObjectFormatV1 {
         return ObjectKeyHash.from(Objects.requireNonNull(objectKey, "objectKey"));
     }
 
+    /** Strict ownerless inverse used only by complete object inventory. */
+    public static ParsedCompactedObjectKey parseObjectKey(
+            String cluster, ReadView view, ObjectKey objectKey) {
+        Objects.requireNonNull(view, "view");
+        Objects.requireNonNull(objectKey, "objectKey");
+        String exactPrefix = prefix(cluster, view).value();
+        if (!objectKey.value().startsWith(exactPrefix)) {
+            throw new IllegalArgumentException("compacted object key is outside the view prefix");
+        }
+        String[] components = objectKey.value().substring(exactPrefix.length()).split("/", -1);
+        if (components.length != 3 || !components[2].endsWith(".parquet")) {
+            throw new IllegalArgumentException("compacted object key path is not canonical");
+        }
+        StreamId streamId = new StreamId(KeyComponentCodec.decodeComponent(components[0]));
+        String[] range = components[1].split("-", -1);
+        if (range.length != 2) {
+            throw new IllegalArgumentException("compacted object range is not canonical");
+        }
+        OffsetRange coverage = new OffsetRange(
+                KeyComponentCodec.decodeNonNegativeLong(range[0]),
+                KeyComponentCodec.decodeNonNegativeLong(range[1]));
+        if (coverage.isEmpty()) {
+            throw new IllegalArgumentException("compacted object range cannot be empty");
+        }
+        String filename = components[2].substring(
+                0, components[2].length() - ".parquet".length());
+        int delimiter = filename.indexOf('-');
+        if (delimiter != 64) {
+            throw new IllegalArgumentException("compacted object content hash is not canonical");
+        }
+        Checksum contentSha256 = new Checksum(
+                ChecksumType.SHA256, filename.substring(0, delimiter));
+        requireSha256(contentSha256, "contentSha256");
+        String outputAttemptId = requireBase32(
+                filename.substring(delimiter + 1), "outputAttemptId");
+        String canonical = exactPrefix
+                + KeyComponentCodec.encodeComponent(streamId.value())
+                + "/"
+                + KeyComponentCodec.encodeNonNegativeLong(coverage.startOffset())
+                + "-"
+                + KeyComponentCodec.encodeNonNegativeLong(coverage.endOffset())
+                + "/"
+                + contentSha256.value()
+                + "-"
+                + outputAttemptId
+                + ".parquet";
+        if (!canonical.equals(objectKey.value())) {
+            throw new IllegalArgumentException("compacted object key is not canonical");
+        }
+        return new ParsedCompactedObjectKey(
+                view,
+                streamId,
+                coverage,
+                contentSha256,
+                outputAttemptId,
+                objectId(objectKey));
+    }
+
     private static Set<String> unionMetadataKeys() {
         java.util.HashSet<String> keys = new java.util.HashSet<>(COMMON_METADATA_KEYS);
         keys.addAll(TOPIC_METADATA_KEYS);
         return Set.copyOf(keys);
+    }
+
+    public record ParsedCompactedObjectKey(
+            ReadView view,
+            StreamId streamId,
+            OffsetRange sourceCoverage,
+            Checksum contentSha256,
+            String outputAttemptId,
+            ObjectId objectId) {
+        public ParsedCompactedObjectKey {
+            Objects.requireNonNull(view, "view");
+            Objects.requireNonNull(streamId, "streamId");
+            Objects.requireNonNull(sourceCoverage, "sourceCoverage");
+            if (sourceCoverage.isEmpty()) {
+                throw new IllegalArgumentException("sourceCoverage cannot be empty");
+            }
+            requireSha256(contentSha256, "contentSha256");
+            outputAttemptId = requireBase32(outputAttemptId, "outputAttemptId");
+            Objects.requireNonNull(objectId, "objectId");
+        }
     }
 
     private static String require(Map<String, String> values, String key) {
@@ -347,6 +434,14 @@ public final class CompactedObjectFormatV1 {
         String value = require(values, key);
         if (value.isBlank()) {
             throw new CompactedObjectFormatException("blank required Parquet metadata: " + key);
+        }
+        return value;
+    }
+
+    private static String requireText(String value, String field) {
+        Objects.requireNonNull(value, field);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(field + " cannot be blank");
         }
         return value;
     }
@@ -372,6 +467,14 @@ public final class CompactedObjectFormatV1 {
     private static String requireBase32(String value) {
         if (value.length() < 26 || value.length() > 128 || !value.matches("[a-z2-7]+")) {
             throw new CompactedObjectFormatException("invalid compacted output-attempt id");
+        }
+        return value;
+    }
+
+    private static String requireBase32(String value, String field) {
+        value = requireText(value, field);
+        if (value.length() < 26 || value.length() > 128 || !value.matches("[a-z2-7]+")) {
+            throw new IllegalArgumentException(field + " must be lowercase base32 with at least 128 bits");
         }
         return value;
     }

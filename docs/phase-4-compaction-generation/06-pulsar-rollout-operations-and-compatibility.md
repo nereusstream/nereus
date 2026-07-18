@@ -901,8 +901,10 @@ source-retirement coordinator in `Phase4PhysicalGcRuntime`, and `NereusManagedLe
 cursor and shared stores. `NereusRuntimeConfiguration` now carries a cross-validated `PhysicalGcConfig`; its
 compatibility constructors deliberately use `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). The current
 Pulsar bridge still takes that compatibility path：it does not map the table's physical-GC properties and the runtime
-does not schedule physical-root or registration scans. Therefore broker startup cannot MARK or DELETE, and the
-rollout sequence above remains unchanged until mapping、scheduling、coverage proofs and activation are implemented.
+does not schedule physical-root、object-inventory or registration scans. Checkpoint AL makes the inventory scanner an
+owned runtime component but adds no startup invocation：listing remains audit/discovery input and the scanner exposes
+no MARK/delete path. Therefore broker startup cannot MARK or DELETE, and the rollout sequence above remains unchanged
+until mapping、scheduling、coverage proofs and activation are implemented.
 
 ## 12. Operations and Status
 

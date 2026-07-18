@@ -235,8 +235,9 @@ MARKED for later retry.
 exact MARKED or DELETING root after restart. `Phase4PhysicalGcRuntime` composes that adapter with the durable journal、
 empty cursor metadata-retirement registry and all six reference domains, and production managed-ledger ownership now
 closes this runtime before the cursor and shared stores. No root/registration scanner is scheduled yet；broker config
-mapping、coverage/delete activation、object inventory and registration retirement remain target work. Safe defaults
-therefore still perform no deletion.
+mapping、coverage/delete activation and registration retirement remain target work. Checkpoint AL additionally installs
+the provider-owned known-prefix inventory scanner. It can register an old exact-HEAD object whose root is missing, but
+it is not scheduled and it cannot mark or delete objects；safe defaults therefore still perform no deletion.
 
 Full M4–M6 target construction：
 

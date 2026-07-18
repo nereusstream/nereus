@@ -29,8 +29,9 @@ implemented. Checkpoints X–AF additionally deliver durable registration/backfi
 Object-WAL boundary and the coupled production generation-aware read/replay/source-repair/materialization runtime.
 Checkpoints AG–AI additionally deliver exact logical-retention planning/service semantics、the shared bounded execution
 lane、production managed-ledger/facade installation and exact Pulsar retention/backlog policy plus loaded/unloaded
-admin admission. Cursor snapshot GC、object inventory、registration retirement and destructive GC composition remain
-target work. Package、class and method names
+admin admission. Checkpoints AJ–AL additionally implement cursor-snapshot discovery/execution plus the current-writer
+known-prefix inventory and exact missing-root registration boundary. Periodic scheduling、registration retirement、
+broker physical-GC configuration/activation and the remaining destructive runtime remain target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 

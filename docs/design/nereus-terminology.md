@@ -178,6 +178,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   roots 与 owner-bound permanent protections，并在最终 authority revalidation 后 CAS physical/cursor backfill
   proofs 的 ordinary checkpoint；它不表示 broker cold-topic registration backfill/barrier、object inventory、
   cursor deletion scanner 或 production GC 已启用。
+- **F4-M4 checkpoint AL**：为当前 Object-WAL、两种 compacted view、NRC1 与 NCS1 writer key 提供 strict
+  inverse，并完整分页注册 grace-old、exact-HEAD、missing-root 对象的 ordinary checkpoint；新 root 重新等待一整段
+  orphan grace，listing 不提供删除权威，scanner 也尚未调度，因此不表示 production GC 已启用。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

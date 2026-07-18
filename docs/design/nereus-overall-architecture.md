@@ -102,7 +102,7 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4 through checkpoint AK 已实现 NRC1 protocol、protected generation-zero append、
+Oxia/LocalStack final gates。M4 through checkpoint AL 已实现 NRC1 protocol、protected generation-zero append、
 recovery-root/replay/index repair、bounded GC plan/root/journal fence、root-authenticated destructive skeleton、typed
 generation-zero source retirement，以及 completed-trim/COMMITTED/TOPIC_COMPACTED source eligibility 和
 grace-fenced higher-generation pre-drain/reproof，并增加 durable generation-activation authority、future sentinel
@@ -111,7 +111,8 @@ permanent/pinned cursor-snapshot new-write/read frontier，以及 strict NPR1 pr
 physical/cursor live-reference backfill；checkpoint AJ further adds complete bounded cursor-snapshot candidate
 inventory and the single central GC fence's post-drain revalidation callback，while checkpoint AK makes evidence
 restart-reconstructable and installs exact drift rollback plus the cursor execution/six-domain runtime lifecycle.
-No root/registration scan is scheduled and safe defaults still disable deletion。M5 checkpoint X 又实现 exact durable registration create/refresh/final
+Checkpoint AL further adds strict inverses for all current V1 object writers plus exact old missing-root registration；
+no root/registration/inventory scan is scheduled and safe defaults still disable deletion。M5 checkpoint X 又实现 exact durable registration create/refresh/final
 revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、
 broker-incarnation-aware deterministic readiness epoch/full digest 和 registry-notification invalidation。
@@ -131,8 +132,9 @@ policy/config/evidence values、source-index-verified stable candidate planner �
 service。Checkpoint AH 继续实现 shared bounded/coalescing plan lane、whole-operation timeout/close、managed-ledger
 production installation/facade route 与 exact typed Pulsar config mapping。Checkpoint AI 又实现 exact effective
 retention/backlog snapshot、generation/marker-gated policy install 与 loaded/unloaded/partition-child logical trim
-admission。Cursor snapshot candidate/deletion scanning、object inventory、registration retirement、destructive GC composition
-和 M6 仍是 target；production deletion 继续关闭。
+admission。Cursor snapshot candidate/execution and current-writer object inventory now have checkpoints AJ–AL；
+periodic lifecycle scheduling、registration retirement、destructive GC activation/composition 和 M6 仍是 target；
+production deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -344,10 +346,10 @@ flowchart TB
 | Module | Target responsibility | Current status (2026-07-18) |
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented |
-| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI、protocol-neutral global reference scope、projection-authority capture contract and public generation-zero protection identities implemented；M4 recovery/root/GC consumers are in progress through checkpoint AK |
+| `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI、protocol-neutral global reference scope、projection-authority capture contract and public generation-zero protection identities implemented；M4 recovery/root/GC consumers are in progress through checkpoint AL |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay、F4-M1–M3 metadata/publication gates、M4 protected-append/activation foundations and checkpoint-X canonical projection-ref encoder implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
-| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint AK implements NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、ownerless-global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier、all-shard physical/cursor live-reference backfill、cursor post-drain revalidation and exact restart rollback/source retirement；checkpoint AF composes source repair plus the non-destructive production materialization lifecycle, while scheduling/inventory/activation remain pending；depends on core, never the reverse |
+| `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint AL implements NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、ownerless-global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier、all-shard physical/cursor live-reference backfill、cursor post-drain/restart execution and current-writer missing-root inventory；checkpoint AF composes source repair plus the non-destructive production materialization lifecycle, while scheduling/registration-retirement/activation remain pending；depends on core, never the reverse |
 | `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、restart-reconstructable cursor candidates、durable registration/proof/activation、pre-I/O async admission、checkpoint-AF materialization runtime ownership、checkpoint-AK physical-GC lifecycle ownership and checkpoints AG–AI retention planner/F3 trim/shared-lane/per-ledger facade/policy admission complete；physical-GC scheduling remains pending |
 | `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership、checkpoint-AF coupled Object-WAL composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin mapping and checkpoint-AK cursor-GC executor/six-domain runtime implemented；broker GC mapping、scheduling and activation remain disabled |
 | `nereus-kop-adapter` | Kafka projection | marker only |

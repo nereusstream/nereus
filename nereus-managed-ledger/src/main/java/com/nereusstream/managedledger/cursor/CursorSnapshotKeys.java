@@ -2,7 +2,9 @@
 package com.nereusstream.managedledger.cursor;
 
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.api.keys.KeyComponentCodec;
+import com.nereusstream.objectstore.ObjectKeyPrefix;
 import com.nereusstream.metadata.oxia.CursorIds;
 import com.nereusstream.metadata.oxia.OxiaKeyspace;
 import java.util.Objects;
@@ -12,11 +14,15 @@ public final class CursorSnapshotKeys {
     private CursorSnapshotKeys() {
     }
 
+    public static ObjectKeyPrefix clusterPrefix(String cluster) {
+        String canonicalCluster = new OxiaKeyspace(cluster).cluster();
+        return new ObjectKeyPrefix(KeyComponentCodec.encodeComponent(canonicalCluster)
+                + "/cursor-snapshots/v1/");
+    }
+
     public static String streamPrefix(String cluster, CursorLedgerIdentity ledger) {
         Objects.requireNonNull(ledger, "ledger");
-        String canonicalCluster = new OxiaKeyspace(cluster).cluster();
-        return KeyComponentCodec.encodeComponent(canonicalCluster)
-                + "/cursor-snapshots/v1/"
+        return clusterPrefix(cluster).value()
                 + KeyComponentCodec.encodeComponent(ledger.projection().streamId())
                 + "/";
     }
@@ -45,23 +51,40 @@ public final class CursorSnapshotKeys {
     public static ParsedSnapshotKey parse(
             String cluster, CursorLedgerIdentity ledger, ObjectKey key) {
         Objects.requireNonNull(key, "key");
-        String prefix = streamPrefix(cluster, ledger);
-        if (!key.value().startsWith(prefix)) {
+        ParsedOwnerlessSnapshotKey parsed = parseOwnerless(cluster, key);
+        if (!parsed.streamId().value().equals(ledger.projection().streamId())) {
             throw new IllegalArgumentException("cursor snapshot key is outside its stream prefix");
         }
-        String[] components = key.value().substring(prefix.length()).split("/", -1);
-        if (components.length != 3 || !isStableHash(components[0])) {
-            throw new IllegalArgumentException("cursor snapshot key has a non-canonical cursor hash/path");
+        return new ParsedSnapshotKey(
+                parsed.cursorNameHash(),
+                parsed.cursorGeneration(),
+                parsed.snapshotId());
+    }
+
+    /** Strict cluster-wide inverse used by ownerless F4 object inventory. */
+    public static ParsedOwnerlessSnapshotKey parseOwnerless(
+            String cluster, ObjectKey key) {
+        Objects.requireNonNull(key, "key");
+        String prefix = clusterPrefix(cluster).value();
+        if (!key.value().startsWith(prefix)) {
+            throw new IllegalArgumentException("cursor snapshot key is outside the cluster prefix");
         }
-        long cursorGeneration = KeyComponentCodec.decodeNonNegativeLong(components[1]);
-        if (cursorGeneration < 1 || !components[2].endsWith(".ncs")) {
+        String[] components = key.value().substring(prefix.length()).split("/", -1);
+        if (components.length != 4 || !isStableHash(components[1])) {
+            throw new IllegalArgumentException("cursor snapshot key has a non-canonical owner path");
+        }
+        StreamId streamId = new StreamId(KeyComponentCodec.decodeComponent(components[0]));
+        long cursorGeneration = KeyComponentCodec.decodeNonNegativeLong(components[2]);
+        if (cursorGeneration < 1 || !components[3].endsWith(".ncs")) {
             throw new IllegalArgumentException("cursor snapshot key has an invalid generation/suffix");
         }
-        String snapshotId = components[2].substring(
-                0, components[2].length() - ".ncs".length());
+        String snapshotId = components[3].substring(
+                0, components[3].length() - ".ncs".length());
         CursorIds.requireRandomId(snapshotId, "snapshotId");
         String canonical = prefix
-                + components[0]
+                + KeyComponentCodec.encodeComponent(streamId.value())
+                + "/"
+                + components[1]
                 + "/"
                 + KeyComponentCodec.encodeNonNegativeLong(cursorGeneration)
                 + "/"
@@ -70,8 +93,11 @@ public final class CursorSnapshotKeys {
         if (!canonical.equals(key.value())) {
             throw new IllegalArgumentException("cursor snapshot key is not canonical");
         }
-        return new ParsedSnapshotKey(
-                components[0], cursorGeneration, snapshotId);
+        return new ParsedOwnerlessSnapshotKey(
+                streamId,
+                components[1],
+                cursorGeneration,
+                snapshotId);
     }
 
     private static boolean isStableHash(String value) {
@@ -95,6 +121,20 @@ public final class CursorSnapshotKeys {
         public ParsedSnapshotKey {
             if (!isStableHash(cursorNameHash) || cursorGeneration < 1) {
                 throw new IllegalArgumentException("parsed cursor snapshot identity is invalid");
+            }
+            snapshotId = CursorIds.requireRandomId(snapshotId, "snapshotId");
+        }
+    }
+
+    public record ParsedOwnerlessSnapshotKey(
+            StreamId streamId,
+            String cursorNameHash,
+            long cursorGeneration,
+            String snapshotId) {
+        public ParsedOwnerlessSnapshotKey {
+            Objects.requireNonNull(streamId, "streamId");
+            if (!isStableHash(cursorNameHash) || cursorGeneration < 1) {
+                throw new IllegalArgumentException("parsed ownerless cursor snapshot identity is invalid");
             }
             snapshotId = CursorIds.requireRandomId(snapshotId, "snapshotId");
         }

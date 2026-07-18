@@ -17,6 +17,7 @@ import com.nereusstream.materialization.gc.GcReferenceDomainRegistry;
 import com.nereusstream.materialization.gc.GcReferenceDomainVersion;
 import com.nereusstream.materialization.gc.GenerationReferenceDomain;
 import com.nereusstream.materialization.gc.MaterializationReferenceDomain;
+import com.nereusstream.materialization.gc.ObjectInventoryScanner;
 import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.materialization.gc.PhysicalObjectGarbageCollector;
 import com.nereusstream.materialization.gc.RegisteredStreamGcGlobalReferenceScope;
@@ -46,6 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class Phase4PhysicalGcRuntime implements AutoCloseable {
     private final CursorSnapshotGcScanner cursorScanner;
     private final CursorSnapshotGcExecutor cursorExecutor;
+    private final ObjectInventoryScanner objectInventoryScanner;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public Phase4PhysicalGcRuntime(
@@ -191,6 +193,14 @@ public final class Phase4PhysicalGcRuntime implements AutoCloseable {
                 exactObjectStore,
                 exactClock,
                 exactScheduler);
+        this.objectInventoryScanner = new ObjectInventoryScanner(
+                exactCluster,
+                exactConfig,
+                exactPhysical,
+                exactObjectStore,
+                Phase4ObjectInventoryFamilies.currentV1(exactCluster),
+                exactClock,
+                exactScheduler);
         this.cursorExecutor = new CursorSnapshotGcExecutor(
                 exactConfig,
                 cursorScanner,
@@ -207,9 +217,17 @@ public final class Phase4PhysicalGcRuntime implements AutoCloseable {
         return cursorExecutor;
     }
 
+    public ObjectInventoryScanner objectInventoryScanner() {
+        if (closed.get()) {
+            throw new IllegalStateException("Phase 4 physical GC runtime is closed");
+        }
+        return objectInventoryScanner;
+    }
+
     @Override
     public void close() {
         if (closed.compareAndSet(false, true)) {
+            objectInventoryScanner.close();
             cursorScanner.close();
         }
     }

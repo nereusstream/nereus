@@ -50,12 +50,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class DefaultWalObjectWriter implements WalObjectWriter {
     private static final DateTimeFormatter OBJECT_TIME =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
-    private static final DateTimeFormatter YEAR =
-            DateTimeFormatter.ofPattern("yyyy").withZone(ZoneOffset.UTC);
-    private static final DateTimeFormatter MONTH =
-            DateTimeFormatter.ofPattern("MM").withZone(ZoneOffset.UTC);
-    private static final DateTimeFormatter DAY =
-            DateTimeFormatter.ofPattern("dd").withZone(ZoneOffset.UTC);
     private static final String CONTENT_TYPE = "application/vnd.nereus.wal-object";
 
     private final ObjectStore objectStore;
@@ -129,7 +123,8 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
         ObjectId objectId = new ObjectId("wo-" + OBJECT_TIME.format(now) + "-"
                 + writerIdHash + "-" + request.writerRunIdHash() + "-"
                 + KeyComponentCodec.encodeNonNegativeLong(sequence));
-        ObjectKey objectKey = objectKey(request.cluster(), writerIdHash, request.writerRunIdHash(), objectId, now);
+        ObjectKey objectKey = WalObjectKeys.objectKey(
+                request.cluster(), writerIdHash, request.writerRunIdHash(), objectId, now);
         List<WalStreamSliceInput> sortedInputs = request.slices().stream()
                 .sorted(Comparator.comparing((WalStreamSliceInput input) -> input.streamId().value()))
                 .toList();
@@ -287,22 +282,6 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
             throw failure(ErrorCode.OBJECT_CHECKSUM_MISMATCH, false, "object store returned mismatched object length");
         }
         return result;
-    }
-
-    private ObjectKey objectKey(
-            String cluster,
-            String writerIdHash,
-            String writerRunIdHash,
-            ObjectId objectId,
-            Instant now) {
-        String clusterComponent = KeyComponentCodec.encodeComponent(cluster);
-        return new ObjectKey(clusterComponent + "/wal/"
-                + YEAR.format(now) + "/"
-                + MONTH.format(now) + "/"
-                + DAY.format(now) + "/"
-                + writerIdHash + "/"
-                + writerRunIdHash + "/"
-                + objectId.value() + ".nrs");
     }
 
     private static long checkedAdd(long left, long right) {

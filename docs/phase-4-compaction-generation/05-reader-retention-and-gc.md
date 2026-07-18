@@ -164,12 +164,14 @@ late-byte cleanup、references-before-manifest ordering、root-last conditional 
 Checkpoint V closes the new cursor-snapshot write/read frontier：guarded immutable PUT、ACTIVE physical root、
 current-root-owned bounded pending protection、cursor-CAS visibility、permanent live-root protection and durable read
 lease；a hydrate/read repairs permanent protection after cursor-CAS response loss. Physical-root backfill、object
-inventory、registration retirement and the remaining materialization/GC runtime composition remain planned.
+inventory、registration retirement and the remaining materialization/GC runtime composition were still planned at
+that checkpoint.
 Checkpoint W subsequently implements physical/cursor live-reference backfill, and checkpoint AJ implements read-only
 cursor snapshot candidate discovery plus post-drain full revalidation. Checkpoint AK makes that evidence
 restart-reconstructable, adds exact drift rollback and composes the cursor path into the central six-domain
-mark/drain/DELETING/source-retirement runtime. Periodic root/registration scheduling、object inventory、registration
-retirement、broker config mapping and activation remain planned，so production deletion is still disabled.
+mark/drain/DELETING/source-retirement runtime. Checkpoint AL adds current-writer object inventory and exact old
+missing-root registration. Periodic root/registration/inventory scheduling、registration retirement、broker config
+mapping and activation remain planned，so production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1540,7 +1542,7 @@ cannot reuse the old digest and is unmarked without deleting bytes；an uncertai
 `Phase4PhysicalGcRuntime` composes the executor with all six domains and is owned by the production provider/runtime,
 but it intentionally contains no periodic scheduler. The existing broker mapping also continues to construct
 `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). Root/registration scheduling、the cursor-snapshot
-coverage bit、broker GC knob mapping、object inventory、registration retirement and physical-delete activation remain
+coverage bit、broker GC knob mapping、registration retirement and physical-delete activation remain
 required before production cursor snapshot deletion is available.
 
 ## 11. Orphan Discovery
@@ -1560,7 +1562,10 @@ metadata failure releases the admission flag for a later pass, and `close()` rej
 borrowed metadata store/scheduler. Lifecycle-specific routing、periodic scheduling and recovery coordinators are not
 yet runtime-composed；the scanner itself never consults object-store listing.
 
-`ObjectInventoryScanner` pages only known product prefixes and registers exact HEAD identity. Candidate classes：
+Checkpoint AL implements `ObjectInventoryScanner` for the exact object-key families written by the current runtime：
+Object-WAL v1、COMMITTED compacted v1、TOPIC_COMPACTED v1、NRC1 recovery checkpoints and NCS1 cursor snapshots.
+Each family owns a canonical directory prefix and strict forward/inverse key grammar；prefix membership alone is not
+an identity. Candidate classes include：
 
 - output uploaded but no task/output/index reference；
 - PREPARED/ABORTED publication output after retry grace；
@@ -1569,12 +1574,22 @@ yet runtime-composed；the scanner itself never consults object-store listing.
 - legacy manifest with no reachable slices after migration coverage；
 - physical object whose metadata root is missing。
 
-Listing is eventually consistent/audit input used mainly for bytes uploaded before any root CAS. The scanner waits
-`orphanNotBefore`, registers/revalidates every domain，
-marks the physical root, waits a second inventory/grace cycle and only then follows the same GC algorithm. A missing
-manifest or a single empty listing is never proof of orphanhood.
+One complete pass visits the canonical non-overlapping family prefixes in order and completely pages each prefix.
+For every listed key it first applies the strict inverse and checks for an existing root. A missing root is eligible
+for registration only when listing `lastModified + orphanGrace + maximumClockSkew <= passStart`、an exact HEAD still
+has the same key/length and, when listing supplied it, ETag、the HEAD length is positive and its storage checksum is
+CRC32C, and a second root read is still absent. Disabled or dry-run mode records `WOULD_REGISTER` without mutation.
+Enabled non-dry-run mode creates an exact ACTIVE root whose `createdAtMillis` is listing `lastModified` and whose
+`orphanNotBeforeMillis` is `passStart + orphanGrace + maximumClockSkew`, thereby imposing a second full grace before
+root-authoritative GC can even evaluate it. A lost create response converges only when reload returns that complete
+desired root record；a concurrent different root becomes `ROOT_CONFLICT`.
 
-Unknown prefixes、malformed keys、identity mismatch or objects newer than grace are reported/quarantined, not deleted.
+Listing is eventually consistent audit/discovery input used mainly for bytes uploaded before any root CAS. It never
+proves absence, never produces a GC plan and the scanner contains no MARK、protection-retirement or object-delete
+operation. Missing `lastModified`、young/future timestamps、malformed keys、stale listing 404、HEAD/list mismatch and
+root conflict each receive an exact report outcome and no mutation. Unknown prefixes are never enumerated. The
+production runtime owns the scanner but does not schedule or invoke it yet；a single empty listing is never proof of
+orphanhood.
 
 ## 12. Stream-registration Retirement
 

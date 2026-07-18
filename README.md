@@ -230,8 +230,12 @@ MARKED 重试；scanner 本身没有 root CAS、protection removal 或 object de
 `CursorSnapshotGcExecutor` 将 candidate 接入中央 mark/drain/revalidate/DELETING/source-retirement 链。
 `Phase4PhysicalGcRuntime` 已把 exact six domains、journal、collector 和 executor 交给 production provider/
 managed-ledger runtime 统一持有和关闭；但它不调度 root/registration pass，现有 broker bridge 仍只提供
-`enabled=false, dryRun=true` 的兼容默认值。Coverage/delete activation、object inventory、registration retirement
-和 broker GC 参数映射仍未启用，因此启动 broker 不会触发 destructive work。
+`enabled=false, dryRun=true` 的兼容默认值。Checkpoint AL 又加入当前五类 V1 writer prefix 的 strict key
+inverse 与 `ObjectInventoryScanner`：完整分页只把经过 age/skew、exact HEAD、CRC32C/length 和二次 root
+absence 验证的旧对象注册为 ACTIVE physical root，并为新 root 重置一整段 orphan grace；listing 从不授权
+删除，malformed/young/stale/mismatch/conflict 只计数。Scanner 由 runtime 持有但尚未调度。Coverage/delete
+activation、periodic root/registration/inventory scheduling、registration retirement 和 broker GC 参数映射仍未
+启用，因此启动 broker 不会触发 destructive work。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
@@ -242,6 +246,10 @@ tests 已于 2026-07-16 通过。
 execution adapter、six-domain runtime composition、safe-default config 和 runtime close ownership；该 gate 已于
 2026-07-18 在 Java 21、locked Pulsar `330eeeb3fa9903ed0123c2a0e261d403c32f0a59` 上通过，root build
 执行 139 个 actionable tasks，继承的 nested Pulsar regression 报告 138 个 actionable tasks。
+`phase4M4ObjectInventoryCheck --rerun-tasks` 覆盖 checkpoint AL 的五类 writer strict inverse、complete
+known-prefix pagination、age/HEAD/root 双检、second-grace root registration、dry-run 和 response-loss recovery；
+已于 2026-07-18 在 Java 21、同一 locked Pulsar 上通过，root build 执行 131 个 actionable tasks，nested Pulsar
+regression 报告 138 个 actionable tasks。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。
