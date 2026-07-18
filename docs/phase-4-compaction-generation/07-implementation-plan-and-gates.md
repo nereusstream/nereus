@@ -98,8 +98,9 @@ cursor-CAS-then-permanent completion、response-loss repair on hydrate/read、du
 physical/protection/read-pin production wiring for this path. Checkpoint W adds strict NPR1 projection resolution、
 the all-64-shard physical-root/cursor-root live-reference backfill、exact commit/index/cursor owner protections、
 stable final revalidation and response-loss-safe dual activation proofs. Broker registration backfill proof/barrier、
-cursor snapshot candidate/deletion scanning、object inventory、registration retirement and the remaining
-materialization/GC runtime composition remain pending. Checkpoint X starts M5 by adding the exact durable
+object inventory、registration retirement and the remaining materialization/GC runtime composition remain pending.
+Checkpoint AJ adds complete bounded cursor-snapshot candidate discovery plus the post-drain final-inventory callback；
+its scheduling、MARK/delete adapter and activation bit remain pending. Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
 binding/cursor/generation two-stable-snapshot barrier、deterministic broker-incarnation readiness epoch/full digest
@@ -645,8 +646,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Checkpoint V implements the guarded/protected/pinned cursor-snapshot new-write frontier and its production
 > physical/protection/read-pin wiring. Checkpoint W implements strict NPR1 projection authority and the stable
 > physical-root/cursor-root live-reference backfill plus dual activation proofs. Broker registration proof/barrier、
-> cursor snapshot candidate/deletion scanning、object inventory、registration retirement、remaining materialization/GC runtime
-> composition、real-service destructive scenarios and the final M4 gate remain before F4-M4 can be called complete.
+> Checkpoint AJ now implements complete bounded cursor-snapshot candidate discovery and the post-drain full-inventory
+> callback immediately before delete intent. Scanner scheduling、MARK/delete composition、the cursor coverage bit、object
+> inventory、registration retirement、remaining materialization/GC runtime composition、real-service destructive
+> scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
 > identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
@@ -813,7 +816,7 @@ gc/PhysicalGcMarkStatus.java                              implemented checkpoint
 gc/PhysicalGcMarkResult.java                              implemented checkpoint I
 gc/PhysicalGcAdvanceStatus.java                           implemented checkpoint I
 gc/PhysicalGcAdvanceResult.java                           implemented checkpoint I
-gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint I fence, extended L journal auth
+gc/PhysicalObjectGarbageCollector.java                    implemented checkpoint I fence, extended L journal auth/AJ final candidate callback
 gc/PhysicalObjectRootVisitor.java                         implemented checkpoint I
 gc/PhysicalObjectRootScanResult.java                      implemented checkpoint I
 gc/PhysicalObjectRootScanner.java                         implemented checkpoint I
@@ -838,7 +841,7 @@ gc/GcMetricsObserver.java
 
 ```text
 retention/CursorSnapshotReferenceDomain.java             implemented K affected, extended T ownerless
-retention/CursorSnapshotGcScanner.java
+retention/CursorSnapshotGcScanner.java                         implemented checkpoint AJ read-only discovery/revalidation
 retention/ProjectionGenerationReferenceDomain.java       implemented K affected, extended T ownerless
 cursor/CursorSnapshotWriteAuthority.java                  implemented checkpoint V
 cursor/CursorSnapshotPublication.java                     implemented checkpoint V
@@ -906,7 +909,7 @@ ManagedLedgerGenerationProjectionRefV1Test                implemented checkpoint
 PhysicalRootBackfillCoordinatorTest                       implemented checkpoint W data/cursor/response-loss paths
 MultiStreamWalRetirementTest
 GenerationRetirementFallbackTest
-CursorSnapshotGcScannerTest
+CursorSnapshotGcScannerTest                                   implemented checkpoint AJ
 CursorSnapshotGcRaceTest
 CursorSnapshotReferenceDomainTest                         implemented K, extended T ownerless
 ProjectionGenerationReferenceDomainTest                   implemented K, extended T ownerless
@@ -942,6 +945,7 @@ retirement.
 ./gradlew phase4M4TombstoneRetirementCheck
 ./gradlew phase4M4CursorProtectionCheck
 ./gradlew phase4M4PhysicalRootBackfillCheck
+./gradlew phase4M4CursorSnapshotGcCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -1107,6 +1111,21 @@ coverage evidence. This ordinary checkpoint does not implement the broker-side c
 capability barrier, enable delete bits, schedule `CursorSnapshotGcScanner`, enumerate orphan object inventory, retire
 registrations, or run the real-service destructive final scenarios. The ordinary gate passed with
 `--rerun-tasks` on 2026-07-16.
+
+`phase4M4CursorSnapshotGcCheck` extends checkpoint W with checkpoint AJ. It audits strict NCS key inversion、complete
+retention/cursor/object/protection pagination with an exact 10,000-value ceiling、listing age plus clock-skew
+eligibility、ACTIVE cursor-snapshot root/list identity、owner-bound permanent and skew-expired pending protection
+classification、canonical candidate/query evidence and one-at-a-time bounded visitation. It also audits the central
+collector's candidate-kind callback after the second reader/protection/metadata drain and before the final
+MARKED-root/journal/activation fence. Focused local-object-store tests prove exact candidate emission、unchanged
+MARKED-successor revalidation、cursor-owner drift rejection、strict pending expiry and fail-closed inventory overflow；
+collector tests prove false revalidation unmarks while a revalidation failure retains MARKED. The scanner contains no
+root CAS、protection removal or object-delete call. This ordinary checkpoint does not schedule the scanner、enable the
+cursor coverage/delete bits、compose destructive recovery、enumerate other orphan prefixes、retire registrations or
+run the real-service M4 final scenarios.
+The aggregate gate passed with `--rerun-tasks` on 2026-07-18 under Java 21 against locked Pulsar
+`master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`; the root build and inherited nested Pulsar regression each
+reported 138 actionable tasks.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

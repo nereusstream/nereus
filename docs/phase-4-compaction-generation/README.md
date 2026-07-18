@@ -75,8 +75,12 @@
 > routing 与五项 Pulsar typed broker config 映射。Checkpoint AI 又实现 exact immutable Pulsar
 > retention/backlog snapshot、checked policy projection、stable cluster readiness、registration-backed marker
 > admission、activation 后 policy 稳定重读，以及 loaded/unloaded/partition-child `TRIM_TOPIC` 路由。Cursor
-> snapshot candidate/deletion scanner、object inventory、
-> registration retirement、production physical GC 与最终删除开关仍保持关闭
+> snapshot logical trim remains independent of object deletion. Checkpoint AJ now adds strict NCS key inversion、
+> complete bounded retention/cursor/object/protection inventory、canonical cursor-snapshot candidate evidence and a
+> post-drain full revalidation callback in the central GC fence. Owner/root/list drift unmarks and incomplete reads
+> retain MARKED for retry；the managed-ledger scanner owns no mutation. Scanner scheduling、candidate-to-plan/runtime
+> composition、coverage/delete activation、object inventory、registration retirement、production physical GC 与最终
+> 删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
 >
@@ -946,6 +950,25 @@ root/permanent owner protection，以及 registration proof 缺失时 fail close
 backfill/barrier、不设置 delete bits、不运行 cursor deletion scanner/object listing，也不是 M4 final gate；
 该 gate 已于 2026-07-16 使用 `--rerun-tasks` 通过。
 
+### 6.25a F4-M4 cursor-snapshot GC discovery checkpoint
+
+Checkpoint AJ 实现 `CursorSnapshotGcScanner` 的 read-only candidate/revalidation boundary。Scanner 读取 exact
+retention authority，完整分页最多 10,000 个 cursor roots、canonical F3 snapshot objects 和每对象 protections；
+任何下一页越界都 fail closed，不把上限当截断。`CursorSnapshotKeys.parse` 严格反解
+`cursorNameHash/cursorGeneration/snapshotId.ncs`。候选必须同时满足 listing age + clock skew、ACTIVE
+`CURSOR_SNAPSHOT` root、length/ETag identity、complete unreferenced inventory，以及只有 owner-bound permanent 或
+skew-safe expired pending cursor protection。每个 candidate 的 retention/root/live-ref/list/root/protection facts
+被绑定进 canonical query evidence，并按 one-at-a-time visitor 执行。
+
+中央 `PhysicalObjectGarbageCollector` 新增 final-candidate callback，在第二次 reader/protection/metadata drain
+之后、最终 MARKED root/journal/activation fence 之前调用。Cursor revalidation 重跑完整 inventory，只接受 exact
+ACTIVE root 或其 one-epoch MARKED successor；普通 owner/root/list/protection drift 返回 false 并 unmark，读取/
+limit failure 保留 MARKED 重试。Scanner 不包含 root CAS、protection delete 或 object delete。Focused tests 覆盖
+真实 local object listing、MARKED successor、owner drift、pending expiry+skew 和 inventory overflow。
+`phase4M4CursorSnapshotGcCheck --rerun-tasks` 已于 2026-07-18 在 Java 21、locked Pulsar
+`330eeeb3fa9903ed0123c2a0e261d403c32f0a59` 上通过；root 与 nested Pulsar build 均报告 138 actionable tasks。
+Production scheduling、candidate-to-plan adapter、coverage/delete bits 和 destructive runtime composition 仍关闭。
+
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
 Checkpoint X 关闭 cold-topic backfill 开始前必须先关闭的新写前沿。`ProjectionIdentity` 现在拥有共享的
@@ -1244,7 +1267,7 @@ four-suite broker invocation passed 129 tasks.
 | F4-M1 | metadata/object lifecycle primitives、list/delete、reader lease and codecs | complete/final-gated on 2026-07-15 |
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
-| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while cursor snapshot candidate/deletion scanning、object inventory、registration retirement、physical GC composition and final gate remain pending |
+| F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint AJ, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots、all-shard physical/cursor live-reference backfill and complete cursor-snapshot candidate/post-drain revalidation are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while cursor-snapshot scheduling/MARK/delete composition、object inventory、registration retirement、physical GC activation and final gate remain pending |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；physical GC composition and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 

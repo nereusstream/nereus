@@ -154,7 +154,23 @@ public final class PhysicalObjectGarbageCollector {
     }
 
     public CompletableFuture<PhysicalGcAdvanceResult> advanceToDeleteIntent(GcPlan plan) {
+        return advanceToDeleteIntent(
+                plan,
+                ignored -> CompletableFuture.completedFuture(true));
+    }
+
+    /**
+     * Advances one sealed plan only after a candidate-kind-specific final inventory revalidation.
+     *
+     * <p>The callback runs after both reader/protection/metadata drain passes and immediately before
+     * the final MARKED-root/journal/activation fence. A normal authority drift returns {@code false}
+     * and rolls the root back to ACTIVE; a callback failure leaves the root MARKED for retry.
+     */
+    public CompletableFuture<PhysicalGcAdvanceResult> advanceToDeleteIntent(
+            GcPlan plan,
+            FinalCandidateRevalidator finalCandidateRevalidator) {
         Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(finalCandidateRevalidator, "finalCandidateRevalidator");
         if (!config.enabled()) {
             return CompletableFuture.completedFuture(
                     PhysicalGcAdvanceResult.simple(PhysicalGcAdvanceStatus.DISABLED));
@@ -176,7 +192,12 @@ public final class PhysicalObjectGarbageCollector {
                                 loadExactRetirementJournal(plan, deadline)
                                         .thenCompose(ignored -> acquireActivationProof(plan, deadline))
                                         .thenCompose(proof -> drainAndEnterIntent(
-                                                plan, root, proof, now, deadline)))
+                                                plan,
+                                                root,
+                                                proof,
+                                                now,
+                                                finalCandidateRevalidator,
+                                                deadline)))
                         .orElseGet(() -> CompletableFuture.completedFuture(
                                 PhysicalGcAdvanceResult.simple(
                                         PhysicalGcAdvanceStatus.ROOT_CHANGED))));
@@ -320,6 +341,7 @@ public final class PhysicalObjectGarbageCollector {
             VersionedPhysicalObjectRoot markedRoot,
             GenerationActivationProof proof,
             long now,
+            FinalCandidateRevalidator finalCandidateRevalidator,
             MaterializationDeadline deadline) {
         return activeLeaseRetryAt(plan, now, deadline)
                 .thenCompose(retryAt -> {
@@ -353,7 +375,11 @@ public final class PhysicalObjectGarbageCollector {
                                                     .stillMatches(collection, deadline)
                                                     .thenCompose(matches -> matches
                                                             ? finalDrainFence(
-                                                                    plan, proof, now, deadline)
+                                                                    plan,
+                                                                    proof,
+                                                                    now,
+                                                                    finalCandidateRevalidator,
+                                                                    deadline)
                                                             : unmark(
                                                                     plan,
                                                                     markedRoot,
@@ -367,6 +393,7 @@ public final class PhysicalObjectGarbageCollector {
             GcPlan plan,
             GenerationActivationProof proof,
             long now,
+            FinalCandidateRevalidator finalCandidateRevalidator,
             MaterializationDeadline deadline) {
         return activeLeaseRetryAt(plan, now, deadline)
                 .thenCompose(retryAt -> {
@@ -387,30 +414,51 @@ public final class PhysicalObjectGarbageCollector {
                                                 plan.candidate(),
                                                 plan.plannedMetadataRemovals(),
                                                 deadline)
-                                        .thenCompose(matches -> matches
-                                                ? loadExactMarked(plan, deadline)
-                                                        .thenCompose(optional -> {
-                                                            if (optional.isEmpty()) {
-                                                                return CompletableFuture.completedFuture(
-                                                                        PhysicalGcAdvanceResult.simple(
-                                                                                PhysicalGcAdvanceStatus
-                                                                                        .ROOT_CHANGED));
-                                                            }
-                                                            return loadExactRetirementJournal(
-                                                                            plan, deadline)
-                                                                    .thenCompose(ignored -> deadline.bound(
-                                                                            () -> activationGuard.revalidate(
-                                                                                    proof),
-                                                                            "revalidate physical-delete activation before delete intent"))
-                                                                    .thenCompose(ignored -> deletingCas(
-                                                                            plan,
-                                                                            optional.orElseThrow(),
-                                                                            now,
-                                                                            deadline));
-                                                        })
-                                                : unmarkCurrent(plan, deadline));
+                                        .thenCompose(matches -> {
+                                            if (!matches) {
+                                                return unmarkCurrent(plan, deadline);
+                                            }
+                                            return deadline.bound(
+                                                            () -> finalCandidateRevalidator.revalidate(plan),
+                                                            "revalidate candidate-specific inventory before delete intent")
+                                                    .thenCompose(candidateMatches -> candidateMatches
+                                                            ? enterDeleteIntent(
+                                                                    plan,
+                                                                    proof,
+                                                                    now,
+                                                                    deadline)
+                                                            : unmarkCurrent(plan, deadline));
+                                        });
                             });
                 });
+    }
+
+    private CompletableFuture<PhysicalGcAdvanceResult> enterDeleteIntent(
+            GcPlan plan,
+            GenerationActivationProof proof,
+            long now,
+            MaterializationDeadline deadline) {
+        return loadExactMarked(plan, deadline).thenCompose(optional -> {
+            if (optional.isEmpty()) {
+                return CompletableFuture.completedFuture(
+                        PhysicalGcAdvanceResult.simple(
+                                PhysicalGcAdvanceStatus.ROOT_CHANGED));
+            }
+            return loadExactRetirementJournal(plan, deadline)
+                    .thenCompose(ignored -> deadline.bound(
+                            () -> activationGuard.revalidate(proof),
+                            "revalidate physical-delete activation before delete intent"))
+                    .thenCompose(ignored -> deletingCas(
+                            plan,
+                            optional.orElseThrow(),
+                            now,
+                            deadline));
+        });
+    }
+
+    @FunctionalInterface
+    public interface FinalCandidateRevalidator {
+        CompletableFuture<Boolean> revalidate(GcPlan plan);
     }
 
     private CompletableFuture<PhysicalGcAdvanceResult> unmarkCurrent(

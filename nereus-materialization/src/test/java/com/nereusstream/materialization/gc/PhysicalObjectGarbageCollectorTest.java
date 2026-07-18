@@ -425,6 +425,72 @@ class PhysicalObjectGarbageCollectorTest {
     }
 
     @Test
+    void candidateSpecificFinalRevalidationUnmarksDriftAndRetainsMarkedRootOnFailure() {
+        PhysicalGcConfig config = config(true, false);
+
+        FakePhysicalObjectMetadataStore driftStore = new FakePhysicalObjectMetadataStore();
+        MutableClock driftClock = new MutableClock(1_000);
+        VersionedPhysicalObjectRoot driftActive = createActiveRoot(driftStore);
+        PhysicalObjectGarbageCollector driftCollector = collector(
+                config,
+                driftStore,
+                driftClock,
+                new TrackingDomain("projection-generation-v1"),
+                new TrackingDomain("generation-v1"));
+        GcPlan driftPlan = driftCollector.mark(
+                        candidate(config, driftActive, query(driftActive)),
+                        List.of(),
+                        List.of())
+                .join().plan().orElseThrow();
+        driftClock.setMillis(12_001);
+        AtomicInteger driftRevalidations = new AtomicInteger();
+
+        PhysicalGcAdvanceResult drift = driftCollector.advanceToDeleteIntent(
+                        driftPlan,
+                        ignored -> {
+                            driftRevalidations.incrementAndGet();
+                            return CompletableFuture.completedFuture(false);
+                        })
+                .join();
+
+        assertThat(drift.status()).isEqualTo(PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED);
+        assertThat(driftRevalidations).hasValue(1);
+        assertThat(driftStore.getRoot(
+                                CLUSTER,
+                                driftPlan.candidate().object().objectKeyHash())
+                        .join().orElseThrow().value().lifecycle())
+                .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+
+        FakePhysicalObjectMetadataStore failedStore = new FakePhysicalObjectMetadataStore();
+        MutableClock failedClock = new MutableClock(1_000);
+        VersionedPhysicalObjectRoot failedActive = createActiveRoot(failedStore);
+        PhysicalObjectGarbageCollector failedCollector = collector(
+                config,
+                failedStore,
+                failedClock,
+                new TrackingDomain("projection-generation-v1"),
+                new TrackingDomain("generation-v1"));
+        GcPlan failedPlan = failedCollector.mark(
+                        candidate(config, failedActive, query(failedActive)),
+                        List.of(),
+                        List.of())
+                .join().plan().orElseThrow();
+        failedClock.setMillis(12_001);
+
+        assertThatThrownBy(() -> failedCollector.advanceToDeleteIntent(
+                        failedPlan,
+                        ignored -> CompletableFuture.failedFuture(
+                                new RuntimeException("injected candidate revalidation failure")))
+                .join())
+                .hasRootCauseMessage("injected candidate revalidation failure");
+        assertThat(failedStore.getRoot(
+                                CLUSTER,
+                                failedPlan.candidate().object().objectKeyHash())
+                        .join().orElseThrow().value().lifecycle())
+                .isEqualTo(PhysicalObjectLifecycle.MARKED);
+    }
+
+    @Test
     void deleteIntentLostResponseAndMarkedRestartBothConvergeWithoutDeletingAnything() {
         LostRootCasResponseStore store = new LostRootCasResponseStore(PhysicalObjectLifecycle.DELETING);
         PhysicalGcConfig config = config(true, false);

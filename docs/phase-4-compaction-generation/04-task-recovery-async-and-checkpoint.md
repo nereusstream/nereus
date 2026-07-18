@@ -210,6 +210,20 @@ the last case also emits an owner-bound reference. Both domains use the core bou
 rerun the full query in `stillMatches`, and at checkpoint K returned incomplete+veto for ownerless queries. Checkpoint
 T later supplies the gated global scope；production runtime installation and cursor snapshot GC remain later work.
 
+Checkpoint AJ implements the cursor-snapshot GC discovery/revalidation node without moving deletion ownership into
+managed-ledger. `CursorSnapshotGcScanner` uses one bounded asynchronous pass to load the exact F3 retention authority、
+page every cursor root、page the canonical snapshot prefix and page every candidate protection. It accepts no
+truncation beyond 10,000 values, validates the strict NCS key inverse、age/skew、ACTIVE physical-root/list identity and
+only owner-bound cursor protections. It emits a canonical `CURSOR_SNAPSHOT_CANDIDATE` query to one visitor at a time
+but performs no root/protection/object mutation.
+
+The central `PhysicalObjectGarbageCollector` now accepts a candidate-kind-specific final revalidator. It invokes that
+callback only after the second reader/protection/metadata drain and before the final MARKED root、sealed journal and
+activation revalidation. The cursor callback repeats the complete inventory and accepts only unchanged retention/
+cursor/list/protection authority plus the exact one-epoch MARKED successor. Ordinary drift unmarks；an incomplete or
+failed read leaves MARKED for restart-safe retry. Scanner scheduling、candidate-to-plan adapter composition、coverage
+activation and all deletion calls remain target runtime work after checkpoint AJ.
+
 Full M4–M6 target construction：
 
 ```java

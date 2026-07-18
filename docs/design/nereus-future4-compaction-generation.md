@@ -577,9 +577,11 @@ guarded PUT、pending/permanent protection、response-loss repair 和 durable re
 strict NPR1 projection identity、protocol-neutral projection authority capture，以及在 completed registration proof
 前提下遍历全部 64 registry shards 的 physical-root/cursor-root live-reference backfill；它使用 exact HEAD、
 commit/index/cursor owner protection handshake、最终 authority revalidation 和双 activation-proof CAS 收口。
-Broker cold-topic registration proof、cursor snapshot candidate/deletion scanning、object
-inventory、registration retirement、remaining materialization/GC runtime composition 和 final M4 gate 仍待完成；
-production deletion 保持关闭。
+Checkpoint AJ further implements strict cursor-snapshot key inversion、complete bounded retention/root/object/
+protection inventory、canonical candidate evidence and post-drain final revalidation in the central GC fence.
+Broker cold-topic registration proof is now implemented by the M5 checkpoints below；cursor scanner scheduling、
+MARK/delete composition、object inventory、registration retirement、remaining materialization/GC runtime composition
+和 final M4 gate 仍待完成；production deletion 保持关闭。
 
 M5 checkpoint X 已进一步实现共享 canonical projection-ref encoder、exact durable registration
 create/refresh/final revalidation、topic create/open/recreate return barrier，以及 production shared generation-store
@@ -633,6 +635,6 @@ production service/facade routing，以及 Pulsar typed retention config mapping
 immutable effective retention/backlog snapshot、stable generation readiness、registration-backed marker admission、
 post-activation policy reload 和 loaded/unloaded/partition-child `TRIM_TOPIC` route；physical deletion 仍关闭。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 through checkpoint AI 也不声称 production physical GC、
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AJ 和 M5 through checkpoint AI 也不声称 production physical GC、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

@@ -164,8 +164,10 @@ late-byte cleanup、references-before-manifest ordering、root-last conditional 
 Checkpoint V closes the new cursor-snapshot write/read frontier：guarded immutable PUT、ACTIVE physical root、
 current-root-owned bounded pending protection、cursor-CAS visibility、permanent live-root protection and durable read
 lease；a hydrate/read repairs permanent protection after cursor-CAS response loss. Physical-root backfill、object
-inventory、cursor snapshot candidate/deletion scanning、registration retirement and the remaining
-materialization/GC runtime composition remain planned，so production deletion is still disabled.
+inventory、registration retirement and the remaining materialization/GC runtime composition remain planned.
+Checkpoint W subsequently implements physical/cursor live-reference backfill, and checkpoint AJ implements read-only
+cursor snapshot candidate discovery plus post-drain full revalidation；scanner scheduling、MARK/delete composition and
+activation remain planned，so production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1504,6 +1506,30 @@ CAS DELETING and delete exact object
 An owner change、cursor create/recreate/reset/delete、snapshot replacement or either pending retention lifecycle
 invalidates the attempt. A same-name topic recreation uses another stream/projection prefix and cannot authorize old
 incarnation deletion without old-stream lifecycle/reference proof.
+
+Checkpoint AJ implements the read-only discovery and post-drain revalidation portion of this sequence.
+`CursorSnapshotGcScanner` first reads the exact retention root, completely pages cursor roots and the canonical F3
+object prefix, and refuses any pass that exceeds the configured hard maximum of 10,000 roots、objects or protections.
+Prefix membership is insufficient：`CursorSnapshotKeys.parse` proves the exact
+`cursorNameHash/cursorGeneration/snapshotId.ncs` grammar. An eligible candidate additionally requires a listing
+`lastModified` older than `orphanGrace + maximumClockSkew`、an exact ACTIVE `CURSOR_SNAPSHOT` physical root whose
+length/ETag match the listing、and a complete protection set containing only same-root-epoch cursor protections.
+Permanent protections are removable only against the complete current cursor-root inventory；pending protections are
+removable only strictly after `expiresAt + maximumClockSkew`. Unknown age、missing root、non-ACTIVE root、identity
+mismatch、foreign protection and malformed keys are counted but never emitted.
+
+The scanner binds retention/root/live-reference facts、the exact listing、ACTIVE physical-root version/digest and
+every planned protection version/digest into `CURSOR_SNAPSHOT_CANDIDATE` evidence, then invokes one asynchronous
+visitor at a time under one whole-pass deadline. After the central collector has marked and drained the root,
+`revalidate(candidate)` repeats the complete list/retention/root/protection cut, accepts only the exact ACTIVE root or
+its one-epoch MARKED successor, and returns false for ordinary owner/root/list/reference drift. The new
+`PhysicalObjectGarbageCollector.FinalCandidateRevalidator` runs this callback after its second reader/protection/
+metadata drain and immediately before the final root/journal/activation fence；false rolls MARKED back to ACTIVE,
+while a failed/incomplete revalidation leaves MARKED for retry. This preserves one deletion correctness owner.
+
+Checkpoint AJ still does not schedule the scanner、mark a candidate、remove protections、call object deletion、publish
+the cursor-snapshot GC coverage bit or enable physical-delete activation. Those production-composition and rollout
+steps remain required before cursor snapshot deletion is available.
 
 ## 11. Orphan Discovery
 

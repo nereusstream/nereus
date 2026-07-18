@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AJ、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -40,6 +40,9 @@ Already present：
   reference domains. New strict appends now establish `REACHABLE_APPEND` before head CAS and `VISIBLE_GENERATION`
   before success；registration/backfill/readiness/activation proofs and physical/cursor live-reference backfill are
   implemented.
+- F4-M4 checkpoint AJ：the cursor-snapshot path now has strict key inversion、complete bounded
+  retention/root/object/protection inventory、canonical candidate evidence and a post-drain final revalidation seam
+  in the single central GC fence. It remains read-only and production deletion remains disabled.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative
@@ -62,7 +65,8 @@ Not present：
 - BookKeeper WAL writer/reader/location types；
 - production-composed global-domain source retirement and physical/cursor/root/audit GC completion；
 - primary-WAL retention gate and destructive GC daemon composition；
-- cursor-snapshot candidate/deletion、object inventory、registration retirement and physical-GC composition；
+- production-composed cursor-snapshot mark/deletion、object inventory、registration retirement and physical-GC
+  scheduling；
 - mixed primary target resolver。
 
 The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default
