@@ -618,6 +618,16 @@ durable ACTIVE 收敛，CAS 后还会重证 cached readiness 与 durable authori
 promise 在 proof 完成后等待 activation；失败 report 或默认关闭状态不调用 coordinator。具体 mutation call
 sites 和 topic marker 尚未接入。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 through checkpoint AC 也不声称 production physical GC、
+M5 checkpoints AD–AF 已继续实现 protected Object-WAL `WAL_DURABLE` acknowledgement、generation-zero
+restart/read repair、per-stream pre-I/O activation/lag admission，以及把 resolver/read-repair/materialization
+lifecycle 与 exact Pulsar profile/config mapping 作为一个 production unit 装配。Sync 仍为默认，async 仍要求
+durable generation activation proof；BookKeeper primary path 未实现。
+
+M5 checkpoint AG 已实现 product-neutral exact retention policy/config/evidence values、source-index-verified
+stable candidate planning 和 ownership/activation/final-authority gated F3 logical-trim delegation。它不会直接
+调用 L0 trim，也不会等待 physical GC；Pulsar retention policy/admin mapping、shared bounded plan lane 和
+managed-ledger production installation 尚未实现。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint W 和 M5 through checkpoint AG 也不声称 production physical GC、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

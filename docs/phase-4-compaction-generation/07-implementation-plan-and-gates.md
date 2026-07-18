@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`bce3422a94edf01c483c15063c6879254b3ff03f`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -122,7 +122,11 @@ throttle/reject semantics. Checkpoint AF atomically installs the Phase 4 resolve
 generation-aware read/failure handler、NRC1 replay/index repair、generation-zero repair-before-plan and owned
 materialization service in `DefaultNereusRuntimeProvider`；the local Pulsar fork maps exact sync/async first-create
 profile and the complete bounded materialization configuration. Legacy constructors remain Phase 1.5-only, sync is
-still the default, and async remains activation-proof gated.
+still the default, and async remains activation-proof gated. Checkpoint AG implements the product-neutral logical
+retention correctness slice：checked exact Pulsar policy values、bounded config/evidence values、a stable
+source-index-verified candidate planner and an ownership/activation-gated service whose only mutation is the F3
+`CursorRetentionCoordinator.requestTrim` protocol. Pulsar policy/admin mapping、the shared bounded/coalescing plan
+lane and production managed-ledger composition remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1145,12 +1149,15 @@ nereus-metadata-oxia/.../ManagedLedgerProjectionMetadataStore.java   exact looku
 nereus-metadata-oxia/.../ProjectionMetadataStoreCore.java            exact lookup/marker CAS implemented K
 nereus-metadata-oxia/.../records/TopicProjectionRecord.java          composed marker validation implemented K
 
-nereus-managed-ledger/.../retention/RetentionPolicySnapshot.java
-nereus-managed-ledger/.../retention/NereusRetentionConfig.java
-nereus-managed-ledger/.../retention/RetentionStatsToken.java
-nereus-managed-ledger/.../retention/RetentionCandidate.java
-nereus-managed-ledger/.../retention/RetentionCandidatePlanner.java
-nereus-managed-ledger/.../retention/NereusManagedLedgerRetentionService.java
+nereus-managed-ledger/.../retention/RetentionPolicySnapshot.java      implemented checkpoint AG exact policy/checked units
+nereus-managed-ledger/.../retention/NereusRetentionConfig.java       implemented checkpoint AG bounded values/defaults
+nereus-managed-ledger/.../retention/RetentionStatsToken.java         implemented checkpoint AG exact stats identity
+nereus-managed-ledger/.../retention/RetentionCandidate.java          implemented checkpoint AG formula/evidence value
+nereus-managed-ledger/.../retention/RetentionPolicySnapshotProvider.java implemented checkpoint AG authority seam
+nereus-managed-ledger/.../retention/RetentionCandidatePlanner.java   implemented checkpoint AG plan/revalidate contract
+nereus-managed-ledger/.../retention/DefaultRetentionCandidatePlanner.java implemented checkpoint AG stable source-verified planner
+nereus-managed-ledger/.../retention/RetentionEvidenceDigests.java    implemented checkpoint AG complete evidence digest
+nereus-managed-ledger/.../retention/NereusManagedLedgerRetentionService.java implemented checkpoint AG F3-delegated logical trim
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionRefV1.java checkpoint W strict codec
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionAuthorityReader.java checkpoint W reader
 nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCoordinator.java checkpoint X broker-safe contract
@@ -1224,9 +1231,9 @@ NereusManagedLedgerOpenCoordinatorTest                     extended checkpoint X
 NereusManagedLedgerRuntimeTest                             extended checkpoints X/AA–AC ownership/close order
 ProjectionIdentityTest                                     implemented checkpoint X canonical encoder
 GenerationActivationCompatibilityTest
-RetentionCandidatePlannerTest
-NereusRetentionConfigTest
-NereusManagedLedgerRetentionTest
+RetentionCandidatePlannerTest                              implemented checkpoint AG OR/strict-time/stale-source/drift
+NereusRetentionConfigTest                                 implemented checkpoint AG policy/config boundaries
+NereusManagedLedgerRetentionTest                          implemented checkpoint AG order/no-op/lost-owner callback
 NereusManagedLedgerGenerationReadTest
 NereusRuntimeF4CompositionTest
 NereusRuntimeF4ConfigurationCrossValidationTest
@@ -1261,6 +1268,7 @@ NereusGenerationProtocolBrokerTest
 ./gradlew phase4M5ActivationGuardCheck
 ./gradlew phase4M5PublicationActivationCheck
 ./gradlew phase4M5AsyncObjectWalCheck
+./gradlew phase4M5RetentionPlannerCheck
 ./gradlew phase4M5Check
 ./gradlew phase4M5FinalCheck --rerun-tasks
 ```
@@ -1278,7 +1286,7 @@ does not modify the local Pulsar fork, advertise generation capability, activate
 topics, or publish a cluster backfill proof. The ordinary gate passed with `--rerun-tasks` on 2026-07-16.
 
 `phase4M5GenerationCapabilityCheck` is the checkpoint-Y precursor. It consumes the exact clean local fork
-`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, audits the capability/readiness/invalidation surface, publishes
+`master@bce3422a94edf01c483c15063c6879254b3ff03f`, audits the capability/readiness/invalidation surface, publishes
 the existing Nereus F2 development composite, and runs broker spotless、checkstyle plus focused generation/cursor/
 binding suites. The readiness identity is domain-separated SHA-256 over sorted persistent broker registry keys、
 advertised broker ids、start timestamps and sorted required protocol pairs；the frozen two-broker fixture yields
@@ -1289,7 +1297,7 @@ registration backfill proof、activate a topic marker or enable publication/dele
 on 2026-07-16.
 
 `phase4M5RegistrationBackfillCheck` is the checkpoint-Z precursor. It consumes the current exact clean local fork
-`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, publishes the Nereus development composite, audits the product
+`master@bce3422a94edf01c483c15063c6879254b3ff03f`, publishes the Nereus development composite, audits the product
 candidate and broker traversal/config/lifecycle surfaces, and runs managed-ledger plus Pulsar spotless、checkstyle and
 focused suites. The traversal never loads/owns a topic；it sorts tenants/namespaces/topics, processes one namespace at
 a time, batches topic work under the configured concurrency, captures strict NPR1 projection identity, performs
@@ -1309,7 +1317,7 @@ and rejects standalone advance after deletion enablement. The gate covers lost C
 invalidation after CAS. It does not activate a topic marker or enable publication/deletion. It passed on 2026-07-16.
 
 `phase4M5ActivationGuardCheck` is the checkpoint-AB precursor. It consumes the exact clean local fork
-`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, publishes the current development composite and runs
+`master@bce3422a94edf01c483c15063c6879254b3ff03f`, publishes the current development composite and runs
 core/managed-ledger/adapter checks plus broker-common/broker spotless、checkstyle and
 `NereusBrokerStorageConfigurationTest`. The managed-ledger guard requires one exact ACTIVE cluster record carrying
 the current readiness epoch、complete stream-registration proof and the canonical six-domain set whose frozen digest
@@ -1322,7 +1330,7 @@ gate does not advance the cluster record to ACTIVE and does not yet install the 
 async publication、logical trim and physical deletion remain unavailable. It passed on 2026-07-16.
 
 `phase4M5PublicationActivationCheck` is the checkpoint-AC precursor. It consumes the exact clean local fork
-`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`, publishes the current development composite and runs
+`master@bce3422a94edf01c483c15063c6879254b3ff03f`, publishes the current development composite and runs
 core/managed-ledger/adapter checks plus broker spotless、checkstyle、
 `NereusGenerationRegistrationBackfillTest` and
 `NereusManagedLedgerStorageGenerationActivationTest`. The product coordinator makes no first write while the switch
@@ -1361,6 +1369,18 @@ generation/Oxia/ObjectStore resources. The locked Pulsar mapper persists only ex
 names, constructs the complete validated `MaterializationConfig`, appends processRunId to the staging base and keeps
 sync as the default. Focused Nereus module tests and `NereusBrokerStorageConfigurationTest` passed on 2026-07-16.
 Retention/admin and destructive GC composition remain outside this checkpoint.
+
+`phase4M5RetentionPlannerCheck` is the checkpoint-AG precursor. It inherits the complete checkpoint-AD chain, audits
+the exact retention contract surface and runs `:nereus-managed-ledger:check`. The planner captures a maximum of 4,096
+canonical stats facts, verifies each exact source-index key/version/durable SHA, applies stock time-OR-size policy at
+verified range boundaries, and requires two identical captures both when planning and immediately before mutation.
+The service orders ownership admission、generation activation、exact policy load、stable plan、activation revalidation、
+planner authority revalidation、F3 trim and final ownership exactly, and never calls `StreamStorage.trim` or waits for
+physical deletion. Nine focused tests cover policy/unit/config bounds、strict expiry、stale source and pending-state
+vetoes、head/policy/owner drift、exact call order、no-op and ownership loss after durable trim. Pulsar policy/admin
+mapping、production runtime installation、shared queue/concurrency enforcement and physical GC remain outside this
+checkpoint. The gate passed on 2026-07-18 under Java 21 against locked Pulsar
+`master@bce3422a94edf01c483c15063c6879254b3ff03f`.
 
 ## 8. F4-M6 — Final Acceptance
 

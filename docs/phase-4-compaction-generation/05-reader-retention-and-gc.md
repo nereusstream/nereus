@@ -107,9 +107,15 @@ nereus-materialization/src/main/java/com/nereusstream/materialization/gc/
   ObjectInventoryScanner.java
 
 nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention/
-  RetentionCandidatePlanner.java
   RetentionPolicySnapshot.java
+  NereusRetentionConfig.java
+  RetentionStatsToken.java
+  RetentionCandidate.java
+  RetentionPolicySnapshotProvider.java
+  RetentionCandidatePlanner.java
+  DefaultRetentionCandidatePlanner.java
   NereusManagedLedgerRetentionService.java
+  RetentionEvidenceDigests.java
   ProjectionGenerationReferenceDomain.java
   CursorSnapshotReferenceDomain.java
   CursorSnapshotGcScanner.java
@@ -965,6 +971,13 @@ public record RetentionPolicySnapshot(
         long retentionTimeMillis,      // -1=infinite, 0=no post-consume time retention
         long retentionSizeBytes) { }    // -1=infinite, 0=no post-consume size retention
 
+public record NereusRetentionConfig(
+        int statsScanPageSize,
+        int maxConcurrentPlans,
+        int maxQueuedPlans,
+        Duration operationTimeout,
+        Duration closeTimeout) { }
+
 public record RetentionStatsToken(
         String key,
         long metadataVersion,
@@ -988,6 +1001,9 @@ public record RetentionCandidate(
 public interface RetentionCandidatePlanner {
     CompletableFuture<Optional<RetentionCandidate>> plan(
             StreamId streamId, RetentionPolicySnapshot policy);
+
+    CompletableFuture<Void> revalidate(
+            RetentionCandidate candidate, RetentionPolicySnapshot policy);
 }
 ```
 
@@ -1001,6 +1017,19 @@ Candidate construction requires canonical ordered/unique stats tokens, bounds th
 limit and hashes the complete head/cursor/policy/stats evidence. It returns empty when the computed candidate does not
 advance the current trim or any scan is incomplete. The result is ephemeral；the trim service reloads and revalidates
 every captured authority before entering F3's pending protocol.
+
+Checkpoint AG implements this product-neutral surface. `RetentionPolicySnapshot.fromMinutesAndMebibytes` uses checked
+unit conversion；`NereusRetentionConfig` accepts a stats page size in `[1, 512]`、positive plan/queue bounds and
+positive millisecond-representable operation/close timeouts. Its current defaults are `128 / 8 / 1024 / 30s / 30s`.
+The active planner consumes `statsScanPageSize` and `operationTimeout`；the shared coalescing lane that will enforce
+`maxConcurrentPlans`/`maxQueuedPlans` remains part of the later production composition checkpoint.
+
+`DefaultRetentionCandidatePlanner` captures one `Clock.millis()` per attempt, scans at most 4,096 canonical stats
+tokens, verifies each token's exact source-index key/version/durable SHA and COMMITTED-view range/commit/cumulative
+identity, and captures the complete candidate twice. Authority drift retries at most four stable attempts. Final
+`revalidate` repeats the same two captures with the original `plannedAtMillis` and requires byte-for-byte equivalent
+candidate evidence. Missing/incomplete stats or stale source identity can only reduce the eligible boundary or return
+empty；they never authorize a trim.
 
 ### 8.2 Candidate formula
 
@@ -1041,14 +1070,23 @@ restarts. `PROTECTION_PENDING` and `TRIM_PENDING` are vetoes, not temporary valu
 NereusManagedLedgerRetentionService.trim(reason)
   -> ownershipGuard.requireOwned()
   -> activationGuard.requireReady(LOGICAL_TRIM, liveProjection, activateIfAbsent=true)
+  -> reload exact RetentionPolicySnapshot
   -> compute stable candidate
   -> activationGuard.revalidate(proof)
+  -> planner.revalidate(candidate, policy)
   -> CursorRetentionCoordinator.requestTrim(cursorOwnerSession, candidate, reason)
   -> ownershipGuard.requireOwned() before callback success
 ```
 
 The returned/admin promise completes after F3 proves logical trim ACTIVE/completed. Physical deletion is scheduled
 later and is not included in that promise. No Phase 4 caller invokes `StreamStorage.trim` directly.
+
+Checkpoint AG implements that exact order in `NereusManagedLedgerRetentionService`. Only retriable
+`METADATA_CONDITION_FAILED` failures before `requestTrim` are retried, at most four times；once the F3 call starts it
+is never replayed by this service. A no-op still performs the final ownership check. Lost ownership after durable F3
+completion fails the broker callback and suppresses the completion observer, without rolling back the durable trim.
+This checkpoint does not yet install the service in `NereusManagedLedger` or map Pulsar topic policy/admin calls；it
+therefore does not claim broker-visible retention rollout or physical GC.
 
 ### 8.4 Backlog eviction
 

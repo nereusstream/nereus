@@ -110,7 +110,7 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Phase 4
-Pulsar source lock 已推进到 `master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`。M6 增加
+Pulsar source lock 已推进到 `master@bce3422a94edf01c483c15063c6879254b3ff03f`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace admin route 静态审计。
@@ -211,8 +211,13 @@ registration/topic-marker activation 和 materialization lag gate 放入每流 a
 prepare/upload 之前；lag truth 从 current-policy `COMMITTED` generation 的连续覆盖、root-stable live commits
 和可验证 retention stats 重建，advisory checkpoint 只做 ahead-contradiction 检查。F2 topic/L0 metadata 与
 request factory 现在可无歧义保存和恢复 sync/async Object-WAL profile，BookKeeper profiles 仍拒绝。该
-guard/reader 还未由 production provider 和 Pulsar configuration 装配，因此 checkpoint AE 不等于 broker
-侧 async policy 已启用。
+guard/reader 在 checkpoint AF 已与 generation-aware read、NRC1 replay/index repair、source repair 和 bounded
+materialization lifecycle 一起由 production provider 原子装配；Pulsar configuration 也已映射 exact
+sync/async Object-WAL profile 与完整 `MaterializationConfig`。Checkpoint AG 又实现 exact retention
+policy/config/evidence values、source-index-verified stable candidate planner，以及 ownership/activation/final-
+authority gated、只委托 F3 coordinator 的 logical-trim service。Pulsar retention policy/admin mapping、shared
+bounded plan lane、managed-ledger production installation 和 physical GC 仍未接入，因此 AG 不等于 broker
+retention 已启用。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
@@ -223,7 +228,10 @@ tests 已于 2026-07-16 通过。
 `phase4M5RegistrationBackfillCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5RegistrationProofCheck` 已于 2026-07-16 通过。
 Checkpoint AE 的四个受影响模块回归和 focused lag/admission tests 已于 2026-07-16 通过；production
-composition 与 aggregate M5 gate 仍待后续 checkpoint。
+composition 已由 checkpoint AF 完成。Checkpoint AG 的九个 policy/config/planner/service focused tests 与
+`phase4M5RetentionPlannerCheck` 覆盖 strict time-OR-size、stale source、pending lifecycle、authority drift、
+exact call order、no-op 和 durable trim 后 ownership loss；Pulsar policy/admin 与 aggregate M5 gate 仍待后续
+checkpoint。该 checkpoint gate 已于 2026-07-18 在 Java 21 下通过完整前置 Nereus/locked-Pulsar 回归链。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

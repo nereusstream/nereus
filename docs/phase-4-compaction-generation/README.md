@@ -68,17 +68,20 @@
 > generation-zero startup/source repair、authoritative lag reader，以及 bounded materialization
 > scanner/worker/checkpoint/retirement lifecycle。Pulsar broker config 已映射 exact sync/async default profile 和
 > 完整 `MaterializationConfig`，并为每个 processRunId 分配独立 staging 目录；sync 仍为默认，async 仍要求
-> durable generation activation proof。cursor snapshot candidate/deletion scanner、object inventory、registration
-> retirement、production physical GC 与最终删除开关仍保持关闭
+> durable generation activation proof。Checkpoint AG 又实现 exact retention policy/config/evidence values、
+> source-index-verified stable candidate planner，以及 ownership/activation/final-authority gated、只委托 F3
+> `CursorRetentionCoordinator` 的 logical-trim service。Pulsar retention policy/admin mapping、shared bounded plan
+> lane、managed-ledger production installation、cursor snapshot candidate/deletion scanner、object inventory、
+> registration retirement、production physical GC 与最终删除开关仍保持关闭
 >
 > 设计基线日期：2026-07-14
 >
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`
+> `master@bce3422a94edf01c483c15063c6879254b3ff03f`
 
-> 实现状态日期：2026-07-16
+> 实现状态日期：2026-07-18
 
 F4-M1 已经落地 API/metadata/object-store 基础、guarded/replayable object IO，以及 core 的物理对象
 identity、GC reference-domain proof value、generation activation proof contract 和 durable reader pin handshake。
@@ -1188,6 +1191,19 @@ Focused composition、materialization/managed-ledger/adapter regression 和 lock
 2026-07-16 通过。该 checkpoint 不启用 BookKeeper profile，也不实现 retention policy/admin、cursor snapshot
 candidate/deletion、object inventory、registration retirement 或 physical delete。
 
+Checkpoint AG 完成逻辑 retention 的 product-neutral correctness slice。`RetentionPolicySnapshot` 冻结 exact
+policy version/time/size 并用 checked arithmetic 转换 Pulsar minutes/MiB；`RetentionCandidate` 把 cursor/time/
+size cuts、head/cursor/policy versions、最多 4,096 个 canonical stats tokens 和完整 SHA-256 evidence 绑定为
+ephemeral value。`DefaultRetentionCandidatePlanner` 对每个 stats value 重证 exact source-index
+key/version/durable SHA 和 COMMITTED-view range/commit/cumulative identity，使用严格时间边界与 time-OR-size
+公式，并在 plan/final-revalidate 各要求两次完全相同的 authority capture。`NereusManagedLedgerRetentionService`
+按 ownership -> activation -> exact policy -> stable plan -> activation revalidate -> planner revalidate -> F3 trim
+-> final ownership 执行；它不直接调用 `StreamStorage.trim`，也不等待 physical GC。九个 focused tests 与
+`phase4M5RetentionPlannerCheck` 覆盖 policy/config bounds、stale/incomplete source、pending lifecycle、authority
+drift、exact call order、no-op 和 durable trim 后 ownership loss。该 checkpoint 尚未把 policy/admin 和 service
+装入 Pulsar/production managed-ledger，`maxConcurrentPlans`/`maxQueuedPlans` 的共享 coalescing lane 也仍待实现。
+`phase4M5RetentionPlannerCheck` 已于 2026-07-18 在 Java 21 下通过完整前置 Nereus 与 locked-Pulsar gates。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -1197,7 +1213,7 @@ candidate/deletion、object inventory、registration retirement 或 physical del
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while cursor snapshot candidate/deletion scanning、object inventory、registration retirement、physical GC composition and final gate remain pending |
-| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；retention policy/admin and final rollout gates remain |
+| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；Pulsar retention policy/admin、shared plan lane、production installation and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：

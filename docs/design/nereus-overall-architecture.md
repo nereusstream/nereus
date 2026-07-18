@@ -1,7 +1,7 @@
 # Nereus 总体架构设计
 
 > 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4 milestones 4–6 pending
-> 最近设计/实现同步：2026-07-16
+> 最近设计/实现同步：2026-07-18
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
 ## 1. 摘要
@@ -123,9 +123,11 @@ coordinator、proof-gated publication-only `PREPARED -> ACTIVE` CAS、bounded co
 readiness revalidation 和 broker zero-failure backfill sequencing。Checkpoint AD–AE 随后实现 protected async Object-WAL acknowledgement、generation-zero
 restart/read repair 和 per-stream pre-I/O proof/lag admission；checkpoint AF 已把 resolver、generation-aware
 read/repair、NRC1 replay、source repair 和 materialization service 原子装配进 production provider，并映射 exact
-Pulsar sync/async profile 与 materialization config。Cursor snapshot candidate/deletion scanning、object
-inventory、registration retirement、retention/admin、destructive GC composition 和 M6 仍是 target；production
-deletion 继续关闭。
+Pulsar sync/async profile 与 materialization config。Checkpoint AG 又实现 product-neutral exact retention
+policy/config/evidence values、source-index-verified stable candidate planner 和 ownership-safe F3 logical-trim
+service。Pulsar retention policy/admin mapping、shared bounded plan lane、managed-ledger production installation、
+cursor snapshot candidate/deletion scanning、object inventory、registration retirement、destructive GC composition
+和 M6 仍是 target；production deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -133,8 +135,8 @@ alias。
 ### 2.3 仅设计或占位
 
 - BookKeeper primary WAL execution；
-- `WAL_DURABLE` fast boundary 和 async materialization profile（F4-M0 已设计；M3 planner/recovery、
-  exact-source worker、checkpoint/service building blocks 已实现，但 profile 尚未启用）；
+- BookKeeper-backed `WAL_DURABLE` fast boundary、`BOOKKEEPER_WAL_ASYNC_OBJECT` writer/reader and mixed-primary
+  resolver；Object-WAL async execution/runtime 已由 checkpoint AD–AF 实现但仍受 generation activation proof；
 - KoP、routing、production topic-compaction admission、lakehouse、advanced Pulsar semantics；
 - Future 4 production physical retirement/GC and async materialization remain unavailable until F4-M4–M6 are implemented；
   the in-progress M4 checkpoints alone do not enable them. Later tracks remain north-star designs；Future 3 and
@@ -334,15 +336,15 @@ flowchart TB
 
 ## 8. Repository module boundary
 
-| Module | Target responsibility | Current status (2026-07-16) |
+| Module | Target responsibility | Current status (2026-07-18) |
 | --- | --- | --- |
 | `nereus-api` | stable protocol-neutral L0 surface | Phase 1 + Phase 1.5 generic/recovery/lifecycle API implemented |
 | `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI、protocol-neutral global reference scope、projection-authority capture contract and public generation-zero protection identities implemented；M4 recovery/root/GC consumers are in progress through checkpoint W |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay、F4-M1–M3 metadata/publication gates、M4 protected-append/activation foundations and checkpoint-X canonical projection-ref encoder implemented |
 | `nereus-object-store` | object IO and Object WAL | M3 implemented |
 | `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M3 final-gated；M4 through checkpoint W implements NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、ownerless-global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier and all-shard physical/cursor live-reference backfill；checkpoint AF composes source repair plus the non-destructive production materialization lifecycle, while final GC remains pending；depends on core, never the reverse |
-| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、durable registration/proof/activation、pre-I/O async admission and checkpoint-AF materialization runtime ownership complete |
-| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership and checkpoint-AF coupled Object-WAL read-repair/materialization composition with typed config mapping implemented；retention/admin and destructive GC composition remain pending |
+| `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、durable registration/proof/activation、pre-I/O async admission、checkpoint-AF materialization runtime ownership and checkpoint-AG stable retention planner/F3 trim service foundation complete；production retention installation remains pending |
+| `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership and checkpoint-AF coupled Object-WAL read-repair/materialization composition with typed config mapping implemented；exact retention policy/admin mapping and destructive GC composition remain pending |
 | `nereus-kop-adapter` | Kafka projection | marker only |
 
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、

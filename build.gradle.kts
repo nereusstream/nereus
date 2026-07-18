@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1")
+    .orElse("bce3422a94edf01c483c15063c6879254b3ff03f")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1195,4 +1195,21 @@ tasks.register("phase4M5AsyncObjectWalCheck") {
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-core:check")
+}
+
+tasks.register<Exec>("checkPhase4M5RetentionPlannerContractSurface") {
+    group = "verification"
+    description = "Audit the exact policy, stable candidate, and F3-delegated logical-retention surface."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m5-retention-planner-contract-surface.sh")
+}
+
+tasks.register("phase4M5RetentionPlannerCheck") {
+    group = "verification"
+    description = "Verify checkpoint AG stable logical-retention planning and ownership-safe F3 trim delegation."
+    dependsOn("phase4M5AsyncObjectWalCheck")
+    dependsOn("checkPhase4M5RetentionPlannerContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-managed-ledger:check")
 }

@@ -39,7 +39,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1`。
+`master@bce3422a94edf01c483c15063c6879254b3ff03f`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |

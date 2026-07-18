@@ -1,15 +1,16 @@
 # Nereus Design Index
 
 > 状态：当前设计索引
-> 最近一次设计/实现同步：2026-07-16
+> 最近一次设计/实现同步：2026-07-18
 > 当前交付阶段：Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；Future 4 M3 format、
 > planner/worker、protection/checkpoint/service、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction SPI/registry、
 > terminal workflow-metadata retirement、COMMITTED-source topic bootstrap、tagged-v1/sorted-spill two-pass engine
 > and isolated NTC1 publication have passed deterministic and real Oxia/LocalStack gates；M4 through checkpoint W
 > additionally implements guarded/protected cursor IO and all-shard physical/cursor live-reference backfill；
-> M5 checkpoint X closes the durable registration create/open frontier，and checkpoint Y adds the Pulsar generation
-> capability plus deterministic two-stable-snapshot broker readiness；checkpoint Z adds exact unloaded projection
-> capture and canonical bounded cold-topic registration traversal/report；the remainder of milestones 4–6 is pending
+> M5 checkpoints X–AF close durable registration/readiness/activation、protected async Object-WAL acknowledgement、
+> pre-I/O lag admission and coupled production read-repair/materialization composition；checkpoint AG adds stable
+> source-verified retention planning and ownership-safe F3 logical-trim delegation；the remainder of milestones 4–6
+> is pending
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
 未来能力和历史 review 各自有清晰位置。
@@ -81,12 +82,12 @@ streamId + offset
 | `nereus-materialization` | `Implemented`（F4-M1–M3 final-gated；F4-M4 through checkpoint W） | M1–M3 planner/worker/publication/topic engine plus M4 NRC1/recovery、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、activation-gated global scope/future sentinel、ownerless generation/append/materialization domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill；production GC composition remains disabled |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
-| Async object materialization | `Reserved` | profile/durability names and M2 publication plus M3 planning/recovery/exact-source worker/checkpoint/service building blocks exist；profile admission、retention and execution gates do not |
-| `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6；F4 T/W + M5 checkpoints X/Z/AA–AC） | F2 ledger facade/cursor boundary plus F3 state machines、F4 projection/cursor reference domains、strict NPR1 authority、checkpoint-X exact durable registration coordinator/open-return barrier、checkpoint-Z immutable unloaded projection candidate、checkpoint-AA product-owned durable registration proof coordinator、checkpoint-AB activation guard and checkpoint-AC publication-only cluster activation coordinator are implemented/tested |
-| `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete；F4 M5 checkpoints X/AA–AC wiring + fork checkpoints Y/Z/AA–AC） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、checkpoint-X shared generation-store/registration ownership、checkpoint-Y generation capability/readiness barrier、checkpoint-Z canonical bounded cold-topic traversal/report、checkpoint-AA exact readiness/proof handoff、checkpoint-AB default-off activation-guard composition and checkpoint-AC proof-to-ACTIVE sequencing are implemented/tested；mutation callers remain pending |
+| Async object materialization | `Implemented / rollout in progress`（F4-M5 AD–AF） | Object-WAL `WAL_DURABLE` boundary、generation-zero repair、pre-I/O proof/lag admission and coupled production read-repair/materialization runtime exist；BookKeeper primary and final rollout gates do not |
+| `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6；F4 T/W + M5 X/Z/AA–AE/AG） | F2 ledger facade/cursor boundary plus F3 state machines、F4 projection/cursor reference domains、strict NPR1 authority、durable registration/proof/activation、pre-I/O async admission and checkpoint-AG stable retention planner/F3 trim service foundation are implemented/tested；production retention installation remains pending |
+| `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete；F4 M5 checkpoints X/AA–AF wiring + fork Y/Z/AA–AF） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、durable generation registration/readiness/activation and checkpoint-AF coupled Object-WAL read-repair/materialization composition/config mapping are implemented/tested；exact retention policy/admin mapping and destructive GC remain pending |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Future 4 materialization/compaction | `In progress / F4-M1–M3 final-gated；M4 through W；M5 through AC` | M4 NRC1/recovery、retirement/GC fences、activation/global domains、cursor protection and physical/cursor live-reference backfill are implemented/tested；M5 checkpoint X adds exact durable registration create/refresh/final revalidation、open/recreate return barrier and production ownership，checkpoint Y adds reserved generation lookup capability and deterministic two-stable-snapshot broker readiness，checkpoint Z adds exact unloaded projection capture plus canonical bounded cold-topic traversal/report，checkpoint AA persists exact zero-failure coverage under a product-owned response-loss-safe proof CAS，checkpoint AB adds exact activation proof/revalidation plus the default-off first-marker switch，and checkpoint AC adds proof-gated publication-only cluster ACTIVE orchestration；mutation callers、remaining M4 GC runtime and M5–M6 remain |
+| Future 4 materialization/compaction | `In progress / F4-M1–M3 final-gated；M4 through W；M5 through AG` | M4 NRC1/recovery、retirement/GC fences、activation/global domains、cursor protection and physical/cursor live-reference backfill are implemented/tested；M5 X–AF add exact durable registration/readiness/activation、protected async Object-WAL acknowledgement、pre-I/O lag admission and coupled production runtime/config mapping；AG adds stable exact-evidence retention planning and ownership-safe F3 logical trim；Pulsar retention mapping/installation、remaining M4 GC runtime and M5–M6 gates remain |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -240,8 +241,8 @@ decision behind items 14 and 16-18。
 | `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
-| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M3 final-gated；M4 through W；M5 through Z，remainder of M4–M6 remains |
-| `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | designed/reserved |
+| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M3 final-gated；M4 through W；M5 through AG，remainder of M4–M6 remains |
+| `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | implementation in progress / M5 through AG |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
 
@@ -254,7 +255,7 @@ decision behind items 14 and 16-18。
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Implemented / final-gated`（M0/M0R + M1-M6） |
-| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M3 final-gated；M4 through W；M5 through Z`；精确合同见 `../phase-4-compaction-generation/` |
+| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M3 final-gated；M4 through W；M5 through AG`；精确合同见 `../phase-4-compaction-generation/` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
 | `nereus-future7-routing-brownout-elasticity.md` | F7 routing/brown-out/elasticity | `Designed` |

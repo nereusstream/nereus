@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="148d18a404aee6eb0208a8a1f7e2c0eabc89a2a1"
+current_pulsar_lock="bce3422a94edf01c483c15063c6879254b3ff03f"
 
 require_literal() {
     local literal="$1"
@@ -84,6 +84,8 @@ require_literal "phase4M5PublicationActivationCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M5AsyncObjectWalCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M5RetentionPlannerCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint U" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint V" \
@@ -108,6 +110,20 @@ require_literal "Checkpoint AE" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AF" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AG" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AG implements that exact order" \
+    "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
+require_literal "Checkpoint AG implements and validates this value type" \
+    "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
+require_literal "checkpoint-AG stable retention planner" \
+    "docs/design/nereus-overall-architecture.md"
+require_literal "M5 through AG" \
+    "docs/design/nereus-design-index.md"
+require_literal "M5 through checkpoint AG" \
+    "docs/design/nereus-future4-compaction-generation.md"
+require_literal "M5 through checkpoint AG" \
+    "docs/automq-like-stream-storage/README.md"
 require_literal "ManagedLedgerMaterializationRegistrationCandidate" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "2f234d6b9baa3a760460090850d22734f94cd72d51fd0f27706fda272fc01d7c" \
@@ -157,4 +173,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through W and M5 through AF, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through W and M5 through AG, source lock, gates, and local links verified."

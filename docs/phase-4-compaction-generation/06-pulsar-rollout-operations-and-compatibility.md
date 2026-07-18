@@ -14,7 +14,7 @@ Generation、object id、task id、reader lease and recovery checkpoint never en
 The local Pulsar source remains the only compatibility oracle for this phase. Phase 4 does not adapt a released
 `5.0.0-M1` binary or resolve a published M1 snapshot.
 
-## 2. Planned Nereus Runtime Changes
+## 2. Target and Incremental Nereus Runtime Changes
 
 ### 2.1 Typed configuration
 
@@ -49,6 +49,11 @@ Its page size is positive and `<= 512`；concurrency/queue limits and timeouts a
 executing plan per stream；duplicate housekeeping triggers coalesce, while explicit admin futures retain independent
 completion. Policy retention values are not copied into this config—they come from the versioned topic feature
 snapshot on every attempt.
+
+Checkpoint AG implements and validates this value type with defaults `128 / 8 / 1024 / 30s / 30s`, together with the
+exact policy snapshot、candidate/token values and planner/service contracts. The planner currently enforces the page
+and operation-timeout bounds. The shared per-stream coalescing lane and runtime configuration mapping that enforce
+the concurrency/queue/close bounds remain pending.
 
 `NereusBrokerStorageConfiguration` builds `MaterializationConfig.committedPolicy` through
 `MaterializationPolicyFactory.losslessCommitted(...)`. The factory fixes id `nereus-committed-default`, view/task/
@@ -124,6 +129,16 @@ Checkpoint AC constructs `DefaultManagedLedgerGenerationProtocolActivationCoordi
 store、exact domain set and readiness provider. `NereusManagedLedgerRuntime` exposes only the typed
 `activatePublication()` boundary；the broker never imports or mutates `GenerationProtocolActivationStore`. The
 coordinator owns the publication-only ACTIVE CAS and still does not start materialization/GC or enable a delete bit.
+
+Checkpoint AF constructs and owns the coupled Object-WAL resolver、generation-aware read/recovery repair、lag reader
+and bounded materialization service as `Phase4ObjectWalRuntime`, then installs its exact read/admission seams into
+`DefaultStreamStorage`. It starts before the broker storage is returned and closes before generation/Oxia/ObjectStore
+resources. This composition still does not install physical GC.
+
+Checkpoint AG implements `DefaultRetentionCandidatePlanner` and `NereusManagedLedgerRetentionService` as tested
+product-neutral components. It deliberately stops before this ownership graph：the provider does not yet construct a
+policy provider、shared retention lane or per-ledger retention service, and the Pulsar fork does not yet route policy/
+admin calls to it.
 
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive
