@@ -391,6 +391,13 @@ concurrent new objects are covered by their write hook. Object-store listing is 
 or deleted-incarnation bytes enter the orphan/domain-proof path separately. Any unknown live index/target format
 keeps deletion disabled.
 
+Checkpoint BC adds a second mode for a deletion-active readiness change. `runRollover` freezes the exact old
+activation wrapper and performs the same complete root/protection traversal for the strictly newer epoch, but does not
+CAS either coverage proof. After exact old-wrapper revalidation, the activation coordinator combines the report with
+the new registration completion and a fresh object-store capability proof, then publishes all three proofs、the scope
+digest and the new epoch in one CAS while both delete bits stay true. This prevents a partial durable epoch from
+becoming a new correctness owner and leaves old-epoch GC fenced throughout membership drift.
+
 Checkpoint W implements this contract in `DefaultPhysicalRootBackfillCoordinator`. The coordinator first requires the
 same-epoch completed stream-registration proof, then walks every one of the 64 registration shards in canonical page
 order. Up to `maxConcurrentStreams` streams are processed concurrently, while their per-stream data/cursor coverage

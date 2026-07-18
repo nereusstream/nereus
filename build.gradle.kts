@@ -1414,6 +1414,29 @@ tasks.register("phase4M4LatePutTombstoneCheck") {
     dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
 }
 
+tasks.register<Exec>("checkPhase4M4ReadinessRolloverContractSurface") {
+    group = "verification"
+    description = "Audit deletion-active readiness rollover without partial proof publication."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-readiness-rollover-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4ReadinessRolloverCheck") {
+    group = "verification"
+    description = "Verify checkpoint BC atomically refreshes deletion authority after broker readiness changes."
+    dependsOn("phase4M4LatePutTombstoneCheck")
+    dependsOn("checkPhase4M4ReadinessRolloverContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1424,7 +1447,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4LatePutTombstoneCheck")
+    dependsOn("phase4M4ReadinessRolloverCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

@@ -10,11 +10,13 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.core.capability.GenerationCapabilityReadiness;
 import com.nereusstream.core.capability.GenerationCapabilityReadinessProvider;
+import com.nereusstream.core.capability.GenerationRegistrationBackfillCompletion;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationRequest;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationResult.Status;
 import com.nereusstream.materialization.gc.PhysicalRootBackfillCoordinator;
 import com.nereusstream.materialization.gc.PhysicalRootBackfillFailure;
 import com.nereusstream.materialization.gc.PhysicalRootBackfillReport;
+import com.nereusstream.materialization.gc.PhysicalRootBackfillRequest;
 import com.nereusstream.materialization.gc.PhysicalRootBackfillStage;
 import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.F4MetadataTestValues;
@@ -139,6 +141,90 @@ class Phase4PhysicalDeletionActivationCoordinatorTest {
             assertThat(result.status()).isEqualTo(Status.ALREADY_ACTIVE);
             assertThat(backfills).hasValue(0);
             assertThat(probes).hasValue(0);
+        }
+    }
+
+    @Test
+    void deletionActiveReadinessRolloverReplacesEveryProofInOneCas() {
+        try (GenerationProtocolActivationStore store = store()) {
+            seedDeletion(store, CAPABILITY);
+            VersionedGenerationProtocolActivation old = store.get(CLUSTER)
+                    .join()
+                    .orElseThrow();
+            GenerationCapabilityReadiness nextReadiness =
+                    new GenerationCapabilityReadiness(
+                            READINESS_EPOCH + 1,
+                            sha256(F4MetadataTestValues.HASH_A),
+                            2);
+            MutableReadinessProvider readiness =
+                    new MutableReadinessProvider(nextReadiness);
+            List<String> calls = new ArrayList<>();
+            PhysicalRootBackfillCoordinator backfill =
+                    new PhysicalRootBackfillCoordinator() {
+                        @Override
+                        public CompletableFuture<PhysicalRootBackfillReport> run(
+                                PhysicalRootBackfillRequest request) {
+                            return CompletableFuture.failedFuture(
+                                    new AssertionError(
+                                            "ordinary activation backfill must not run"));
+                        }
+
+                        @Override
+                        public CompletableFuture<PhysicalRootBackfillReport>
+                                runRollover(
+                                        PhysicalRootBackfillRequest request,
+                                        VersionedGenerationProtocolActivation
+                                                expectedCurrent) {
+                            calls.add("rollover-backfill");
+                            assertThat(expectedCurrent).isEqualTo(old);
+                            assertThat(store.get(CLUSTER).join())
+                                    .contains(old);
+                            return CompletableFuture.completedFuture(
+                                    successfulReport(
+                                            request.runId(),
+                                            request.expectedBrokerReadinessEpoch()));
+                        }
+                    };
+            var coordinator = coordinator(
+                    true,
+                    readiness,
+                    store,
+                    backfill,
+                    probe(calls, null));
+            GenerationRegistrationBackfillCompletion registration =
+                    new GenerationRegistrationBackfillCompletion(
+                            RUN_ID,
+                            nextReadiness,
+                            sha256(F4MetadataTestValues.HASH_E),
+                            0);
+
+            VersionedGenerationProtocolActivation installed = coordinator
+                    .rollover(registration, 4, TIMEOUT, old)
+                    .join();
+
+            assertThat(calls).containsExactly("rollover-backfill", "probe");
+            GenerationProtocolActivationRecord value = installed.value();
+            assertThat(value.brokerCapabilityReadinessEpoch())
+                    .isEqualTo(READINESS_EPOCH + 1);
+            assertThat(value.physicalDeleteEnabled()).isTrue();
+            assertThat(value.cursorSnapshotDeleteEnabled()).isTrue();
+            assertThat(value.streamRegistrationBackfill().coverageSha256())
+                    .isEqualTo(F4MetadataTestValues.HASH_E);
+            assertThat(value.physicalRootBackfill().coverageSha256())
+                    .isEqualTo(PHYSICAL_COVERAGE);
+            assertThat(value.cursorSnapshotBackfill().coverageSha256())
+                    .isEqualTo(CURSOR_COVERAGE);
+            assertThat(value.streamRegistrationBackfill()
+                            .brokerReadinessEpoch())
+                    .isEqualTo(READINESS_EPOCH + 1);
+            assertThat(value.physicalRootBackfill().brokerReadinessEpoch())
+                    .isEqualTo(READINESS_EPOCH + 1);
+            assertThat(value.cursorSnapshotBackfill().brokerReadinessEpoch())
+                    .isEqualTo(READINESS_EPOCH + 1);
+            assertThat(value.objectStoreCapabilitySha256())
+                    .isEqualTo(CAPABILITY);
+            assertThat(store.get(CLUSTER).join())
+                    .contains(installed);
         }
     }
 
@@ -463,9 +549,15 @@ class Phase4PhysicalDeletionActivationCoordinatorTest {
     }
 
     private static PhysicalRootBackfillReport successfulReport(String runId) {
+        return successfulReport(runId, READINESS_EPOCH);
+    }
+
+    private static PhysicalRootBackfillReport successfulReport(
+            String runId,
+            long readinessEpoch) {
         return new PhysicalRootBackfillReport(
                 runId,
-                READINESS_EPOCH,
+                readinessEpoch,
                 3,
                 4,
                 2,

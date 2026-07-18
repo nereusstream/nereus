@@ -77,7 +77,8 @@ require_literal "$repo_root" "activation.objectStoreCapabilitySha256()" "$startu
 require_literal "$repo_root" ".equals(expectedCapabilitySha256)" "$startup_gate"
 require_literal "$repo_root" "another configured object-store scope" "$startup_gate"
 
-require_literal "$repo_root" "implements ManagedLedgerPhysicalDeletionActivationCoordinator, AutoCloseable" "$physical_runtime"
+require_literal "$repo_root" "implements ManagedLedgerPhysicalDeletionActivationCoordinator," "$physical_runtime"
+require_literal "$repo_root" "ManagedLedgerGenerationReadinessRolloverCoordinator," "$physical_runtime"
 require_literal "$repo_root" "new DefaultPhysicalRootBackfillCoordinator(" "$physical_runtime"
 require_literal "$repo_root" "new DefaultPhase4PhysicalDeletionActivationCoordinator(" "$physical_runtime"
 require_literal "$repo_root" "startMutatingLifecycleIfAuthorized(false).join()" "$physical_runtime"

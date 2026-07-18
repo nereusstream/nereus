@@ -15,14 +15,19 @@ import com.nereusstream.metadata.oxia.F4MetadataTestValues;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStoreTestFactory;
 import com.nereusstream.metadata.oxia.VersionedGenerationProtocolActivation;
+import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
@@ -188,6 +193,91 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
         }
     }
 
+    @Test
+    void deletionActiveEpochDelegatesOneBoundedAtomicRollover() {
+        MutableReadinessProvider readiness =
+                new MutableReadinessProvider(readiness(8, "cc"));
+        try (GenerationProtocolActivationStore store = activationStore()) {
+            VersionedGenerationProtocolActivation old = seedDeletion(store, 7);
+            AtomicInteger concurrency = new AtomicInteger();
+            AtomicReference<Duration> timeout = new AtomicReference<>();
+            ManagedLedgerGenerationReadinessRolloverCoordinator rollover =
+                    (registration, maxConcurrentStreams, suppliedTimeout, current) -> {
+                        assertThat(current).isEqualTo(old);
+                        concurrency.set(maxConcurrentStreams);
+                        timeout.set(suppliedTimeout);
+                        GenerationProtocolActivationRecord value = current.value();
+                        long epoch = registration.readiness()
+                                .brokerReadinessEpoch();
+                        GenerationProtocolActivationRecord replacement =
+                                new GenerationProtocolActivationRecord(
+                                        value.schemaVersion(),
+                                        value.protocolVersion(),
+                                        value.lifecycle(),
+                                        value.publicationEnabled(),
+                                        value.physicalDeleteEnabled(),
+                                        value.cursorSnapshotDeleteEnabled(),
+                                        epoch,
+                                        value.requiredReferenceDomains(),
+                                        completeProof(
+                                                registration.runId(),
+                                                epoch,
+                                                registration.coverageSha256()
+                                                        .value(),
+                                                1_100),
+                                        completeProof(
+                                                registration.runId(),
+                                                epoch,
+                                                sha("dd").value(),
+                                                1_101),
+                                        completeProof(
+                                                registration.runId(),
+                                                epoch,
+                                                sha("ee").value(),
+                                                1_102),
+                                        value.objectStoreCapabilitySha256(),
+                                        value.activatingBrokerRunId(),
+                                        value.preparedAtMillis(),
+                                        value.activatedAtMillis(),
+                                        1_103,
+                                        0);
+                        return store.compareAndSet(
+                                CLUSTER,
+                                replacement,
+                                current.metadataVersion());
+                    };
+            var coordinator =
+                    new DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
+                            CLUSTER,
+                            store,
+                            readiness,
+                            F4MetadataTestValues.referenceDomains(),
+                            rollover,
+                            Clock.fixed(
+                                    Instant.ofEpochMilli(1_000),
+                                    ZoneOffset.UTC));
+            Duration deadline = Duration.ofSeconds(17);
+
+            coordinator.complete(
+                            completion(readiness.value(), sha("ff"), 0),
+                            23,
+                            deadline)
+                    .join();
+
+            assertThat(concurrency).hasValue(23);
+            assertThat(timeout).hasValue(deadline);
+            GenerationProtocolActivationRecord installed = store.get(CLUSTER)
+                    .join()
+                    .orElseThrow()
+                    .value();
+            assertThat(installed.brokerCapabilityReadinessEpoch()).isEqualTo(8);
+            assertThat(installed.physicalDeleteEnabled()).isTrue();
+            assertThat(installed.cursorSnapshotDeleteEnabled()).isTrue();
+            assertThat(installed.streamRegistrationBackfill().coverageSha256())
+                    .isEqualTo(sha("ff").value());
+        }
+    }
+
     private static DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator
             coordinator(
                     GenerationProtocolActivationStore store,
@@ -209,6 +299,51 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
                         ZoneOffset.UTC),
                 F4MetadataTestValues.PROCESS,
                 F4MetadataTestValues.referenceDomains());
+    }
+
+    private static VersionedGenerationProtocolActivation seedDeletion(
+            GenerationProtocolActivationStore store,
+            long epoch) {
+        VersionedGenerationProtocolActivation current =
+                store.getOrCreate(CLUSTER).join();
+        GenerationProtocolActivationRecord value = current.value();
+        GenerationProtocolActivationRecord replacement =
+                new GenerationProtocolActivationRecord(
+                        value.schemaVersion(),
+                        value.protocolVersion(),
+                        GenerationProtocolActivationLifecycle.ACTIVE,
+                        true,
+                        true,
+                        true,
+                        epoch,
+                        value.requiredReferenceDomains(),
+                        completeProof(RUN_ID, epoch, sha("10").value(), 950),
+                        completeProof(RUN_ID, epoch, sha("20").value(), 951),
+                        completeProof(RUN_ID, epoch, sha("30").value(), 952),
+                        sha("40").value(),
+                        value.activatingBrokerRunId(),
+                        value.preparedAtMillis(),
+                        940,
+                        960,
+                        0);
+        return store.compareAndSet(
+                        CLUSTER,
+                        replacement,
+                        current.metadataVersion())
+                .join();
+    }
+
+    private static GenerationBackfillProofRecord completeProof(
+            String runId,
+            long epoch,
+            String coverage,
+            long completedAtMillis) {
+        return new GenerationBackfillProofRecord(
+                runId,
+                epoch,
+                coverage,
+                true,
+                completedAtMillis);
     }
 
     private static GenerationRegistrationBackfillCompletion completion(

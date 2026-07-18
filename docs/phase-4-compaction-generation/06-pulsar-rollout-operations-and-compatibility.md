@@ -389,9 +389,12 @@ Checkpoint AA adds `GenerationRegistrationBackfillCompletion` as the product bou
 comparison, only a zero-failure report is submitted, within the same whole-run deadline. The product coordinator
 reacquires exact readiness before CAS, compares epoch/full digest/broker count, and installs the proof through the
 shared-Oxia activation store. Same-epoch completed coverage is immutable；a rerun with another run id and the same
-coverage converges. A newer readiness epoch resets physical-root/cursor-snapshot proof epochs to incomplete and clears
-the old object-store capability；deletion-enabled authority rejects standalone refresh. CAS response loss and
-condition conflicts reload the durable value. Final cached-readiness plus durable-proof revalidation is mandatory.
+coverage converges. Before deletion is active, a newer readiness epoch resets physical-root/cursor-snapshot proof
+epochs to incomplete and clears the old object-store capability. Once deletion is active, a registration-only refresh
+remains forbidden；checkpoint BC instead runs physical/cursor coverage in non-publishing mode、repeats the configured-
+scope capability probe and atomically replaces the readiness epoch、all three proofs and capability digest while both
+monotonic delete bits remain true. CAS response loss and condition conflicts reload the durable value. Final cached-
+readiness plus durable-proof revalidation is mandatory.
 An old broker joining therefore invalidates readiness immediately；the durable old-epoch proof remains harmless and
 the activation guard must block F4 mutations until all required proofs are refreshed under a stable capable epoch.
 
@@ -574,6 +577,14 @@ proof before operations resume. `ACTIVE` requires：
 - cursor snapshot pin/inventory backfill complete or snapshot-delete bit disabled；
 - exact domain registry match；
 - object-store list/delete capability probe passed before delete bit is enabled。
+
+Checkpoint BC makes that post-activation refresh executable. The broker-owned cold-topic traversal still produces
+only the new registration completion fact. The product-owned coordinator freezes the old deletion authority, runs the
+root/cursor scan without publishing either dependent proof, performs the scope canary, and emits one CAS containing
+the complete new-epoch tuple. No intermediate durable record combines a new registration proof with old physical/
+cursor/capability facts. A broker whose mutating GC lifecycle was deferred at startup may start it only after this CAS
+and exact startup-gate revalidation. The locked Pulsar adapter must still forward the traversal's actual remaining
+deadline and concurrency before the real two-broker final gate can pass.
 
 Checkpoint AC is the first production owner of the ACTIVE CAS, but only for publication. It proves the first two
 publication prerequisites above through exact broker readiness and the durable registration proof；the physical-root、

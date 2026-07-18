@@ -14,6 +14,7 @@ import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.ReferenceDomainVersionRecord;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,6 +34,8 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
     private final GenerationProtocolActivationStore activations;
     private final GenerationCapabilityReadinessProvider readinessProvider;
     private final List<ReferenceDomainVersionRecord> requiredDomains;
+    private final ManagedLedgerGenerationReadinessRolloverCoordinator
+            readinessRollover;
     private final Clock clock;
 
     public DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
@@ -41,18 +44,46 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             GenerationCapabilityReadinessProvider readinessProvider,
             List<ReferenceDomainVersionRecord> requiredDomains,
             Clock clock) {
+        this(
+                cluster,
+                activations,
+                readinessProvider,
+                requiredDomains,
+                (completion, maxConcurrentStreams, timeout, current) ->
+                        CompletableFuture.failedFuture(notReady(
+                                "registration proof cannot advance readiness while deletion is enabled")),
+                clock);
+    }
+
+    public DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
+            String cluster,
+            GenerationProtocolActivationStore activations,
+            GenerationCapabilityReadinessProvider readinessProvider,
+            List<ReferenceDomainVersionRecord> requiredDomains,
+            ManagedLedgerGenerationReadinessRolloverCoordinator readinessRollover,
+            Clock clock) {
         this.cluster = new OxiaKeyspace(cluster).cluster();
         this.activations = Objects.requireNonNull(
                 activations, "activations");
         this.readinessProvider = Objects.requireNonNull(
                 readinessProvider, "readinessProvider");
         this.requiredDomains = canonicalDomains(requiredDomains);
+        this.readinessRollover = Objects.requireNonNull(
+                readinessRollover, "readinessRollover");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
     public CompletableFuture<Void> complete(
             GenerationRegistrationBackfillCompletion completion) {
+        return complete(completion, 1, Duration.ofHours(1));
+    }
+
+    @Override
+    public CompletableFuture<Void> complete(
+            GenerationRegistrationBackfillCompletion completion,
+            int maxConcurrentStreams,
+            Duration timeout) {
         final GenerationRegistrationBackfillCompletion exact;
         try {
             exact = Objects.requireNonNull(completion, "completion");
@@ -60,22 +91,38 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                 throw notReady(
                         "registration backfill contains failures");
             }
+            if (maxConcurrentStreams <= 0
+                    || maxConcurrentStreams
+                            > ManagedLedgerPhysicalDeletionActivationRequest
+                                    .MAX_CONCURRENT_STREAMS) {
+                throw new IllegalArgumentException(
+                        "maxConcurrentStreams must be in [1, 1024]");
+            }
+            timeout = requireTimeout(timeout);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
+        final Duration exactTimeout = timeout;
         return readinessProvider
                 .requireGenerationCapabilityReadiness()
                 .thenCompose(current -> {
                     requireExactReadiness(exact.readiness(), current);
                     return activations.getOrCreate(cluster);
                 })
-                .thenCompose(current -> install(exact, current, 0))
+                .thenCompose(current -> install(
+                        exact,
+                        maxConcurrentStreams,
+                        exactTimeout,
+                        current,
+                        0))
                 .thenCompose(installed -> finalRevalidate(
                         exact, installed));
     }
 
     private CompletableFuture<VersionedGenerationProtocolActivation> install(
             GenerationRegistrationBackfillCompletion completion,
+            int maxConcurrentStreams,
+            Duration timeout,
             VersionedGenerationProtocolActivation current,
             int attempt) {
         if (attempt >= MAX_CAS_ATTEMPTS) {
@@ -102,8 +149,11 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
         }
         if (value.physicalDeleteEnabled()
                 || value.cursorSnapshotDeleteEnabled()) {
-            return CompletableFuture.failedFuture(notReady(
-                    "registration proof cannot advance readiness while deletion is enabled"));
+            return readinessRollover.rollover(
+                    completion,
+                    maxConcurrentStreams,
+                    timeout,
+                    current);
         }
 
         long completedAt = Math.max(1, clock.millis());
@@ -169,6 +219,8 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                                         F4MetadataConditionFailedException) {
                                     return install(
                                             completion,
+                                            maxConcurrentStreams,
+                                            timeout,
                                             reloaded,
                                             attempt + 1);
                                 }
@@ -248,6 +300,17 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             throw notReady(
                     "broker generation readiness changed around registration proof");
         }
+    }
+
+    private static Duration requireTimeout(Duration value) {
+        Objects.requireNonNull(value, "timeout");
+        if (value.isZero()
+                || value.isNegative()
+                || value.toMillis() <= 0) {
+            throw new IllegalArgumentException(
+                    "timeout must be positive and millisecond-representable");
+        }
+        return value;
     }
 
     private static List<ReferenceDomainVersionRecord> canonicalDomains(

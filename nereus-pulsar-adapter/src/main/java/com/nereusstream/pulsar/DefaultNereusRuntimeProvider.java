@@ -175,14 +175,6 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             generationProtocolActivationStore,
                             generationMetadataStore,
                             projectionStore);
-            generationRegistrationBackfillProofCoordinator =
-                    new DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
-                            streamConfig.cluster(),
-                            generationProtocolActivationStore,
-                            context.generationCapabilityReadinessProvider(),
-                            NereusGenerationProtocolReferenceDomains
-                                    .currentV1(),
-                            clock);
             generationProtocolActivationCoordinator =
                     new DefaultManagedLedgerGenerationProtocolActivationCoordinator(
                             streamConfig.cluster(),
@@ -359,6 +351,15 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     scheduler,
                     callbackExecutor,
                     clock);
+            generationRegistrationBackfillProofCoordinator =
+                    new DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
+                            streamConfig.cluster(),
+                            generationProtocolActivationStore,
+                            context.generationCapabilityReadinessProvider(),
+                            NereusGenerationProtocolReferenceDomains
+                                    .currentV1(),
+                            physicalGcRuntime,
+                            clock);
             phase4Runtime.start();
             physicalGcRuntime.start();
             return new NereusManagedLedgerRuntime(

@@ -15,6 +15,7 @@ import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionAc
 import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.stats.NereusManagedLedgerFactoryStats;
 import com.nereusstream.metadata.oxia.records.TopicProjectionRecord;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -118,13 +119,24 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
 
     public CompletableFuture<Void> completeGenerationRegistrationBackfill(
             GenerationRegistrationBackfillCompletion completion) {
+        return completeGenerationRegistrationBackfill(
+                completion, 1, Duration.ofHours(1));
+    }
+
+    public CompletableFuture<Void> completeGenerationRegistrationBackfill(
+            GenerationRegistrationBackfillCompletion completion,
+            int maxConcurrentStreams,
+            Duration timeout) {
         if (closed.get()) {
             return CompletableFuture.failedFuture(factoryClosed());
         }
         try {
             return runtime
                     .generationRegistrationBackfillProofCoordinator()
-                    .complete(completion);
+                    .complete(
+                            completion,
+                            maxConcurrentStreams,
+                            timeout);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }

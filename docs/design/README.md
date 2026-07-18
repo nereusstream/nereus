@@ -82,8 +82,10 @@ fresh coordinator/runtime 只从同一 DELETING root、sealed journal 与 exact 
 对象在全部前置阶段完成前保持存在。checkpoint BB 又把 guarded Object-WAL session/root proof 接到每个
 provider transmission，覆盖 references/manifest 删除切点的 exact late PUT，并以真实 Oxia/LocalStack 证明 root
 退休后外部重现的同 key bytes 会被 missing-root inventory 注册为新的 ACTIVE ownerless root、经过完整 grace
-后再删除。当前 broker safe defaults 不启动该服务；实际 two-broker ownership/unload/failover 矩阵与 M4/M6
-最终兼容门禁仍未完成。
+后再删除。checkpoint BC 又让 deletion-active readiness 变化通过 non-publishing physical/cursor scan、fresh
+scope canary 和单个 epoch/three-proof/capability CAS 恢复 authority，两个 delete bits 不回退。当前 broker safe
+defaults 不启动该服务；locked-Pulsar exact traversal bounds 与实际 two-broker ownership/unload/failover 矩阵、
+M4/M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

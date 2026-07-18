@@ -62,6 +62,7 @@ import com.nereusstream.metadata.oxia.records.CursorSnapshotReferenceRecord;
 import com.nereusstream.metadata.oxia.records.CursorStateRecord;
 import com.nereusstream.metadata.oxia.records.EntryIndexReferenceRecord;
 import com.nereusstream.metadata.oxia.records.GenerationBackfillProofRecord;
+import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.GenerationProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.ManagedLedgerProjectionIdentity;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
@@ -408,6 +409,68 @@ class PhysicalRootBackfillCoordinatorTest {
         }
     }
 
+    @Test
+    void deletionActiveRolloverScansWithoutPublishingPartialProofs() {
+        try (GenerationMetadataStore generations =
+                        GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+                GenerationProtocolActivationStore activations =
+                        activationStore();
+                CursorMetadataStore cursors =
+                        new FakeCursorMetadataStore()) {
+            VersionedGenerationProtocolActivation expected =
+                    prepareDeletionAuthority(activations);
+            FakePhysicalObjectMetadataStore physical =
+                    new FakePhysicalObjectMetadataStore();
+            try (DefaultObjectProtectionManager protections =
+                            protectionManager(physical);
+                    SourceRetirementMetadataStore sources =
+                            unsupported(SourceRetirementMetadataStore.class);
+                    OxiaMetadataStore l0 =
+                            unsupported(OxiaMetadataStore.class);
+                    ObjectStore objects =
+                            unsupported(ObjectStore.class)) {
+                var coordinator =
+                        new DefaultPhysicalRootBackfillCoordinator(
+                                CLUSTER,
+                                l0,
+                                generations,
+                                sources,
+                                cursors,
+                                activations,
+                                physical,
+                                protections,
+                                objects,
+                                subject -> CompletableFuture.failedFuture(
+                                        new AssertionError(
+                                                "empty registry cannot read a projection")),
+                                8,
+                                Duration.ofSeconds(1),
+                                CLOCK);
+
+                PhysicalRootBackfillReport report = coordinator.runRollover(
+                                new PhysicalRootBackfillRequest(
+                                        RUN_ID,
+                                        READINESS_EPOCH + 1,
+                                        4,
+                                        Duration.ofSeconds(5)),
+                                expected)
+                        .join();
+
+                assertThat(report.failureCount()).isZero();
+                assertThat(report.brokerReadinessEpoch())
+                        .isEqualTo(READINESS_EPOCH + 1);
+                assertThat(activations.get(CLUSTER).join())
+                        .contains(expected);
+                assertThat(expected.value().physicalRootBackfill()
+                                .brokerReadinessEpoch())
+                        .isEqualTo(READINESS_EPOCH);
+                assertThat(expected.value().cursorSnapshotBackfill()
+                                .brokerReadinessEpoch())
+                        .isEqualTo(READINESS_EPOCH);
+            }
+        }
+    }
+
     private static GenerationProtocolActivationStore activationStore() {
         return GenerationProtocolActivationStoreTestFactory.inMemory(
                 CLOCK,
@@ -451,6 +514,49 @@ class PhysicalRootBackfillCoordinatorTest {
                         replacement,
                         current.metadataVersion())
                 .join();
+    }
+
+    private static VersionedGenerationProtocolActivation
+            prepareDeletionAuthority(
+                    GenerationProtocolActivationStore store) {
+        VersionedGenerationProtocolActivation current =
+                store.getOrCreate(CLUSTER).join();
+        GenerationProtocolActivationRecord value = current.value();
+        GenerationProtocolActivationRecord replacement =
+                new GenerationProtocolActivationRecord(
+                        value.schemaVersion(),
+                        value.protocolVersion(),
+                        GenerationProtocolActivationLifecycle.ACTIVE,
+                        true,
+                        true,
+                        true,
+                        READINESS_EPOCH,
+                        value.requiredReferenceDomains(),
+                        completeProof(F4MetadataTestValues.HASH_A, 3_101),
+                        completeProof(F4MetadataTestValues.HASH_B, 3_102),
+                        completeProof(F4MetadataTestValues.HASH_C, 3_103),
+                        F4MetadataTestValues.HASH_D,
+                        value.activatingBrokerRunId(),
+                        value.preparedAtMillis(),
+                        3_100,
+                        3_200,
+                        0);
+        return store.compareAndSet(
+                        CLUSTER,
+                        replacement,
+                        current.metadataVersion())
+                .join();
+    }
+
+    private static GenerationBackfillProofRecord completeProof(
+            String coverage,
+            long completedAtMillis) {
+        return new GenerationBackfillProofRecord(
+                RUN_ID,
+                READINESS_EPOCH,
+                coverage,
+                true,
+                completedAtMillis);
     }
 
     private static DefaultObjectProtectionManager protectionManager(

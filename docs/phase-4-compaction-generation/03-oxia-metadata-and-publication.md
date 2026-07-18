@@ -415,6 +415,12 @@ changing an object-store capability proof requires a newer epoch. Lost CAS respo
 reload equals the exact desired durable value at a later version. This foundation does not run registration/root/cursor
 backfills and does not enable any capability bit.
 
+Checkpoint BC consumes the already-frozen newer-epoch transition without changing the schema. If both V1 deletion
+bits are true, no coordinator may first persist only the new registration proof. The product path performs the
+physical/cursor scan and capability probe against the unchanged old wrapper, then one version CAS replaces the epoch、
+three complete proofs and capability digest together while preserving ACTIVE/publication/deletion. Store transition
+validation continues to prohibit same-epoch proof mutation、bit regression and immutable protocol-identity changes.
+
 ### 1.19 F4-M4 activation-gated global reference authority
 
 Checkpoint T adds no new durable key. `RegisteredStreamGcGlobalReferenceScope` first performs read-only

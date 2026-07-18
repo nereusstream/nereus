@@ -241,6 +241,57 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 });
     }
 
+    @Override
+    public CompletableFuture<PhysicalRootBackfillReport> runRollover(
+            PhysicalRootBackfillRequest request,
+            VersionedGenerationProtocolActivation expectedCurrent) {
+        final PhysicalRootBackfillRequest exact;
+        final VersionedGenerationProtocolActivation expected;
+        final Deadline deadline;
+        try {
+            exact = Objects.requireNonNull(request, "request");
+            expected = Objects.requireNonNull(
+                    expectedCurrent, "expectedCurrent");
+            deadline = Deadline.start(exact.timeout(), nanoTime);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        RunAccumulator accumulator = new RunAccumulator(exact);
+        return deadline.call(() -> activations.get(cluster))
+                .handle((optional, failure) -> {
+                    if (failure != null) {
+                        accumulator.globalFailure(
+                                CoverageSide.BOTH,
+                                PhysicalRootBackfillStage.FINAL_REVALIDATION,
+                                f4Keys.generationProtocolActivationKey(),
+                                errorCode(
+                                        PhysicalRootBackfillStage
+                                                .FINAL_REVALIDATION,
+                                        failure));
+                        return Optional
+                                .<VersionedGenerationProtocolActivation>empty();
+                    }
+                    return optional;
+                })
+                .thenCompose(optional -> startRollover(
+                        optional,
+                        expected,
+                        exact,
+                        accumulator,
+                        deadline))
+                .exceptionally(failure -> {
+                    accumulator.globalFailure(
+                            CoverageSide.BOTH,
+                            PhysicalRootBackfillStage.FINAL_REVALIDATION,
+                            f4Keys.generationProtocolActivationKey(),
+                            errorCode(
+                                    PhysicalRootBackfillStage
+                                            .FINAL_REVALIDATION,
+                                    failure));
+                    return accumulator.report();
+                });
+    }
+
     private CompletableFuture<PhysicalRootBackfillReport> start(
             Optional<VersionedGenerationProtocolActivation> optional,
             PhysicalRootBackfillRequest request,
@@ -277,6 +328,61 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 .thenCompose(ignored -> publishProofs(
                         basis, request, accumulator, deadline))
                 .thenApply(ignored -> accumulator.report());
+    }
+
+    private CompletableFuture<PhysicalRootBackfillReport> startRollover(
+            Optional<VersionedGenerationProtocolActivation> optional,
+            VersionedGenerationProtocolActivation expected,
+            PhysicalRootBackfillRequest request,
+            RunAccumulator accumulator,
+            Deadline deadline) {
+        if (optional.isEmpty()) {
+            accumulator.globalFailure(
+                    CoverageSide.BOTH,
+                    PhysicalRootBackfillStage.FINAL_REVALIDATION,
+                    f4Keys.generationProtocolActivationKey(),
+                    "ACTIVATION_ABSENT");
+            return CompletableFuture.completedFuture(
+                    accumulator.report());
+        }
+        VersionedGenerationProtocolActivation current =
+                optional.orElseThrow();
+        String precondition = rolloverPrecondition(
+                current, expected, request.expectedBrokerReadinessEpoch());
+        if (precondition != null) {
+            accumulator.globalFailure(
+                    CoverageSide.BOTH,
+                    PhysicalRootBackfillStage.FINAL_REVALIDATION,
+                    current.key(),
+                    precondition);
+            return CompletableFuture.completedFuture(
+                    accumulator.report());
+        }
+        return scanShard(0, request, accumulator, deadline)
+                .thenCompose(ignored -> revalidateRolloverBasis(
+                        expected, accumulator, deadline))
+                .thenApply(ignored -> accumulator.report());
+    }
+
+    private CompletableFuture<Void> revalidateRolloverBasis(
+            VersionedGenerationProtocolActivation expected,
+            RunAccumulator accumulator,
+            Deadline deadline) {
+        if (accumulator.failureCount != 0) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return deadline.call(() -> activations.get(cluster))
+                .thenAccept(optional -> {
+                    if (optional.isEmpty()
+                            || !optional.orElseThrow().equals(expected)) {
+                        accumulator.globalFailure(
+                                CoverageSide.BOTH,
+                                PhysicalRootBackfillStage
+                                        .FINAL_REVALIDATION,
+                                expected.key(),
+                                "ACTIVATION_AUTHORITY_CHANGED");
+                    }
+                });
     }
 
     private CompletableFuture<Void> scanShard(
@@ -1819,6 +1925,24 @@ public final class DefaultPhysicalRootBackfillCoordinator
                                 .brokerReadinessEpoch()
                         != expectedEpoch) {
             return "REGISTRATION_BACKFILL_INCOMPLETE";
+        }
+        return null;
+    }
+
+    private static String rolloverPrecondition(
+            VersionedGenerationProtocolActivation current,
+            VersionedGenerationProtocolActivation expected,
+            long nextEpoch) {
+        if (!current.equals(expected)) {
+            return "ACTIVATION_AUTHORITY_CHANGED";
+        }
+        GenerationProtocolActivationRecord value = current.value();
+        if (!value.physicalDeleteEnabled()
+                || !value.cursorSnapshotDeleteEnabled()) {
+            return "DELETION_AUTHORITY_INACTIVE";
+        }
+        if (nextEpoch <= value.brokerCapabilityReadinessEpoch()) {
+            return "READINESS_EPOCH_NOT_NEWER";
         }
         return null;
     }

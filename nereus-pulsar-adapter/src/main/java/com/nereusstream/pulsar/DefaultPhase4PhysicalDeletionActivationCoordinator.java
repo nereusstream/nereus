@@ -5,6 +5,8 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.core.capability.GenerationCapabilityReadiness;
 import com.nereusstream.core.capability.GenerationCapabilityReadinessProvider;
+import com.nereusstream.core.capability.GenerationRegistrationBackfillCompletion;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationReadinessRolloverCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationRequest;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationResult;
@@ -41,7 +43,8 @@ import java.util.function.Supplier;
  * Runs the live-reference backfill and configured-scope canary before one monotonic CAS enables both V1 deletion bits.
  */
 public final class DefaultPhase4PhysicalDeletionActivationCoordinator
-        implements ManagedLedgerPhysicalDeletionActivationCoordinator {
+        implements ManagedLedgerPhysicalDeletionActivationCoordinator,
+                ManagedLedgerGenerationReadinessRolloverCoordinator {
     private static final int MAX_CAS_ATTEMPTS = 32;
 
     private final String cluster;
@@ -130,6 +133,214 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
                                 readiness,
                                 requireActivation(optional),
                                 deadline)));
+    }
+
+    @Override
+    public CompletableFuture<VersionedGenerationProtocolActivation> rollover(
+            GenerationRegistrationBackfillCompletion registration,
+            int maxConcurrentStreams,
+            Duration timeout,
+            VersionedGenerationProtocolActivation current) {
+        final GenerationRegistrationBackfillCompletion exactRegistration;
+        final VersionedGenerationProtocolActivation exactCurrent;
+        final Deadline deadline;
+        try {
+            exactRegistration = Objects.requireNonNull(
+                    registration, "registration");
+            exactCurrent = Objects.requireNonNull(current, "current");
+            if (!activationEnabled) {
+                throw notReady(
+                        "deletion-active readiness rollover requires enabled non-dry-run configuration");
+            }
+            if (exactRegistration.failureCount() != 0) {
+                throw notReady(
+                        "registration backfill contains failures");
+            }
+            new ManagedLedgerPhysicalDeletionActivationRequest(
+                    exactRegistration.runId(),
+                    maxConcurrentStreams,
+                    timeout);
+            deadline = Deadline.start(timeout, nanoTime);
+            requireRolloverSource(exactRegistration, exactCurrent);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        return deadline.call(
+                        readinessProvider::requireGenerationCapabilityReadiness)
+                .thenCompose(readiness -> {
+                    requireExactReadiness(
+                            exactRegistration.readiness(), readiness);
+                    return deadline.call(() -> activations.get(cluster));
+                })
+                .thenCompose(optional -> {
+                    VersionedGenerationProtocolActivation observed =
+                            requireActivation(optional);
+                    if (!observed.equals(exactCurrent)) {
+                        if (sameRolloverAuthority(
+                                observed.value(), exactRegistration)) {
+                            return CompletableFuture.completedFuture(observed);
+                        }
+                        return CompletableFuture.failedFuture(notReady(
+                                "generation activation changed before readiness rollover backfill"));
+                    }
+                    PhysicalRootBackfillRequest request =
+                            new PhysicalRootBackfillRequest(
+                                    exactRegistration.runId(),
+                                    exactRegistration.readiness()
+                                            .brokerReadinessEpoch(),
+                                    maxConcurrentStreams,
+                                    deadline.remaining());
+                    return deadline.call(() -> backfill.runRollover(
+                                    request, exactCurrent))
+                            .thenCompose(report -> afterRolloverBackfill(
+                                    exactRegistration,
+                                    exactCurrent,
+                                    request,
+                                    report,
+                                    deadline));
+                })
+                .thenCompose(installed -> finalRolloverRevalidate(
+                        exactRegistration, installed, deadline));
+    }
+
+    private CompletableFuture<VersionedGenerationProtocolActivation>
+            afterRolloverBackfill(
+                    GenerationRegistrationBackfillCompletion registration,
+                    VersionedGenerationProtocolActivation current,
+                    PhysicalRootBackfillRequest request,
+                    PhysicalRootBackfillReport report,
+                    Deadline deadline) {
+        final Coverage coverage;
+        try {
+            coverage = requireSuccessfulRolloverReport(request, report);
+            requireCurrentReadiness(registration.readiness());
+        } catch (Throwable failure) {
+            return resolveConcurrentRollover(registration, failure, deadline);
+        }
+        final ObjectStoreDeleteCapabilityRequest probeRequest;
+        try {
+            probeRequest = new ObjectStoreDeleteCapabilityRequest(
+                    registration.runId(), deadline.remaining());
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        return deadline.call(() -> capabilityProbe.probe(probeRequest))
+                .thenCompose(proof -> {
+                    requireCapabilityProof(proof);
+                    requireCurrentReadiness(registration.readiness());
+                    RolloverProofs proofs = rolloverProofs(
+                            registration, coverage, proof);
+                    return installRollover(
+                            registration,
+                            proofs,
+                            current,
+                            0,
+                            deadline);
+                });
+    }
+
+    private CompletableFuture<VersionedGenerationProtocolActivation>
+            installRollover(
+                    GenerationRegistrationBackfillCompletion registration,
+                    RolloverProofs proofs,
+                    VersionedGenerationProtocolActivation current,
+                    int attempt,
+                    Deadline deadline) {
+        if (attempt >= MAX_CAS_ATTEMPTS) {
+            return CompletableFuture.failedFuture(notReady(
+                    "readiness rollover CAS retry budget exhausted"));
+        }
+        final GenerationProtocolActivationRecord replacement;
+        try {
+            requireCurrentReadiness(registration.readiness());
+            requireRolloverSource(registration, current);
+            replacement = rolloverReplacement(
+                    current.value(), registration, proofs);
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        return deadline.call(() -> activations.compareAndSet(
+                        cluster,
+                        replacement,
+                        current.metadataVersion()))
+                .handle((updated, failure) -> {
+                    if (failure == null) {
+                        return CompletableFuture.completedFuture(updated);
+                    }
+                    Throwable cause = unwrap(failure);
+                    return deadline.call(() -> activations.get(cluster))
+                            .thenCompose(optional -> {
+                                VersionedGenerationProtocolActivation reloaded =
+                                        requireActivation(optional);
+                                if (sameRolloverAuthority(
+                                        reloaded.value(), registration)) {
+                                    return CompletableFuture.completedFuture(
+                                            reloaded);
+                                }
+                                if (cause
+                                                instanceof
+                                                F4MetadataConditionFailedException
+                                        && reloaded.value()
+                                                        .brokerCapabilityReadinessEpoch()
+                                                < registration.readiness()
+                                                        .brokerReadinessEpoch()) {
+                                    return installRollover(
+                                            registration,
+                                            proofs,
+                                            reloaded,
+                                            attempt + 1,
+                                            deadline);
+                                }
+                                return CompletableFuture.failedFuture(cause);
+                            });
+                })
+                .thenCompose(Function.identity());
+    }
+
+    private CompletableFuture<VersionedGenerationProtocolActivation>
+            finalRolloverRevalidate(
+                    GenerationRegistrationBackfillCompletion registration,
+                    VersionedGenerationProtocolActivation installed,
+                    Deadline deadline) {
+        try {
+            requireCurrentReadiness(registration.readiness());
+            if (!sameRolloverAuthority(
+                    installed.value(), registration)) {
+                throw notReady(
+                        "installed deletion authority does not match the new readiness epoch");
+            }
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        return deadline.call(() -> activations.get(cluster))
+                .thenApply(optional -> {
+                    VersionedGenerationProtocolActivation current =
+                            requireActivation(optional);
+                    if (!sameRolloverAuthority(
+                            current.value(), registration)) {
+                        throw notReady(
+                                "deletion authority changed after readiness rollover");
+                    }
+                    requireCurrentReadiness(registration.readiness());
+                    return current;
+                });
+    }
+
+    private CompletableFuture<VersionedGenerationProtocolActivation>
+            resolveConcurrentRollover(
+                    GenerationRegistrationBackfillCompletion registration,
+                    Throwable original,
+                    Deadline deadline) {
+        return deadline.call(() -> activations.get(cluster))
+                .thenCompose(optional -> {
+                    VersionedGenerationProtocolActivation current =
+                            requireActivation(optional);
+                    if (sameRolloverAuthority(
+                            current.value(), registration)) {
+                        return CompletableFuture.completedFuture(current);
+                    }
+                    return CompletableFuture.failedFuture(original);
+                });
     }
 
     private CompletableFuture<ManagedLedgerPhysicalDeletionActivationResult> start(
@@ -350,6 +561,152 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
                 readiness, activation.streamRegistrationBackfill());
     }
 
+    private void requireRolloverSource(
+            GenerationRegistrationBackfillCompletion registration,
+            VersionedGenerationProtocolActivation current) {
+        GenerationProtocolActivationRecord value = current.value();
+        if (value.lifecycle()
+                        != GenerationProtocolActivationLifecycle.ACTIVE
+                || !value.publicationEnabled()) {
+            throw notReady(
+                    "generation publication must be ACTIVE before readiness rollover");
+        }
+        if (!value.requiredReferenceDomains().equals(requiredDomains)) {
+            throw invariant(
+                    "durable generation reference-domain set differs from the local runtime");
+        }
+        if (!deletionEnabled(value)) {
+            throw notReady(
+                    "readiness rollover requires active physical deletion authority");
+        }
+        if (!value.objectStoreCapabilitySha256()
+                .equals(expectedCapabilitySha256)) {
+            throw invariant(
+                    "active physical deletion authority belongs to another object-store scope");
+        }
+        long nextEpoch = registration.readiness().brokerReadinessEpoch();
+        if (nextEpoch <= value.brokerCapabilityReadinessEpoch()) {
+            throw notReady(
+                    "deletion-active readiness rollover requires a strictly newer epoch");
+        }
+        requireCompleteProofForEpoch(
+                value.streamRegistrationBackfill(),
+                value.brokerCapabilityReadinessEpoch(),
+                "stream-registration");
+        requireCompleteProofForEpoch(
+                value.physicalRootBackfill(),
+                value.brokerCapabilityReadinessEpoch(),
+                "physical-root");
+        requireCompleteProofForEpoch(
+                value.cursorSnapshotBackfill(),
+                value.brokerCapabilityReadinessEpoch(),
+                "cursor-snapshot");
+    }
+
+    private Coverage requireSuccessfulRolloverReport(
+            PhysicalRootBackfillRequest request,
+            PhysicalRootBackfillReport report) {
+        PhysicalRootBackfillReport exact = Objects.requireNonNull(
+                report, "backfill report");
+        if (!exact.runId().equals(request.runId())
+                || exact.brokerReadinessEpoch()
+                        != request.expectedBrokerReadinessEpoch()) {
+            throw invariant(
+                    "physical-root rollover report does not match its request");
+        }
+        if (exact.failureCount() != 0
+                || !exact.boundedFailures().isEmpty()) {
+            throw notReady(
+                    "physical-root/cursor-root readiness rollover contains failures");
+        }
+        return new Coverage(
+                exact.dataCoverageSha256().value(),
+                exact.cursorCoverageSha256().value());
+    }
+
+    private RolloverProofs rolloverProofs(
+            GenerationRegistrationBackfillCompletion registration,
+            Coverage coverage,
+            ObjectStoreDeleteCapabilityProof capability) {
+        long completedAt = Math.max(1, clock.millis());
+        long readinessEpoch = registration.readiness()
+                .brokerReadinessEpoch();
+        return new RolloverProofs(
+                new GenerationBackfillProofRecord(
+                        registration.runId(),
+                        readinessEpoch,
+                        registration.coverageSha256().value(),
+                        true,
+                        completedAt),
+                new GenerationBackfillProofRecord(
+                        registration.runId(),
+                        readinessEpoch,
+                        coverage.physicalRootSha256(),
+                        true,
+                        completedAt),
+                new GenerationBackfillProofRecord(
+                        registration.runId(),
+                        readinessEpoch,
+                        coverage.cursorSnapshotSha256(),
+                        true,
+                        completedAt),
+                capability.completedAtMillis());
+    }
+
+    private GenerationProtocolActivationRecord rolloverReplacement(
+            GenerationProtocolActivationRecord current,
+            GenerationRegistrationBackfillCompletion registration,
+            RolloverProofs proofs) {
+        long updatedAt = Math.max(
+                Math.max(current.updatedAtMillis(), proofs.completedAtMillis()),
+                Math.max(1, clock.millis()));
+        return new GenerationProtocolActivationRecord(
+                current.schemaVersion(),
+                current.protocolVersion(),
+                current.lifecycle(),
+                current.publicationEnabled(),
+                current.physicalDeleteEnabled(),
+                current.cursorSnapshotDeleteEnabled(),
+                registration.readiness().brokerReadinessEpoch(),
+                current.requiredReferenceDomains(),
+                proofs.registration(),
+                proofs.physicalRoot(),
+                proofs.cursorSnapshot(),
+                expectedCapabilitySha256,
+                current.activatingBrokerRunId(),
+                current.preparedAtMillis(),
+                current.activatedAtMillis(),
+                updatedAt,
+                0);
+    }
+
+    private boolean sameRolloverAuthority(
+            GenerationProtocolActivationRecord activation,
+            GenerationRegistrationBackfillCompletion registration) {
+        long readinessEpoch = registration.readiness()
+                .brokerReadinessEpoch();
+        return activation.lifecycle()
+                        == GenerationProtocolActivationLifecycle.ACTIVE
+                && activation.publicationEnabled()
+                && deletionEnabled(activation)
+                && activation.brokerCapabilityReadinessEpoch()
+                        == readinessEpoch
+                && activation.requiredReferenceDomains()
+                        .equals(requiredDomains)
+                && activation.objectStoreCapabilitySha256()
+                        .equals(expectedCapabilitySha256)
+                && sameProof(
+                        activation.streamRegistrationBackfill(),
+                        readinessEpoch,
+                        registration.coverageSha256().value())
+                && completeProofForEpoch(
+                        activation.physicalRootBackfill(),
+                        readinessEpoch)
+                && completeProofForEpoch(
+                        activation.cursorSnapshotBackfill(),
+                        readinessEpoch);
+    }
+
     private void requireBaseAuthority(
             GenerationCapabilityReadiness readiness,
             GenerationProtocolActivationRecord activation) {
@@ -435,6 +792,16 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
         }
     }
 
+    private static void requireExactReadiness(
+            GenerationCapabilityReadiness expected,
+            GenerationCapabilityReadiness actual) {
+        if (!Objects.requireNonNull(expected, "expected")
+                .equals(Objects.requireNonNull(actual, "actual"))) {
+            throw notReady(
+                    "broker generation readiness changed around deletion-authority rollover");
+        }
+    }
+
     private Coverage requireSuccessfulReport(
             ManagedLedgerPhysicalDeletionActivationRequest request,
             ActivationBasis basis,
@@ -514,6 +881,31 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
             throw notReady(
                     name + " backfill proof is absent or changed");
         }
+    }
+
+    private static void requireCompleteProofForEpoch(
+            GenerationBackfillProofRecord proof,
+            long readinessEpoch,
+            String name) {
+        if (!completeProofForEpoch(proof, readinessEpoch)) {
+            throw notReady(
+                    name + " proof is incomplete for the active readiness epoch");
+        }
+    }
+
+    private static boolean completeProofForEpoch(
+            GenerationBackfillProofRecord proof,
+            long readinessEpoch) {
+        return proof.complete()
+                && proof.brokerReadinessEpoch() == readinessEpoch;
+    }
+
+    private static boolean sameProof(
+            GenerationBackfillProofRecord proof,
+            long readinessEpoch,
+            String coverageSha256) {
+        return completeProofForEpoch(proof, readinessEpoch)
+                && proof.coverageSha256().equals(coverageSha256);
     }
 
     private static boolean deletionEnabled(
@@ -619,6 +1011,32 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
         private InstallResult {
             Objects.requireNonNull(activation, "activation");
             Objects.requireNonNull(status, "status");
+        }
+    }
+
+    private record RolloverProofs(
+            GenerationBackfillProofRecord registration,
+            GenerationBackfillProofRecord physicalRoot,
+            GenerationBackfillProofRecord cursorSnapshot,
+            long capabilityCompletedAtMillis) {
+        private RolloverProofs {
+            Objects.requireNonNull(registration, "registration");
+            Objects.requireNonNull(physicalRoot, "physicalRoot");
+            Objects.requireNonNull(cursorSnapshot, "cursorSnapshot");
+            if (capabilityCompletedAtMillis <= 0) {
+                throw new IllegalArgumentException(
+                        "capabilityCompletedAtMillis must be positive");
+            }
+        }
+
+        private long completedAtMillis() {
+            return Math.max(
+                    capabilityCompletedAtMillis,
+                    Math.max(
+                            registration.completedAtMillis(),
+                            Math.max(
+                                    physicalRoot.completedAtMillis(),
+                                    cursorSnapshot.completedAtMillis())));
         }
     }
 

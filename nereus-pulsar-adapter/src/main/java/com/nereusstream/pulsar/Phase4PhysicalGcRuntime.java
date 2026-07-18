@@ -5,11 +5,13 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.core.capability.GenerationCapabilityReadinessProvider;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
+import com.nereusstream.core.capability.GenerationRegistrationBackfillCompletion;
 import com.nereusstream.core.physical.GcGlobalReferenceScope;
 import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjectionAuthorityReader;
+import com.nereusstream.managedledger.generation.ManagedLedgerGenerationReadinessRolloverCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationCoordinator;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationRequest;
 import com.nereusstream.managedledger.generation.ManagedLedgerPhysicalDeletionActivationResult;
@@ -51,6 +53,7 @@ import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.VersionedGenerationProtocolActivation;
 import com.nereusstream.metadata.oxia.retirement.ObjectAuditRetirementStore;
 import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import com.nereusstream.objectstore.ObjectStore;
@@ -74,7 +77,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * non-overlapping root -> registration -> inventory fixed-delay loop; safe defaults remain disabled and dry-run.
  */
 public final class Phase4PhysicalGcRuntime
-        implements ManagedLedgerPhysicalDeletionActivationCoordinator, AutoCloseable {
+        implements ManagedLedgerPhysicalDeletionActivationCoordinator,
+                ManagedLedgerGenerationReadinessRolloverCoordinator,
+                AutoCloseable {
     private final PhysicalGcConfig config;
     private final CursorSnapshotGcScanner cursorScanner;
     private final CursorSnapshotGcExecutor cursorExecutor;
@@ -82,7 +87,7 @@ public final class Phase4PhysicalGcRuntime
     private final StreamRegistrationRetirementScanner registrationScanner;
     private final ObjectInventoryScanner objectInventoryScanner;
     private final PhysicalGcLifecycleService lifecycleService;
-    private final ManagedLedgerPhysicalDeletionActivationCoordinator
+    private final DefaultPhase4PhysicalDeletionActivationCoordinator
             deletionActivationCoordinator;
     private final Phase4PhysicalGcStartupGate startupGate;
     private final SourceRetirementMetadataStore sourceRetirementMetadata;
@@ -418,6 +423,37 @@ public final class Phase4PhysicalGcRuntime
         return deletionActivationCoordinator.activate(exact)
                 .thenCompose(result -> startMutatingLifecycleIfAuthorized(true)
                         .thenApply(ignored -> result));
+    }
+
+    @Override
+    public CompletableFuture<VersionedGenerationProtocolActivation> rollover(
+            GenerationRegistrationBackfillCompletion registration,
+            int maxConcurrentStreams,
+            Duration timeout,
+            VersionedGenerationProtocolActivation current) {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Phase 4 physical GC runtime is closed"));
+        }
+        final GenerationRegistrationBackfillCompletion exactRegistration;
+        final Duration exactTimeout;
+        final VersionedGenerationProtocolActivation exactCurrent;
+        try {
+            exactRegistration = Objects.requireNonNull(
+                    registration, "registration");
+            exactTimeout = Objects.requireNonNull(timeout, "timeout");
+            exactCurrent = Objects.requireNonNull(current, "current");
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+        return deletionActivationCoordinator
+                .rollover(
+                        exactRegistration,
+                        maxConcurrentStreams,
+                        exactTimeout,
+                        exactCurrent)
+                .thenCompose(installed -> startMutatingLifecycleIfAuthorized(true)
+                        .thenApply(ignored -> installed));
     }
 
     public String expectedObjectStoreCapabilitySha256() {

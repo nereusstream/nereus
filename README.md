@@ -393,6 +393,13 @@ ACTIVE ownerless root、施加完整 grace，随后再 MARK/delete。聚焦 core
 28.5.2 与 locked Pulsar `c59da789e88df2b57829de3277c60194b44fceb6` 上以 3m56s 通过（159/159 tasks
 executed），并作为该检查点的聚合 gate。实际 Pulsar two-broker ownership/unload/failover 仍是 M4 final
 前的剩余 destructive 证据。
+Checkpoint BC 又补上 deletion 已激活后的 broker-readiness rollover：新稳定 epoch 的 registration completion
+不会单独改写 proof；product runtime 先在旧 activation wrapper 下执行不发布中间 proof 的 physical/cursor
+root/protection 全量扫描，再运行 configured-scope canary，并用单个 CAS 同时替换 readiness epoch、三类完整
+proof 与 capability digest，两个 monotonic delete bits 始终保持 true。Readiness drift 会继续 fence 旧 epoch
+GC，成功 CAS 后才允许此前因 epoch mismatch 延后的 runtime 启动。对应 managed-ledger、materialization、
+adapter 聚焦测试已通过；locked Pulsar 仍需传递 traversal 的 exact remaining deadline/concurrency，随后才能
+进入真实 two-broker unload/failover/restart final fixture。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

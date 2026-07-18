@@ -248,15 +248,15 @@ require_literal "checkpoints AG–AI retention planner" \
     "docs/design/nereus-overall-architecture.md"
 require_literal "M5 through AI" \
     "docs/design/nereus-design-index.md"
-require_literal "M4 through BB" \
+require_literal "M4 through BC" \
     "docs/design/nereus-design-index.md"
 require_literal "M5 through checkpoint AI" \
     "docs/design/nereus-future4-compaction-generation.md"
 require_literal "M5 through checkpoint AI" \
     "docs/automq-like-stream-storage/README.md"
-require_literal "M4 through checkpoint BB" \
+require_literal "M4 through checkpoint BC" \
     "docs/automq-like-stream-storage/README.md"
-require_literal "M4 through checkpoint BB" \
+require_literal "M4 through checkpoint BC" \
     "docs/design/nereus-future4-compaction-generation.md"
 require_literal "post-delete cut against real services" \
     "docs/design/nereus-commit-protocol.md"
@@ -315,4 +315,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through BB and M5 through AI, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through BC and M5 through AI, source lock, gates, and local links verified."

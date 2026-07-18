@@ -139,7 +139,11 @@ Oxia/LocalStack runtime. Checkpoint BB closes the late first/retried PUT and tom
 provider attempts now revalidate the durable append session on both sides of the physical-root read；DELETED roots
 fence stale retries, audit-deletion cuts rediscover exact late bytes before root retirement, and a real
 Oxia/LocalStack object that reappears after root retirement re-enters inventory as a fresh ACTIVE ownerless root with
-another full grace. The actual Pulsar two-broker ownership/unload/failover matrix remains pending.
+another full grace. Checkpoint BC then removes the deletion-active broker-readiness dead end：a complete new
+registration traversal triggers a non-publishing physical/cursor root scan、fresh configured-scope canary and one CAS
+that preserves both delete bits while replacing the epoch、all three proofs and capability digest. Runtime startup
+deferred by the old epoch resumes only after exact new authority is durable. Locked-Pulsar propagation of the exact
+remaining traversal deadline/concurrency and the actual two-broker ownership/unload/failover matrix remain pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -709,7 +713,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > Checkpoint BA proves journaled source/protection post-delete recovery. Checkpoint BB proves guarded Object-WAL
 > first/retried transmissions、late exact PUT at both Phase 1 audit-removal cuts and real post-root external
 > reappearance through missing-root inventory. The actual two-broker ownership/unload/failover scenario and final M4
-> gate remain before F4-M4 can be called complete.
+> gate remain before F4-M4 can be called complete. Checkpoint BC adds product-owned atomic deletion-authority
+> readiness rollover without a partial-proof durable state；the locked broker call still needs to preserve the cold-
+> topic traversal's exact remaining deadline/concurrency before the two-broker final fixture.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
 > identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
@@ -904,8 +910,8 @@ gc/DefaultPhysicalRootTombstoneRetirementCoordinator.java  implemented checkpoin
 gc/TombstoneRetirementResult.java                          implemented checkpoint U
 gc/TombstoneRetirementStatus.java                          implemented checkpoint U
 gc/TombstoneRetirementDigests.java                         implemented checkpoint U
-gc/PhysicalRootBackfillCoordinator.java                  implemented checkpoint W contract
-gc/DefaultPhysicalRootBackfillCoordinator.java           implemented checkpoint W all-shard backfill/proof CAS
+gc/PhysicalRootBackfillCoordinator.java                  implemented checkpoint W contract, extended BC non-publishing rollover
+gc/DefaultPhysicalRootBackfillCoordinator.java           implemented checkpoint W proof CAS, extended BC exact-old-wrapper scan
 gc/PhysicalRootBackfillDigest.java                        implemented checkpoint W hierarchical coverage digest
 gc/PhysicalRootBackfillRequest.java                       implemented checkpoint W bounded request
 gc/PhysicalRootBackfillReport.java                        implemented checkpoint W full counters/bounded failures
@@ -934,6 +940,9 @@ cursor/DefaultCursorSnapshotStore.java                    implemented checkpoint
 cursor/CursorSnapshotInventory.java             unchanged authority semantics
 generation/ManagedLedgerGenerationProjectionRefV1.java   implemented checkpoint W strict NPR1 + golden identity
 generation/ManagedLedgerGenerationProjectionAuthorityReader.java implemented checkpoint W binding/topic capture
+generation/ManagedLedgerGenerationReadinessRolloverCoordinator.java implemented checkpoint BC atomic product boundary
+generation/ManagedLedgerGenerationRegistrationBackfillProofCoordinator.java extended checkpoint BC bounded rollover handoff
+generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java extended checkpoint BC deletion-active delegation
 ```
 
 `nereus-pulsar-adapter` / managed-ledger runtime ownership：
@@ -948,12 +957,12 @@ Phase4ObjectInventoryFamilies.java                       implemented checkpoint 
 Phase4PhysicalRootLifecycleRouter.java                   implemented checkpoint AN total root-state routing
 Phase4PhysicalGcStartupGate.java                         implemented checkpoint AR exact durable scope/domain restart fence
 Phase4GcReferenceDomainAssembly.java                     implemented checkpoint AS exact shared ownerless interpretation
-Phase4PhysicalGcRuntime.java                             implemented checkpoint AK/AN lifecycle, extended AS shared-domain activation/start ownership
+Phase4PhysicalGcRuntime.java                             implemented checkpoint AK/AN lifecycle, extended BC rollover/start ownership
 NereusRuntimeConfiguration.java                         extended checkpoint AO broker-mapped PhysicalGcConfig validation
-DefaultNereusRuntimeProvider.java                       extended checkpoint AS one shared capability/reference-domain composition
+DefaultNereusRuntimeProvider.java                       extended checkpoint BC shared capability/reference-domain/rollover composition
 NereusManagedLedgerRuntime.java                         extended checkpoint AR typed physical-delete activation exposure
 NereusManagedLedgerFactory.java                         extended checkpoint AR broker-safe activation method
-DefaultPhase4PhysicalDeletionActivationCoordinator.java implemented checkpoint AQ ordered proof composition/atomic CAS
+DefaultPhase4PhysicalDeletionActivationCoordinator.java implemented checkpoint AQ activation, extended BC atomic epoch/proof rollover
 locked Pulsar NereusManagedLedgerStorage.java            extended checkpoint AR publication-then-delete sequencing
 ```
 
@@ -967,7 +976,8 @@ RecoveryCheckpointStreamingTest
 RecoveryCheckpointSparseDirectoryTest
 RecoveryCheckpointDomainValidationTest
 ObjectStoreDeleteCapabilityProbeTest                     implemented checkpoint AP lifecycle/digest/loss/cleanup
-Phase4PhysicalDeletionActivationCoordinatorTest          implemented checkpoint AQ order/drift/conflict/loss/atomicity
+Phase4PhysicalDeletionActivationCoordinatorTest          implemented checkpoint AQ activation and BC atomic rollover
+PhysicalRootBackfillCoordinatorTest                      extended checkpoint BC non-publishing rollover scan
 Phase4PhysicalGcStartupGateTest                          implemented checkpoint AR defer/exact-scope/domain-drift cuts
 ManagedLedgerGenerationProtocolActivationGuardTest       extended checkpoint AR wrong-scope deletion rejection
 NereusManagedLedgerStorageGenerationActivationTest       extended checkpoint AR strict ordering/failure propagation
@@ -1557,6 +1567,27 @@ Pulsar `master@c59da789e88df2b57829de3277c60194b44fceb6` in 3m56s with 159/159 r
 executable checkpoint boundary. BB closes required scenario 52. It is still not `phase4M4FinalCheck`：actual Pulsar
 two-broker ownership、topic unload and failover evidence remains mandatory.
 
+`phase4M4ReadinessRolloverCheck` is checkpoint BC. `completeGenerationRegistrationBackfill` now has a bounded overload
+that carries stream concurrency and one remaining deadline into a possible deletion-active transition. The ordinary
+registration-only path is unchanged while deletion is false. If either deletion bit is already true, the proof
+coordinator delegates to `ManagedLedgerGenerationReadinessRolloverCoordinator` instead of attempting an illegal
+registration-only epoch advance.
+
+`DefaultPhysicalRootBackfillCoordinator.runRollover` accepts the exact versioned old authority, requires a strictly
+newer requested epoch and executes the complete canonical data/cursor root and protection traversal without writing
+activation proofs. It reloads the exact old wrapper after traversal. The activation coordinator validates the report,
+rechecks full broker readiness, reruns the AP scope canary, constructs three complete new-epoch proof records and uses
+one version CAS to replace epoch/proofs/capability while ACTIVE/publication/both deletion bits remain true. Conflict or
+lost-response recovery accepts only a complete concurrent authority for the same new epoch and registration coverage；
+final readiness plus durable-record revalidation remains mandatory. The physical-GC runtime starts a previously
+deferred lifecycle only after this authority passes the startup gate.
+
+The deterministic managed-ledger/materialization/adapter tests cover bounded delegation、zero-object non-publishing
+scan and one-CAS proof replacement. The static BC audit fixes those interfaces、runtime/provider composition and test
+names. This checkpoint is intentionally not the M4 final gate：the local Pulsar fork still calls the compatibility
+overload and must forward the traversal's exact remaining deadline/concurrency before the real two-broker unload/
+failover/restart fixture is authoritative.
+
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration
 
 ### 7.1 Nereus production artifacts
@@ -1607,8 +1638,9 @@ nereus-managed-ledger/.../generation/ManagedLedgerGenerationProjectionAuthorityR
 nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCoordinator.java checkpoint X broker-safe contract
 nereus-managed-ledger/.../generation/DefaultManagedLedgerMaterializationRegistrationCoordinator.java checkpoint X exact registration
 nereus-managed-ledger/.../generation/ManagedLedgerMaterializationRegistrationCandidate.java checkpoint Z exact unloaded projection fact
-nereus-managed-ledger/.../generation/ManagedLedgerGenerationRegistrationBackfillProofCoordinator.java checkpoint AA product boundary
-nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java checkpoint AA proof CAS
+nereus-managed-ledger/.../generation/ManagedLedgerGenerationRegistrationBackfillProofCoordinator.java checkpoint AA boundary, extended BC bounded handoff
+nereus-managed-ledger/.../generation/ManagedLedgerGenerationReadinessRolloverCoordinator.java checkpoint BC atomic authority boundary
+nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java checkpoint AA proof CAS, extended BC rollover
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationGuard.java checkpoint AB exact admission/proof
 nereus-managed-ledger/.../generation/ManagedLedgerAsyncAppendAdmissionGuard.java checkpoint AE pre-IO proof/lag admission
 nereus-managed-ledger/.../generation/ManagedLedgerGenerationProtocolActivationCoordinator.java checkpoint AC product boundary
@@ -1621,7 +1653,7 @@ nereus-pulsar-adapter/.../NereusRuntimeConfiguration.java              extended 
 nereus-pulsar-adapter/.../NereusRuntimeContext.java                   checkpoints AA/AB readiness provider and first-activation switch
 nereus-pulsar-adapter/.../NereusGenerationProtocolReferenceDomains.java checkpoint AA exact six-domain set
 nereus-pulsar-adapter/.../Phase4ObjectWalRuntime.java                  implemented checkpoint AF owned production composition
-nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoints X/AA–AC/AF/AN/AO runtime and shared GC timing wiring
+nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java           checkpoints X/AA–AC/AF/AN/AO/BC runtime and rollover wiring
 ```
 
 ### 7.2 Local Pulsar fork artifacts
@@ -1667,7 +1699,7 @@ Phase4ObjectWalRuntimeTest                                          implemented 
 ManagedLedgerGenerationProtocolTest                         implemented K protocol/CAS foundation
 ManagedLedgerGenerationProjectionRefV1GoldenTest
 ManagedLedgerMaterializationRegistrationCoordinatorTest    implemented checkpoint X identity/hint/response-loss/drift
-ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest implemented checkpoint AA admission/CAS/epoch/loss
+ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest implemented checkpoint AA admission/CAS, extended BC bounded rollover
 ManagedLedgerGenerationProtocolActivationGuardTest         implemented checkpoint AB marker/proof/delete admission
 ManagedLedgerGenerationProtocolActivationCoordinatorTest   implemented checkpoint AC ACTIVE CAS/conflict/loss/drift
 ManagedLedgerGenerationProjectionRefV1Test                 extended checkpoint Z exact candidate identity

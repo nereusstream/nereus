@@ -4,7 +4,7 @@
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
-> F4-M4 through checkpoint BB and F4-M5 through checkpoint AI are in progress；F4-M6 pending
+> F4-M4 through checkpoint BC and F4-M5 through checkpoint AI are in progress；F4-M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -692,6 +692,13 @@ append session 与 absent-or-exact-ACTIVE root，旧 session/DELETED root 在发
 真实 Oxia/LocalStack 夹具证明 inventory 会重建新的 ACTIVE root、施加完整 ownerless grace，再进入常规
 MARK/drain/delete。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint BB 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
+Checkpoint BC 再关闭 deletion-active readiness rollover 的协议死路：membership/incarnation 变化首先让旧
+epoch 的本地 guard fail closed；新稳定 epoch 的 registration completion 触发非发布式 physical/cursor root
+backfill 和新的 configured-scope canary，随后一个 activation CAS 同时替换 epoch、三类 complete proof 与
+capability digest，同时保持 ACTIVE/publication/两个 delete bits 为 true。不存在“新 registration proof + 旧
+physical/cursor proof”的 durable 中间态。Locked Pulsar 仍需把 cold-topic traversal 的 exact remaining
+deadline/concurrency 传入该边界，真实 two-broker unload/failover/restart 证据也仍属于 M4 final gate。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint BC 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。
