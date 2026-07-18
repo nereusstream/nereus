@@ -146,6 +146,8 @@ require_literal "Checkpoint AN" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AO" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint AP" \
+    "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint AK closes the restart cut after MARK" \
     "docs/phase-4-compaction-generation/04-task-recovery-async-and-checkpoint.md"
 require_literal 'Checkpoint AK implements `recoverMarked`' \
@@ -166,6 +168,8 @@ require_literal "phase4M4LifecycleSchedulingCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M4PhysicalGcConfigCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M4ObjectStoreCapabilityCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint AG implements that exact order" \
     "docs/phase-4-compaction-generation/05-reader-retention-and-gc.md"
 require_literal "Checkpoint AH implements the shared process" \
@@ -178,13 +182,13 @@ require_literal "checkpoints AG–AI retention planner" \
     "docs/design/nereus-overall-architecture.md"
 require_literal "M5 through AI" \
     "docs/design/nereus-design-index.md"
-require_literal "M4 through AO" \
+require_literal "M4 through AP" \
     "docs/design/nereus-design-index.md"
 require_literal "M5 through checkpoint AI" \
     "docs/design/nereus-future4-compaction-generation.md"
 require_literal "M5 through checkpoint AI" \
     "docs/automq-like-stream-storage/README.md"
-require_literal "M4 through checkpoint AO" \
+require_literal "M4 through checkpoint AP" \
     "docs/automq-like-stream-storage/README.md"
 require_literal "ManagedLedgerMaterializationRegistrationCandidate" \
     "docs/phase-4-compaction-generation/README.md"
@@ -235,4 +239,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through AO and M5 through AI, source lock, gates, and local links verified."
+echo "Phase 4 M1-M3 final status plus M4 through AP and M5 through AI, source lock, gates, and local links verified."

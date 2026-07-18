@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AO、M5 through checkpoint AI；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint AP、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -58,6 +58,9 @@ Already present：
 - F4-M4 checkpoint AO：Pulsar now maps all bounded physical-GC fields into the typed runtime, and the provider shares
   those exact lease/protection/skew/orphan values across write、read-pin、cursor and GC paths. This adds no coverage or
   object-store capability proof and cannot activate physical deletion.
+- F4-M4 checkpoint AP：the configured-scope probe now exercises guarded PUT、exact HEAD、complete LIST、ETag-bound
+  exact DELETE、response-loss absence convergence and idempotent cleanup, producing one deterministic non-secret V1
+  capability digest. No production coordinator persists it or activates deletion yet.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative
@@ -78,7 +81,8 @@ Already present：
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
-- physical-root/cursor coverage proof、object-store capability proof and destructive activation；
+- production composition/persistence of physical-root/cursor coverage plus object-store capability proof, and
+  destructive activation；
 - primary-WAL retention gate and final real-service destructive/scale evidence；
 - mixed primary target resolver。
 

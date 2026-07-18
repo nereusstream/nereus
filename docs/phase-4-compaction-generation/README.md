@@ -1130,6 +1130,32 @@ bit. Coverage proof、capability proof、monotonic destructive activation and th
 gate remain mandatory. The AO gate passed on 2026-07-18 under Java 21；the root build reported 144 actionable tasks
 （63 executed）and the locked Pulsar focused/style build reported 141 actionable tasks（all executed）.
 
+### 6.25g F4-M4 configured object-store delete-capability checkpoint
+
+Checkpoint AP implements the real configured-scope capability proof that checkpoint AO deliberately left separate.
+`DefaultObjectStoreDeleteCapabilityProbe` derives one deterministic V1 SHA-256 from the provider class、normalized
+endpoint、region、bucket、logical prefix、path-style mode and the exact semantics it exercises. Credential references、
+access keys、secret keys and session tokens are neither inputs nor output. A caller supplies a lowercase base32 run id
+and one positive overall deadline；the probe uses only the isolated
+`__nereus_capability__/delete-v1/<runId>/probe` namespace and returns only the capability digest、a hashed probe-key
+audit identity and completion time.
+
+One successful run must prove the complete sequence：guarded if-absent PUT of deterministic CRC32C bytes；exact
+HEAD with key/length/checksum/non-empty ETag；one complete LIST page containing that exact key/length/last-modified
+identity；ETag-bound exact DELETE；HEAD absence even when the DELETE response was lost；a second DELETE returning
+`ALREADY_ABSENT`；and a final complete LIST proving absence. A lost PUT response converges only through the exact HEAD.
+Any mismatch、incomplete listing、foreign collision or timeout fails closed, and failure cleanup HEADs then deletes
+only an exact matching canary. The product never infers safety for existing business objects from this canary.
+
+`phase4M4ObjectStoreCapabilityCheck` freezes the API/value validation、scope identity、operation order、response-loss
+recovery、cleanup and focused local-object-store tests. Checkpoint AP does not persist the digest into
+`GenerationProtocolActivationRecord`, does not compose/run checkpoint-W backfill, and cannot enable
+`physicalObjectDeletionEnabled` or `cursorSnapshotDeletionEnabled`. Product-owned monotonic activation and the real
+Oxia/LocalStack destructive/scale gate remain mandatory.
+The AP gate passed on 2026-07-18 under Java 21 against locked Pulsar
+`master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`；the root build reported 145 actionable tasks（69 executed）and
+the inherited focused Pulsar build reported 141 actionable tasks（all executed）.
+
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
 Checkpoint X 关闭 cold-topic backfill 开始前必须先关闭的新写前沿。`ProjectionIdentity` 现在拥有共享的

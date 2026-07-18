@@ -189,6 +189,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   `PhysicalGcConfig`，并让 provider 的 pending protection、reader lease、clock skew、orphan grace 只消费这一
   份 cross-validated value 的 ordinary checkpoint；默认仍为 `enabled=false, dryRun=true`，配置本身不构成
   coverage/capability proof 或 destructive activation authority。
+- **F4-M4 checkpoint AP**：在隔离高熵 canary key 上证明 configured object-store scope 的 guarded if-absent
+  PUT、exact CRC32C/length/ETag HEAD、complete LIST、ETag-bound exact DELETE、lost-response absence convergence、
+  idempotent DELETE 与 post-delete LIST absence，并产出不含 credential 的 deterministic V1 capability SHA-256
+  的 ordinary checkpoint；它不持久化该摘要、不运行 coverage backfill，也不构成 destructive activation authority。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、

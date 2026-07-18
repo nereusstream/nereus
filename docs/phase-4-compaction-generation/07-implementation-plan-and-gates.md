@@ -109,7 +109,10 @@ owner/protection drain plus delete-response-loss cuts. Checkpoint AN adds comple
 complete 64-shard registration retirement、inventory-last ordering, fixed-delay/non-overlap/hint coalescing and
 close-first runtime ownership. Checkpoint AO maps the complete bounded physical-GC broker configuration into the typed
 runtime and removes provider-local protection/lease/orphan timing constants. Safe defaults still start no pass；coverage/
-capability proof、delete activation and the real-service final gate remain pending.
+delete activation and the real-service final gate remain pending. Checkpoint AP now implements the independent
+configured-scope object-store capability proof：guarded PUT、exact HEAD、complete LIST、ETag-bound exact DELETE、
+response-loss absence convergence and idempotent cleanup produce one deterministic non-secret V1 scope digest, but
+the digest is not yet persisted and no delete bit is enabled.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -664,8 +667,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > registration-last conditional retirement. Checkpoint AN adds the strict metadata-first physical-root/registration/
 > inventory pass, exhaustive root lifecycle routing, restart-safe generic ownerless execution and non-overlapping
 > fixed-delay provider composition. Checkpoint AO maps the complete physical-GC broker configuration and makes the
-> provider consume the same cross-validated lease/protection/orphan values. The cursor coverage bit、capability proof、
-> physical-delete activation、real-service destructive
+> provider consume the same cross-validated lease/protection/orphan values. Checkpoint AP implements the real
+> configured-scope object-store capability probe without persisting or activating its digest. Product composition of
+> the cursor/physical coverage proof、capability proof、physical-delete activation、real-service destructive
 > scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
@@ -677,6 +681,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 `nereus-object-store`：
 
 ```text
+ObjectStoreDeleteCapabilityProbe.java                    implemented checkpoint AP protocol boundary
+ObjectStoreDeleteCapabilityRequest.java                  implemented checkpoint AP bounded run identity/deadline
+ObjectStoreDeleteCapabilityProof.java                    implemented checkpoint AP redacted durable-candidate value
+DefaultObjectStoreDeleteCapabilityProbe.java             implemented checkpoint AP exact lifecycle/scope digest
 checkpoint/RecoveryCheckpointCodecV1.java
 checkpoint/DefaultRecoveryCheckpointCodecV1.java
 checkpoint/RecoveryCheckpointFormatV1.java               extended checkpoint AL ownerless strict inverse
@@ -908,6 +916,7 @@ RecoveryCheckpointStrictDecodeTest
 RecoveryCheckpointStreamingTest
 RecoveryCheckpointSparseDirectoryTest
 RecoveryCheckpointDomainValidationTest
+ObjectStoreDeleteCapabilityProbeTest                     implemented checkpoint AP lifecycle/digest/loss/cleanup
 MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
 RecoveryCheckpointBuilderTest
@@ -1009,6 +1018,7 @@ retirement.
 ./gradlew phase4M4RegistrationRetirementCheck
 ./gradlew phase4M4LifecycleSchedulingCheck
 ./gradlew phase4M4PhysicalGcConfigCheck
+./gradlew phase4M4ObjectStoreCapabilityCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -1256,6 +1266,18 @@ delete bits；those remain separate durable authorities. The source boundary is
 `master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`. The aggregate gate passed on 2026-07-18 under Java 21；the root
 build reported 144 actionable tasks（63 executed）and the locked Pulsar focused/style build reported 141 actionable
 tasks（all executed）.
+
+`phase4M4ObjectStoreCapabilityCheck` extends checkpoint AO with checkpoint AP. It audits the isolated base32 run/key
+namespace、single checked deadline、guarded if-absent canary PUT、exact CRC32C/length/non-empty-ETag HEAD、complete
+single-page LIST with last-modified identity、ETag-bound exact DELETE、lost PUT/DELETE response recovery through exact
+facts、idempotent `ALREADY_ABSENT` and final LIST absence. The deterministic SHA-256 binds provider class、normalized
+endpoint、region、bucket、logical prefix、path-style and the frozen V1 semantics while a contract audit rejects any
+credential/token input. Focused tests prove stable same-scope identity, scope-change identity, response-loss recovery,
+incomplete-list fail-closed behavior and exact cleanup. This ordinary gate does not run the physical/cursor backfill,
+persist `objectStoreCapabilitySha256`, set either deletion bit or prove real S3/Oxia destructive recovery. Those remain
+the next product-activation and final-service checkpoints. The aggregate gate passed on 2026-07-18 under Java 21
+against locked Pulsar `master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`；the root build reported 145 actionable
+tasks（69 executed）and the inherited focused Pulsar build reported 141 actionable tasks（all executed）.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

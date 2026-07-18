@@ -1120,6 +1120,27 @@ tasks.register("phase4M4PhysicalGcConfigCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register<Exec>("checkPhase4M4ObjectStoreCapabilityContractSurface") {
+    group = "verification"
+    description = "Audit the configured-scope guarded PUT/HEAD/LIST/exact-DELETE capability proof."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-object-store-capability-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4ObjectStoreCapabilityCheck") {
+    group = "verification"
+    description = "Verify checkpoint AP object-store destructive-protocol capability without activating deletion."
+    dependsOn("phase4M4PhysicalGcConfigCheck")
+    dependsOn("checkPhase4M4ObjectStoreCapabilityContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-object-store:check")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1130,7 +1151,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4PhysicalGcConfigCheck")
+    dependsOn("phase4M4ObjectStoreCapabilityCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

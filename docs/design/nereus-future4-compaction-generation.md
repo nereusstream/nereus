@@ -646,6 +646,9 @@ production service/facade routing，以及 Pulsar typed retention config mapping
 immutable effective retention/backlog snapshot、stable generation readiness、registration-backed marker admission、
 post-activation policy reload 和 loaded/unloaded/partition-child `TRIM_TOPIC` route；physical deletion 仍关闭。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AO 和 M5 through checkpoint AI 也不声称 production physical GC、
+Checkpoint AP 已实现 configured-scope guarded PUT/exact HEAD/complete LIST/exact DELETE canary 和 deterministic
+non-secret capability digest；它尚未与 checkpoint-W backfill、activation store 或 broker startup 组合。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AP 和 M5 through checkpoint AI 也不声称 production physical GC、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

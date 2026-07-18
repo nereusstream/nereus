@@ -32,7 +32,9 @@ lane、production managed-ledger/facade installation and exact Pulsar retention/
 admin admission. Checkpoints AJ–AN additionally implement cursor-snapshot discovery/execution、the current-writer
 known-prefix inventory and exact missing-root registration boundary、registration-last retirement and the strict
 metadata-first lifecycle. Checkpoint AO maps the exact bounded broker physical-GC configuration into that runtime；
-coverage/capability proof、physical-delete activation and the remaining destructive runtime remain target work. Package、class and method names
+checkpoint AP now implements the configured-scope object-store PUT/HEAD/LIST/exact-DELETE capability proof without
+persisting or activating it. Product composition of coverage + capability proof、physical-delete activation and the
+remaining destructive runtime remain target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 
@@ -87,6 +89,10 @@ nereus-core/src/main/java/com/nereusstream/core/recovery/
 nereus-object-store/src/main/java/com/nereusstream/objectstore/
   PutObjectAttemptGuard.java
   ObjectPutRetryPolicy.java
+  ObjectStoreDeleteCapabilityProbe.java
+  ObjectStoreDeleteCapabilityRequest.java
+  ObjectStoreDeleteCapabilityProof.java
+  DefaultObjectStoreDeleteCapabilityProbe.java
 
 nereus-object-store/src/main/java/com/nereusstream/objectstore/staging/
   ManagedStagingFile.java
@@ -1508,6 +1514,50 @@ conditional attempt and compatibility fallback share the original absolute deadl
 currently active request. Every other conditional failure remains closed. For that narrow fallback, immutability +
 no-key-reuse + the durable root fence close the race. `ALREADY_ABSENT` is idempotent success only when the root already
 records the exact expected immutable identity；absence during ordinary reads remains corruption.
+
+### 10.1 Configured-scope destructive capability proof
+
+Checkpoint AP implements this production API in `nereus-object-store`：
+
+```java
+public interface ObjectStoreDeleteCapabilityProbe {
+    String expectedCapabilitySha256();
+
+    CompletableFuture<ObjectStoreDeleteCapabilityProof> probe(
+            ObjectStoreDeleteCapabilityRequest request);
+}
+
+public record ObjectStoreDeleteCapabilityRequest(
+        String runId,
+        Duration timeout) { }
+
+public record ObjectStoreDeleteCapabilityProof(
+        int protocolVersion,
+        String capabilitySha256,
+        String probeObjectKeySha256,
+        long completedAtMillis) { }
+```
+
+`runId` is 26–128 lowercase unpadded base32 characters and therefore carries at least 128 bits of caller-generated
+entropy. The one overall timeout covers every primary operation and response-loss recheck；the internal deadline uses
+checked nanosecond addition, passes only positive millisecond durations to providers and also bounds exposed futures.
+The probe key is exactly `__nereus_capability__/delete-v1/<runId>/probe`. Payload bytes bind protocol name、expected
+capability digest and run id, and are uploaded with `ifAbsent=true` plus CRC32C metadata.
+
+The V1 success sequence is ordered and indivisible：PUT (or exact HEAD convergence after a lost response)、exact HEAD、
+complete single-page prefix LIST、exact identity DELETE with the observed ETag、HEAD absence convergence、a second
+idempotent DELETE returning `ALREADY_ABSENT`, then complete LIST absence. Exact HEAD requires key、length、CRC32C and
+non-empty ETag；present LIST additionally requires the same key/length, a last-modified value, no continuation token
+and no conflicting ETag. A response-loss DELETE is success only after exact HEAD absence. Discovery/listing is being
+tested here as a provider capability；it still never authorizes deletion of a Nereus data object.
+
+The deterministic capability SHA-256 uses length-delimited UTF-8 fields：protocol、provider class、normalized endpoint、
+region、bucket、logical prefix、path-style flag and six frozen semantic labels. Request timeout、pool size and
+credential references are intentionally excluded：they are runtime tuning/secret inputs, not scope identity. On any
+failure, cleanup first requires the same exact HEAD identity and deletes only that canary；a foreign/mismatching key is
+retained and the probe fails closed. The returned key hash supports redacted audit correlation. Only
+`capabilitySha256` may later be persisted in cluster activation metadata, and checkpoint AP itself performs no such
+CAS and grants no physical-delete authority.
 
 ## 11. Object-format Test Contract
 

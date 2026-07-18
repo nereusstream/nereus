@@ -910,6 +910,17 @@ therefore starts no lifecycle pass, while `dryRun=true` remains the second indep
 still cannot acquire physical-delete authority until coverage/capability proofs and monotonic activation are complete,
 so configuration alone cannot bypass the rollout sequence above.
 
+Checkpoint AP adds `DefaultObjectStoreDeleteCapabilityProbe` at the protocol-neutral object-store boundary. Before a
+product coordinator may request deletion activation, it can now prove the exact configured provider/scope supports
+guarded PUT、exact HEAD、complete LIST、ETag-bound exact DELETE、lost-response absence convergence and idempotent
+absence. The stable digest includes provider/endpoint/region/bucket/prefix/path-style plus frozen V1 semantic labels；
+it excludes credentials and tuning values. Each run uses a high-entropy isolated canary key, validates CRC32C/length/
+ETag/last-modified, performs post-delete HEAD and LIST absence checks, and exact-cleans the canary on failure.
+Checkpoint AP intentionally exposes no broker startup hook：it neither runs checkpoint-W coverage backfill nor writes
+the digest/delete bits. Therefore an enabled non-dry-run broker configuration still lacks destructive authority until
+the product activation coordinator completes the same readiness epoch's backfills, executes this probe and advances
+both V1 delete bits atomically through the activation store.
+
 ## 12. Operations and Status
 
 F4 does not add a public Pulsar compaction/offload status. It exposes Nereus runtime snapshots for broker metrics and
