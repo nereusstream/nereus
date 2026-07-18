@@ -108,7 +108,8 @@ Already present：
   ownership/unload/failover evidence remains pending.
 - F4-M4 checkpoint BC：deletion-active broker-readiness changes now run physical/cursor coverage without publishing
   partial proofs and atomically replace the epoch、three proofs and scope digest while both delete bits stay true；the
-  locked broker still needs to forward its exact remaining traversal bounds before the two-broker final gate。
+  locked broker forwards exact traversal concurrency/remaining deadline through a product-owned monotonic budget。
+  The two-broker final fixture remains outstanding.
 - F4-M5 checkpoints AD–AE：the opt-in Phase 4 resolver implements `WAL_DURABLE` after the protected stable head；
   generation-zero restart/read repair is durable, and every async append now has an exact per-stream-lane admission
   seam that resolves the F2 projection, obtains/revalidates the generation marker proof, then applies authoritative

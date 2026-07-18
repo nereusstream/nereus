@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`c59da789e88df2b57829de3277c60194b44fceb6`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`725b2ad9e7f57135e18419589ff0a42b05fe58aa`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -143,7 +143,9 @@ another full grace. Checkpoint BC then removes the deletion-active broker-readin
 registration traversal triggers a non-publishing physical/cursor root scan、fresh configured-scope canary and one CAS
 that preserves both delete bits while replacing the epoch、all three proofs and capability digest. Runtime startup
 deferred by the old epoch resumes only after exact new authority is durable. Locked-Pulsar propagation of the exact
-remaining traversal deadline/concurrency and the actual two-broker ownership/unload/failover matrix remain pending.
+remaining traversal deadline/concurrency is now implemented through the three-argument proof boundary, including the
+shared 1,024 concurrency ceiling and product-owned monotonic deadline. The actual two-broker ownership/unload/failover
+matrix remains pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -714,8 +716,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > first/retried transmissions、late exact PUT at both Phase 1 audit-removal cuts and real post-root external
 > reappearance through missing-root inventory. The actual two-broker ownership/unload/failover scenario and final M4
 > gate remain before F4-M4 can be called complete. Checkpoint BC adds product-owned atomic deletion-authority
-> readiness rollover without a partial-proof durable state；the locked broker call still needs to preserve the cold-
-> topic traversal's exact remaining deadline/concurrency before the two-broker final fixture.
+> readiness rollover without a partial-proof durable state；the locked broker call now preserves the cold-topic
+> traversal's exact concurrency and remaining whole-run deadline through the product boundary. The two-broker final
+> fixture is the remaining destructive line.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
 > identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
@@ -1584,9 +1587,13 @@ deferred lifecycle only after this authority passes the startup gate.
 
 The deterministic managed-ledger/materialization/adapter tests cover bounded delegation、zero-object non-publishing
 scan and one-CAS proof replacement. The static BC audit fixes those interfaces、runtime/provider composition and test
-names. This checkpoint is intentionally not the M4 final gate：the local Pulsar fork still calls the compatibility
-overload and must forward the traversal's exact remaining deadline/concurrency before the real two-broker unload/
-failover/restart fixture is authoritative.
+names. The locked Pulsar fork now calls the bounded storage/factory overload with the traversal's exact concurrency
+and remaining whole-run deadline；request/config validation freezes the shared 1,024 ceiling. The product proof
+coordinator starts one monotonic deadline before readiness admission, bounds activation/CAS/reload/final reads and
+hands only the remaining budget into rollover. `phase4M4ReadinessRolloverPulsarCheck` and the extended static audit
+freeze this cross-repository seam. This checkpoint is intentionally not the M4 final gate：the real two-broker unload/
+failover/restart fixture must still become authoritative. The locked-Pulsar sub-gate passed on 2026-07-19 under Java
+21 with 65 outer tasks and 141/141 nested tasks executed.
 
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration
 

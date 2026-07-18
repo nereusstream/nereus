@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("c59da789e88df2b57829de3277c60194b44fceb6")
+    .orElse("725b2ad9e7f57135e18419589ff0a42b05fe58aa")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1421,6 +1421,31 @@ tasks.register<Exec>("checkPhase4M4ReadinessRolloverContractSurface") {
     commandLine(
         "bash",
         "scripts/check-phase4-m4-readiness-rollover-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M4ReadinessRolloverPulsarCheck") {
+    group = "verification"
+    description = "Run locked Pulsar readiness-rollover bound formatting, style, and focused tests."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M4LatePutTombstoneCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker-common:spotlessJavaCheck",
+        ":pulsar-broker-common:checkstyleMain",
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusGenerationRegistrationBackfillTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBrokerStorageConfigurationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
     )
 }
 
@@ -1429,6 +1454,7 @@ tasks.register("phase4M4ReadinessRolloverCheck") {
     description = "Verify checkpoint BC atomically refreshes deletion authority after broker readiness changes."
     dependsOn("phase4M4LatePutTombstoneCheck")
     dependsOn("checkPhase4M4ReadinessRolloverContractSurface")
+    dependsOn("phase4M4ReadinessRolloverPulsarCheck")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn("checkPhase4PulsarSourceLock")

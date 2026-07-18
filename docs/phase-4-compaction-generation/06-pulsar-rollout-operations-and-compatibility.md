@@ -583,8 +583,10 @@ only the new registration completion fact. The product-owned coordinator freezes
 root/cursor scan without publishing either dependent proof, performs the scope canary, and emits one CAS containing
 the complete new-epoch tuple. No intermediate durable record combines a new registration proof with old physical/
 cursor/capability facts. A broker whose mutating GC lifecycle was deferred at startup may start it only after this CAS
-and exact startup-gate revalidation. The locked Pulsar adapter must still forward the traversal's actual remaining
-deadline and concurrency before the real two-broker final gate can pass.
+and exact startup-gate revalidation. The locked Pulsar adapter now forwards the request's exact concurrency and its
+actual remaining whole-run deadline through the storage/factory proof boundary. Broker and product code share the
+1,024 concurrency ceiling；the product starts no second full timeout and bounds readiness、activation、CAS/reloads and
+the final durable read under the same monotonic deadline. The real two-broker final gate remains outstanding.
 
 Checkpoint AC is the first production owner of the ACTIVE CAS, but only for publication. It proves the first two
 publication prerequisites above through exact broker readiness and the durable registration proof；the physical-root、

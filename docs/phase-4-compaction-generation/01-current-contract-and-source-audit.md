@@ -30,7 +30,7 @@ Repository baseline：`e330969cd5c2c11cd38d0bd7f687185171ae91e2`。
 | `nereus-managed-ledger/.../cursor/CursorSnapshotInventory.java` | `e8b46f08ba6904d2312ae245bd1bbc661c2fc739` | read-only live/orphan classification；not delete authority |
 | `nereus-managed-ledger/.../cursor/DefaultCursorRetentionCoordinator.java` | `66a81bba145d54150097e2bb1dec3370fe2e1848` | owner-scoped pending protection/trim protocol |
 | `nereus-managed-ledger/.../AbstractNereusManagedLedger.java` | `5a3b8214ce81b19280963d799ad1f86e8a68a83c` | current trim housekeeping no-op |
-| `nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java` | `25b21d7b4fe594804b048940ea81a65d4964b06f` | current product-owned exact readiness/proof CAS owner |
+| `nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java` | `6181f43e7966c2b8aa958486c1eecb36d6cdc9aa` | current product-owned exact readiness/proof CAS and monotonic deadline owner |
 | `nereus-managed-ledger/.../NereusManagedLedgerRuntime.java` | `a91a7c36498091fa29a442250a8733751e68fc24` | current activation-store/proof-coordinator lifecycle owner |
 | `nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java` | `6f96b29762d06bf1ab013693973f6ac40c59f0c7` | current product composition/close owner |
 
@@ -39,14 +39,14 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@c59da789e88df2b57829de3277c60194b44fceb6`。
+`master@725b2ad9e7f57135e18419589ff0a42b05fe58aa`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
 | `pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java` | `0b76b1939603c7ba60ed1c4691287819421d3ed4` | two-stable-snapshot barrier plus product-neutral readiness provider |
 | `pulsar-broker/.../nereus/NereusGenerationCapabilityReadiness.java` | `782303d1442972a02a290955f920835971a8d8fe` | exact full readiness identity and core conversion |
-| `pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java` | `385215ac919a837e11ff999fc4c8bfe02d170b60` | canonical traversal/report plus zero-failure proof handoff |
-| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `be3a1bdd0b036a2c4dea58651bfe519e228bcc8c` | broker-to-product proof completion and publication-activation delegate |
+| `pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java` | `39e68dd8e9719bffe6dc21d037c485168417ca4e` | canonical traversal/report plus exact remaining-budget/concurrency proof handoff |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `3ca141fcfd0f8f6049fd40725d0007789bf088f7` | bounded broker-to-product proof completion and publication-activation delegate |
 | `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `14916134ed514fc0d2c2e6628e7317463798bb89` | current retention/compaction/admin denylist |
 | `pulsar-broker/.../nereus/NereusAdminOperation.java` | `a99c967347ce7b9edc29b57892b220f42bedf8be` | closed loaded/unloaded admin operation set |
 | `pulsar-broker/.../service/BacklogQuotaManager.java` | `686e2244b560a16c69303e854719016d610fb305` | cursor skip/mark-delete backlog eviction call path |

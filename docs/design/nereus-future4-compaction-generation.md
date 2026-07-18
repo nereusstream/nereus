@@ -696,8 +696,9 @@ Checkpoint BC 再关闭 deletion-active readiness rollover 的协议死路：mem
 epoch 的本地 guard fail closed；新稳定 epoch 的 registration completion 触发非发布式 physical/cursor root
 backfill 和新的 configured-scope canary，随后一个 activation CAS 同时替换 epoch、三类 complete proof 与
 capability digest，同时保持 ACTIVE/publication/两个 delete bits 为 true。不存在“新 registration proof + 旧
-physical/cursor proof”的 durable 中间态。Locked Pulsar 仍需把 cold-topic traversal 的 exact remaining
-deadline/concurrency 传入该边界，真实 two-broker unload/failover/restart 证据也仍属于 M4 final gate。
+physical/cursor proof”的 durable 中间态。Locked Pulsar 已把 cold-topic traversal 的 exact concurrency 与同一
+whole-run deadline 的实际剩余预算传入该边界，product proof coordinator 也用该 monotonic deadline 约束所有
+readiness/activation/CAS/reload/final-read 阶段。真实 two-broker unload/failover/restart 证据仍属于 M4 final gate。
 
 F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint BC 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、

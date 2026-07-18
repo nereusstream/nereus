@@ -25,8 +25,10 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -201,6 +203,8 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
             VersionedGenerationProtocolActivation old = seedDeletion(store, 7);
             AtomicInteger concurrency = new AtomicInteger();
             AtomicReference<Duration> timeout = new AtomicReference<>();
+            AtomicLong nanoTime = new AtomicLong(
+                    TimeUnit.SECONDS.toNanos(100));
             ManagedLedgerGenerationReadinessRolloverCoordinator rollover =
                     (registration, maxConcurrentStreams, suppliedTimeout, current) -> {
                         assertThat(current).isEqualTo(old);
@@ -255,7 +259,9 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
                             rollover,
                             Clock.fixed(
                                     Instant.ofEpochMilli(1_000),
-                                    ZoneOffset.UTC));
+                                    ZoneOffset.UTC),
+                            () -> nanoTime.getAndAdd(
+                                    TimeUnit.SECONDS.toNanos(1)));
             Duration deadline = Duration.ofSeconds(17);
 
             coordinator.complete(
@@ -265,7 +271,9 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
                     .join();
 
             assertThat(concurrency).hasValue(23);
-            assertThat(timeout).hasValue(deadline);
+            assertThat(timeout.get())
+                    .isPositive()
+                    .isLessThan(deadline);
             GenerationProtocolActivationRecord installed = store.get(CLUSTER)
                     .join()
                     .orElseThrow()

@@ -148,7 +148,8 @@ before bytes, audit-delete cuts rediscover exact late bytes, and real post-root 
 missing-root registration plus another full ownerless grace. Checkpoint BC further adds product-owned atomic
 deletion-active readiness rollover：the physical/cursor scan publishes no partial proofs, and one activation CAS
 preserves both delete bits while replacing the new epoch、three proofs and scope digest. Old-epoch GC remains fenced；
-the locked broker deadline/concurrency handoff and real two-broker final fixture are still pending. M5
+the locked broker now preserves the exact traversal concurrency and remaining whole-run deadline through a product-
+owned monotonic deadline；only the real two-broker final fixture is still pending. M5
 checkpoint X 又实现 exact durable registration create/refresh/final
 revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、

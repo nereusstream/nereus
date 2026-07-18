@@ -20,7 +20,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /**
  * Installs only the exact zero-failure registration coverage proof under the
@@ -37,6 +40,7 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
     private final ManagedLedgerGenerationReadinessRolloverCoordinator
             readinessRollover;
     private final Clock clock;
+    private final LongSupplier nanoTime;
 
     public DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
             String cluster,
@@ -52,7 +56,8 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                 (completion, maxConcurrentStreams, timeout, current) ->
                         CompletableFuture.failedFuture(notReady(
                                 "registration proof cannot advance readiness while deletion is enabled")),
-                clock);
+                clock,
+                System::nanoTime);
     }
 
     public DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
@@ -62,6 +67,24 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             List<ReferenceDomainVersionRecord> requiredDomains,
             ManagedLedgerGenerationReadinessRolloverCoordinator readinessRollover,
             Clock clock) {
+        this(
+                cluster,
+                activations,
+                readinessProvider,
+                requiredDomains,
+                readinessRollover,
+                clock,
+                System::nanoTime);
+    }
+
+    DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator(
+            String cluster,
+            GenerationProtocolActivationStore activations,
+            GenerationCapabilityReadinessProvider readinessProvider,
+            List<ReferenceDomainVersionRecord> requiredDomains,
+            ManagedLedgerGenerationReadinessRolloverCoordinator readinessRollover,
+            Clock clock,
+            LongSupplier nanoTime) {
         this.cluster = new OxiaKeyspace(cluster).cluster();
         this.activations = Objects.requireNonNull(
                 activations, "activations");
@@ -71,6 +94,7 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
         this.readinessRollover = Objects.requireNonNull(
                 readinessRollover, "readinessRollover");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
     }
 
     @Override
@@ -85,6 +109,7 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
             int maxConcurrentStreams,
             Duration timeout) {
         final GenerationRegistrationBackfillCompletion exact;
+        final Deadline deadline;
         try {
             exact = Objects.requireNonNull(completion, "completion");
             if (exact.failureCount() != 0) {
@@ -98,33 +123,33 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                 throw new IllegalArgumentException(
                         "maxConcurrentStreams must be in [1, 1024]");
             }
-            timeout = requireTimeout(timeout);
+            deadline = Deadline.start(requireTimeout(timeout), nanoTime);
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        final Duration exactTimeout = timeout;
-        return readinessProvider
-                .requireGenerationCapabilityReadiness()
+        return deadline
+                .call(readinessProvider::requireGenerationCapabilityReadiness)
                 .thenCompose(current -> {
                     requireExactReadiness(exact.readiness(), current);
-                    return activations.getOrCreate(cluster);
+                    return deadline.call(() -> activations.getOrCreate(cluster));
                 })
                 .thenCompose(current -> install(
                         exact,
                         maxConcurrentStreams,
-                        exactTimeout,
                         current,
-                        0))
+                        0,
+                        deadline))
                 .thenCompose(installed -> finalRevalidate(
-                        exact, installed));
+                        exact, installed, deadline));
     }
 
     private CompletableFuture<VersionedGenerationProtocolActivation> install(
             GenerationRegistrationBackfillCompletion completion,
             int maxConcurrentStreams,
-            Duration timeout,
             VersionedGenerationProtocolActivation current,
-            int attempt) {
+            int attempt,
+            Deadline deadline) {
+        deadline.remaining();
         if (attempt >= MAX_CAS_ATTEMPTS) {
             return CompletableFuture.failedFuture(notReady(
                     "registration backfill proof CAS retry budget exhausted"));
@@ -149,11 +174,12 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
         }
         if (value.physicalDeleteEnabled()
                 || value.cursorSnapshotDeleteEnabled()) {
-            return readinessRollover.rollover(
-                    completion,
-                    maxConcurrentStreams,
-                    timeout,
-                    current);
+            return deadline.callWithRemaining(remaining ->
+                    readinessRollover.rollover(
+                            completion,
+                            maxConcurrentStreams,
+                            remaining,
+                            current));
         }
 
         long completedAt = Math.max(1, clock.millis());
@@ -193,16 +219,16 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                         value.activatedAtMillis(),
                         Math.max(value.updatedAtMillis(), completedAt),
                         0);
-        return activations.compareAndSet(
-                        cluster,
-                        replacement,
-                        current.metadataVersion())
+        return deadline.call(() -> activations.compareAndSet(
+                                cluster,
+                                replacement,
+                                current.metadataVersion()))
                 .handle((updated, failure) -> {
                     if (failure == null) {
                         return CompletableFuture.completedFuture(updated);
                     }
                     Throwable cause = unwrap(failure);
-                    return activations.get(cluster)
+                    return deadline.call(() -> activations.get(cluster))
                             .thenCompose(optional -> {
                                 VersionedGenerationProtocolActivation reloaded =
                                         optional.orElseThrow(() -> notReady(
@@ -220,9 +246,9 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                                     return install(
                                             completion,
                                             maxConcurrentStreams,
-                                            timeout,
                                             reloaded,
-                                            attempt + 1);
+                                            attempt + 1,
+                                            deadline);
                                 }
                                 return CompletableFuture.failedFuture(cause);
                             });
@@ -232,7 +258,9 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
 
     private CompletableFuture<Void> finalRevalidate(
             GenerationRegistrationBackfillCompletion expected,
-            VersionedGenerationProtocolActivation installed) {
+            VersionedGenerationProtocolActivation installed,
+            Deadline deadline) {
+        deadline.remaining();
         Optional<GenerationCapabilityReadiness> readiness =
                 readinessProvider.currentGenerationCapabilityReadiness();
         if (readiness.isEmpty()) {
@@ -250,7 +278,7 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
-        return activations.get(cluster)
+        return deadline.call(() -> activations.get(cluster))
                 .thenAccept(optional -> {
                     VersionedGenerationProtocolActivation current =
                             optional.orElseThrow(() -> notReady(
@@ -356,5 +384,64 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                 ErrorCode.METADATA_INVARIANT_VIOLATION,
                 false,
                 message);
+    }
+
+    private static final class Deadline {
+        private final long deadlineNanos;
+        private final LongSupplier nanoTime;
+
+        private Deadline(long deadlineNanos, LongSupplier nanoTime) {
+            this.deadlineNanos = deadlineNanos;
+            this.nanoTime = nanoTime;
+        }
+
+        private static Deadline start(
+                Duration timeout, LongSupplier nanoTime) {
+            Objects.requireNonNull(timeout, "timeout");
+            Objects.requireNonNull(nanoTime, "nanoTime");
+            try {
+                return new Deadline(
+                        Math.addExact(
+                                nanoTime.getAsLong(), timeout.toNanos()),
+                        nanoTime);
+            } catch (ArithmeticException failure) {
+                throw new IllegalArgumentException(
+                        "registration proof deadline overflows",
+                        failure);
+            }
+        }
+
+        private Duration remaining() {
+            long nanos = deadlineNanos - nanoTime.getAsLong();
+            if (nanos <= 0) {
+                throw new NereusException(
+                        ErrorCode.TIMEOUT,
+                        true,
+                        "registration proof timed out");
+            }
+            long millis = Math.max(
+                    1, (nanos + 999_999L) / 1_000_000L);
+            return Duration.ofMillis(millis);
+        }
+
+        private <T> CompletableFuture<T> call(
+                Supplier<CompletableFuture<T>> operation) {
+            return callWithRemaining(ignored -> operation.get());
+        }
+
+        private <T> CompletableFuture<T> callWithRemaining(
+                Function<Duration, CompletableFuture<T>> operation) {
+            final Duration bounded;
+            final CompletableFuture<T> future;
+            try {
+                bounded = remaining();
+                future = Objects.requireNonNull(
+                        operation.apply(bounded), "operation future");
+            } catch (Throwable failure) {
+                return CompletableFuture.failedFuture(failure);
+            }
+            return future.orTimeout(
+                    bounded.toMillis(), TimeUnit.MILLISECONDS);
+        }
     }
 }

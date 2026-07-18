@@ -110,7 +110,7 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Phase 4
-Pulsar source lock 已推进到 `master@c59da789e88df2b57829de3277c60194b44fceb6`。M6 增加
+Pulsar source lock 已推进到 `master@725b2ad9e7f57135e18419589ff0a42b05fe58aa`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace admin route 静态审计。
@@ -398,8 +398,12 @@ Checkpoint BC 又补上 deletion 已激活后的 broker-readiness rollover：新
 root/protection 全量扫描，再运行 configured-scope canary，并用单个 CAS 同时替换 readiness epoch、三类完整
 proof 与 capability digest，两个 monotonic delete bits 始终保持 true。Readiness drift 会继续 fence 旧 epoch
 GC，成功 CAS 后才允许此前因 epoch mismatch 延后的 runtime 启动。对应 managed-ledger、materialization、
-adapter 聚焦测试已通过；locked Pulsar 仍需传递 traversal 的 exact remaining deadline/concurrency，随后才能
-进入真实 two-broker unload/failover/restart final fixture。
+adapter 聚焦测试已通过。Locked Pulsar 现在把 traversal 的原始 concurrency 与同一 whole-run deadline 的
+实际剩余预算传到 product proof coordinator；broker 配置和 request 都把并发上限冻结为 1,024。Product
+coordinator 再用一个 monotonic deadline 约束 readiness、activation、CAS/reload/final read，并只把扣除前置
+耗时后的预算交给 rollover。`phase4M4ReadinessRolloverCheck` 同时运行 Nereus 与 locked-Pulsar 聚焦 gate；
+其新增的 locked-Pulsar 子 gate 已于 2026-07-19 在 Java 21 上通过（外层 65 tasks；nested Pulsar 141/141
+executed）。真实 two-broker unload/failover/restart fixture 仍是 M4 final 前唯一剩余的 destructive 证据。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。
