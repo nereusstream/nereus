@@ -68,7 +68,9 @@ scope restart fence；checkpoint AS 又统一 activation guard/GC registry 的 o
 checkpoint AT 又验证 real DELETE 后、DELETED-root CAS 前的 process loss 可由独立 runtime 从 durable DELETING
 authority 完成；checkpoint AU 又验证 DELETED-root CAS 已在真实 Oxia 生效但响应丢失时，exact reload 收敛且
 LocalStack object DELETE 不会重复；checkpoint AV 再验证两个独立 runtime 竞争同一 MARKED root 时，一个 raw
-DELETING CAS 获胜、失败方 reload 同一 durable intent，幂等 exact-delete 路径收敛同一 DELETED root。
+DELETING CAS 获胜、失败方 reload 同一 durable intent，幂等 exact-delete 路径收敛同一 DELETED root；
+checkpoint AW 进一步让全新 runtime 在 LIST 恒空时恢复覆盖 256 shard 的 mixed MARKED/DELETING roots，
+并修正 inventory 只能依赖 opaque continuation、不能假设跨页 logical-key 顺序的合同。
 当前 broker safe defaults 不启动该服务；剩余 destructive/scale 矩阵与 M4/M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

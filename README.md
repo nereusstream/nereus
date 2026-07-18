@@ -339,6 +339,14 @@ Checkpoint AV 进一步把两个独立 runtime 强制同步竞争同一 MARKED r
 `c59da789e88df2b57829de3277c60194b44fceb6` 上通过（153 actionable tasks，68 executed、85 up-to-date），
 其两组串行 locked-Pulsar 验证为 141/141 和 129/129 executed。它关闭 two-worker runtime 竞争切片，
 但不替代真实 two-broker ownership/failover、source/protection kill points 或规模矩阵。
+Checkpoint AW 继续覆盖所有 256 个 physical-root shard：每个 shard 持久化一个真实 LocalStack 对象与
+sealed journal，新进程在 LIST 强制为空时从 Oxia 恢复 128 个 MARKED 和 128 个 DELETING root，并全部
+收敛为 DELETED/缺失对象。该测试同时发现并修复 inventory scanner 错误假设跨页 logical-key 单调的问题；
+现在只以 exact family prefix 和变化的 opaque continuation 判定翻页进度。聚焦真实服务方法以 38
+actionable tasks（2 executed、36 up-to-date）通过，完整 AS–AW source set 以 47/47 executed tasks 通过；
+`phase4M4AllShardRecoveryCheck` 也已于 2026-07-18 在 Java 21、Docker 28.5.2 和 locked Pulsar
+`c59da789e88df2b57829de3277c60194b44fceb6` 上通过（154 actionable tasks，73 executed、81 up-to-date），
+其两组串行 locked-Pulsar 验证为 141/141 和 138/138 executed。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

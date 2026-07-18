@@ -88,7 +88,7 @@ public final class ObjectInventoryScanner implements AutoCloseable {
         }
         Counts counts = new Counts();
         CompletableFuture<ObjectInventoryScanResult> result = scanFamily(
-                0, Optional.empty(), null, now, counts);
+                0, Optional.empty(), now, counts);
         result.whenComplete((ignored, failure) -> scanning.set(false));
         return result;
     }
@@ -96,7 +96,6 @@ public final class ObjectInventoryScanner implements AutoCloseable {
     private CompletableFuture<ObjectInventoryScanResult> scanFamily(
             int familyIndex,
             Optional<String> continuation,
-            String lastKey,
             long now,
             Counts counts) {
         if (familyIndex == families.size()) {
@@ -111,7 +110,7 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                                         config.objectListPageSize(), deadline.remaining())),
                         "list object inventory family " + family.familyId())
                 .thenCompose(page -> {
-                    requirePage(family, page, lastKey);
+                    requirePage(family, page, continuation);
                     counts.page();
                     return inspectPage(family, page.objects(), 0, now, counts)
                             .thenCompose(ignored -> {
@@ -119,7 +118,6 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                                     return scanFamily(
                                             familyIndex,
                                             page.continuationToken(),
-                                            page.objects().get(page.objects().size() - 1).key().value(),
                                             now,
                                             counts);
                                 }
@@ -127,7 +125,6 @@ public final class ObjectInventoryScanner implements AutoCloseable {
                                 return scanFamily(
                                         familyIndex + 1,
                                         Optional.empty(),
-                                        null,
                                         now,
                                         counts);
                             });
@@ -380,12 +377,12 @@ public final class ObjectInventoryScanner implements AutoCloseable {
     private static void requirePage(
             ObjectInventoryFamily family,
             ListObjectsResult page,
-            String lastKey) {
+            Optional<String> suppliedContinuation) {
         if (!page.prefix().equals(family.prefix())
-                || (lastKey != null
-                        && !page.objects().isEmpty()
-                        && page.objects().get(0).key().value().compareTo(lastKey) <= 0)) {
-            throw invariant("object inventory listing did not advance within the exact family prefix");
+                || (page.continuationToken().isPresent()
+                        && page.continuationToken().equals(suppliedContinuation))) {
+            throw invariant(
+                    "object inventory listing escaped its prefix or repeated the supplied opaque token");
         }
     }
 

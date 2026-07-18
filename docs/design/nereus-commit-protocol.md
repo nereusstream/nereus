@@ -573,6 +573,12 @@ only after loading the byte-equivalent DELETING root. Since that root is shared 
 both workers may issue the same immutable-identity DELETE；the operation is idempotent and both terminal paths must
 converge to the same versioned DELETED root. No worker-specific memory becomes part of the proof.
 
+Checkpoint AW proves recovery breadth does not add a hidden correctness owner. A fresh process scans every one of the
+256 physical-root shards and recovers a mixed MARKED/DELETING population even when every object LIST is empty. The
+inventory cursor is opaque；it authorizes only the next discovery page and cannot be decoded into cross-page logical
+key order. Exact prefix mismatch or a repeated non-terminal token fails closed, while root/journal recovery proceeds
+entirely from Oxia authority.
+
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the
 Phase 1 object-reference record, manifest and finally the exact-version root. Every actual provider PUT/retry first

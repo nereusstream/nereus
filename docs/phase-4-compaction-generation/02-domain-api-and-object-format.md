@@ -1507,6 +1507,12 @@ post-filtering as a complete page. A provider returning more keys、wrong prefix
 repeated non-terminal token fails the scan. Objects are strictly ordered within each returned logical page；callers
 must use the opaque token rather than infer cross-page order from base64 physical keys.
 
+Checkpoint AW makes that last sentence executable in the production inventory scanner. A returned page must carry
+the exact requested logical family prefix；when it is non-terminal, its opaque token must differ from the token
+supplied for that call. The scanner does not compare the first logical key of the new page with the previous page's
+last key. Focused tests feed pages in descending cross-page logical order and separately repeat an opaque token；the
+former completes, while the latter fails closed before another continuation is followed.
+
 Delete is admitted only while the physical root is `DELETING`. The implementation performs exact HEAD identity
 validation before DELETE. S3 `If-Match` is used where supported；for compatible stores without conditional DELETE，
 only a raw HTTP 405 or 501 response to that conditional DELETE permits one retry without `If-Match`. The exact HEAD、

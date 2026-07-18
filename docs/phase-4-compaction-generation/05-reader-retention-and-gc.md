@@ -179,8 +179,11 @@ response-loss slice. Checkpoint AT additionally proves real post-DELETE/pre-DELE
 from durable DELETING authority in a fresh runtime. Checkpoint AU proves an already-applied DELETED-root CAS whose
 response is lost converges through exact root reload with one physical DELETE, and that a subsequent fresh runtime
 does not delete again. Checkpoint AV then proves two independent runtime workers can concurrently resume one MARKED
-root and converge through one durable DELETING intent plus idempotent exact deletes. The remaining two-broker/scale/
-failure final gate is still planned，and the safe-default production bridge still schedules no pass or deletion.
+root and converge through one durable DELETING intent plus idempotent exact deletes. Checkpoint AW adds fresh-process
+recovery of a mixed 128 MARKED / 128 DELETING population spanning all 256 root shards while every object LIST is
+empty. It also removes cross-page logical-key ordering as an inventory-progress assumption；only the exact prefix and
+changing opaque continuation are valid. The remaining two-broker/scale/failure final gate is still planned，and the
+safe-default production bridge still schedules no pass or deletion.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1741,6 +1744,18 @@ byte-equivalent DELETING replacement. Both then enter the same exact object-stor
 Duplicate idempotent recovery attempts are permitted and bounded by the active workers；they cannot change object
 identity, invent a new attempt or produce multiple terminal roots. Both processes finally read the same versioned
 DELETED root and absent object.
+
+Checkpoint AW tests the authoritative scan at its fixed shard boundary. The fixture persists one compacted object and
+root for each of the 256 `F4Keyspace.physicalObjectShard` values, seals all retirement journals, and exits with even
+shards MARKED and odd shards DELETING. A fresh runtime is given an object store whose LIST is always empty. Its root
+pass still observes exactly 128 roots in each non-terminal state, resumes both routes and proves all 256 roots DELETED
+with every exact HEAD absent. Listing remains discovery-only and cannot suppress durable recovery work.
+
+The first AW run also proved why inventory pagination must not compare logical keys between pages. S3 stores canonical
+logical keys as base64url and one logical prefix expands to as many as 16 disjoint physical prefixes；the opaque
+continuation traverses that physical order, which need not be logical-key order. `ObjectInventoryScanner` now accepts
+any per-page-canonical order returned behind a changing opaque token, while exact prefix mismatch or a repeated
+non-terminal token fails closed. This matches the object-store contract and keeps recovery independent of LIST.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

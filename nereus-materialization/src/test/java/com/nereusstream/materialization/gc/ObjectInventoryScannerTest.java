@@ -211,6 +211,64 @@ class ObjectInventoryScannerTest {
         }
     }
 
+    @Test
+    void opaqueContinuationDoesNotImplyCrossPageLogicalOrdering() {
+        FakePhysicalObjectMetadataStore metadata = new FakePhysicalObjectMetadataStore();
+        InventoryObjectStore objects = new InventoryObjectStore();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try {
+            ObjectKey lower = key("a.obj");
+            ObjectKey higher = key("z.obj");
+            Instant old = NOW.minus(Duration.ofHours(3));
+            objects.list(lower, 1, "etag-a", old);
+            objects.head(lower, 1, "etag-a", CRC32C);
+            objects.list(higher, 1, "etag-z", old);
+            objects.head(higher, 1, "etag-z", CRC32C);
+            objects.pageInDescendingLogicalOrder();
+
+            try (ObjectInventoryScanner scanner = scanner(
+                    enabledConfig(true, false), metadata, objects, scheduler)) {
+                ObjectInventoryScanResult result = scanner.scan().join();
+                assertThat(result.pagesScanned()).isEqualTo(2);
+                assertThat(result.objectsListed()).isEqualTo(2);
+                assertThat(result.rootsRegistered()).isEqualTo(2);
+            }
+        } finally {
+            scheduler.shutdownNow();
+            objects.close();
+            metadata.close();
+        }
+    }
+
+    @Test
+    void repeatedOpaqueContinuationFailsClosed() {
+        FakePhysicalObjectMetadataStore metadata = new FakePhysicalObjectMetadataStore();
+        InventoryObjectStore objects = new InventoryObjectStore();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try {
+            Instant old = NOW.minus(Duration.ofHours(3));
+            ObjectKey first = key("a.obj");
+            ObjectKey second = key("b.obj");
+            objects.list(first, 1, "etag-a", old);
+            objects.head(first, 1, "etag-a", CRC32C);
+            objects.list(second, 1, "etag-b", old);
+            objects.head(second, 1, "etag-b", CRC32C);
+            objects.repeatOpaqueContinuation();
+
+            try (ObjectInventoryScanner scanner = scanner(
+                    enabledConfig(true, false), metadata, objects, scheduler)) {
+                assertThatThrownBy(() -> scanner.scan().join())
+                        .hasRootCauseInstanceOf(NereusException.class)
+                        .hasRootCauseMessage(
+                                "object inventory listing escaped its prefix or repeated the supplied opaque token");
+            }
+        } finally {
+            scheduler.shutdownNow();
+            objects.close();
+            metadata.close();
+        }
+    }
+
     private static ObjectInventoryScanner scanner(
             PhysicalGcConfig config,
             FakePhysicalObjectMetadataStore metadata,
@@ -342,9 +400,24 @@ class ObjectInventoryScannerTest {
     }
 
     private static final class InventoryObjectStore implements ObjectStore {
+        private enum PagingMode {
+            LOGICAL,
+            DESCENDING_OPAQUE,
+            REPEATED_OPAQUE_TOKEN
+        }
+
         private final List<ListedObject> listed = new ArrayList<>();
         private final Map<ObjectKey, HeadObjectResult> heads = new HashMap<>();
+        private PagingMode pagingMode = PagingMode.LOGICAL;
         private boolean closed;
+
+        private void pageInDescendingLogicalOrder() {
+            pagingMode = PagingMode.DESCENDING_OPAQUE;
+        }
+
+        private void repeatOpaqueContinuation() {
+            pagingMode = PagingMode.REPEATED_OPAQUE_TOKEN;
+        }
 
         private void list(
                 ObjectKey key,
@@ -371,6 +444,23 @@ class ObjectInventoryScannerTest {
                 Optional<String> continuationToken,
                 ListObjectsOptions options) {
             ensureOpen();
+            if (pagingMode == PagingMode.DESCENDING_OPAQUE) {
+                List<ListedObject> page = continuationToken.isEmpty()
+                        ? List.of(listed.getLast())
+                        : List.of(listed.getFirst());
+                Optional<String> next = continuationToken.isEmpty()
+                        ? Optional.of("opaque-descending-page-2")
+                        : Optional.empty();
+                return CompletableFuture.completedFuture(
+                        new ListObjectsResult(prefix, page, next));
+            }
+            if (pagingMode == PagingMode.REPEATED_OPAQUE_TOKEN) {
+                List<ListedObject> page = continuationToken.isEmpty()
+                        ? List.of(listed.getFirst())
+                        : List.of(listed.getLast());
+                return CompletableFuture.completedFuture(new ListObjectsResult(
+                        prefix, page, Optional.of("opaque-repeated-token")));
+            }
             List<ListedObject> remaining = listed.stream()
                     .filter(value -> value.key().value().startsWith(prefix.value()))
                     .filter(value -> continuationToken.isEmpty()

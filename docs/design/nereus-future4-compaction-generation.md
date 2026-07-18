@@ -4,7 +4,7 @@
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
-> F4-M4 through checkpoint AV and F4-M5 through checkpoint AI are in progress；F4-M6 pending
+> F4-M4 through checkpoint AW and F4-M5 through checkpoint AI are in progress；F4-M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -663,6 +663,10 @@ coordinator exact reload 完整 replacement 后收敛，LocalStack target 只 DE
 Checkpoint AV 进一步让两个独立 runtime 同时进入同一 MARKED-root replacement CAS；一个 raw Oxia CAS 成功，
 另一个只凭 exact reload 继续，两条 immutable DELETE recovery 路径幂等收敛同一 DELETED root。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AV 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
+Checkpoint AW 再把恢复边界扩展到全部 256 个 physical-root shard：新进程在 object LIST 恒为空时，
+仅凭 Oxia root/sealed journal 恢复 128 个 MARKED 与 128 个 DELETING 对象。该 scale fixture 同时修正
+inventory scanner 的跨页排序假设；opaque continuation 是翻页进度，base64 S3 key 顺序不是 logical key 顺序。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AW 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

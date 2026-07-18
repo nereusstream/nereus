@@ -957,6 +957,13 @@ reloads that exact durable intent, and both idempotent exact-delete paths conver
 not yet a two-broker ownership/unload/failover test：the locked Pulsar bridge still needs that M6 evidence even though
 the product runtime's shared-intent concurrency is now real-service tested.
 
+Checkpoint AW exercises restart breadth below the broker bridge. It spans all 256 physical-root shards with a mixed
+MARKED/DELETING population and starts a fresh runtime whose object inventory is forced empty. Every root is recovered
+from Oxia authority and its sealed journal, so a broker restart cannot inherit a hidden shard cursor or LIST-derived
+candidate. The same checkpoint fixes inventory pagination to honor only the exact family prefix and opaque-token
+progress；base64 physical order is deliberately not projected into a cross-page logical-order promise. Actual Pulsar
+ownership transfer, unload and two-broker failover remain M6 evidence.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

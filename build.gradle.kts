@@ -1274,6 +1274,28 @@ tasks.register("phase4M4TwoWorkerConvergenceCheck") {
     dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
 }
 
+tasks.register<Exec>("checkPhase4M4AllShardRecoveryContractSurface") {
+    group = "verification"
+    description = "Audit all-shard mixed-lifecycle recovery and opaque object-list continuation semantics."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-all-shard-recovery-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4AllShardRecoveryCheck") {
+    group = "verification"
+    description = "Verify checkpoint AW all 256 root shards recover from durable metadata with empty object inventory."
+    dependsOn("phase4M4TwoWorkerConvergenceCheck")
+    dependsOn("checkPhase4M4AllShardRecoveryContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1284,7 +1306,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4TwoWorkerConvergenceCheck")
+    dependsOn("phase4M4AllShardRecoveryCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

@@ -27,6 +27,7 @@ import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.CursorMetadataStoreConfig;
+import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
 import com.nereusstream.metadata.oxia.ManagedLedgerProjectionMetadataStore;
@@ -88,6 +89,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -126,6 +128,8 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
     private static final Duration ACTIVATION_TIMEOUT = Duration.ofSeconds(90);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration DRAIN_GRACE = Duration.ofMinutes(6);
+    private static final F4Keyspace SHARD_KEYSPACE =
+            new F4Keyspace("f4-m4-integration-shards");
 
     @Container
     private static final OxiaContainer OXIA = new OxiaContainer(OXIA_IMAGE).withShards(4);
@@ -506,6 +510,98 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             assertThat(workerB.root(target)).isEqualTo(workerA.root(target));
             workerA.assertObjectAbsent(target);
             workerB.assertObjectAbsent(target);
+        }
+    }
+
+    @Test
+    void freshProcessRecoversMarkedAndDeletingRootsFromEveryShardWithEmptyInventory()
+            throws Exception {
+        MutableClock clock = new MutableClock(5_000_000);
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "f4-m4-all-shards-" + suffix;
+        String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
+        createBucket(bucket);
+        ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "all-shards");
+        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
+                READINESS_EPOCH, sha256("broker-set/all-shards/" + suffix), 2);
+        PhysicalGcConfig gcConfig = physicalGcConfig();
+        List<TargetObject> targets;
+
+        try (Process first = Process.open(
+                cluster,
+                "r".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("all-shards-first"),
+                clock,
+                StoreDecorator.identity())) {
+            first.seedPublication();
+            targets = first.createOneOwnerlessCompactedObjectPerShard();
+            assertThat(targets).hasSize(256);
+            for (int shard = 0; shard < targets.size(); shard++) {
+                assertThat(rootShard(targets.get(shard).hash())).isEqualTo(shard);
+            }
+
+            ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
+                            "s".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .join();
+            assertThat(activation.status())
+                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            first.runtime.lifecycleService().scanNow().get(120, TimeUnit.SECONDS);
+            assertThat(targets)
+                    .allSatisfy(target -> assertThat(first.root(target).value().lifecycle())
+                            .isEqualTo(PhysicalObjectLifecycle.MARKED));
+        }
+
+        clock.advance(Duration.ofMinutes(7));
+        try (Process setup = Process.open(
+                cluster,
+                "t".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("all-shards-setup"),
+                clock,
+                StoreDecorator.identity())) {
+            for (int shard = 1; shard < targets.size(); shard += 2) {
+                assertThat(setup.forceDeleting(targets.get(shard)).value().lifecycle())
+                        .isEqualTo(PhysicalObjectLifecycle.DELETING);
+            }
+            for (int shard = 0; shard < targets.size(); shard++) {
+                PhysicalObjectLifecycle expected = (shard & 1) == 0
+                        ? PhysicalObjectLifecycle.MARKED
+                        : PhysicalObjectLifecycle.DELETING;
+                assertThat(setup.root(targets.get(shard)).value().lifecycle())
+                        .isEqualTo(expected);
+            }
+        }
+
+        AtomicInteger emptyListCalls = new AtomicInteger();
+        try (Process recovered = Process.open(
+                cluster,
+                "u".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("all-shards-recovered"),
+                clock,
+                raw -> new EmptyInventoryObjectStore(raw, emptyListCalls))) {
+            recovered.runtime.start();
+            var pass = recovered.runtime.lifecycleService()
+                    .scanNow()
+                    .get(180, TimeUnit.SECONDS);
+
+            assertThat(pass.roots().markedRoots()).isEqualTo(128);
+            assertThat(pass.roots().deletingRoots()).isEqualTo(128);
+            assertThat(pass.roots().totalRoots()).isEqualTo(256);
+            assertThat(emptyListCalls).hasPositiveValue();
+            for (TargetObject target : targets) {
+                assertThat(recovered.root(target).value().lifecycle())
+                        .isEqualTo(PhysicalObjectLifecycle.DELETED);
+                recovered.assertObjectAbsent(target);
+            }
         }
     }
 
@@ -899,6 +995,100 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                     0);
             physical.createRoot(cluster, root).join();
             return new TargetObject(key, ObjectKeyHash.from(key));
+        }
+
+        private List<TargetObject> createOneOwnerlessCompactedObjectPerShard() {
+            ArrayList<TargetObject> targets = new ArrayList<>(256);
+            for (int shard = 0; shard < 256; shard++) {
+                targets.add(createOwnerlessCompactedObjectForShard(shard));
+            }
+            return List.copyOf(targets);
+        }
+
+        private TargetObject createOwnerlessCompactedObjectForShard(int requiredShard) {
+            for (int nonce = 0; ; nonce++) {
+                byte[] payload = ("phase4-m4-ownerless/" + cluster + "/"
+                                + requiredShard + "/" + nonce)
+                        .getBytes(StandardCharsets.UTF_8);
+                Checksum contentSha256 = sha256(payload);
+                CompactedObjectWriteRequest request = new CompactedObjectWriteRequest(
+                        cluster,
+                        ReadView.COMMITTED,
+                        new StreamId("ownerless-shard-" + requiredShard + "-" + nonce),
+                        new OffsetRange(0, 1),
+                        "v".repeat(26),
+                        sha256("source-set/" + cluster + "/" + requiredShard),
+                        sha256("policy/" + cluster + "/" + requiredShard),
+                        PayloadFormat.PULSAR_ENTRY_BATCH,
+                        CompactedObjectFormatV1.COMMITTED_FORMAT_ID,
+                        Optional.empty(),
+                        1,
+                        1,
+                        1,
+                        payload.length,
+                        List.of(),
+                        0,
+                        payload.length,
+                        1,
+                        "UNCOMPRESSED",
+                        "f4-m4-all-shards",
+                        Optional.empty());
+                ObjectKey key = CompactedObjectFormatV1.objectKey(request, contentSha256);
+                ObjectKeyHash hash = ObjectKeyHash.from(key);
+                if (rootShard(hash) != requiredShard) {
+                    continue;
+                }
+                PutObjectResult stored = objectStore.putObject(
+                                key,
+                                ByteBuffer.wrap(payload),
+                                new PutObjectOptions(
+                                        "application/octet-stream",
+                                        Crc32cChecksums.checksum(payload),
+                                        true,
+                                        Map.of("nereus-integration", "f4-m4-all-shards"),
+                                        REQUEST_TIMEOUT))
+                        .join();
+                long now = clock.millis();
+                PhysicalObjectRootRecord root = new PhysicalObjectRootRecord(
+                        1,
+                        hash.value(),
+                        key.value(),
+                        CompactedObjectFormatV1.objectId(key).value(),
+                        PhysicalObjectKind.COMMITTED_COMPACTED.wireId(),
+                        stored.objectLength(),
+                        stored.checksum().type().name(),
+                        stored.checksum().value(),
+                        contentSha256.value(),
+                        stored.etag(),
+                        PhysicalObjectLifecycle.ACTIVE,
+                        1,
+                        now,
+                        now,
+                        "",
+                        "",
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        "",
+                        "",
+                        0);
+                physical.createRoot(cluster, root).join();
+                return new TargetObject(key, hash);
+            }
+        }
+
+        private VersionedPhysicalObjectRoot forceDeleting(TargetObject target) {
+            VersionedPhysicalObjectRoot marked = root(target);
+            if (marked.value().lifecycle() != PhysicalObjectLifecycle.MARKED) {
+                throw new AssertionError("all-shard recovery setup requires a MARKED root");
+            }
+            return physical.compareAndSetRoot(
+                            cluster,
+                            deletingForRecoveryFixture(marked.value(), clock.millis()),
+                            marked.metadataVersion())
+                    .join();
         }
 
         private VersionedPhysicalObjectRoot root(TargetObject target) {
@@ -1357,6 +1547,25 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
+    private static final class EmptyInventoryObjectStore extends ForwardingObjectStore {
+        private final AtomicInteger emptyListCalls;
+
+        private EmptyInventoryObjectStore(ObjectStore delegate, AtomicInteger emptyListCalls) {
+            super(delegate);
+            this.emptyListCalls = emptyListCalls;
+        }
+
+        @Override
+        public CompletableFuture<ListObjectsResult> listObjects(
+                ObjectKeyPrefix prefix,
+                Optional<String> continuationToken,
+                ListObjectsOptions options) {
+            emptyListCalls.incrementAndGet();
+            return CompletableFuture.completedFuture(
+                    new ListObjectsResult(prefix, List.of(), Optional.empty()));
+        }
+    }
+
     private static Object proxyObjectMethod(
             Object proxy,
             Method method,
@@ -1391,6 +1600,39 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    private static int rootShard(ObjectKeyHash hash) {
+        return SHARD_KEYSPACE.physicalObjectShard(hash);
+    }
+
+    private static PhysicalObjectRootRecord deletingForRecoveryFixture(
+            PhysicalObjectRootRecord current, long deleteStartedAtMillis) {
+        return new PhysicalObjectRootRecord(
+                current.schemaVersion(),
+                current.objectKeyHash(),
+                current.objectKey(),
+                current.objectId(),
+                current.objectKindId(),
+                current.objectLength(),
+                current.storageChecksumType(),
+                current.storageChecksumValue(),
+                current.contentSha256(),
+                current.etag(),
+                PhysicalObjectLifecycle.DELETING,
+                Math.addExact(current.lifecycleEpoch(), 1),
+                current.createdAtMillis(),
+                current.orphanNotBeforeMillis(),
+                current.gcAttemptId(),
+                current.referenceSetSha256(),
+                current.markedAtMillis(),
+                current.deleteNotBeforeMillis(),
+                deleteStartedAtMillis,
+                0,
+                0,
+                "",
+                "",
+                0);
     }
 
     private static final class MutableClock extends Clock {

@@ -125,7 +125,10 @@ DELETING root after the real object DELETE completes but before the old process 
 checkpoint AU fixture then proves an applied DELETED-root Oxia CAS with a lost response converges through the exact
 replacement reload and never repeats the LocalStack DELETE. Checkpoint AV forces two independent worker runtimes to
 race the same MARKED root and proves one durable DELETING intent plus idempotent exact-delete convergence. The
-remaining real-service two-broker/scale/failure matrix remains pending.
+checkpoint AW fixture then recovers 128 MARKED and 128 DELETING roots across all 256 physical shards in a fresh
+runtime with every object LIST forced empty. It also aligns inventory progress with the frozen opaque-token contract
+instead of inferring cross-page logical order. The remaining real-service two-broker/scale/failure matrix remains
+pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -1374,6 +1377,27 @@ cursor roots, snapshot listing, process-death lease expiry and multi-stream obje
 both existing sync append and replay recovery establish `REACHABLE_APPEND` before head visibility and
 `VISIBLE_GENERATION` before strict success, across every response-loss cut. Ten thousand deleted roots are reduced to
 bounded audit metadata only after the long grace, while a stale first/retried PUT cannot resurrect a retired key.
+
+`phase4M4AllShardRecoveryCheck` is checkpoint AW. Its real-service method generates one exact object/root per
+`F4Keyspace.physicalObjectShard`, activates deletion, obtains 256 sealed MARKED roots and closes the originating
+process. A non-running setup runtime converts only odd shards to the production-shaped DELETING value. A final fresh
+runtime receives empty LIST pages yet its authoritative root scan observes 128 MARKED plus 128 DELETING roots and
+converges all 256 through their sealed journals to DELETED and exact S3 absence.
+
+The fixture found a real continuation mismatch before it passed. `ObjectInventoryScanner` formerly compared logical
+keys across calls even though `ListObjectsResult` promises order only within one page and the S3 adapter's opaque
+`nls1` cursor walks disjoint base64url prefixes. The scanner now validates the exact requested family prefix and
+requires a non-terminal opaque token to differ from the supplied token. Unit tests accept descending logical order
+across pages and reject an unchanged token. The focused AW method passed on 2026-07-18 under Java 21 and Docker 28.5.2
+with 38 actionable tasks（2 executed、36 up-to-date）；the complete AS–AW real-service source set then passed with
+47/47 executed tasks. The aggregate gate composes AV, that source set, materialization checks and a dedicated static
+audit. It passed on 2026-07-18 under Java 21 and Docker 28.5.2 against locked Pulsar
+`master@c59da789e88df2b57829de3277c60194b44fceb6`；the root build reported 154 actionable tasks（73 executed、81 up-to-
+date）, and the two serialized locked-Pulsar builds executed 141/141 and 138/138 tasks.
+
+Checkpoint AW is still not `phase4M4FinalCheck`. It closes item 47's all-shard/empty-list recovery portion only；the
+one-shard and 10,000-root scale bounds, source/protection deletion cuts, late PUT/tombstone races and actual broker
+ownership/failover remain mandatory.
 
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration
 

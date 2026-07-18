@@ -8,7 +8,7 @@
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
 > checkpoints、topic-compaction neutral SPI/registry、COMMITTED-source bootstrap、tagged-v1 key encoding、
 > sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；F4-M3 ordinary/real-service
-> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint AV 已实现 opt-in physical-GC composition，并以
+> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint AW 已实现 opt-in physical-GC composition，并以
 > 真实 Oxia/LocalStack 验证 wrong-scope、empty-list/lost-response、post-DELETE/pre-root-CAS restart 与 applied-
 > DELETED-CAS response-loss exact-reload cuts，以及 two-worker shared-intent/idempotent-delete convergence；
 > 其他 object families `Designed/Reserved`
@@ -425,6 +425,11 @@ task/audit reference have moved away from their stream.
 
 GC may use object listing to find candidates，but all deletion decisions are validated against authoritative
 metadata and ownership。
+
+Checkpoint AW freezes the page-order boundary for that listing. Logical objects are ordered only within one returned
+page；the continuation is opaque because canonical base64url S3 prefixes do not preserve logical-key order across
+physical-prefix pages. Inventory validates exact prefix and token progress but never treats cross-page key order or
+LIST absence as deletion/recovery authority.
 
 ## 15. Implementation sources
 
