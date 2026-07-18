@@ -14,6 +14,7 @@
 
 package com.nereusstream.metadata.oxia;
 
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectId;
@@ -45,6 +46,11 @@ public interface OxiaMetadataStore extends AutoCloseable {
     CompletableFuture<StreamMetadataSnapshot> getStreamSnapshot(
             String cluster,
             StreamId streamId);
+
+    /** Read-only proof that the captured append session still owns the active stream head. */
+    CompletableFuture<Void> revalidateAppendSession(
+            String cluster,
+            AppendSession session);
 
     CompletableFuture<AppendSessionRecord> acquireAppendSession(
             String cluster,

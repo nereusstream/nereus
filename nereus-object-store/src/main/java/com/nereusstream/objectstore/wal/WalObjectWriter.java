@@ -14,12 +14,29 @@
 
 package com.nereusstream.objectstore.wal;
 
+import com.nereusstream.objectstore.PutObjectAttemptGuard;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 public interface WalObjectWriter {
     PreparedWalObject prepare(WalWriteRequest request);
 
     CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject);
+
+    /**
+     * Uploads through a provider-attempt guard. Implementations with internal retries must invoke the guard before
+     * every provider transmission; the default preserves compatibility for single-attempt test writers.
+     */
+    default CompletableFuture<WalWriteResult> upload(
+            PreparedWalObject preparedObject,
+            PutObjectAttemptGuard attemptGuard) {
+        PreparedWalObject prepared = Objects.requireNonNull(
+                preparedObject, "preparedObject");
+        PutObjectAttemptGuard guard = Objects.requireNonNull(
+                attemptGuard, "attemptGuard");
+        return guard.authorize(prepared.result().objectKey(), 1)
+                .thenCompose(ignored -> upload(prepared));
+    }
 
     default CompletableFuture<WalWriteResult> write(WalWriteRequest request) {
         try {

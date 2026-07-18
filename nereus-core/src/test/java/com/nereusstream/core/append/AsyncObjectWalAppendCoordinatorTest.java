@@ -16,6 +16,7 @@ package com.nereusstream.core.append;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.DurabilityLevel;
@@ -29,6 +30,7 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
@@ -208,6 +210,14 @@ class AsyncObjectWalAppendCoordinatorTest {
         final AtomicInteger visibleCalls = new AtomicInteger();
         final CompletableFuture<ProtectedGenerationZero> visible =
                 new CompletableFuture<>();
+
+        @Override
+        public CompletableFuture<Void> authorizeUpload(
+                AppendSession session,
+                PhysicalObjectIdentity object,
+                Duration timeout) {
+            throw new UnsupportedOperationException();
+        }
 
         @Override
         public CompletableFuture<ProtectedStableAppend> protectBeforeHead(

@@ -14,6 +14,7 @@
 
 package com.nereusstream.core.recovery;
 
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -31,6 +32,7 @@ import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroProtectionIdentities;
 import com.nereusstream.core.append.ProtectedGenerationZero;
 import com.nereusstream.core.append.ProtectedStableAppend;
+import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
 import com.nereusstream.metadata.oxia.AppendRecoveryCommit;
 import com.nereusstream.metadata.oxia.AppendRecoveryCommitEncoding;
@@ -294,6 +296,14 @@ final class GenerationZeroRepairTestSupport {
 
         private RecordingPublisher(AtomicInteger protections) {
             this.protections = protections;
+        }
+
+        @Override
+        public CompletableFuture<Void> authorizeUpload(
+                AppendSession session,
+                PhysicalObjectIdentity object,
+                Duration timeout) {
+            throw new UnsupportedOperationException();
         }
 
         @Override

@@ -14,8 +14,9 @@
 
 package com.nereusstream.metadata.oxia.testing;
 
-import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendSession;
+import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -417,6 +418,35 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
                             "",
                             observedAtMillis,
                             head.metadataVersion()));
+        });
+    }
+
+    @Override
+    public CompletableFuture<Void> revalidateAppendSession(
+            String cluster,
+            AppendSession session) {
+        return complete(() -> {
+            AppendSession expected = Objects.requireNonNull(session, "session");
+            StreamHeadRecord head = headOrThrow(cluster, expected.streamId());
+            requireActive(head);
+            AppendSessionSnapshotRecord current = head.appendSession();
+            long now = clock.getAsLong();
+            if (current.isEmpty() || current.expiresAtMillis() <= now) {
+                throw failure(
+                        ErrorCode.APPEND_SESSION_EXPIRED,
+                        true,
+                        "append session expired before guarded object upload");
+            }
+            if (!current.writerId().equals(expected.writerId())
+                    || current.epoch() != expected.epoch()
+                    || !current.fencingToken().equals(expected.fencingToken())
+                    || current.leaseVersion() < expected.leaseVersion()) {
+                throw failure(
+                        ErrorCode.FENCED_APPEND,
+                        false,
+                        "append session changed before guarded object upload");
+            }
+            return null;
         });
     }
 

@@ -24,6 +24,7 @@ import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
@@ -31,6 +32,8 @@ import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.core.physical.PhysicalObjectIdentity;
+import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.core.profile.Phase15StorageProfileResolver;
 import com.nereusstream.core.profile.StorageProfileResolver;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
@@ -713,9 +716,18 @@ public final class AppendCoordinator implements AutoCloseable {
             Attempt attempt,
             PreparedAttempt prepared) {
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start WAL upload");
+        PhysicalObjectIdentity object = walPhysicalObject(
+                prepared.primaryAppend().preparedObject().result());
         return attempt.deadline().bound(
                         () -> primaryAppender.persist(
-                                prepared.primaryAppend(), attempt.deadline().remaining()),
+                                prepared.primaryAppend(),
+                                attempt.deadline().remaining(),
+                                (key, providerAttempt) -> authorizeWalUpload(
+                                        attempt,
+                                        prepared,
+                                        object,
+                                        key,
+                                        providerAttempt)),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "upload WAL object")
                 .thenCompose(durable -> {
@@ -746,6 +758,38 @@ public final class AppendCoordinator implements AutoCloseable {
                                 prepared.session(), attempt.deadline())
                         .thenApply(session -> new UploadedAttempt(session, prepared.expectedOffset(), writeResult)))
                 .thenCompose(uploaded -> commit(lane, attempt, uploaded));
+    }
+
+    private CompletableFuture<Void> authorizeWalUpload(
+            Attempt attempt,
+            PreparedAttempt prepared,
+            PhysicalObjectIdentity object,
+            ObjectKey key,
+            int providerAttempt) {
+        if (!object.objectKey().equals(key) || providerAttempt <= 0) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "guarded Object WAL provider attempt has an invalid identity",
+                    AppendOutcome.KNOWN_NOT_COMMITTED));
+        }
+        try {
+            return physicalReferences.authorizeUpload(
+                    prepared.session(), object, attempt.deadline().remaining());
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private static PhysicalObjectIdentity walPhysicalObject(WalWriteResult result) {
+        return PhysicalObjectIdentity.create(
+                result.objectKey(),
+                Optional.of(result.objectId()),
+                PhysicalObjectKind.OBJECT_WAL,
+                result.objectLength(),
+                result.storageChecksum(),
+                Optional.empty(),
+                Optional.empty());
     }
 
     private CompletableFuture<AppendResult> commit(

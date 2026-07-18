@@ -28,7 +28,9 @@ import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.keys.KeyComponentCodec;
+import com.nereusstream.objectstore.ByteBufferObjectUpload;
 import com.nereusstream.objectstore.ObjectStore;
+import com.nereusstream.objectstore.PutObjectAttemptGuard;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.PutObjectResult;
 import java.io.ByteArrayOutputStream;
@@ -93,7 +95,17 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
 
     @Override
     public CompletableFuture<WalWriteResult> upload(PreparedWalObject preparedObject) {
+        return upload(
+                preparedObject,
+                (ignored, attempt) -> CompletableFuture.completedFuture(null));
+    }
+
+    @Override
+    public CompletableFuture<WalWriteResult> upload(
+            PreparedWalObject preparedObject,
+            PutObjectAttemptGuard attemptGuard) {
         Objects.requireNonNull(preparedObject, "preparedObject");
+        Objects.requireNonNull(attemptGuard, "attemptGuard");
         WalWriteResult result = preparedObject.result();
         PutObjectOptions options = new PutObjectOptions(
                 CONTENT_TYPE,
@@ -101,10 +113,18 @@ public final class DefaultWalObjectWriter implements WalObjectWriter {
                 true,
                 Map.of("objectChecksum", result.objectChecksum().value()),
                 preparedObject.uploadTimeout());
-        return objectStore.putObject(
-                        result.objectKey(),
-                        preparedObject.payload(),
-                        options)
+        ByteBufferObjectUpload source = new ByteBufferObjectUpload(
+                preparedObject.payload());
+        CompletableFuture<PutObjectResult> upload;
+        try {
+            upload = objectStore.putObject(
+                    result.objectKey(), source, options, attemptGuard);
+        } catch (Throwable failure) {
+            source.close();
+            return CompletableFuture.failedFuture(failure);
+        }
+        upload.whenComplete((ignored, failure) -> source.close());
+        return upload
                 .thenApply(putResult -> verifyPutResult(result, putResult))
                 .exceptionally(DefaultWalObjectWriter::unwrapCompletionException);
     }

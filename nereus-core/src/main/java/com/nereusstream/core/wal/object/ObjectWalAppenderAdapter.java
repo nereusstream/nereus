@@ -7,6 +7,7 @@ import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
 import com.nereusstream.core.wal.PrimaryAppendRequest;
 import com.nereusstream.core.wal.PrimaryWalAppender;
+import com.nereusstream.objectstore.PutObjectAttemptGuard;
 import com.nereusstream.objectstore.wal.CompressionType;
 import com.nereusstream.objectstore.wal.PreparedWalObject;
 import com.nereusstream.objectstore.wal.WalObjectWriter;
@@ -42,7 +43,17 @@ public final class ObjectWalAppenderAdapter implements PrimaryWalAppender<Object
     }
     @Override public CompletableFuture<DurablePrimaryAppend> persist(
             ObjectPreparedPrimaryAppend prepared, Duration timeout) {
-        return writer.upload(prepared.preparedObject()).thenApply(result -> {
+        return persist(
+                prepared,
+                timeout,
+                (ignored, attempt) -> CompletableFuture.completedFuture(null));
+    }
+    public CompletableFuture<DurablePrimaryAppend> persist(
+            ObjectPreparedPrimaryAppend prepared,
+            Duration timeout,
+            PutObjectAttemptGuard attemptGuard) {
+        Objects.requireNonNull(timeout, "timeout");
+        return writer.upload(prepared.preparedObject(), attemptGuard).thenApply(result -> {
             var slice = result.slices().get(0);
             ObjectSliceReadTarget target = new ObjectSliceReadTarget(1, result.objectId(), result.objectKey(),
                     ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1", "OPAQUE_SLICE", slice.sliceId(),

@@ -2,6 +2,7 @@
 package com.nereusstream.core.append;
 
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadView;
@@ -47,6 +48,33 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
                 cluster,
                 metadata,
                 physicalStore);
+    }
+
+    @Override
+    public CompletableFuture<Void> authorizeUpload(
+            AppendSession session,
+            PhysicalObjectIdentity object,
+            Duration timeout) {
+        AppendSession expectedSession = Objects.requireNonNull(session, "session");
+        PhysicalObjectIdentity expectedObject = Objects.requireNonNull(object, "object");
+        AppendDeadline deadline = new AppendDeadline(timeout);
+        return deadline.bound(
+                        () -> metadata.revalidateAppendSession(cluster, expectedSession),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "revalidate Object WAL append session before provider PUT")
+                .thenCompose(ignored -> deadline.bound(
+                        () -> physicalStore.getRoot(
+                                cluster, expectedObject.objectKeyHash()),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "load Object WAL physical root before provider PUT"))
+                .thenApply(optional -> {
+                    requireUploadRoot(expectedObject, optional);
+                    return null;
+                })
+                .thenCompose(ignored -> deadline.bound(
+                        () -> metadata.revalidateAppendSession(cluster, expectedSession),
+                        AppendOutcome.KNOWN_NOT_COMMITTED,
+                        "reprove Object WAL append session before provider PUT"));
     }
 
     @Override
@@ -220,6 +248,23 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
             throw invariant("physical object root changed after protection", outcome);
         }
         return root;
+    }
+
+    private static void requireUploadRoot(
+            PhysicalObjectIdentity object,
+            Optional<VersionedPhysicalObjectRoot> optional) {
+        if (optional.isEmpty()) {
+            return;
+        }
+        VersionedPhysicalObjectRoot root = optional.orElseThrow();
+        if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE
+                || !PhysicalObjectIdentity.from(root.value()).equals(object)) {
+            throw new NereusException(
+                    ErrorCode.FENCED_APPEND,
+                    false,
+                    "Object WAL provider PUT is fenced by a non-active or different physical root",
+                    AppendOutcome.KNOWN_NOT_COMMITTED);
+        }
     }
 
     private static ProtectedStableAppend protectedStableAppend(
