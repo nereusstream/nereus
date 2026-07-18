@@ -102,7 +102,7 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4 through checkpoint AP 已实现 NRC1 protocol、protected generation-zero append、
+Oxia/LocalStack final gates。M4 through checkpoint AQ 已实现 NRC1 protocol、protected generation-zero append、
 recovery-root/replay/index repair、bounded GC plan/root/journal fence、root-authenticated destructive skeleton、typed
 generation-zero source retirement，以及 completed-trim/COMMITTED/TOPIC_COMPACTED source eligibility 和
 grace-fenced higher-generation pre-drain/reproof，并增加 durable generation-activation authority、future sentinel
@@ -117,7 +117,10 @@ convergence。Checkpoint AN composes complete metadata-first root/registration/i
 routing and restart-safe ownerless execution；checkpoint AO maps the complete typed broker physical-GC configuration
 and removes provider-local protection/lease/orphan timing constants. Safe defaults do not start the service and still
 disable deletion。Checkpoint AP adds a configured-scope guarded PUT/exact HEAD/complete LIST/ETag-bound exact DELETE
-probe and deterministic non-secret V1 capability digest；it does not persist the digest or enable deletion. M5
+probe and deterministic non-secret V1 capability digest；the probe itself does not persist the digest or enable
+deletion. Checkpoint AQ composes exact readiness/domain/registration/coverage/capability authority and atomically
+installs the digest with both V1 delete bits；provider/Pulsar startup composition and restart scope-digest gating remain
+pending, so production deletion is still disabled. M5
 checkpoint X 又实现 exact durable registration create/refresh/final
 revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、

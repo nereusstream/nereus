@@ -112,7 +112,10 @@ runtime and removes provider-local protection/lease/orphan timing constants. Saf
 delete activation and the real-service final gate remain pending. Checkpoint AP now implements the independent
 configured-scope object-store capability proof：guarded PUT、exact HEAD、complete LIST、ETag-bound exact DELETE、
 response-loss absence convergence and idempotent cleanup produce one deterministic non-secret V1 scope digest, but
-the digest is not yet persisted and no delete bit is enabled.
+the probe itself does not persist the digest or enable deletion. Checkpoint AQ adds the bounded product-owned
+coordinator that freezes ACTIVE/readiness/domain/registration authority, runs and verifies the two coverage
+backfills, runs the configured-scope canary and atomically installs its digest with both V1 delete bits. Provider and
+Pulsar composition、restart scope-digest gating and the real-service final gate remain pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -898,6 +901,9 @@ generation/ManagedLedgerGenerationProjectionAuthorityReader.java implemented che
 `nereus-pulsar-adapter` / managed-ledger runtime ownership：
 
 ```text
+ManagedLedgerPhysicalDeletionActivationCoordinator.java  implemented checkpoint AQ product boundary
+ManagedLedgerPhysicalDeletionActivationRequest.java      implemented checkpoint AQ bounded run/concurrency/deadline
+ManagedLedgerPhysicalDeletionActivationResult.java       implemented checkpoint AQ redacted final durable facts
 CursorSnapshotGcExecutor.java                            implemented checkpoint AK mark/recover/retire adapter
 Phase4ObjectInventoryFamilies.java                       implemented checkpoint AL exact five-family registry
 Phase4PhysicalRootLifecycleRouter.java                   implemented checkpoint AN total root-state routing
@@ -905,6 +911,7 @@ Phase4PhysicalGcRuntime.java                             implemented checkpoint 
 NereusRuntimeConfiguration.java                         extended checkpoint AO broker-mapped PhysicalGcConfig validation
 DefaultNereusRuntimeProvider.java                       extended checkpoint AO shared lease/protection/orphan consumption
 NereusManagedLedgerRuntime.java                         extended checkpoint AK close-first optional ownership
+DefaultPhase4PhysicalDeletionActivationCoordinator.java implemented checkpoint AQ ordered proof composition/atomic CAS
 ```
 
 ### 6.2 Focused tests
@@ -917,6 +924,7 @@ RecoveryCheckpointStreamingTest
 RecoveryCheckpointSparseDirectoryTest
 RecoveryCheckpointDomainValidationTest
 ObjectStoreDeleteCapabilityProbeTest                     implemented checkpoint AP lifecycle/digest/loss/cleanup
+Phase4PhysicalDeletionActivationCoordinatorTest          implemented checkpoint AQ order/drift/conflict/loss/atomicity
 MetadataRecoveryCheckpointVerifierTest
 RecoveryCheckpointCoordinatorTest
 RecoveryCheckpointBuilderTest

@@ -291,6 +291,13 @@ bucket、prefix、path-style 和上述 V1 semantics 组成的 deterministic SHA-
 `phase4M4ObjectStoreCapabilityCheck` 只证明这一独立能力边界。该 gate 已于 2026-07-18 在 Java 21 和 locked
 Pulsar `master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f` 上通过；root build 报告 145 个 actionable tasks
 （69 executed），focused Pulsar build 报告 141 个（全部 executed）。
+Checkpoint AQ 现已加入 product-owned physical-deletion activation coordinator。一次 bounded request 先冻结
+ACTIVE publication、exact reference-domain set、broker readiness epoch 和同 epoch registration proof，再运行
+physical-root/cursor-root backfill、验证落盘 coverage proofs、运行 AP canary，最后用一个 version CAS 同时写入
+capability digest 并打开两个 V1 deletion bits。readiness drift、失败 backfill、same-epoch scope mismatch 均 fail
+closed；CAS conflict 不重复 backfill/canary，lost response 只接受 reload 后的 exact durable authority，返回前再做
+readiness/activation 双重校验。AQ 目前仍是未接入 provider/Pulsar 启动路径的协议协调器；runtime scope-digest
+startup gate、broker composition 和真实 Oxia/LocalStack destructive/scale gate 仍待完成。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

@@ -1156,6 +1156,26 @@ The AP gate passed on 2026-07-18 under Java 21 against locked Pulsar
 `master@42a4bfd7dfae1d0b23e07dd2b9ebb59f0344782f`；the root build reported 145 actionable tasks（69 executed）and
 the inherited focused Pulsar build reported 141 actionable tasks（all executed）.
 
+### 6.25h F4-M4 product-owned physical-deletion activation checkpoint
+
+Checkpoint AQ implements the bounded activation transaction that composes checkpoint W coverage with checkpoint AP
+configured-scope capability evidence. `ManagedLedgerPhysicalDeletionActivationRequest` carries one lowercase-base32
+run id、bounded stream concurrency and one overall deadline；the redacted result returns only the readiness epoch、two
+coverage digests、capability digest、activation metadata version and `ACTIVATED`/`ALREADY_ACTIVE` status.
+
+`DefaultPhase4PhysicalDeletionActivationCoordinator` first captures exact ACTIVE publication、the canonical reference-
+domain set、current stable broker readiness and the completed same-epoch registration proof. If the same scope is
+already active it performs no backfill or canary. Otherwise it runs the physical-root/cursor-root backfill, rejects
+any failure, reloads and verifies both exact durable coverage proofs, runs the configured-scope canary, rechecks
+readiness and performs one version CAS that installs the capability digest and enables both V1 deletion bits together.
+Condition conflicts reload and retry only the final CAS（maximum 32 attempts）without repeating backfill/canary；a lost
+CAS response converges only from exact durable authority. Final success reloads activation and revalidates readiness.
+
+AQ deliberately does not yet expose the coordinator through `NereusManagedLedgerFactory`, start the physical-GC
+lifecycle after activation, or gate restart recovery on the local expected capability digest. Provider/Pulsar
+composition、the startup scope guard、ordinary contract gate and real Oxia/LocalStack destructive/scale evidence remain
+mandatory before production deletion can be called enabled.
+
 ### 6.26 F4-M5 durable registration frontier checkpoint
 
 Checkpoint X 关闭 cold-topic backfill 开始前必须先关闭的新写前沿。`ProjectionIdentity` 现在拥有共享的
