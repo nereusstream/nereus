@@ -80,6 +80,38 @@ class StreamRegistrationRetirementCoordinatorTest {
     }
 
     @Test
+    void emptyRecoveryRootDeleteResponseLossConvergesBeforeRegistrationRetirement() {
+        AtomicBoolean loseRootResponse = new AtomicBoolean(true);
+        try (Fixture fixture = fixture(
+                true,
+                stableExternal(),
+                null,
+                loseRootResponse,
+                true,
+                false)) {
+            fixture.generations()
+                    .getOrCreateRecoveryRoot(CLUSTER, fixture.stream())
+                    .join();
+
+            StreamRegistrationRetirementResult result =
+                    fixture.coordinator().retire(fixture.stream()).join();
+
+            assertThat(result.status()).isEqualTo(
+                    StreamRegistrationRetirementStatus.RETIRED);
+            assertThat(result.recoveryRootRetired()).isTrue();
+            assertThat(loseRootResponse).isFalse();
+            assertThat(fixture.generations()
+                            .getRecoveryRoot(CLUSTER, fixture.stream())
+                            .join())
+                    .isEmpty();
+            assertThat(fixture.generations()
+                            .getStreamRegistration(CLUSTER, fixture.stream())
+                            .join())
+                    .isEmpty();
+        }
+    }
+
+    @Test
     void finalExternalAuthorityDriftRetainsRegistration() {
         AtomicInteger captures = new AtomicInteger();
         try (Fixture fixture = fixture(
@@ -109,7 +141,7 @@ class StreamRegistrationRetirementCoordinatorTest {
 
     @Test
     void nonDeletedL0RemainsNonDestructive() {
-        try (Fixture fixture = fixture(true, stableExternal(), null, false, false)) {
+        try (Fixture fixture = fixture(true, stableExternal(), null, null, false, false)) {
             StreamRegistrationRetirementResult result =
                     fixture.coordinator().retire(fixture.stream()).join();
 
@@ -139,13 +171,14 @@ class StreamRegistrationRetirementCoordinatorTest {
             boolean enabled,
             com.nereusstream.core.capability.StreamRetirementReferenceAuthorityReader external,
             AtomicBoolean loseResponse) {
-        return fixture(enabled, external, loseResponse, true, false);
+        return fixture(enabled, external, loseResponse, null, true, false);
     }
 
     private static Fixture fixture(
             boolean enabled,
             com.nereusstream.core.capability.StreamRetirementReferenceAuthorityReader external,
-            AtomicBoolean loseResponse,
+            AtomicBoolean loseRegistrationResponse,
+            AtomicBoolean loseRecoveryRootResponse,
             boolean deleted,
             boolean projectionLive) {
         FakeOxiaMetadataStore l0 = new FakeOxiaMetadataStore(CLOCK::millis);
@@ -191,9 +224,13 @@ class StreamRegistrationRetirementCoordinatorTest {
                                 1,
                                 0))
                 .join();
-        GenerationMetadataStore exposed = loseResponse == null
+        GenerationMetadataStore exposed = loseRegistrationResponse == null
+                        && loseRecoveryRootResponse == null
                 ? durable
-                : loseRegistrationDeleteResponse(durable, loseResponse);
+                : loseDeleteResponses(
+                        durable,
+                        loseRegistrationResponse,
+                        loseRecoveryRootResponse);
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         var projectionReader = (com.nereusstream.core.capability.GenerationProjectionAuthorityReader)
                 subject -> CompletableFuture.completedFuture(
@@ -228,9 +265,10 @@ class StreamRegistrationRetirementCoordinatorTest {
         return new Fixture(stream, l0, durable, scheduler, coordinator);
     }
 
-    private static GenerationMetadataStore loseRegistrationDeleteResponse(
+    private static GenerationMetadataStore loseDeleteResponses(
             GenerationMetadataStore delegate,
-            AtomicBoolean loseResponse) {
+            AtomicBoolean loseRegistrationResponse,
+            AtomicBoolean loseRecoveryRootResponse) {
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -238,11 +276,20 @@ class StreamRegistrationRetirementCoordinatorTest {
                     try {
                         Object result = method.invoke(delegate, arguments);
                         if (method.getName().equals("deleteStreamRegistration")
-                                && loseResponse.compareAndSet(true, false)) {
+                                && loseRegistrationResponse != null
+                                && loseRegistrationResponse.compareAndSet(true, false)) {
                             @SuppressWarnings("unchecked")
                             CompletableFuture<Void> deleted = (CompletableFuture<Void>) result;
                             return deleted.thenCompose(ignored -> CompletableFuture.failedFuture(
                                     new IllegalStateException("lost registration delete response")));
+                        }
+                        if (method.getName().equals("deleteRecoveryRoot")
+                                && loseRecoveryRootResponse != null
+                                && loseRecoveryRootResponse.compareAndSet(true, false)) {
+                            @SuppressWarnings("unchecked")
+                            CompletableFuture<Void> deleted = (CompletableFuture<Void>) result;
+                            return deleted.thenCompose(ignored -> CompletableFuture.failedFuture(
+                                    new IllegalStateException("lost recovery-root delete response")));
                         }
                         return result;
                     } catch (InvocationTargetException failure) {

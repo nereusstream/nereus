@@ -170,8 +170,9 @@ Checkpoint W subsequently implements physical/cursor live-reference backfill, an
 cursor snapshot candidate discovery plus post-drain full revalidation. Checkpoint AK makes that evidence
 restart-reconstructable, adds exact drift rollback and composes the cursor path into the central six-domain
 mark/drain/DELETING/source-retirement runtime. Checkpoint AL adds current-writer object inventory and exact old
-missing-root registration. Periodic root/registration/inventory scheduling、registration retirement、broker config
-mapping and activation remain planned，so production deletion is still disabled.
+missing-root registration. Checkpoint AM adds proof-driven stream-registration retirement and its exact managed-ledger
+F3 authority. Periodic root/registration/inventory scheduling、registration-retirement runtime composition、broker
+config mapping and activation remain planned，so production deletion is still disabled.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1542,7 +1543,7 @@ cannot reuse the old digest and is unmarked without deleting bytes；an uncertai
 `Phase4PhysicalGcRuntime` composes the executor with all six domains and is owned by the production provider/runtime,
 but it intentionally contains no periodic scheduler. The existing broker mapping also continues to construct
 `PhysicalGcConfig.defaults()` (`enabled=false, dryRun=true`). Root/registration scheduling、the cursor-snapshot
-coverage bit、broker GC knob mapping、registration retirement and physical-delete activation remain
+coverage bit、broker GC knob mapping、registration-retirement runtime composition and physical-delete activation remain
 required before production cursor snapshot deletion is available.
 
 ## 11. Orphan Discovery
@@ -1636,8 +1637,12 @@ pending root protections that have no durable owner object may remain as conserv
 retirement success evidence. After every metadata prefix is empty, the coordinator re-captures the exact registration,
 L0, projection and external authority snapshots before the registration-last CAS. Current focused tests cover the
 empty deleted-stream path, final registration-delete response loss, final external-authority drift, non-DELETED L0,
-F3 cursor/retention terminality and authority limits. Periodic runtime composition and the broader non-empty-owner /
-recovery-root crash-cut gate remain pending; production scheduling and delete activation are still disabled.
+F3 cursor/retention terminality and authority limits. They also exercise a real published workflow with two terminal
+higher indexes and three index/task-owned protections, plus a real NRC1 non-empty recovery root whose checkpoint and
+target protections retire before the root; protection/index/task/root/registration delete-response loss converges
+from exact absence while both physical roots remain present. `phase4M4RegistrationRetirementCheck` freezes this
+ordering and the fail-closed blocker matrix. Periodic runtime composition and the real-service final gate remain
+pending; production scheduling and delete activation are still disabled.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

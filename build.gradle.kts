@@ -1025,6 +1025,29 @@ tasks.register("phase4M4ObjectInventoryCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register<Exec>("checkPhase4M4RegistrationRetirementContractSurface") {
+    group = "verification"
+    description = "Audit exact deleted-stream authority, owner drain ordering, and registration-last retirement."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-m4-registration-retirement-contract-surface.sh")
+}
+
+tasks.register("phase4M4RegistrationRetirementCheck") {
+    group = "verification"
+    description = "Verify bounded stream-registration retirement and response-loss convergence without object deletion."
+    dependsOn("phase4M4ObjectInventoryCheck")
+    dependsOn("checkPhase4M4RegistrationRetirementContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1035,7 +1058,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4ObjectInventoryCheck")
+    dependsOn("phase4M4RegistrationRetirementCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

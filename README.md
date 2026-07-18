@@ -239,7 +239,9 @@ broker 不会触发 destructive work。Checkpoint AM 已加入 proof-driven stre
 foundation：只有精确 DELETED L0、non-live projection、完整且无引用的 F3 cursor/retention authority
 与 terminal/audit-grace-expired F4 workflow 事实同时成立时，才依次退休 owner protection、index/task、
 recovery root、checkpoint/stats/sequence，最后经过 exact recapture 删除 registration。该 coordinator 尚未
-接入 periodic runtime，注册退休也不会在 broker 启动后自动执行。
+接入 periodic runtime，注册退休也不会在 broker 启动后自动执行。对应 ordinary gate 现已覆盖真实 published
+workflow 的 task/two-index/three-protection drain，以及 non-empty NRC1 checkpoint-root/target protection 退休；
+所有 delete-response loss 均依赖 exact absence 收敛，physical root 在整个 registration-retirement 测试后仍保留。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。
@@ -254,6 +256,11 @@ execution adapter、six-domain runtime composition、safe-default config 和 run
 known-prefix pagination、age/HEAD/root 双检、second-grace root registration、dry-run 和 response-loss recovery；
 已于 2026-07-18 在 Java 21、同一 locked Pulsar 上通过，root build 执行 131 个 actionable tasks，nested Pulsar
 regression 报告 138 个 actionable tasks。
+`phase4M4RegistrationRetirementCheck` 覆盖 checkpoint AM 的 exact L0/projection/F3 authority、terminal/audit
+grace blockers、published task/index owner-protection drain、non-empty NRC1 root 以及 protection/index/task/root/
+registration delete-response loss；它还断言 physical root 不被注册退休路径删除。该 gate 已于
+2026-07-18 在 Java 21、locked Pulsar `330eeeb3fa9903ed0123c2a0e261d403c32f0a59` 上通过；root build
+报告 132 个 actionable tasks（68 executed），nested Pulsar 报告 138 个（3 executed）。
 `phase4M5RegistrationFrontierCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已于 2026-07-16 通过。
 `phase4M5ActivationGuardCheck` 已于 2026-07-16 通过。

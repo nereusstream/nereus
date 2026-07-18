@@ -105,7 +105,8 @@ six domains、journal and source-retirement lifecycle under the production provi
 scheduling、registration-retirement runtime composition、broker GC config mapping and activation remain pending.
 Checkpoint AL adds the owned current-writer inventory scanner and exact missing-root registration, but does not
 schedule it. Checkpoint AM adds the proof-driven registration-retirement coordinator and exact managed-ledger
-cursor/retention authority; its periodic runtime owner and broader crash-cut/final-service gate remain pending.
+cursor/retention authority. Its ordinary gate now includes non-empty published-workflow and real NRC1 recovery-root
+owner/protection drain plus delete-response-loss cuts; the periodic runtime owner and final-service gate remain pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -951,7 +952,9 @@ ProjectionGenerationReferenceDomainTest                   implemented K, extende
 ObjectInventoryScannerTest                              implemented checkpoint AL age/HEAD/dry-run/response-loss paths
 Phase4ObjectInventoryFamiliesTest                       implemented checkpoint AL writer-key inverse coverage
 StreamRegistrationRetirementCoordinatorTest              implemented checkpoint AM exact recapture/response-loss foundation
+StreamRegistrationRetirementWorkflowTest                 implemented checkpoint AM task/index/protection blocker and drain matrix
 ManagedLedgerStreamRetirementAuthorityReaderTest          implemented checkpoint AM terminality/limit authority proof
+RecoveryCheckpointCoordinatorTest                        extended checkpoint AM non-empty root/protection retirement
 FutureCatalogSentinelTest                                 implemented checkpoint T
 ```
 
@@ -985,6 +988,7 @@ retirement.
 ./gradlew phase4M4CursorSnapshotGcCheck
 ./gradlew phase4M4CursorGcExecutionCheck
 ./gradlew phase4M4ObjectInventoryCheck
+./gradlew phase4M4RegistrationRetirementCheck
 ./gradlew phase4M4Check
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
@@ -1188,11 +1192,26 @@ reports `WOULD_REGISTER` or creates one exact ACTIVE root with a second full orp
 converges only through equality with that complete desired root. Every listed value receives one outcome；malformed、
 young、stale、HEAD-mismatched and root-conflicting values cause no mutation. The scanner exposes no delete operation,
 is only owned—not scheduled—by `Phase4PhysicalGcRuntime`, and therefore does not enable production deletion. This
-ordinary gate does not implement periodic lifecycle routing、registration retirement、broker physical-GC mapping/
+ordinary gate does not include the later checkpoint-AM registration retirement, periodic lifecycle routing、broker physical-GC mapping/
 activation or the real-service destructive final scenarios.
 The aggregate gate passed with `--rerun-tasks` on 2026-07-18 under Java 21 against locked Pulsar
 `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`；the root build executed 131 actionable tasks and the inherited
 nested Pulsar regression reported 138 actionable tasks（3 executed、135 up-to-date）。
+
+`phase4M4RegistrationRetirementCheck` extends checkpoint AL with checkpoint AM. It audits the protocol-neutral exact
+per-stream external-reference snapshot and the managed-ledger F3 retention/cursor authority, including stable NPR1
+identity、complete pagination、ACTIVE retention、DELETED-only cursors and configured authority overflow. The bounded
+coordinator requires exact DELETED L0、non-live projection、reference-free F3 authority、terminal/audit-grace-expired
+tasks and higher indexes, and an empty post-anchor recovery tail. It removes only owner-scoped protections before the
+matching terminal index/task/root, drains checkpoint/stats/sequence metadata, rescans every prefix, re-captures all
+authorities and conditionally removes the registration last. Focused tests cover non-terminal/live-index/audit-grace
+blocks, empty-root and final-registration response loss, a published workflow with three protections and two indexes,
+and a real non-empty NRC1 root with checkpoint-object/target protections. They explicitly retain the physical roots;
+the coordinator exposes no object/root delete. Periodic registration scheduling、broker physical-GC mapping/
+activation and real-service destructive final scenarios remain outside this ordinary gate.
+The aggregate gate passed on 2026-07-18 under Java 21 against locked Pulsar
+`master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`; the root build reported 132 actionable tasks（68 executed）and
+the inherited nested Pulsar regression reported 138 actionable tasks（3 executed）.
 
 Final gate uses real Oxia + LocalStack across two independent runtimes. It proves old commit/index/source deletion is
 impossible before root checkpoint; after deletion, append replay/index repair/read use the checkpoint/higher target.

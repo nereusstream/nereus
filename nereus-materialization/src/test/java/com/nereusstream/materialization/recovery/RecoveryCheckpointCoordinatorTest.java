@@ -22,13 +22,19 @@ import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationOperation;
+import com.nereusstream.core.capability.GenerationProjectionAuthoritySnapshot;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
+import com.nereusstream.core.capability.StreamRetirementReferenceAuthoritySnapshot;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.GcAuthorityToken;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.core.recovery.AnchorAwareCommitWalker;
 import com.nereusstream.materialization.MaterializationConfig;
+import com.nereusstream.materialization.gc.PhysicalGcConfig;
+import com.nereusstream.materialization.gc.StreamRegistrationRetirementCoordinator;
+import com.nereusstream.materialization.gc.StreamRegistrationRetirementStatus;
 import com.nereusstream.metadata.oxia.AllocatedGeneration;
 import com.nereusstream.metadata.oxia.AppendRecoveryAnchor;
 import com.nereusstream.metadata.oxia.AppendRecoveryCommit;
@@ -145,6 +151,88 @@ class RecoveryCheckpointCoordinatorTest {
             assertThat(resumed.status()).isEqualTo(
                     RecoveryCheckpointBuildStatus.NO_LIVE_TAIL);
             fixture.assertPermanentProtections(published);
+        }
+    }
+
+    @Test
+    void registrationRetirementDrainsNonEmptyCheckpointRootAcrossDeleteResponseLoss()
+            throws Exception {
+        try (Fixture fixture = new Fixture(temporaryDirectory.resolve("registration-retirement"))) {
+            VersionedRecoveryCheckpointRoot root = fixture.coordinator(
+                            fixture.generations, fixture.physical)
+                    .checkpoint(STREAM)
+                    .join()
+                    .publication()
+                    .orElseThrow()
+                    .root();
+            fixture.assertPermanentProtections(root);
+            retireIndex(fixture.generations, fixture.targetIndex);
+
+            AtomicBoolean loseIndexDelete = new AtomicBoolean(true);
+            AtomicBoolean loseRootDelete = new AtomicBoolean(true);
+            AtomicBoolean loseRegistrationDelete = new AtomicBoolean(true);
+            AtomicBoolean loseProtectionDelete = new AtomicBoolean(true);
+            GenerationMetadataStore generations = loseRetirementDeleteResponses(
+                    fixture.generations,
+                    loseIndexDelete,
+                    loseRootDelete,
+                    loseRegistrationDelete);
+            PhysicalObjectMetadataStore physical = loseRetirementProtectionDeleteResponse(
+                    fixture.physical, loseProtectionDelete);
+            StreamRegistrationRetirementCoordinator coordinator =
+                    new StreamRegistrationRetirementCoordinator(
+                            CLUSTER,
+                            retirementL0(fixture.l0Store),
+                            generations,
+                            physical,
+                            subject -> CompletableFuture.completedFuture(
+                                    new GenerationProjectionAuthoritySnapshot(
+                                            subject,
+                                            false,
+                                            Optional.empty(),
+                                            List.of(new GcAuthorityToken(
+                                                    "/projection/checkpoint-retirement",
+                                                    1,
+                                                    sha("checkpoint-retirement-projection"))))),
+                            subject -> CompletableFuture.completedFuture(
+                                    StreamRetirementReferenceAuthoritySnapshot.complete(
+                                            subject, 0, List.of())),
+                            fixture.codec,
+                            physicalGcConfig(),
+                            Duration.ofMillis(500),
+                            CLOCK,
+                            fixture.scheduler);
+
+            var result = coordinator.retire(STREAM).join();
+
+            assertThat(result.status())
+                    .isEqualTo(StreamRegistrationRetirementStatus.RETIRED);
+            assertThat(result.protectionsRetired()).isEqualTo(2);
+            assertThat(result.indexesRetired()).isOne();
+            assertThat(result.recoveryRootRetired()).isTrue();
+            assertThat(result.sequencesRetired()).isOne();
+            assertThat(result.registrationRetired()).isTrue();
+            assertThat(loseIndexDelete).isFalse();
+            assertThat(loseRootDelete).isFalse();
+            assertThat(loseRegistrationDelete).isFalse();
+            assertThat(loseProtectionDelete).isFalse();
+            assertThat(fixture.generations.getRecoveryRoot(CLUSTER, STREAM).join())
+                    .isEmpty();
+            assertThat(fixture.generations.getStreamRegistration(CLUSTER, STREAM).join())
+                    .isEmpty();
+
+            var checkpointReference = root.value().checkpoints().get(0);
+            assertThat(fixture.physical.getRoot(
+                            CLUSTER,
+                            new com.nereusstream.api.ObjectKeyHash(
+                                    checkpointReference.objectKeyHash()))
+                    .join())
+                    .isPresent();
+            assertThat(fixture.physical.getRoot(
+                            CLUSTER,
+                            com.nereusstream.api.ObjectKeyHash.from(fixture.target.objectKey()))
+                    .join())
+                    .isPresent();
         }
     }
 
@@ -599,6 +687,161 @@ class RecoveryCheckpointCoordinatorTest {
                 return CompletableFuture.completedFuture(null);
             }
         };
+    }
+
+    private static void retireIndex(
+            GenerationMetadataStore store,
+            VersionedGenerationIndex current) {
+        VersionedGenerationIndex draining = store.compareAndSetIndex(
+                        CLUSTER,
+                        indexState(
+                                current.value(),
+                                GenerationLifecycle.DRAINING,
+                                "registration-retirement-test-drain",
+                                3),
+                        current.metadataVersion())
+                .join();
+        store.compareAndSetIndex(
+                        CLUSTER,
+                        indexState(
+                                draining.value(),
+                                GenerationLifecycle.RETIRED,
+                                "registration-retirement-test-retired",
+                                4),
+                        draining.metadataVersion())
+                .join();
+    }
+
+    private static GenerationIndexRecord indexState(
+            GenerationIndexRecord current,
+            GenerationLifecycle lifecycle,
+            String reason,
+            long changedAtMillis) {
+        return new GenerationIndexRecord(
+                current.schemaVersion(),
+                current.streamId(),
+                current.readViewId(),
+                current.offsetStart(),
+                current.offsetEnd(),
+                current.generation(),
+                current.publicationId(),
+                current.taskId(),
+                lifecycle,
+                current.sourceSetSha256(),
+                current.policySha256(),
+                current.readTarget(),
+                current.targetIdentitySha256(),
+                current.materializationPolicySha256(),
+                current.payloadFormat(),
+                current.sourceRecordCount(),
+                current.outputRecordCount(),
+                current.entryCount(),
+                current.logicalBytes(),
+                current.cumulativeSizeAtStart(),
+                current.cumulativeSizeAtEnd(),
+                current.firstCommitVersion(),
+                current.lastCommitVersion(),
+                current.schemaRefs(),
+                current.projectionRef(),
+                current.createdAtMillis(),
+                current.committedAtMillis(),
+                reason,
+                changedAtMillis,
+                0);
+    }
+
+    private static OxiaMetadataStore retirementL0(OxiaMetadataStore delegate) {
+        StreamMetadataSnapshot deleted = deletedSnapshot();
+        return proxy(
+                OxiaMetadataStore.class,
+                delegate,
+                (method, arguments, result) -> method.getName().equals("getStreamSnapshot")
+                        ? CompletableFuture.completedFuture(deleted)
+                        : result);
+    }
+
+    private static StreamMetadataSnapshot deletedSnapshot() {
+        long version = 9;
+        return new StreamMetadataSnapshot(
+                new StreamMetadataRecord(
+                        STREAM.value(),
+                        "persistent://tenant/ns/checkpoint-topic",
+                        "stream-name-hash",
+                        StreamState.DELETED.name(),
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        Map.of(),
+                        1,
+                        1,
+                        version),
+                new CommittedEndOffsetRecord(STREAM.value(), 2, 20, 2, version),
+                new TrimRecord(STREAM.value(), 0, "", 1, version));
+    }
+
+    private static GenerationMetadataStore loseRetirementDeleteResponses(
+            GenerationMetadataStore delegate,
+            AtomicBoolean loseIndexDelete,
+            AtomicBoolean loseRootDelete,
+            AtomicBoolean loseRegistrationDelete) {
+        return proxy(
+                GenerationMetadataStore.class,
+                delegate,
+                (method, arguments, result) -> {
+                    AtomicBoolean loss = switch (method.getName()) {
+                        case "deleteIndex" -> loseIndexDelete;
+                        case "deleteRecoveryRoot" -> loseRootDelete;
+                        case "deleteStreamRegistration" -> loseRegistrationDelete;
+                        default -> null;
+                    };
+                    if (loss != null && loss.compareAndSet(true, false)) {
+                        @SuppressWarnings("unchecked")
+                        CompletableFuture<Void> deleted = (CompletableFuture<Void>) result;
+                        return deleted.thenCompose(ignored -> CompletableFuture.failedFuture(
+                                new IllegalStateException(
+                                        "lost " + method.getName() + " response")));
+                    }
+                    return result;
+                });
+    }
+
+    private static PhysicalObjectMetadataStore loseRetirementProtectionDeleteResponse(
+            PhysicalObjectMetadataStore delegate,
+            AtomicBoolean loseResponse) {
+        return proxy(
+                PhysicalObjectMetadataStore.class,
+                delegate,
+                (method, arguments, result) -> {
+                    if (method.getName().equals("deleteProtection")
+                            && loseResponse.compareAndSet(true, false)) {
+                        @SuppressWarnings("unchecked")
+                        CompletableFuture<Void> deleted = (CompletableFuture<Void>) result;
+                        return deleted.thenCompose(ignored -> CompletableFuture.failedFuture(
+                                new IllegalStateException(
+                                        "lost deleteProtection response")));
+                    }
+                    return result;
+                });
+    }
+
+    private static PhysicalGcConfig physicalGcConfig() {
+        return new PhysicalGcConfig(
+                true,
+                false,
+                1,
+                1,
+                1,
+                10,
+                100,
+                100,
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(3),
+                Duration.ofMillis(5),
+                Duration.ofSeconds(11),
+                Duration.ofSeconds(30),
+                Duration.ofHours(1),
+                Duration.ofHours(2),
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(2));
     }
 
     private static GenerationMetadataStore loseFirstRootCasResponse(
