@@ -27,3 +27,36 @@ dependencies {
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+val f4M4IntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[f4M4IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[f4M4IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(f4M4IntegrationTest.implementationConfigurationName, project())
+    add(f4M4IntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(f4M4IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(f4M4IntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(f4M4IntegrationTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
+    add(f4M4IntegrationTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
+    add(f4M4IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(f4M4IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(f4M4IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+tasks.register<Test>("f4M4IntegrationTest") {
+    group = "verification"
+    description = "Run F4-M4 activation and destructive restart recovery against real Oxia and LocalStack."
+    testClassesDirs = f4M4IntegrationTest.output.classesDirs
+    classpath = f4M4IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}
