@@ -234,8 +234,12 @@ managed-ledger runtime 统一持有和关闭；但它不调度 root/registration
 inverse 与 `ObjectInventoryScanner`：完整分页只把经过 age/skew、exact HEAD、CRC32C/length 和二次 root
 absence 验证的旧对象注册为 ACTIVE physical root，并为新 root 重置一整段 orphan grace；listing 从不授权
 删除，malformed/young/stale/mismatch/conflict 只计数。Scanner 由 runtime 持有但尚未调度。Coverage/delete
-activation、periodic root/registration/inventory scheduling、registration retirement 和 broker GC 参数映射仍未
-启用，因此启动 broker 不会触发 destructive work。
+activation、periodic root/registration/inventory scheduling 和 broker GC 参数映射仍未启用，因此启动
+broker 不会触发 destructive work。Checkpoint AM 已加入 proof-driven stream-registration retirement
+foundation：只有精确 DELETED L0、non-live projection、完整且无引用的 F3 cursor/retention authority
+与 terminal/audit-grace-expired F4 workflow 事实同时成立时，才依次退休 owner protection、index/task、
+recovery root、checkpoint/stats/sequence，最后经过 exact recapture 删除 registration。该 coordinator 尚未
+接入 periodic runtime，注册退休也不会在 broker 启动后自动执行。
 `phase4M4CursorProtectionCheck` 以及直接相关的 LocalStack-only、real Oxia + LocalStack cursor integration
 tests 已于 2026-07-16 通过。
 `phase4M4PhysicalRootBackfillCheck --rerun-tasks` 也已于 2026-07-16 通过。

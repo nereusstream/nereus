@@ -1595,7 +1595,13 @@ orphanhood.
 
 A stream registration is one record per stream incarnation, so deleted incarnations must eventually leave the 64
 active scan shards. Its removal is the final metadata-retirement step, never an input that authorizes another delete.
-`StreamRegistrationRetirementCoordinator` may call `deleteStreamRegistration(..., expectedVersion)`（implemented by
+Checkpoint AM implements `StreamRegistrationRetirementCoordinator` and the protocol-neutral
+`StreamRetirementReferenceAuthorityReader`/exact snapshot contract. The managed-ledger implementation scans the
+stream's F3 retention record plus every cursor page, retains the exact key/version/value-digest authorities and is
+reference-free only for a complete bounded snapshot with stable ACTIVE retention and only DELETED cursor records.
+Transitional retention, a non-terminal cursor, NPR1 mismatch, pagination overflow or authority drift fails closed.
+
+The coordinator may call `deleteStreamRegistration(..., expectedVersion)`（implemented by
 conditional `deleteIfVersion`）only after one complete proof：
 
 ```text
@@ -1622,6 +1628,16 @@ failure、unknown lifecycle、domain
 veto or changed version retains the registration. Response loss is resolved by re-reading the exact key；absence is
 success only for the same completed proof attempt. A cached scanner entry remains harmless because it reloads the L0
 tombstone/projection before mutation. Same-name topic recreation has a different `StreamId` and registration key.
+
+Owner-backed protections are removed before their terminal index/task/recovery-root metadata owner, never after it.
+If the process stops in that interval, the still-present owner/root remains visible to its reference domain and vetoes
+physical deletion. NRC1 root publications and source/target identities reconstruct the permanent protection scope;
+pending root protections that have no durable owner object may remain as conservative stale vetoes and are not used as
+retirement success evidence. After every metadata prefix is empty, the coordinator re-captures the exact registration,
+L0, projection and external authority snapshots before the registration-last CAS. Current focused tests cover the
+empty deleted-stream path, final registration-delete response loss, final external-authority drift, non-DELETED L0,
+F3 cursor/retention terminality and authority limits. Periodic runtime composition and the broader non-empty-owner /
+recovery-root crash-cut gate remain pending; production scheduling and delete activation are still disabled.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

@@ -102,8 +102,10 @@ object inventory、registration retirement and the remaining materialization/GC 
 Checkpoint AJ adds complete bounded cursor-snapshot candidate discovery plus the post-drain final-inventory callback；
 checkpoint AK makes its evidence restart-reconstructable, adds exact drift rollback and composes the cursor executor、
 six domains、journal and source-retirement lifecycle under the production provider. Periodic physical-root/registration
-scheduling、registration retirement、broker GC config mapping and activation remain pending. Checkpoint AL adds the
-owned current-writer inventory scanner and exact missing-root registration, but does not schedule it.
+scheduling、registration-retirement runtime composition、broker GC config mapping and activation remain pending.
+Checkpoint AL adds the owned current-writer inventory scanner and exact missing-root registration, but does not
+schedule it. Checkpoint AM adds the proof-driven registration-retirement coordinator and exact managed-ledger
+cursor/retention authority; its periodic runtime owner and broader crash-cut/final-service gate remain pending.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -654,7 +656,9 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > callback immediately before delete intent. Checkpoint AK adds restart-stable evidence/recovery、exact MARKED rollback
 > and the cursor mark/drain/DELETING/source-retirement adapter in a provider-owned six-domain runtime. Checkpoint AL
 > adds all current V1 writer key inverses plus complete known-prefix inventory and exact missing-root registration.
-> Periodic physical-root/registration/inventory scheduling、the cursor coverage bit、registration retirement、broker
+> Checkpoint AM adds exact deleted-stream/projection/F3 authority capture, bounded workflow/root drain and
+> registration-last conditional retirement. Periodic physical-root/registration/inventory scheduling、the cursor
+> coverage bit、registration-retirement runtime composition、broker
 > physical-GC config mapping/activation、real-service destructive
 > scenarios and the final M4 gate remain before F4-M4 can be called complete.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
@@ -705,6 +709,8 @@ physical/GcGlobalReferenceScope.java                  implemented checkpoint T p
 physical/GcGlobalReferenceScopeSnapshot.java          implemented checkpoint T canonical activation/registration facts
 capability/GenerationProjectionAuthorityReader.java   implemented checkpoint W protocol-neutral F2 authority seam
 capability/GenerationProjectionAuthoritySnapshot.java implemented checkpoint W exact live/non-live authority capture
+capability/StreamRetirementReferenceAuthorityReader.java   implemented checkpoint AM protocol-neutral external-reference seam
+capability/StreamRetirementReferenceAuthoritySnapshot.java implemented checkpoint AM bounded exact authority capture
 OxiaMetadataStore                                prepare/commit prepared append
 OxiaJavaClientMetadataStore                      exact two-stage stable append
 AppendRecoveryAnchor.java                        implemented checkpoint C foundation
@@ -820,7 +826,9 @@ gc/FutureCatalogSentinelDomain.java                      implemented checkpoint 
 gc/SourceRetirementCoordinator.java                      implemented checkpoint M recovery foundation
 gc/PhysicalGcDeletionResult.java                         implemented checkpoint M recovery foundation
 gc/PhysicalGcDeletionStatus.java                         implemented checkpoint M recovery foundation
-gc/StreamRegistrationRetirementCoordinator.java
+gc/StreamRegistrationRetirementCoordinator.java          implemented checkpoint AM registration-last proof/mutation order
+gc/StreamRegistrationRetirementResult.java               implemented checkpoint AM exact mutation summary
+gc/StreamRegistrationRetirementStatus.java               implemented checkpoint AM fail-closed outcomes
 gc/PhysicalGcMarkStatus.java                              implemented checkpoint I
 gc/PhysicalGcMarkResult.java                              implemented checkpoint I
 gc/PhysicalGcAdvanceStatus.java                           implemented checkpoint I
@@ -853,6 +861,7 @@ gc/GcMetricsObserver.java
 
 ```text
 retention/CursorSnapshotReferenceDomain.java             implemented K affected, extended T ownerless
+retention/ManagedLedgerStreamRetirementAuthorityReader.java implemented checkpoint AM F3 cursor/retention authority
 retention/CursorSnapshotGcScanner.java                    implemented AJ discovery/revalidation, extended AK marked recovery
 retention/ProjectionGenerationReferenceDomain.java       implemented K affected, extended T ownerless
 cursor/CursorSnapshotKeys.java                           extended checkpoint AL cluster-wide strict inverse
@@ -941,7 +950,8 @@ CursorSnapshotReferenceDomainTest                         implemented K, extende
 ProjectionGenerationReferenceDomainTest                   implemented K, extended T ownerless
 ObjectInventoryScannerTest                              implemented checkpoint AL age/HEAD/dry-run/response-loss paths
 Phase4ObjectInventoryFamiliesTest                       implemented checkpoint AL writer-key inverse coverage
-StreamRegistrationRetirementCoordinatorTest
+StreamRegistrationRetirementCoordinatorTest              implemented checkpoint AM exact recapture/response-loss foundation
+ManagedLedgerStreamRetirementAuthorityReaderTest          implemented checkpoint AM terminality/limit authority proof
 FutureCatalogSentinelTest                                 implemented checkpoint T
 ```
 

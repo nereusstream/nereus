@@ -84,9 +84,12 @@
 > production provider. Checkpoint AL adds strict inverses for every current V1 writer prefix and a complete
 > known-prefix `ObjectInventoryScanner` that registers only old exact-HEAD missing-root objects, gives each new root a
 > second full orphan grace, converges create-response loss only through the exact desired root, and never treats
-> listing as deletion authority. The provider owns but does not schedule this scanner. Periodic
-> root/registration/inventory scheduling、coverage/delete activation、registration retirement、broker physical-GC config
-> mapping and the final deletion switch remain closed；the typed config still defaults to
+> listing as deletion authority. The provider owns but does not schedule this scanner. Checkpoint AM adds the bounded,
+> proof-driven registration-retirement foundation: exact DELETED L0/non-live projection/F3 cursor-retention captures,
+> terminal-and-audit-grace workflow drain, owner-protection-before-owner retirement, recovery-root/metadata cleanup,
+> final authority recapture and registration-last conditional delete with response-loss convergence. Periodic
+> root/registration/inventory scheduling、coverage/delete activation、registration-retirement runtime composition、broker
+> physical-GC config mapping and the final deletion switch remain closed；the typed config still defaults to
 > `enabled=false, dryRun=true`
 >
 > 设计基线日期：2026-07-14
