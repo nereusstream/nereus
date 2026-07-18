@@ -426,6 +426,89 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
+    @Test
+    void twoIndependentWorkersConvergeConcurrentDeletingIntentAndExactDeletes()
+            throws Exception {
+        MutableClock clock = new MutableClock(4_000_000);
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "f4-m4-two-workers-" + suffix;
+        String bucket = "nereus-f4-m4-" + suffix.substring(0, 24);
+        createBucket(bucket);
+        ObjectStoreConfiguration scope = objectStoreConfiguration(bucket, "two-workers");
+        GenerationCapabilityReadiness readiness = new GenerationCapabilityReadiness(
+                READINESS_EPOCH, sha256("broker-set/two-workers/" + suffix), 2);
+        PhysicalGcConfig gcConfig = physicalGcConfig();
+        TargetObject target;
+
+        try (Process first = Process.open(
+                cluster,
+                "n".repeat(26),
+                scope,
+                readiness,
+                gcConfig,
+                stagingDirectory("two-workers-first"),
+                clock,
+                StoreDecorator.identity())) {
+            first.seedPublication();
+            target = first.createOwnerlessCompactedObject();
+
+            ManagedLedgerPhysicalDeletionActivationResult activation = first.runtime
+                    .activate(new ManagedLedgerPhysicalDeletionActivationRequest(
+                            "o".repeat(26), 4, ACTIVATION_TIMEOUT))
+                    .join();
+            assertThat(activation.status())
+                    .isEqualTo(ManagedLedgerPhysicalDeletionActivationResult.Status.ACTIVATED);
+            first.runtime.lifecycleService().scanNow().join();
+            assertThat(first.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.MARKED);
+            first.assertObjectPresent(target);
+        }
+
+        clock.advance(Duration.ofMinutes(7));
+        DeletingRootCasRace deletingRace = new DeletingRootCasRace(target.hash());
+        TargetDeleteRace deleteRace = new TargetDeleteRace(target.key());
+        try (Process workerA = Process.open(
+                        cluster,
+                        "p".repeat(26),
+                        scope,
+                        readiness,
+                        gcConfig,
+                        stagingDirectory("two-workers-a"),
+                        clock,
+                        raw -> new ConcurrentTargetDeleteObjectStore(raw, deleteRace),
+                        PhysicalStoreDecorator.raceDeletingRootCas(deletingRace));
+                Process workerB = Process.open(
+                        cluster,
+                        "q".repeat(26),
+                        scope,
+                        readiness,
+                        gcConfig,
+                        stagingDirectory("two-workers-b"),
+                        clock,
+                        raw -> new ConcurrentTargetDeleteObjectStore(raw, deleteRace),
+                        PhysicalStoreDecorator.raceDeletingRootCas(deletingRace))) {
+            workerA.runtime.start();
+            workerB.runtime.start();
+            CompletableFuture<?> passA = workerA.runtime.lifecycleService().scanNow();
+            CompletableFuture<?> passB = workerB.runtime.lifecycleService().scanNow();
+
+            deletingRace.bothArrived().get(30, TimeUnit.SECONDS);
+            deleteRace.bothArrived().get(30, TimeUnit.SECONDS);
+            CompletableFuture.allOf(passA, passB).get(30, TimeUnit.SECONDS);
+
+            assertThat(deletingRace.attempts()).hasValue(2);
+            assertThat(deletingRace.successes()).hasValue(1);
+            assertThat(deletingRace.failures()).hasValue(1);
+            assertThat(deleteRace.attempts()).hasValue(2);
+            assertThat(deleteRace.completions()).hasValue(2);
+            assertThat(workerA.root(target).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.DELETED);
+            assertThat(workerB.root(target)).isEqualTo(workerA.root(target));
+            workerA.assertObjectAbsent(target);
+            workerB.assertObjectAbsent(target);
+        }
+    }
+
     private Path stagingDirectory(String name) throws Exception {
         Path path = Files.createDirectories(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
@@ -986,6 +1069,86 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
                         return invokeDelegate(raw, method, arguments);
                     });
         }
+
+        static PhysicalStoreDecorator raceDeletingRootCas(DeletingRootCasRace race) {
+            return raw -> (PhysicalObjectMetadataStore) Proxy.newProxyInstance(
+                    PhysicalObjectMetadataStore.class.getClassLoader(),
+                    new Class<?>[] {PhysicalObjectMetadataStore.class},
+                    (proxy, method, arguments) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return proxyObjectMethod(
+                                    proxy,
+                                    method,
+                                    arguments,
+                                    "two-worker DELETING-CAS physical metadata store");
+                        }
+                        if (method.getName().equals("close")) {
+                            return null;
+                        }
+                        if (race.matches(method, arguments)) {
+                            return race.execute(raw, method, arguments);
+                        }
+                        return invokeDelegate(raw, method, arguments);
+                    });
+        }
+    }
+
+    private static final class DeletingRootCasRace {
+        private final ObjectKeyHash target;
+        private final AtomicInteger attempts = new AtomicInteger();
+        private final AtomicInteger successes = new AtomicInteger();
+        private final AtomicInteger failures = new AtomicInteger();
+        private final CompletableFuture<Void> bothArrived = new CompletableFuture<>();
+
+        private DeletingRootCasRace(ObjectKeyHash target) {
+            this.target = target;
+        }
+
+        private boolean matches(Method method, Object[] arguments) {
+            return method.getName().equals("compareAndSetRoot")
+                    && arguments != null
+                    && arguments.length == 3
+                    && arguments[1] instanceof PhysicalObjectRootRecord replacement
+                    && replacement.objectKeyHash().equals(target.value())
+                    && replacement.lifecycle() == PhysicalObjectLifecycle.DELETING;
+        }
+
+        private CompletableFuture<?> execute(
+                PhysicalObjectMetadataStore raw, Method method, Object[] arguments) {
+            int arrived = attempts.incrementAndGet();
+            if (arrived > 2) {
+                return CompletableFuture.failedFuture(
+                        new AssertionError("more than two DELETING CAS attempts reached the race"));
+            }
+            if (arrived == 2) {
+                bothArrived.complete(null);
+            }
+            return bothArrived
+                    .thenCompose(ignored -> invokeDelegateFuture(raw, method, arguments))
+                    .whenComplete((value, failure) -> {
+                        if (failure == null) {
+                            successes.incrementAndGet();
+                        } else {
+                            failures.incrementAndGet();
+                        }
+                    });
+        }
+
+        private AtomicInteger attempts() {
+            return attempts;
+        }
+
+        private AtomicInteger successes() {
+            return successes;
+        }
+
+        private AtomicInteger failures() {
+            return failures;
+        }
+
+        private CompletableFuture<Void> bothArrived() {
+            return bothArrived;
+        }
     }
 
     private abstract static class ForwardingObjectStore implements ObjectStore {
@@ -1086,6 +1249,72 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
         }
     }
 
+    private static final class ConcurrentTargetDeleteObjectStore
+            extends ForwardingObjectStore {
+        private final TargetDeleteRace race;
+
+        private ConcurrentTargetDeleteObjectStore(
+                ObjectStore delegate, TargetDeleteRace race) {
+            super(delegate);
+            this.race = race;
+        }
+
+        @Override
+        public CompletableFuture<DeleteObjectResult> deleteObject(
+                ObjectKey key, DeleteObjectOptions options) {
+            if (!key.equals(race.target())) {
+                return delegate.deleteObject(key, options);
+            }
+            return race.execute(delegate, key, options);
+        }
+    }
+
+    private static final class TargetDeleteRace {
+        private final ObjectKey target;
+        private final AtomicInteger attempts = new AtomicInteger();
+        private final AtomicInteger completions = new AtomicInteger();
+        private final CompletableFuture<Void> bothArrived = new CompletableFuture<>();
+
+        private TargetDeleteRace(ObjectKey target) {
+            this.target = target;
+        }
+
+        private CompletableFuture<DeleteObjectResult> execute(
+                ObjectStore delegate, ObjectKey key, DeleteObjectOptions options) {
+            int arrived = attempts.incrementAndGet();
+            if (arrived > 2) {
+                return CompletableFuture.failedFuture(
+                        new AssertionError("more than two exact target DELETE attempts reached the race"));
+            }
+            if (arrived == 2) {
+                bothArrived.complete(null);
+            }
+            return bothArrived
+                    .thenCompose(ignored -> delegate.deleteObject(key, options))
+                    .whenComplete((value, failure) -> {
+                        if (failure == null) {
+                            completions.incrementAndGet();
+                        }
+                    });
+        }
+
+        private ObjectKey target() {
+            return target;
+        }
+
+        private AtomicInteger attempts() {
+            return attempts;
+        }
+
+        private AtomicInteger completions() {
+            return completions;
+        }
+
+        private CompletableFuture<Void> bothArrived() {
+            return bothArrived;
+        }
+    }
+
     private static final class EmptyInventoryLostDeleteResponseObjectStore
             extends ForwardingObjectStore {
         private final ObjectKey target;
@@ -1147,6 +1376,20 @@ class Phase4PhysicalGcOxiaS3IntegrationTest {
             return method.invoke(delegate, arguments);
         } catch (InvocationTargetException failure) {
             throw failure.getCause();
+        }
+    }
+
+    private static CompletableFuture<?> invokeDelegateFuture(
+            Object delegate, Method method, Object[] arguments) {
+        try {
+            Object result = invokeDelegate(delegate, method, arguments);
+            if (result instanceof CompletableFuture<?> future) {
+                return future;
+            }
+            return CompletableFuture.failedFuture(
+                    new AssertionError("decorated metadata method did not return a future"));
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
         }
     }
 

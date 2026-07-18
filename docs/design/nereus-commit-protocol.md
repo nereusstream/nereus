@@ -511,9 +511,9 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 > physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless execution、current-writer inventory、
 > registration-last retirement、metadata-first lifecycle、typed broker GC config、configured-scope capability proof、
 > atomic deletion activation、provider/Pulsar restart fencing and shared reference-domain interpretation are
-> implemented through F4-M4 checkpoint AU. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
+> implemented through F4-M4 checkpoint AV. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
 > response、post-DELETE/pre-DELETED-root-CAS independent recovery and applied-DELETED-CAS response-loss exact reload
-> without repeated DELETE. F4-M5 checkpoints X–AI additionally implement
+> without repeated DELETE, plus two-worker shared-intent/idempotent-delete convergence. F4-M5 checkpoints X–AI additionally implement
 > durable registration/readiness/activation、protected async Object-WAL acknowledgement/read repair、pre-I/O lag
 > admission、coupled materialization、stable retention planning/F3 trim delegation and exact Pulsar policy/admin
 > admission. Safe defaults keep physical deletion disabled；the explicit opt-in path and these restart slices exist,
@@ -566,6 +566,12 @@ the caller receives a retriable timeout. `completeDeletedRoot` reloads by object
 replacement under the same immutable identity/attempt/journal digest. It therefore returns success without replaying
 the LocalStack DELETE；a later independent runtime also performs no delete. A different or still-DELETING value cannot
 be interpreted as the successful CAS.
+
+Checkpoint AV proves the multi-worker interpretation of durable delete intent. Two independent processes can both
+derive the same MARKED plan and race its version CAS；only one raw Oxia replacement succeeds. The loser may continue
+only after loading the byte-equivalent DELETING root. Since that root is shared recovery authority rather than a lease,
+both workers may issue the same immutable-identity DELETE；the operation is idempotent and both terminal paths must
+converge to the same versioned DELETED root. No worker-specific memory becomes part of the proof.
 
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the

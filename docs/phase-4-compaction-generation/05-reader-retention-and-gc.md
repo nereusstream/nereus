@@ -178,8 +178,9 @@ consume the exact same ownerless global/projection domain assembly and proves on
 response-loss slice. Checkpoint AT additionally proves real post-DELETE/pre-DELETED-root-CAS process loss converges
 from durable DELETING authority in a fresh runtime. Checkpoint AU proves an already-applied DELETED-root CAS whose
 response is lost converges through exact root reload with one physical DELETE, and that a subsequent fresh runtime
-does not delete again. The remaining scale/failure final gate is still planned，and the safe-default production bridge
-still schedules no pass or deletion.
+does not delete again. Checkpoint AV then proves two independent runtime workers can concurrently resume one MARKED
+root and converge through one durable DELETING intent plus idempotent exact deletes. The remaining two-broker/scale/
+failure final gate is still planned，and the safe-default production bridge still schedules no pass or deletion.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -1732,6 +1733,14 @@ return success without restarting source retirement or object deletion. The fixt
 test-side root read, counts exactly one LocalStack DELETE, and proves a later independently assembled runtime counts
 zero. A different root/attempt/replacement would remain `ROOT_CHANGED` or fail closed；response loss never authorizes
 a guessed transition.
+
+Checkpoint AV tests the intended multi-worker meaning of DELETING：it is shared durable recovery authority, not an
+exclusive process lease. Two metadata proxies hold separate runtimes at the same replacement CAS until both arrive.
+Exactly one raw Oxia CAS wins；the loser can continue only because the production uncertain-CAS branch reloads the
+byte-equivalent DELETING replacement. Both then enter the same exact object-store operation behind a second barrier.
+Duplicate idempotent recovery attempts are permitted and bounded by the active workers；they cannot change object
+identity, invent a new attempt or produce multiple terminal roots. Both processes finally read the same versioned
+DELETED root and absent object.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

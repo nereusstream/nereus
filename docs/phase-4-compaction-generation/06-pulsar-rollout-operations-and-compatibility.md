@@ -951,6 +951,12 @@ the CAS result. It reloads and accepts only the complete durable replacement, so
 fresh runtime subsequently observes terminal DELETED and also performs zero target DELETE calls. This preserves the
 broker-facing activation contract while leaving multi-broker ownership/failover and scale certification pending.
 
+Checkpoint AV exercises worker concurrency below the broker bridge. Two independent runtime assemblies using distinct
+process run ids and the same activated scope are forced to race one MARKED root. One Oxia DELETING CAS wins；the other
+reloads that exact durable intent, and both idempotent exact-delete paths converge to the same DELETED root. This is
+not yet a two-broker ownership/unload/failover test：the locked Pulsar bridge still needs that M6 evidence even though
+the product runtime's shared-intent concurrency is now real-service tested.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

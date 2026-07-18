@@ -1253,6 +1253,27 @@ tasks.register("phase4M4DeletedCasResponseLossCheck") {
     dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
 }
 
+tasks.register<Exec>("checkPhase4M4TwoWorkerConvergenceContractSurface") {
+    group = "verification"
+    description = "Audit deterministic two-runtime DELETING-CAS contention and exact-delete convergence."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-two-worker-convergence-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M4TwoWorkerConvergenceCheck") {
+    group = "verification"
+    description = "Verify checkpoint AV two independent workers converge one durable delete intent against real services."
+    dependsOn("phase4M4DeletedCasResponseLossCheck")
+    dependsOn("checkPhase4M4TwoWorkerConvergenceContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-pulsar-adapter:f4M4IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1263,7 +1284,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4DeletedCasResponseLossCheck")
+    dependsOn("phase4M4TwoWorkerConvergenceCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

@@ -4,7 +4,7 @@
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
-> F4-M4 through checkpoint AU and F4-M5 through checkpoint AI are in progress；F4-M6 pending
+> F4-M4 through checkpoint AV and F4-M5 through checkpoint AI are in progress；F4-M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -660,7 +660,9 @@ Checkpoint AT 进一步在真实 DELETE 返回成功后、旧进程调用 DELETE
 durable DELETING root/sealed journal 与 HEAD absence 完成 DELETED，不继承 LIST、callback 或 candidate state。
 Checkpoint AU 再把 DELETED-root CAS 的真实 Oxia future 先执行成功、再替换为 retriable timeout；production
 coordinator exact reload 完整 replacement 后收敛，LocalStack target 只 DELETE 一次，随后独立 runtime 为零次。
+Checkpoint AV 进一步让两个独立 runtime 同时进入同一 MARKED-root replacement CAS；一个 raw Oxia CAS 成功，
+另一个只凭 exact reload 继续，两条 immutable DELETE recovery 路径幂等收敛同一 DELETED root。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AU 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AV 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

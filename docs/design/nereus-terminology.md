@@ -209,6 +209,8 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   checkpoint；它关闭一个 process-death cut，但不代表 all-shard/multi-worker/scale failure matrix 已完成。
 - **F4-M4 checkpoint AU**：真实 `DELETING -> DELETED` Oxia CAS 已生效但响应丢失；production exact reload 只接受
   完整 expected replacement，目标对象只 DELETE 一次，独立重启也不会再次 DELETE 的 real-service checkpoint。
+- **F4-M4 checkpoint AV**：两个独立 worker runtime 同时竞争同一 MARKED root；一个 raw DELETING CAS 获胜，
+  失败方 exact reload 同一 shared intent，两条 immutable DELETE recovery 路径幂等收敛一个 DELETED root。
 - **F4-M5 checkpoint X**：把 canonical projection-ref encoding、exact durable registration
   create/refresh/final revalidation、topic create/open/recreate return-before-registration 和 shared
   generation-store production ownership落地的 ordinary checkpoint；它不表示 generation lookup capability、
