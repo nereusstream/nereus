@@ -124,6 +124,23 @@ class NereusManagedLedgerRetentionTest {
     }
 
     @Test
+    void policyAdmissionActivatesAndRevalidatesWithoutPlanningOrCursorMutation() {
+        List<String> calls = new ArrayList<>();
+        NereusManagedLedgerRetentionService service = service(
+                calls,
+                new AtomicInteger(),
+                Optional.of(candidate));
+
+        service.ensurePolicyAdmissionReady().join();
+
+        assertThat(calls).containsExactly(
+                "owned",
+                "activation-require:LOGICAL_TRIM:true",
+                "activation-revalidate",
+                "owned");
+    }
+
+    @Test
     void lostOwnershipAfterDurableTrimFailsCallbackAndSkipsObserver() {
         List<String> calls = new ArrayList<>();
         AtomicInteger ownershipChecks = new AtomicInteger();

@@ -207,6 +207,17 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
         return Optional.ofNullable(retentionPolicy.get());
     }
 
+    /** Completes only after registration-backed generation authority is active and still owned by this broker. */
+    public CompletableFuture<Void> ensureGenerationProtocolReadyForPolicy() {
+        if (retentionService == null) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                    false,
+                    "Phase 4 logical retention is not installed in this runtime"));
+        }
+        return retentionService.ensurePolicyAdmissionReady();
+    }
+
     @Override
     public NereusManagedLedgerRuntime runtime() {
         return runtime;

@@ -99,6 +99,19 @@ public final class NereusManagedLedgerRetentionService {
                 });
     }
 
+    /** Activates and revalidates F4 authority before a broker publishes a policy that can mutate logical history. */
+    public CompletableFuture<Void> ensurePolicyAdmissionReady() {
+        return ownershipGuard.requireOwned(
+                        "logical retention policy admission")
+                .thenCompose(ignored -> activationGuard.requireReady(
+                        GenerationOperation.LOGICAL_TRIM,
+                        liveProjection,
+                        true))
+                .thenCompose(activationGuard::revalidate)
+                .thenCompose(ignored -> ownershipGuard.requireOwned(
+                        "logical retention policy admission final check"));
+    }
+
     StreamId streamId() {
         return streamId;
     }
