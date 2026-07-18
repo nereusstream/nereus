@@ -584,6 +584,12 @@ a page. A writer persists 1,001 roots in one shard plus one in every other shard
 each shard with an empty continuation and visits all 1,256 immutable identities exactly once using 64-entry pages.
 The continuation is scan progress only；neither process memory nor object inventory becomes commit or deletion truth.
 
+Checkpoint AY proves the terminal audit path has the same bounded meaning at 10,000 roots. The first complete scan
+persists each DELETED root's exact first-absence proof and stops；a later complete scan crosses the independent orphan
+window, repeats owner/HEAD authority, deletes Phase 1 references before manifest and conditionally removes that exact
+root last. Pages contain at most 32 roots and only one visitor is active. Cancelled materialization/S3 deadline tasks
+are removed immediately, so completed operations cannot become an implicit process-memory history.
+
 `DELETED` is the terminal data-lifecycle result, but its audit key need not live forever. After a separately configured
 long grace, two exact HEAD-absence windows and two unchanged complete owner/domain scans, F4 conditionally removes the
 Phase 1 object-reference record, manifest and finally the exact-version root. Every actual provider PUT/retry first

@@ -1418,6 +1418,11 @@ explicit reader/protection absence markers and every canonical domain snapshot d
 the candidate. A later scanner pass must observe both strict grace boundaries and the same proof before it can read or
 delete an audit key.
 
+Checkpoint AY makes the scheduler half of that statement executable at the 10,000-root boundary. Production
+materialization and S3 deadline executors enable remove-on-cancel and disable delayed/periodic work after shutdown, so
+every successful bounded metadata or HEAD operation removes its cancelled far-future timer immediately. A complete
+pass therefore retains only its bounded root page and current visitor, not one cancelled timer per prior operation.
+
 The implemented coordinator treats any persisted reader lease or protection as `HANDLE_PRESENT`, any emitted domain
 reference as `OWNER_PRESENT`, and an incomplete/vetoing reference-domain pass as `DOMAIN_VETO`. Each blocker clears the
 persisted absence observation by exact root CAS. An exact reappearing object is deleted only after the root is reloaded,
@@ -1763,6 +1768,13 @@ Oxia, then closes. A new process starts every shard with an empty continuation a
 Its scanner reads shard 0 in exactly 16 pages and all other shards in one page each, visiting the complete set of
 1,256 immutable hashes exactly once. This is bounded metadata enumeration evidence；it neither consults object LIST
 nor transfers a cursor or registry from the writer process.
+
+Checkpoint AY tests the DELETED-root retirement cardinality itself. Ten thousand exact roots with matching Phase 1
+reference/manifest audits cross the durable first-absence window in one complete pass and the separate orphan window
+in a later pass. The production scanner/coordinator then removes references before manifest and each root last；a
+third pass is empty. The fixture forces 32-value pagination and proves one visitor、audit call、HEAD and root delete at
+a time, while both production deadline scheduler factories remove cancelled tasks and leave an empty queue after
+each pass. No per-root future/result collection is accumulated.
 
 V1 has no TTL-only or “stale hint” deletion. Operationally, the active registry cardinality is bounded by live plus
 not-yet-fully-retired stream incarnations；metrics expose both populations and shard skew.

@@ -4,7 +4,7 @@
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
-> F4-M4 through checkpoint AX and F4-M5 through checkpoint AI are in progress；F4-M6 pending
+> F4-M4 through checkpoint AY and F4-M5 through checkpoint AI are in progress；F4-M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -671,6 +671,11 @@ Checkpoint AX 再关闭 physical-root 热点分页规模线：首进程向真实
 ACTIVE root 与其余 255 个 shard 各一个后退出；全新 scanner 从每 shard 空 continuation 开始，以 64 条/page
 在热点 shard 精确读取 16 页、其余各一页，并证明 1,256 个 immutable identity 无重复、无遗漏。
 
-F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AX 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
+Checkpoint AY 再关闭 10,000-DELETED-root 退休规模线：production scanner/coordinator 第一轮持久化每个 root
+的 first-absence proof，第二轮在独立 orphan window 后按 Phase 1 references、manifest、root-last 顺序退休；
+32-entry pagination、one-at-a-time visitation 和 remove-on-cancel materialization/S3 deadline scheduler 冻结
+高基数内存边界。
+
+F4-M0 只是 design gate；F4-M1–M3 final gates、M4 through checkpoint AY 和 M5 through checkpoint AI 也不声称 production physical GC final-gated、
 async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
 故障点和 release gates 见代码级实施计划。

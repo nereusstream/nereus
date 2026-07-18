@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4-M4 through checkpoint AX and F4-M5 through checkpoint AI are in progress，F4-M6 pending
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M3 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4-M4 through checkpoint AY and F4-M5 through checkpoint AI are in progress，F4-M6 pending
 > 最近设计/实现同步：2026-07-18
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -102,7 +102,7 @@ planner/recovery、exact-source claim-to-output-ready worker、protection/checkp
 service lifecycle、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral SPI/registry 以及 terminal
 workflow-metadata retirement，以及 topic COMMITTED-source bootstrap、tagged-v1 unkeyed 表示、
 sorted-spill two-pass engine/worker/isolated publication 已实现并于 2026-07-15 通过 ordinary/真实
-Oxia/LocalStack final gates。M4 through checkpoint AX 已实现 NRC1 protocol、protected generation-zero append、
+Oxia/LocalStack final gates。M4 through checkpoint AY 已实现 NRC1 protocol、protected generation-zero append、
 recovery-root/replay/index repair、bounded GC plan/root/journal fence、root-authenticated destructive skeleton、typed
 generation-zero source retirement，以及 completed-trim/COMMITTED/TOPIC_COMPACTED source eligibility 和
 grace-fenced higher-generation pre-drain/reproof，并增加 durable generation-activation authority、future sentinel
@@ -133,7 +133,9 @@ Checkpoint AW then proves a fresh runtime recovers mixed MARKED/DELETING roots f
 object inventory, and fixes discovery pagination to follow only changing opaque tokens rather than cross-page logical
 key order. Checkpoint AX then persists 1,001 roots in one physical shard plus one in every other shard through real
 four-shard Oxia, closes the writer and proves a fresh scanner covers all 1,256 identities exactly once with bounded
-64-entry pages. M5
+64-entry pages. Checkpoint AY then drives 10,000 DELETED roots through the durable first-absence and separate orphan
+windows with 32-entry pages、one-at-a-time production coordination、Phase 1 audit cleanup/root-last deletion and no
+retained cancelled deadline timers. M5
 checkpoint X 又实现 exact durable registration create/refresh/final
 revalidation、topic open/recreate return barrier，以及 shared generation-store production ownership。Checkpoint Y
 又在 Pulsar fork 实现 reserved generation lookup capability、binding/cursor/generation three-property barrier、

@@ -7,10 +7,33 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 
 class S3CompatibleObjectStoreProviderTest {
+    @Test
+    void cancelledRequestDeadlinesAreRemovedInsteadOfRetainedUntilDueTime() {
+        ScheduledThreadPoolExecutor scheduler =
+                S3CompatibleObjectStoreProvider.newDeadlineScheduler();
+        try {
+            ScheduledFuture<?> deadline = scheduler.schedule(
+                    () -> { }, 1, TimeUnit.DAYS);
+
+            assertThat(scheduler.getQueue()).hasSize(1);
+            assertThat(deadline.cancel(false)).isTrue();
+
+            assertThat(scheduler.getRemoveOnCancelPolicy()).isTrue();
+            assertThat(scheduler.getExecuteExistingDelayedTasksAfterShutdownPolicy()).isFalse();
+            assertThat(scheduler.getContinueExistingPeriodicTasksAfterShutdownPolicy()).isFalse();
+            assertThat(scheduler.getQueue()).isEmpty();
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
     @Test
     void clearsResolverOwnedSecretArrays() {
         char[] access = "access-key".toCharArray();

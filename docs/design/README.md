@@ -72,7 +72,9 @@ DELETING CAS 获胜、失败方 reload 同一 durable intent，幂等 exact-dele
 checkpoint AW 进一步让全新 runtime 在 LIST 恒空时恢复覆盖 256 shard 的 mixed MARKED/DELETING roots，
 并修正 inventory 只能依赖 opaque continuation、不能假设跨页 logical-key 顺序的合同；checkpoint AX 再以
 真实四分片 Oxia 证明首进程写入 1,001 个同 shard root 加其余每 shard 一个后，全新 scanner 从空 continuation
-以 16 个热点页加 255 个单页无重复、无遗漏地读取全部 1,256 个 identity。
+以 16 个热点页加 255 个单页无重复、无遗漏地读取全部 1,256 个 identity；checkpoint AY 又让 10,000 个
+DELETED root 经过持久化 first-absence 与独立 orphan window 两轮生产扫描，按 references → manifest → root
+顺序退休，并修复 materialization/S3 cancelled deadline timer 在高基数成功请求后滞留的问题。
 当前 broker safe defaults 不启动该服务；剩余 destructive/scale 矩阵与 M4/M6 最终兼容门禁仍未完成。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

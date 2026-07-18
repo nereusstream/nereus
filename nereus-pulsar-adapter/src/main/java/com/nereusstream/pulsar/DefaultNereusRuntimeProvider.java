@@ -36,6 +36,7 @@ import com.nereusstream.managedledger.generation.ManagedLedgerGenerationRegistra
 import com.nereusstream.managedledger.generation.ManagedLedgerAsyncAppendAdmissionGuard;
 import com.nereusstream.managedledger.generation.ManagedLedgerMaterializationRegistrationCoordinator;
 import com.nereusstream.managedledger.retention.NereusRetentionRuntime;
+import com.nereusstream.materialization.MaterializationSchedulers;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationProtocolActivationStore;
@@ -215,7 +216,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             clock);
             cursorMetadataStore = CursorMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, configuration.cursorMetadata());
-            scheduler = Executors.newSingleThreadScheduledExecutor(daemonFactory("nereus-f2-scheduler"));
+            scheduler = MaterializationSchedulers.newSingleThreadScheduler(
+                    daemonFactory("nereus-f2-scheduler"));
             callbackExecutor = Executors.newFixedThreadPool(
                     Math.min(Runtime.getRuntime().availableProcessors(), 8),
                     daemonFactory("nereus-f2-callback"));

@@ -970,6 +970,13 @@ shard from an empty continuation and proves bounded `64`-entry pagination covers
 This removes the single-page-per-shard assumption without claiming Pulsar ownership transfer or the remaining
 10,000-root/failure certification.
 
+Checkpoint AY exercises the first 10,000-root retirement boundary below the broker bridge. Two complete production
+scanner/coordinator passes persist the first absence proof and later retire every matching Phase 1 audit/root in
+references-before-manifest/root-last order under 32-entry pages and one-at-a-time visitation. The provider's shared
+materialization scheduler and S3's request-deadline scheduler now remove cancelled timers immediately, so high-rate
+successful cuts do not retain one delayed task per historical operation. This is deterministic product-runtime
+evidence；actual Pulsar ownership transfer/unload and two-broker failover remain M6 work.
+
 The Pulsar bridge records the typed `mutationsAllowed()` value during storage initialization. After a zero-failure
 registration backfill it first waits for publication activation, then only under that physical switch submits the AQ
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation

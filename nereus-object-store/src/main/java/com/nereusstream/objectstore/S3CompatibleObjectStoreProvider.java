@@ -4,8 +4,8 @@ package com.nereusstream.objectstore;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,8 +59,7 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
                             .retryPolicy(RetryPolicy.none())
                             .build())
                     .build();
-            deadlineScheduler = Executors.newSingleThreadScheduledExecutor(
-                    daemonFactory("nereus-s3-deadline"));
+            deadlineScheduler = newDeadlineScheduler();
             verifyBucket(client, config);
             store = new S3CompatibleObjectStore(
                     client,
@@ -86,6 +85,15 @@ public final class S3CompatibleObjectStoreProvider implements ObjectStoreProvide
             }
             throw new IllegalStateException("unexpected S3 provider bootstrap failure");
         }
+    }
+
+    static ScheduledThreadPoolExecutor newDeadlineScheduler() {
+        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(
+                1, daemonFactory("nereus-s3-deadline"));
+        scheduler.setRemoveOnCancelPolicy(true);
+        scheduler.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        scheduler.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        return scheduler;
     }
 
     @Override
