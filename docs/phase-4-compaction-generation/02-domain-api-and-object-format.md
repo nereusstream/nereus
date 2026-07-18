@@ -27,9 +27,10 @@ The collector stops at durable delete intent and deliberately exposes no metadat
 typed source destructive recovery and the separate DELETED-root/Phase 1 audit-retirement coordinator are now
 implemented. Checkpoints X–AF additionally deliver durable registration/backfill/activation、the protected async
 Object-WAL boundary and the coupled production generation-aware read/replay/source-repair/materialization runtime.
-Checkpoints AG–AH additionally deliver exact logical-retention planning/service semantics、the shared bounded execution
-lane and production managed-ledger/facade installation. Cursor snapshot GC、object inventory、registration retirement、
-destructive GC composition and exact Pulsar retention-policy/admin activation remain target work. Package、class and method names
+Checkpoints AG–AI additionally deliver exact logical-retention planning/service semantics、the shared bounded execution
+lane、production managed-ledger/facade installation and exact Pulsar retention/backlog policy plus loaded/unloaded
+admin admission. Cursor snapshot GC、object inventory、registration retirement and destructive GC composition remain
+target work. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 

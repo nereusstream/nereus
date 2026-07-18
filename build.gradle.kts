@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("68093ba53388c4cdbe6516a35391451646820c71")
+    .orElse("330eeeb3fa9903ed0123c2a0e261d403c32f0a59")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1254,6 +1254,53 @@ tasks.register("phase4M5RetentionRuntimeCheck") {
     dependsOn("phase4M5RetentionPlannerCheck")
     dependsOn("checkPhase4M5RetentionRuntimeContractSurface")
     dependsOn("phase4M5RetentionRuntimePulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("checkPhase4M5RetentionPolicyAdminContractSurface") {
+    group = "verification"
+    description = "Audit exact Pulsar retention policy projection and generation-gated admin routing."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-retention-policy-admin-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M5RetentionPolicyAdminPulsarCheck") {
+    group = "verification"
+    description = "Run locked Pulsar exact policy/admin formatting, style, and focused tests."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M5RetentionRuntimeCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusTopicFeatureResolverTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusTopicFeatureValidatorTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusAdminOperationTest",
+        "--tests", "org.apache.pulsar.broker.service.persistent.PersistentTopicNereusAdmissionTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("phase4M5RetentionPolicyAdminCheck") {
+    group = "verification"
+    description = "Verify checkpoint AI exact topic policy admission and loaded/unloaded logical trim routing."
+    dependsOn("phase4M5RetentionRuntimeCheck")
+    dependsOn("checkPhase4M5RetentionPolicyAdminContractSurface")
+    dependsOn("phase4M5RetentionPolicyAdminPulsarCheck")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-managed-ledger:check")

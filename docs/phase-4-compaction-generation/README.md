@@ -72,7 +72,9 @@
 > source-index-verified stable candidate planner，以及 ownership/activation/final-authority gated、只委托 F3
 > `CursorRetentionCoordinator` 的 logical-trim service。Checkpoint AH 继续实现 process-owned shared bounded
 > plan lane、same-stream coalescing、whole-operation timeout/close、per-ledger service installation、facade trim
-> routing 与五项 Pulsar typed broker config 映射。Exact effective Pulsar retention policy/admin mapping、cursor
+> routing 与五项 Pulsar typed broker config 映射。Checkpoint AI 又实现 exact immutable Pulsar
+> retention/backlog snapshot、checked policy projection、stable cluster readiness、registration-backed marker
+> admission、activation 后 policy 稳定重读，以及 loaded/unloaded/partition-child `TRIM_TOPIC` 路由。Cursor
 > snapshot candidate/deletion scanner、object inventory、
 > registration retirement、production physical GC 与最终删除开关仍保持关闭
 >
@@ -81,7 +83,7 @@
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@68093ba53388c4cdbe6516a35391451646820c71`
+> `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`
 
 > 实现状态日期：2026-07-18
 
@@ -1211,11 +1213,28 @@ fixed-size executor 与 bounded queue 限制实际未完成的 async plan 数量
 future，但每个 housekeeping/admin caller 获得独立 completion；operation timeout 覆盖整个 service future，
 runtime close 先拒绝新任务再 bounded drain/force-fail。Facade 只在 exact policy snapshot 已安装时调用该 lane，
 成功边界仍是 F3 durable logical trim。Pulsar broker config 现映射 page/concurrency/queue/operation/close 五个
-边界并在 client construction 前做跨层校验。Topic-policy resolver 尚未把 exact effective
-`RetentionPolicies` 安装为 snapshot，loaded/unloaded admin gate 也尚未放行 `TRIM_TOPIC`，因此当前 production
-route 仍 fail closed，physical deletion 继续不可用。
+边界并在 client construction 前做跨层校验。在 AH source lock 上，topic-policy resolver 尚未把 exact
+effective `RetentionPolicies` 安装为 snapshot，loaded/unloaded admin gate 也尚未放行 `TRIM_TOPIC`；checkpoint
+AI 在下节关闭了该 logical-retention broker 缺口。Physical deletion 在两个 checkpoint 中都继续不可用。
 `phase4M5RetentionRuntimeCheck` 已于 2026-07-18 在 Java 21 和 locked Pulsar
 `master@68093ba53388c4cdbe6516a35391451646820c71` 上通过 151-task 完整前置/模块/契约/Pulsar focused 链。
+
+Checkpoint AI closes the broker logical-retention policy/admin cut. `NereusResolvedTopicFeatures` now retains exact
+immutable effective `RetentionPolicies` and both typed `BacklogQuota` values, plus precise-time mode and runtime
+readiness；the resolver keeps local > global > namespace > broker precedence and checked conversion rejects invalid
+or overflowing retention values before publication. `NereusTopicOpenContext` carries the exact derived
+`RetentionPolicySnapshot` and rejects any mismatch. When a retention or consumer-eviction policy first needs F4,
+`PersistentTopic` waits for ownership、registration-backed marker activation/revalidation and a fresh equal policy
+input tuple before installing config/policy/features；a stale async completion cannot install its snapshot. Loaded
+admin uses that exact feature snapshot；unloaded bound topics require current cluster generation readiness before
+`TRIM_TOPIC` loads, and the loaded route validates again before `trimConsumedLedgersInBackground`. Size eviction and
+precise time eviction are admitted only with generation readiness；non-precise time eviction stays rejected, while
+producer hold/exception remains non-destructive. The service repeats durable activation/ownership/policy/planner/F3
+checks at mutation time, so the broker projection is not a correctness owner. `phase4M5RetentionPolicyAdminCheck`
+and its focused Java/style/static-documentation chain are the checkpoint-AI evidence boundary；physical deletion is
+still disabled. The aggregate gate passed on 2026-07-18 under Java 21 against locked Pulsar
+`master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59` with 153 Nereus/inherited/source/document/Pulsar tasks；its final
+four-suite broker invocation passed 129 tasks.
 
 ## 7. Milestones
 
@@ -1226,7 +1245,7 @@ route 仍 fail closed，physical deletion 继续不可用。
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | in progress；through checkpoint W, NRC1/recovery replay/index repair、exact retirement metadata、GC plans/root fence/scanner、root-authenticated journal/destructive recovery、typed source handlers、all completed-trim/COMMITTED/TOPIC_COMPACTED source-eligibility paths、grace-fenced higher pre-drain/reproof、durable activation authority、future sentinel、five affected/ownerless domains、dual-absence DELETED-root retirement、guarded/protected/pinned cursor snapshots and all-shard physical/cursor live-reference backfill are implemented/tested；checkpoint AF composes the non-destructive replay/index/source-repair and materialization lifecycle in production, while cursor snapshot candidate/deletion scanning、object inventory、registration retirement、physical GC composition and final gate remain pending |
-| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；Pulsar exact policy/admin activation and final rollout gates remain |
+| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；physical GC composition and final rollout gates remain |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：

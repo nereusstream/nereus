@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and local Pulsar
-`68093ba53388c4cdbe6516a35391451646820c71`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`330eeeb3fa9903ed0123c2a0e261d403c32f0a59`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
@@ -127,7 +127,9 @@ retention correctness slice：checked exact Pulsar policy values、bounded confi
 source-index-verified candidate planner and an ownership/activation-gated service whose only mutation is the F3
 `CursorRetentionCoordinator.requestTrim` protocol. Checkpoint AH adds the shared bounded/coalescing execution lane、
 whole-operation timeout/close、production runtime/per-ledger facade composition and five exact Pulsar broker config
-fields. Exact effective topic-policy snapshot mapping and loaded/unloaded `TRIM_TOPIC` admission remain pending.
+fields. Checkpoint AI adds exact immutable effective retention/backlog policy mapping、stable generation readiness、
+registration-backed marker admission with post-activation policy reload, and loaded/unloaded/partition-child
+`TRIM_TOPIC` routing. Physical GC composition and the aggregate M5/M6 rollout remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1237,6 +1239,7 @@ NereusRetentionConfigTest                                 implemented checkpoint
 NereusManagedLedgerRetentionTest                          implemented checkpoint AG order/no-op/lost-owner callback
 NereusRetentionExecutionLaneTest                          implemented checkpoint AH coalescing/concurrency/queue/timeout/close
 NereusRuntimeConfigurationRetentionTest                   implemented checkpoint AH cross-layer timeout/queue bounds
+NereusManagedLedgerRetentionTest                          extended checkpoint AI policy admission activation/revalidation
 NereusManagedLedgerGenerationReadTest
 NereusRuntimeF4CompositionTest
 NereusRuntimeF4ConfigurationCrossValidationTest
@@ -1251,13 +1254,10 @@ NereusStorageBindingCapabilityTest                        extended checkpoint Y
 NereusGenerationRegistrationBackfillTest                  implemented checkpoint Z order/concurrency/digest/drift, extended AA proof admission
 NereusBrokerStorageConfigurationTest                      extended checkpoint AF exact profile/config and AH retention defaults/rejection
 NereusManagedLedgerStorageGenerationActivationTest        implemented checkpoint AC success/failure/disabled sequencing
-NereusTopicFeatureResolverF4Test
-NereusTopicFeatureValidatorF4Test
-NereusAdminOperationF4Test
-NereusManagedLedgerStorageF4Test
-NereusRetentionPolicyUpdateTest
-NereusBacklogEvictionTest
-NereusTrimTopicRouteTest
+NereusTopicFeatureResolverTest                            extended checkpoint AI exact precedence/copy/projection
+NereusTopicFeatureValidatorTest                           extended checkpoint AI retention/backlog matrix/overflow
+NereusAdminOperationTest                                  extended checkpoint AI ready/unready unloaded trim
+PersistentTopicNereusAdmissionTest                        extended checkpoint AI loaded trim/marker/stable reload
 NereusGenerationProtocolBrokerTest
 ```
 
@@ -1398,6 +1398,21 @@ still absent, so the route fails closed and no physical-delete capability is ena
 `phase4M5RetentionRuntimeCheck` passed on 2026-07-18 under Java 21 against locked Pulsar
 `master@68093ba53388c4cdbe6516a35391451646820c71` (151 tasks), including all inherited gates、module checks、contract/
 documentation audits and the focused Pulsar formatting/style/test chain.
+
+Checkpoint AI implements the exact broker policy/admin boundary. The resolver stores defensive copies of the exact
+effective retention tuple and both typed backlog quotas instead of booleans, carries precise-time mode separately and
+accepts generation readiness only from the Nereus storage context. `NereusTopicOpenContext` proves that the installed
+`RetentionPolicySnapshot` is the checked canonical conversion of those same Pulsar facts. A policy that can mutate
+logical history waits for stable all-broker generation readiness, the product-owned registration/marker activation
+guard, final ownership revalidation and a fresh equal complete policy-input tuple before it replaces the loaded
+snapshot. The loaded admin path consumes that exact snapshot；the unloaded binding path first checks generation
+readiness, and `PersistentTopicsBase` repeats the loaded check before invoking the facade. Partitioned trim waits for
+all child requests. Size eviction and precise-time eviction are admitted only when generation-ready；ledger-estimate
+time eviction remains rejected, and producer hold/exception does not claim delete authority. The mutation path still
+ends at F3 logical trim and physical GC remains disabled. `phase4M5RetentionPolicyAdminCheck` composes the inherited
+AH gate、Nereus checks、source/document audits and four focused Pulsar suites. It passed on 2026-07-18 under Java 21
+against locked Pulsar `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59` with 153 aggregate tasks；the final broker
+invocation passed 129 tasks.
 
 ## 8. F4-M6 — Final Acceptance
 

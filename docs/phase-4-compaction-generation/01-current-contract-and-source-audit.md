@@ -39,7 +39,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@68093ba53388c4cdbe6516a35391451646820c71`。
+`master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -58,7 +58,22 @@ Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
 | `pulsar-broker-common/.../resources/NamespaceResources.java` | `1f20be916edd5e2cf92713a169064c32a9b46514` | `listNamespacesAsync(tenant)` backfill traversal |
 | `pulsar-broker-common/.../resources/TopicResources.java` | `66d2e81fb0eb9ebfda99deef636857e6200cf0e6` | `listPersistentTopicsAsync(namespace)` including unloaded topics |
 
-The table preserves the M0 blob audit. At the current checkpoint-AC source lock, the fork additionally contains
+The table preserves the M0 blob audit. The following overlay records the exact broker files changed by checkpoint AI
+at the current source lock；these hashes, rather than the M0 rows above, are authoritative for the policy/admin cut.
+
+| Checkpoint-AI source | Current Git blob | F4 relevance |
+| --- | --- | --- |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `5f35683c1942b5968f1fd6e4aab8e0aec299b03c` | unloaded binding readiness and admin admission |
+| `pulsar-broker/.../nereus/NereusResolvedTopicFeatures.java` | `2a3fdd7bdc2697d047077591740ca2956c4f7518` | exact immutable retention/backlog facts |
+| `pulsar-broker/.../nereus/NereusTopicFeatureResolver.java` | `7e262fe0a0a61e507ae5b61d11e5f978a84f8b7f` | effective policy precedence and readiness projection |
+| `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `33d3942b033de602ded94676226308c30181aacf` | F4 policy/admin admission matrix |
+| `pulsar-broker/.../nereus/NereusTopicOpenContext.java` | `5712df5e6057a72bb45fc7727b0ee1f62b20a91c` | exact checked retention snapshot binding |
+| `pulsar-broker/.../nereus/NereusTopicPolicySnapshot.java` | `97e9c1a5c27a491b7545ba431ad14e784854040d` | stable complete policy-input comparison |
+| `pulsar-broker/.../service/BrokerService.java` | `90d6bdeabe3e887a0abb7e76efab451f341d5dad` | storage-bound capability/readiness resolution |
+| `pulsar-broker/.../service/persistent/PersistentTopic.java` | `e1ef70dbd0733782b50104028cb1a462b5f7f703` | marker admission, stable reload and loaded snapshot install |
+| `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `64d1af0f05db3050fcd26ac635dbc65915ef89da` | loaded and partition-child `TRIM_TOPIC` route |
+
+At the checkpoint-AC source lock, the fork additionally contained
 `NereusGenerationProtocolCapability`、`NereusGenerationCapabilityReadiness` and the generation extension to
 `NereusBrokerCapabilityCoordinator`：all three protocol versions are advertised/verified under two stable persistent-
 broker snapshots, readiness includes broker start timestamps, and broker-registry notifications invalidate the
@@ -140,25 +155,36 @@ requestTrim(owner, candidate, reason)
   -> CAS TRIM_PENDING -> ACTIVE(completed offset)
 ```
 
-`AbstractNereusManagedLedger.trimConsumedLedgersInBackground` currently only completes the promise. F4 must override
-the writable implementation and enter the exact coordinator path；it must never call `StreamStorage.trim` directly.
+`AbstractNereusManagedLedger.trimConsumedLedgersInBackground` keeps the compatibility no-op only for non-writable
+views. Checkpoints AH–AI override the writable ledger, execute through the shared bounded retention lane and exact
+policy provider, then delegate the only logical mutation to the F3 coordinator；the facade never calls
+`StreamStorage.trim` directly and completes before physical GC.
 
 ### 3.4 Broker policy/admin paths
 
 Current local Pulsar behavior：
 
-- topic open rejects retention、consumer backlog eviction、compaction and Pulsar offload for Nereus；
-- loaded and unloaded `TRIM_TOPIC` are rejected by `NereusTopicFeatureValidator` before the F3 no-op；
+- topic open/update stores exact immutable effective retention/backlog values and rejects compaction、Pulsar offload、
+  non-precise time eviction and any F4-mutating policy without stable generation readiness；
+- a retention/consumer-eviction policy waits for registration-backed marker activation/revalidation and a stable
+  post-activation policy reload before installation；
+- loaded `TRIM_TOPIC` checks the installed exact feature snapshot, while unloaded bound topics first check current
+  cluster readiness；the loaded path validates again before entering the retention service；
 - `BacklogQuotaManager` size eviction calls `ManagedCursor.skipEntries` on the slowest cursor；F3 persists that
   destructive movement correctly；
-- non-precise time eviction calls ledger-segment methods (`getLedgerInfo/getLedgersInfo`) that the virtual ledger does
-  not support；
+- precise time eviction stays on cursor expiry/mutation；non-precise ledger-segment eviction is rejected because the
+  virtual ledger deliberately has no stock rollover semantics；
 - compaction trigger/status and `readCompacted=true` remain denied。
 
 F4 therefore admits only the policy paths mapped in document 06. It does not claim that every stock
 BookKeeper-ledger retention heuristic is meaningful for one immutable virtual ledger.
 
-## 4. Current Gaps and Required Owners
+## 4. M0 Gap Inventory and Required Owners
+
+The “current fact” column below is the frozen M0 input fact, not a claim about the latest checkpoint. Implemented
+closures are tracked in document 07；as of checkpoint AI the generation/reader/task/publication/retention-rollout rows
+have implementation slices, while cursor-snapshot GC、inventory/registration retirement and physical-GC composition
+remain open.
 
 | Gap | Current fact | Phase 4 owner |
 | --- | --- | --- |

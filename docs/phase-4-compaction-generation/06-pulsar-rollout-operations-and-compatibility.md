@@ -141,9 +141,11 @@ Checkpoint AG implements `DefaultRetentionCandidatePlanner` and `NereusManagedLe
 product-neutral components. Checkpoint AH adds `NereusRetentionRuntime` to this ownership graph after cursor storage/
 retention construction. It owns the process-wide bounded lane and creates a policy-provider-backed service for every
 writable `NereusManagedLedger`; runtime close drains it before cursor/generation/Oxia resources. The facade override
-routes `trimConsumedLedgersInBackground` through this runtime and completes after F3 durable logical trim. The Pulsar
-fork still does not install the exact effective topic `RetentionPolicies` snapshot or admit loaded/unloaded
-`TRIM_TOPIC`, so the production route fails closed until the next policy/admin checkpoint.
+routes `trimConsumedLedgersInBackground` through this runtime and completes after F3 durable logical trim. Checkpoint
+AI installs the exact effective topic `RetentionPolicySnapshot` from the same immutable policy-input tuple, activates
+and revalidates registration-backed generation authority before an F4-mutating policy becomes visible, reloads the
+policy tuple after activation, and admits loaded/unloaded `TRIM_TOPIC` only with generation readiness. The retention
+service still repeats activation、ownership、policy and planner revalidation before delegating the only mutation to F3.
 
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive

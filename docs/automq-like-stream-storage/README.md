@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AH；
+> 状态：Implementation in progress / F4-M1–M3 final-gated、M4 through checkpoint W、M5 through checkpoint AI；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -52,16 +52,17 @@ Already present：
   ownership/activation/final-authority gated F3 logical-trim delegation are implemented. Missing/incomplete/stale
   evidence can only stop or reduce a candidate, and the returned promise never waits for physical GC.
 - F4-M5 checkpoint AH：the shared bounded/coalescing retention lane、whole-operation timeout/close、per-ledger
-  service/facade installation and Pulsar typed retention config mapping are implemented. Exact effective topic policy
-  and admin admission remain fail-closed.
+  service/facade installation and Pulsar typed retention config mapping are implemented.
+- F4-M5 checkpoint AI：exact immutable effective retention/backlog policy projection、checked snapshot identity、
+  generation/marker admission、post-activation stable reload and loaded/unloaded/partition-child `TRIM_TOPIC`
+  routing are implemented；logical mutation still terminates at F3.
 
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
 - production-composed global-domain source retirement and physical/cursor/root/audit GC completion；
 - primary-WAL retention gate and destructive GC daemon composition；
-- Pulsar exact retention policy/admin activation、cursor-snapshot candidate/deletion、object inventory and
-  registration retirement；
+- cursor-snapshot candidate/deletion、object inventory、registration retirement and physical-GC composition；
 - mixed primary target resolver。
 
 The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default
