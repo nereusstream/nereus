@@ -13,8 +13,11 @@
 > second fresh-process dual-absence convergence；it
 > also found and fixed the
 > public BookKeeper client's consuming `ByteBuf` ownership boundary。These checkpoints are
+> extended by a real intent/head/generation-zero applied-response-loss matrix that reuses one exact BK range with no
+> duplicate provider write and preserves the frozen pre-head no-public-attempt-id boundary。These checkpoints are
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
-> `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck`。`BookKeeperWalRuntime` can execute
+> `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` /
+> `bookKeeperPrimaryWalM2StableRecoveryCheck`。`BookKeeperWalRuntime` can execute
 > BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade，including three-ledger rollover、unload/reopen、
 > historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes the exact
 > borrowed stock-client boundary。BK-M3 is now in progress：task V2 preserves exact tagged BK sources，F4 exact-source
@@ -61,6 +64,10 @@
 > `bookKeeperPrimaryWalM3LagFailureCheck --rerun-tasks` adds real shared-lag and unreadable-output fail-closed evidence
 > and passes 65/65 executable tasks；
 > but is intentionally not the still-unregistered `bookKeeperPrimaryWalM3FinalCheck`。
+
+> 2026-07-20：`bookKeeperPrimaryWalM2StableRecoveryCheck --rerun-tasks` passes 63/63 executable tasks against real
+> Oxia + BookKeeper，including applied commit-intent、stream-head and generation-zero response loss with one exact BK
+> range and no duplicate write。This is a focused M2 checkpoint，not the still-unregistered M2 aggregate/final gate。
 
 ## 1. Delivery identity
 

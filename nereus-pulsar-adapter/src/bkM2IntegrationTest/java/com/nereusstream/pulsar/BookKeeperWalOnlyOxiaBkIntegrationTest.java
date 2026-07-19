@@ -8,6 +8,7 @@ import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendOptions;
+import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
@@ -71,6 +72,7 @@ import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.records.AllocationSlotLifecycle;
 import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
@@ -1192,6 +1194,83 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
+    void realOxiaStableAppendResponseLossReusesOneBookKeeperRangeAndRepairsGenerationZero()
+            throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-stable-loss-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(4_750_000), ZoneId.of("UTC"));
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri)) {
+            for (StableAppendResponseCut cut : StableAppendResponseCut.values()) {
+                AtomicReference<CountingOperations> operations = new AtomicReference<>();
+                AppliedStableAppendResponseLoss responseLoss = new AppliedStableAppendResponseLoss(cut);
+                try (Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-stable-loss-" + cut.name().toLowerCase(java.util.Locale.ROOT),
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> counting(raw, operations),
+                        responseLoss::decorate)) {
+                    StreamId stream = process.storage.createOrGetStream(
+                                    new StreamName("persistent://tenant/namespace/bk-stable-loss-"
+                                            + cut.name().toLowerCase(java.util.Locale.ROOT) + "-" + suffix),
+                                    new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                            .join()
+                            .streamId();
+                    AppendSession session = process.acquire(stream, "writer-1");
+                    AppendResult recovered;
+                    try {
+                        recovered = process.append(stream, session, new byte[] {1}, new byte[] {2, 3});
+                    } catch (java.util.concurrent.CompletionException expectedResponseLoss) {
+                        NereusException failure = requireNereusFailure(expectedResponseLoss);
+                        assertThat(responseLoss.injected())
+                                .as("expected %s response loss but append failed first with %s: %s",
+                                        cut, failure.code(), failure.getMessage())
+                                .isTrue();
+                        AppendAttemptId recoveryAttempt = failure.appendAttemptId().orElseGet(() -> new AppendAttemptId(
+                                process.bookKeeperMetadata.scanReservations(
+                                                cluster, stream, Optional.empty(), 10)
+                                        .join()
+                                        .values()
+                                        .get(0)
+                                        .value()
+                                        .appendAttemptId()));
+                        recovered = failure.appendAttemptId().isPresent()
+                                ? process.storage.recoverAppend(
+                                                stream,
+                                                recoveryAttempt,
+                                                new AppendRecoveryOptions(TIMEOUT))
+                                        .join()
+                                : process.recoveryCoordinator.recoverAfterRestart(
+                                                session,
+                                                recoveryAttempt,
+                                                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                                                TIMEOUT)
+                                        .join();
+                    }
+                    assertThat(responseLoss.injected()).as("response cut %s", cut).isTrue();
+                    assertThat(operations.get().writeCalls()).isEqualTo(2);
+                    AppendResult stable = recovered;
+                    assertThat(process.storage.resolve(stream, 0, new ResolveOptions(10, false, true)).join().ranges())
+                            .singleElement()
+                            .satisfies(range -> {
+                                assertThat(range.readTarget()).isEqualTo(stable.readTarget());
+                                assertThat(range.generation()).isZero();
+                            });
+                    assertRead(process, stream, List.of(new byte[] {1}, new byte[] {2, 3}));
+                }
+            }
+        }
+    }
+
+    @Test
     void newOwnerRecoveryOpenFencesLiveOldHandleAndPreventsOldHeadCommit() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "bk-m2-live-fence-" + suffix;
@@ -1664,6 +1743,17 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         return (BookKeeperEntryRangeReadTarget) result.readTarget();
     }
 
+    private static NereusException requireNereusFailure(Throwable failure) {
+        Throwable current = failure;
+        while (current != null && !(current instanceof NereusException)) {
+            current = current.getCause();
+        }
+        if (current instanceof NereusException exact) {
+            return exact;
+        }
+        throw new AssertionError("expected NereusException", failure);
+    }
+
     private static Map<Integer, BookKeeperLedgerRootRecord> oneRootPerShard(BookKeeperKeyspace keys) {
         Map<Integer, BookKeeperLedgerRootRecord> roots = new LinkedHashMap<>();
         for (long ledgerId = 1;
@@ -1871,6 +1961,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     configuration,
                     reservation,
                     clock,
+                    Function.identity(),
                     Function.identity());
         }
 
@@ -1884,6 +1975,29 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 Clock clock,
                 Function<BookKeeperClientOperations, BookKeeperClientOperations> operationDecorator)
                 throws Exception {
+            return open(
+                    cluster,
+                    clusterName,
+                    deployment,
+                    processRunId,
+                    configuration,
+                    reservation,
+                    clock,
+                    operationDecorator,
+                    Function.identity());
+        }
+
+        private static Process open(
+                BKCluster cluster,
+                String clusterName,
+                String deployment,
+                String processRunId,
+                BookKeeperWalConfiguration configuration,
+                BookKeeperLedgerIdNamespaceReservation reservation,
+                Clock clock,
+                Function<BookKeeperClientOperations, BookKeeperClientOperations> operationDecorator,
+                Function<OxiaMetadataStore, OxiaMetadataStore> metadataDecorator)
+                throws Exception {
             OxiaClientConfiguration oxia = OxiaClientConfiguration.defaults(OXIA.getServiceAddress());
             SharedOxiaClientRuntime oxiaRuntime = SharedOxiaClientRuntime.connect(oxia, clock);
             BookKeeperMetadataStoreConfig metadataConfiguration = new BookKeeperMetadataStoreConfig(
@@ -1893,6 +2007,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     configuration.maxUncertainAllocations());
             OxiaJavaClientMetadataStore l0 = OxiaJavaClientMetadataStore.usingSharedRuntime(
                     oxia, oxiaRuntime, clock, metadataConfiguration);
+            OxiaMetadataStore runtimeMetadata = java.util.Objects.requireNonNull(
+                    metadataDecorator.apply(l0), "decorated Oxia metadata store");
             OxiaJavaBookKeeperMetadataStore bookKeeperMetadata =
                     OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
                             oxia, oxiaRuntime, clock, metadataConfiguration);
@@ -1957,7 +2073,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     clusterName,
                     configuration,
                     bookKeeperMetadata,
-                    l0,
+                    runtimeMetadata,
                     references,
                     recovery,
                     clock);
@@ -1965,8 +2081,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             StreamStorageConfig storageConfiguration = StreamStorageConfig.defaults(clusterName, "writer-1");
             DefaultStreamStorage storage = runtime.newGenerationZeroStorage(
                     storageConfiguration,
-                    l0,
-                    new MetadataAppendRecoverySearcher(clusterName, l0),
+                    runtimeMetadata,
+                    new MetadataAppendRecoverySearcher(clusterName, runtimeMetadata),
                     AppendAdmissionGuard.noOp(),
                     clock,
                     Runnable::run,
@@ -1991,6 +2107,17 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
 
         private AppendResult append(StreamId streamId, byte[]... payloads) {
+            return append(streamId, Optional.empty(), payloads);
+        }
+
+        private AppendResult append(StreamId streamId, AppendSession session, byte[]... payloads) {
+            return append(streamId, Optional.of(session), payloads);
+        }
+
+        private AppendResult append(
+                StreamId streamId,
+                Optional<AppendSession> session,
+                byte[]... payloads) {
             List<AppendEntry> entries = java.util.stream.IntStream.range(0, payloads.length)
                     .mapToObj(index -> new AppendEntry(payloads[index], 1, index + 1L, Map.of()))
                     .toList();
@@ -2008,7 +2135,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                             streamId,
                             batch,
                             new AppendOptions(
-                                    Optional.empty(),
+                                    session,
                                     DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
                                     TIMEOUT,
                                     true,
@@ -2066,6 +2193,65 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             l0.close();
             oxiaRuntime.close();
             client.close();
+        }
+    }
+
+    private enum StableAppendResponseCut {
+        COMMIT_INTENT("prepareStableAppend"),
+        STREAM_HEAD("commitPreparedStableAppend"),
+        GENERATION_ZERO("materializeGenerationZero");
+
+        private final String methodName;
+
+        StableAppendResponseCut(String methodName) {
+            this.methodName = methodName;
+        }
+
+        private boolean matches(java.lang.reflect.Method method) {
+            return method.getName().equals(methodName);
+        }
+    }
+
+    private static final class AppliedStableAppendResponseLoss {
+        private final StableAppendResponseCut cut;
+        private final AtomicBoolean injected = new AtomicBoolean();
+
+        private AppliedStableAppendResponseLoss(StableAppendResponseCut cut) {
+            this.cut = java.util.Objects.requireNonNull(cut, "cut");
+        }
+
+        private OxiaMetadataStore decorate(OxiaMetadataStore delegate) {
+            return (OxiaMetadataStore) Proxy.newProxyInstance(
+                    OxiaMetadataStore.class.getClassLoader(),
+                    new Class<?>[] {OxiaMetadataStore.class},
+                    (ignored, method, arguments) -> {
+                        Object result = invoke(method, delegate, arguments);
+                        if (cut.matches(method)
+                                && result instanceof CompletableFuture<?> future
+                                && injected.compareAndSet(false, true)) {
+                            return future.thenCompose(value -> CompletableFuture.failedFuture(
+                                    new NereusException(
+                                            ErrorCode.TIMEOUT,
+                                            true,
+                                            "injected applied " + cut + " response loss")));
+                        }
+                        return result;
+                    });
+        }
+
+        private boolean injected() {
+            return injected.get();
+        }
+
+        private static Object invoke(
+                java.lang.reflect.Method method,
+                Object target,
+                Object[] arguments) throws Throwable {
+            try {
+                return method.invoke(target, arguments);
+            } catch (InvocationTargetException failure) {
+                throw failure.getCause();
+            }
         }
     }
 

@@ -703,6 +703,12 @@ tasks.register("bookKeeperPrimaryWalM2RealServiceCheck") {
     dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
 }
 
+tasks.register("bookKeeperPrimaryWalM2StableRecoveryCheck") {
+    group = "verification"
+    description = "Verify real Oxia BK_ONLY intent/head/gen0 response-loss convergence without another BK write."
+    dependsOn("bookKeeperPrimaryWalM2RealServiceCheck")
+}
+
 tasks.register("bookKeeperPrimaryWalM3ExactSourceCheck") {
     group = "verification"
     description = "Verify BK task V2 target round-trip and provider-neutral exact-source reads."

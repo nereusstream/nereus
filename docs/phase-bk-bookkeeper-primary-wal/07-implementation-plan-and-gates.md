@@ -20,7 +20,7 @@ BookKeeper ledger deletion      implemented and real-service tested / production
 `bookKeeperPrimaryWalM2AllocatorCheck` / `bookKeeperPrimaryWalM2AppendReadCheck` /
 `bookKeeperPrimaryWalM2RecoveryFencingCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` and
-`bookKeeperPrimaryWalM2RealServiceCheck` are executable and backed by real
+`bookKeeperPrimaryWalM2RealServiceCheck` / `bookKeeperPrimaryWalM2StableRecoveryCheck` are executable and backed by real
 module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPrimaryWalM3ExactSourceCheck` /
 `bookKeeperPrimaryWalM3ProtectionCheck` / `bookKeeperPrimaryWalM3AsyncProfileCheck` /
 `bookKeeperPrimaryWalM3LagCheck` / `bookKeeperPrimaryWalM3SourceRetirementCheck` /
@@ -347,6 +347,14 @@ the identical target with zero BK writes, while an expired old session is replac
 the old range and allocates a different ledger at entry zero。This is real B/O restart evidence, not yet the abrupt
 process-kill C cut。
 
+The stable-recovery checkpoint now injects an applied response loss after each production-Oxia commit-intent、stream-head
+and generation-zero operation while the primary bytes live in real BookKeeper。The pre-head intent cut deliberately
+keeps the frozen Phase 1.5 `KNOWN_NOT_COMMITTED` / no-public-attempt-id boundary and recovers from the durable internal
+BK reservation identity；head and generation-zero cuts use the retained public attempt。All three converge the exact
+same range，perform exactly the original two BookKeeper entry writes and leave one readable generation-zero index。
+This closes the real O/B portions of BK-28 and BK-29；independent-process transport chaos remains BK-M6 evidence。
+`bookKeeperPrimaryWalM2StableRecoveryCheck --rerun-tasks` passed 63/63 executable tasks on 2026-07-20。
+
 Still required before BK-M2 is complete：close the remaining BK-M2 scenario/evidence rows and execute the ordinary /
 aggregate final tasks against the current source locks。Production provider composition、first-create admission and
 loaded/unloaded/two-broker ownership rollout are BK-M5 responsibilities, not hidden BK-M2 completion criteria；until
@@ -409,6 +417,7 @@ bookKeeperPrimaryWalM2RecoveryFencingCheck
 bookKeeperPrimaryWalM2RetentionCheck
 bookKeeperPrimaryWalM2PulsarCheck
 bookKeeperPrimaryWalM2RealServiceCheck       real Oxia + real BK + restart/delete-response-loss checkpoint
+bookKeeperPrimaryWalM2StableRecoveryCheck    real intent/head/gen0 response-loss + same-range recovery
 bookKeeperPrimaryWalM2Check                 ordinary aggregate, delete remains dry-run
 bookKeeperPrimaryWalM2FinalCheck            real Oxia + real BK + restart/delete-response-loss
 ```

@@ -73,6 +73,9 @@ delayed matching create recovered by the bounded fixed-slot scanner、permanent 
 client/runtime cold restart、all-256-root/all-16-slot cold Oxia scans、stable historical targets、real multi-entry
 advanced-ledger ranges、first/middle/last partial-write sealing/no-tail-reuse、same-target generation-zero repair、trim、
 lost delete response and fresh-process dual absence。
+The same real-service path now injects applied commit-intent、head and generation-zero response loss，then recovers the
+same exact range with no duplicate BookKeeper write；the pre-head cut remains intentionally internal-reservation recovery
+under the frozen Phase 1.5 no-public-attempt-id contract。
 The following deterministic restart-recovery checkpoint adds O(1) stream/attempt reservation identity、same-session
 durable range replay with zero BK rewrite、new-session abandon/seal/retire、intent/head response-loss convergence and
 generation-zero repair after the source ledger is already sealed；the corresponding real process cuts remain in the
