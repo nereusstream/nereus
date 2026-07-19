@@ -971,9 +971,34 @@ selection must discard that shortcut and run a fresh generation scan plus durabl
 
 ### 8.6 Merge and retirement
 
-At 32 root references or configured object threshold, a merge task reads/pins current checkpoint objects and writes a
-new NRC1 object with identical canonical entries. Root CAS atomically replaces the reference list. Old checkpoint
-objects are GC candidates only after all replay readers release leases and the newer root is revalidated.
+The implemented M6 trigger is the frozen `RecoveryCheckpointMerger.MERGE_REFERENCE_COUNT == 32` boundary. No lower
+object-count/byte threshold is currently exposed by `MaterializationConfig`, so runtime and documentation must not
+claim an additional configurable trigger. After reconciling the exact current root, `RecoveryCheckpointCoordinator`
+selects merge before invoking `RecoveryCheckpointBuilder`；therefore a full root no longer terminates as
+`REFERENCE_LIMIT`.
+
+`RecoveryCheckpointMerger.prepare` walks the 32 references in root order. For every reference it performs exact HEAD
+(key、length、CRC32C、optional canonical NRC1 metadata and ETag), derives the complete
+`PhysicalObjectIdentity`、acquires an `ObjectReadPinManager` durable lease whose post-write selection callback requires
+the same versioned root and stream registration, then runs `RecoveryCheckpointCodecV1.openAndVerify` and compares the
+complete header/object identity to the reference. A root/registration drift or any malformed source releases every
+already-acquired lease and publishes nothing. Explicit cancellation prevents later source admission and releases a
+lease that returns after cancellation；durable expiry remains the process-death fallback, not the normal cleanup path.
+
+The prepared plan calls `RecoveryCheckpointCodecV1.merge` once. The codec retains only source directories、one bounded
+publication page per source and primitive local-to-merged publication-index maps；it performs a two-pass canonical
+publication merge/deduplication and streams remapped commit entries into one staged NRC1 object. The coordinator then
+reuses the ordinary guarded PUT、strict HEAD/open verification、bounded pending protection、activation/selection
+revalidation and response-loss-safe root CAS pipeline. The merge publication plan has an empty retained-reference
+list, so the CAS replaces all 32 references with the single merged reference while preserving exact coverage、commit
+versions、cumulative sizes and source-head summary.
+
+Source leases remain held through successful root CAS and
+`RecoveryCheckpointRootReconciler` creation/revalidation of the new root-owned checkpoint-object and checkpoint-target
+protections；only then does the coordinator release them. A lost successful root-CAS response converges by exact root
+reload before reconciliation. Old checkpoint objects are GC candidates only after the current-root reference domain
+excludes them and all replay/merge readers release leases；stale old-root protections are retired only through the
+ordinary GC proof, never as a side effect of merge publication.
 
 Live commit keys below the new root, their generic committed markers and generation-zero indexes become retirement
 candidates. Conditional metadata deletion and physical source deletion follow document 05；root publication alone

@@ -14,6 +14,7 @@ import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.capability.LiveProjectionSubject;
 import com.nereusstream.core.physical.ObjectProtection;
+import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.materialization.MaterializationConfig;
@@ -37,7 +38,9 @@ import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointCodecV1;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointFormatV1;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointMergeResult;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointObject;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteRequest;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteResult;
 import java.time.Clock;
 import java.time.Duration;
@@ -59,6 +62,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
     private final ObjectStore objectStore;
     private final RecoveryCheckpointCodecV1 codec;
     private final RecoveryCheckpointBuilder builder;
+    private final RecoveryCheckpointMerger merger;
     private final RecoveryCheckpointProtectionManager protections;
     private final RecoveryCheckpointRootReconciler rootReconciler;
     private final GenerationProtocolActivationGuard activationGuard;
@@ -76,6 +80,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
             RecoveryCheckpointCodecV1 codec,
             RecoveryCheckpointBuilder builder,
             RecoveryCheckpointProtectionManager protections,
+            ObjectReadPinManager readPins,
             GenerationProtocolActivationGuard activationGuard,
             MaterializationConfig config,
             Duration pendingProtectionDuration,
@@ -89,6 +94,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                 codec,
                 builder,
                 protections,
+                readPins,
                 activationGuard,
                 new SecureRecoveryCheckpointAttemptIdGenerator(),
                 config,
@@ -105,6 +111,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
             RecoveryCheckpointCodecV1 codec,
             RecoveryCheckpointBuilder builder,
             RecoveryCheckpointProtectionManager protections,
+            ObjectReadPinManager readPins,
             GenerationProtocolActivationGuard activationGuard,
             RecoveryCheckpointAttemptIdGenerator attemptIds,
             MaterializationConfig config,
@@ -123,6 +130,13 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
         this.config = Objects.requireNonNull(config, "config");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.merger = new RecoveryCheckpointMerger(
+                this.cluster,
+                this.generationStore,
+                this.objectStore,
+                this.codec,
+                Objects.requireNonNull(readPins, "readPins"),
+                this.clock);
         this.pendingProtectionDurationMillis = requirePendingDuration(
                 pendingProtectionDuration,
                 config.operationTimeout(),
@@ -172,19 +186,42 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                     .thenCompose(admission -> rootReconciler
                             .reconcile(admission.root(), deadline)
                             .thenApply(ignored -> admission))
-                    .thenCompose(admission -> deadline.bound(
-                                    () -> builder.build(
-                                            streamId,
-                                            admission.root(),
-                                            admission.registration(),
-                                            requireText(attemptIds.next(), "checkpointAttemptId")),
-                                    "build recovery checkpoint plan")
-                            .thenCompose(build -> build.plan().isEmpty()
-                                    ? CompletableFuture.completedFuture(
-                                            RecoveryCheckpointRunResult.skipped(build.status()))
-                                    : publish(admission, build.plan().orElseThrow())))
+                    .thenCompose(this::planAndPublish)
                     .whenComplete((ignored, failure) -> close());
             return result;
+        }
+
+        private CompletableFuture<RecoveryCheckpointRunResult> planAndPublish(
+                Admission admission) {
+            String attemptId = requireText(
+                    attemptIds.next(), "checkpointAttemptId");
+            if (admission.root().value().checkpoints().size()
+                    == RecoveryCheckpointMerger.MERGE_REFERENCE_COUNT) {
+                return deadline.bound(
+                                () -> merger.prepare(
+                                        admission.root(),
+                                        admission.registration(),
+                                        attemptId,
+                                        deadline),
+                                "prepare recovery checkpoint merge")
+                        .thenCompose(plan -> publish(
+                                admission, new MergePublicationPlan(plan)));
+            }
+            return deadline.bound(
+                            () -> builder.build(
+                                    streamId,
+                                    admission.root(),
+                                    admission.registration(),
+                                    attemptId),
+                            "build recovery checkpoint plan")
+                    .thenCompose(build -> build.plan().isEmpty()
+                            ? CompletableFuture.completedFuture(
+                                    RecoveryCheckpointRunResult.skipped(
+                                            build.status()))
+                            : publish(
+                                    admission,
+                                    new BuiltPublicationPlan(
+                                            build.plan().orElseThrow())));
         }
 
         private CompletableFuture<Admission> admit(AdmissionInputs inputs) {
@@ -201,36 +238,48 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
 
         private CompletableFuture<RecoveryCheckpointRunResult> publish(
                 Admission admission,
-                RecoveryCheckpointPlan plan) {
-            return deadline.bound(
-                            () -> codec.write(
-                                    plan.writeRequest(),
-                                    new RecoveryCheckpointListPublisher<>(plan.publications()),
-                                    new RecoveryCheckpointListPublisher<>(plan.entries())),
+                PublicationPlan plan) {
+            CompletableFuture<RecoveryCheckpointRunResult> publication;
+            if (!plan.baseRoot().equals(admission.root())
+                    || !plan.registration().equals(admission.registration())) {
+                publication = CompletableFuture.failedFuture(invariant(
+                        "recovery checkpoint publication plan differs from admission"));
+            } else {
+                publication = deadline.bound(
+                            () -> plan.write(deadline.remaining()),
                             "write staged NRC1 recovery checkpoint")
-                    .thenCompose(result -> {
-                        written = result;
-                        if (result.objectLength() > plan.maximumObjectBytes()) {
+                    .thenCompose(staged -> {
+                        written = staged.object();
+                        if (staged.object().objectLength()
+                                > plan.maximumObjectBytes()) {
                             throw invariant("NRC1 object exceeds configured checkpoint byte limit");
                         }
-                        return upload(admission, plan, result);
+                        return upload(admission, plan, staged);
                     })
-                    .thenCompose(head -> verifyUploaded(plan, written)
+                    .thenCompose(uploaded -> verifyUploaded(uploaded.staged())
                             .thenApply(opened -> new VerifiedUpload(
-                                    head,
+                                    uploaded.head(),
                                     opened,
-                                    checkpointIdentity(written, head))))
-                    .thenCompose(upload -> acquirePending(admission, plan, upload))
-                    .thenCompose(state -> publishRoot(admission, plan, state))
+                                    checkpointIdentity(
+                                            uploaded.staged().object(),
+                                            uploaded.head()))))
+                    .thenCompose(upload -> acquirePending(
+                            admission, plan, upload))
+                    .thenCompose(state -> publishRoot(
+                            admission, plan, state))
                     .thenCompose(published -> rootReconciler
                             .reconcile(published.root(), deadline)
                             .thenApply(ignored -> RecoveryCheckpointRunResult.published(published)));
+            }
+            return releasePlan(plan, publication);
         }
 
-        private CompletableFuture<HeadObjectResult> upload(
+        private CompletableFuture<UploadedCheckpoint> upload(
                 Admission admission,
-                RecoveryCheckpointPlan plan,
-                RecoveryCheckpointWriteResult result) {
+                PublicationPlan plan,
+                StagedCheckpoint staged) {
+            RecoveryCheckpointWriteRequest request = staged.request();
+            RecoveryCheckpointWriteResult result = staged.object();
             PutObjectOptions options = new PutObjectOptions(
                     RecoveryCheckpointFormatV1.CONTENT_TYPE,
                     result.storageCrc32c(),
@@ -240,9 +289,9 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                             "nereus-content-sha256", result.contentSha256().value(),
                             "nereus-stream-id", streamId.value(),
                             "nereus-checkpoint-sequence", Long.toString(
-                                    plan.writeRequest().checkpointSequence()),
+                                    request.checkpointSequence()),
                             "nereus-checkpoint-attempt-id",
-                                    plan.writeRequest().checkpointAttemptId()),
+                                    request.checkpointAttemptId()),
                     deadline.remaining());
             return deadline.bound(
                             () -> objectStore.putObject(
@@ -253,7 +302,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                                             () -> authorizeUpload(
                                                     admission,
                                                     plan,
-                                                    result,
+                                                    staged,
                                                     key,
                                                     attempt),
                                             "authorize recovery checkpoint provider attempt")),
@@ -261,25 +310,27 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                     .handle((ignored, failure) -> {
                         if (failure == null
                                 || unwrap(failure) instanceof ObjectAlreadyExistsException) {
-                            return head(plan, result);
+                            return head(staged);
                         }
                         return CompletableFuture.<HeadObjectResult>failedFuture(unwrap(failure));
                     })
-                    .thenCompose(value -> value);
+                    .thenCompose(value -> value)
+                    .thenApply(head -> new UploadedCheckpoint(staged, head));
         }
 
         private CompletableFuture<Void> authorizeUpload(
                 Admission admission,
-                RecoveryCheckpointPlan plan,
-                RecoveryCheckpointWriteResult result,
+                PublicationPlan plan,
+                StagedCheckpoint staged,
                 ObjectKey key,
                 int providerAttempt) {
+            RecoveryCheckpointWriteResult result = staged.object();
             if (!key.equals(result.objectKey()) || providerAttempt <= 0) {
                 return CompletableFuture.failedFuture(invariant(
                         "guarded recovery checkpoint upload identity is invalid"));
             }
             return activationGuard.revalidate(admission.proof())
-                    .thenCompose(ignored -> builder.revalidate(plan))
+                    .thenCompose(ignored -> plan.revalidate())
                     .thenCompose(ignored -> physicalStore.getRoot(
                             cluster, result.objectKeyHash()))
                     .thenAccept(optional -> optional.ifPresent(root ->
@@ -287,8 +338,8 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
         }
 
         private CompletableFuture<HeadObjectResult> head(
-                RecoveryCheckpointPlan plan,
-                RecoveryCheckpointWriteResult result) {
+                StagedCheckpoint staged) {
+            RecoveryCheckpointWriteResult result = staged.object();
             return deadline.bound(
                             () -> objectStore.headObject(
                                     result.objectKey(),
@@ -299,7 +350,10 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                                 || head.objectLength() != result.objectLength()
                                 || !head.checksum().equals(result.storageCrc32c())
                                 || !headMetadataMatches(
-                                        plan, result, head, streamId.value())) {
+                                        staged.request(),
+                                        result,
+                                        head,
+                                        streamId.value())) {
                             throw invariant(
                                     "uploaded recovery checkpoint HEAD differs from staged bytes");
                         }
@@ -308,8 +362,8 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
         }
 
         private CompletableFuture<RecoveryCheckpointObject> verifyUploaded(
-                RecoveryCheckpointPlan plan,
-                RecoveryCheckpointWriteResult result) {
+                StagedCheckpoint staged) {
+            RecoveryCheckpointWriteResult result = staged.object();
             return deadline.bound(
                             () -> codec.openAndVerify(
                                     result.objectKey(),
@@ -318,7 +372,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                                     deadline.remaining()),
                             "strictly verify uploaded NRC1 recovery checkpoint")
                     .thenApply(object -> {
-                        if (!object.header().equals(plan.writeRequest())
+                        if (!object.header().equals(staged.request())
                                 || !object.objectId().equals(result.objectId())
                                 || !object.objectKey().equals(result.objectKey())
                                 || object.objectLength() != result.objectLength()
@@ -334,37 +388,45 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
 
         private CompletableFuture<PendingPublication> acquirePending(
                 Admission admission,
-                RecoveryCheckpointPlan plan,
+                PublicationPlan plan,
                 VerifiedUpload upload) {
             long expiresAt = Math.addExact(
                     clock.millis(), pendingProtectionDurationMillis);
             return deadline.bound(
-                            () -> builder.revalidate(plan),
+                            plan::revalidate,
                             "revalidate checkpoint plan before pending protection")
                     .thenCompose(ignored -> deadline.bound(
                             () -> activationGuard.revalidate(admission.proof()),
                             "revalidate activation before pending protection"))
                     .thenCompose(ignored -> deadline.bound(
                             () -> protections.acquirePending(
-                                    plan, upload.object(), expiresAt),
+                                    plan.baseRoot(),
+                                    upload.checkpoint().header(),
+                                    upload.object(),
+                                    expiresAt),
                             "acquire bounded recovery checkpoint pending protection"))
                     .thenApply(pending -> new PendingPublication(upload, pending));
         }
 
         private CompletableFuture<PublishedRecoveryCheckpoint> publishRoot(
                 Admission admission,
-                RecoveryCheckpointPlan plan,
+                PublicationPlan plan,
                 PendingPublication state) {
-            RecoveryCheckpointReferenceRecord reference = reference(plan, written);
-            RecoveryCheckpointRootRecord replacement = root(plan, reference);
+            RecoveryCheckpointWriteRequest request =
+                    state.upload().checkpoint().header();
+            RecoveryCheckpointReferenceRecord reference = reference(
+                    request, written);
+            RecoveryCheckpointRootRecord replacement = root(
+                    plan, request, reference);
             return deadline.bound(
-                            () -> builder.revalidate(plan),
+                            plan::revalidate,
                             "revalidate checkpoint plan before root CAS")
                     .thenCompose(ignored -> deadline.bound(
                             () -> activationGuard.revalidate(admission.proof()),
                             "revalidate activation before recovery-root CAS"))
                     .thenCompose(ignored -> deadline.bound(
-                            () -> protections.revalidatePending(plan, state.pending()),
+                            () -> protections.revalidatePending(
+                                    plan.baseRoot(), state.pending()),
                             "revalidate pending protection before recovery-root CAS"))
                     .thenCompose(ignored -> compareAndSetRoot(plan, replacement))
                     .thenApply(published -> new PublishedRecoveryCheckpoint(
@@ -372,7 +434,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
         }
 
         private CompletableFuture<VersionedRecoveryCheckpointRoot> compareAndSetRoot(
-                RecoveryCheckpointPlan plan,
+                PublicationPlan plan,
                 RecoveryCheckpointRootRecord replacement) {
             return deadline.bound(
                             () -> generationStore.compareAndSetRecoveryRoot(
@@ -399,6 +461,40 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                                 });
                     })
                     .thenCompose(value -> value);
+        }
+
+        private <T> CompletableFuture<T> releasePlan(
+                PublicationPlan plan,
+                CompletableFuture<T> source) {
+            CompletableFuture<T> result = new CompletableFuture<>();
+            source.whenComplete((value, failure) -> {
+                CompletableFuture<Void> release;
+                try {
+                    release = Objects.requireNonNull(
+                            plan.release(), "checkpoint plan release future");
+                } catch (Throwable releaseFailure) {
+                    release = CompletableFuture.failedFuture(releaseFailure);
+                }
+                release.whenComplete((ignored, releaseFailure) -> {
+                    if (failure == null && releaseFailure == null) {
+                        result.complete(value);
+                        return;
+                    }
+                    Throwable exact = failure == null
+                            ? unwrap(releaseFailure)
+                            : unwrap(failure);
+                    if (failure != null && releaseFailure != null) {
+                        exact.addSuppressed(unwrap(releaseFailure));
+                    }
+                    result.completeExceptionally(exact);
+                });
+            });
+            result.whenComplete((ignored, failure) -> {
+                if (result.isCancelled()) {
+                    source.cancel(true);
+                }
+            });
+            return result;
         }
 
         private void close() {
@@ -481,7 +577,7 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
     }
 
     private static boolean headMetadataMatches(
-            RecoveryCheckpointPlan plan,
+            RecoveryCheckpointWriteRequest request,
             RecoveryCheckpointWriteResult result,
             HeadObjectResult head,
             String streamId) {
@@ -493,16 +589,15 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
                         head.metadata().get("nereus-content-sha256"))
                 && streamId.equals(
                         head.metadata().get("nereus-stream-id"))
-                && Long.toString(plan.writeRequest().checkpointSequence()).equals(
+                && Long.toString(request.checkpointSequence()).equals(
                         head.metadata().get("nereus-checkpoint-sequence"))
-                && plan.writeRequest().checkpointAttemptId().equals(
+                && request.checkpointAttemptId().equals(
                         head.metadata().get("nereus-checkpoint-attempt-id"));
     }
 
     private RecoveryCheckpointReferenceRecord reference(
-            RecoveryCheckpointPlan plan,
+            RecoveryCheckpointWriteRequest request,
             RecoveryCheckpointWriteResult result) {
-        var request = plan.writeRequest();
         return new RecoveryCheckpointReferenceRecord(
                 request.checkpointSequence(),
                 request.checkpointAttemptId(),
@@ -528,7 +623,8 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
     }
 
     private RecoveryCheckpointRootRecord root(
-            RecoveryCheckpointPlan plan,
+            PublicationPlan plan,
+            RecoveryCheckpointWriteRequest request,
             RecoveryCheckpointReferenceRecord reference) {
         List<RecoveryCheckpointReferenceRecord> references = new ArrayList<>(
                 plan.retainedReferences());
@@ -538,8 +634,8 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
         RecoveryCheckpointReferenceRecord last = exact.get(exact.size() - 1);
         return new RecoveryCheckpointRootRecord(
                 1,
-                plan.writeRequest().streamId().value(),
-                plan.writeRequest().checkpointSequence(),
+                request.streamId().value(),
+                request.checkpointSequence(),
                 first.coveredStartOffset(),
                 last.coveredEndOffset(),
                 first.firstCommitVersion(),
@@ -620,6 +716,164 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
     private static NereusException invariant(String message, Throwable cause) {
         return new NereusException(
                 ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+    }
+
+    private interface PublicationPlan {
+        VersionedRecoveryCheckpointRoot baseRoot();
+
+        VersionedMaterializationStreamRegistration registration();
+
+        List<RecoveryCheckpointReferenceRecord> retainedReferences();
+
+        long maximumObjectBytes();
+
+        CompletableFuture<StagedCheckpoint> write(Duration timeout);
+
+        CompletableFuture<Void> revalidate();
+
+        CompletableFuture<Void> release();
+    }
+
+    private final class BuiltPublicationPlan implements PublicationPlan {
+        private final RecoveryCheckpointPlan plan;
+
+        private BuiltPublicationPlan(RecoveryCheckpointPlan plan) {
+            this.plan = Objects.requireNonNull(plan, "plan");
+        }
+
+        @Override
+        public VersionedRecoveryCheckpointRoot baseRoot() {
+            return plan.baseRoot();
+        }
+
+        @Override
+        public VersionedMaterializationStreamRegistration registration() {
+            return plan.registration();
+        }
+
+        @Override
+        public List<RecoveryCheckpointReferenceRecord> retainedReferences() {
+            return plan.retainedReferences();
+        }
+
+        @Override
+        public long maximumObjectBytes() {
+            return plan.maximumObjectBytes();
+        }
+
+        @Override
+        public CompletableFuture<StagedCheckpoint> write(Duration timeout) {
+            Objects.requireNonNull(timeout, "timeout");
+            return codec.write(
+                            plan.writeRequest(),
+                            new RecoveryCheckpointListPublisher<>(
+                                    plan.publications()),
+                            new RecoveryCheckpointListPublisher<>(
+                                    plan.entries()))
+                    .thenApply(object -> new StagedCheckpoint(
+                            plan.writeRequest(), object));
+        }
+
+        @Override
+        public CompletableFuture<Void> revalidate() {
+            return builder.revalidate(plan);
+        }
+
+        @Override
+        public CompletableFuture<Void> release() {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    private final class MergePublicationPlan implements PublicationPlan {
+        private final RecoveryCheckpointMerger.PreparedMerge plan;
+
+        private MergePublicationPlan(
+                RecoveryCheckpointMerger.PreparedMerge plan) {
+            this.plan = Objects.requireNonNull(plan, "plan");
+            if (plan.sourceCount()
+                    != RecoveryCheckpointMerger.MERGE_REFERENCE_COUNT) {
+                throw invariant("prepared checkpoint merge source count changed");
+            }
+        }
+
+        @Override
+        public VersionedRecoveryCheckpointRoot baseRoot() {
+            return plan.baseRoot();
+        }
+
+        @Override
+        public VersionedMaterializationStreamRegistration registration() {
+            return plan.registration();
+        }
+
+        @Override
+        public List<RecoveryCheckpointReferenceRecord> retainedReferences() {
+            return List.of();
+        }
+
+        @Override
+        public long maximumObjectBytes() {
+            return config.recoveryCheckpointMaxBytes();
+        }
+
+        @Override
+        public CompletableFuture<StagedCheckpoint> write(Duration timeout) {
+            return plan.write(timeout).thenApply(this::staged);
+        }
+
+        private StagedCheckpoint staged(
+                RecoveryCheckpointMergeResult result) {
+            try {
+                if (result.sourceCount()
+                                != RecoveryCheckpointMerger.MERGE_REFERENCE_COUNT
+                        || result.request().checkpointSequence()
+                                != plan.checkpointSequence()
+                        || !result.request().checkpointAttemptId().equals(
+                                plan.checkpointAttemptId())) {
+                    throw invariant("NRC1 merge result differs from its prepared plan");
+                }
+                return new StagedCheckpoint(
+                        result.request(), result.object());
+            } catch (Throwable failure) {
+                result.close();
+                throw failure;
+            }
+        }
+
+        @Override
+        public CompletableFuture<Void> revalidate() {
+            return plan.revalidate();
+        }
+
+        @Override
+        public CompletableFuture<Void> release() {
+            return plan.release();
+        }
+    }
+
+    private record StagedCheckpoint(
+            RecoveryCheckpointWriteRequest request,
+            RecoveryCheckpointWriteResult object) {
+        private StagedCheckpoint {
+            Objects.requireNonNull(request, "request");
+            Objects.requireNonNull(object, "object");
+            if (!object.objectKey().equals(
+                    RecoveryCheckpointFormatV1.objectKey(
+                            request, object.contentSha256()))) {
+                throw new IllegalArgumentException(
+                        "staged checkpoint request/object identity is inconsistent");
+            }
+        }
+    }
+
+    private record UploadedCheckpoint(
+            StagedCheckpoint staged,
+            HeadObjectResult head) {
+        private UploadedCheckpoint {
+            Objects.requireNonNull(staged, "staged");
+            Objects.requireNonNull(head, "head");
+        }
     }
 
     private record AdmissionInputs(

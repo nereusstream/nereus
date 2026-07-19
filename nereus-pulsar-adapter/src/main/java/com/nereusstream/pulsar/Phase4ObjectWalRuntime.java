@@ -214,6 +214,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                                 exactGenerations,
                                 exactPhysical,
                                 exactProtections),
+                        exactReadPins,
                         exactActivation,
                         exactConfig,
                         exactRecoveryCheckpointPendingProtectionDuration,

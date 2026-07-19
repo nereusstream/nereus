@@ -180,8 +180,15 @@ source-index-verified candidate planner and an ownership/activation-gated servic
 whole-operation timeout/close、production runtime/per-ledger facade composition and five exact Pulsar broker config
 fields. Checkpoint AI adds exact immutable effective retention/backlog policy mapping、stable generation readiness、
 registration-backed marker admission with post-activation policy reload, and loaded/unloaded/partition-child
-`TRIM_TOPIC` routing. The M5 final gate composes those paths with the already-final-gated M4 physical-GC predecessor；
-only M6 and the aggregate Phase 4 completion boundary remain pending.
+`TRIM_TOPIC` routing. The M5 final gate composes those paths with the already-final-gated M4 physical-GC predecessor.
+Checkpoint BD starts M6 by implementing the bounded 32-reference NRC1 merge and its production root-publication
+closure：exact HEAD + durable source read-pin + root/registration post-write revalidation、bounded streaming
+publication deduplication/entry-index remap、the shared guarded PUT/pending-protection/root-CAS path、lost-CAS exact
+reload、new-root permanent-protection reconciliation and source-lease release only after that reconciliation. The
+focused fixture proves all 32 leases are durable at the successful CAS, the response may be lost, one replacement
+reference preserves all 32 entries/publications, and selection drift after the first lease write leaves the old root
+authoritative with no leaked lease/staging reservation. Remaining M6 scale fixtures、52-scenario evidence and the
+aggregate Phase 4 completion boundary remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -845,10 +852,10 @@ testing/FakeOxiaMetadataStore                  exact parity
 `nereus-materialization`：
 
 ```text
-recovery/RecoveryCheckpointCoordinator.java               implemented checkpoint D
+recovery/RecoveryCheckpointCoordinator.java               implemented checkpoint D + BD merge publication
 recovery/RecoveryCheckpointBuilder.java           implemented checkpoint C foundation
-recovery/RecoveryCheckpointMerger.java
-recovery/RecoveryCheckpointProtectionManager.java implemented checkpoint C foundation
+recovery/RecoveryCheckpointMerger.java                     implemented checkpoint BD
+recovery/RecoveryCheckpointProtectionManager.java implemented checkpoint C + BD generic pending owner
 recovery/RecoveryCheckpointRootReconciler.java            implemented checkpoint D
 recovery/MetadataRecoveryCheckpointVerifier.java
 gc/GcCandidate.java                                      implemented checkpoint H
@@ -1936,6 +1943,17 @@ The method passed with `testRetryCount=0` on the locked
 separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
+
+Current implementation checkpoint (2026-07-19)：BD is implemented and focused-green. The product-neutral NRC1 codec
+can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
+all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
+reconciles the new root's permanent protections, and releases source leases afterward. This is M6 foundation evidence
+only；`phase4M6Check`、`phase4M6FinalCheck` and the aggregate Phase 4 gates do not yet exist/pass and no completion claim
+is made here. Exact deterministic evidence is
+`RecoveryCheckpointMergeTest.mergesThirtyTwoActiveReferencesWithBoundedRemappingAndExactEntries` plus
+`RecoveryCheckpointCoordinatorTest.mergesThirtyTwoReferencesWithPinnedSourcesAndConvergesLostRootCasResponse`、
+`selectionDriftDuringMergePinLeavesOldRootAuthoritativeAndReleasesLease` and
+`cancellationWhileMergePinReturnsReleasesLateLeaseWithoutStaging`.
 
 ### 8.1 Required scenarios
 

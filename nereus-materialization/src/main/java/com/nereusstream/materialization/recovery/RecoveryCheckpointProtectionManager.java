@@ -30,6 +30,7 @@ import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -60,30 +61,68 @@ public final class RecoveryCheckpointProtectionManager {
             PhysicalObjectIdentity checkpointObject,
             long expiresAtMillis) {
         Objects.requireNonNull(plan, "plan");
+        return acquirePending(
+                plan.baseRoot(),
+                plan.writeRequest(),
+                checkpointObject,
+                expiresAtMillis);
+    }
+
+    public CompletableFuture<ObjectProtection> acquirePending(
+            VersionedRecoveryCheckpointRoot baseRoot,
+            RecoveryCheckpointWriteRequest checkpoint,
+            PhysicalObjectIdentity checkpointObject,
+            long expiresAtMillis) {
+        Objects.requireNonNull(baseRoot, "baseRoot");
+        Objects.requireNonNull(checkpoint, "checkpoint");
         Objects.requireNonNull(checkpointObject, "checkpointObject");
+        long expectedSequence;
+        try {
+            expectedSequence = Math.addExact(
+                    baseRoot.value().checkpointSequence(), 1);
+        } catch (ArithmeticException failure) {
+            throw invariant("recovery checkpoint sequence exhausted");
+        }
+        if (!checkpoint.streamId().value().equals(
+                        baseRoot.value().streamId())
+                || checkpoint.checkpointSequence() != expectedSequence) {
+            throw invariant(
+                    "pending checkpoint protection differs from its base root");
+        }
         ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
-                plan.baseRoot());
+                baseRoot);
         ObjectProtectionRequest request = new ObjectProtectionRequest(
                 checkpointObject,
                 ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING,
-                pendingReferenceId(plan, checkpointObject),
+                pendingReferenceId(
+                        checkpoint.streamId().value(),
+                        checkpoint.checkpointSequence(),
+                        checkpoint.checkpointAttemptId(),
+                        checkpointObject),
                 owner,
                 expiresAtMillis);
         return protections.acquireOrTransfer(
                 request,
-                actual -> requireExactRoot(plan.baseRoot(), owner, actual));
+                actual -> requireExactRoot(baseRoot, owner, actual));
     }
 
     public CompletableFuture<ObjectProtection> revalidatePending(
             RecoveryCheckpointPlan plan,
             ObjectProtection pending) {
         Objects.requireNonNull(plan, "plan");
+        return revalidatePending(plan.baseRoot(), pending);
+    }
+
+    public CompletableFuture<ObjectProtection> revalidatePending(
+            VersionedRecoveryCheckpointRoot baseRoot,
+            ObjectProtection pending) {
+        Objects.requireNonNull(baseRoot, "baseRoot");
         Objects.requireNonNull(pending, "pending");
         ObjectProtectionOwner owner = RecoveryCheckpointProtectionIdentities.rootOwner(
-                plan.baseRoot());
+                baseRoot);
         return protections.revalidate(
                 pending,
-                actual -> requireExactRoot(plan.baseRoot(), owner, actual));
+                actual -> requireExactRoot(baseRoot, owner, actual));
     }
 
     public CompletableFuture<RecoveryCheckpointProtections> acquirePermanent(
@@ -416,11 +455,13 @@ public final class RecoveryCheckpointProtectionManager {
     }
 
     private static String pendingReferenceId(
-            RecoveryCheckpointPlan plan,
+            String streamId,
+            long checkpointSequence,
+            String checkpointAttemptId,
             PhysicalObjectIdentity object) {
-        return "rcp1-" + stable(plan.writeRequest().streamId().value()
-                + '\0' + plan.writeRequest().checkpointSequence()
-                + '\0' + plan.writeRequest().checkpointAttemptId()
+        return "rcp1-" + stable(streamId
+                + '\0' + checkpointSequence
+                + '\0' + checkpointAttemptId
                 + '\0' + object.objectKeyHash().value());
     }
 

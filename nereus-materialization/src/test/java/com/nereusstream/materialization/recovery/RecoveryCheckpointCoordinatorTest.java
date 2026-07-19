@@ -11,6 +11,7 @@ import com.nereusstream.api.EntryIndexRef;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
+import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ProjectionType;
@@ -26,12 +27,16 @@ import com.nereusstream.core.capability.GenerationProjectionAuthoritySnapshot;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.capability.StreamRetirementReferenceAuthoritySnapshot;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.GcAuthorityToken;
 import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectReadLease;
+import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.core.recovery.AnchorAwareCommitWalker;
 import com.nereusstream.materialization.MaterializationConfig;
+import com.nereusstream.materialization.MaterializationDeadline;
 import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.materialization.gc.StreamRegistrationRetirementCoordinator;
 import com.nereusstream.materialization.gc.StreamRegistrationRetirementStatus;
@@ -48,9 +53,12 @@ import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.ObjectProtectionScanPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.RecoveryCheckpointRootDigests;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
+import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
+import com.nereusstream.metadata.oxia.codec.GenerationIndexRecordCodecV1;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
@@ -61,12 +69,20 @@ import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
+import com.nereusstream.metadata.oxia.records.RecoveryCheckpointReferenceRecord;
+import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.objectstore.ObjectStore;
+import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.checkpoint.DefaultRecoveryCheckpointCodecV1;
 import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointCodecV1;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointEntry;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointFormatV1;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointPublication;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteRequest;
+import com.nereusstream.objectstore.checkpoint.RecoveryCheckpointWriteResult;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.lang.reflect.InvocationTargetException;
@@ -95,6 +111,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class RecoveryCheckpointCoordinatorTest {
+    private static final String BASE32 = "abcdefghijklmnopqrstuvwxyz234567";
     private static final String CLUSTER = "checkpoint-coordinator-cluster";
     private static final StreamId STREAM = new StreamId("checkpoint-coordinator-stream");
     private static final ProjectionRef PROJECTION = new ProjectionRef(
@@ -123,6 +140,116 @@ class RecoveryCheckpointCoordinatorTest {
             assertThat(root.value().checkpointSequence()).isEqualTo(1);
             assertThat(root.value().coveredEndOffset()).isEqualTo(2);
             fixture.assertPermanentProtections(root);
+        }
+    }
+
+    @Test
+    void mergesThirtyTwoReferencesWithPinnedSourcesAndConvergesLostRootCasResponse()
+            throws Exception {
+        try (Fixture fixture = new Fixture(
+                temporaryDirectory.resolve("merge-lost-cas"))) {
+            VersionedRecoveryCheckpointRoot seeded =
+                    fixture.seedThirtyTwoCheckpointReferences();
+            AtomicBoolean observedPinnedSources = new AtomicBoolean();
+            GenerationMetadataStore generationStore =
+                    observePinnedMergeAndLoseRootCasResponse(
+                            fixture.generations,
+                            fixture.physical,
+                            seeded.value().checkpoints(),
+                            observedPinnedSources);
+            RecoveryCheckpointCoordinator coordinator = fixture.coordinator(
+                    generationStore, fixture.physical);
+
+            RecoveryCheckpointRunResult result = coordinator.checkpoint(STREAM).join();
+
+            assertThat(result.status()).isEqualTo(
+                    RecoveryCheckpointBuildStatus.READY);
+            VersionedRecoveryCheckpointRoot merged =
+                    result.publication().orElseThrow().root();
+            assertThat(observedPinnedSources).isTrue();
+            assertThat(merged.value().checkpointSequence()).isEqualTo(33);
+            assertThat(merged.value().coveredStartOffset()).isZero();
+            assertThat(merged.value().coveredEndOffset()).isEqualTo(32);
+            assertThat(merged.value().firstCommitVersion()).isEqualTo(1);
+            assertThat(merged.value().lastCommitVersion()).isEqualTo(32);
+            assertThat(merged.value().checkpoints()).hasSize(1);
+            assertThat(merged.value().checkpoints().get(0).commitEntryCount())
+                    .isEqualTo(32);
+            assertThat(merged.value().checkpoints().get(0).publicationCount())
+                    .isEqualTo(32);
+            assertThat(merged.value().checkpoints().get(0).objectKey())
+                    .isNotIn(seeded.value().checkpoints().stream()
+                            .map(RecoveryCheckpointReferenceRecord::objectKey)
+                            .toList());
+            fixture.assertMergedPermanentProtections(merged);
+            fixture.assertNoReaderLeases(seeded.value().checkpoints());
+            assertThat(fixture.stagingFiles.reservedBytes()).isZero();
+        }
+    }
+
+    @Test
+    void selectionDriftDuringMergePinLeavesOldRootAuthoritativeAndReleasesLease()
+            throws Exception {
+        try (Fixture fixture = new Fixture(
+                temporaryDirectory.resolve("merge-selection-drift"))) {
+            VersionedRecoveryCheckpointRoot seeded =
+                    fixture.seedThirtyTwoCheckpointReferences();
+            ObjectReadPinManager drifting = failFirstPinSelectionRevalidation(
+                    fixture.newReadPins(fixture.physical));
+            RecoveryCheckpointCoordinator coordinator = fixture.coordinator(
+                    fixture.generations, fixture.physical, drifting);
+
+            assertThatThrownBy(() -> coordinator.checkpoint(STREAM).join())
+                    .isInstanceOf(CompletionException.class)
+                    .hasRootCauseInstanceOf(
+                            F4MetadataConditionFailedException.class);
+
+            assertThat(fixture.generations.getRecoveryRoot(CLUSTER, STREAM).join())
+                    .contains(seeded);
+            fixture.assertNoReaderLeases(seeded.value().checkpoints());
+            assertThat(fixture.stagingFiles.reservedBytes()).isZero();
+        }
+    }
+
+    @Test
+    void cancellationWhileMergePinReturnsReleasesLateLeaseWithoutStaging()
+            throws Exception {
+        try (Fixture fixture = new Fixture(
+                temporaryDirectory.resolve("merge-cancel"))) {
+            VersionedRecoveryCheckpointRoot seeded =
+                    fixture.seedThirtyTwoCheckpointReferences();
+            VersionedMaterializationStreamRegistration registration =
+                    fixture.generations.getStreamRegistration(CLUSTER, STREAM)
+                            .join()
+                            .orElseThrow();
+            DelayedReadPins readPins = new DelayedReadPins();
+            RecoveryCheckpointMerger merger = new RecoveryCheckpointMerger(
+                    CLUSTER,
+                    fixture.generations,
+                    fixture.objectStore,
+                    fixture.codec,
+                    readPins,
+                    CLOCK);
+            try (MaterializationDeadline deadline =
+                    new MaterializationDeadline(
+                            fixture.config.operationTimeout(),
+                            fixture.scheduler)) {
+                CompletableFuture<RecoveryCheckpointMerger.PreparedMerge> prepared =
+                        merger.prepare(
+                                seeded,
+                                registration,
+                                "z".repeat(26),
+                                deadline);
+                readPins.acquisitionStarted.join();
+
+                assertThat(prepared.cancel(true)).isTrue();
+                readPins.completeAcquisition();
+                readPins.released.join();
+
+                assertThat(prepared).isCancelled();
+                assertThat(readPins.lease.isReleased()).isTrue();
+                assertThat(fixture.stagingFiles.reservedBytes()).isZero();
+            }
         }
     }
 
@@ -236,6 +363,88 @@ class RecoveryCheckpointCoordinatorTest {
         }
     }
 
+    private static final class DelayedReadPins
+            implements ObjectReadPinManager {
+        private final CompletableFuture<Void> acquisitionStarted =
+                new CompletableFuture<>();
+        private final CompletableFuture<Void> released =
+                new CompletableFuture<>();
+        private final CompletableFuture<ObjectReadLease> acquisition =
+                new CompletableFuture<>();
+        private PhysicalObjectIdentity object;
+        private long maximumReadDeadlineMillis;
+        private LateLease lease;
+
+        @Override
+        public synchronized CompletableFuture<ObjectReadLease> acquire(
+                PhysicalObjectIdentity object,
+                long maximumReadDeadlineMillis,
+                SelectionRevalidator selectionRevalidator) {
+            if (this.object != null) {
+                return CompletableFuture.failedFuture(
+                        new AssertionError("unexpected second delayed pin acquisition"));
+            }
+            this.object = object;
+            this.maximumReadDeadlineMillis = maximumReadDeadlineMillis;
+            acquisitionStarted.complete(null);
+            return acquisition;
+        }
+
+        private synchronized void completeAcquisition() {
+            lease = new LateLease(
+                    object, maximumReadDeadlineMillis, released);
+            acquisition.complete(lease);
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+
+    private static final class LateLease implements ObjectReadLease {
+        private final PhysicalObjectIdentity object;
+        private final long maximumReadDeadlineMillis;
+        private final CompletableFuture<Void> released;
+        private final AtomicBoolean releaseStarted = new AtomicBoolean();
+
+        private LateLease(
+                PhysicalObjectIdentity object,
+                long maximumReadDeadlineMillis,
+                CompletableFuture<Void> released) {
+            this.object = object;
+            this.maximumReadDeadlineMillis = maximumReadDeadlineMillis;
+            this.released = released;
+        }
+
+        @Override
+        public PhysicalObjectIdentity object() {
+            return object;
+        }
+
+        @Override
+        public String leaseId() {
+            return "l".repeat(26);
+        }
+
+        @Override
+        public long maximumReadDeadlineMillis() {
+            return maximumReadDeadlineMillis;
+        }
+
+        @Override
+        public CompletableFuture<Void> release() {
+            if (releaseStarted.compareAndSet(false, true)) {
+                released.complete(null);
+            }
+            return released;
+        }
+
+        @Override
+        public boolean isReleased() {
+            return releaseStarted.get();
+        }
+    }
+
     private static final class Fixture implements AutoCloseable {
         private final GenerationMetadataStore generations =
                 GenerationMetadataStoreTestFactory.inMemory(CLOCK);
@@ -252,6 +461,8 @@ class RecoveryCheckpointCoordinatorTest {
         private final VersionedGenerationIndex targetIndex;
         private final ObjectSliceReadTarget target;
         private final java.util.ArrayList<ObjectProtectionManager> protectionManagers =
+                new java.util.ArrayList<>();
+        private final java.util.ArrayList<ObjectReadPinManager> readPinManagers =
                 new java.util.ArrayList<>();
 
         private Fixture(Path directory) throws Exception {
@@ -289,6 +500,16 @@ class RecoveryCheckpointCoordinatorTest {
         private RecoveryCheckpointCoordinator coordinator(
                 GenerationMetadataStore generationStore,
                 PhysicalObjectMetadataStore physicalStore) {
+            return coordinator(
+                    generationStore,
+                    physicalStore,
+                    newReadPins(physicalStore));
+        }
+
+        private RecoveryCheckpointCoordinator coordinator(
+                GenerationMetadataStore generationStore,
+                PhysicalObjectMetadataStore physicalStore,
+                ObjectReadPinManager readPins) {
             ObjectProtectionManager objectProtections = new DefaultObjectProtectionManager(
                     CLUSTER,
                     physicalStore,
@@ -318,12 +539,27 @@ class RecoveryCheckpointCoordinatorTest {
                     codec,
                     builder,
                     checkpointProtections,
+                    readPins,
                     activationGuard(),
                     () -> "a".repeat(26),
                     config,
                     PENDING_DURATION,
                     scheduler,
                     CLOCK);
+        }
+
+        private ObjectReadPinManager newReadPins(
+                PhysicalObjectMetadataStore physicalStore) {
+            ObjectReadPinManager readPins = new DefaultObjectReadPinManager(
+                    CLUSTER,
+                    "m".repeat(26),
+                    physicalStore,
+                    Duration.ofMinutes(2),
+                    config.maximumClockSkew(),
+                    Duration.ofMinutes(10),
+                    CLOCK);
+            readPinManagers.add(readPins);
+            return readPins;
         }
 
         private void createTargetRoot() {
@@ -372,6 +608,269 @@ class RecoveryCheckpointCoordinatorTest {
                             2,
                             2,
                             0)).join();
+        }
+
+        private VersionedRecoveryCheckpointRoot
+                seedThirtyTwoCheckpointReferences() {
+            VersionedRecoveryCheckpointRoot current = generations
+                    .getOrCreateRecoveryRoot(CLUSTER, STREAM)
+                    .join();
+            List<RecoveryCheckpointReferenceRecord> references =
+                    new java.util.ArrayList<>();
+            GenerationIndexRecordCodecV1 generationCodec =
+                    new GenerationIndexRecordCodecV1();
+            for (int index = 0;
+                    index < RecoveryCheckpointMerger.MERGE_REFERENCE_COUNT;
+                    index++) {
+                long version = index + 1L;
+                long start = index;
+                long end = start + 1;
+                long cumulativeStart = index * 10L;
+                long cumulativeEnd = cumulativeStart + 10;
+                String commitId = "merge-commit-" + version;
+                String previousCommitId = index == 0
+                        ? ""
+                        : "merge-commit-" + index;
+                VersionedGenerationIndex generation =
+                        createMergeTargetIndex(
+                                index,
+                                start,
+                                end,
+                                cumulativeStart,
+                                cumulativeEnd,
+                                version);
+                GenerationIndexRecord canonicalGeneration =
+                        generation.value().withMetadataVersion(0);
+                byte[] generationBytes = generationCodec.encode(
+                        canonicalGeneration);
+                RecoveryCheckpointPublication publication =
+                        new RecoveryCheckpointPublication(
+                                canonicalGeneration.generation(),
+                                new PublicationId(
+                                        canonicalGeneration.publicationId()),
+                                new OffsetRange(start, end),
+                                ByteBuffer.wrap(generationBytes),
+                                sha(generationBytes));
+                AppendRecoveryCommit evidence = commit(
+                        commitId,
+                        previousCommitId,
+                        start,
+                        end,
+                        cumulativeEnd,
+                        version);
+                RecoveryCheckpointEntry entry =
+                        new RecoveryCheckpointEntry(
+                                version,
+                                new OffsetRange(start, end),
+                                cumulativeEnd,
+                                commitId,
+                                previousCommitId,
+                                evidence.canonicalCommitRecord(),
+                                evidence.canonicalCommitRecordSha256(),
+                                List.of(0));
+                RecoveryCheckpointWriteRequest request =
+                        new RecoveryCheckpointWriteRequest(
+                                CLUSTER,
+                                STREAM,
+                                version,
+                                base32Id('a', index),
+                                new OffsetRange(start, end),
+                                version,
+                                version,
+                                cumulativeStart,
+                                cumulativeEnd,
+                                commitId,
+                                commitId,
+                                "merge-commit-32",
+                                32,
+                                PROJECTION_SHA,
+                                1,
+                                1);
+                try (RecoveryCheckpointWriteResult written = codec.write(
+                                request,
+                                new RecoveryCheckpointListPublisher<>(
+                                        List.of(publication)),
+                                new RecoveryCheckpointListPublisher<>(
+                                        List.of(entry)))
+                        .join()) {
+                    uploadCheckpoint(request, written);
+                    references.add(reference(request, written));
+                }
+                RecoveryCheckpointRootRecord replacement = root(
+                        version, references);
+                current = generations.compareAndSetRecoveryRoot(
+                                CLUSTER,
+                                replacement,
+                                current.metadataVersion())
+                        .join();
+            }
+            return current;
+        }
+
+        private VersionedGenerationIndex createMergeTargetIndex(
+                int index,
+                long start,
+                long end,
+                long cumulativeStart,
+                long cumulativeEnd,
+                long commitVersion) {
+            PublicationId publication = new PublicationId(
+                    base32Id('p', index));
+            AllocatedGeneration allocated = generations.allocateGeneration(
+                    CLUSTER, STREAM, ReadView.COMMITTED, publication).join();
+            GenerationIndexRecord prepared = mergeGeneration(
+                    allocated.generation().value(),
+                    publication,
+                    GenerationLifecycle.PREPARED,
+                    0,
+                    start,
+                    end,
+                    cumulativeStart,
+                    cumulativeEnd,
+                    commitVersion);
+            VersionedGenerationIndex created = generations.createPrepared(
+                    CLUSTER, prepared).join();
+            return generations.compareAndSetIndex(
+                    CLUSTER,
+                    mergeGeneration(
+                            allocated.generation().value(),
+                            publication,
+                            GenerationLifecycle.COMMITTED,
+                            commitVersion,
+                            start,
+                            end,
+                            cumulativeStart,
+                            cumulativeEnd,
+                            commitVersion),
+                    created.metadataVersion()).join();
+        }
+
+        private GenerationIndexRecord mergeGeneration(
+                long generation,
+                PublicationId publication,
+                GenerationLifecycle lifecycle,
+                long committedAt,
+                long start,
+                long end,
+                long cumulativeStart,
+                long cumulativeEnd,
+                long commitVersion) {
+            var encoded = ReadTargetCodecRegistry.phase15().encode(target);
+            int records = Math.toIntExact(
+                    Math.subtractExact(end, start));
+            return new GenerationIndexRecord(
+                    1,
+                    STREAM.value(),
+                    ReadView.COMMITTED.wireId(),
+                    start,
+                    end,
+                    generation,
+                    publication.value(),
+                    "checkpoint-merge-task-" + commitVersion,
+                    lifecycle,
+                    sha("merge-source-" + commitVersion).value(),
+                    sha("policy").value(),
+                    encoded,
+                    encoded.identityChecksumValue(),
+                    sha("policy").value(),
+                    PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                    records,
+                    records,
+                    records,
+                    Math.subtractExact(cumulativeEnd, cumulativeStart),
+                    cumulativeStart,
+                    cumulativeEnd,
+                    commitVersion,
+                    commitVersion,
+                    List.of(),
+                    PROJECTION_IDENTITY,
+                    1,
+                    committedAt,
+                    "",
+                    Math.max(1, committedAt),
+                    0);
+        }
+
+        private void uploadCheckpoint(
+                RecoveryCheckpointWriteRequest request,
+                RecoveryCheckpointWriteResult written) {
+            objectStore.putObject(
+                            written.objectKey(),
+                            written.stagingFile(),
+                            new PutObjectOptions(
+                                    RecoveryCheckpointFormatV1.CONTENT_TYPE,
+                                    written.storageCrc32c(),
+                                    true,
+                                    Map.of(
+                                            "nereus-format", "NRC1",
+                                            "nereus-content-sha256",
+                                                    written.contentSha256().value(),
+                                            "nereus-stream-id",
+                                                    request.streamId().value(),
+                                            "nereus-checkpoint-sequence",
+                                                    Long.toString(
+                                                            request.checkpointSequence()),
+                                            "nereus-checkpoint-attempt-id",
+                                                    request.checkpointAttemptId()),
+                                    config.operationTimeout()))
+                    .join();
+        }
+
+        private RecoveryCheckpointReferenceRecord reference(
+                RecoveryCheckpointWriteRequest request,
+                RecoveryCheckpointWriteResult written) {
+            return new RecoveryCheckpointReferenceRecord(
+                    request.checkpointSequence(),
+                    request.checkpointAttemptId(),
+                    request.coverage().startOffset(),
+                    request.coverage().endOffset(),
+                    request.firstCommitVersion(),
+                    request.lastCommitVersion(),
+                    request.cumulativeSizeAtStart(),
+                    request.cumulativeSizeAtEnd(),
+                    request.firstCommitId(),
+                    request.lastCommitId(),
+                    request.sourceHeadCommitId(),
+                    request.sourceHeadCommitVersion(),
+                    request.projectionIdentitySha256().value(),
+                    written.objectId().value(),
+                    written.objectKey().value(),
+                    written.objectKeyHash().value(),
+                    written.objectLength(),
+                    written.storageCrc32c().value(),
+                    written.contentSha256().value(),
+                    request.expectedEntryCount(),
+                    request.expectedPublicationCount());
+        }
+
+        private RecoveryCheckpointRootRecord root(
+                long checkpointSequence,
+                List<RecoveryCheckpointReferenceRecord> references) {
+            List<RecoveryCheckpointReferenceRecord> exact =
+                    List.copyOf(references);
+            RecoveryCheckpointReferenceRecord first = exact.get(0);
+            RecoveryCheckpointReferenceRecord last =
+                    exact.get(exact.size() - 1);
+            return new RecoveryCheckpointRootRecord(
+                    1,
+                    STREAM.value(),
+                    checkpointSequence,
+                    first.coveredStartOffset(),
+                    last.coveredEndOffset(),
+                    first.firstCommitVersion(),
+                    last.lastCommitVersion(),
+                    first.cumulativeSizeAtStart(),
+                    last.cumulativeSizeAtEnd(),
+                    first.firstCommitId(),
+                    last.lastCommitId(),
+                    exact,
+                    RecoveryCheckpointRootDigests.checkpointSetSha256(
+                                    exact)
+                            .value(),
+                    last.sourceHeadCommitId(),
+                    last.sourceHeadCommitVersion(),
+                    CLOCK.millis(),
+                    0);
         }
 
         private GenerationIndexRecord generation(
@@ -470,8 +969,68 @@ class RecoveryCheckpointCoordinatorTest {
                     .isEqualTo(GenerationLifecycle.COMMITTED);
         }
 
+        private void assertMergedPermanentProtections(
+                VersionedRecoveryCheckpointRoot root) {
+            RecoveryCheckpointReferenceRecord reference =
+                    root.value().checkpoints().get(0);
+            ObjectProtectionScanPage checkpoint = physical.scanProtections(
+                    CLUSTER,
+                    new com.nereusstream.api.ObjectKeyHash(
+                            reference.objectKeyHash()),
+                    Optional.empty(),
+                    100).join();
+            assertThat(checkpoint.values())
+                    .filteredOn(value -> ObjectProtectionType.fromWireId(
+                                    value.value().protectionTypeId())
+                            == ObjectProtectionType.RECOVERY_CHECKPOINT_OBJECT)
+                    .singleElement()
+                    .satisfies(value -> {
+                        assertThat(value.value().ownerKey())
+                                .isEqualTo(root.key());
+                        assertThat(value.value().ownerMetadataVersion())
+                                .isEqualTo(root.metadataVersion());
+                    });
+            assertThat(checkpoint.values())
+                    .extracting(value -> ObjectProtectionType.fromWireId(
+                            value.value().protectionTypeId()))
+                    .doesNotContain(
+                            ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING);
+
+            ObjectProtectionScanPage targets = physical.scanProtections(
+                    CLUSTER,
+                    com.nereusstream.api.ObjectKeyHash.from(target.objectKey()),
+                    Optional.empty(),
+                    1_000).join();
+            assertThat(targets.values())
+                    .filteredOn(value -> ObjectProtectionType.fromWireId(
+                                    value.value().protectionTypeId())
+                                    == ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET
+                            && value.value().ownerKey().equals(root.key())
+                            && value.value().ownerMetadataVersion()
+                                    == root.metadataVersion())
+                    .hasSize(RecoveryCheckpointMerger.MERGE_REFERENCE_COUNT);
+        }
+
+        private void assertNoReaderLeases(
+                List<RecoveryCheckpointReferenceRecord> references) {
+            for (RecoveryCheckpointReferenceRecord reference : references) {
+                assertThat(physical.scanReaderLeases(
+                                CLUSTER,
+                                new com.nereusstream.api.ObjectKeyHash(
+                                        reference.objectKeyHash()),
+                                Optional.empty(),
+                                100)
+                        .join()
+                        .values())
+                        .isEmpty();
+            }
+        }
+
         @Override
         public void close() throws Exception {
+            for (ObjectReadPinManager manager : readPinManagers) {
+                manager.close();
+            }
             for (ObjectProtectionManager manager : protectionManagers) {
                 manager.close();
             }
@@ -844,6 +1403,81 @@ class RecoveryCheckpointCoordinatorTest {
                 Duration.ofSeconds(2));
     }
 
+    private static GenerationMetadataStore
+            observePinnedMergeAndLoseRootCasResponse(
+                    GenerationMetadataStore delegate,
+                    PhysicalObjectMetadataStore physical,
+                    List<RecoveryCheckpointReferenceRecord> sources,
+                    AtomicBoolean observedPinnedSources) {
+        AtomicBoolean lose = new AtomicBoolean(true);
+        return proxy(
+                GenerationMetadataStore.class,
+                delegate,
+                (method, arguments, result) -> {
+                    if (!method.getName().equals(
+                                    "compareAndSetRecoveryRoot")
+                            || !(arguments[1]
+                                    instanceof RecoveryCheckpointRootRecord
+                                            replacement)
+                            || replacement.checkpoints().size() != 1) {
+                        return result;
+                    }
+                    assertThat(sources).hasSize(
+                            RecoveryCheckpointMerger.MERGE_REFERENCE_COUNT);
+                    for (RecoveryCheckpointReferenceRecord source : sources) {
+                        assertThat(physical.scanReaderLeases(
+                                        CLUSTER,
+                                        new com.nereusstream.api.ObjectKeyHash(
+                                                source.objectKeyHash()),
+                                        Optional.empty(),
+                                        100)
+                                .join()
+                                .values())
+                                .as("source lease at merge root CAS: %s", source.objectKey())
+                                .isNotEmpty();
+                    }
+                    observedPinnedSources.set(true);
+                    if (lose.compareAndSet(true, false)) {
+                        @SuppressWarnings("unchecked")
+                        CompletableFuture<VersionedRecoveryCheckpointRoot> exact =
+                                (CompletableFuture<VersionedRecoveryCheckpointRoot>) result;
+                        return exact.thenCompose(ignored ->
+                                CompletableFuture.failedFuture(
+                                        new F4MetadataConditionFailedException(
+                                                "lost merged recovery-root CAS response")));
+                    }
+                    return result;
+                });
+    }
+
+    private static ObjectReadPinManager
+            failFirstPinSelectionRevalidation(
+                    ObjectReadPinManager delegate) {
+        AtomicBoolean fail = new AtomicBoolean(true);
+        return new ObjectReadPinManager() {
+            @Override
+            public CompletableFuture<ObjectReadLease> acquire(
+                    PhysicalObjectIdentity object,
+                    long maximumReadDeadlineMillis,
+                    SelectionRevalidator selectionRevalidator) {
+                SelectionRevalidator exact = fail.compareAndSet(true, false)
+                        ? () -> selectionRevalidator.revalidate()
+                                .thenCompose(ignored ->
+                                        CompletableFuture.failedFuture(
+                                                new F4MetadataConditionFailedException(
+                                                        "selection changed after merge lease write")))
+                        : selectionRevalidator;
+                return delegate.acquire(
+                        object, maximumReadDeadlineMillis, exact);
+            }
+
+            @Override
+            public void close() {
+                delegate.close();
+            }
+        };
+    }
+
     private static GenerationMetadataStore loseFirstRootCasResponse(
             GenerationMetadataStore delegate) {
         AtomicBoolean lose = new AtomicBoolean(true);
@@ -914,6 +1548,12 @@ class RecoveryCheckpointCoordinatorTest {
 
     private static Checksum crc(String value) {
         return new Checksum(ChecksumType.CRC32C, value);
+    }
+
+    private static String base32Id(char prefix, int index) {
+        return Character.toString(prefix).repeat(24)
+                + BASE32.charAt(index / BASE32.length())
+                + BASE32.charAt(index % BASE32.length());
     }
 
     private static String projectionIdentity(ProjectionRef value) {
