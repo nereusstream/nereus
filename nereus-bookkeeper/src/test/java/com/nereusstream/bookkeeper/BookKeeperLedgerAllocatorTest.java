@@ -108,6 +108,121 @@ class BookKeeperLedgerAllocatorTest {
     }
 
     @Test
+    void matchingCreateAfterResponseLossIsRecoveryOpenedSealedAndPermanentlyHazardous() {
+        BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
+        BookKeeperMetadataStoreConfig metadataConfig = metadataConfig(configuration);
+        try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(metadataConfig, CLOCK)) {
+            FakeOperations operations = new FakeOperations(true, true);
+            BookKeeperLedgerAllocator allocator = allocator(configuration, metadata, operations, new Random(12));
+
+            assertThatThrownBy(() -> allocator.allocate(new BookKeeperLedgerAllocationRequest(
+                            STREAM, session(1, 1, "token-1"), Duration.ofSeconds(10))).join())
+                    .cause()
+                    .isInstanceOf(NereusException.class)
+                    .extracting(error -> ((NereusException) error).code())
+                    .isEqualTo(ErrorCode.PRIMARY_WAL_WRITE_FAILED);
+
+            var allocation = metadata.scanAllocations(
+                            CLUSTER, STREAM, Optional.<BookKeeperScanToken>empty(), 10)
+                    .join()
+                    .values()
+                    .get(0);
+            assertThat(allocation.value().lifecycle()).isEqualTo(LedgerAllocationLifecycle.PHYSICAL_CREATED);
+            assertThat(allocation.value().lateCreateHazard()).isTrue();
+            assertThat(allocation.value().bookKeeperMetadataSha256()).hasSize(64);
+            assertThat(metadata.getAllocationSlot(CLUSTER, allocation.value().allocationSlot()).join())
+                    .get()
+                    .extracting(slot -> slot.value().lifecycle())
+                    .isEqualTo(AllocationSlotLifecycle.CREATE_UNCERTAIN);
+            assertThat(metadata.getRoot(
+                            CLUSTER, configuration.providerScopeSha256(), allocation.value().candidateLedgerId())
+                    .join())
+                    .get()
+                    .satisfies(root -> {
+                        assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+                        assertThat(root.value().lateCreateHazard()).isTrue();
+                    });
+            assertThat(metadata.getWriter(CLUSTER, STREAM).join())
+                    .get()
+                    .extracting(value -> value.value().lifecycle())
+                    .isEqualTo(BookKeeperWriterLifecycle.IDLE);
+            assertThat(operations.recoveryOpenCalls).isOne();
+        }
+    }
+
+    @Test
+    void boundedUncertainSlotRecoverySealsMatchingLateCreateWithoutClearingTheSlot() {
+        BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
+        try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
+                metadataConfig(configuration), CLOCK)) {
+            FakeOperations operations = new FakeOperations(true);
+            BookKeeperLedgerAllocator allocator = allocator(configuration, metadata, operations, new Random(14));
+            assertThatThrownBy(() -> allocator.allocate(new BookKeeperLedgerAllocationRequest(
+                            STREAM, session(1, 1, "token-1"), Duration.ofSeconds(10))).join())
+                    .hasCauseInstanceOf(NereusException.class);
+
+            BookKeeperUncertainAllocationRecoveryResult absent =
+                    allocator.reconcileUncertainAllocations(Duration.ofSeconds(10)).join();
+            assertThat(absent.absentLedgers()).isOne();
+            operations.revealMatchingPhysicalLedger();
+            BookKeeperUncertainAllocationRecoveryResult result =
+                    allocator.reconcileUncertainAllocations(Duration.ofSeconds(10)).join();
+
+            assertThat(result.scannedSlots()).isOne();
+            assertThat(result.uncertainSlots()).isOne();
+            assertThat(result.recoveredLedgers()).isOne();
+            var allocation = metadata.scanAllocations(
+                            CLUSTER, STREAM, Optional.<BookKeeperScanToken>empty(), 10)
+                    .join()
+                    .values()
+                    .get(0);
+            assertThat(allocation.value().lifecycle()).isEqualTo(LedgerAllocationLifecycle.PHYSICAL_CREATED);
+            assertThat(metadata.getAllocationSlot(CLUSTER, allocation.value().allocationSlot()).join()).isPresent();
+            assertThat(metadata.getRoot(
+                            CLUSTER, configuration.providerScopeSha256(), allocation.value().candidateLedgerId())
+                    .join())
+                    .get()
+                    .satisfies(root -> {
+                        assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+                        assertThat(root.value().lateCreateHazard()).isTrue();
+                    });
+        }
+    }
+
+    @Test
+    void boundedUncertainSlotRecoveryQuarantinesForeignLateCreateWithoutDeletingIt() {
+        BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
+        try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
+                metadataConfig(configuration), CLOCK)) {
+            FakeOperations operations = new FakeOperations(true);
+            BookKeeperLedgerAllocator allocator = allocator(configuration, metadata, operations, new Random(15));
+            assertThatThrownBy(() -> allocator.allocate(new BookKeeperLedgerAllocationRequest(
+                            STREAM, session(1, 1, "token-1"), Duration.ofSeconds(10))).join())
+                    .hasCauseInstanceOf(NereusException.class);
+
+            operations.revealForeignPhysicalLedger();
+            BookKeeperUncertainAllocationRecoveryResult result =
+                    allocator.reconcileUncertainAllocations(Duration.ofSeconds(10)).join();
+
+            assertThat(result.quarantinedLedgers()).isOne();
+            var allocation = metadata.scanAllocations(
+                            CLUSTER, STREAM, Optional.<BookKeeperScanToken>empty(), 10)
+                    .join()
+                    .values()
+                    .get(0);
+            assertThat(allocation.value().lifecycle()).isEqualTo(LedgerAllocationLifecycle.FOREIGN_COLLISION);
+            assertThat(metadata.getAllocationSlot(CLUSTER, allocation.value().allocationSlot()).join()).isPresent();
+            assertThat(metadata.getRoot(
+                            CLUSTER, configuration.providerScopeSha256(), allocation.value().candidateLedgerId())
+                    .join())
+                    .get()
+                    .extracting(root -> root.value().lifecycle())
+                    .isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
+            assertThat(operations.deleteCalls).isZero();
+        }
+    }
+
+    @Test
     void writerStateRejectsStaleSessionBeforeAnyProviderCreate() {
         BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
         try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
@@ -300,14 +415,32 @@ class BookKeeperLedgerAllocatorTest {
 
     private static final class FakeOperations implements BookKeeperClientOperations {
         private final boolean failCreate;
+        private boolean physicalExistsAfterFailure;
+        private boolean foreignPhysicalMetadata;
         private int createCalls;
         private int recoveryOpenCalls;
+        private int deleteCalls;
         private Map<String, byte[]> createdCustomMetadata = Map.of();
         private BookKeeperWalConfiguration createdConfiguration;
         private long createdLedgerId;
 
         private FakeOperations(boolean failCreate) {
+            this(failCreate, false);
+        }
+
+        private FakeOperations(boolean failCreate, boolean physicalExistsAfterFailure) {
             this.failCreate = failCreate;
+            this.physicalExistsAfterFailure = physicalExistsAfterFailure;
+        }
+
+        private void revealMatchingPhysicalLedger() {
+            physicalExistsAfterFailure = true;
+            foreignPhysicalMetadata = false;
+        }
+
+        private void revealForeignPhysicalLedger() {
+            physicalExistsAfterFailure = true;
+            foreignPhysicalMetadata = true;
         }
 
         @Override
@@ -356,12 +489,22 @@ class BookKeeperLedgerAllocatorTest {
 
         @Override
         public CompletableFuture<LedgerMetadata> metadata(long ledgerId, BookKeeperOperationDeadline deadline) {
+            if (physicalExistsAfterFailure && ledgerId == createdLedgerId && createdConfiguration != null) {
+                Map<String, byte[]> metadata = createdCustomMetadata;
+                if (foreignPhysicalMetadata) {
+                    metadata = new java.util.HashMap<>(createdCustomMetadata);
+                    metadata.put("nereus.allocation-id", "foreign-allocation".getBytes(StandardCharsets.UTF_8));
+                }
+                return CompletableFuture.completedFuture(
+                        ledgerMetadata(ledgerId, createdConfiguration, metadata));
+            }
             return CompletableFuture.failedFuture(new NereusException(
                     ErrorCode.PRIMARY_WAL_TARGET_NOT_FOUND, false, "injected absent ledger"));
         }
 
         @Override
         public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+            deleteCalls++;
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
         }
     }

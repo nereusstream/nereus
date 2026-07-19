@@ -54,8 +54,9 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 - append, resolve/read, trim/recovery, restart, and post-head repair state machines；
 - ordinary and Docker-backed final acceptance gates。
 
-Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
-materialization profiles are reserved design/API boundaries, not implemented support.
+Only `OBJECT_WAL_SYNC_OBJECT` is currently installed as a Phase 1 production-broker execution target. The
+BookKeeper profiles remain rollout-disabled before BK-M5, although BK_ONLY is executable through the explicit
+module-local runtime and its current BK-M2 gates.
 
 The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 and BK-M1
 are complete/final-gated；BK-M2 now has its keyspace/seven codecs、focused production/fake metadata stores、exact
@@ -67,9 +68,10 @@ code-level target is frozen in
 [`docs/phase-bk-bookkeeper-primary-wal/`](docs/phase-bk-bookkeeper-primary-wal/README.md)：
 BK-M0–M6 cover provider-neutral append/read seams、exact ledger allocation/lifecycle/fencing、BK_ONLY retention、F4
 async/sync reuse and Pulsar rollout. The BK_ONLY production logical-trim/abandoned-owner retirement bridge is now part
-of the M2 retention checkpoint；the real Oxia + BookKeeper checkpoint now covers rollover、fresh client/runtime cold
-restart、stable historical targets、trim、lost delete response and fresh-process dual absence。Remaining M2 matrix and
-aggregate/final evidence is still incomplete。BK_ONLY is executable only through the explicit module-local runtime；
+of the M2 retention checkpoint；the real Oxia + BookKeeper checkpoint now covers exact CreateAdv response loss、a
+delayed matching create recovered by the bounded fixed-slot scanner、permanent hazard/GC veto、rollover、fresh
+client/runtime cold restart、stable historical targets、trim、lost delete response and fresh-process dual absence。
+Remaining M2 matrix and aggregate/final evidence is still incomplete。BK_ONLY is executable only through the explicit module-local runtime；
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。

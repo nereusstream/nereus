@@ -6,9 +6,10 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 `bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-11、BK-12 and the deterministic all-shard portion of BK-19
 passed on 2026-07-19 under `bookKeeperPrimaryWalM2MetadataCheck`；BK-19 still requires its real-Oxia final evidence。
-The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-21、
-BK-30、BK-37、BK-41、BK-49、BK-53 and BK-55, including a fresh process between the two absence observations；it does
-not claim the remaining M2 rows。BK-13 through BK-96 otherwise remain required target evidence and are currently
+The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
+the matching-create/retention-veto portion of BK-17、BK-21、BK-30、BK-37、BK-41、BK-49、BK-53 and BK-55, including
+a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
+does not claim the remaining M2 rows。BK-13 through BK-96 otherwise remain required target evidence and are currently
 **not complete**。During
 implementation, each row
 receives an exact test method、gate、source lock、date and result. No implementation row may be marked covered by prose
@@ -57,10 +58,10 @@ Evidence levels：
 | BK-11 | M2 | D/O | seven V1 writer/allocation/slot/root/reservation/protection/lease codecs share production/fake golden/failure contracts | `BookKeeperMetadataCodecContractTest` + `BookKeeperMetadataStoreContractScenario` |
 | BK-12 | M2 | D | key strict inverse rejects wrong cluster/shard/depth/noncanonical components | `BookKeeperKeyspaceTest.strictlyInvertsEveryWriterPrefix` |
 | BK-13 | M2 | O | intent -> durable slot CLAIMED/CREATE_STARTED -> root -> active writer survives every Oxia CAS response loss | `BookKeeperAllocatorOxiaIT.convergesEveryAllocationCut` |
-| BK-14 | M2 | B/O | exact create response loss persists slot + permanent hazard；matching metadata is recovery-opened/sealed because the write handle is unrecoverable | `BookKeeperAllocatorIT.recoversExactCreateResponseLoss` |
+| BK-14 | M2 | B/O | exact create response loss persists slot + permanent hazard；matching metadata is recovery-opened/sealed because the write handle is unrecoverable | `BookKeeperWalOnlyOxiaBkIntegrationTest.createResponseLossRecoverySealsTheExactLedgerAndKeepsTheHazardSlot` |
 | BK-15 | M2 | B/O | candidate already owned by stock/foreign ledger is never deleted and a new id wins | `BookKeeperAllocatorIT.doesNotDeleteForeignCollision` |
 | BK-16 | M2 | D/O | two streams choose the same candidate; global root admits one allocation | `BookKeeperAllocatorContentionIT.serializesGlobalLedgerIdentity` |
-| BK-17 | M2 | B/O/C | `CREATE_UNCERTAIN` stays slot-consuming；matching late create seals with permanent GC veto, foreign quarantines | `BookKeeperAllocationLateCreateIT.recoversLatePhysicalCreate` |
+| BK-17 | M2 | B/O/C | `CREATE_UNCERTAIN` stays slot-consuming；matching late create seals with permanent GC veto, foreign quarantines | matching late-create + permanent GC-veto checkpoint: `BookKeeperWalOnlyOxiaBkIntegrationTest.createResponseLossRecoverySealsTheExactLedgerAndKeepsTheHazardSlot`; deterministic foreign checkpoint: `BookKeeperLedgerAllocatorTest.boundedUncertainSlotRecoveryQuarantinesForeignLateCreateWithoutDeletingIt`; remaining: real foreign late-create cut |
 | BK-18 | M2 | D/O | writer state never reuses segment/entry ids and physical-byte/range counters never move backward after conflict/restart | `BookKeeperWriterStatePropertyTest.isMonotonicAcrossCasSchedules` |
 | BK-19 | M2 | O | all 256 root + 16 fixed allocation-slot shards scan empty opaque continuations without omission | `BookKeeperLedgerRootScannerOxiaIT.scansEveryShardFromEmptyContinuation` |
 | BK-20 | M2 | D | invalid lifecycle fields/transitions and immutable identity drift fail closed | `BookKeeperLedgerTransitionsTest.rejectsIllegalTransitions` |

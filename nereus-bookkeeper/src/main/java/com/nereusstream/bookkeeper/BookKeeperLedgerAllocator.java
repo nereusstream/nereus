@@ -41,6 +41,8 @@ public final class BookKeeperLedgerAllocator {
     private final BookKeeperClientOperations client;
     private final BookKeeperPasswordProvider passwordProvider;
     private final BookKeeperWriterStateMachine writerState;
+    private final BookKeeperLedgerRecovery allocationRecovery;
+    private final BookKeeperUncertainAllocationReconciler uncertainAllocations;
     private final Clock clock;
     private final RandomGenerator random;
     private final Supplier<String> allocationIds;
@@ -82,6 +84,25 @@ public final class BookKeeperLedgerAllocator {
         this.passwordProvider = Objects.requireNonNull(passwordProvider, "passwordProvider");
         this.writerState = Objects.requireNonNull(writerState, "writerState");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.allocationRecovery = new BookKeeperLedgerRecovery(
+                cluster,
+                configuration,
+                writerMetadata,
+                ledgerMetadata,
+                namespaceVerifier,
+                client,
+                passwordProvider,
+                writerState,
+                clock);
+        this.uncertainAllocations = new BookKeeperUncertainAllocationReconciler(
+                cluster,
+                configuration,
+                writerMetadata,
+                ledgerMetadata,
+                namespaceVerifier,
+                client,
+                allocationRecovery,
+                clock);
         this.random = Objects.requireNonNull(random, "random");
         this.allocationIds = allocationIds == null ? this::newAllocationId : allocationIds;
         BookKeeperMetadataStoreConfig metadataConfig = new BookKeeperMetadataStoreConfig(
@@ -98,6 +119,12 @@ public final class BookKeeperLedgerAllocator {
         return namespaceVerifier.requireActive(configuration, deadline.remaining())
                 .thenCompose(reservation -> writerState.requireIdle(exact.session())
                         .thenCompose(writer -> allocateCandidate(exact, reservation, writer, deadline, 0)));
+    }
+
+    /** Reconciles every fixed uncertainty slot without clearing its permanent provider-transmission hazard. */
+    public CompletableFuture<BookKeeperUncertainAllocationRecoveryResult> reconcileUncertainAllocations(
+            Duration timeout) {
+        return uncertainAllocations.reconcile(timeout);
     }
 
     private CompletableFuture<AllocatedBookKeeperLedger> allocateCandidate(
@@ -359,8 +386,15 @@ public final class BookKeeperLedgerAllocator {
                 return CompletableFuture.completedFuture(new UncertainProbe(root, intent));
             }
             try {
-                expected.requireExactImmutableLedgerMetadata(root.value().ledgerId(), configuration, metadata);
-                return CompletableFuture.completedFuture(new UncertainProbe(root, intent));
+                String metadataSha256 = expected.requireExactImmutableLedgerMetadata(
+                        root.value().ledgerId(), configuration, metadata).value();
+                return casIntent(
+                                intent,
+                                LedgerAllocationLifecycle.PHYSICAL_CREATED,
+                                true,
+                                metadataSha256,
+                                "matching provider create recovered without writable handle")
+                        .thenCompose(physical -> sealRecoveredCreate(root, physical, deadline));
             } catch (Throwable mismatch) {
                 String reason = "foreign or mismatching ledger metadata after uncertain create";
                 return casRootQuarantined(root, reason)
@@ -369,6 +403,21 @@ public final class BookKeeperLedgerAllocator {
                                 .thenApply(foreign -> new UncertainProbe(quarantined, foreign)));
             }
         }).thenCompose(java.util.function.Function.identity());
+    }
+
+    private CompletableFuture<UncertainProbe> sealRecoveredCreate(
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
+            BookKeeperVersionedValue<LedgerAllocationIntentRecord> physical,
+            BookKeeperOperationDeadline deadline) {
+        CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> sealed;
+        try {
+            sealed = allocationRecovery.sealUnowned(
+                    root, deadline.remaining(), "lost CreateAdv response recovered exact physical ledger");
+        } catch (Throwable failure) {
+            return CompletableFuture.completedFuture(new UncertainProbe(root, physical));
+        }
+        return sealed.handle((value, failure) ->
+                new UncertainProbe(failure == null ? value : root, physical));
     }
 
     private CompletableFuture<BookKeeperVersionedValue<BookKeeperWriterStateRecord>> abortPreTransmission(

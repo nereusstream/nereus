@@ -100,6 +100,10 @@ require_literal 'bookKeeperPrimaryWalM2RuntimeCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2RetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2PulsarCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2RealServiceCheck' "build.gradle.kts"
+require_literal 'BookKeeperUncertainAllocationReconciler' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'class BookKeeperUncertainAllocationReconciler' \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperUncertainAllocationReconciler.java"
 
 scenario_matrix="$design_dir/08-scenario-evidence-matrix.md"
 scenario_count="$(rg -c '^\| BK-[0-9]+ \|' "$scenario_matrix")"

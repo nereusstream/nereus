@@ -226,6 +226,12 @@ borrowed-client test against the clean pinned checkout。
 
 The real-service checkpoint uses production `OxiaJavaClientMetadataStore` /
 `OxiaJavaBookKeeperMetadataStore` and `DefaultBookKeeperClientOperations` against one real BookKeeper 4.18 bookie。It
+forces exact CreateAdv response loss after physical creation and verifies recovery-open sealing、permanent slot/hazard
+retention and a fresh candidate；it also delays physical creation until after the first absent probe, then uses the
+bounded 16-shard `BookKeeperUncertainAllocationReconciler` exposed by `BookKeeperLedgerAllocator` to discover、
+identity-check、recovery-seal and retain the late ledger；`BookKeeperUncertainAllocationRecoveryResult` reports the
+complete bounded pass without turning absence into release authority。The
+retention gate proves both `LATE_CREATE_HAZARD` and `ALLOCATION_SLOT_PRESENT` remain permanent vetoes。The same gate
 forces a two-range ledger rollover, closes and recreates both Oxia and BookKeeper clients, proves historical target and
 byte stability, recovery-seals the cold active writer before allocating a new ledger, retires a completely trimmed
 ledger, injects a successful provider delete with a lost response, then recreates the process again before the second
@@ -258,6 +264,7 @@ No generic unbounded list/delete primitive is added. Golden codec changes requir
 Implement in this order：
 
 1. `BookKeeperLedgerAllocator` reserved-namespace exact-id intent/durable-slot/root reservation/create/reconcile；
+   `BookKeeperUncertainAllocationReconciler` scans all 16 fixed slot shards and seals/quarantines late creates；
 2. `BookKeeperWriterStateMachine` allocation/active/reservation/recovering CAS；
 3. `BookKeeperPrimaryWalAppender` explicit ordered writes and taint/seal；
 4. `BookKeeperLedgerRecovery` recovery-open/fence/seal and nonterminal scan；

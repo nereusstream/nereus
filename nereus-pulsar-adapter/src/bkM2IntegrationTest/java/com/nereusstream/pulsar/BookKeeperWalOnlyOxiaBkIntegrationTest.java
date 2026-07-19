@@ -8,6 +8,7 @@ import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendResult;
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.DurabilityLevel;
@@ -23,6 +24,7 @@ import com.nereusstream.api.TrimOptions;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.bookkeeper.BookKeeperClientOperations;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
+import com.nereusstream.bookkeeper.BookKeeperLedgerAllocationRequest;
 import com.nereusstream.bookkeeper.BookKeeperLedgerAllocator;
 import com.nereusstream.bookkeeper.BookKeeperLedgerGcAction;
 import com.nereusstream.bookkeeper.BookKeeperLedgerGcConfiguration;
@@ -37,6 +39,7 @@ import com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppender;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalReader;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationProof;
 import com.nereusstream.bookkeeper.BookKeeperReaderLeaseManager;
+import com.nereusstream.bookkeeper.BookKeeperRetentionBlocker;
 import com.nereusstream.bookkeeper.BookKeeperSecretRef;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.bookkeeper.BookKeeperWalOnlyReferenceRetirementCoordinator;
@@ -53,12 +56,17 @@ import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
+import com.nereusstream.metadata.oxia.BookKeeperScanToken;
+import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
-import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
+import com.nereusstream.metadata.oxia.records.AllocationSlotLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
+import com.nereusstream.metadata.oxia.records.LedgerAllocationLifecycle;
 import io.netty.buffer.ByteBuf;
 import io.oxia.testcontainers.OxiaContainer;
 import java.nio.charset.StandardCharsets;
@@ -245,6 +253,143 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
                 assertRead(gcRestarted, streamId, List.of(new byte[] {4, 5, 6}, new byte[] {7}), 2);
             }
+        }
+    }
+
+    @Test
+    void createResponseLossRecoverySealsTheExactLedgerAndKeepsTheHazardSlot() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-create-loss-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(2_000_000), ZoneId.of("UTC"));
+        BookKeeperWalConfiguration configuration = configuration();
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        OxiaClientConfiguration oxia = OxiaClientConfiguration.defaults(OXIA.getServiceAddress());
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                SharedOxiaClientRuntime oxiaRuntime = SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaBookKeeperMetadataStore metadata = OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
+                        oxia,
+                        oxiaRuntime,
+                        clock,
+                        new BookKeeperMetadataStoreConfig(
+                                configuration.maxAppendRangesPerLedger(),
+                                configuration.protectionSlotsPerRange(),
+                                configuration.maxReaderLeasesPerLedger(),
+                                configuration.maxUncertainAllocations()));
+                BookKeeper client = bookKeeperCluster.newClient()) {
+            DefaultBookKeeperClientOperations raw = new DefaultBookKeeperClientOperations(client);
+            LostCreateResponseOperations operations = new LostCreateResponseOperations(raw);
+            BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier =
+                    new BookKeeperLedgerIdNamespaceReservationVerifier(
+                            (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
+                                    Optional.of(reservation)),
+                            deployment);
+            byte[] password = "bk-m2-secret".getBytes(StandardCharsets.UTF_8);
+            StreamId stream = new StreamId("stream-create-loss-" + suffix);
+            AppendSession session = new AppendSession(stream, "writer-1", 1, "token-1", 1, 10_000);
+            BookKeeperWriterStateMachine writerState = new BookKeeperWriterStateMachine(
+                    cluster, configuration, metadata, clock, "process-create-loss");
+            BookKeeperLedgerAllocator allocator = new BookKeeperLedgerAllocator(
+                    cluster,
+                    configuration,
+                    metadata,
+                    metadata,
+                    namespaceVerifier,
+                    operations,
+                    ignored -> password.clone(),
+                    writerState,
+                    clock);
+
+            assertThatThrownBy(() -> allocator.allocate(
+                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+                    .join()).hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
+
+            var allocation = metadata.scanAllocations(
+                            cluster, stream, Optional.<BookKeeperScanToken>empty(), 10)
+                    .join()
+                    .values()
+                    .get(0);
+            long uncertainLedgerId = allocation.value().candidateLedgerId();
+            assertThat(allocation.value().lifecycle()).isEqualTo(LedgerAllocationLifecycle.PHYSICAL_CREATED);
+            assertThat(allocation.value().lateCreateHazard()).isTrue();
+            assertThat(metadata.getAllocationSlot(cluster, allocation.value().allocationSlot()).join())
+                    .get()
+                    .extracting(slot -> slot.value().lifecycle())
+                    .isEqualTo(AllocationSlotLifecycle.CREATE_UNCERTAIN);
+            assertThat(metadata.getRoot(cluster, configuration.providerScopeSha256(), uncertainLedgerId).join())
+                    .get()
+                    .satisfies(root -> {
+                        assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+                        assertThat(root.value().lateCreateHazard()).isTrue();
+                    });
+            assertThat(metadata.getWriter(cluster, stream).join())
+                    .get()
+                    .extracting(writer -> writer.value().lifecycle())
+                    .isEqualTo(BookKeeperWriterLifecycle.IDLE);
+            assertThat(raw.metadata(uncertainLedgerId, new BookKeeperOperationDeadline(TIMEOUT)).join().isClosed())
+                    .isTrue();
+
+            var replacement = allocator.allocate(
+                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+                    .join();
+            assertThat(replacement.root().value().ledgerId()).isNotEqualTo(uncertainLedgerId);
+            replacement.handle().closeAsync().join();
+
+            DelayedCreateOperations delayedOperations = new DelayedCreateOperations(raw);
+            StreamId lateStream = new StreamId("stream-late-create-" + suffix);
+            AppendSession lateSession = new AppendSession(
+                    lateStream, "writer-2", 1, "token-2", 1, 10_000);
+            BookKeeperWriterStateMachine lateWriterState = new BookKeeperWriterStateMachine(
+                    cluster, configuration, metadata, clock, "process-late-create");
+            BookKeeperLedgerAllocator lateAllocator = new BookKeeperLedgerAllocator(
+                    cluster,
+                    configuration,
+                    metadata,
+                    metadata,
+                    namespaceVerifier,
+                    delayedOperations,
+                    ignored -> password.clone(),
+                    lateWriterState,
+                    clock);
+            assertThatThrownBy(() -> lateAllocator.allocate(
+                            new BookKeeperLedgerAllocationRequest(lateStream, lateSession, TIMEOUT))
+                    .join()).hasCauseInstanceOf(com.nereusstream.api.NereusException.class);
+
+            WriteAdvHandle delayedHandle = delayedOperations.createNow().join();
+            long lateLedgerId = delayedHandle.getId();
+            var lateRecovery = lateAllocator.reconcileUncertainAllocations(TIMEOUT).join();
+            assertThat(lateRecovery.uncertainSlots()).isEqualTo(2);
+            assertThat(lateRecovery.recoveredLedgers()).isEqualTo(2);
+            assertThat(metadata.getRoot(cluster, configuration.providerScopeSha256(), lateLedgerId).join())
+                    .get()
+                    .satisfies(root -> {
+                        assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+                        assertThat(root.value().lateCreateHazard()).isTrue();
+                    });
+            assertThat(raw.metadata(lateLedgerId, new BookKeeperOperationDeadline(TIMEOUT)).join().isClosed())
+                    .isTrue();
+            var lateRoot = metadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), lateLedgerId)
+                    .join()
+                    .orElseThrow();
+            BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
+            BookKeeperWalRetentionGate retentionGate = new BookKeeperWalRetentionGate(
+                    cluster,
+                    configuration,
+                    gc,
+                    metadata,
+                    metadata,
+                    namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation(configuration, reservation)),
+                    raw,
+                    clock);
+            assertThat(retentionGate.evaluate(lateRoot, TIMEOUT).join().blockers())
+                    .contains(BookKeeperRetentionBlocker.LATE_CREATE_HAZARD)
+                    .contains(BookKeeperRetentionBlocker.ALLOCATION_SLOT_PRESENT);
+            delayedHandle.closeAsync().join();
         }
     }
 
@@ -603,6 +748,162 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         private boolean lostResponseInjected() {
             return injected.get();
         }
+    }
+
+    private static final class LostCreateResponseOperations implements BookKeeperClientOperations {
+        private final BookKeeperClientOperations delegate;
+        private final AtomicBoolean inject = new AtomicBoolean(true);
+
+        private LostCreateResponseOperations(BookKeeperClientOperations delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public CompletableFuture<WriteAdvHandle> createAdvanced(
+                long ledgerId,
+                BookKeeperWalConfiguration configuration,
+                byte[] password,
+                Map<String, byte[]> customMetadata,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.createAdvanced(ledgerId, configuration, password, customMetadata, deadline)
+                    .thenCompose(handle -> {
+                        if (inject.compareAndSet(true, false)) {
+                            return CompletableFuture.failedFuture(new com.nereusstream.api.NereusException(
+                                    com.nereusstream.api.ErrorCode.TIMEOUT,
+                                    true,
+                                    "injected lost CreateAdv response"));
+                        }
+                        return CompletableFuture.completedFuture(handle);
+                    });
+        }
+
+        @Override
+        public CompletableFuture<ReadHandle> open(
+                long ledgerId,
+                BookKeeperDigestType digestType,
+                byte[] password,
+                boolean recovery,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.open(ledgerId, digestType, password, recovery, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Long> write(
+                WriteAdvHandle handle,
+                long entryId,
+                ByteBuf entry,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.write(handle, entryId, entry, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerEntries> readUnconfirmed(
+                ReadHandle handle,
+                long firstEntryId,
+                long lastEntryIdInclusive,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerMetadata> metadata(
+                long ledgerId, BookKeeperOperationDeadline deadline) {
+            return delegate.metadata(ledgerId, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+            return delegate.delete(ledgerId, deadline);
+        }
+    }
+
+    private static final class DelayedCreateOperations implements BookKeeperClientOperations {
+        private final BookKeeperClientOperations delegate;
+        private PendingCreate pending;
+
+        private DelayedCreateOperations(BookKeeperClientOperations delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public synchronized CompletableFuture<WriteAdvHandle> createAdvanced(
+                long ledgerId,
+                BookKeeperWalConfiguration configuration,
+                byte[] password,
+                Map<String, byte[]> customMetadata,
+                BookKeeperOperationDeadline deadline) {
+            if (pending != null) {
+                return CompletableFuture.failedFuture(new IllegalStateException(
+                        "only one delayed CreateAdv is supported by this fixture"));
+            }
+            Map<String, byte[]> copiedMetadata = customMetadata.entrySet().stream().collect(
+                    java.util.stream.Collectors.toUnmodifiableMap(
+                            Map.Entry::getKey, entry -> entry.getValue().clone()));
+            pending = new PendingCreate(
+                    ledgerId, configuration, password.clone(), copiedMetadata, deadline);
+            return CompletableFuture.failedFuture(new com.nereusstream.api.NereusException(
+                    com.nereusstream.api.ErrorCode.TIMEOUT,
+                    true,
+                    "injected create request delayed beyond the original response"));
+        }
+
+        private synchronized CompletableFuture<WriteAdvHandle> createNow() {
+            PendingCreate exact = java.util.Objects.requireNonNull(pending, "pending delayed create");
+            pending = null;
+            return delegate.createAdvanced(
+                            exact.ledgerId(),
+                            exact.configuration(),
+                            exact.password(),
+                            exact.customMetadata(),
+                            exact.deadline())
+                    .whenComplete((ignored, failure) -> java.util.Arrays.fill(exact.password(), (byte) 0));
+        }
+
+        @Override
+        public CompletableFuture<ReadHandle> open(
+                long ledgerId,
+                BookKeeperDigestType digestType,
+                byte[] password,
+                boolean recovery,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.open(ledgerId, digestType, password, recovery, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Long> write(
+                WriteAdvHandle handle,
+                long entryId,
+                ByteBuf entry,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.write(handle, entryId, entry, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerEntries> readUnconfirmed(
+                ReadHandle handle,
+                long firstEntryId,
+                long lastEntryIdInclusive,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerMetadata> metadata(
+                long ledgerId, BookKeeperOperationDeadline deadline) {
+            return delegate.metadata(ledgerId, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+            return delegate.delete(ledgerId, deadline);
+        }
+
+        private record PendingCreate(
+                long ledgerId,
+                BookKeeperWalConfiguration configuration,
+                byte[] password,
+                Map<String, byte[]> customMetadata,
+                BookKeeperOperationDeadline deadline) { }
     }
 
     private static final class MutableClock extends Clock {

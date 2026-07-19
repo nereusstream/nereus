@@ -6,8 +6,10 @@
 > allocator、writer state machine、recovery-open sealing、ordered exact-range appender、fixed physical-reference
 > activation、non-recovery reader/lease/checksum、bounded whole-ledger retention and explicit module-local profile
 > composition checkpoints are implemented。The real-service checkpoint additionally passes real Oxia + BookKeeper
-> rollover、fresh-client/runtime cold restart、stable-target history、post-restart writer recovery、whole-ledger trim /
-> deletion、lost DELETE response and a second fresh-process dual-absence convergence；it also found and fixed the
+> exact CreateAdv response loss、delayed matching create recovery through the bounded fixed-slot scanner、permanent
+> hazard/retention veto、rollover、fresh-client/runtime cold restart、stable-target history、post-restart writer
+> recovery、whole-ledger trim/deletion、lost DELETE response and a second fresh-process dual-absence convergence；it
+> also found and fixed the
 > public BookKeeper client's consuming `ByteBuf` ownership boundary。These checkpoints are
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 > `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck`。`BookKeeperWalRuntime` can execute
