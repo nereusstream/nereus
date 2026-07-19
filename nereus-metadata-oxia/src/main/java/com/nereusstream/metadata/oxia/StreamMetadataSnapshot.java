@@ -44,4 +44,50 @@ public record StreamMetadataSnapshot(
     public long metadataVersion() {
         return metadata.metadataVersion();
     }
+
+    /**
+     * Compares the complete versioned authority exposed by this snapshot.
+     *
+     * <p>{@link TrimRecord#reason()} and {@link TrimRecord#updatedAtMillis()} are hydrated
+     * observation fields rather than fields in the authoritative stream-head value. They must
+     * therefore not make two reads of the same head version appear different.
+     */
+    public boolean sameVersionedAuthority(StreamMetadataSnapshot other) {
+        return other != null
+                && metadataVersion() == other.metadataVersion()
+                && sameSemanticAuthority(other);
+    }
+
+    /**
+     * Compares stable stream authority while ignoring the shared stream-head version.
+     *
+     * <p>This form is reserved for protocols whose evidence deliberately excludes append-session
+     * renewal and other version-only head changes. Commit, trim, policy, profile, and lifecycle
+     * changes remain observable.
+     */
+    public boolean sameSemanticAuthority(StreamMetadataSnapshot other) {
+        if (other == null) {
+            return false;
+        }
+        StreamMetadataRecord otherMetadata = other.metadata();
+        CommittedEndOffsetRecord otherCommittedEnd = other.committedEnd();
+        TrimRecord otherTrim = other.trim();
+        return metadata.streamId().equals(otherMetadata.streamId())
+                && metadata.streamName().equals(otherMetadata.streamName())
+                && metadata.streamNameHash().equals(otherMetadata.streamNameHash())
+                && metadata.state().equals(otherMetadata.state())
+                && metadata.profile().equals(otherMetadata.profile())
+                && metadata.attributes().equals(otherMetadata.attributes())
+                && metadata.createdAtMillis() == otherMetadata.createdAtMillis()
+                && metadata.policyVersion() == otherMetadata.policyVersion()
+                && committedEnd.streamId().equals(otherCommittedEnd.streamId())
+                && committedEnd.committedEndOffset()
+                        == otherCommittedEnd.committedEndOffset()
+                && committedEnd.cumulativeSize()
+                        == otherCommittedEnd.cumulativeSize()
+                && committedEnd.commitVersion()
+                        == otherCommittedEnd.commitVersion()
+                && trim.streamId().equals(otherTrim.streamId())
+                && trim.trimOffset() == otherTrim.trimOffset();
+    }
 }

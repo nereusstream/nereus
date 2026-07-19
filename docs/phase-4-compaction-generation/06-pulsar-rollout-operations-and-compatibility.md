@@ -1163,3 +1163,11 @@ It cannot publish NTC1 into the ordinary offset-index namespace or change F4 com
 - rollout steps with publication on/deletion off, then deletion activation；
 - old broker joining after cluster activation blocks new F4 operations and old decoder fails activated topics；
 - runtime construction/partial failure/reverse close with workers/leases drained before ObjectStore close。
+
+F4-M5 final-gates the implemented subset with
+`NereusAsyncRetentionMultiBrokerIntegrationTest.repairsAsyncHistoryAndLogicallyTrimsEvictedBacklogAcrossOwnershipCuts`。
+The retry-disabled fixture uses two brokers、shared real Oxia、pinned LocalStack and stock BookKeeper；it proves the
+async profile/cold-registration barrier、ordinary and compressed-batch exact `MessageIdAdv` values、owner stop/rejoin、
+exact retention/backlog installation、durable size eviction、unloaded ACTIVE-binding trim、post-trim append/read and a
+second ownership cut. Its logical-trim success retains every captured WAL object key, so the admin completion cannot
+be mistaken for physical-GC completion.

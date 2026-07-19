@@ -245,6 +245,10 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M5 checkpoint AC**：实现 product-owned、proof-gated publication-only cluster ACTIVE CAS，并让 broker
   zero-failure backfill completion 等待该 activation 的 ordinary checkpoint；它不表示 topic marker、
   mutation call sites、async profile 或 physical deletion 已启用。
+- **F4-M5**：Object-WAL async profile、durable registration/readiness/activation、pre-I/O lag、coupled
+  materialization、exact retention/backlog projection、bounded F3 logical trim 和 Pulsar admin routing 里程碑；已于
+  2026-07-19 通过 ordinary 与 retry-disabled real two-broker final gate。Complete 不表示 BookKeeper primary WAL
+  profile 已实现，也不替代 F4-M6 aggregate compatibility gate。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("5aeb199eadc2f5bcd2d618e1dbc42b810168de2d")
+    .orElse("0e9829a7453497910ab468669e644e88b4bc2f93")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1859,4 +1859,62 @@ tasks.register("phase4M5RetentionPolicyAdminCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn(":nereus-managed-ledger:check")
     dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("checkPhase4M5FinalContractSurface") {
+    group = "verification"
+    description = "Audit the complete async Object-WAL, logical-retention, ownership-cut, and coexistence surface."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m5-final-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register("phase4M5Check") {
+    group = "verification"
+    description = "Run the complete ordinary F4-M5 async-profile and logical-retention gate."
+    dependsOn("phase4M5RetentionPolicyAdminCheck")
+    dependsOn("checkPhase4M5FinalContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("phase4M5AsyncRetentionMultiBrokerPulsarCheck") {
+    group = "verification"
+    description = "Run the retry-disabled real two-broker async Object-WAL and logical-retention gate."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M5Check")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusAsyncRetentionMultiBrokerIntegrationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+        "-PtestRetryCount=0",
+    )
+}
+
+tasks.register("phase4M5FinalCheck") {
+    group = "verification"
+    description = "Run the complete F4-M5 release gate including real two-broker async retention and failover."
+    dependsOn("phase4M5Check")
+    dependsOn("checkPhase4M5FinalContractSurface")
+    dependsOn("phase4M5AsyncRetentionMultiBrokerPulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
 }

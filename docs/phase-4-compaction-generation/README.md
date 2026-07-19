@@ -148,13 +148,18 @@
 > across readiness、activation、CAS/reload/final-read and rollover. The final locked-Pulsar two-broker fixture now
 > proves exact source-byte deletion、MessageId stability、ownership/unload/failover/restart and stock BookKeeper
 > coexistence with retry disabled.
+> F4-M5 closes the async/retention rollout boundary. Its retry-disabled two-broker fixture runs the
+> `OBJECT_WAL_ASYNC_OBJECT` profile through cold registration、ordinary/compressed-batch exact MessageIds、owner
+> failover/rejoin、durable size-backlog eviction、unloaded ACTIVE-binding trim、post-trim append/read and another owner
+> cut while preserving physical WAL bytes and a stock BookKeeper control topic. The complete M5 ordinary/final gates
+> passed on 2026-07-19；F4-M6 remains pending.
 >
 > 设计基线日期：2026-07-14
 >
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@5aeb199eadc2f5bcd2d618e1dbc42b810168de2d`
+> `master@0e9829a7453497910ab468669e644e88b4bc2f93`
 
 > 实现状态日期：2026-07-19
 
@@ -868,8 +873,8 @@ production deletion 继续关闭。
 
 Checkpoint R 用 `HigherGenerationRetirementEligibilityVerifier` 关闭 §9.1 的剩余协议分支。所有 higher source
 先尝试 `CompletedTrimRetirementVerifier`：source range 必须完整落在同一 authoritative
-`StreamMetadataSnapshot.trimOffset` 以下，source wrapper、完整 stream snapshot 和可选 recovery-root wrapper
-会在同一次 proof 内精确重读。Generation-zero planner 也先走同一 completed-trim proof；只有未完成 trim 时
+`StreamMetadataSnapshot.trimOffset` 以下，source wrapper、versioned stream authority 和可选 recovery-root wrapper
+会在同一次 proof 内精确重读；hydrated trim reason/read time 不属于持久化 authority。Generation-zero planner 也先走同一 completed-trim proof；只有未完成 trim 时
 才要求 checkpoint P 的 current NRC1 replacement。因此 below-trim 不是时间或本地 hint，而是 exact L0
 metadata + source + recovery-root version set。
 
@@ -1605,7 +1610,9 @@ page size instead of passing the broader metadata page size into F3 cursor scans
 
 The last rollover also showed that whole `StreamMetadataSnapshot.equals` is not a stable authority test：the shared
 stream-head metadata version changes on append-session renewal, and hydrated trim reason/time are observational.
-`DefaultPhysicalRootBackfillCoordinator` therefore compares and hashes `stream-authority-v1` only from immutable
+`StreamMetadataSnapshot` now exposes separate versioned/semantic authority comparisons. Retention、lag、completed-trim
+and deleted-registration revalidation retain the shared version but ignore response-local trim fields；
+`DefaultPhysicalRootBackfillCoordinator` compares and hashes `stream-authority-v1` only from immutable
 stream identity/profile/policy/attributes、committed offset/size/commit version and trim offset. Append recovery
 authority similarly excludes the shared head metadata version while retaining stream id、last commit id、offset、size
 and commit version. A new commit、policy/lifecycle change or trim movement still fails closed；session renewal or a
@@ -1918,6 +1925,23 @@ still disabled. The aggregate gate passed on 2026-07-18 under Java 21 against lo
 `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59` with 153 Nereus/inherited/source/document/Pulsar tasks；its final
 four-suite broker invocation passed 129 tasks.
 
+### 6.35 F4-M5 async-retention final gate
+
+F4-M5 已完成并通过 final gate。`StreamMetadataSnapshot` 现在提供显式的 versioned/semantic authority 比较；M5
+planner 保留 shared Oxia head version，但忽略每次读取重建的 trim reason/time，M4 GC semantic proof 继续忽略
+append-session-only version drift。Durable backlog size 从最慢 durable cursor 的 mark-delete successor 计算，inactive
+subscription 仍保护 backlog；`LOGICAL_TRIM` 只消费 publication/live-projection authority，不消费 physical-delete bits。
+卸载后的 admin trim 仅把 exact ACTIVE Nereus binding 当作存在性证明，加载同一 incarnation 后重复 loaded gate。
+
+`phase4M5Check` 聚合 checkpoint X–AI、当前 clean source lock、受影响模块和静态/文档门禁；
+`phase4M5FinalCheck` 再运行 retry-disabled
+`NereusAsyncRetentionMultiBrokerIntegrationTest.repairsAsyncHistoryAndLogicallyTrimsEvictedBacklogAcrossOwnershipCuts`。
+真实 shared Oxia、pinned LocalStack、两 broker 与 stock BookKeeper 场景证明 async ordinary/compressed-batch
+payload/properties/全部 `MessageIdAdv` 坐标、cold registration、owner stop/rejoin、exact policy install、size backlog
+eviction、unload 后 logical trim、trim 后 append/read、第二次 ownership cut 和 BookKeeper 共存。Logical trim 完成后
+捕获的 physical WAL keys 仍存在；物理删除只属于已经 final-gated 的 M4 exact activation path。该方法于
+2026-07-19 在 locked Pulsar `master@0e9829a7453497910ab468669e644e88b4bc2f93`、`testRetryCount=0` 下通过。
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -1927,7 +1951,7 @@ four-suite broker invocation passed 129 tasks.
 | F4-M2 | generation publication、committed resolver、target-reader dispatch and fallback | complete/final-gated on 2026-07-15；real Oxia/LocalStack restart、concurrency、pin/quarantine/fallback evidence passed |
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
-| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | in progress；checkpoint X implements exact durable registration create/refresh/final revalidation、topic open/recreate return barrier and shared generation-store production ownership；checkpoint Y adds reserved generation capability and deterministic two-stable-snapshot broker readiness/invalidation；checkpoint Z adds exact unloaded projection candidate plus canonical bounded cold-topic traversal/report；checkpoint AA adds product-owned durable registration proof CAS and exact broker readiness handoff；checkpoint AB adds product-owned activation proof/revalidation plus the disabled-by-default first-marker switch；checkpoint AC adds proof-gated publication-only cluster ACTIVE transition and broker sequencing；checkpoint AD adds the opt-in Phase 4 Object-WAL matrix、protected-head `WAL_DURABLE` cut and protected live-tail/read repair；checkpoint AE adds exact F2 sync/async profile round-trip、per-stream pre-I/O activation/revalidation and authoritative lag gate；checkpoint AF installs the coupled production resolver/read-repair/materialization runtime and exact Pulsar profile/config mapping；checkpoint AG adds exact policy/config/evidence values、stable source-verified candidate planning and ownership-safe F3 logical-trim delegation；checkpoint AH adds the shared bounded/coalescing execution lane、production ledger/facade installation and exact typed broker config mapping；checkpoint AI adds exact effective Pulsar retention/backlog projection、generation/marker-gated policy install and loaded/unloaded/partition-child logical trim admission；M5/M6 final rollout gates remain |
+| F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
 | F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | planned |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：

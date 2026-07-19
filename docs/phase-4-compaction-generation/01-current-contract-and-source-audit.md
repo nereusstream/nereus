@@ -39,7 +39,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@5aeb199eadc2f5bcd2d618e1dbc42b810168de2d`。
+`master@0e9829a7453497910ab468669e644e88b4bc2f93`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -60,12 +60,13 @@ Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
 | `pulsar-broker-common/.../resources/NamespaceResources.java` | `1f20be916edd5e2cf92713a169064c32a9b46514` | `listNamespacesAsync(tenant)` backfill traversal |
 | `pulsar-broker-common/.../resources/TopicResources.java` | `66d2e81fb0eb9ebfda99deef636857e6200cf0e6` | `listPersistentTopicsAsync(namespace)` including unloaded topics |
 
-The table preserves the M0 blob audit. The following overlay records the exact broker files changed by checkpoint AI
-at the current source lock；these hashes, rather than the M0 rows above, are authoritative for the policy/admin cut.
+The table preserves the M0 blob audit. The following overlay records the exact broker files changed through the M5
+final boundary at the current source lock；these hashes, rather than the M0 rows above, are authoritative for the
+policy/admin and real acceptance cuts.
 
-| Checkpoint-AI source | Current Git blob | F4 relevance |
+| M5-final source | Current Git blob | F4 relevance |
 | --- | --- | --- |
-| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `5f35683c1942b5968f1fd6e4aab8e0aec299b03c` | unloaded binding readiness and admin admission |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `8888864320eb09f5fbdedc119bac7248d9ea6318` | unloaded binding readiness and admin admission |
 | `pulsar-broker/.../nereus/NereusResolvedTopicFeatures.java` | `2a3fdd7bdc2697d047077591740ca2956c4f7518` | exact immutable retention/backlog facts |
 | `pulsar-broker/.../nereus/NereusTopicFeatureResolver.java` | `7e262fe0a0a61e507ae5b61d11e5f978a84f8b7f` | effective policy precedence and readiness projection |
 | `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `33d3942b033de602ded94676226308c30181aacf` | F4 policy/admin admission matrix |
@@ -73,7 +74,9 @@ at the current source lock；these hashes, rather than the M0 rows above, are au
 | `pulsar-broker/.../nereus/NereusTopicPolicySnapshot.java` | `97e9c1a5c27a491b7545ba431ad14e784854040d` | stable complete policy-input comparison |
 | `pulsar-broker/.../service/BrokerService.java` | `90d6bdeabe3e887a0abb7e76efab451f341d5dad` | storage-bound capability/readiness resolution |
 | `pulsar-broker/.../service/persistent/PersistentTopic.java` | `e1ef70dbd0733782b50104028cb1a462b5f7f703` | marker admission, stable reload and loaded snapshot install |
-| `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `64d1af0f05db3050fcd26ac635dbc65915ef89da` | loaded and partition-child `TRIM_TOPIC` route |
+| `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `8e9e71b4bd6ca52ca9f64e3ad1b834ee092244ce` | loaded、partition-child and ACTIVE-bound unloaded `TRIM_TOPIC` route |
+| `pulsar-broker/.../nereus/NereusMultiBrokerIntegrationTest.java` | `e5fa56c345a29ad7cdc9154901d0f46fcaf1e971` | shared real Oxia、LocalStack、BookKeeper and broker ownership fixture |
+| `pulsar-broker/.../nereus/NereusAsyncRetentionMultiBrokerIntegrationTest.java` | `e6437cd197ab3d39f08145b023e08c5e53a5ac88` | retry-disabled M5 async/retention/failover/restart/BookKeeper final gate |
 
 At the checkpoint-AC source lock, the fork additionally contained
 `NereusGenerationProtocolCapability`、`NereusGenerationCapabilityReadiness` and the generation extension to

@@ -384,7 +384,8 @@ public final class StreamRegistrationRetirementCoordinator {
                                         () -> l0.getStreamSnapshot(cluster, stream),
                                         "revalidate deleted L0 stream authority")
                                 .thenCompose(streamSnapshot -> {
-                                    if (!streamSnapshot.equals(expected.streamSnapshot())) {
+                                    if (!streamSnapshot.sameVersionedAuthority(
+                                            expected.streamSnapshot())) {
                                         return CompletableFuture.completedFuture(false);
                                     }
                                     return bound(

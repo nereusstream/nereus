@@ -512,12 +512,17 @@ public record TrimRecord(
 ```
 
 `TrimRecord` is a hydrated view derived from `StreamHeadRecord.trimOffset`. Phase 1 does not keep an
-authoritative `/trim` key.
+authoritative `/trim` key. `reason` and `updatedAtMillis` describe the update response/current read observation；they
+are not persisted stream-head authority and may differ between two reads of the same Oxia version.
 
 `StreamMetadataSnapshot` is the read-side aggregate hydrated from one `StreamHeadRecord` get. Its
 `StreamMetadataRecord`、`CommittedEndOffsetRecord` and `TrimRecord` must carry the same stream id and Oxia
 metadata version, and trim cannot exceed committed end. Core read/metadata APIs use this operation instead
 of independently reading three views and constructing a torn snapshot across concurrent head CAS updates.
+Correctness revalidation must not use record `equals`：`sameVersionedAuthority` compares all exposed persisted facts
+and the shared Oxia version while excluding the two hydrated trim observation fields；
+`sameSemanticAuthority` additionally excludes the shared head version for explicitly version-insensitive protocols,
+while still detecting identity、lifecycle、profile、policy、commit and trim changes.
 
 ## 4. `OxiaMetadataStore` Interface
 
@@ -614,6 +619,8 @@ public record StreamMetadataSnapshot(
         StreamMetadataRecord metadata,
         CommittedEndOffsetRecord committedEnd,
         TrimRecord trim) {
+    public boolean sameVersionedAuthority(StreamMetadataSnapshot other);
+    public boolean sameSemanticAuthority(StreamMetadataSnapshot other);
 }
 
 public record DerivedIndexRepairResult(

@@ -3,10 +3,11 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`5aeb199eadc2f5bcd2d618e1dbc42b810168de2d`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`0e9829a7453497910ab468669e644e88b4bc2f93`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and retry-disabled real
-two-broker final boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and
-real-service tests：
+two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real two-broker async/
+retention boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and real-
+service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
   delete surface；
@@ -179,7 +180,8 @@ source-index-verified candidate planner and an ownership/activation-gated servic
 whole-operation timeout/close、production runtime/per-ledger facade composition and five exact Pulsar broker config
 fields. Checkpoint AI adds exact immutable effective retention/backlog policy mapping、stable generation readiness、
 registration-backed marker admission with post-activation policy reload, and loaded/unloaded/partition-child
-`TRIM_TOPIC` routing. Physical GC composition and the aggregate M5/M6 rollout remain pending.
+`TRIM_TOPIC` routing. The M5 final gate composes those paths with the already-final-gated M4 physical-GC predecessor；
+only M6 and the aggregate Phase 4 completion boundary remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1761,6 +1763,7 @@ NereusTopicFeatureResolverTest                            extended checkpoint AI
 NereusTopicFeatureValidatorTest                           extended checkpoint AI retention/backlog matrix/overflow
 NereusAdminOperationTest                                  extended checkpoint AI ready/unready unloaded trim
 PersistentTopicNereusAdmissionTest                        extended checkpoint AI loaded trim/marker/stable reload
+NereusAsyncRetentionMultiBrokerIntegrationTest            implemented M5 final async/trim/failover/restart/BK gate
 NereusGenerationProtocolBrokerTest
 ```
 
@@ -1881,6 +1884,8 @@ Retention/admin and destructive GC composition remain outside this checkpoint.
 the exact retention contract surface and runs `:nereus-managed-ledger:check`. The planner captures a maximum of 4,096
 canonical stats facts, verifies each exact source-index key/version/durable SHA, applies stock time-OR-size policy at
 verified range boundaries, and requires two identical captures both when planning and immediately before mutation.
+The shared head version remains part of that equality, but response-local hydrated trim reason/read time are excluded
+through `StreamMetadataSnapshot.sameVersionedAuthority`；a focused regression varies both fields on every head read.
 The service orders ownership admission、generation activation、exact policy load、stable plan、activation revalidation、
 planner authority revalidation、F3 trim and final ownership exactly, and never calls `StreamStorage.trim` or waits for
 physical deletion. Nine focused tests cover policy/unit/config bounds、strict expiry、stale source and pending-state
@@ -1916,6 +1921,19 @@ ends at F3 logical trim and physical GC remains disabled. `phase4M5RetentionPoli
 AH gate、Nereus checks、source/document audits and four focused Pulsar suites. It passed on 2026-07-18 under Java 21
 against locked Pulsar `master@330eeeb3fa9903ed0123c2a0e261d403c32f0a59` with 153 aggregate tasks；the final broker
 invocation passed 129 tasks.
+
+F4-M5 is complete/final-gated on 2026-07-19. `phase4M5Check` composes every checkpoint X–AI predecessor、the current
+clean Pulsar source lock、module/document/static contracts and the shared versioned/semantic stream-authority
+regressions. `phase4M5FinalCheck` adds retry-disabled
+`NereusAsyncRetentionMultiBrokerIntegrationTest.repairsAsyncHistoryAndLogicallyTrimsEvictedBacklogAcrossOwnershipCuts`
+against two brokers、shared real Oxia、pinned LocalStack and stock BookKeeper. The scenario creates an async-profile
+topic, cold-registers it, writes ordinary and compressed batched entries, preserves exact payload/properties and every
+`MessageIdAdv` coordinate through owner loss/rejoin, installs exact retention/backlog policy, performs durable size
+eviction, loads the exact ACTIVE-bound incarnation after unload, completes F3 logical trim without deleting physical
+WAL bytes, appends/reads after trim, rolls ownership again and keeps an independent BookKeeper topic writable/readable.
+The method passed with `testRetryCount=0` on the locked
+`master@0e9829a7453497910ab468669e644e88b4bc2f93` source. F4-M6 and the aggregate Phase 4 completion gate remain
+separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 

@@ -2191,30 +2191,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
             StreamMetadataSnapshot second) {
         Objects.requireNonNull(first, "first");
         Objects.requireNonNull(second, "second");
-        return first.metadata().streamId().equals(
-                        second.metadata().streamId())
-                && first.metadata().streamName().equals(
-                        second.metadata().streamName())
-                && first.metadata().streamNameHash().equals(
-                        second.metadata().streamNameHash())
-                && first.metadata().state().equals(
-                        second.metadata().state())
-                && first.metadata().profile().equals(
-                        second.metadata().profile())
-                && first.metadata().attributes().equals(
-                        second.metadata().attributes())
-                && first.metadata().createdAtMillis()
-                        == second.metadata().createdAtMillis()
-                && first.metadata().policyVersion()
-                        == second.metadata().policyVersion()
-                && first.committedEnd().committedEndOffset()
-                        == second.committedEnd().committedEndOffset()
-                && first.committedEnd().cumulativeSize()
-                        == second.committedEnd().cumulativeSize()
-                && first.committedEnd().commitVersion()
-                        == second.committedEnd().commitVersion()
-                && first.trim().trimOffset()
-                        == second.trim().trimOffset();
+        return first.sameSemanticAuthority(second);
     }
 
     static boolean sameAppendRecoveryAuthority(

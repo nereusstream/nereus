@@ -286,7 +286,8 @@ implement BookKeeper IO。
 > Status: Implemented through F4-M4 and final-gated on 2026-07-19. NCP1/NTC1 and NRC1 codec/strict reader、
 > recovery-root publication、replay/index repair、source retirement and referenced/ownerless physical GC are wired
 > into the production runtime and covered by a retry-disabled real two-broker acceptance gate. Safe broker defaults
-> still schedule no physical deletion；F4-M5/M6 remain separate rollout/compatibility milestones.
+> still schedule no physical deletion；F4-M5 async/retention rollout is final-gated，while F4-M6 remains the separate
+> aggregate scale/failure/compatibility milestone.
 
 A read-optimized object is per-stream and covers a declared half-open offset range. Its durable header includes a
 closed read-view value (`COMMITTED` or `TOPIC_COMPACTED`); view-specific indexes and generation ordering never cross.

@@ -4,8 +4,8 @@
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
-> F4-M4 real two-broker source-deletion/MessageId/unload/failover/restart/BookKeeper gate passed；F4-M5 through
-> checkpoint AI is in progress；F4-M6 pending
+> F4-M4 real two-broker source-deletion gate and F4-M5 retry-disabled async-retention/MessageId/unload/failover/
+> restart/BookKeeper gate passed；F4-M1–M5 are final-gated，F4-M6 pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -650,6 +650,13 @@ production service/facade routing，以及 Pulsar typed retention config mapping
 immutable effective retention/backlog snapshot、stable generation readiness、registration-backed marker admission、
 post-activation policy reload 和 loaded/unloaded/partition-child `TRIM_TOPIC` route；physical deletion 仍关闭。
 
+M5 final gate 已在 locked two-broker Pulsar、shared real Oxia、pinned LocalStack 和 stock BookKeeper 上以 retry
+disabled 通过。`OBJECT_WAL_ASYNC_OBJECT` topic 经 cold registration、ordinary/compressed-batch exact MessageId、
+owner stop/rejoin、durable size-backlog eviction、unload 后 ACTIVE-binding logical trim、trim 后 append/read 和再次
+ownership cut 保持一致；logical trim 只消费 publication/live-projection authority，物理 WAL bytes 不随 admin
+promise 删除。`StreamMetadataSnapshot` 的 versioned comparator 还明确排除 hydrated trim observation fields，
+同时保留 head version/commit/trim/policy truth。F4-M5 已 final-gated；BookKeeper primary-WAL profiles 仍为 reserved。
+
 Checkpoint AP 已实现 configured-scope guarded PUT/exact HEAD/complete LIST/exact DELETE canary 和 deterministic
 non-secret capability digest。Checkpoint AQ 已实现 product-owned bounded coordinator：冻结 exact
 ACTIVE/readiness/domain/registration authority，运行并核验 checkpoint-W backfill 与 AP canary，再以一个 CAS
@@ -706,7 +713,7 @@ readiness/activation/CAS/reload/final-read 阶段。最终 retry-disabled two-br
 删除后 compacted read 仍可用，普通/批内 MessageId 经 unload、owner failover、restart/reverse takeover 保持不变，
 并保留 stock BookKeeper 共存；F4-M4 已 final-gated。
 
-F4-M0 只是 design gate；F4-M1–M4 final gates 也不构成整个 Phase 4 完成声明。F4-M4 只在 exact activation/
-scope/proof 下 final-gate physical GC，safe defaults 仍不调度或删除；M5 through checkpoint AI 也不声称完整
-async/Pulsar rollout、benchmark、chaos 或 Phase 4 compatibility certification。F4-M4–M6 的确切文件、测试、
-故障点和 release gates 见代码级实施计划。
+F4-M0 只是 design gate；F4-M1–M5 final gates 也不构成整个 Phase 4 完成声明。F4-M4 只在 exact activation/
+scope/proof 下 final-gate physical GC，safe defaults 仍不调度或删除；M5 final-gates the scoped Object-WAL async/
+Pulsar retention rollout but does not claim M6 scale/failure/compatibility certification. F4-M6 的确切文件、测试、
+故障点和 aggregate release gates 见代码级实施计划。

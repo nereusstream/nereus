@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implementation in progress / F4-M1–M4 final-gated、M5 through checkpoint AI；
+> 状态：Implemented / F4-M1–M5 final-gated；F4-M6 aggregate compatibility pending；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -130,11 +130,14 @@ Already present：
 - F4-M5 checkpoint AI：exact immutable effective retention/backlog policy projection、checked snapshot identity、
   generation/marker admission、post-activation stable reload and loaded/unloaded/partition-child `TRIM_TOPIC`
   routing are implemented；logical mutation still terminates at F3.
+- F4-M5 final gate：a retry-disabled real two-broker fixture proves cold async registration、ordinary/compressed-batch
+  exact MessageIds、owner stop/rejoin、durable size-backlog eviction、unloaded ACTIVE-binding logical trim、post-trim
+  append/read and another ownership cut while retaining physical WAL bytes and a stock BookKeeper control topic.
 
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
-- primary-WAL retention gate and final real-service destructive/scale evidence；
+- BookKeeper-primary retention and the Phase 4 M6 scale/chaos matrix；
 - mixed primary target resolver。
 
 The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default
@@ -359,7 +362,7 @@ acknowledged primary range merely because materialization lags。
 
 ## 12. Implementation gate
 
-Before `OBJECT_WAL_ASYNC_OBJECT` can move from `Reserved` to `Implemented`：
+`OBJECT_WAL_ASYNC_OBJECT` moved from `Reserved` to `Implemented` after these executable M5 gates：
 
 - F4-M1–M4 metadata/object lifecycle、generation、worker、checkpoint and GC gates；
 - `WAL_DURABLE` success/replay/read-after-success contract tests；
@@ -368,8 +371,11 @@ Before `OBJECT_WAL_ASYNC_OBJECT` can move from `Reserved` to `Implemented`：
 - primary-WAL retention/reference integration；
 - Pulsar monotonic `nereus.generation-protocol=1` activation and async-profile admission；
 - metrics/backpressure/close behavior；
-- F4-M5/M6 ordinary/final gates and all predecessor regressions；
+- F4-M5 ordinary/final gates and all predecessor regressions；
 - Phase 1/1.5/2/3 and overall docs updated in the same change。
+
+F4-M6 remains the Phase 4-wide scale/failure/compatibility and aggregate completion gate；it is not permission to
+infer either BookKeeper primary profile from the implemented Object-WAL profile.
 
 BookKeeper async/sync profiles have an additional independent gate: a real BookKeeper writer/reader/location and
 ledger-retention implementation. They do not block completion of the explicitly scoped Object-WAL async path。

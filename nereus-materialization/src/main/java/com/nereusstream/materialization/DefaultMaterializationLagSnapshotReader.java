@@ -936,15 +936,7 @@ public final class DefaultMaterializationLagSnapshotReader
     private static boolean sameStreamAuthority(
             StreamMetadataSnapshot current,
             StreamMetadataSnapshot expected) {
-        return current.metadata().equals(expected.metadata())
-                && current.committedEnd().equals(
-                        expected.committedEnd())
-                && current.trim().streamId().equals(
-                        expected.trim().streamId())
-                && current.trim().trimOffset()
-                        == expected.trim().trimOffset()
-                && current.trim().metadataVersion()
-                        == expected.trim().metadataVersion();
+        return current.sameVersionedAuthority(expected);
     }
 
     private static NereusException condition(

@@ -295,7 +295,8 @@ public final class DefaultRetentionCandidatePlanner
                         .thenCompose(head -> authority.cursor(owner)
                                 .thenApply(cursor -> {
                                     if (!initialPolicy.equals(policy)
-                                            || !initialHead.equals(head)
+                                            || !initialHead
+                                                    .sameVersionedAuthority(head)
                                             || !initialCursor.equals(cursor)) {
                                         throw new AuthorityDriftException();
                                     }

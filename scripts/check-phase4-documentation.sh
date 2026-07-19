@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="5aeb199eadc2f5bcd2d618e1dbc42b810168de2d"
+current_pulsar_lock="0e9829a7453497910ab468669e644e88b4bc2f93"
 
 require_literal() {
     local literal="$1"
@@ -18,6 +18,7 @@ lock_docs=(
     docs/phase-4-compaction-generation/README.md
     docs/phase-4-compaction-generation/01-current-contract-and-source-audit.md
     docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md
+    docs/design/nereus-design-index.md
 )
 for path in "${lock_docs[@]}"; do
     require_literal "$current_pulsar_lock" "$path"
@@ -104,6 +105,14 @@ require_literal "phase4M5RetentionRuntimeCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M5RetentionRuntimeCheck" \
     "build.gradle.kts"
+require_literal "phase4M5RetentionPolicyAdminCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M5Check" \
+    "build.gradle.kts"
+require_literal "phase4M5FinalCheck" \
+    "build.gradle.kts"
+require_literal "phase4M5FinalCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "Checkpoint U" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint V" \
@@ -246,13 +255,13 @@ require_literal "Checkpoint AH implements the shared per-stream coalescing lane"
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
 require_literal "checkpoints AG–AI retention planner" \
     "docs/design/nereus-overall-architecture.md"
-require_literal "M5 through AI" \
+require_literal "F4-M1–M5 final-gated" \
     "docs/design/nereus-design-index.md"
-require_literal "F4-M1–M4 final-gated" \
+require_literal "F4-M1–M5 final-gated" \
     "docs/design/nereus-design-index.md"
-require_literal "M5 through checkpoint AI" \
+require_literal "F4-M5 已 final-gated" \
     "docs/design/nereus-future4-compaction-generation.md"
-require_literal "M5 through checkpoint AI" \
+require_literal "Implemented / F4-M1–M5 final-gated" \
     "docs/automq-like-stream-storage/README.md"
 require_literal "F4-M4 final gate" \
     "docs/automq-like-stream-storage/README.md"
@@ -319,4 +328,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M4 final status plus M5 through AI, source lock, gates, and local links verified."
+echo "Phase 4 M1-M5 final status, current source lock, gates, and local links verified."

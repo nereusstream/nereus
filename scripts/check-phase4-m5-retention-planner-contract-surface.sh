@@ -22,6 +22,7 @@ require_literal() {
 
 main="$repo_root/nereus-managed-ledger/src/main/java/com/nereusstream/managedledger/retention"
 test="$repo_root/nereus-managed-ledger/src/test/java/com/nereusstream/managedledger/retention"
+metadata_snapshot="$repo_root/nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/StreamMetadataSnapshot.java"
 
 policy="$main/RetentionPolicySnapshot.java"
 config="$main/NereusRetentionConfig.java"
@@ -44,6 +45,7 @@ for path in \
     "$planner" \
     "$provider" \
     "$service" \
+    "$metadata_snapshot" \
     "$config_test" \
     "$planner_test" \
     "$service_test"; do
@@ -70,6 +72,8 @@ require_literal "value.lifecycle() == GenerationLifecycle.COMMITTED" "$planner"
 require_literal "value.readViewId() == ReadView.COMMITTED.wireId()" "$planner"
 require_literal "return age > retentionTimeMillis" "$planner"
 require_literal "Math.min(cursorCut, Math.max(timeCut, sizeCut))" "$planner"
+require_literal ".sameVersionedAuthority(head)" "$planner"
+require_literal "public boolean sameVersionedAuthority(" "$metadata_snapshot"
 
 require_literal "GenerationOperation.LOGICAL_TRIM" "$service"
 require_literal "activationGuard.revalidate(proof)" "$service"
@@ -83,6 +87,7 @@ require_literal "appliesTimeOrSizeFormulaAtVerifiedRangeBoundaries" "$planner_te
 require_literal "usesStrictAgeBoundaryAndStopsAtStaleSource" "$planner_test"
 require_literal "handlesZeroInfiniteAndPendingPoliciesConservatively" "$planner_test"
 require_literal "finalRevalidationRejectsHeadPolicyOrOwnerDrift" "$planner_test"
+require_literal "stableCaptureIgnoresHydratedTrimObservationDrift" "$planner_test"
 require_literal "gatesAndRevalidatesBeforeEnteringF3Trim" "$service_test"
 require_literal "noOpStillRequiresFinalOwnershipButDoesNotMutate" "$service_test"
 require_literal "lostOwnershipAfterDurableTrimFailsCallbackAndSkipsObserver" "$service_test"

@@ -2,8 +2,8 @@
 
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
-> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M4
-> 已 implementation/final-gated，F4-M5 through checkpoint AI 正在实现；
+> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M5
+> 已 implementation/final-gated，F4-M6 pending；
 > txn、catalog 仍为 target design。
 
 ## 1. Purpose
@@ -528,8 +528,9 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 > without repeated DELETE, plus two-worker shared-intent/idempotent-delete convergence. F4-M5 checkpoints X–AI additionally implement
 > durable registration/readiness/activation、protected async Object-WAL acknowledgement/read repair、pre-I/O lag
 > admission、coupled materialization、stable retention planning/F3 trim delegation and exact Pulsar policy/admin
-> admission. Safe defaults keep physical deletion disabled；the explicit opt-in path and these restart slices exist,
-> while the remaining M4/M6 destructive/scale matrix is not final-gated.
+> admission. Its retry-disabled real two-broker final gate covers durable backlog eviction、unloaded logical trim、
+> post-trim IO、exact ordinary/batched MessageIds、owner rejoin/failover and BookKeeper coexistence. Safe defaults keep
+> physical deletion disabled；F4-M6 remains the aggregate scale/failure/compatibility boundary.
 
 An object is deletable only when all relevant conditions are true：
 

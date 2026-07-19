@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M4 complete/final-gated；F4-M3 format + planner/recovery + exact-source worker + protection/checkpoint/service + Pulsar Entry/NCP1 exact-byte round trip + topic-compaction SPI/COMMITTED-source bootstrap/tagged-key/sorted-spill engine-worker-publication + terminal workflow-metadata retirement passed deterministic and real Oxia/LocalStack gates；F4-M4 additionally passed retry-disabled real two-broker source-deletion/MessageId/unload/failover/restart/BookKeeper acceptance；F4-M5 through checkpoint AI is in progress，F4-M6 pending
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M5 complete/final-gated；F4-M3 format/planner/worker passed deterministic and real Oxia/LocalStack gates，F4-M4 passed retry-disabled real two-broker source-deletion/MessageId acceptance，F4-M5 passed retry-disabled async-retention/unload/failover/restart/BookKeeper acceptance；F4-M6 pending
 > 最近设计/实现同步：2026-07-19
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -175,7 +175,10 @@ production installation/facade route 与 exact typed Pulsar config mapping。Che
 retention/backlog snapshot、generation/marker-gated policy install 与 loaded/unloaded/partition-child logical trim
 admission。Cursor snapshot candidate/execution、current-writer object inventory、registration retirement and the
 metadata-first lifecycle now have checkpoints AJ–AO；coverage/capability proof、destructive activation and M4 final
-acceptance are complete, while M5/M6 remain targets；safe-default production deletion 继续关闭。
+acceptance are complete。The M5 final gate additionally proves cold async registration、exact ordinary/batched
+MessageIds、durable backlog eviction、unloaded logical trim、post-trim IO、owner rejoin/failover and stock BookKeeper
+coexistence with retry disabled；M5 is complete/final-gated，while M6 remains the final target. Safe-default production
+deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated
 alias。
@@ -188,9 +191,9 @@ alias。
 - KoP、routing、production topic-compaction admission、lakehouse、advanced Pulsar semantics；
 - Future 4 NRC1 recovery、source retirement and referenced/ownerless physical GC are implemented and F4-M4
   final-gated；safe broker defaults remain `enabled=false, dryRun=true`, so destructive execution still requires the
-  explicit capability/coverage activation path. Async Object-WAL/materialization is implemented through the current
-  F4-M5 checkpoints but remains proof-gated；M5/M6 rollout and compatibility completion are still open. Later tracks
-  remain north-star designs；Future 3 and F4-M1–M4 are implemented/final-gated。
+  explicit capability/coverage activation path. Async Object-WAL/materialization and Pulsar logical-retention rollout
+  are F4-M5 final-gated but remain proof-gated at runtime；M6 compatibility completion is still open. Later tracks
+  remain north-star designs；Future 3 and F4-M1–M5 are implemented/final-gated。
 
 目标架构章节描述这些能力时使用 `Designed`，不代表当前代码已支持。
 

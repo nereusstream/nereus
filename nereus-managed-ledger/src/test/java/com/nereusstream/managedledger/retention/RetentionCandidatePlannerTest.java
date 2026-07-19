@@ -184,6 +184,21 @@ class RetentionCandidatePlannerTest {
                 .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class);
     }
 
+    @Test
+    void stableCaptureIgnoresHydratedTrimObservationDrift() {
+        authority.varyTrimObservation = true;
+
+        RetentionCandidate candidate = planner.plan(
+                        STREAM, authority.policy)
+                .join()
+                .orElseThrow();
+        planner.revalidate(candidate, authority.policy).join();
+
+        assertThat(candidate.streamHeadMetadataVersion()).isEqualTo(7);
+        assertThat(candidate.candidateTrimOffset()).isEqualTo(20);
+        assertThat(authority.headReads).isGreaterThanOrEqualTo(8);
+    }
+
     private void addSource(
             String key,
             long metadataVersion) {
@@ -331,6 +346,7 @@ class RetentionCandidatePlannerTest {
         private int policyReads;
         private int headReads;
         private int cursorReads;
+        private boolean varyTrimObservation;
 
         private FakeAuthority(
                 RetentionPolicySnapshot policy,
@@ -358,7 +374,11 @@ class RetentionCandidatePlannerTest {
         public CompletableFuture<StreamMetadataSnapshot> head(
                 StreamId streamId) {
             headReads++;
-            return CompletableFuture.completedFuture(head);
+            if (!varyTrimObservation) {
+                return CompletableFuture.completedFuture(head);
+            }
+            return CompletableFuture.completedFuture(
+                    withTrimObservation(head, headReads));
         }
 
         @Override
@@ -395,6 +415,20 @@ class RetentionCandidatePlannerTest {
                 sourceIndex(StreamId streamId, String key) {
             return CompletableFuture.completedFuture(
                     Optional.ofNullable(sources.get(key)));
+        }
+
+        private static StreamMetadataSnapshot withTrimObservation(
+                StreamMetadataSnapshot value,
+                long observation) {
+            return new StreamMetadataSnapshot(
+                    value.metadata(),
+                    value.committedEnd(),
+                    new TrimRecord(
+                            value.trim().streamId(),
+                            value.trim().trimOffset(),
+                            "observation-" + observation,
+                            observation,
+                            value.trim().metadataVersion()));
         }
     }
 }

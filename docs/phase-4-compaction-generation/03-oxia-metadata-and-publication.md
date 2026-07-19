@@ -379,9 +379,10 @@ composition or physical deletion.
 
 Checkpoint R adds an exact L0 metadata dependency to source retirement without transferring correctness to a cache or
 watch. `CompletedTrimRetirementVerifier` reads `OxiaMetadataStore.getStreamSnapshot(cluster, stream)` and accepts only
-when the source's whole `[offsetStart, offsetEnd)` is below `TrimRecord.trimOffset`. It freezes the full
-`StreamMetadataSnapshot` rather than only the scalar trim offset, together with the exact source wrapper and optional
-`VersionedRecoveryCheckpointRoot`; all facts are reread byte-for-byte before the proof returns. Canonical source keys
+when the source's whole `[offsetStart, offsetEnd)` is below `TrimRecord.trimOffset`. It freezes the full versioned
+authority exposed by `StreamMetadataSnapshot` rather than only the scalar trim offset, together with the exact source
+wrapper and optional `VersionedRecoveryCheckpointRoot`; all persisted facts and the shared head version are reread
+before the proof returns. Hydrated trim reason/read time are response-local and are deliberately excluded. Canonical source keys
 are reconstructed for generation zero and for either higher-generation view. A changed source、snapshot or root is a
 retryable condition failure, while contradictory stream identities are invariant failures.
 

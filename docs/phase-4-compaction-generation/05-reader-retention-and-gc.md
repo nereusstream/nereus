@@ -1084,7 +1084,8 @@ tokens, verifies each token's exact source-index key/version/durable SHA and COM
 identity, and captures the complete candidate twice. Authority drift retries at most four stable attempts. Final
 `revalidate` repeats the same two captures with the original `plannedAtMillis` and requires byte-for-byte equivalent
 candidate evidence. Missing/incomplete stats or stale source identity can only reduce the eligible boundary or return
-empty；they never authorize a trim.
+empty；they never authorize a trim. Head capture uses `StreamMetadataSnapshot.sameVersionedAuthority`：the shared Oxia
+version remains candidate evidence, while hydrated `TrimRecord.reason/updatedAtMillis` never create false drift.
 
 ### 8.2 Candidate formula
 
@@ -1116,8 +1117,9 @@ Nereus range granularity. Missing/stale publish-time stats conservatively stop `
 sizes from committed truth. Age arithmetic is checked/saturating and never wraps. Candidate is never
 aligned by physical object identity；it is an offset.
 
-Before requesting trim, planner re-reads policy、head and owner retention root. Any version/session/lifecycle change
-restarts. `PROTECTION_PENDING` and `TRIM_PENDING` are vetoes, not temporary values to ignore.
+Before requesting trim, planner re-reads policy、head and owner retention root. Any persisted head version、owner
+session or lifecycle change restarts；response-local trim observation fields do not. `PROTECTION_PENDING` and
+`TRIM_PENDING` are vetoes, not temporary values to ignore.
 
 ### 8.3 Logical trim call
 
@@ -1352,8 +1354,9 @@ ACTIVE candidate-root fence. A DRAINING source must pass the same proof again wh
 later replacement/index/root degradation blocks MARK/DELETE planning.
 
 Checkpoint R completes the remaining §9.1 source-eligibility branches. `CompletedTrimRetirementVerifier` requires the
-whole source range below the current L0 trim, freezes the exact source、full `StreamMetadataSnapshot` and optional
-recovery-root wrapper, then rereads all three. Generation-zero uses that proof as the alternative to checkpoint P's
+whole source range below the current L0 trim, freezes the exact source、versioned `StreamMetadataSnapshot` authority
+and optional recovery-root wrapper, then rereads all three. The comparison retains the shared Oxia version and every
+persisted exposed fact but excludes hydrated trim reason/read time. Generation-zero uses that proof as the alternative to checkpoint P's
 healthy NRC1 replacement；higher COMMITTED and TOPIC_COMPACTED sources use it before consulting view-specific
 replacement facts.
 
@@ -1683,7 +1686,7 @@ require generation-v1/materialization-v1 snapshots contain no live reference for
 conditionally remove every materialization checkpoint、retention-stats and generation-sequence key;
   rescan each prefix and require empty
 reload projection proof, L0 tombstone and R2
-require every captured version/digest unchanged and R2.version == R1.version
+require every captured version/digest and L0 versioned authority unchanged and R2.version == R1.version
 deleteIfVersion(registrationKey, R1.version, registryShardPartitionKey)
 ```
 

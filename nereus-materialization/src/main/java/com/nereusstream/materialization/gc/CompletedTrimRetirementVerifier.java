@@ -68,7 +68,8 @@ final class CompletedTrimRetirementVerifier {
                     return l0.getStreamSnapshot(cluster, identity.stream());
                 })
                 .thenCompose(snapshot -> {
-                    if (!snapshot.equals(expected.snapshot())) {
+                    if (!snapshot.sameVersionedAuthority(
+                            expected.snapshot())) {
                         return CompletableFuture.failedFuture(condition(
                                 "completed trim changed while retirement facts were frozen"));
                     }
