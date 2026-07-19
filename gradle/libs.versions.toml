@@ -35,6 +35,7 @@ assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 # Release publication must replace these source-build coordinates with organization-owned published artifacts.
 pulsar-broker = { module = "org.apache.pulsar:pulsar-broker", version.ref = "pulsar" }
 pulsar-managed-ledger = { module = "org.apache.pulsar:managed-ledger", version.ref = "pulsar" }
+pulsar-metadata = { module = "org.apache.pulsar:pulsar-metadata", version.ref = "pulsar" }
 pulsar-common = { module = "org.apache.pulsar:pulsar-common", version.ref = "pulsar" }
 pulsar-client-original = { module = "org.apache.pulsar:pulsar-client-original", version.ref = "pulsar" }
 pulsar-client-admin-api = { module = "org.apache.pulsar:pulsar-client-admin-api", version.ref = "pulsar" }

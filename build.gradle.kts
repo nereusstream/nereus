@@ -70,7 +70,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f4OxiaIntegrationTest",
     ),
     ":nereus-object-store" to setOf("s3IntegrationTest"),
-    ":nereus-pulsar-adapter" to setOf("f4M4IntegrationTest"),
+    ":nereus-pulsar-adapter" to setOf("f4M4IntegrationTest", "bkM2IntegrationTest"),
 )
 val dockerBackedPulsarExecTasks = setOf(
     "phase2PulsarFinalCheck",
@@ -99,6 +99,7 @@ val pulsarCheckoutExecTasks = setOf(
     "phase4M5RetentionPolicyAdminPulsarCheck",
     "phase4M5AsyncRetentionMultiBrokerPulsarCheck",
     "phase4M6TwoBrokerWorkerContentionPulsarCheck",
+    "bookKeeperPrimaryWalM2PulsarCheck",
 )
 
 tasks.matching { it.name in dockerBackedPulsarExecTasks }.configureEach {
@@ -639,9 +640,31 @@ tasks.register("bookKeeperPrimaryWalM2MetadataCheck") {
 tasks.register("bookKeeperPrimaryWalM2RuntimeCheck") {
     group = "verification"
     description = "Verify the BK-M2 allocator, writer, recovery, physical-reference, lease, and exact reader runtime checkpoint."
-    dependsOn("bookKeeperPrimaryWalM2MetadataCheck")
+    dependsOn("bookKeeperPrimaryWalM2RecoveryFencingCheck")
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-core:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM2AllocatorCheck") {
+    group = "verification"
+    description = "Verify reserved-id allocation, immutable provider identity, and uncertain-create recovery."
+    dependsOn("bookKeeperPrimaryWalM2MetadataCheck")
+    dependsOn(":nereus-bookkeeper:bkM2AllocatorTest")
+}
+
+tasks.register("bookKeeperPrimaryWalM2AppendReadCheck") {
+    group = "verification"
+    description = "Verify exact BK append/read targets, buffer ownership, rollover, and L0 generation-zero composition."
+    dependsOn("bookKeeperPrimaryWalM2AllocatorCheck")
+    dependsOn(":nereus-bookkeeper:bkM2AppendReadTest")
+    dependsOn(":nereus-core:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM2RecoveryFencingCheck") {
+    group = "verification"
+    description = "Verify stale-session fencing, recovery-open sealing, restart ownership transfer, and inventory repair."
+    dependsOn("bookKeeperPrimaryWalM2AppendReadCheck")
+    dependsOn(":nereus-bookkeeper:bkM2RecoveryFencingTest")
 }
 
 tasks.register("bookKeeperPrimaryWalM2RetentionCheck") {
@@ -671,6 +694,13 @@ tasks.register<Exec>("bookKeeperPrimaryWalM2PulsarCheck") {
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
     )
+}
+
+tasks.register("bookKeeperPrimaryWalM2RealServiceCheck") {
+    group = "verification"
+    description = "Run BK-M2 real Oxia/BookKeeper restart, rollover, and delete-response-loss acceptance."
+    dependsOn("bookKeeperPrimaryWalM2RetentionCheck")
+    dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

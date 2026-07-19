@@ -7,18 +7,20 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 ```text
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
-BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (module-local profile checkpoint)
+BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)
 BK-M3 .. BK-M6                  not implemented
-BK_ONLY module-local runtime    executable; not registered by the production broker provider
+BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
-BookKeeper ledger deletion      absent / safe default closed
+BookKeeper ledger deletion      implemented and real-service tested / production safe default closed
 ```
 
 `bookKeeperPrimaryWalDocumentationCheck` remains the documentation gate. `bookKeeperPrimaryWalM1Check`、
 `bookKeeperPrimaryWalM1FinalCheck` and the focused `bookKeeperPrimaryWalM2MetadataCheck` /
-`bookKeeperPrimaryWalM2RuntimeCheck` / `bookKeeperPrimaryWalM2RetentionCheck` /
-`bookKeeperPrimaryWalM2PulsarCheck` are executable and backed by real
-module/unit/predecessor dependencies；the unfinished M2 aggregate/final gates and M3–M6 names remain frozen target names and must
+`bookKeeperPrimaryWalM2AllocatorCheck` / `bookKeeperPrimaryWalM2AppendReadCheck` /
+`bookKeeperPrimaryWalM2RecoveryFencingCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
+`bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` and
+`bookKeeperPrimaryWalM2RealServiceCheck` are executable and backed by real
+module/unit/Oxia/BookKeeper/predecessor dependencies；the unfinished M2 aggregate/final gates and M3–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
@@ -222,8 +224,18 @@ stock BookKeeper client as a borrowed/non-closed context resource。`bookKeeperP
 exact development artifacts，runs the ManagedLedger/adapter/module tests，then forces fresh broker Checkstyle and the
 borrowed-client test against the clean pinned checkout。
 
-Still required before BK-M2 is complete：complete crash-cut/restart/rollover/resource and real-service deletion suites，
-plus production provider runtime composition/admission。The broker profile remains rejected before primary IO。
+The real-service checkpoint uses production `OxiaJavaClientMetadataStore` /
+`OxiaJavaBookKeeperMetadataStore` and `DefaultBookKeeperClientOperations` against one real BookKeeper 4.18 bookie。It
+forces a two-range ledger rollover, closes and recreates both Oxia and BookKeeper clients, proves historical target and
+byte stability, recovery-seals the cold active writer before allocating a new ledger, retires a completely trimmed
+ledger, injects a successful provider delete with a lost response, then recreates the process again before the second
+absence CAS reaches `DELETED`。The first run exposed that BookKeeper consumes the `ByteBuf` passed to `writeAsync`；the
+adapter now transmits a retained duplicate and the SPI explicitly keeps caller ownership, with a focused ref-count test。
+
+Still required before BK-M2 is complete：close the remaining BK-M2 scenario/evidence rows and execute the ordinary /
+aggregate final tasks against the current source locks。Production provider composition、first-create admission and
+loaded/unloaded/two-broker ownership rollout are BK-M5 responsibilities, not hidden BK-M2 completion criteria；until
+BK-M5, the broker profile remains rejected before primary IO。
 
 ### 5.1 Metadata/keyspace
 
@@ -278,6 +290,7 @@ bookKeeperPrimaryWalM2AppendReadCheck
 bookKeeperPrimaryWalM2RecoveryFencingCheck
 bookKeeperPrimaryWalM2RetentionCheck
 bookKeeperPrimaryWalM2PulsarCheck
+bookKeeperPrimaryWalM2RealServiceCheck       real Oxia + real BK + restart/delete-response-loss checkpoint
 bookKeeperPrimaryWalM2Check                 ordinary aggregate, delete remains dry-run
 bookKeeperPrimaryWalM2FinalCheck            real Oxia + real BK + restart/delete-response-loss
 ```

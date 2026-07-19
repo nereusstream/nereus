@@ -9,7 +9,10 @@ import org.apache.bookkeeper.client.api.LedgerMetadata;
 import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.client.api.WriteAdvHandle;
 
-/** Narrow public-API adapter used to fake deterministic provider outcomes without mocking BookKeeper internals. */
+/**
+ * Narrow public-API adapter used to fake deterministic provider outcomes without mocking BookKeeper internals.
+ * Callers retain ownership of every supplied {@link ByteBuf}; an implementation must not consume that reference.
+ */
 public interface BookKeeperClientOperations {
     CompletableFuture<WriteAdvHandle> createAdvanced(
             long ledgerId,

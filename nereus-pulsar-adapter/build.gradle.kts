@@ -65,3 +65,35 @@ tasks.register<Test>("f4M4IntegrationTest") {
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
 }
+
+val bkM2IntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[bkM2IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[bkM2IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(bkM2IntegrationTest.implementationConfigurationName, project())
+    add(bkM2IntegrationTest.implementationConfigurationName, libs.pulsar.metadata)
+    add(bkM2IntegrationTest.implementationConfigurationName, libs.bookkeeper.server)
+    add(bkM2IntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(bkM2IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(bkM2IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(bkM2IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(bkM2IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
+tasks.register<Test>("bkM2IntegrationTest") {
+    group = "verification"
+    description = "Run BK-M2 restart, rollover, and retention recovery against real Oxia and BookKeeper."
+    testClassesDirs = bkM2IntegrationTest.output.classesDirs
+    classpath = bkM2IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}

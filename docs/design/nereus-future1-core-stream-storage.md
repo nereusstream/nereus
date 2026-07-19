@@ -4,9 +4,10 @@
 > 交付映射：`docs/phase-1-core-stream-storage/`
 > 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
 > 当前后续：F1-BK / BookKeeper Primary WAL Delivery 的 BK-M0 与 BK-M1 已 complete/final-gated；
-> BK-M2 `BOOKKEEPER_WAL_ONLY` implementation 已完成 metadata/store、allocator/writer/recovery/reader 与
-> whole-ledger retention checkpoints；BK-M2 profile/Pulsar gate 与 BK-M3–M6
-> 尚未实现，三个 BookKeeper profile 仍为 pre-IO rejected；
+> BK-M2 `BOOKKEEPER_WAL_ONLY` implementation 已完成 metadata/store、allocator/writer/recovery/reader、
+> whole-ledger retention、module-local profile/facade 和 real Oxia + BookKeeper restart/delete checkpoints；
+> BK-M2 remaining matrix/aggregate gate 与 BK-M3–M6 尚未完成，production broker 的三个 BookKeeper profile
+> 仍为 pre-IO rejected；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、

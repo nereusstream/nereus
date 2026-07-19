@@ -28,7 +28,7 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 + F1-BK BK-M0-M6 | Phase 1/1.5 implemented/final-gated；F1-BK BK-M0/BK-M1 complete/final-gated；BK-M2 metadata/store/scanner checkpoint implemented；BK-M3–M6 not implemented | complete BK-M2 allocator/writer/reader/retention and `BOOKKEEPER_WAL_ONLY` runtime |
+| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 + F1-BK BK-M0-M6 | Phase 1/1.5 implemented/final-gated；F1-BK BK-M0/BK-M1 complete/final-gated；BK-M2 through real Oxia/BookKeeper restart/delete checkpoint；BK-M3–M6 not implemented | close remaining BK-M2 matrix and aggregate/final gate |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
 | F4 Materialization/Compaction | Phase 4 F4-M0-M6 | Implemented/final-gated；M4 implements recovery/retirement/physical+cursor GC、activation/global domains、restart/scale/late-PUT cuts、atomic readiness rollover and retry-disabled real source deletion；M5 implements durable registration/readiness/activation、protected async Object-WAL、pre-I/O lag admission、coupled production materialization、versioned exact-evidence retention/F3 trim、durable backlog eviction and exact Pulsar policy/admin routing，then final-gates MessageIds、unload/failover/rejoin/post-trim IO and BookKeeper coexistence；M6 BD–BQ close scale/failure/compatibility and the clean 203/203-task aggregate；safe defaults keep production deletion disabled | F5/F6/F8 may consume the final-gated F4 contracts |
@@ -40,8 +40,8 @@ protocol/table state = projection
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
 profile from the completed P15-M6 surface。Future 4's explicit production composition now implements/final-gates
-`OBJECT_WAL_ASYNC_OBJECT` without changing that legacy boundary；all BookKeeper primary profiles remain reservations
-until their adapters/state machines pass independent gates。The exact F1-BK target is
+`OBJECT_WAL_ASYNC_OBJECT` without changing that legacy boundary；BK_ONLY is executable only in the independently gated
+module/facade composition while production broker admission remains reserved until BK-M5。The exact F1-BK target is
 `../phase-bk-bookkeeper-primary-wal/README.md`；it is not Future 5 and does not renumber F5–F8。
 
 ## 3. Dependency graph

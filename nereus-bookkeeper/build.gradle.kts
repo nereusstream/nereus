@@ -13,3 +13,39 @@ dependencies {
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testRuntimeOnly(libs.junit.platform.launcher)
 }
+
+fun registerFocusedTest(name: String, descriptionText: String, vararg classes: String) {
+    tasks.register<Test>(name) {
+        group = "verification"
+        description = descriptionText
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        useJUnitPlatform()
+        filter {
+            classes.forEach(::includeTestsMatching)
+        }
+    }
+}
+
+registerFocusedTest(
+    "bkM2AllocatorTest",
+    "Run BK-M2 reserved-id allocation and provider identity tests.",
+    "com.nereusstream.bookkeeper.BookKeeperLedgerAllocatorTest",
+)
+
+registerFocusedTest(
+    "bkM2AppendReadTest",
+    "Run BK-M2 append, exact read, buffer ownership, and L0 composition tests.",
+    "com.nereusstream.bookkeeper.BookKeeperClientApiContractTest",
+    "com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppenderTest",
+    "com.nereusstream.bookkeeper.BookKeeperPrimaryWalReaderTest",
+    "com.nereusstream.bookkeeper.BookKeeperStreamStorageIntegrationTest",
+)
+
+registerFocusedTest(
+    "bkM2RecoveryFencingTest",
+    "Run BK-M2 uncertain-create, stale-session, ownership-transfer, and recovery-inventory tests.",
+    "com.nereusstream.bookkeeper.BookKeeperLedgerAllocatorTest",
+    "com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppenderTest",
+    "com.nereusstream.bookkeeper.BookKeeperWalRetentionGateTest",
+)

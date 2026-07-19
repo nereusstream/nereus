@@ -2,6 +2,7 @@
 package com.nereusstream.bookkeeper;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.util.ReferenceCountUtil;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Map;
@@ -78,7 +79,18 @@ public final class DefaultBookKeeperClientOperations implements BookKeeperClient
 
     @Override public CompletableFuture<Long> write(
             WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
-        return mapped(deadline.bound(handle.writeAsync(entryId, entry)), BookKeeperExceptionMapper.Operation.WRITE);
+        // BookKeeper's WriteAdvHandle consumes/releases the reference passed to writeAsync. Keep the
+        // provider-neutral SPI caller-owned by transmitting a separate retained reference.
+        ByteBuf transmitted = Objects.requireNonNull(entry, "entry").retainedDuplicate();
+        try {
+            return mapped(
+                    deadline.bound(handle.writeAsync(entryId, transmitted)),
+                    BookKeeperExceptionMapper.Operation.WRITE);
+        } catch (Throwable failure) {
+            ReferenceCountUtil.safeRelease(transmitted);
+            return CompletableFuture.failedFuture(BookKeeperExceptionMapper.map(
+                    failure, BookKeeperExceptionMapper.Operation.WRITE));
+        }
     }
     @Override public CompletableFuture<LedgerEntries> readUnconfirmed(
             ReadHandle handle, long first, long last, BookKeeperOperationDeadline deadline) {

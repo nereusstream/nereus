@@ -67,9 +67,10 @@ code-level target is frozen in
 [`docs/phase-bk-bookkeeper-primary-wal/`](docs/phase-bk-bookkeeper-primary-wal/README.md)：
 BK-M0–M6 cover provider-neutral append/read seams、exact ledger allocation/lifecycle/fencing、BK_ONLY retention、F4
 async/sync reuse and Pulsar rollout. The BK_ONLY production logical-trim/abandoned-owner retirement bridge is now part
-of the M2 retention checkpoint；remaining crash/resource suites、real-service deletion and Pulsar integration are still
-incomplete。BK_ONLY is executable only through the explicit module-local runtime；the production broker provider still
-rejects all BookKeeper profiles before primary IO until its rollout gates pass。
+of the M2 retention checkpoint；the real Oxia + BookKeeper checkpoint now covers rollover、fresh client/runtime cold
+restart、stable historical targets、trim、lost delete response and fresh-process dual absence。Remaining M2 matrix and
+aggregate/final evidence is still incomplete。BK_ONLY is executable only through the explicit module-local runtime；
+the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the

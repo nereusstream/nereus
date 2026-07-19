@@ -5,13 +5,16 @@
 > regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：metadata/store/scanner and the
 > allocator、writer state machine、recovery-open sealing、ordered exact-range appender、fixed physical-reference
 > activation、non-recovery reader/lease/checksum、bounded whole-ledger retention and explicit module-local profile
-> composition checkpoints are implemented and
+> composition checkpoints are implemented。The real-service checkpoint additionally passes real Oxia + BookKeeper
+> rollover、fresh-client/runtime cold restart、stable-target history、post-restart writer recovery、whole-ledger trim /
+> deletion、lost DELETE response and a second fresh-process dual-absence convergence；it also found and fixed the
+> public BookKeeper client's consuming `ByteBuf` ownership boundary。These checkpoints are
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 > `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck`。`BookKeeperWalRuntime` can execute
 > BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade；the pinned local Pulsar broker passes the exact
-> borrowed stock-client boundary。Remaining crash-cut/rollover/real-service suites and production profile
-> composition/admission remain incomplete；the production broker provider therefore still rejects the profile before
-> primary IO。
+> borrowed stock-client boundary。The remaining M2 scenario/evidence rows and aggregate/final gate are not yet closed；
+> production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
+> fail-closed, so the production broker still rejects the profile before primary IO。
 
 ## 1. Delivery identity
 
@@ -197,8 +200,10 @@ absence before `DELETED`；GC remains disabled/dry-run by default and local conf
 Tests cover normal allocation、
 uncertain create、stale-session pre-IO rejection、ownership-transfer sealing、contiguous/reused ranges、partial write
 seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads、checksum failure、retirement-authority failure、
-reader veto and mark/drain/lost-delete-response/dual-absence convergence。Profile registration and production Pulsar
-routing remain deliberately absent；real-service deletion cuts remain BK-M2 work。The module-local
+reader veto and mark/drain/lost-delete-response/dual-absence convergence。The Docker-backed
+`BookKeeperWalOnlyOxiaBkIntegrationTest` now repeats rollover、cold history read、writer recovery、trim、delete response
+loss and dual absence against production Oxia adapters plus a real BookKeeper 4.18 cluster, including a fresh process
+after the first absence。Profile registration and production Pulsar routing remain deliberately absent for BK-M5。The module-local
 `BookKeeperStorageProfileResolver`、`BookKeeperWalRuntime` and generic `DefaultStreamStorage` composition now admit
 BK_ONLY only when the exact appender/reader are installed；strict append waits for generation zero and cold read
 resolves the same `BookKeeperEntryRangeReadTarget`。Production and fake L0 stores share
@@ -213,5 +218,6 @@ entry bytes through `NereusManagedLedger.addEntry/readEntry` over generation zer
 uses the virtual ledger。The pinned Pulsar fork now obtains the same stock
 `BookkeeperManagedLedgerStorageClass.getBookKeeperClient()` instance, passes it as an explicitly borrowed
 `NereusRuntimeContext` resource, rejects non-BK/null providers, and passes broker main/test Checkstyle plus its focused
-test。`DefaultNereusRuntimeProvider` does not yet compose that client into the production BK runtime；this checkpoint
-therefore does not enable first-create or claim a real broker BK_ONLY data path。
+test。`DefaultNereusRuntimeProvider` does not yet compose that client into the production BK runtime；that BK-M5 rollout
+boundary does not weaken the now-real BK-M2 storage evidence, but it still prevents first-create and a production broker
+BK_ONLY data path。
