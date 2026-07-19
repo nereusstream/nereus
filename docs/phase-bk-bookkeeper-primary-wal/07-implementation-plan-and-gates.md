@@ -270,6 +270,12 @@ pre-head validation and an explicit advanced-ledger write, while the replacement
 at entry zero。Two process-run state machines also contend from the same observed writer version and only one recovery
 owner/replacement ledger wins；the remaining independent-process contention cut stays open in the matrix。
 
+The real reader gate now keeps the exact three-entry ledger range intact for a logical read beginning at offset one：
+the provider call remains `[0,2]` with `withRecovery(false)`，NBKR1 is verified over all three entries, and only then
+are entries one and two returned。Replaying the same real range with an incorrect target checksum fails the whole
+future with `PRIMARY_WAL_CHECKSUM_MISMATCH` and still performs no recovery-open；count/id/config real corruptions remain
+open separately。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session

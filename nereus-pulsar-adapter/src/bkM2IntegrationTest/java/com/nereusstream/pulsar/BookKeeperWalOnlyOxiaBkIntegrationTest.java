@@ -20,6 +20,7 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolveOptions;
+import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
@@ -312,6 +313,77 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             assertThat(target.entryCount()).isEqualTo(3);
             assertRead(process, stream, List.of(
                     new byte[] {1, 2}, new byte[] {3}, new byte[] {4, 5, 6}));
+        }
+    }
+
+    @Test
+    void realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift()
+            throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-reader-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(1_550_000), ZoneId.of("UTC"));
+        AtomicReference<CountingOperations> counting = new AtomicReference<>();
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-reader",
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> counting(raw, counting))) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-reader-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            process.append(stream, new byte[] {1}, new byte[] {2}, new byte[] {3});
+
+            assertRead(process, stream, List.of(new byte[] {2}, new byte[] {3}), 1);
+            assertThat(counting.get().normalOpenCalls()).isOne();
+            assertThat(counting.get().recoveryOpenCalls()).isZero();
+            assertThat(counting.get().lastReadRange()).containsExactly(0, 2);
+
+            ResolvedRange resolved = process.storage.resolve(stream, 0, new ResolveOptions(10, false, true))
+                    .join()
+                    .ranges()
+                    .get(0);
+            BookKeeperEntryRangeReadTarget exact = (BookKeeperEntryRangeReadTarget) resolved.readTarget();
+            BookKeeperEntryRangeReadTarget corrupt = new BookKeeperEntryRangeReadTarget(
+                    exact.version(),
+                    exact.clusterAlias(),
+                    exact.ledgerId(),
+                    exact.firstEntryId(),
+                    exact.entryCount(),
+                    exact.entryMapping(),
+                    sha('f'));
+            ResolvedRange corruptRange = new ResolvedRange(
+                    resolved.offsetRange(),
+                    resolved.generation(),
+                    corrupt,
+                    resolved.payloadFormat(),
+                    resolved.recordCount(),
+                    resolved.entryCount(),
+                    resolved.logicalBytes(),
+                    resolved.schemaRefs(),
+                    resolved.projectionRef(),
+                    resolved.commitVersion());
+            assertThatThrownBy(() -> process.reader.readPhysicalWithStats(
+                            stream,
+                            0,
+                            List.of(corruptRange),
+                            new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
+                    .join()).hasCauseInstanceOf(NereusException.class)
+                    .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
+                            .isEqualTo(ErrorCode.PRIMARY_WAL_CHECKSUM_MISMATCH));
+            assertThat(counting.get().recoveryOpenCalls()).isZero();
+            assertThat(counting.get().lastReadRange()).containsExactly(0, 2);
         }
     }
 
@@ -1018,6 +1090,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         private final DefaultBookKeeperClientOperations rawOperations;
         private final BookKeeperPrimaryWalAppender appender;
         private final BookKeeperAppendRecoveryCoordinator recoveryCoordinator;
+        private final BookKeeperPrimaryWalReader reader;
         private final BookKeeperWalRuntime runtime;
         private final DefaultStreamStorage storage;
 
@@ -1031,6 +1104,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 DefaultBookKeeperClientOperations rawOperations,
                 BookKeeperPrimaryWalAppender appender,
                 BookKeeperAppendRecoveryCoordinator recoveryCoordinator,
+                BookKeeperPrimaryWalReader reader,
                 BookKeeperWalRuntime runtime,
                 DefaultStreamStorage storage) {
             this.clusterName = clusterName;
@@ -1042,6 +1116,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             this.rawOperations = rawOperations;
             this.appender = appender;
             this.recoveryCoordinator = recoveryCoordinator;
+            this.reader = reader;
             this.runtime = runtime;
             this.storage = storage;
         }
@@ -1173,6 +1248,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     rawOperations,
                     appender,
                     recoveryCoordinator,
+                    reader,
                     runtime,
                     storage);
         }
@@ -1259,7 +1335,10 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     private static final class CountingOperations implements BookKeeperClientOperations {
         private final BookKeeperClientOperations delegate;
         private final AtomicInteger writes = new AtomicInteger();
+        private final AtomicInteger normalOpens = new AtomicInteger();
+        private final AtomicInteger recoveryOpens = new AtomicInteger();
         private final AtomicReference<WriteAdvHandle> createdHandle = new AtomicReference<>();
+        private final AtomicReference<long[]> lastReadRange = new AtomicReference<>();
 
         private CountingOperations(BookKeeperClientOperations delegate) {
             this.delegate = delegate;
@@ -1286,6 +1365,8 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 byte[] password,
                 boolean recovery,
                 BookKeeperOperationDeadline deadline) {
+            if (recovery) recoveryOpens.incrementAndGet();
+            else normalOpens.incrementAndGet();
             return delegate.open(ledgerId, digestType, password, recovery, deadline);
         }
 
@@ -1305,6 +1386,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 long firstEntryId,
                 long lastEntryIdInclusive,
                 BookKeeperOperationDeadline deadline) {
+            lastReadRange.set(new long[] {firstEntryId, lastEntryIdInclusive});
             return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
         }
 
@@ -1325,6 +1407,18 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         private WriteAdvHandle createdHandle() {
             return java.util.Objects.requireNonNull(createdHandle.get(), "created BookKeeper write handle");
+        }
+
+        private int normalOpenCalls() {
+            return normalOpens.get();
+        }
+
+        private int recoveryOpenCalls() {
+            return recoveryOpens.get();
+        }
+
+        private long[] lastReadRange() {
+            return java.util.Objects.requireNonNull(lastReadRange.get(), "BookKeeper read range").clone();
         }
     }
 
