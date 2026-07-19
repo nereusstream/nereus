@@ -80,10 +80,12 @@ open M2 matrix。
 The same checkpoint now has production Oxia + BookKeeper B/O evidence across a fresh runtime for same-session durable
 replay and expired-session fencing/new-ledger retry；only the abrupt-kill C variants remain open for those rows。
 Remaining M2 matrix and aggregate/final evidence is still incomplete。BK_ONLY is executable only through the explicit module-local runtime；
-BK-M3 has now started with executable checkpoints for BK task V2/exact-source reads、durable fixed-slot
+BK-M3 now has executable checkpoints for BK task V2/exact-source reads、durable fixed-slot
 `MATERIALIZATION_SOURCE` ownership and restart transfer、shared F4 runtime provider composition、the async
-stable-head profile plan and the common authoritative lag reader。Source retirement、sealed-ledger final flush and
-real BK-to-Object publication/failure cuts remain open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
+stable-head profile plan、common authoritative lag reader、source-retirement authority and sealed-ledger trigger。
+The first real Oxia + BookKeeper + Object chain also proves BK fallback across a fresh runtime、NCP1 publication、
+higher-generation normal reads and the exact retirement proof。Response-loss and physical source release/delete cuts
+remain open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。

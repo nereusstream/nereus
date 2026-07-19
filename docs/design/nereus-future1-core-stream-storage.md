@@ -8,8 +8,9 @@
 > bounded uncertain-allocation reconciliation、whole-ledger retention、module-local profile/facade 和 real Oxia +
 > BookKeeper create-response-loss / late-create / restart / delete checkpoints plus cold all-shard Oxia coverage；
 > BK-M2 remaining matrix/aggregate gate 尚未完成；BK-M3 已推进到 provider-neutral exact-source、durable source
-> protection、async profile/runtime composition、shared lag、retirement-metadata authority 与 sealed shared-scanner
-> trigger checkpoint，live Object read/real-service final gate 及 BK-M4–M6 尚未完成。Production broker 的三个 BookKeeper profile
+> protection、async profile/runtime composition、shared lag、retirement-metadata authority、sealed shared-scanner
+> trigger and first real Oxia/BK/Object publication/read/retirement-proof checkpoint；response-loss、physical source
+> release/final gate 及 BK-M4–M6 尚未完成。Production broker 的三个 BookKeeper profile
 > 仍为 pre-IO rejected；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 

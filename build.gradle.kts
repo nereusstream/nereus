@@ -70,7 +70,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f4OxiaIntegrationTest",
     ),
     ":nereus-object-store" to setOf("s3IntegrationTest"),
-    ":nereus-pulsar-adapter" to setOf("f4M4IntegrationTest", "bkM2IntegrationTest"),
+    ":nereus-pulsar-adapter" to setOf("f4M4IntegrationTest", "bkM2IntegrationTest", "bkM3IntegrationTest"),
 )
 val dockerBackedPulsarExecTasks = setOf(
     "phase2PulsarFinalCheck",
@@ -768,6 +768,13 @@ tasks.register("bookKeeperPrimaryWalM3Check") {
     dependsOn(":nereus-materialization:check")
     dependsOn(":nereus-bookkeeper:check")
     dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register("bookKeeperPrimaryWalM3RealServiceCheck") {
+    group = "verification"
+    description = "Run BK-M3 real Oxia/BookKeeper/Object stable-head, fallback, fresh-runtime publication, and read proof."
+    dependsOn("bookKeeperPrimaryWalM3Check")
+    dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

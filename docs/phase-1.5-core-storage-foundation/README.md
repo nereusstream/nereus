@@ -127,15 +127,16 @@ must not create a second temporary L0 API。
 | seal/logical delete | implemented |
 | `AppendResult.cumulativeSize` public handoff | implemented/final-gated |
 | BookKeeper target value/codec | implemented；later F1-BK adds exact writer/reader and BK-M3 task/source support |
-| BookKeeper profiles | production reserved/rejected before IO；BK_ONLY module-local M2 runtime and BK async M3 source/profile/lag checkpoints now exist |
+| BookKeeper profiles | production reserved/rejected before IO；BK_ONLY module-local M2 runtime and BK async M3 first real publication/read/proof checkpoint now exist |
 | `WAL_DURABLE` success | reserved/rejected by Phase 1.5；later implemented/final-gated for F4 `OBJECT_WAL_ASYNC_OBJECT` only |
 | async materialization/higher generation | reserved at Phase 1.5 exit；later F4 `OBJECT_WAL_ASYNC_OBJECT` implemented/final-gated；BookKeeper primary variants reserved |
 | physical object deletion | absent at Phase 1.5 exit；later F4 implementation is final-gated and exact-activation-only with safe defaults closed |
 
 Phase 1.5 之后的 BookKeeper primary-WAL 实现合同已单独冻结为 F1-BK：
 `../phase-bk-bookkeeper-primary-wal/README.md`。它复用这里的 tagged target、registry、stable-head/gen0 split 和
-generic recovery。F1-BK 已实现 BK-M1、BK-M2 的 module-local runtime，并推进 BK-M3 source/protection/profile/lag、retirement-metadata/sealed-trigger
-checkpoint；production rollout 仍未完成，不能把 reserved codec/registry seam 或 partial checkpoint 当成 broker
+generic recovery。F1-BK 已实现 BK-M1、BK-M2 的 module-local runtime，并推进 BK-M3 source/protection/profile/lag、
+retirement-metadata/sealed-trigger and first real Oxia/BK/Object publication/read/proof checkpoint；production rollout
+仍未完成，不能把 reserved codec/registry seam 或 partial checkpoint 当成 broker
 profile support。
 
 ## 7. Aggregate Gates

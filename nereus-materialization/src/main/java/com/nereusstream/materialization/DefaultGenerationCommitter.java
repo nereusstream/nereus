@@ -6,14 +6,12 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.GenerationId;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamState;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
@@ -74,6 +72,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
     private final PhysicalObjectMetadataStore physicalStore;
     private final ObjectProtectionManager protectionManager;
     private final MaterializationTaskProtectionReconciler taskProtectionReconciler;
+    private final MaterializationSourceProtectionRegistry sourceProtectionAdapters;
     private final GenerationProtocolActivationGuard activationGuard;
     private final MaterializationOutputVerifier outputVerifier;
     private final PublicationIdGenerator publicationIds;
@@ -189,6 +188,8 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         this.operationTimeout = requirePositive(operationTimeout, "operationTimeout");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.sourceProtectionAdapters = Objects.requireNonNull(
+                sourceProtectionAdapters, "sourceProtectionAdapters");
         this.taskProtectionReconciler = new DefaultMaterializationTaskProtectionReconciler(
                 this.cluster,
                 new MaterializationTaskStore(this.cluster, this.generationStore, this.clock),
@@ -196,7 +197,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 new MetadataPhysicalObjectIdentityResolver(
                         this.cluster, this.l0Store, this.physicalStore),
                 this.protectionManager,
-                Objects.requireNonNull(sourceProtectionAdapters, "sourceProtectionAdapters"),
+                this.sourceProtectionAdapters,
                 this.operationTimeout,
                 this.scheduler);
     }
@@ -627,7 +628,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                     .thenCompose(ignored -> loadSnapshot())
                     .thenCompose(snapshot -> {
                         validateSnapshot(snapshot, admission.profile());
-                        return revalidateSources(snapshot);
+                        return revalidateSources(snapshot, publishingTask);
                     })
                     .thenCompose(ignored -> loadExactPrepared(prepared))
                     .thenCompose(ignored -> deadline.bound(
@@ -790,17 +791,20 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             });
         }
 
-        private CompletableFuture<Void> revalidateSources(StreamMetadataSnapshot snapshot) {
+        private CompletableFuture<Void> revalidateSources(
+                StreamMetadataSnapshot snapshot,
+                VersionedMaterializationTask publishingTask) {
             List<CompletableFuture<Void>> checks = new ArrayList<>(task.sources().size());
             for (SourceGeneration source : task.sources()) {
-                checks.add(revalidateSource(source, snapshot));
+                checks.add(revalidateSource(source, snapshot, publishingTask));
             }
             return CompletableFuture.allOf(checks.toArray(CompletableFuture[]::new));
         }
 
         private CompletableFuture<Void> revalidateSource(
                 SourceGeneration source,
-                StreamMetadataSnapshot snapshot) {
+                StreamMetadataSnapshot snapshot,
+                VersionedMaterializationTask publishingTask) {
             if (source.commitVersion() > snapshot.committedEnd().commitVersion()) {
                 return CompletableFuture.failedFuture(condition(
                         "materialization source is newer than committed head"));
@@ -817,21 +821,17 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                         VersionedGenerationCandidate candidate = optional.orElseThrow(() ->
                                 condition("materialization source index disappeared"));
                         requireSourceIndex(source, candidate);
-                        if (!(source.readTarget() instanceof ObjectSliceReadTarget target)) {
-                            return CompletableFuture.failedFuture(new NereusException(
-                                    ErrorCode.UNSUPPORTED_READ_TARGET,
-                                    false,
-                                    "F4-M2 publication requires object-slice sources"));
-                        }
                         return deadline.bound(
-                                        () -> physicalStore.getRoot(
-                                                cluster, ObjectKeyHash.from(target.objectKey())),
-                                        "reload materialization source physical root")
-                                .thenApply(root -> {
-                                    requireSourceRoot(target, source.view(), root.orElseThrow(() ->
-                                            condition("materialization source physical root is absent")));
-                                    return null;
-                                });
+                                        () -> sourceProtectionAdapters.acquireOrTransfer(
+                                                task.streamId(),
+                                                source,
+                                                MaterializationProtectionIdentities.sourceReferenceId(
+                                                        cluster, task, source),
+                                                taskOwner(publishingTask),
+                                                expected -> revalidateTaskOwner(
+                                                        publishingTask, expected)),
+                                        "revalidate materialization source protection")
+                                .thenApply(ignored -> null);
                     });
         }
 
@@ -928,12 +928,11 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             } catch (IllegalArgumentException failure) {
                 throw invariant("materialization registration has an unknown storage profile", failure);
             }
-            if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                    && profile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+            if (!profile.objectMaterializationEnabled()) {
                 throw new NereusException(
                         ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
                         false,
-                        "generation publication requires an Object-WAL materialization profile");
+                        "generation publication requires an object-materialization profile");
             }
             Optional<ProjectionRef> decoded;
             try {
@@ -1083,34 +1082,6 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 return;
             }
             throw invariant("unknown materialization source index wrapper");
-        }
-
-        private void requireSourceRoot(
-                ObjectSliceReadTarget target,
-                ReadView view,
-                VersionedPhysicalObjectRoot root) {
-            if (root.value().lifecycle() != PhysicalObjectLifecycle.ACTIVE) {
-                throw condition("materialization source root is not ACTIVE");
-            }
-            PhysicalObjectIdentity identity = PhysicalObjectIdentity.from(root.value());
-            long targetEnd;
-            try {
-                targetEnd = Math.addExact(target.objectOffset(), target.objectLength());
-            } catch (ArithmeticException overflow) {
-                throw invariant("materialization source object range overflows", overflow);
-            }
-            PhysicalObjectKind expectedKind = target.objectType() == ObjectType.MULTI_STREAM_WAL_OBJECT
-                    ? PhysicalObjectKind.OBJECT_WAL
-                    : view == ReadView.COMMITTED
-                            ? PhysicalObjectKind.COMMITTED_COMPACTED
-                            : PhysicalObjectKind.TOPIC_COMPACTED;
-            if (!identity.objectKey().equals(target.objectKey())
-                    || identity.objectId().isEmpty()
-                    || !identity.objectId().orElseThrow().equals(target.objectId())
-                    || identity.kind() != expectedKind
-                    || targetEnd > identity.objectLength()) {
-                throw invariant("materialization source target conflicts with physical root identity");
-            }
         }
 
         private ObjectProtectionOwner taskOwner(VersionedMaterializationTask value) {

@@ -28,16 +28,21 @@
 > `minMergeSourceRanges=2`。These checkpoints are executable through `bookKeeperPrimaryWalM3ExactSourceCheck`、
 > `bookKeeperPrimaryWalM3ProtectionCheck`、`bookKeeperPrimaryWalM3AsyncProfileCheck` and
 > `bookKeeperPrimaryWalM3LagCheck`、`bookKeeperPrimaryWalM3SourceRetirementCheck`、
-> `bookKeeperPrimaryWalM3LiveReadCheck`、`bookKeeperPrimaryWalM3SealedLedgerCheck` and
-> `bookKeeperPrimaryWalM3Check`。The live checkpoint now fresh-resolves and reads the full exact higher generation under
-> normal durable Object pins before BK retirement，while generation-zero fallback delegates protection to the BK reader
-> lease。Real BK-to-Object publication and fresh-runtime failure cuts remain pending，so BK-M3 is not complete。The remaining
+> `bookKeeperPrimaryWalM3LiveReadCheck`、`bookKeeperPrimaryWalM3SealedLedgerCheck`、
+> `bookKeeperPrimaryWalM3Check` and `bookKeeperPrimaryWalM3RealServiceCheck`。The live checkpoint fresh-resolves and
+> reads the full exact higher generation under normal durable Object pins before BK retirement，while generation-zero
+> fallback delegates protection to the BK reader lease。The first real-service chain now proves stable-head ack with no
+> Object generation，BK fallback before/after a fresh runtime，durable task reconstruction from committed metadata，exact
+> NCP1 publication to S3-compatible storage，normal higher-generation reads and the exact live-read retirement proof over
+> real Oxia + BookKeeper + LocalStack。Task/protection/publication response-loss cuts and physical source release/delete
+> remain pending，so BK-M3 is not complete。The remaining
 > M2 scenario/evidence rows and aggregate/final gate are not yet closed；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
 
-> 2026-07-19：the live-read checkpoint `bookKeeperPrimaryWalM3Check --rerun-tasks` passes 62/62 executable tasks；
-> this is deterministic aggregate evidence，not `bookKeeperPrimaryWalM3FinalCheck` real-service evidence。
+> 2026-07-19：the deterministic checkpoint `bookKeeperPrimaryWalM3Check --rerun-tasks` passes 62/62 executable tasks；
+> `bookKeeperPrimaryWalM3RealServiceCheck` adds the first real Oxia + BookKeeper + S3-compatible end-to-end evidence，
+> but is intentionally not the still-unregistered `bookKeeperPrimaryWalM3FinalCheck`。
 
 ## 1. Delivery identity
 

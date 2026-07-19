@@ -572,8 +572,7 @@ public final class CheckpointDerivedIndexRepairer implements GenerationIndexRepa
                 || !value.streamId().equals(streamId.value())
                 || !value.projectionIdentitySha256().equals(
                         reference.projectionIdentitySha256())
-                || (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                        && profile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT)) {
+                || !profile.objectMaterializationEnabled()) {
             throw invariant(
                     "checkpoint repair registration differs from NRC1 projection identity",
                     null);

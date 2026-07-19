@@ -14,6 +14,8 @@
 
 package com.nereusstream.core;
 
+import com.nereusstream.api.keys.DeterministicIds;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Objects;
 
@@ -107,7 +109,7 @@ public record StreamStorageConfig(
                 maxDerivedIndexRepairCommitsPerCall, maxCachedStreams, maxInFlightAppends, maxBufferedBytes,
                 maxConcurrentObjectReads, maxReadBufferBytes, maxObjectBytes, maxAppendBatchRecords,
                 offsetIndexCacheTtl, autoAcquireAppendSession, enableMetadataWatch, enableOffsetIndexCache,
-                java.util.UUID.randomUUID().toString().replace("-", ""),
+                randomProcessRunId(),
                 Duration.ofSeconds(5), Duration.ofMillis(100), Duration.ofSeconds(5), Duration.ofMinutes(10),
                 Math.max(1, maxInFlightAppends),
                 maxInFlightAppends > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : Math.max(2, maxInFlightAppends * 2));
@@ -137,7 +139,7 @@ public record StreamStorageConfig(
                 true,
                 false,
                 true,
-                java.util.UUID.randomUUID().toString().replace("-", ""),
+                randomProcessRunId(),
                 Duration.ofSeconds(5),
                 Duration.ofMillis(100),
                 Duration.ofSeconds(5),
@@ -149,6 +151,12 @@ public record StreamStorageConfig(
     public int maxConcurrentPrimaryReads() { return maxConcurrentObjectReads; }
     public long maxPrimaryReadBufferBytes() { return maxReadBufferBytes; }
     public long maxPrimaryAppendBytes() { return maxBufferedBytes; }
+
+    private static String randomProcessRunId() {
+        byte[] entropy = new byte[32];
+        new SecureRandom().nextBytes(entropy);
+        return DeterministicIds.randomRunIdHash(entropy);
+    }
 
     private static String requireNonBlank(String value, String name) {
         Objects.requireNonNull(value, name);

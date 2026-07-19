@@ -6,6 +6,7 @@ import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.AppendAdmissionGuard;
 import com.nereusstream.core.read.ReadMetricsObserver;
+import com.nereusstream.core.read.Phase4ReadComponents;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
@@ -60,6 +61,11 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
                 Objects.requireNonNull(sourceProtections, "sourceProtections"));
     }
 
+    public BookKeeperGenerationZeroPhysicalReferencePublisher generationZeroPhysicalReferences() {
+        ensureOpen();
+        return physicalReferences;
+    }
+
     public DefaultStreamStorage newGenerationZeroStorage(
             StreamStorageConfig configuration,
             OxiaMetadataStore metadata,
@@ -78,6 +84,33 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
                 recoverySearcher,
                 profileResolver,
                 appendAdmissionGuard,
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    /** Composes BK generation zero with the shared higher-Object generation resolver and readers. */
+    public DefaultStreamStorage newGenerationAwareStorage(
+            StreamStorageConfig configuration,
+            OxiaMetadataStore metadata,
+            AppendRecoverySearcher recoverySearcher,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Phase4ReadComponents readComponents,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
+        ensureOpen();
+        return new DefaultStreamStorage(
+                configuration,
+                metadata,
+                registry,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                readComponents,
                 clock,
                 callbackExecutor,
                 readMetricsObserver,

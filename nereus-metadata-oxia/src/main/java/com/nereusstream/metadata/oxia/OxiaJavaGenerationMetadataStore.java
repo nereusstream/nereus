@@ -401,12 +401,12 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
     public CompletableFuture<TaskScanPage> scanTasks(
             String cluster, StreamId streamId, Optional<F4ScanToken> continuation, int limit) {
         F4Keyspace keys = new F4Keyspace(cluster);
-        String prefix = F4MetadataStoreSupport.prefixStart(keys.taskPrefix(streamId));
         return scanSimple(
                 keys,
                 streamId,
                 F4ScanKind.MATERIALIZATION_TASK,
-                prefix,
+                keys.taskPrefix(streamId),
+                1,
                 continuation,
                 limit,
                 MaterializationTaskRecord.class,
@@ -508,12 +508,12 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
             Optional<F4ScanToken> continuation,
             int limit) {
         F4Keyspace keys = new F4Keyspace(cluster);
-        String prefix = F4MetadataStoreSupport.prefixStart(keys.checkpointPrefix(streamId));
         return scanSimple(
                 keys,
                 streamId,
                 F4ScanKind.MATERIALIZATION_CHECKPOINT,
-                prefix,
+                keys.checkpointPrefix(streamId),
+                2,
                 continuation,
                 limit,
                 MaterializationCheckpointRecord.class,
@@ -796,23 +796,28 @@ public final class OxiaJavaGenerationMetadataStore implements GenerationMetadata
             F4Keyspace keys,
             StreamId streamId,
             F4ScanKind kind,
-            String prefix,
+            String basePrefix,
+            int descendantSegments,
             Optional<F4ScanToken> continuation,
             int limit,
             Class<R> recordType,
             Function<F4MetadataStoreSupport.Decoded<R>, V> wrapper,
             java.util.function.BiFunction<List<V>, Optional<F4ScanToken>, P> pageFactory) {
         F4MetadataStoreSupport.requirePageLimit(limit);
+        String scanPrefix = F4MetadataStoreSupport.prefixStart(basePrefix);
+        String rangeStart = F4MetadataStoreSupport.fixedDepthStart(
+                basePrefix, descendantSegments);
         String scope = support.scopeSha256(kind.name() + "\0" + streamId.value());
-        F4ScanToken token = support.validateToken(continuation, keys.cluster(), kind, scope, prefix);
-        String from = token == null ? prefix : token.resumeFromInclusive();
-        String base = prefix.substring(0, prefix.length() - 1);
-        String to = F4MetadataStoreSupport.prefixEnd(base);
+        F4ScanToken token = support.validateToken(
+                continuation, keys.cluster(), kind, scope, scanPrefix);
+        String from = token == null ? rangeStart : token.resumeFromInclusive();
+        String to = F4MetadataStoreSupport.fixedDepthEnd(
+                basePrefix, descendantSegments);
         return support.client().rangeScan(from, to, limit, keys.streamPartitionKey(streamId)).thenApply(stored -> {
             List<V> values = stored.stream().map(item -> wrapper.apply(support.decode(item, recordType))).toList();
             Optional<F4ScanToken> next = stored.size() == limit
                     ? Optional.of(new F4ScanToken(
-                            keys.cluster(), kind, scope, prefix, stored.get(stored.size() - 1).key()))
+                            keys.cluster(), kind, scope, scanPrefix, stored.get(stored.size() - 1).key()))
                     : Optional.empty();
             return pageFactory.apply(values, next);
         });

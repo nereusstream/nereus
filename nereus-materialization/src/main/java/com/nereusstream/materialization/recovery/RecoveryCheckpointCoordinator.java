@@ -531,12 +531,11 @@ public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPu
         } catch (RuntimeException failure) {
             throw invariant("recovery checkpoint registration is malformed", failure);
         }
-        if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                && profile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+        if (!profile.objectMaterializationEnabled()) {
             throw new NereusException(
                     ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
                     false,
-                    "recovery checkpoint requires an Object-WAL profile");
+                    "recovery checkpoint requires an object-materialization profile");
         }
         return new LiveProjectionSubject(
                 new StreamId(value.streamId()),

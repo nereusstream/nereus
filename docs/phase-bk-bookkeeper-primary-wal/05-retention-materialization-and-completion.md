@@ -108,8 +108,13 @@ The shared resolver now admits every object-materializing profile。Before publi
 is returned without an Object lease only because `BookKeeperPrimaryWalReader` owns the durable ledger reader lease and
 final lease revalidation；positive generations remain Object-only and resolver-pin-owned。This preserves normal BK
 fallback during lag without weakening higher-generation GC safety。`Phase4ObjectWalRuntime` constructs and exports the
-live `CommittedGenerationRetirementAuthority` for BK composition。Real Oxia + BookKeeper + Object publication and
-fresh-runtime cuts remain required before the M3 final gate and broker registration。
+live `CommittedGenerationRetirementAuthority` for BK composition。The first real-service fixture now runs this chain
+over real Oxia + BookKeeper + LocalStack：stable-head append with no Object generation，BK read across a fresh runtime，
+ordinary scanner/worker NCP1 publication，higher-generation normal read and exact retirement proof all pass。It also
+locks two shared prerequisites uncovered by the composition：default process IDs are canonical base32 publication
+identities，and Oxia checkpoint scans use the checkpoint key's exact two descendant segments。Task/protection/
+publication response-loss and physical BK release/delete cuts remain required before the M3 final gate and broker
+registration。
 
 ## 4. `BookKeeperWalRetentionGate`
 

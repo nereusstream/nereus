@@ -72,10 +72,21 @@ val bkM2IntegrationTest by sourceSets.creating {
     runtimeClasspath += output + compileClasspath
 }
 
+val bkM3IntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
 configurations[bkM2IntegrationTest.implementationConfigurationName].extendsFrom(
     configurations.testImplementation.get(),
 )
 configurations[bkM2IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+configurations[bkM3IntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[bkM3IntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
     configurations.testRuntimeOnly.get(),
 )
 
@@ -88,6 +99,18 @@ dependencies {
     add(bkM2IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
     add(bkM2IntegrationTest.implementationConfigurationName, libs.assertj)
     add(bkM2IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+
+    add(bkM3IntegrationTest.implementationConfigurationName, project())
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.pulsar.metadata)
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.bookkeeper.server)
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
+    add(bkM3IntegrationTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(bkM3IntegrationTest.implementationConfigurationName, libs.assertj)
+    add(bkM3IntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
 }
 
 tasks.register<Test>("bkM2IntegrationTest") {
@@ -95,6 +118,15 @@ tasks.register<Test>("bkM2IntegrationTest") {
     description = "Run BK-M2 allocation, shard, restart, rollover, and retention recovery against real services."
     testClassesDirs = bkM2IntegrationTest.output.classesDirs
     classpath = bkM2IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+}
+
+tasks.register<Test>("bkM3IntegrationTest") {
+    group = "verification"
+    description = "Run BK async stable-head, fallback, fresh-runtime publication, and retirement against real services."
+    testClassesDirs = bkM3IntegrationTest.output.classesDirs
+    classpath = bkM3IntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
 }

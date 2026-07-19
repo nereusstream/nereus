@@ -8,7 +8,7 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)
-BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (through retirement-metadata/sealed-trigger checkpoint)
+BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (first real-service publication/read checkpoint)
 BK-M4 .. BK-M6                  not implemented
 BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
@@ -24,8 +24,9 @@ BookKeeper ledger deletion      implemented and real-service tested / production
 module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPrimaryWalM3ExactSourceCheck` /
 `bookKeeperPrimaryWalM3ProtectionCheck` / `bookKeeperPrimaryWalM3AsyncProfileCheck` /
 `bookKeeperPrimaryWalM3LagCheck` / `bookKeeperPrimaryWalM3SourceRetirementCheck` /
-`bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` are also executable。The unfinished M2
-aggregate/final gates、M3 live-read/real-service final gate and M4–M6 names remain frozen target names and must
+`bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` /
+`bookKeeperPrimaryWalM3RealServiceCheck` are also executable。The unfinished M2 aggregate/final gates、M3 failure-cut
+final gate and M4–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
@@ -490,6 +491,15 @@ of the policy's higher-generation merge minimum。`BookKeeperSealedLedgerMateria
 revalidates the exact SEALED root and hints `DefaultMaterializationService.scanNow` through
 `MaterializationStreamTrigger`; it contains no index scan、grouping、task store or worker。
 
+The first real-service checkpoint composes the production adapters instead of fakes：a first process appends and acks
+`BOOKKEEPER_WAL_ASYNC_OBJECT` at stable head while no Object generation exists，and the normal generation-aware reader
+returns the exact BK range。After all first-process clients close，a fresh Oxia/BK/Object runtime reconstructs the stream
+registration and generation-zero target，still reads from BK，then runs the ordinary F4 scanner/worker/publisher to
+write exact NCP1 bytes to LocalStack and publish one COMMITTED higher generation。The normal resolver then selects that
+Object target and `CommittedObjectGenerationAuthority` proves it through a fresh resolve、durable Object pin and full
+read。This fixture also exposed and fixed the default UUID-hex `processRunId` incompatibility with read-pin publication
+identity and the real Oxia two-descendant checkpoint scan boundary；both now have direct regression evidence。
+
 ### 6.3 Gates
 
 ```text
@@ -501,15 +511,17 @@ bookKeeperPrimaryWalM3SourceRetirementCheck
 bookKeeperPrimaryWalM3LiveReadCheck
 bookKeeperPrimaryWalM3SealedLedgerCheck
 bookKeeperPrimaryWalM3Check
+bookKeeperPrimaryWalM3RealServiceCheck       first real Oxia + BK + Object end-to-end chain
 bookKeeperPrimaryWalM3FinalCheck             real Oxia + BK + Object store, fresh-runtime cuts
 ```
 
-The ordinary M3 gate now proves all deterministic source/protection/profile/lag/retirement-metadata/live-read/
-sealed-trigger contracts。Final gate still proves stable-head ack before object generation、real BK reads during lag、
-task reconstruction、NCP1 exact bytes、higher-generation selection/fallback、source protection cuts、trim/replacement
-release and whole-ledger delete against real services and fresh runtimes。
-`bookKeeperPrimaryWalM3Check --rerun-tasks` passes 62/62 tasks for the live-read checkpoint on 2026-07-19；the
-real-service final task remains intentionally unregistered。
+The ordinary M3 gate proves all deterministic source/protection/profile/lag/retirement-metadata/live-read/
+sealed-trigger contracts。`bookKeeperPrimaryWalM3RealServiceCheck` now proves stable-head ack before Object generation、
+real BK fallback across process replacement、fresh-runtime task creation、NCP1 exact bytes、COMMITTED publication、
+higher-generation selection and exact live-read retirement proof。Final gate still adds task/source-protection/output/
+publication response-loss cuts、lag admission under real load、trim/replacement release and whole-ledger delete against
+fresh runtimes。`bookKeeperPrimaryWalM3Check --rerun-tasks` passed 62/62 deterministic tasks on 2026-07-19；the
+`bookKeeperPrimaryWalM3FinalCheck` task remains intentionally unregistered。
 
 ### 6.4 Mandatory review stop D
 

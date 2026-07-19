@@ -588,9 +588,8 @@ public final class RecoveryCheckpointBuilder {
         }
         if ((state != StreamState.ACTIVE && state != StreamState.SEALED)
                 || profile != registered
-                || (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
-                        && profile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT)) {
-            throw condition("stream is not eligible for Object-WAL recovery checkpointing");
+                || !profile.objectMaterializationEnabled()) {
+            throw condition("stream is not eligible for object-generation recovery checkpointing");
         }
         Optional<ProjectionRef> registeredProjection = decodeProjection(
                 registration.value().projectionRef(),

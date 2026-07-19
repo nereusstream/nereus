@@ -134,6 +134,70 @@ public final class DefaultStreamStorage implements StreamStorage {
         this.lifecycleCoordinator = new StreamLifecycleCoordinator(config, metadataStore, appendCoordinator);
     }
 
+    /** Complete provider-neutral generation-aware seam used by primary WALs whose higher generations are Objects. */
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            PrimaryWalRegistry primaryWalRegistry,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Phase4ReadComponents readComponents,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
+        this.config = Objects.requireNonNull(config, "config");
+        this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
+        PrimaryWalRegistry registry = Objects.requireNonNull(primaryWalRegistry, "primaryWalRegistry");
+        Objects.requireNonNull(physicalReferences, "physicalReferences");
+        Objects.requireNonNull(recoverySearcher, "recoverySearcher");
+        Objects.requireNonNull(profileResolver, "profileResolver");
+        Objects.requireNonNull(appendAdmissionGuard, "appendAdmissionGuard");
+        Phase4ReadComponents components = Objects.requireNonNull(readComponents, "readComponents");
+        Objects.requireNonNull(clock, "clock");
+        Objects.requireNonNull(callbackExecutor, "callbackExecutor");
+        Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
+        Objects.requireNonNull(trimMetricsObserver, "trimMetricsObserver");
+        this.appendSessionManager = new AppendSessionManager(config, metadataStore, clock);
+        this.appendCoordinator = new AppendCoordinator(
+                config,
+                metadataStore,
+                registry,
+                appendSessionManager,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                clock,
+                callbackExecutor);
+        ReadResolver readResolver = new ReadResolver(
+                config,
+                metadataStore,
+                profileResolver,
+                registry::hasReader,
+                clock,
+                readMetricsObserver,
+                callbackExecutor);
+        this.readCoordinator = new ReadCoordinator(
+                config,
+                readResolver,
+                components.resolver(),
+                components.readers(),
+                components.failureHandler(),
+                components.retryPolicy(),
+                readMetricsObserver,
+                callbackExecutor);
+        this.trimCoordinator = new TrimCoordinator(
+                config,
+                metadataStore,
+                readCoordinator::invalidate,
+                trimMetricsObserver,
+                callbackExecutor);
+        this.lifecycleCoordinator = new StreamLifecycleCoordinator(config, metadataStore, appendCoordinator);
+    }
+
     public DefaultStreamStorage(
             StreamStorageConfig config,
             OxiaMetadataStore metadataStore,
