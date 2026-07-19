@@ -64,7 +64,7 @@ broker-local offset”。任何成功 append 都必须返回 stable offset/proje
 | `OBJECT_WAL` | Object store | compatibility alias | strict | deprecated alias |
 | `OBJECT_WAL_SYNC_OBJECT` | Object store | generation-0 object target before ack | `WAL_DURABLE_AND_INDEX_COMMITTED` | Phase 1 target |
 | `OBJECT_WAL_ASYNC_OBJECT` | Object store | primary WAL committed first；read-optimized generation later | `WAL_DURABLE` | implemented/final-gated in F4-M5；proof-gated at runtime，aggregate-certified by F4-M6 |
-| `BOOKKEEPER_WAL_ONLY` | BookKeeper | disabled | `WAL_DURABLE` | BK-M2 module/facade runtime plus real Oxia/BookKeeper restart/delete checkpoint implemented；aggregate pending，production broker pre-IO rejected until BK-M5 |
+| `BOOKKEEPER_WAL_ONLY` | BookKeeper | disabled | `WAL_DURABLE` | BK-M2 module/facade runtime and real Oxia/BookKeeper restart/delete evidence complete/final-gated；production broker pre-IO rejected until BK-M5 |
 | `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | higher Object generation required before producer completion | profile durability + `REQUIRED_OBJECT_GENERATION` completion | BK-M1 foundation complete；profile not implemented |
 | `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | object-backed target published by shared F4 worker | `WAL_DURABLE` | BK-M3 focused source/protection/profile/lag、retirement、real publication/read/physical-delete/response-loss and unreadable-output fail-closed evidence implemented；predecessor/aggregate final gate pending；production pre-IO rejected |
 

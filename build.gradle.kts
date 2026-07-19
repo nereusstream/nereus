@@ -723,6 +723,25 @@ tasks.register("bookKeeperPrimaryWalM2AllocationAuthorityCheck") {
     dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
 }
 
+tasks.register("bookKeeperPrimaryWalM2Check") {
+    group = "verification"
+    description = "Run the complete ordinary BK_ONLY metadata, runtime, retention, and Pulsar boundary gate."
+    dependsOn("bookKeeperPrimaryWalM2PulsarCheck")
+    dependsOn("checkBookKeeperModuleBoundaries")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-bookkeeper:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register("bookKeeperPrimaryWalM2FinalCheck") {
+    group = "verification"
+    description = "Run BK-M2 ordinary, real Oxia/BookKeeper, pinned Pulsar, and final-gated predecessor acceptance."
+    dependsOn("bookKeeperPrimaryWalM2Check")
+    dependsOn("bookKeeperPrimaryWalM2AllocationAuthorityCheck")
+    dependsOn("bookKeeperPrimaryWalM1FinalCheck")
+}
+
 tasks.register("bookKeeperPrimaryWalM3ExactSourceCheck") {
     group = "verification"
     description = "Verify BK task V2 target round-trip and provider-neutral exact-source reads."

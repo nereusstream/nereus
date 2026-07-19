@@ -2,7 +2,7 @@
 
 > 状态：BK-M0 design gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；
 > `bookKeeperPrimaryWalM1FinalCheck` 通过 199-task aggregate（包含 Phase 1.5、Phase 4 与 pinned local Pulsar
-> regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：metadata/store/scanner and the
+> regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` completed/final-gated on 2026-07-20：metadata/store/scanner and the
 > allocator、writer state machine、recovery-open sealing、ordered exact-range appender、fixed physical-reference
 > activation、non-recovery reader/lease/checksum、bounded whole-ledger retention and explicit module-local profile
 > composition checkpoints are implemented。The real-service checkpoint additionally passes real Oxia + BookKeeper
@@ -21,10 +21,11 @@
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 > `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` /
 > `bookKeeperPrimaryWalM2StableRecoveryCheck` / `bookKeeperPrimaryWalM2IsolationRetentionCheck` /
-> `bookKeeperPrimaryWalM2AllocationAuthorityCheck`。`BookKeeperWalRuntime` can execute
+> `bookKeeperPrimaryWalM2AllocationAuthorityCheck` / `bookKeeperPrimaryWalM2Check` /
+> `bookKeeperPrimaryWalM2FinalCheck`。`BookKeeperWalRuntime` can execute
 > BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade，including three-ledger rollover、unload/reopen、
 > historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes the exact
-> borrowed stock-client boundary。BK-M3 is now in progress：task V2 preserves exact tagged BK sources，F4 exact-source
+> borrowed stock-client boundary。BK-M3 focused implementation is complete：task V2 preserves exact tagged BK sources，F4 exact-source
 > reads and source protection are provider-registered，BK `MATERIALIZATION_SOURCE` uses bounded durable dynamic slots
 > with restart-safe owner transfer，the shared F4 runtime accepts the matched BK reader/protection provider，the async
 > profile freezes `BOOKKEEPER_ENTRY_RANGE + ASYNCHRONOUS + STABLE_HEAD`，and the existing F4 lag authority admits the
@@ -54,9 +55,9 @@
 > installs the thin BK-async adapter over the shared F4 lag gate，proves real backlog rejection before writer/BK mutation
 > and recovery after Object coverage，then physically removes a COMMITTED Object and proves retirement fails closed、
 > every fixed BK reference remains ACTIVE、the ledger remains present and normal reads quarantine/fall back to the exact
-> BK range。BK-M3 focused implementation evidence is therefore closed；the milestone final gate remains withheld until
-> its BK-M2 predecessor aggregate and the later abrupt-process/chaos aggregate are closed。The remaining
-> M2 scenario/evidence rows and aggregate/final gate are not yet closed；
+> BK range。BK-M3 focused implementation evidence is therefore closed and its BK-M2 predecessor is now final-gated；the
+> BK-M3 milestone final task remains to be registered and executed over those chains。Abrupt-process/chaos evidence
+> remains assigned to BK-M6 rather than retroactively blocking the BK-M2 storage milestone；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
 
@@ -71,11 +72,14 @@
 
 > 2026-07-20：`bookKeeperPrimaryWalM2StableRecoveryCheck --rerun-tasks` passes 63/63 executable tasks against real
 > Oxia + BookKeeper，including applied commit-intent、stream-head and generation-zero response loss with one exact BK
-> range and no duplicate write。This is a focused M2 checkpoint，not the still-unregistered M2 aggregate/final gate。
+> range and no duplicate write。This is a focused M2 checkpoint that precedes the now-passed M2 aggregate/final gate。
 > `bookKeeperPrimaryWalM2IsolationRetentionCheck --rerun-tasks` also passes 63/63 executable tasks，adding real
 > provider-boundary/delayed foreign-ledger quarantine and exact-Cartesian protection inventory evidence。
 > `bookKeeperPrimaryWalM2AllocationAuthorityCheck --rerun-tasks` also passes，adding real Oxia mutation-response-loss
 > reload and global candidate contention evidence。
+> `bookKeeperPrimaryWalM2Check --rerun-tasks` passes 107/107 executable tasks，including the pinned local Pulsar
+> broker Checkstyle/test boundary；`bookKeeperPrimaryWalM2FinalCheck` passes its 212-task aggregate with all Phase
+> 1.5–4、real Oxia/BookKeeper and pinned Pulsar predecessors on 2026-07-20。
 
 ## 1. Delivery identity
 

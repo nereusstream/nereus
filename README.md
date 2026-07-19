@@ -58,8 +58,8 @@ Only `OBJECT_WAL_SYNC_OBJECT` is currently installed as a Phase 1 production-bro
 BookKeeper profiles remain rollout-disabled before BK-M5, although BK_ONLY is executable through the explicit
 module-local runtime and its current BK-M2 gates.
 
-The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 and BK-M1
-are complete/final-gated；BK-M2 now has its keyspace/seven codecs、focused production/fake metadata stores、exact
+The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 through BK-M2
+are complete/final-gated；BK-M2 has its keyspace/seven codecs、focused production/fake metadata stores、exact
 response-loss recovery、bounded shard scanners、exact allocator/writer/recovery/reader runtime and whole-ledger
 retention convergence implemented under the M2 metadata/runtime/retention checks。An explicit `BookKeeperWalRuntime`
 now admits `BOOKKEEPER_WAL_ONLY` and proves strict append plus cold generation-zero read through the provider-neutral
@@ -82,11 +82,13 @@ The allocation-authority fixture additionally loses real Oxia mutation responses
 forces two streams onto one candidate id，proving exact reload and one global owner without provider deletion。
 The following deterministic restart-recovery checkpoint adds O(1) stream/attempt reservation identity、same-session
 durable range replay with zero BK rewrite、new-session abandon/seal/retire、intent/head response-loss convergence and
-generation-zero repair after the source ledger is already sealed；the corresponding real process cuts remain in the
-open M2 matrix。
+generation-zero repair after the source ledger is already sealed；the corresponding abrupt-process cuts remain assigned
+to the BK-M6 chaos matrix。
 The same checkpoint now has production Oxia + BookKeeper B/O evidence across a fresh runtime for same-session durable
 replay and expired-session fencing/new-ledger retry；only the abrupt-kill C variants remain open for those rows。
-Remaining M2 matrix and aggregate/final evidence is still incomplete。BK_ONLY is executable only through the explicit module-local runtime；
+`bookKeeperPrimaryWalM2Check --rerun-tasks` passed 107/107 executable tasks and
+`bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate on 2026-07-20。BK_ONLY is final-gated but remains
+executable only through the explicit module-local runtime；
 BK-M3 now has executable checkpoints for BK task V2/exact-source reads、durable fixed-slot
 `MATERIALIZATION_SOURCE` ownership and restart transfer、shared F4 runtime provider composition、the async
 stable-head profile plan、common authoritative lag reader、source-retirement authority and sealed-ledger trigger。
@@ -96,8 +98,8 @@ source protection、retires all mandatory range references、deletes the sealed 
 fresh-runtime response-loss extension converges applied task create、source protection、Object PUT and every publication
 CAS without rewriting BK or allocating another task/generation。The focused lag/failure checkpoint now rejects a real
 backlog before BK mutation、re-admits after Object coverage and keeps all BK references/bytes on a physically missing
-COMMITTED Object while normal reads fall back to BK。The BK-M2 predecessor and later aggregate/rollout gates remain
-open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
+COMMITTED Object while normal reads fall back to BK。The BK-M2 predecessor is now closed；the dependent BK-M3 final
+gate and later rollout gates remain open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。

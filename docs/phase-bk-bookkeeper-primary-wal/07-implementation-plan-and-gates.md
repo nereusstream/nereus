@@ -7,8 +7,8 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 ```text
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
-BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)
-BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT focused implementation complete (aggregate predecessor pending)
+BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20
+BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT focused implementation complete (final gate next)
 BK-M4 .. BK-M6                  not implemented
 BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
@@ -21,15 +21,16 @@ BookKeeper ledger deletion      implemented and real-service tested / production
 `bookKeeperPrimaryWalM2RecoveryFencingCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` and
 `bookKeeperPrimaryWalM2RealServiceCheck` / `bookKeeperPrimaryWalM2StableRecoveryCheck` /
-`bookKeeperPrimaryWalM2IsolationRetentionCheck` / `bookKeeperPrimaryWalM2AllocationAuthorityCheck` are executable and backed by real
+`bookKeeperPrimaryWalM2IsolationRetentionCheck` / `bookKeeperPrimaryWalM2AllocationAuthorityCheck` /
+`bookKeeperPrimaryWalM2Check` / `bookKeeperPrimaryWalM2FinalCheck` are executable and backed by real
 module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPrimaryWalM3ExactSourceCheck` /
 `bookKeeperPrimaryWalM3ProtectionCheck` / `bookKeeperPrimaryWalM3AsyncProfileCheck` /
 `bookKeeperPrimaryWalM3LagCheck` / `bookKeeperPrimaryWalM3SourceRetirementCheck` /
 `bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` /
 `bookKeeperPrimaryWalM3RealServiceCheck` / `bookKeeperPrimaryWalM3PhysicalRetirementCheck` /
 `bookKeeperPrimaryWalM3ResponseLossCheck` / `bookKeeperPrimaryWalM3LagFailureCheck` are also executable。The
-unfinished M2 aggregate/final gates、M3 predecessor-dependent final gate and M4–M6 names remain frozen target names and must
-not be registered as empty/success-only Gradle tasks. A milestone becomes complete
+The M2 ordinary/final gates are complete。The M3 final gate and M4–M6 names remain frozen target names and must not be
+registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
 ## 2. Delivery dependency graph
@@ -374,10 +375,13 @@ loser advances to a second owned ledger without any provider delete。This close
 levels；the broader independent-process transport matrix remains BK-M6。
 `bookKeeperPrimaryWalM2AllocationAuthorityCheck --rerun-tasks` passed on 2026-07-20。
 
-Still required before BK-M2 is complete：close the remaining BK-M2 scenario/evidence rows and execute the ordinary /
-aggregate final tasks against the current source locks。Production provider composition、first-create admission and
+The remaining M2 row suffixes are explicitly assigned to BK-M5 Pulsar rollout and BK-M6 independent-process/chaos
+evidence rather than hidden M2 prerequisites。The ordinary and aggregate final tasks passed against the current source
+locks。Production provider composition、first-create admission and
 loaded/unloaded/two-broker ownership rollout are BK-M5 responsibilities, not hidden BK-M2 completion criteria；until
 BK-M5, the broker profile remains rejected before primary IO。
+`bookKeeperPrimaryWalM2Check --rerun-tasks` passed 107/107 executable tasks on 2026-07-20；
+`bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate on the same date。
 
 ### 5.1 Metadata/keyspace
 

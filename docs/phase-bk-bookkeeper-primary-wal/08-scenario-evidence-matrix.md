@@ -4,27 +4,16 @@
 
 BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrimaryWalM1Check` and the 199-task
 `bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
-`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-11、BK-12 and the deterministic all-shard precursor for BK-19
-passed on 2026-07-19 under `bookKeeperPrimaryWalM2MetadataCheck`。BK-20 now passes its explicit D-level lifecycle /
-immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256-root/all-16-slot-shard scan。
-The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
-the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-32、BK-33、BK-35、BK-37、
-BK-38、BK-39、BK-40、
-BK-41、BK-42、BK-47、BK-48、BK-49、BK-52、BK-53、BK-54、BK-56
-and BK-55, including
-a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
-does not claim the remaining M2 rows。The focused allocator gate also adds D checkpoints for every applied metadata
-response-loss operation in BK-13、foreign collision/new-candidate behavior in BK-15、global-root contention in BK-16
-and randomized monotonic writer/range behavior in BK-18；their remaining O/B levels stay open。The deterministic
-append/read gate additionally proves pre-provider profile/oversize rejection (BK-23)、same-target/no-rewrite
-generation-zero repair (the D checkpoint of BK-29) and an unrepresentable `DEFERRED_SYNC` configuration plus an
-adapter-forced empty write-flag set (BK-36)。The deterministic retention-authority checkpoint adds complete BK-50 and
-BK-51 owner-domain cuts；only the reader and mandatory-range subsets currently have real B/O evidence。BK-13 through BK-96
-otherwise remain required target evidence and are currently
-**not complete**。During
-implementation, each row
-receives an exact test method、gate、source lock、date and result. No implementation row may be marked covered by prose
-only.
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-M2 then completed on 2026-07-20 through the 107/107-task
+`bookKeeperPrimaryWalM2Check --rerun-tasks` and the 212-task `bookKeeperPrimaryWalM2FinalCheck` aggregate against
+current local Pulsar `master@41d1cddb9d29451884002b96de2bc52367cbb8ca`。The final aggregate covers BK-11 through
+BK-56 at the milestone's declared D/O/B and focused local-Pulsar boundary：all codecs/keyspaces/shards、allocation and
+writer monotonicity、foreign and same-candidate authority、uncertain/late create、exact append/recovery/fencing/read、
+generation-zero repair、resource/deadline contracts、logical trim、complete protection inventory and dual-absence
+whole-ledger deletion。It includes real Oxia/BookKeeper response-loss、restart、rollover、cold-read、foreign quarantine
+and retention cuts。Rows that additionally name production broker P/T or abrupt-process C evidence keep those suffixes
+assigned to BK-M5/BK-M6；they are not hidden BK-M2 completion prerequisites。Every implementation claim below still
+requires an exact test method、owning gate、source lock、date and result；prose alone never covers a row。
 
 The 2026-07-19 `bookKeeperPrimaryWalM3PhysicalRetirementCheck --rerun-tasks` passed 65/65 executable tasks。Its real
 O/B/S chain covers the positive path of BK-58、BK-59、BK-61、BK-62、BK-65、BK-66 and BK-67 through dynamic source

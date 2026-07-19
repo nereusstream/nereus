@@ -102,6 +102,10 @@ require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM2Check' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM2FinalCheck' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'No online migration in BK-M0–M6' \
     "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
 require_literal 'BK-96' \
@@ -112,7 +116,9 @@ require_literal 'BK-M0 design/source audit       documentation-gated on 2026-07-
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
-require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)' \
+require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'multiEntryAppendUsesOneExactConsecutiveBookKeeperRange' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
@@ -220,6 +226,8 @@ require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM2Check' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM2FinalCheck' "build.gradle.kts"
 require_literal 'realOxiaStableAppendResponseLossReusesOneBookKeeperRangeAndRepairsGenerationZero' \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'foreignLedgerCreatedAtProviderBoundaryIsQuarantinedAndNeverDeletedBeforeFreshCandidateWins' \
@@ -295,9 +303,9 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck|StableRecoveryCheck|IsolationRetentionCheck|AllocationAuthorityCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check))|[4-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck|StableRecoveryCheck|IsolationRetentionCheck|AllocationAuthorityCheck|Check|FinalCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check))|[4-6])' \
     "$repo_root/build.gradle.kts"; then
-    echo "unfinished BK-M2 final/profile, BK-M3 final, and BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
+    echo "unfinished BK-M3 final and BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1
 fi
 
