@@ -19,6 +19,7 @@ import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
+import com.nereusstream.metadata.oxia.ResponseLossPartitionedOxiaBackend;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
@@ -531,6 +532,64 @@ class BookKeeperWalRetentionGateTest {
             assertThat(deleted.action()).isEqualTo(BookKeeperLedgerGcAction.DELETED);
             assertThat(deleted.root().orElseThrow().value().lifecycle())
                     .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle.DELETED);
+        }
+    }
+
+    @Test
+    void everyGcRootCasConvergesAfterAppliedResponseLoss() {
+        for (int lostRootCas = 1; lostRootCas <= 4; lostRootCas++) {
+            ResponseLossPartitionedOxiaBackend backend = new ResponseLossPartitionedOxiaBackend();
+            try (BookKeeperPrimaryWalAppenderTest.Runtime runtime =
+                    new BookKeeperPrimaryWalAppenderTest.Runtime(backend)) {
+                StableLedger ledger = appendCommitAndSeal(runtime);
+                retireAll(runtime, ledger);
+                MutableClock clock = new MutableClock(1_000);
+                BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
+                        1,
+                        Duration.ZERO,
+                        Duration.ofMinutes(2),
+                        Duration.ofSeconds(10),
+                        true,
+                        false);
+                BookKeeperProtocolActivationProof activation = activation(runtime);
+                BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
+                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                        runtime.configuration,
+                        gc,
+                        runtime.metadata,
+                        runtime.metadata,
+                        runtime.verifier,
+                        timeout -> CompletableFuture.completedFuture(activation),
+                        runtime.operations,
+                        clock);
+                BookKeeperLedgerRetentionManager manager = new BookKeeperLedgerRetentionManager(
+                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                        runtime.configuration,
+                        gc,
+                        runtime.metadata,
+                        runtime.verifier,
+                        timeout -> CompletableFuture.completedFuture(activation),
+                        runtime.operations,
+                        gate,
+                        clock);
+                var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().candidate().orElseThrow();
+                backend.loseResponse(ResponseLossPartitionedOxiaBackend.Operation.PUT_IF_VERSION, lostRootCas);
+
+                var marked = manager.mark(candidate, TIMEOUT).join();
+                assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
+                clock.setMillis(121_001);
+                var deleting = manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
+                assertThat(deleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
+                var firstAbsent = manager.converge(deleting.root().orElseThrow(), TIMEOUT).join();
+                assertThat(firstAbsent.action()).isEqualTo(BookKeeperLedgerGcAction.FIRST_ABSENCE_RECORDED);
+
+                clock.setMillis(131_002);
+                var deleted = manager.converge(firstAbsent.root().orElseThrow(), TIMEOUT).join();
+                assertThat(deleted.action()).isEqualTo(BookKeeperLedgerGcAction.DELETED);
+                assertThat(deleted.root().orElseThrow().value().lifecycle())
+                        .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle.DELETED);
+                assertThat(backend.responseWasLost()).isTrue();
+            }
         }
     }
 

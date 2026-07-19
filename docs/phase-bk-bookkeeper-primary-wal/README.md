@@ -202,7 +202,9 @@ absence before `DELETED`；GC remains disabled/dry-run by default and local conf
 Tests cover normal allocation、
 uncertain create、stale-session pre-IO rejection、ownership-transfer sealing、contiguous/reused ranges、partial write
 seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads、checksum failure、retirement-authority failure、
-reader veto and mark/drain/lost-delete-response/dual-absence convergence。The Docker-backed
+reader veto and mark/drain/lost-delete-response/dual-absence convergence。Every GC root CAS from `SEALED -> MARKED`
+through the second-absence `DELETED` transition also has deterministic applied-response-loss recovery through the
+production Oxia metadata adapter；the independent-process transport-loss cut remains open。The Docker-backed
 `BookKeeperWalOnlyOxiaBkIntegrationTest` now repeats rollover、cold history read、writer recovery、trim、delete response
 loss and dual absence against production Oxia adapters plus a real BookKeeper 4.18 cluster, including a fresh process
 after the first absence。Profile registration and production Pulsar routing remain deliberately absent for BK-M5。The module-local

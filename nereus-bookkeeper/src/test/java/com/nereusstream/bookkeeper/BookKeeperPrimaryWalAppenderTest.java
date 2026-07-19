@@ -250,38 +250,58 @@ class BookKeeperPrimaryWalAppenderTest {
     }
 
     static final class Runtime implements AutoCloseable {
-        final BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
-        final FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
-                new BookKeeperMetadataStoreConfig(configuration.maxAppendRangesPerLedger(),
-                        configuration.protectionSlotsPerRange(), configuration.maxReaderLeasesPerLedger(),
-                        configuration.maxUncertainAllocations()), CLOCK);
-        final FakeOperations operations = new FakeOperations();
-        final BookKeeperWriterStateMachine writerState = new BookKeeperWriterStateMachine(
-                CLUSTER, configuration, metadata, CLOCK, "process-run-1");
-        final BookKeeperLedgerIdNamespaceReservationVerifier verifier =
-                new BookKeeperLedgerIdNamespaceReservationVerifier(
-                        (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
-                                Optional.of(reservation(configuration))), DEPLOYMENT);
+        final BookKeeperWalConfiguration configuration;
+        final FakeBookKeeperMetadataStore metadata;
+        final FakeOperations operations;
+        final BookKeeperWriterStateMachine writerState;
+        final BookKeeperLedgerIdNamespaceReservationVerifier verifier;
         private final AtomicInteger allocationSequence = new AtomicInteger();
-        private final BookKeeperLedgerAllocator allocator = new BookKeeperLedgerAllocator(
-                CLUSTER, configuration, metadata, metadata, verifier, operations,
-                ignored -> "secret".getBytes(StandardCharsets.UTF_8), writerState, CLOCK, new Random(41),
-                () -> "allocation-" + allocationSequence.incrementAndGet());
-        final BookKeeperLedgerRecovery recovery = new BookKeeperLedgerRecovery(
-                CLUSTER, configuration, metadata, metadata, verifier, operations,
-                ignored -> "secret".getBytes(StandardCharsets.UTF_8), writerState, CLOCK);
-        final BookKeeperPrimaryWalAppender appender = new BookKeeperPrimaryWalAppender(
-                CLUSTER, configuration, metadata, metadata, allocator, recovery, writerState, operations, CLOCK);
-        final BookKeeperPrimaryPhysicalReferenceAdapter references =
-                new BookKeeperPrimaryPhysicalReferenceAdapter(
-                        CLUSTER, configuration, metadata, metadata, CLOCK);
-        final BookKeeperLedgerHandleCache handles = new BookKeeperLedgerHandleCache(
-                8, 8 * 1024, 1024, Duration.ofMinutes(1));
-        final BookKeeperReaderLeaseManager readerLeases = new BookKeeperReaderLeaseManager(
-                CLUSTER, configuration, metadata, CLOCK, "reader-process-1");
-        final BookKeeperPrimaryWalReader reader = new BookKeeperPrimaryWalReader(
-                CLUSTER, configuration, metadata, operations,
-                ignored -> "secret".getBytes(StandardCharsets.UTF_8), handles, readerLeases);
+        private final BookKeeperLedgerAllocator allocator;
+        final BookKeeperLedgerRecovery recovery;
+        final BookKeeperPrimaryWalAppender appender;
+        final BookKeeperPrimaryPhysicalReferenceAdapter references;
+        final BookKeeperLedgerHandleCache handles;
+        final BookKeeperReaderLeaseManager readerLeases;
+        final BookKeeperPrimaryWalReader reader;
+
+        Runtime() {
+            this(null);
+        }
+
+        Runtime(com.nereusstream.metadata.oxia.ResponseLossPartitionedOxiaBackend responseLossBackend) {
+            configuration = BookKeeperTestConfigurations.valid();
+            BookKeeperMetadataStoreConfig metadataConfiguration = new BookKeeperMetadataStoreConfig(
+                    configuration.maxAppendRangesPerLedger(),
+                    configuration.protectionSlotsPerRange(),
+                    configuration.maxReaderLeasesPerLedger(),
+                    configuration.maxUncertainAllocations());
+            metadata = responseLossBackend == null
+                    ? new FakeBookKeeperMetadataStore(metadataConfiguration, CLOCK)
+                    : new FakeBookKeeperMetadataStore(metadataConfiguration, CLOCK, responseLossBackend);
+            operations = new FakeOperations();
+            writerState = new BookKeeperWriterStateMachine(
+                    CLUSTER, configuration, metadata, CLOCK, "process-run-1");
+            verifier = new BookKeeperLedgerIdNamespaceReservationVerifier(
+                    (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
+                            Optional.of(reservation(configuration))), DEPLOYMENT);
+            allocator = new BookKeeperLedgerAllocator(
+                    CLUSTER, configuration, metadata, metadata, verifier, operations,
+                    ignored -> "secret".getBytes(StandardCharsets.UTF_8), writerState, CLOCK, new Random(41),
+                    () -> "allocation-" + allocationSequence.incrementAndGet());
+            recovery = new BookKeeperLedgerRecovery(
+                    CLUSTER, configuration, metadata, metadata, verifier, operations,
+                    ignored -> "secret".getBytes(StandardCharsets.UTF_8), writerState, CLOCK);
+            appender = new BookKeeperPrimaryWalAppender(
+                    CLUSTER, configuration, metadata, metadata, allocator, recovery, writerState, operations, CLOCK);
+            references = new BookKeeperPrimaryPhysicalReferenceAdapter(
+                    CLUSTER, configuration, metadata, metadata, CLOCK);
+            handles = new BookKeeperLedgerHandleCache(8, 8 * 1024, 1024, Duration.ofMinutes(1));
+            readerLeases = new BookKeeperReaderLeaseManager(
+                    CLUSTER, configuration, metadata, CLOCK, "reader-process-1");
+            reader = new BookKeeperPrimaryWalReader(
+                    CLUSTER, configuration, metadata, operations,
+                    ignored -> "secret".getBytes(StandardCharsets.UTF_8), handles, readerLeases);
+        }
 
         @Override
         public void close() {

@@ -309,6 +309,12 @@ bounded repair、a process reader lease and an ACTIVE writer selecting the ledge
 the complete D-level owner-domain contract；the real-service reader and mandatory-range subsets remain the current
 B/O evidence，while real materialization-source coverage belongs to BK-M3。
 
+The GC response-loss checkpoint now arms the production Oxia metadata adapter at each of the four conditional root
+writes：`SEALED -> MARKED`、`MARKED -> DELETING`、the first durable absence and the second-absence `DELETED` tombstone。
+For every cut，the write is applied before its response is lost；exact reload recognizes the intended durable digest，
+returns the stored version and lets the same deletion workflow reach `DELETED` without another physical identity or a
+blind provider delete。This is BK-55 D evidence；a real independent-process transport-loss cut remains required。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session
