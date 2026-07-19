@@ -172,6 +172,11 @@
 > protection are sealed into the ordinary GC journal, survive MARKED process loss, converge commit-delete response
 > loss and retire metadata before protection before bytes. A prior unmark leaves a stale protection epoch, which is
 > owner/absence-checked and rebound without MARK in that pass rather than becoming a permanent leak.
+> Checkpoint BK adds the executable 52-scenario evidence matrix and declares the M6/Phase 4 aggregate gates without
+> claiming their final result. It also closes the real partitioned-topic admin route：zero-byte partition catalog
+> placeholders are not BookKeeper durable state；base-topic operations expand to every exact partition；only a local
+> loaded projection is consulted, while remote-owned or unloaded partitions are decided by the durable binding. The
+> focused binding test and retry-disabled two-broker compatibility method pass on the new source lock.
 > These are focused
 > M6 foundations, not the aggregate completion claim.
 >
@@ -180,7 +185,7 @@
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`
+> `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`
 
 > 实现状态日期：2026-07-19
 
@@ -437,6 +442,7 @@ current L0 protocol-neutral gate.
 | [05-reader-retention-and-gc.md](05-reader-retention-and-gc.md) | durable read pins、reference handshake、logical retention、source/snapshot/object GC |
 | [06-pulsar-rollout-operations-and-compatibility.md](06-pulsar-rollout-operations-and-compatibility.md) | exact broker/facade changes、capability rollout、policy/admin matrix、F5/F6/F8 handoff |
 | [07-implementation-plan-and-gates.md](07-implementation-plan-and-gates.md) | M0-M6 file inventory、tests、failure matrix、ordinary/final release gates |
+| [08-m6-scenario-evidence-matrix.md](08-m6-scenario-evidence-matrix.md) | executable 52/52 required-scenario to annotated-test and owning-gate traceability |
 
 The north-star summary remains
 [nereus-future4-compaction-generation.md](../design/nereus-future4-compaction-generation.md)；when it conflicts with
@@ -1984,8 +1990,8 @@ snapshots are deliberately `DELETED`, so the scale fixture exercises discovery a
 creating 16,448 unrelated tasks；the existing admitted-stream fixtures separately prove authoritative head/task work
 is not skipped. `phase4M6RegistryScaleCheck` composes the M5 final predecessor、static contract/document/module/source
 audits and complete metadata/materialization checks. Checkpoint BH remains focused M6 evidence；two-worker/two-broker
-composition is closed by checkpoint BI；the exact 52-scenario executable map and aggregate M6/Phase 4 gates remain
-open.
+composition is closed by checkpoint BI；checkpoint BK below closes the exact 52-scenario traceability map and declares
+the aggregate M6/Phase 4 tasks, while execution of the final aggregate remains open.
 
 ### 6.37 F4-M6 two-broker/two-worker contention checkpoint
 
@@ -2012,7 +2018,7 @@ broker gate both pass；the declared Spotless/Checkstyle/test gate executed 138 
 
 `phase4M6TwoBrokerWorkerContentionCheck` composes checkpoint BH、the static contract/document/module/source audits、
 core/object-store/materialization checks and retry-disabled locked-Pulsar execution. BI closes only the required
-two-broker/two-worker scale row；the exact 52-scenario executable map and aggregate gates remain open.
+two-broker/two-worker scale row；checkpoint BK below supplies the executable map and aggregate task composition.
 
 ### 6.38 F4-M6 protected-head and abandoned append-intent checkpoint
 
@@ -2037,7 +2043,34 @@ and unchanged head, then observes the protection before head visibility. The exi
 success behind exact generation-zero `VISIBLE_GENERATION`. The three abandoned-intent tests cover all-six-domain veto,
 orphan grace, process restart, response loss, drift/unmark/epoch rebind and owner-absence-to-presence drift.
 `phase4M6AbandonedAppendIntentCheck` composes checkpoint BI、affected module checks and the BJ static/document/source
-audits. The 52-scenario executable map and aggregate M6/Phase 4 gates remain open.
+audits. Checkpoint BK below supplies the 52-scenario executable map and aggregate task composition.
+
+### 6.39 F4-M6 executable evidence and partitioned admin checkpoint
+
+Checkpoint BK turns section 8.1 of the implementation plan into
+[`08-m6-scenario-evidence-matrix.md`](08-m6-scenario-evidence-matrix.md). Its IDs are exactly `01..52`; every row names
+one or more annotated test methods in this repository or the source-locked Pulsar checkout and one declared owning
+Gradle gate. `scripts/check-phase4-m6-scenario-evidence-matrix.sh` rejects missing/duplicate rows、invalid evidence
+tokens、missing files/method annotations and undeclared gates. The root `checkPhase4M6ScenarioEvidenceMatrix` task
+executes it；`phase4M6Check` composes ordinary M6 evidence and all affected modules；`phase4M6FinalCheck` adds every
+M1–M5 final predecessor and `phase3FinalCheck`；`phase4FinalCheck` remains the only Phase 4 completion claim. These
+tasks are now declared, but their complete `--rerun-tasks` aggregate has not yet passed.
+
+Scenario 30 exposed two real Pulsar compatibility defects. `createPartitionedTopic` writes zero-byte
+`/managed-ledgers/...` catalog placeholders for exact partitions, so storage-class selection must distinguish that
+catalog fact from non-empty BookKeeper ManagedLedger metadata. `NereusStorageClassBindingStore` now treats only the
+non-empty form as BookKeeper durable state and conservatively fails closed if an existence observation disappears.
+`PersistentTopicsBase` expands a base partitioned topic to every exact partition. It interprets a locally loaded topic
+when present and otherwise validates the globally durable Nereus binding；it never tries to load a remote-owned
+partition merely to answer an admin admission question.
+
+`NereusStorageClassBindingStoreTest.ignoresAnEmptyPartitionCatalogPlaceholderWhenSelectingNereus` locks the storage
+fact boundary. `NereusCursorMultiBrokerIntegrationTest`
+`.preservesMessageIdsPropertiesAndIncarnationAcrossCompatibilityCuts` now creates and opens two Nereus partitions,
+rejects base-topic compaction while loaded, unloads both partitions, then rejects shadow-policy mutation from durable
+bindings without installing the policy. The focused binding suite、retry-disabled two-broker method and declared
+Spotless/Checkstyle checks pass on Pulsar
+`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`.
 
 ## 7. Milestones
 
@@ -2049,7 +2082,7 @@ audits. The 52-scenario executable map and aggregate M6/Phase 4 gates remain ope
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BJ focused-green, aggregate gates pending |
+| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BK focused/evidence-green、52/52 executable traceability complete、aggregate tasks declared；full rerun aggregate pending |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

@@ -41,7 +41,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`。
+`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -56,7 +56,9 @@ Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
 | `pulsar-broker/.../nereus/NereusAdminOperation.java` | `a99c967347ce7b9edc29b57892b220f42bedf8be` | closed loaded/unloaded admin operation set |
 | `pulsar-broker/.../service/BacklogQuotaManager.java` | `686e2244b560a16c69303e854719016d610fb305` | cursor skip/mark-delete backlog eviction call path |
 | `managed-ledger/.../impl/ManagedLedgerImpl.java` | `26fdb458a21b2edfcdbaed049681e69fd4b99077` | exact time/size OR retention and conservative whole-ledger size-boundary rule |
-| `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `ca2a1ab569f4cbd6d31d8d464b1b69cd2374045e` | `TRIM_TOPIC` route before managed-ledger call |
+| `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `70db01aca57920dfc864292fdc976bb19061df5d` | base-topic partition expansion；loaded-local projection or durable unloaded binding validates the same closed admin matrix |
+| `pulsar-broker/.../nereus/NereusStorageClassBindingStore.java` | `70b2b604acb033c4e75d6986cbea226e0d9d4cac` | distinguishes zero-byte partition catalog placeholders from non-empty BookKeeper durable metadata before storage-class claim |
+| `pulsar-broker/.../nereus/NereusCursorMultiBrokerIntegrationTest.java` | `7470d8a3ca75a052deb00c3c69626f70de417210` | real loaded/unloaded partitioned admin routing、Nereus first open and two-broker ownership evidence |
 | `pulsar-broker/.../admin/impl/NamespacesBase.java` | `a30d50a1ae8ec8c2492df7026e1c5deab6e711f6` | bounded topic-list memory limiter/size-cache pattern reused by backfill |
 | `managed-ledger/.../ManagedLedger.java` | `0455f0efa8bb6d0ef248b870b1a68166cdcef2c8` | `trimConsumedLedgersInBackground(CompletableFuture<?>)` contract |
 | `pulsar-broker-common/.../resources/TenantResources.java` | `1f954e6bfe89640c214915cc206c0bd52ae95180` | async tenant enumeration for cold-topic registration backfill |

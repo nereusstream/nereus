@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("9e3ac18107ba57bca88ee74f39c0c10581c24e8b")
+    .orElse("4d9d5bbd0230770cd2692088bf7d0644d4b46f94")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -2010,4 +2010,63 @@ tasks.register("phase4M6AbandonedAppendIntentCheck") {
     dependsOn(":nereus-core:check")
     dependsOn(":nereus-materialization:check")
     dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("checkPhase4M6ScenarioEvidenceMatrix") {
+    group = "verification"
+    description = "Verify all 52 Phase 4 M6 scenarios map to real annotated tests and declared owning gates."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m6-scenario-evidence-matrix.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register("phase4M6Check") {
+    group = "verification"
+    description = "Run the complete ordinary F4-M6 gate and the executable 52-scenario evidence audit."
+    dependsOn("phase4M6AbandonedAppendIntentCheck")
+    dependsOn("checkPhase4M6ScenarioEvidenceMatrix")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-api:check")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register("phase4M6FinalCheck") {
+    group = "verification"
+    description = "Run every ordinary, scale, and real-service F4-M6 acceptance gate."
+    dependsOn("phase4M6Check")
+    dependsOn("phase4M1FinalCheck")
+    dependsOn("phase4M2FinalCheck")
+    dependsOn("phase4M3FinalCheck")
+    dependsOn("phase4M4FinalCheck")
+    dependsOn("phase4M5FinalCheck")
+    dependsOn("phase3FinalCheck")
+}
+
+tasks.register("phase4Check") {
+    group = "verification"
+    description = "Run every ordinary Phase 4 compaction, generation, retention, and GC gate."
+    dependsOn("phase4M6Check")
+}
+
+tasks.register("phase4FinalCheck") {
+    group = "verification"
+    description = "Run the complete Phase 1 through Phase 4 release gate; this is the only Phase 4 completion claim."
+    dependsOn("phase4Check")
+    dependsOn("phase3FinalCheck")
+    dependsOn("phase4M1FinalCheck")
+    dependsOn("phase4M2FinalCheck")
+    dependsOn("phase4M3FinalCheck")
+    dependsOn("phase4M4FinalCheck")
+    dependsOn("phase4M5FinalCheck")
+    dependsOn("phase4M6FinalCheck")
 }

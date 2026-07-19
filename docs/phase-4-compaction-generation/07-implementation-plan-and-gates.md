@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`9e3ac18107ba57bca88ee74f39c0c10581c24e8b`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`4d9d5bbd0230770cd2692088bf7d0644d4b46f94`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and retry-disabled real
 two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real two-broker async/
 retention boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and real-
@@ -207,8 +207,9 @@ repeats from a new scanner and new empty continuations using no watch/process hi
 distinct broker-owned worker runtimes at one barrier over the same registered topics, converges a complete 64-shard
 pass through each runtime, and proves direct plus Pulsar-facade exact reads of sixteen 128 KiB ZSTD-materialized
 entries per topic with unchanged properties/`MessageIdAdv` and a stock BookKeeper control topic. The real fixture also
-forced and fixed compressed-physical versus returned-logical byte accounting. The 52-scenario executable mapping and
-aggregate gates remain pending.
+forced and fixed compressed-physical versus returned-logical byte accounting. Checkpoint BJ closes protected-head
+ordering and abandoned protected-intent retirement. Checkpoint BK supplies the executable 52/52 scenario mapping、
+partitioned loaded/unloaded admin evidence and aggregate task composition；the full rerun aggregate remains pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1969,7 +1970,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BJ are implemented and focused-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BK are implemented and focused/evidence-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -1978,8 +1979,8 @@ highest generation；the existing overflow fixture proves candidate 4,097 fails 
 scale fixture streams one million entries without constructing a million-entry list, asserts demand is exactly one,
 checks the exact publication/commit directory sizes and 3,907 sparse anchors, keeps staging below the configured
 384 MiB budget, verifies the uploaded object, performs first/middle/last sparse reads and releases all staging bytes.
-This is M6 foundation evidence only；`phase4M6Check`、`phase4M6FinalCheck` and the aggregate Phase 4 gates do not yet
-exist/pass and no completion claim is made here. Exact deterministic evidence is
+This is M6 evidence only；`phase4M6Check`、`phase4M6FinalCheck` and the aggregate Phase 4 tasks now exist, but their full
+rerun has not yet passed and no completion claim is made here. Exact deterministic evidence is
 `RecoveryCheckpointMergeTest.mergesThirtyTwoActiveReferencesWithBoundedRemappingAndExactEntries` plus
 `RecoveryCheckpointCoordinatorTest.mergesThirtyTwoReferencesWithPinnedSourcesAndConvergesLostRootCasResponse`、
 `selectionDriftDuringMergePinLeavesOldRootAuthoritativeAndReleasesLease` and
@@ -2022,6 +2023,23 @@ test `headRemainsUnchangedWhileReachableAppendProtectionIsPending` freezes the a
 intent and protection acquisition, proves the durable head remains at zero and the append future remains incomplete,
 then releases protection and observes head one plus the durable `REACHABLE_APPEND`. The strict-success half remains
 directly covered by `AsyncObjectWalAppendCoordinatorTest.strictDurabilityWaitsForExactVisibleGenerationProtection`.
+
+Checkpoint BK closes the executable evidence-index and partitioned-admin gaps without changing the final completion
+rule. [`08-m6-scenario-evidence-matrix.md`](08-m6-scenario-evidence-matrix.md) contains exactly IDs `01..52`; every row
+names annotated Nereus/Pulsar test methods and a declared owning gate. The Bash-3-compatible
+`scripts/check-phase4-m6-scenario-evidence-matrix.sh` validates row cardinality/order、evidence token grammar、source
+existence、nearby test annotations and gate declarations against this repository plus the source-locked Pulsar tree.
+The root `checkPhase4M6ScenarioEvidenceMatrix` task executes that audit.
+
+Scenario 30 now has real partitioned coverage on Pulsar
+`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`. Pulsar creates zero-byte `/managed-ledgers/...` catalog
+placeholders for exact partitions before their first durable open. `NereusStorageClassBindingStore` therefore treats
+only non-empty ManagedLedger metadata as BookKeeper durable state, but fails closed if a positive existence
+observation disappears. `PersistentTopicsBase` expands a base partitioned topic to every exact child. A locally loaded
+topic may supply projection facts；a remote-owned or unloaded child is validated from the durable Nereus binding and
+is never loaded merely for admin admission. The focused placeholder test and retry-disabled two-broker compatibility
+method prove first Nereus open、loaded compaction rejection、full unload and unloaded shadow-policy rejection without
+policy installation. Spotless and both broker Checkstyle tasks pass.
 
 ### 8.1 Required scenarios
 
@@ -2115,13 +2133,15 @@ exercise writer/reader/directory bounds. The registry fixture uses deterministic
 the frozen shard function；it traverses at least two pages per shard and then restarts with empty continuations.
 Checkpoint BH implements the exact registry row；it does not treat registration or its scan order as stream-head/task
 truth, and all 16,448 stale-hint snapshots are safely skipped only after authoritative L0 inspection. Checkpoint BI
-implements the final two-broker/two-worker row through broker-owned production runtimes and shared durable services；it
-does not replace the still-required per-scenario executable audit. Checkpoint BJ closes scenario 51's protected-head
-ordering and abandoned-intent retirement path；it likewise remains one named scenario row rather than the 52-row map.
+implements the final two-broker/two-worker row through broker-owned production runtimes and shared durable services.
+Checkpoint BJ closes scenario 51's protected-head ordering and abandoned-intent retirement path. Checkpoint BK maps
+every one of these facts into the executable 52-row audit；the map proves traceability, not that the owning gates have
+all run in the current aggregate.
 
 ### 8.3 Gates
 
 ```text
+./gradlew checkPhase4M6ScenarioEvidenceMatrix
 ./gradlew phase4M6RegistryScaleCheck
 ./gradlew phase4M6TwoBrokerWorkerContentionCheck
 ./gradlew phase4M6AbandonedAppendIntentCheck
@@ -2132,6 +2152,8 @@ ordering and abandoned-intent retirement path；it likewise remains one named sc
 ```
 
 `phase4FinalCheck` composes every M1-M6 final gate plus `phase3FinalCheck`. It is the only Phase 4 completion claim.
+The tasks are implemented；until `phase4M6FinalCheck --rerun-tasks` and `phase4FinalCheck --rerun-tasks` both pass in
+this source-locked state, F4-M6 and Phase 4 remain in progress.
 
 ## 9. Gradle / Build Plan
 

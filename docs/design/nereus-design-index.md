@@ -91,10 +91,10 @@ streamId + offset
 | 模块/能力 | 状态 | 当前事实 |
 | --- | --- | --- |
 | `nereus-api` | `Implemented`（P15-M1/M4/M6 + F4-M1–M2） | generic target/result、exact cumulative append snapshot、append recovery/lifecycle API plus F4 view/generation/publication/object-hash values and content-aware inline entry-index identity |
-| `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1–M5 final-gated；M6 BD–BI） | existing metadata plus F4 keys/records/codecs/CAS/scans/all-shard fixtures、generation activation/registration、dual-reader task schema V2、1,000-reference and exact 16,448-stream/64-shard registry pagination evidence, plus explicit versioned/semantic `StreamMetadataSnapshot` authority comparisons；hydrated trim observation fields are never correctness authority |
+| `nereus-metadata-oxia` | `Implemented`（P15/F2/F3 + F4-M1–M5 final-gated；M6 BD–BJ） | existing metadata plus F4 keys/records/codecs/CAS/scans/all-shard fixtures、generation activation/registration、dual-reader task schema V2、1,000-reference and exact 16,448-stream/64-shard registry pagination evidence, plus explicit versioned/semantic `StreamMetadataSnapshot` authority comparisons；hydrated trim observation fields are never correctness authority |
 | `nereus-object-store` | `Implemented`（L0 M3 + F4-M1–M5 final-gated；M6 BI） | WAL v1 IO、NCP1/NTC1/NRC1、replayable staging、guarded/capability-proven provider operations、M5 async Object-WAL final evidence and resolved-target/measured-physical/logical-returned accounting for compressed BI reads；BookKeeper primary IO remains reserved |
 | `nereus-core` | `Implemented`（P15 + F4-M1–M5 final-gated；M6 BI） | stable L0 core plus F4 resolver/pin/fallback、exact NCP1 adapter、durable protections/reference domains、protected async Object-WAL acknowledgement/repair and compression-safe higher-generation read metrics；M4 runtime GC remains exact-activation gated |
-| `nereus-materialization` | `Implemented`（F4-M1–M5 final-gated；M6 BD–BI） | M1–M3 planner/worker/publication/topic engine、M4 NRC1/recovery/retirement/physical+cursor GC/scale/failure matrix、M5 coupled async read-repair/materialization/lag runtime and M6 32-ref/4,096-candidate/million-entry/128-source task、16,448-stream registry and two-broker/two-worker contention boundaries are implemented；the current broker safe defaults keep scheduling/deletion disabled |
+| `nereus-materialization` | `Implemented`（F4-M1–M5 final-gated；M6 BD–BJ） | M1–M3 planner/worker/publication/topic engine、M4 NRC1/recovery/retirement/physical+cursor GC/scale/failure matrix、M5 coupled async read-repair/materialization/lag runtime and M6 32-ref/4,096-candidate/million-entry/128-source task、16,448-stream registry、two-broker/two-worker contention and abandoned protected-intent retirement boundaries are implemented；the current broker safe defaults keep scheduling/deletion disabled |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
 | BookKeeper primary WAL | `Reserved` | profile enum exists；generic BK location、writer/reader and coordinator do not |
 | Async object materialization | `Implemented / final-gated`（F4-M5） | Object-WAL `WAL_DURABLE` boundary、generation-zero repair、pre-I/O proof/lag admission、coupled production read-repair/materialization runtime and exact Pulsar logical-retention rollout pass the retry-disabled real two-broker gate；BookKeeper primary profiles remain reserved |
@@ -102,7 +102,7 @@ streamId + offset
 | `nereus-pulsar-adapter` | `Implemented`（F2 complete + F3 complete；F4 M4 BC + M5 checkpoints X/AA–AI wiring + fork Y/Z/AA–AR + M6 BI） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、durable generation registration/readiness/activation、checkpoint-AF coupled Object-WAL composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin admission、checkpoint-AN metadata-first root/registration/inventory lifecycle、checkpoint-AO broker physical-GC config mapping、checkpoint-AQ ordered proof/atomic delete activation、checkpoint-AR provider/Pulsar/restart-scope composition、checkpoint-AS exact shared reference-domain assembly、checkpoint-AT real post-DELETE independent recovery、checkpoint-AU applied-DELETED-CAS response-loss exact reload、checkpoint-AV two-worker shared-intent convergence、checkpoint-AW all-256-shard mixed-state recovery/opaque LIST progress、checkpoint-AX real-Oxia hot-shard bounded pagination、checkpoint-AY remove-on-cancel shared runtime scheduler、checkpoint-AZ 10,000-cursor-root exact GC、checkpoint-BA source/protection post-delete recovery、checkpoint-BB real post-root external-reappearance inventory/GC、checkpoint-BC atomic deletion-active readiness rollover and checkpoint-BI real two-broker process-wide worker contention/exact read coexistence are implemented/tested；safe defaults keep destructive execution disabled |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
-| Future 4 materialization/compaction | `In progress / F4-M1–M5 final-gated；M6 BD–BI focused-green` | M4 NRC1/recovery、retirement/GC fences、activation/global domains、scale/failure/late-PUT cuts and retry-disabled real source-deletion acceptance are implemented/tested；M5 final-gates async/retention compatibility；M6 now covers 32-ref merge、4,096/4,097 candidates、million-entry NRC1、1,000+1,000 references、the 128-source/1,048,576-record task with schema V2/capability V2、exact 16,448-stream registry restart and real two-broker/two-worker compressed exact-read convergence；scenario mapping and aggregate gates remain open |
+| Future 4 materialization/compaction | `In progress / F4-M1–M5 final-gated；M6 BD–BK evidence-green` | M4 NRC1/recovery、retirement/GC fences、activation/global domains、scale/failure/late-PUT cuts and retry-disabled real source-deletion acceptance are implemented/tested；M5 final-gates async/retention compatibility；M6 now covers 32-ref merge、4,096/4,097 candidates、million-entry NRC1、1,000+1,000 references、the 128-source/1,048,576-record task with schema V2/capability V2、exact 16,448-stream registry restart、real two-broker/two-worker compressed exact-read convergence、protected-intent retirement、partitioned admin routes and executable 52/52 traceability；full aggregate execution remains open |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
 
 Phase 1 ordinary and final gates are：
@@ -256,7 +256,7 @@ decision behind items 14 and 16-18。
 | `../phase-1.5-core-storage-foundation/README.md` | active L0 evolution、compatibility、milestones and gates | implemented / final-gated |
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
-| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M5 final-gated；M6 BD–BI focused-green |
+| `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | in progress / F4-M1–M5 final-gated；M6 BD–BK evidence-green、52/52 traceability complete、final aggregate pending |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | implemented / F4-M5 final-gated |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -270,7 +270,7 @@ decision behind items 14 and 16-18。
 | `nereus-future1-core-stream-storage.md` | F1 L0 Core StreamStorage | `Implemented`（Phase 1 + Phase 1.5） |
 | `nereus-future2-managed-ledger-facade.md` | F2 ManagedLedger facade | `Implemented`（F2-M0/M0R/M0R2 + P15-M6 + F2-M1-M6 final-gated） |
 | `nereus-future3-cursor-subscription.md` | F3 durable cursor/subscription | `Implemented / final-gated`（M0/M0R + M1-M6） |
-| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M5 final-gated；M6 BD–BI focused-green`；精确合同见 `../phase-4-compaction-generation/` |
+| `nereus-future4-compaction-generation.md` | F4 compaction/materialization/generation | `In progress / F4-M1–M5 final-gated；M6 BD–BK evidence-green、52/52 traceability complete、final aggregate pending`；精确合同见 `../phase-4-compaction-generation/` |
 | `nereus-future5-kop-compatibility.md` | F5 KoP/Kafka projection | `Designed` |
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
 | `nereus-future7-routing-brownout-elasticity.md` | F7 routing/brown-out/elasticity | `Designed` |
@@ -301,7 +301,7 @@ decision behind items 14 and 16-18。
 1. `nereus-future3-cursor-subscription.md`；
 2. `../phase-3-cursor-subscription/README.md`；
 3. 依次评审该目录的 `01` 到 `06` code-level documents；
-4. F3-M6 历史验收使用本地 Pulsar `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Phase 4 implementation/source lock 已推进到 `master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`。M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
+4. F3-M6 历史验收使用本地 Pulsar `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Phase 4 implementation/source lock 已推进到 `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`。M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
 5. 执行 `phase3Check` 和 `phase3FinalCheck --rerun-tasks`；
 6. 后续 F4/F5/F8 必须消费 F3 已冻结的 cursor/reference/MessageId contract，不得另建 correctness owner。
 
@@ -310,10 +310,10 @@ decision behind items 14 and 16-18。
 1. 确认 `../phase-1.5-core-storage-foundation/README.md`、
    `../phase-2-managed-ledger-facade/README.md` 与 `../phase-3-cursor-subscription/README.md` 的已实现输入合同；
 2. 阅读 `nereus-future4-compaction-generation.md` 的 north-star 边界；
-3. 以 `../phase-4-compaction-generation/README.md` 为入口，依次评审 `01` 到 `07` 代码级文档；
+3. 以 `../phase-4-compaction-generation/README.md` 为入口，依次评审 `01` 到 `08` 代码级文档；
 4. 实现必须按 `07-implementation-plan-and-gates.md` 的 M1–M6 顺序和 mandatory review stops 推进；
 5. 重新审计时使用本地 Pulsar
-   `master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`，不把未发布的 Maven snapshot 当作权威源；
+   `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`，不把未发布的 Maven snapshot 当作权威源；
 6. 在 F4-M6 之前不得将尚未实现的 broker destructive-GC activation 或最终兼容路径写成 Implemented。
 
 ### 评审 Phase 1.5

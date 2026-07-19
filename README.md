@@ -110,10 +110,12 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Phase 4
-Pulsar source lock 已推进到 `master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`。M6 增加
+Pulsar source lock 已推进到 `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
-F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace admin route 静态审计。
+F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace/partitioned admin route
+执行证据。分区主题创建留下的零字节 ManagedLedger catalog placeholder 不再被误判为 BookKeeper 耐久状态；
+跨 broker 分区管理校验只解释本地 loaded projection，远端或 unloaded 分区统一回到 durable storage binding。
 真实 gate 还捕获并修复了两个仅在同名 delete/recreate 出现的问题：`DELETED` topic 的 properties probe
 必须返回空视图以允许重建，且 `ManagedLedger.asyncDelete` 必须像 stock BookKeeper 一样在 callback 前释放
 factory cache，避免新 broker topic 复用已删除 stream。`phase3M6Check`、`phase3M6FinalCheck`、
@@ -436,7 +438,7 @@ durable size backlog eviction、卸载后 exact ACTIVE-binding logical trim、tr
 logical trim 不删除 WAL bytes，stock BookKeeper control topic 始终可写可读。`phase4M5Check` 与
 `phase4M5FinalCheck` 是该里程碑的 ordinary/final completion boundary；F4-M6 和 Phase 4 aggregate final gate
 仍待完成。
-F4-M6 checkpoints BD–BI 已完成 focused foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
+F4-M6 checkpoints BD–BK 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
 generation candidates、streaming 1,000,000-entry checkpoint、1,000 reader leases + 1,000 protections 的完整分页
 重扫、同时达到 128 sources / 1,048,576 records 的单 task durable round trip，以及每个 64 registry shards
 精确 257 条、page size 256 的 16,448-stream cold-restart 扫描。BI 又在真实 shared Oxia、LocalStack、BookKeeper
@@ -447,8 +449,9 @@ boundary 要求新增显式
 `MaterializationTaskRecord` schema V2 dual reader；旧 V1 bytes 继续可读，新 task 使用 `2 / 2` envelope，并把
 broker lookup capability 提升为 `nereus.generation-protocol=2`。Topic projection marker 与 durable activation
 record 仍为 V1。新 source lock 上的完整 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已以 166/166 tasks
-通过，并重跑通过 retry-disabled 真实 M4 final predecessor。剩余 52-scenario executable mapping 和 aggregate
-gates 未完成。
+通过，并重跑通过 retry-disabled 真实 M4 final predecessor。BJ 又关闭 protected-head ordering 与 abandoned
+append-intent retirement；BK 增加 partitioned loaded/unloaded admin compatibility，并把 52 个 required scenarios
+全部映射到 annotated tests 和 declared gates。M6/Phase 4 aggregate tasks 已声明，但完整 rerun 尚未通过。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

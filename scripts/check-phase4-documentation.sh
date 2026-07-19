@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="9e3ac18107ba57bca88ee74f39c0c10581c24e8b"
+current_pulsar_lock="4d9d5bbd0230770cd2692088bf7d0644d4b46f94"
 
 require_literal() {
     local literal="$1"
@@ -37,6 +37,20 @@ require_literal "Checkpoint BI" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint BJ" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BK" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "52/52 scenarios traced" \
+    "docs/phase-4-compaction-generation/08-m6-scenario-evidence-matrix.md"
+require_literal "checkPhase4M6ScenarioEvidenceMatrix" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "checkPhase4M6ScenarioEvidenceMatrix" \
+    "build.gradle.kts"
+require_literal "phase4M6Check" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M6FinalCheck" \
+    "build.gradle.kts"
+require_literal "phase4FinalCheck" \
+    "build.gradle.kts"
 require_literal "scansOneThousandReaderLeasesAndProtectionsWithoutTruncationAndRestarts" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "plansAndDurablyRoundTripsOneTaskAtBothSourceAndRecordLimits" \
@@ -358,4 +372,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, M6 BD-BJ foundations, current source lock, gates, and local links verified."
+echo "Phase 4 M1-M5 final status, M6 BD-BK evidence, 52/52 matrix, current source lock, gates, and links verified."
