@@ -263,6 +263,13 @@ ambiguous provider attempt is still running；the permit is released only after 
 seal/recovery path converges。Focused tests cover success、provider failure、timeout、cancel、capacity rejection and
 runtime close；the existing prepared-buffer/client-adapter ref-count tests remain the byte-buffer ownership evidence。
 
+Recovery now has deterministic applied-response-loss coverage for each writer/root CAS across
+`ACTIVE -> SEALING -> SEALED -> IDLE`，including exact closed LAC/length reload。A real BookKeeper/Oxia test keeps the
+old process and `WriteAdvHandle` live while a newer session recovery-opens the ledger；the stale owner then fails both
+pre-head validation and an explicit advanced-ledger write, while the replacement range starts on a different ledger
+at entry zero。Two process-run state machines also contend from the same observed writer version and only one recovery
+owner/replacement ledger wins；the remaining independent-process contention cut stays open in the matrix。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session

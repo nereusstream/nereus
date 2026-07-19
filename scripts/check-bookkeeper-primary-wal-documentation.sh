@@ -104,6 +104,13 @@ require_literal 'BookKeeperAppenderDeadlineTest.propagatesRemainingBudget' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'void propagatesRemainingBudget()' \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppenderDeadlineTest.java"
+require_literal 'BookKeeperLedgerRecoveryTest.recoversEverySealCut' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'void recoversEverySealCut()' \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperLedgerRecoveryTest.java"
+require_literal 'newOwnerRecoveryOpenFencesLiveOldHandleAndPreventsOldHeadCommit' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"

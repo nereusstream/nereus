@@ -50,6 +50,7 @@ registerFocusedTest(
     "bkM2RecoveryFencingTest",
     "Run BK-M2 uncertain-create, stale-session, ownership-transfer, and recovery-inventory tests.",
     "com.nereusstream.bookkeeper.BookKeeperLedgerAllocatorTest",
+    "com.nereusstream.bookkeeper.BookKeeperLedgerRecoveryTest",
     "com.nereusstream.bookkeeper.BookKeeperAppenderDeadlineTest",
     "com.nereusstream.bookkeeper.BookKeeperAppenderResourceTest",
     "com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppenderTest",

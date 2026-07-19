@@ -81,6 +81,7 @@ import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationLifecycle;
 import com.nereusstream.metadata.oxia.testing.BookKeeperMetadataStoreContractScenario;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.oxia.testcontainers.OxiaContainer;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -559,6 +560,92 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 BookKeeperEntryRangeReadTarget replacementTarget =
                         (BookKeeperEntryRangeReadTarget) replacement.readTarget();
                 assertThat(replacementTarget.ledgerId()).isNotEqualTo(oldTarget.ledgerId());
+                assertThat(replacementTarget.firstEntryId()).isZero();
+            }
+        }
+    }
+
+    @Test
+    void newOwnerRecoveryOpenFencesLiveOldHandleAndPreventsOldHeadCommit() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-live-fence-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        MutableClock clock = new MutableClock(5_000_000);
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        AtomicReference<CountingOperations> oldOperations = new AtomicReference<>();
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process oldProcess = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-live-old",
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> counting(raw, oldOperations))) {
+            StreamId stream = oldProcess.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-live-fence-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            AppendSession oldSession = oldProcess.acquire(stream, "writer-old");
+            AppendAttemptId oldAttempt = new AppendAttemptId("attempt-live-old-" + suffix);
+            DurablePrimaryAppend oldDurable = oldProcess.persistOnly(
+                    stream, oldSession, oldAttempt, new byte[] {1});
+            WriteAdvHandle oldHandle = oldOperations.get().createdHandle();
+            long oldLedger = ((BookKeeperEntryRangeReadTarget) oldDurable.readTarget()).ledgerId();
+
+            clock.advance(Duration.ofMinutes(1).plusMillis(1));
+            try (Process newProcess = Process.open(
+                    bookKeeperCluster,
+                    cluster,
+                    deployment,
+                    "process-live-new",
+                    configuration,
+                    reservation,
+                    clock)) {
+                AppendSession newSession = newProcess.acquire(stream, "writer-new");
+                assertThatThrownBy(() -> newProcess.recoveryCoordinator.recoverAfterRestart(
+                                newSession,
+                                oldAttempt,
+                                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                                TIMEOUT)
+                        .join()).hasCauseInstanceOf(NereusException.class)
+                        .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
+                                .isEqualTo(ErrorCode.FENCED_APPEND));
+
+                assertThatThrownBy(() -> oldProcess.appender
+                                .validateBeforeHeadCommit(oldDurable, oldSession, TIMEOUT)
+                                .join())
+                        .hasCauseInstanceOf(NereusException.class)
+                        .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
+                                .isEqualTo(ErrorCode.FENCED_APPEND));
+
+                ByteBuf staleEntry = Unpooled.wrappedBuffer(new byte[] {9});
+                try {
+                    assertThatThrownBy(() -> oldProcess.rawOperations.write(
+                                    oldHandle,
+                                    1,
+                                    staleEntry,
+                                    new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()).hasCauseInstanceOf(NereusException.class)
+                            .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
+                                    .isEqualTo(ErrorCode.FENCED_APPEND));
+                } finally {
+                    staleEntry.release();
+                }
+
+                DurablePrimaryAppend replacement = newProcess.persistOnly(
+                        stream,
+                        newSession,
+                        new AppendAttemptId("attempt-live-new-" + suffix),
+                        new byte[] {2});
+                BookKeeperEntryRangeReadTarget replacementTarget =
+                        (BookKeeperEntryRangeReadTarget) replacement.readTarget();
+                assertThat(replacementTarget.ledgerId()).isNotEqualTo(oldLedger);
                 assertThat(replacementTarget.firstEntryId()).isZero();
             }
         }
@@ -1172,6 +1259,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     private static final class CountingOperations implements BookKeeperClientOperations {
         private final BookKeeperClientOperations delegate;
         private final AtomicInteger writes = new AtomicInteger();
+        private final AtomicReference<WriteAdvHandle> createdHandle = new AtomicReference<>();
 
         private CountingOperations(BookKeeperClientOperations delegate) {
             this.delegate = delegate;
@@ -1184,7 +1272,11 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 byte[] password,
                 Map<String, byte[]> customMetadata,
                 BookKeeperOperationDeadline deadline) {
-            return delegate.createAdvanced(ledgerId, configuration, password, customMetadata, deadline);
+            return delegate.createAdvanced(ledgerId, configuration, password, customMetadata, deadline)
+                    .thenApply(handle -> {
+                        createdHandle.set(handle);
+                        return handle;
+                    });
         }
 
         @Override
@@ -1229,6 +1321,10 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         private int writeCalls() {
             return writes.get();
+        }
+
+        private WriteAdvHandle createdHandle() {
+            return java.util.Objects.requireNonNull(createdHandle.get(), "created BookKeeper write handle");
         }
     }
 
