@@ -77,6 +77,26 @@ public final class ReadCoordinator implements StreamViewReader {
                 config.maxConcurrentObjectReads(), config.maxReadBufferBytes());
     }
 
+    /** Provider-neutral generation-zero constructor used by non-Object primary WAL profiles. */
+    public ReadCoordinator(
+            StreamStorageConfig config,
+            ReadResolver resolver,
+            ReadTargetReaderRegistry readers,
+            ReadMetricsObserver observer,
+            Executor callbackExecutor) {
+        this.config = Objects.requireNonNull(config, "config");
+        this.resolver = Objects.requireNonNull(resolver, "resolver");
+        this.generationResolver = null;
+        this.targetDispatcher = new ReadTargetDispatcher(
+                Objects.requireNonNull(readers, "readers"));
+        this.generationFailureHandler = GenerationReadFailureHandler.noOp();
+        this.generationRetryPolicy = GenerationReadRetryPolicy.defaults();
+        this.observer = Objects.requireNonNull(observer, "observer");
+        this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
+        this.resourceLimiter = new ReadResourceLimiter(
+                config.maxConcurrentObjectReads(), config.maxReadBufferBytes());
+    }
+
     /** F4 constructor using authoritative generation resolution and exact target readers. */
     public ReadCoordinator(
             StreamStorageConfig config,

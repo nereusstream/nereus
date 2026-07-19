@@ -6,6 +6,8 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.target.ReadTargetType;
+import java.util.Objects;
+import java.util.function.Predicate;
 
 /** Executable Phase 1.5 matrix: strict synchronous Object WAL only. */
 public final class Phase15StorageProfileResolver implements StorageProfileResolver {
@@ -25,5 +27,18 @@ public final class Phase15StorageProfileResolver implements StorageProfileResolv
         }
         return new StorageExecutionPlan(profile, ReadTargetType.OBJECT_SLICE,
                 ObjectPublicationMode.SYNCHRONOUS, durability);
+    }
+
+    @Override
+    public ReadTargetType requireReadable(
+            StorageProfile raw, Predicate<ReadTargetType> readerInstalled) {
+        StorageProfile profile = Objects.requireNonNull(raw, "profile").canonical();
+        Predicate<ReadTargetType> installed = Objects.requireNonNull(readerInstalled, "readerInstalled");
+        if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
+                || !installed.test(ReadTargetType.OBJECT_SLICE)) {
+            throw new NereusException(ErrorCode.UNSUPPORTED_STORAGE_PROFILE, false,
+                    "storage profile has no complete Phase 1.5 read plan");
+        }
+        return ReadTargetType.OBJECT_SLICE;
     }
 }

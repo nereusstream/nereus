@@ -54,6 +54,7 @@ import com.nereusstream.core.recovery.AppendRecoverySearcher;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimCoordinator;
 import com.nereusstream.core.trim.TrimMetricsObserver;
+import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
@@ -77,6 +78,61 @@ public final class DefaultStreamStorage implements StreamStorage {
     private final TrimCoordinator trimCoordinator;
     private final StreamLifecycleCoordinator lifecycleCoordinator;
     private final AtomicBoolean closed = new AtomicBoolean();
+
+    /** Complete generation-zero-only provider-neutral composition used by additional primary-WAL modules. */
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            PrimaryWalRegistry primaryWalRegistry,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
+        this.config = Objects.requireNonNull(config, "config");
+        this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
+        PrimaryWalRegistry registry = Objects.requireNonNull(primaryWalRegistry, "primaryWalRegistry");
+        Objects.requireNonNull(physicalReferences, "physicalReferences");
+        Objects.requireNonNull(recoverySearcher, "recoverySearcher");
+        Objects.requireNonNull(profileResolver, "profileResolver");
+        Objects.requireNonNull(appendAdmissionGuard, "appendAdmissionGuard");
+        Objects.requireNonNull(clock, "clock");
+        Objects.requireNonNull(callbackExecutor, "callbackExecutor");
+        Objects.requireNonNull(readMetricsObserver, "readMetricsObserver");
+        Objects.requireNonNull(trimMetricsObserver, "trimMetricsObserver");
+        this.appendSessionManager = new AppendSessionManager(config, metadataStore, clock);
+        this.appendCoordinator = new AppendCoordinator(
+                config,
+                metadataStore,
+                registry,
+                appendSessionManager,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                clock,
+                callbackExecutor);
+        ReadResolver readResolver = new ReadResolver(
+                config,
+                metadataStore,
+                profileResolver,
+                registry::hasReader,
+                clock,
+                readMetricsObserver,
+                callbackExecutor);
+        this.readCoordinator = new ReadCoordinator(
+                config,
+                readResolver,
+                registry.readerRegistry(),
+                readMetricsObserver,
+                callbackExecutor);
+        this.trimCoordinator = new TrimCoordinator(
+                config, metadataStore, readCoordinator::invalidate, trimMetricsObserver, callbackExecutor);
+        this.lifecycleCoordinator = new StreamLifecycleCoordinator(config, metadataStore, appendCoordinator);
+    }
 
     public DefaultStreamStorage(
             StreamStorageConfig config,
@@ -346,6 +402,8 @@ public final class DefaultStreamStorage implements StreamStorage {
         ReadResolver readResolver = new ReadResolver(
                 config,
                 metadataStore,
+                profileResolver,
+                type -> type == com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
                 clock,
                 readMetricsObserver,
                 callbackExecutor);

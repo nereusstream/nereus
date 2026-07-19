@@ -33,7 +33,10 @@ import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.core.profile.Phase15StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolver;
 import com.nereusstream.metadata.oxia.CommitSliceRequest;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairCursor;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairResult;
@@ -57,6 +60,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 
 public final class ReadResolver implements AutoCloseable {
     private static final Comparator<OffsetIndexEntry> GENERATION_ORDER = Comparator
@@ -68,6 +72,8 @@ public final class ReadResolver implements AutoCloseable {
     private final OffsetIndexCache cache;
     private final ReadMetricsObserver observer;
     private final Executor callbackExecutor;
+    private final StorageProfileResolver profileResolver;
+    private final Predicate<ReadTargetType> readerInstalled;
     private final ConcurrentHashMap<StreamId, WatchRegistration> watches = new ConcurrentHashMap<>();
     private final Semaphore watchSlots;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -75,6 +81,24 @@ public final class ReadResolver implements AutoCloseable {
     public ReadResolver(
             StreamStorageConfig config,
             OxiaMetadataStore metadataStore,
+            Clock clock,
+            ReadMetricsObserver observer,
+            Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                new Phase15StorageProfileResolver(),
+                type -> type == ReadTargetType.OBJECT_SLICE,
+                clock,
+                observer,
+                callbackExecutor);
+    }
+
+    public ReadResolver(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            StorageProfileResolver profileResolver,
+            Predicate<ReadTargetType> readerInstalled,
             Clock clock,
             ReadMetricsObserver observer,
             Executor callbackExecutor) {
@@ -88,6 +112,8 @@ public final class ReadResolver implements AutoCloseable {
                 config.maxCommitChainScan());
         this.observer = Objects.requireNonNull(observer, "observer");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
+        this.profileResolver = Objects.requireNonNull(profileResolver, "profileResolver");
+        this.readerInstalled = Objects.requireNonNull(readerInstalled, "readerInstalled");
         this.watchSlots = new Semaphore(config.maxCachedStreams());
     }
 
@@ -404,12 +430,7 @@ public final class ReadResolver implements AutoCloseable {
             case DELETED -> throw new NereusException(
                     ErrorCode.STREAM_NOT_FOUND, false, "stream was deleted");
         }
-        if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT) {
-            throw new NereusException(
-                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
-                    false,
-                    "M5 reads support only OBJECT_WAL_SYNC_OBJECT");
-        }
+        profileResolver.requireReadable(profile, readerInstalled);
     }
 
     private void ensureWatch(StreamId streamId) {

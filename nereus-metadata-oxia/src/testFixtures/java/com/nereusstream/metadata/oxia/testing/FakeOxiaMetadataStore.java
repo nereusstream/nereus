@@ -53,6 +53,10 @@ import com.nereusstream.metadata.oxia.GcRetirementRemovalScanPage;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
 import com.nereusstream.metadata.oxia.ObjectPhysicalReferenceProof;
+import com.nereusstream.metadata.oxia.BookKeeperLedgerMetadataStore;
+import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
+import com.nereusstream.metadata.oxia.BookKeeperPhysicalReferenceProof;
+import com.nereusstream.metadata.oxia.BookKeeperStableAppendProtectionValidator;
 import com.nereusstream.metadata.oxia.ObjectProtectionScanPage;
 import com.nereusstream.metadata.oxia.PhysicalReferenceProof;
 import com.nereusstream.metadata.oxia.PhysicalReferencePurpose;
@@ -286,6 +290,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
     private boolean collapsedWatchEventPending;
     private long objectAuditFailureCount;
     private long watchDeliveryFailureCount;
+    private final BookKeeperStableAppendProtectionValidator bookKeeperProtectionValidator;
     private boolean closed;
 
     public FakeOxiaMetadataStore(LongSupplier clock) {
@@ -293,11 +298,28 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
     }
 
     public FakeOxiaMetadataStore(LongSupplier clock, int maxCommitChainScan) {
+        this(clock, maxCommitChainScan, null);
+    }
+
+    public FakeOxiaMetadataStore(
+            LongSupplier clock,
+            BookKeeperLedgerMetadataStore bookKeeperMetadata,
+            BookKeeperMetadataStoreConfig bookKeeperConfiguration) {
+        this(clock, DEFAULT_COMMIT_CHAIN_SCAN_LIMIT,
+                new BookKeeperStableAppendProtectionValidator(
+                        bookKeeperMetadata, bookKeeperConfiguration));
+    }
+
+    private FakeOxiaMetadataStore(
+            LongSupplier clock,
+            int maxCommitChainScan,
+            BookKeeperStableAppendProtectionValidator bookKeeperProtectionValidator) {
         this.clock = Objects.requireNonNull(clock, "clock");
         if (maxCommitChainScan <= 0) {
             throw new IllegalArgumentException("maxCommitChainScan must be positive");
         }
         this.maxCommitChainScan = maxCommitChainScan;
+        this.bookKeeperProtectionValidator = bookKeeperProtectionValidator;
     }
 
     public FakeOxiaMetadataStore() {
@@ -969,6 +991,14 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
             String cluster,
             PreparedStableAppend prepared,
             PhysicalReferenceProof protectionProof) {
+        if (protectionProof instanceof BookKeeperPhysicalReferenceProof proof) {
+            if (bookKeeperProtectionValidator == null) {
+                throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                        "BookKeeper physical-reference proof validation is not installed");
+            }
+            bookKeeperProtectionValidator.validate(cluster, prepared, proof).join();
+            return;
+        }
         if (!(protectionProof instanceof ObjectPhysicalReferenceProof proof)) {
             throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
                     "primary physical-reference proof type is not installed");

@@ -11,6 +11,11 @@ implementation, each row
 receives an exact test method、gate、source lock、date and result. No implementation row may be marked covered by prose
 only.
 
+The deterministic BK-M2 checkpoint additionally executes
+`BookKeeperStreamStorageIntegrationTest.strictBkOnlyAppendAndColdReadTraverseTheProviderNeutralL0Pipeline`：the
+module-local profile resolver/runtime、exact pre-head BookKeeper proof reload、generation-zero index and cold range
+reader are integrated。It is supporting D-level evidence only；it does not replace the B/O/P final rows below。
+
 Evidence levels：
 
 | Level | Meaning |

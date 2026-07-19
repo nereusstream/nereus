@@ -7,16 +7,17 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 ```text
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
-BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (append/read/recovery checkpoint)
+BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (module-local profile checkpoint)
 BK-M3 .. BK-M6                  not implemented
-all BookKeeper profiles         reserved / rejected before primary IO
+BK_ONLY module-local runtime    executable; not registered by the production broker provider
+all broker BookKeeper profiles  reserved / rejected before primary IO
 BookKeeper ledger deletion      absent / safe default closed
 ```
 
 `bookKeeperPrimaryWalDocumentationCheck` remains the documentation gate. `bookKeeperPrimaryWalM1Check`、
 `bookKeeperPrimaryWalM1FinalCheck` and the focused `bookKeeperPrimaryWalM2MetadataCheck` /
-`bookKeeperPrimaryWalM2RuntimeCheck` are executable and backed by real module/unit/predecessor dependencies；unfinished
-M2 retention/profile/Pulsar gates and M3–M6 names remain frozen target names and must
+`bookKeeperPrimaryWalM2RuntimeCheck` / `bookKeeperPrimaryWalM2RetentionCheck` are executable and backed by real
+module/unit/predecessor dependencies；unfinished M2 Pulsar/final gates and M3–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
@@ -191,7 +192,10 @@ partial-write sealing、new-ledger retry、owner transfer、protection lifecycle
 
 The retention checkpoint implements permanent `RETIRED` protection inventory tombstones、owner-specific
 `BookKeeperProtectionRetirementProof` revalidation、bounded `BookKeeperWalRetentionGate` captures and
-`BookKeeperLedgerRetentionManager`。The manager is a nonblocking convergence state machine：double-capture
+`BookKeeperLedgerRetentionManager`。`BookKeeperWalOnlyRetirementAuthority` and
+`BookKeeperWalOnlyReferenceRetirementCoordinator` consume exact completed L0 trim or abandoned-reservation facts and
+retire the bounded ledger inventory without choosing logical retention。The manager is a nonblocking convergence state
+machine：double-capture
 `SEALED -> MARKED`、drain/unmark、`MARKED -> DELETING`、exact authority/provider validation、delete response-loss
 reload、first absence CAS、`lateCreateAuditGrace` and second absence before `DELETED`。Matching reappearance retries
 under the same intent；foreign metadata quarantines。`bookKeeperPrimaryWalM2RetentionCheck` runs this checkpoint and
@@ -200,9 +204,15 @@ the metadata/runtime regressions；safe defaults still keep physical deletion di
 Recovery also reconstructs missing mandatory fixed slots from the still-selected active reservation before clearing
 writer state，and terminalizes non-durable RESERVED/WRITING attempts as exact `ABANDONED` authorities。
 
-Still required before BK-M2 is complete：the production logical-trim owner-retirement bridge；complete crash-cut/
-restart/rollover/resource and real-service deletion suites；profile admission and local Pulsar gate。The profile
-remains rejected before primary IO。
+The profile checkpoint adds `BookKeeperStorageProfileResolver`、`BookKeeperGenerationZeroPhysicalReferencePublisher`
+and `BookKeeperWalRuntime`。The generic L0 read resolver now delegates persisted-profile admission to the installed
+profile resolver instead of hard-coding Object WAL。A full deterministic storage test drives strict BK_ONLY append、
+exact head/protection proof revalidation、generation-zero publication and cold range read through
+`DefaultStreamStorage`。The runtime closes only its appender/reader adapters and never closes a caller-owned BookKeeper
+client。
+
+Still required before BK-M2 is complete：complete crash-cut/restart/rollover/resource and real-service deletion suites；
+local Pulsar facade gate and production provider admission。The broker profile remains rejected before primary IO。
 
 ### 5.1 Metadata/keyspace
 

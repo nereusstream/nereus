@@ -14,18 +14,26 @@ import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
+import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
+import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
+import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
+import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
+import com.nereusstream.metadata.oxia.records.TrimRecord;
+import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class BookKeeperWalRetentionGateTest {
@@ -137,28 +145,17 @@ class BookKeeperWalRetentionGateTest {
                             0)
                     .join().orElseThrow();
             assertThat(protection.value().lifecycle()).isEqualTo(ProtectionLifecycle.RESERVED);
-            BookKeeperProtectionRetirementProof proof = new BookKeeperProtectionRetirementProof(
-                    protection.key(),
-                    protection.metadataVersion(),
-                    protection.durableValueSha256(),
-                    reservation.key(),
-                    reservation.metadataVersion(),
-                    reservation.durableValueSha256(),
-                    "/retention/abandoned-authority",
-                    reservation.metadataVersion(),
-                    reservation.durableValueSha256(),
-                    BookKeeperProtectionRetirementProof.Reason.ABANDONED_APPEND);
+            BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    l0(new AtomicReference<>(snapshot(0, 7))),
+                    runtime.metadata);
+            BookKeeperProtectionRetirementProof proof = authority.proveAbandonedAppend(protection, TIMEOUT)
+                    .join().orElseThrow();
             BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
                     BookKeeperPrimaryWalAppenderTest.CLUSTER,
                     runtime.configuration,
                     runtime.metadata,
-                    (retirementProof, current, timeout) -> {
-                        assertThat(retirementProof.reason())
-                                .isEqualTo(BookKeeperProtectionRetirementProof.Reason.ABANDONED_APPEND);
-                        assertThat(current.value().lifecycle()).isIn(
-                                ProtectionLifecycle.RESERVED, ProtectionLifecycle.RETIRED);
-                        return CompletableFuture.completedFuture(null);
-                    });
+                    authority);
 
             var retired = references.retire(
                     reservation.value().ledgerId(),
@@ -215,6 +212,51 @@ class BookKeeperWalRetentionGateTest {
                         assertThat(writer.value().lifecycle())
                                 .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle.IDLE);
                     });
+        }
+    }
+
+    @Test
+    void completedLogicalTrimProofIsExactRefreshableAndRetiresTheProtection() {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+            StableLedger ledger = appendCommitAndSeal(runtime);
+            var protection = runtime.metadata.getProtection(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration.providerScopeSha256(),
+                            ledger.target().ledgerId(),
+                            0,
+                            0)
+                    .join().orElseThrow();
+            AtomicReference<StreamMetadataSnapshot> snapshot = new AtomicReference<>(snapshot(12, 7));
+            BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    l0(snapshot),
+                    runtime.metadata);
+            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    runtime.configuration,
+                    runtime.metadata,
+                    authority);
+            BookKeeperProtectionRetirementProof stale = authority.proveLogicalTrim(protection, TIMEOUT)
+                    .join().orElseThrow();
+            snapshot.set(snapshot(12, 8));
+
+            assertThatThrownBy(() -> references.retire(
+                            ledger.target().ledgerId(), 0, 0, stale, TIMEOUT).join())
+                    .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class);
+            assertThat(runtime.metadata.getProtection(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration.providerScopeSha256(),
+                            ledger.target().ledgerId(),
+                            0,
+                            0)
+                    .join()).get().satisfies(current ->
+                            assertThat(current.value().lifecycle()).isEqualTo(ProtectionLifecycle.ACTIVE));
+
+            BookKeeperProtectionRetirementProof refreshed = authority.proveLogicalTrim(protection, TIMEOUT)
+                    .join().orElseThrow();
+            var retired = references.retire(
+                    ledger.target().ledgerId(), 0, 0, refreshed, TIMEOUT).join();
+            assertThat(retired.value().lifecycle()).isEqualTo(ProtectionLifecycle.RETIRED);
         }
     }
 
@@ -339,22 +381,27 @@ class BookKeeperWalRetentionGateTest {
     private static void retireAll(
             BookKeeperPrimaryWalAppenderTest.Runtime runtime,
             StableLedger ledger) {
+        BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
+                BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                l0(new AtomicReference<>(snapshot(12, 7))),
+                runtime.metadata);
         BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
                 BookKeeperPrimaryWalAppenderTest.CLUSTER,
                 runtime.configuration,
                 runtime.metadata,
-                (proof, protection, timeout) -> CompletableFuture.completedFuture(null));
-        for (int protectionSlot = 0; protectionSlot < 3; protectionSlot++) {
-            var protection = runtime.metadata.getProtection(
-                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
-                            runtime.configuration.providerScopeSha256(),
-                            ledger.target().ledgerId(),
-                            0,
-                            protectionSlot)
-                    .join().orElseThrow();
-            references.retire(
-                    ledger.target().ledgerId(), 0, protectionSlot, proof(protection), TIMEOUT).join();
-        }
+                authority);
+        BookKeeperWalOnlyReferenceRetirementCoordinator coordinator =
+                new BookKeeperWalOnlyReferenceRetirementCoordinator(
+                        BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                        runtime.configuration,
+                        runtime.metadata,
+                        authority,
+                        references);
+        BookKeeperWalReferenceRetirementResult result = coordinator.retireEligible(
+                ledger.sealedRoot(), TIMEOUT).join();
+        assertThat(result.scannedProtections()).isEqualTo(3);
+        assertThat(result.newlyRetiredProtections()).isEqualTo(3);
+        assertThat(result.fullyRetired()).isTrue();
     }
 
     private static BookKeeperWalRetentionGate gate(
@@ -408,6 +455,40 @@ class BookKeeperWalRetentionGateTest {
 
     private static Checksum sha(char value) {
         return new Checksum(ChecksumType.SHA256, Character.toString(value).repeat(64));
+    }
+
+    private static StreamMetadataSnapshot snapshot(long trimOffset, long metadataVersion) {
+        return new StreamMetadataSnapshot(
+                new StreamMetadataRecord(
+                        BookKeeperPrimaryWalAppenderTest.STREAM.value(),
+                        "persistent://tenant/namespace/topic",
+                        "stream-name-hash",
+                        "ACTIVE",
+                        "BOOKKEEPER_WAL_ONLY",
+                        Map.of("profile", "bk-only"),
+                        1,
+                        1,
+                        metadataVersion),
+                new CommittedEndOffsetRecord(
+                        BookKeeperPrimaryWalAppenderTest.STREAM.value(), 12, 3, 1, metadataVersion),
+                new TrimRecord(
+                        BookKeeperPrimaryWalAppenderTest.STREAM.value(),
+                        trimOffset,
+                        "retention-test",
+                        1,
+                        metadataVersion));
+    }
+
+    private static OxiaMetadataStore l0(AtomicReference<StreamMetadataSnapshot> snapshot) {
+        return (OxiaMetadataStore) Proxy.newProxyInstance(
+                OxiaMetadataStore.class.getClassLoader(),
+                new Class<?>[] {OxiaMetadataStore.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getStreamSnapshot" -> CompletableFuture.completedFuture(snapshot.get());
+                    case "close" -> null;
+                    case "toString" -> "trim-authority-l0";
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
     }
 
     private record StableLedger(

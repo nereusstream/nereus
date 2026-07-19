@@ -4,10 +4,12 @@
 > `bookKeeperPrimaryWalM1FinalCheck` 通过 199-task aggregate（包含 Phase 1.5、Phase 4 与 pinned local Pulsar
 > regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：metadata/store/scanner and the
 > allocator、writer state machine、recovery-open sealing、ordered exact-range appender、fixed physical-reference
-> activation、non-recovery reader/lease/checksum and bounded whole-ledger retention checkpoints are implemented and
+> activation、non-recovery reader/lease/checksum、bounded whole-ledger retention and explicit module-local profile
+> composition checkpoints are implemented and
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
-> `bookKeeperPrimaryWalM2RetentionCheck`。Runtime profile admission、remaining crash-cut/rollover suites and local
-> Pulsar integration remain incomplete，so the profile is still rejected before IO。
+> `bookKeeperPrimaryWalM2RetentionCheck`。`BookKeeperWalRuntime` can execute BK_ONLY through `DefaultStreamStorage`，
+> while remaining crash-cut/rollover/real-service suites and production/local-Pulsar integration remain incomplete；
+> the production broker provider therefore still rejects the profile before IO。
 
 ## 1. Delivery identity
 
@@ -183,14 +185,22 @@ hazards；stream writer/allocation/range CAS；exact NBKL1 provider metadata；p
 explicit entry-id writes；durable reservation plus mandatory protection slots；generic commit and generation-zero
 owner activation through `BookKeeperPhysicalReferenceProof`；fixed reader-slot deletion fencing；non-recovery full-range
 read、NBKR1 verification、middle-offset clipping and exact provider-neutral accounting。The retention checkpoint adds
-`BookKeeperWalReferenceManager`、durable `RETIRED` protection tombstones、`BookKeeperWalRetentionGate` and
-`BookKeeperLedgerRetentionManager`。It performs bounded complete inventory capture、exact rollout/namespace/provider
+`BookKeeperWalReferenceManager`、`BookKeeperWalOnlyRetirementAuthority`、
+`BookKeeperWalOnlyReferenceRetirementCoordinator`、durable `RETIRED` protection tombstones、
+`BookKeeperWalRetentionGate` and `BookKeeperLedgerRetentionManager`。It consumes exact monotonic L0 trim or durable
+abandoned-reservation authority without choosing the trim offset，then performs bounded complete inventory capture、
+exact rollout/namespace/provider
 validation、double-capture mark、reader drain、unmark-on-drift、provider delete response-loss recovery and delayed dual
 absence before `DELETED`；GC remains disabled/dry-run by default and local config is never deletion authority。
 Tests cover normal allocation、
 uncertain create、stale-session pre-IO rejection、ownership-transfer sealing、contiguous/reused ranges、partial write
 seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads、checksum failure、retirement-authority failure、
 reader veto and mark/drain/lost-delete-response/dual-absence convergence。Profile registration and Pulsar routing remain
-deliberately absent；the production logical-trim owner-retirement bridge and real-service deletion cuts remain BK-M2
-work。Recovery now reconstructs missing mandatory fixed slots from the still-selected active reservation before it may
+deliberately absent；real-service deletion cuts and the Pulsar gate remain BK-M2 work。The module-local
+`BookKeeperStorageProfileResolver`、`BookKeeperWalRuntime` and generic `DefaultStreamStorage` composition now admit
+BK_ONLY only when the exact appender/reader are installed；strict append waits for generation zero and cold read
+resolves the same `BookKeeperEntryRangeReadTarget`。Production and fake L0 stores share
+`BookKeeperStableAppendProtectionValidator`，so this integration still reloads the exact root/protection proof before
+head CAS rather than weakening the gate。Recovery reconstructs
+missing mandatory fixed slots from the still-selected active reservation before it may
 clear writer state，then terminalizes non-durable RESERVED/WRITING attempts as exact `ABANDONED` authorities。

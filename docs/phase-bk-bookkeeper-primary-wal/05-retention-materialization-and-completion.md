@@ -79,6 +79,12 @@ complete bounded ledger inventory；this avoids an unbounded stream-reservation 
 The verifier is owner-specific：logical trim、healthy higher generation and exact abandoned append are distinct
 authorities and elapsed time alone cannot produce a tombstone。
 
+BK-M2 implements the BK_ONLY production bridge as `BookKeeperWalOnlyRetirementAuthority` plus
+`BookKeeperWalOnlyReferenceRetirementCoordinator`。The authority reloads the exact L0 stream-head snapshot，requires a
+BookKeeper profile and `trimOffset >= range.endOffset`，and freezes canonical `NBKTRIM1` authority before the
+pre/post-CAS revalidation。For RESERVED failed ranges it instead reloads the exact ABANDONED reservation key/version/
+stored SHA。The coordinator only consumes these facts；it never advances trim or deletes logical metadata。
+
 ## 4. `BookKeeperWalRetentionGate`
 
 The gate evaluates one sealed root and produces a process-local candidate, never a durable second truth：

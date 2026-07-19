@@ -28,7 +28,7 @@ nereus/
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
-  docs/phase-bk-bookkeeper-primary-wal/  F1-BK code-level target; design only, not implemented
+  docs/phase-bk-bookkeeper-primary-wal/  F1-BK code-level target and BK-M1/M2 implementation evidence
   docs/automq-like-stream-storage/       async materialization profile design
 ```
 
@@ -60,13 +60,16 @@ materialization profiles are reserved design/API boundaries, not implemented sup
 The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 and BK-M1
 are complete/final-gated；BK-M2 now has its keyspace/seven codecs、focused production/fake metadata stores、exact
 response-loss recovery、bounded shard scanners、exact allocator/writer/recovery/reader runtime and whole-ledger
-retention convergence implemented under the M2 metadata/runtime/retention checks。Its
+retention convergence implemented under the M2 metadata/runtime/retention checks。An explicit `BookKeeperWalRuntime`
+now admits `BOOKKEEPER_WAL_ONLY` and proves strict append plus cold generation-zero read through the provider-neutral
+`DefaultStreamStorage` pipeline；it is not yet installed by the production Pulsar runtime。Its
 code-level target is frozen in
 [`docs/phase-bk-bookkeeper-primary-wal/`](docs/phase-bk-bookkeeper-primary-wal/README.md)：
 BK-M0–M6 cover provider-neutral append/read seams、exact ledger allocation/lifecycle/fencing、BK_ONLY retention、F4
-async/sync reuse and Pulsar rollout. The production logical-trim owner-retirement bridge、remaining crash suites、
-profile admission and Pulsar integration are still incomplete；all three BookKeeper profiles therefore remain rejected
-before primary IO until their executable gates pass.
+async/sync reuse and Pulsar rollout. The BK_ONLY production logical-trim/abandoned-owner retirement bridge is now part
+of the M2 retention checkpoint；remaining crash/resource suites、real-service deletion and Pulsar integration are still
+incomplete。BK_ONLY is executable only through the explicit module-local runtime；the production broker provider still
+rejects all BookKeeper profiles before primary IO until its rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the
