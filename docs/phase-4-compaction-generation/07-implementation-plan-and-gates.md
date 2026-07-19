@@ -213,6 +213,10 @@ partitioned loaded/unloaded admin evidence and aggregate task composition；the 
 Checkpoint BL removes Hadoop's transitive reload4j backend from the embeddable ObjectStore runtime after the first
 aggregate run exposed an Oxia retry-path MDC incompatibility；classpath isolation、the storage audit and the real
 Phase 1 Oxia restart suite now pass, while a fresh full aggregate rerun remains required.
+Checkpoint BM then serializes only Docker-owning local and nested-Pulsar tasks through one Gradle shared service under
+the otherwise parallel build, eliminating aggregate-only Oxia readiness starvation without reducing ordinary task
+parallelism. Its static inventory gate and a forced parallel Oxia/LocalStack pair pass；the full rerun is still the
+completion boundary.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1973,7 +1977,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BL are implemented and focused/evidence-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BM are implemented and focused/evidence-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -2053,6 +2057,17 @@ Both direct Hadoop edges now exclude the backend while retaining SLF4J API and h
 surface；`checkPhase2StorageIsolation` freezes the dependency declarations and test. The previously failing real
 four-shard `Phase1FinalIntegrationTest` passes with `--rerun-tasks`. This repairs a prerequisite gate but is not a
 substitute for rerunning `phase4FinalCheck`.
+
+Checkpoint BM makes the final-gate execution itself bounded. Because `org.gradle.parallel=true`, independent release
+branches previously launched multiple local Testcontainers suites at once and could overlap them with nested
+multi-broker Pulsar Gradle builds. A healthy Oxia `/metrics` readiness probe timed out only in that aggregate and the
+same `oxiaIntegrationTest --rerun-tasks` passed alone. Root `DockerIntegrationGateService` now owns one permit via
+`maxParallelUsages=1`. Every local source-set task containing `OxiaContainer` or `LocalStackContainer`, plus every
+nested multi-broker Pulsar final task, declares `usesService(dockerIntegrationGate)`. This constrains only active
+Docker ownership；compilation、unit tests and static checks remain parallel, and requesting one integration task does
+not pull any other task into the graph. `checkPhase4FinalDockerIsolation` audits the exact ten-local/six-nested task
+set and is a prerequisite of both final aggregate tasks. A forced parallel F4 Oxia + ObjectStore LocalStack invocation
+passes and executes the two test tasks under the shared permit.
 
 ### 8.1 Required scenarios
 
@@ -2150,12 +2165,14 @@ implements the final two-broker/two-worker row through broker-owned production r
 Checkpoint BJ closes scenario 51's protected-head ordering and abandoned-intent retirement path. Checkpoint BK maps
 every one of these facts into the executable 52-row audit；the map proves traceability, not that the owning gates have
 all run in the current aggregate. Checkpoint BL keeps that aggregate's combined Hadoop/Oxia broker runtime
-provider-neutral by rejecting a leaked logging implementation.
+provider-neutral by rejecting a leaked logging implementation. Checkpoint BM bounds the aggregate itself to one
+Docker-owning task without disabling parallel compilation or ordinary verification.
 
 ### 8.3 Gates
 
 ```text
 ./gradlew checkPhase4M6ScenarioEvidenceMatrix
+./gradlew checkPhase4FinalDockerIsolation
 ./gradlew phase4M6RegistryScaleCheck
 ./gradlew phase4M6TwoBrokerWorkerContentionCheck
 ./gradlew phase4M6AbandonedAppendIntentCheck
@@ -2166,6 +2183,8 @@ provider-neutral by rejecting a leaked logging implementation.
 ```
 
 `phase4FinalCheck` composes every M1-M6 final gate plus `phase3FinalCheck`. It is the only Phase 4 completion claim.
+Both final tasks also depend on `checkPhase4FinalDockerIsolation`; all real-service owners share the exclusive build
+service even when Gradle evaluates independent final-gate branches concurrently.
 The tasks are implemented；until `phase4M6FinalCheck --rerun-tasks` and `phase4FinalCheck --rerun-tasks` both pass in
 this source-locked state, F4-M6 and Phase 4 remain in progress.
 

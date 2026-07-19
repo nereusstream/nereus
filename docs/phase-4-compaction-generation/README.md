@@ -183,6 +183,11 @@
 > initial write-stream retry into an NPE. Both direct Hadoop edges now exclude the backend；a classpath isolation test、
 > the storage-isolation audit and the real Phase 1 Oxia restart gate pass. The complete aggregate is still pending a
 > fresh rerun.
+> Checkpoint BM makes that rerun resource-deterministic under the repository's required
+> `org.gradle.parallel=true`. All ten local Testcontainers tasks and six nested multi-broker Pulsar builds declare one
+> Gradle shared build service with `maxParallelUsages=1`. Compilation and ordinary tests remain parallel；only a task
+> that owns real Docker services takes the exclusive permit. A dedicated static gate and a parallel two-task
+> Oxia/LocalStack execution pass.
 > These are focused
 > M6 foundations, not the aggregate completion claim.
 >
@@ -2093,6 +2098,22 @@ source-only convention. `checkPhase2StorageIsolation` also freezes both exclusio
 The formerly failing `Phase1FinalIntegrationTest` real four-shard Oxia restart/failure suite passes with tasks rerun；
 the Phase 4 aggregate must still be rerun from the beginning before completion can be claimed.
 
+### 6.41 F4-M6 deterministic Docker release-gate checkpoint
+
+Checkpoint BM fixes the second failure exposed by `phase4FinalCheck --rerun-tasks`. The repository intentionally uses
+`org.gradle.parallel=true`, but the release DAG previously allowed independent Oxia、LocalStack and nested Pulsar
+Testcontainers tasks to start together. Under that load one healthy Oxia container timed out serving its `/metrics`
+readiness probe；the exact `oxiaIntegrationTest` passed immediately when rerun alone, proving a gate resource race
+rather than a storage assertion failure.
+
+`DockerIntegrationGateService` is a root Gradle shared build service with `maxParallelUsages=1`. The ten local
+Docker-backed tasks—Phase 1 Oxia、metadata capability/integration/F4 tests、ObjectStore S3、F3 cursor S3/Oxia and F4
+M2/M3/M4 real-service suites—and all six nested multi-broker Pulsar final tasks call `usesService` on that same permit.
+This adds no task dependencies：an individually requested gate still runs alone, while any aggregate can compile and
+run ordinary work in parallel but starts at most one Docker owner. `checkPhase4FinalDockerIsolation` freezes the full
+task inventory and is required by both `phase4M6FinalCheck` and `phase4FinalCheck`. A forced parallel invocation of
+the F4 Oxia and S3 tasks passes with both tasks serialized by the service. The complete aggregate remains required.
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -2103,7 +2124,7 @@ the Phase 4 aggregate must still be rerun from the beginning before completion c
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BL focused/evidence-green、52/52 executable traceability complete、aggregate tasks declared；full rerun aggregate pending |
+| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BM focused/evidence-green、52/52 executable traceability complete、aggregate tasks declared；full rerun aggregate pending |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

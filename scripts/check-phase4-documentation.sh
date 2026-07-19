@@ -41,6 +41,8 @@ require_literal "Checkpoint BK" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint BL" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BM" \
+    "docs/phase-4-compaction-generation/README.md"
 require_literal "objectStoreLibraryDoesNotSelectTheBrokerLoggingBackend" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "52/52 scenarios traced" \
@@ -54,6 +56,10 @@ require_literal "phase4M6Check" \
 require_literal "phase4M6FinalCheck" \
     "build.gradle.kts"
 require_literal "phase4FinalCheck" \
+    "build.gradle.kts"
+require_literal "checkPhase4FinalDockerIsolation" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "checkPhase4FinalDockerIsolation" \
     "build.gradle.kts"
 require_literal "scansOneThousandReaderLeasesAndProtectionsWithoutTruncationAndRestarts" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
@@ -376,4 +382,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, M6 BD-BL evidence, 52/52 matrix, current source lock, gates, and links verified."
+echo "Phase 4 M1-M5 final status, M6 BD-BM evidence, 52/52 matrix, current source lock, gates, and links verified."

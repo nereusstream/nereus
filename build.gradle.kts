@@ -12,6 +12,11 @@
  * limitations under the License.
  */
 
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
+
+abstract class DockerIntegrationGateService : BuildService<BuildServiceParameters.None>
+
 plugins {
     `base`
     `maven-publish`
@@ -40,10 +45,45 @@ if (pulsarDevelopmentGateRequested) {
 }
 
 val javaLanguageVersion = providers.gradleProperty("javaVersion").map(String::toInt).getOrElse(21)
+val dockerIntegrationGate = gradle.sharedServices.registerIfAbsent(
+    "nereusDockerIntegrationGate",
+    DockerIntegrationGateService::class,
+) {
+    maxParallelUsages.set(1)
+}
+val dockerBackedSubprojectTasks = mapOf(
+    ":nereus-core" to setOf("phase1IntegrationTest"),
+    ":nereus-managed-ledger" to setOf("cursorS3IntegrationTest", "cursorM2IntegrationTest"),
+    ":nereus-materialization" to setOf("f4M2IntegrationTest", "f4M3IntegrationTest"),
+    ":nereus-metadata-oxia" to setOf(
+        "oxiaCapabilitySpike",
+        "oxiaIntegrationTest",
+        "f4OxiaIntegrationTest",
+    ),
+    ":nereus-object-store" to setOf("s3IntegrationTest"),
+    ":nereus-pulsar-adapter" to setOf("f4M4IntegrationTest"),
+)
+val dockerBackedPulsarExecTasks = setOf(
+    "phase2PulsarFinalCheck",
+    "phase3M5PulsarFinalCheck",
+    "phase3M6PulsarFinalCheck",
+    "phase4M4PhysicalGcMultiBrokerPulsarCheck",
+    "phase4M5AsyncRetentionMultiBrokerPulsarCheck",
+    "phase4M6TwoBrokerWorkerContentionPulsarCheck",
+)
+
+tasks.matching { it.name in dockerBackedPulsarExecTasks }.configureEach {
+    usesService(dockerIntegrationGate)
+}
 
 subprojects {
     group = rootProject.group
     version = rootProject.version
+    dockerBackedSubprojectTasks[path]?.let { taskNames ->
+        tasks.matching { it.name in taskNames }.configureEach {
+            usesService(dockerIntegrationGate)
+        }
+    }
 }
 
 configure(subprojects.filter { it.name != "nereus-bom" }) {
@@ -2023,6 +2063,13 @@ tasks.register<Exec>("checkPhase4M6ScenarioEvidenceMatrix") {
     )
 }
 
+tasks.register<Exec>("checkPhase4FinalDockerIsolation") {
+    group = "verification"
+    description = "Verify every Docker-backed release task shares one bounded Gradle build service."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-final-docker-isolation.sh")
+}
+
 tasks.register("phase4M6Check") {
     group = "verification"
     description = "Run the complete ordinary F4-M6 gate and the executable 52-scenario evidence audit."
@@ -2050,6 +2097,7 @@ tasks.register("phase4M6FinalCheck") {
     dependsOn("phase4M4FinalCheck")
     dependsOn("phase4M5FinalCheck")
     dependsOn("phase3FinalCheck")
+    dependsOn("checkPhase4FinalDockerIsolation")
 }
 
 tasks.register("phase4Check") {
@@ -2069,4 +2117,5 @@ tasks.register("phase4FinalCheck") {
     dependsOn("phase4M4FinalCheck")
     dependsOn("phase4M5FinalCheck")
     dependsOn("phase4M6FinalCheck")
+    dependsOn("checkPhase4FinalDockerIsolation")
 }
