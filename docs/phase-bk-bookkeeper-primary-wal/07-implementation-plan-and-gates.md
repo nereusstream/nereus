@@ -8,7 +8,7 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)
-BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (real-service response-loss checkpoint)
+BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT focused implementation complete (aggregate predecessor pending)
 BK-M4 .. BK-M6                  not implemented
 BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
@@ -26,9 +26,8 @@ module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPr
 `bookKeeperPrimaryWalM3LagCheck` / `bookKeeperPrimaryWalM3SourceRetirementCheck` /
 `bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` /
 `bookKeeperPrimaryWalM3RealServiceCheck` / `bookKeeperPrimaryWalM3PhysicalRetirementCheck` /
-`bookKeeperPrimaryWalM3ResponseLossCheck` are also executable。The
-unfinished M2 aggregate/final gates、M3 failure-cut
-final gate and M4–M6 names remain frozen target names and must
+`bookKeeperPrimaryWalM3ResponseLossCheck` / `bookKeeperPrimaryWalM3LagFailureCheck` are also executable。The
+unfinished M2 aggregate/final gates、M3 predecessor-dependent final gate and M4–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
@@ -519,6 +518,14 @@ the final runtime reuses that same task/source/object identity and injects appli
 `PUBLISHED` and dynamic-source release；exact reload converges every cut and the normal resolver returns the Object
 generation。No cut appends another BK range or allocates another task/generation。
 
+The lag/failure checkpoint closes the remaining focused M3 surface。`BookKeeperAsyncAppendAdmissionGuard` contains no
+counter or policy of its own；it filters only `BOOKKEEPER_WAL_ASYNC_OBJECT` and delegates to the one shared
+`MaterializationLagGate`。A real two-record backlog rejects the next append before the exact BK writer record changes，
+returns `BACKPRESSURE_REJECTED` with `KNOWN_NOT_COMMITTED`，and Object publication reduces authoritative lag so a later
+append succeeds and rolls over normally。A second real chain deletes the exact COMMITTED compacted Object；the retirement
+proof fails closed with `OBJECT_NOT_FOUND`，all fixed BK protections remain ACTIVE、the ledger remains present，and the
+ordinary generation-aware reader quarantines/falls back to the exact BK range。
+
 ### 6.3 Gates
 
 ```text
@@ -533,6 +540,7 @@ bookKeeperPrimaryWalM3Check
 bookKeeperPrimaryWalM3RealServiceCheck       first real Oxia + BK + Object end-to-end chain
 bookKeeperPrimaryWalM3PhysicalRetirementCheck real source release + fixed-reference retirement + ledger delete
 bookKeeperPrimaryWalM3ResponseLossCheck      fresh-runtime task/source/output/publication response-loss matrix
+bookKeeperPrimaryWalM3LagFailureCheck        real lag admission/recovery + unreadable-Object retirement veto/fallback
 bookKeeperPrimaryWalM3FinalCheck             real Oxia + BK + Object store, fresh-runtime cuts
 ```
 
@@ -543,11 +551,14 @@ higher-generation selection and exact live-read retirement proof。`bookKeeperPr
 extends that real chain through terminal dynamic-source release、all fixed-reference retirement、whole-ledger physical
 delete and post-delete Object reads。`bookKeeperPrimaryWalM3ResponseLossCheck` adds applied task create、dynamic source
 create/transfer/release、Object PUT and every task/generation publication response-loss cut across fresh runtimes。
-Final gate still adds lag admission under real load and remaining fresh-runtime negative failure cuts。
+`bookKeeperPrimaryWalM3LagFailureCheck` closes real-load lag admission and an unreadable-Object negative retirement cut。
+The focused M3 implementation is closed，but the final task remains unregistered until the BK-M2 predecessor aggregate
+and later abrupt-process/chaos aggregate are executable；this avoids calling a dependent milestone final while M2 is not。
 `bookKeeperPrimaryWalM3Check --rerun-tasks` passed
 62/62 deterministic tasks and `bookKeeperPrimaryWalM3PhysicalRetirementCheck --rerun-tasks` passed 65/65 executable
 tasks；`bookKeeperPrimaryWalM3ResponseLossCheck --rerun-tasks` also passed its 65/65 executable aggregate on
-2026-07-19。The
+2026-07-19；`bookKeeperPrimaryWalM3LagFailureCheck --rerun-tasks` passed the same 65/65 executable aggregate and adds
+real shared-lag admission/recovery plus unreadable-Object retirement veto/fallback evidence。The
 `bookKeeperPrimaryWalM3FinalCheck` task remains intentionally unregistered。
 
 ### 6.4 Mandatory review stop D

@@ -153,8 +153,8 @@ primary Object WAL upload 和 stable head commit；后台化的是 secondary/rea
 `BOOKKEEPER_WAL_ASYNC_OBJECT` 的 BK-M3 已实现 tagged source、exact BK reader dispatch、durable source
 protection、shared worker runtime composition、stable-head profile plan、shared lag、retirement-metadata authority、
 exact-SEALED shared-scanner trigger、real Oxia/BK/Object publication/read/retirement、physical ledger deletion and
-fresh-runtime task/source/output/publication response-loss checkpoints；但 real-load lag admission、remaining negative
-cuts and final gate 尚未完成，production broker 仍在 IO
+fresh-runtime task/source/output/publication response-loss、real-load lag rejection/recovery and unreadable-Object
+retirement-veto/BK-fallback checkpoints；但 predecessor/aggregate final gate 尚未完成，production broker 仍在 IO
 前拒绝。不能仅由 F4 worker 存在推导为 profile 已支持。
 
 ## 3. Profile matrix

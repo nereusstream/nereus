@@ -3,6 +3,7 @@ package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
@@ -28,6 +29,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.bookkeeper.BookKeeperAsyncAppendAdmissionGuard;
 import com.nereusstream.bookkeeper.BookKeeperAsyncObjectRetirementAuthority;
 import com.nereusstream.bookkeeper.BookKeeperClientOperations;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
@@ -58,6 +60,8 @@ import com.nereusstream.bookkeeper.DefaultBookKeeperClientOperations;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.AppendAdmissionGuard;
+import com.nereusstream.core.backpressure.MaterializationLagGate;
+import com.nereusstream.core.backpressure.MaterializationLagThresholds;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationActivationSubject;
 import com.nereusstream.core.capability.GenerationOperation;
@@ -88,6 +92,7 @@ import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationCheckpoint;
+import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
@@ -97,6 +102,7 @@ import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
+import com.nereusstream.objectstore.DeleteObjectOptions;
 import com.nereusstream.objectstore.HeadObjectOptions;
 import com.nereusstream.objectstore.HeadObjectResult;
 import com.nereusstream.objectstore.ObjectStore;
@@ -413,6 +419,200 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
         }
     }
 
+    @Test
+    void sharedRealLagAdmissionRejectsBeforeBookKeeperIoAndRecoversAfterObjectCoverage()
+            throws Exception {
+        Fixture fixture = Fixture.create();
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        MaterializationLagThresholds thresholds = new MaterializationLagThresholds(
+                0,
+                2,
+                0,
+                0,
+                Duration.ZERO,
+                Duration.ofMillis(1));
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        fixture,
+                        bookKeeperCluster,
+                        "lag",
+                        temporaryDirectory.resolve("lag"),
+                        thresholds)) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/lag-" + fixture.suffix),
+                            new StreamCreateOptions(
+                                    StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
+            process.register(stream, 0);
+            AppendResult first = process.append(
+                    stream,
+                    List.of(new byte[] {20, 21}, new byte[] {22, 23, 24}));
+            var writerBeforeReject = process.bookKeeperMetadata
+                    .getWriter(fixture.cluster, stream)
+                    .join()
+                    .orElseThrow();
+            assertThat(writerBeforeReject.value().nextEntryId()).isEqualTo(2);
+            assertThat(writerBeforeReject.value().activeAppendRangeCount()).isOne();
+
+            Throwable rejectedCall = catchThrowable(
+                    () -> process.append(stream, List.of(new byte[] {25})));
+            assertThat(rejectedCall).hasCauseInstanceOf(NereusException.class);
+            NereusException rejected = (NereusException) rejectedCall.getCause();
+            assertThat(rejected.code()).isEqualTo(ErrorCode.BACKPRESSURE_REJECTED);
+            assertThat(rejected.appendOutcome())
+                    .contains(com.nereusstream.api.AppendOutcome.KNOWN_NOT_COMMITTED);
+            assertThat(process.bookKeeperMetadata
+                            .getWriter(fixture.cluster, stream)
+                            .join()
+                            .orElseThrow())
+                    .isEqualTo(writerBeforeReject);
+            assertThat(process.l0.getStreamSnapshot(fixture.cluster, stream)
+                            .join()
+                            .committedEnd()
+                            .committedEndOffset())
+                    .isEqualTo(2);
+            assertExactRead(
+                    process.storage,
+                    stream,
+                    List.of(new byte[] {20, 21}, new byte[] {22, 23, 24}),
+                    BookKeeperEntryRangeReadTarget.class);
+
+            process.phase4.start();
+            process.phase4.materializationService().scanNow().join();
+            await(TIMEOUT, () -> !process.committedHigherGenerations(stream).isEmpty());
+            assertExactRead(
+                    process.storage,
+                    stream,
+                    List.of(new byte[] {20, 21}, new byte[] {22, 23, 24}),
+                    ObjectSliceReadTarget.class);
+
+            AppendResult admitted = process.append(stream, List.of(new byte[] {25}));
+            assertThat(first.range()).isEqualTo(new OffsetRange(0, 2));
+            assertThat(admitted.range()).isEqualTo(new OffsetRange(2, 3));
+            BookKeeperEntryRangeReadTarget firstTarget =
+                    (BookKeeperEntryRangeReadTarget) first.readTarget();
+            BookKeeperEntryRangeReadTarget admittedTarget =
+                    (BookKeeperEntryRangeReadTarget) admitted.readTarget();
+            assertThat(admittedTarget.ledgerId()).isNotEqualTo(firstTarget.ledgerId());
+            assertThat(admittedTarget.firstEntryId()).isZero();
+            assertThat(admittedTarget.lastEntryIdInclusive()).isZero();
+            assertThat(process.bookKeeperMetadata
+                            .getWriter(fixture.cluster, stream)
+                            .join()
+                            .orElseThrow()
+                            .value()
+                            .nextEntryId())
+                    .isOne();
+        }
+    }
+
+    @Test
+    void missingCommittedObjectVetoesBookKeeperRetirementAndFallsBackToExactRange()
+            throws Exception {
+        Fixture fixture = Fixture.create();
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        fixture,
+                        bookKeeperCluster,
+                        "missing-object",
+                        temporaryDirectory.resolve("missing-object"))) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName(
+                                    "persistent://tenant/namespace/missing-object-" + fixture.suffix),
+                            new StreamCreateOptions(
+                                    StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Map.of()))
+                    .join()
+                    .streamId();
+            List<byte[]> expected =
+                    List.of(new byte[] {30}, new byte[] {31, 32}, new byte[] {33, 34, 35});
+            AppendResult sealedRange = process.append(stream, expected.subList(0, 2));
+            AppendResult tail = process.append(stream, expected.subList(2, 3));
+            process.register(stream, tail.commitVersion());
+
+            process.phase4.start();
+            process.phase4.materializationService().scanNow().join();
+            List<VersionedGenerationIndex> committed = process.committedHigherGenerations(stream);
+            assertThat(committed).hasSize(1);
+            ObjectSliceReadTarget target = (ObjectSliceReadTarget) ReadTargetCodecRegistry.phase15()
+                    .decode(committed.getFirst().value().readTarget());
+            HeadObjectResult head = process.objectStore
+                    .headObject(target.objectKey(), new HeadObjectOptions(TIMEOUT))
+                    .join();
+            process.objectStore
+                    .deleteObject(
+                            target.objectKey(),
+                            new DeleteObjectOptions(
+                                    head.objectLength(),
+                                    head.checksum(),
+                                    head.etag(),
+                                    TIMEOUT))
+                    .join();
+
+            assertThatThrownBy(() -> process.phase4.committedGenerationRetirementAuthority()
+                            .proveRetirement(
+                                    stream,
+                                    sealedRange.range(),
+                                    sealedRange.commitVersion())
+                            .join())
+                    .hasRootCauseInstanceOf(NereusException.class)
+                    .rootCause()
+                    .extracting(failure -> ((NereusException) failure).code())
+                    .isEqualTo(ErrorCode.OBJECT_NOT_FOUND);
+            assertExactRead(
+                    process.storage,
+                    stream,
+                    expected,
+                    BookKeeperEntryRangeReadTarget.class);
+
+            long ledgerId = ((BookKeeperEntryRangeReadTarget) sealedRange.readTarget()).ledgerId();
+            var sealedRoot = process.bookKeeperMetadata
+                    .getRoot(
+                            fixture.cluster,
+                            fixture.bookKeeper.providerScopeSha256(),
+                            ledgerId)
+                    .join()
+                    .orElseThrow();
+            assertThat(sealedRoot.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+            BookKeeperWalOnlyRetirementAuthority common = new BookKeeperWalOnlyRetirementAuthority(
+                    fixture.cluster, process.l0, process.bookKeeperMetadata);
+            BookKeeperAsyncObjectRetirementAuthority authority =
+                    new BookKeeperAsyncObjectRetirementAuthority(
+                            fixture.cluster,
+                            fixture.bookKeeper,
+                            common,
+                            process.phase4.committedGenerationRetirementAuthority(),
+                            process.bookKeeperMetadata);
+            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+                    fixture.cluster,
+                    fixture.bookKeeper,
+                    process.bookKeeperMetadata,
+                    authority);
+            var retirement = new BookKeeperWalOnlyReferenceRetirementCoordinator(
+                            fixture.cluster,
+                            fixture.bookKeeper,
+                            process.bookKeeperMetadata,
+                            authority,
+                            references)
+                    .retireEligible(sealedRoot, TIMEOUT)
+                    .join();
+            assertThat(retirement.newlyRetiredProtections()).isZero();
+            assertThat(retirement.fullyRetired()).isFalse();
+            assertThat(process.bookKeeperProtections(ledgerId)
+                            .stream()
+                            .filter(value -> value.value().protectionType()
+                                    != BookKeeperProtectionType.MATERIALIZATION_SOURCE))
+                    .extracting(value -> value.value().lifecycle())
+                    .containsOnly(ProtectionLifecycle.ACTIVE);
+            assertThat(process.rawOperations
+                            .metadata(ledgerId, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join()
+                            .getLedgerId())
+                    .isEqualTo(ledgerId);
+        }
+    }
+
     private static void assertExactRead(
             DefaultStreamStorage storage,
             StreamId stream,
@@ -542,7 +742,8 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                     bookKeeperCluster,
                     process,
                     processDirectory,
-                    ResponseLossPlan.none());
+                    ResponseLossPlan.none(),
+                    Optional.empty());
         }
 
         private static Process open(
@@ -551,6 +752,37 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                 String process,
                 Path processDirectory,
                 ResponseLossPlan responseLosses) throws Exception {
+            return open(
+                    fixture,
+                    bookKeeperCluster,
+                    process,
+                    processDirectory,
+                    responseLosses,
+                    Optional.empty());
+        }
+
+        private static Process open(
+                Fixture fixture,
+                BKCluster bookKeeperCluster,
+                String process,
+                Path processDirectory,
+                MaterializationLagThresholds lagThresholds) throws Exception {
+            return open(
+                    fixture,
+                    bookKeeperCluster,
+                    process,
+                    processDirectory,
+                    ResponseLossPlan.none(),
+                    Optional.of(lagThresholds));
+        }
+
+        private static Process open(
+                Fixture fixture,
+                BKCluster bookKeeperCluster,
+                String process,
+                Path processDirectory,
+                ResponseLossPlan responseLosses,
+                Optional<MaterializationLagThresholds> lagThresholds) throws Exception {
             OxiaClientConfiguration oxia = oxiaConfiguration();
             SharedOxiaClientRuntime oxiaRuntime = SharedOxiaClientRuntime.connect(oxia, fixture.clock);
             BookKeeperMetadataStoreConfig metadataConfig = new BookKeeperMetadataStoreConfig(
@@ -686,11 +918,18 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                     workers,
                     callbacks,
                     fixture.clock);
+            AppendAdmissionGuard appendAdmissionGuard = lagThresholds
+                    .<AppendAdmissionGuard>map(thresholds -> new BookKeeperAsyncAppendAdmissionGuard(
+                            new MaterializationLagGate(
+                                    phase4.lagSnapshotReader(),
+                                    thresholds,
+                                    scheduler)))
+                    .orElseGet(AppendAdmissionGuard::noOp);
             DefaultStreamStorage storage = bookKeeperRuntime.newGenerationAwareStorage(
                     storageConfig,
                     l0,
                     new MetadataAppendRecoverySearcher(fixture.cluster, l0),
-                    AppendAdmissionGuard.noOp(),
+                    appendAdmissionGuard,
                     phase4.readComponents(),
                     fixture.clock,
                     callbacks,

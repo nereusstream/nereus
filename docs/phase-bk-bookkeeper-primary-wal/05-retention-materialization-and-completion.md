@@ -122,8 +122,14 @@ applied task-create response loss before source protection、an applied BK-sourc
 compacted-Object PUT response loss followed by durable `RETRY_WAIT` and source release，and the entire recovered
 claim/output/source-transfer/publish/generation-commit/task-published/source-release CAS chain。Every process reloads
 the same deterministic task/source/output identity，and BK remains the readable generation-zero fallback until the
-exact higher generation is COMMITTED。Real-load lag admission and remaining negative failure cuts are still required
-before the M3 final gate and broker registration。
+exact higher generation is COMMITTED。The real-load checkpoint installs `BookKeeperAsyncAppendAdmissionGuard` only as
+a profile filter over the shared `MaterializationLagGate`：an exact two-record lag rejects the next append with
+`BACKPRESSURE_REJECTED/KNOWN_NOT_COMMITTED` before writer state or BK bytes change，and committed Object coverage makes
+the following append admissible。Its negative chain deletes the exact COMMITTED Object bytes，after which the retirement
+read proof fails with `OBJECT_NOT_FOUND`、all fixed BK references stay ACTIVE、the ledger remains present and the normal
+generation reader quarantines/falls back to BK。No BookKeeper-specific lag or fallback truth was added。The focused M3
+surface is closed；the final milestone still waits for the M2 predecessor and later abrupt-process/chaos aggregate before
+broker registration。
 
 ## 4. `BookKeeperWalRetentionGate`
 

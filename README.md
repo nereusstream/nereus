@@ -87,8 +87,10 @@ The first real Oxia + BookKeeper + Object chain also proves BK fallback across a
 higher-generation normal reads and the exact retirement proof。The physical-retirement extension releases the dynamic
 source protection、retires all mandatory range references、deletes the sealed ledger and keeps Object reads exact；the
 fresh-runtime response-loss extension converges applied task create、source protection、Object PUT and every publication
-CAS without rewriting BK or allocating another task/generation。Real-load lag admission and remaining negative cuts
-remain open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
+CAS without rewriting BK or allocating another task/generation。The focused lag/failure checkpoint now rejects a real
+backlog before BK mutation、re-admits after Object coverage and keeps all BK references/bytes on a physically missing
+COMMITTED Object while normal reads fall back to BK。The BK-M2 predecessor and later aggregate/rollout gates remain
+open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。

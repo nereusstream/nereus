@@ -32,8 +32,8 @@
 > evidence，remaining
 > matrix/aggregate pending；BK-M3 provider-neutral source/protection/profile/lag、retirement-metadata authority、
 > sealed shared-scanner and first real Oxia/BK/Object publication/read/retirement-proof checkpoints 已实现，
-> physical-release and fresh-runtime response-loss checkpoints 已实现；real-load lag/negative-cut final gate 与
-> BK-M4–M6 尚未实现，
+> physical-release、fresh-runtime response-loss、real lag and unreadable-output fail-closed checkpoints 已实现；
+> predecessor/aggregate final gate 与 BK-M4–M6 尚未实现，
 > production broker 的 BookKeeper primary profiles 仍为 pre-IO rejected。
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、

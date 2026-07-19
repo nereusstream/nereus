@@ -94,6 +94,8 @@ require_literal 'bookKeeperPrimaryWalM3PhysicalRetirementCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3ResponseLossCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'No online migration in BK-M0–M6' \
     "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
 require_literal 'BK-96' \
@@ -208,10 +210,17 @@ require_literal 'bookKeeperPrimaryWalM3Check' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3RealServiceCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3PhysicalRetirementCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3ResponseLossCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' "build.gradle.kts"
 require_literal 'stableHeadFallsBackToBookKeeperThenFreshRuntimePublishesAndReadsExactObject' \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'freshRuntimesConvergeAppliedTaskSourceOutputAndPublicationResponseLoss' \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'sharedRealLagAdmissionRejectsBeforeBookKeeperIoAndRecoversAfterObjectCoverage' \
+    "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'missingCommittedObjectVetoesBookKeeperRetirementAndFallsBackToExactRange' \
+    "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'void throttlesAndRejectsBeforeWal' \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAsyncAdmissionTest.java"
 require_literal 'readsBookKeeperSourceThroughRegisteredProviderWithoutObjectIdentityOrPin' \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/ExactSourceRangeReaderTest.java"
 require_literal 'reconstructsBookKeeperProtectionThroughTheProviderRegistry' \
@@ -267,7 +276,7 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|Check))|[4-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check))|[4-6])' \
     "$repo_root/build.gradle.kts"; then
     echo "unfinished BK-M2 final/profile, BK-M3 final, and BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1

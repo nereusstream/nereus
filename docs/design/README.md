@@ -16,7 +16,8 @@ delete checkpoints and cold all-shard Oxia coverage；remaining matrix/aggregate
 属于 BK-M5。BK-M3 已实现 provider-neutral exact-source、durable source protection、async profile/runtime
 composition、shared lag、retirement-metadata authority、sealed shared-scanner and first real Oxia/BK/Object
 publication/read/retirement、physical ledger deletion and fresh-runtime task/source/output/publication response-loss
-checkpoints；real-load lag admission、remaining negative-cut final gate 和 BK-M4–M6 未实现。
+plus real-load lag/physically-missing-Object fail-closed checkpoints；BK-M2/M3 aggregate final gates 和 BK-M4–M6
+未实现。
 
 建议阅读顺序：
 

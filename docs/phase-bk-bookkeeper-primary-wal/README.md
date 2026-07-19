@@ -30,7 +30,8 @@
 > `bookKeeperPrimaryWalM3LagCheck`、`bookKeeperPrimaryWalM3SourceRetirementCheck`、
 > `bookKeeperPrimaryWalM3LiveReadCheck`、`bookKeeperPrimaryWalM3SealedLedgerCheck`、
 > `bookKeeperPrimaryWalM3Check`、`bookKeeperPrimaryWalM3RealServiceCheck` and
-> `bookKeeperPrimaryWalM3PhysicalRetirementCheck`、`bookKeeperPrimaryWalM3ResponseLossCheck`。The live checkpoint fresh-resolves and
+> `bookKeeperPrimaryWalM3PhysicalRetirementCheck`、`bookKeeperPrimaryWalM3ResponseLossCheck` and
+> `bookKeeperPrimaryWalM3LagFailureCheck`。The live checkpoint fresh-resolves and
 > reads the full exact higher generation under normal durable Object pins before BK retirement，while generation-zero
 > fallback delegates protection to the BK reader lease。The first real-service chain now proves stable-head ack with no
 > Object generation，BK fallback before/after a fresh runtime，durable task reconstruction from committed metadata，exact
@@ -42,8 +43,12 @@
 > one deterministic PLANNED task and no premature dynamic source；applied BK-source create plus compacted-Object PUT
 > loss reaches durable `RETRY_WAIT`、releases the dynamic source and preserves BK fallback；a final runtime reuses the
 > same task/source/object identity and converges claim、output-ready、source transfer、publishing、generation attachment、
-> COMMITTED publication、PUBLISHED and source-release response loss before exact Object read。Real-load lag admission
-> and remaining negative failure cuts remain pending，so BK-M3 is not complete。The remaining
+> COMMITTED publication、PUBLISHED and source-release response loss before exact Object read。The lag/failure checkpoint
+> installs the thin BK-async adapter over the shared F4 lag gate，proves real backlog rejection before writer/BK mutation
+> and recovery after Object coverage，then physically removes a COMMITTED Object and proves retirement fails closed、
+> every fixed BK reference remains ACTIVE、the ledger remains present and normal reads quarantine/fall back to the exact
+> BK range。BK-M3 focused implementation evidence is therefore closed；the milestone final gate remains withheld until
+> its BK-M2 predecessor aggregate and the later abrupt-process/chaos aggregate are closed。The remaining
 > M2 scenario/evidence rows and aggregate/final gate are not yet closed；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
@@ -53,6 +58,8 @@
 > through physical source deletion and passes 65/65 executable tasks with `--rerun-tasks`，
 > while `bookKeeperPrimaryWalM3ResponseLossCheck --rerun-tasks` adds the fresh-runtime response-loss matrix and also
 > passes 65/65 executable tasks；
+> `bookKeeperPrimaryWalM3LagFailureCheck --rerun-tasks` adds real shared-lag and unreadable-output fail-closed evidence
+> and passes 65/65 executable tasks；
 > but is intentionally not the still-unregistered `bookKeeperPrimaryWalM3FinalCheck`。
 
 ## 1. Delivery identity

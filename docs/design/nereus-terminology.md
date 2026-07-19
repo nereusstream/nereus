@@ -66,7 +66,7 @@ broker-local offset”。任何成功 append 都必须返回 stable offset/proje
 | `OBJECT_WAL_ASYNC_OBJECT` | Object store | primary WAL committed first；read-optimized generation later | `WAL_DURABLE` | implemented/final-gated in F4-M5；proof-gated at runtime，aggregate-certified by F4-M6 |
 | `BOOKKEEPER_WAL_ONLY` | BookKeeper | disabled | `WAL_DURABLE` | BK-M2 module/facade runtime plus real Oxia/BookKeeper restart/delete checkpoint implemented；aggregate pending，production broker pre-IO rejected until BK-M5 |
 | `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | higher Object generation required before producer completion | profile durability + `REQUIRED_OBJECT_GENERATION` completion | BK-M1 foundation complete；profile not implemented |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | object-backed target published by shared F4 worker | `WAL_DURABLE` | BK-M3 source/protection/profile/lag、retirement/sealed-trigger、real Oxia/BK/Object publication/read/physical-delete and fresh-runtime response-loss checkpoints implemented；real-load lag/negative-cut final gate pending；production pre-IO rejected |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | object-backed target published by shared F4 worker | `WAL_DURABLE` | BK-M3 focused source/protection/profile/lag、retirement、real publication/read/physical-delete/response-loss and unreadable-output fail-closed evidence implemented；predecessor/aggregate final gate pending；production pre-IO rejected |
 
 Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套 engine：
 
@@ -159,8 +159,8 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   target 位于 `../phase-bk-bookkeeper-primary-wal/README.md`；BK-M0 documentation gate 已于 2026-07-19
   通过，BK-M1 foundation 已 complete/final-gated；BK-M2 已推进到 real Oxia/BookKeeper restart/delete checkpoint，
   remaining matrix/aggregate pending；BK-M3 source/protection/profile/lag、retirement-metadata/sealed-trigger and first
-  real Oxia/BK/Object publication/read/physical-delete and fresh-runtime response-loss checkpoints are implemented，
-  real-load lag/negative-cut final gate and
+  real Oxia/BK/Object publication/read/physical-delete、fresh-runtime response-loss、real lag and unreadable-output
+  fail-closed checkpoints are implemented；predecessor/aggregate final gate and
   BK-M4–M6 remain open。
 - **P15-M6**：F2-M0R2 新发现的窄结果交接；把 internal committed truth 已有的 cumulative logical size
   加入 generic `AppendResult`，不改变 durable format/profile/commit boundary；已于 2026-07-12 final-gated。

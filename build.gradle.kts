@@ -790,6 +790,14 @@ tasks.register("bookKeeperPrimaryWalM3ResponseLossCheck") {
     dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
 }
 
+tasks.register("bookKeeperPrimaryWalM3LagFailureCheck") {
+    group = "verification"
+    description = "Verify BK-M3 real lag rejection/recovery and unreadable-Object retirement veto/fallback."
+    dependsOn("bookKeeperPrimaryWalM3ResponseLossCheck")
+    dependsOn(":nereus-bookkeeper:test")
+    dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."
