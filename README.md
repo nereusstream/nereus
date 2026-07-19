@@ -437,8 +437,8 @@ F4-M5 final gate 现已在 `master@0e9829a7453497910ab468669e644e88b4bc2f93` 上
 durable size backlog eviction、卸载后 exact ACTIVE-binding logical trim、trim 后 append/read 与再次 ownership cut；
 logical trim 不删除 WAL bytes，stock BookKeeper control topic 始终可写可读。`phase4M5Check` 与
 `phase4M5FinalCheck` 是该里程碑的 ordinary/final completion boundary；F4-M6 和 Phase 4 aggregate final gate
-仍待完成。
-F4-M6 checkpoints BD–BP 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
+现已由 checkpoint BQ 完成。
+F4-M6 checkpoints BD–BQ 已完成：32-reference NRC1 merge、4,096 admitted/4,097 rejected
 generation candidates、streaming 1,000,000-entry checkpoint、1,000 reader leases + 1,000 protections 的完整分页
 重扫、同时达到 128 sources / 1,048,576 records 的单 task durable round trip，以及每个 64 registry shards
 精确 257 条、page size 256 的 16,448-stream cold-restart 扫描。BI 又在真实 shared Oxia、LocalStack、BookKeeper
@@ -463,8 +463,12 @@ ordinary wrappers 的内层结果仍显示 `UP-TO-DATE`，因此不作为 final 
 分别全量执行通过 127/127 与 129/129 个内层任务，外层 103/103 tasks 在 2m28s 通过。BP 记录 BO-qualified
 aggregate 暴露的标准 Pulsar TTL-policy/admin expiry monitor 竞争：原两 broker cursor gate 把合法的瞬态 HTTP
 409 当成失败。测试现只忽略该精确 conflict，并以 authoritative subscription backlog 归零作为完成条件；其他
-管理异常仍 fail fast。完整两 broker cursor 场景已在新 source lock 上 fresh 138/138 通过。M6/Phase 4 aggregate
-tasks 已声明，但 BP source lock 上的完整 fresh rerun 尚待执行。
+管理异常仍 fail fast。完整两 broker cursor 场景已在新 source lock 上 fresh 138/138 通过。BQ 随后在 clean、
+pushed Nereus `main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` 与 Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600` 上执行
+`./gradlew phase4FinalCheck --rerun-tasks --console=plain`：21m47s 内 203/203 外层 tasks 全部执行并通过，
+M1–M6、Phase 1/1.5/2/3 回归、52/52 executable evidence、真实 Oxia/LocalStack/two-broker 场景与全部
+Docker/checkout/fresh-inner audit 均为绿色。Phase 4 现为 `Implemented / final-gated`。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

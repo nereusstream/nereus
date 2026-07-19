@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 current_pulsar_lock="eaf7b9a704890a9265c21f30d9f351e02d00c600"
+phase4_acceptance_nereus_lock="fa533a934c33f5bcc4fda328c4df64cb96c6b485"
 
 require_literal() {
     local literal="$1"
@@ -22,6 +23,19 @@ lock_docs=(
 )
 for path in "${lock_docs[@]}"; do
     require_literal "$current_pulsar_lock" "$path"
+done
+
+acceptance_docs=(
+    README.md
+    docs/phase-4-compaction-generation/README.md
+    docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md
+    docs/phase-4-compaction-generation/08-m6-scenario-evidence-matrix.md
+    docs/design/nereus-design-index.md
+    docs/design/nereus-future4-compaction-generation.md
+    docs/automq-like-stream-storage/README.md
+)
+for path in "${acceptance_docs[@]}"; do
+    require_literal "$phase4_acceptance_nereus_lock" "$path"
 done
 
 require_literal "activation/task-V2 schema 的 50 个 envelope vectors" "docs/phase-4-compaction-generation/README.md"
@@ -49,6 +63,12 @@ require_literal "Checkpoint BO" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint BP" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BQ" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BQ" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "203/203 outer tasks" \
+    "docs/phase-4-compaction-generation/08-m6-scenario-evidence-matrix.md"
 require_literal "checkPhase4FinalPulsarCheckoutIsolation" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "objectStoreLibraryDoesNotSelectTheBrokerLoggingBackend" \
@@ -317,13 +337,11 @@ require_literal "Checkpoint AH implements the shared per-stream coalescing lane"
     "docs/phase-4-compaction-generation/06-pulsar-rollout-operations-and-compatibility.md"
 require_literal "checkpoints AG–AI retention planner" \
     "docs/design/nereus-overall-architecture.md"
-require_literal "F4-M1–M5 final-gated" \
+require_literal 'Future 4 materialization/compaction | `Implemented / final-gated`' \
     "docs/design/nereus-design-index.md"
-require_literal "F4-M1–M5 final-gated" \
-    "docs/design/nereus-design-index.md"
-require_literal "F4-M5 已 final-gated" \
+require_literal "F4-M1–M6 are final-gated" \
     "docs/design/nereus-future4-compaction-generation.md"
-require_literal "Implemented / F4-M1–M5 final-gated" \
+require_literal "Implemented / final-gated；F4-M1–M6" \
     "docs/automq-like-stream-storage/README.md"
 require_literal "F4-M4 final gate" \
     "docs/automq-like-stream-storage/README.md"
@@ -390,4 +408,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, M6 BD-BP evidence, 52/52 matrix, current source lock, gates, and links verified."
+echo "Phase 4 M1-M6 final status, BQ aggregate evidence, 52/52 matrix, source locks, gates, and links verified."

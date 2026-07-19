@@ -2,12 +2,14 @@
 
 ## 1. Current Status
 
-F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`eaf7b9a704890a9265c21f30d9f351e02d00c600`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
-final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and retry-disabled real
-two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real two-broker async/
-retention boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and real-
-service tests：
+F4-M0 is complete against the original Nereus design input
+`e330969cd5c2c11cd38d0bd7f687185171ae91e2`. Phase 4 final acceptance is complete against clean, pushed Nereus
+`main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` and local Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`. F4-M1、F4-M2 and F4-M3 completed their ordinary and
+Docker-backed final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and
+retry-disabled real two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real
+two-broker async/retention boundary on 2026-07-19；F4-M6 and the aggregate Phase 4 boundary completed on 2026-07-19
+through checkpoint BQ. The following foundation parts are implemented and covered by focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
   delete surface；
@@ -209,10 +211,10 @@ pass through each runtime, and proves direct plus Pulsar-facade exact reads of s
 entries per topic with unchanged properties/`MessageIdAdv` and a stock BookKeeper control topic. The real fixture also
 forced and fixed compressed-physical versus returned-logical byte accounting. Checkpoint BJ closes protected-head
 ordering and abandoned protected-intent retirement. Checkpoint BK supplies the executable 52/52 scenario mapping、
-partitioned loaded/unloaded admin evidence and aggregate task composition；the full rerun aggregate remains pending.
+partitioned loaded/unloaded admin evidence and aggregate task composition；at BK the full rerun aggregate remained pending.
 Checkpoint BL removes Hadoop's transitive reload4j backend from the embeddable ObjectStore runtime after the first
 aggregate run exposed an Oxia retry-path MDC incompatibility；classpath isolation、the storage audit and the real
-Phase 1 Oxia restart suite now pass, while a fresh full aggregate rerun remains required.
+Phase 1 Oxia restart suite now pass；at BL a fresh full aggregate rerun remained required.
 Checkpoint BM then serializes only Docker-owning local and nested-Pulsar tasks through one Gradle shared service under
 the otherwise parallel build, eliminating aggregate-only Oxia readiness starvation without reducing ordinary task
 parallelism. Its static inventory gate and a forced parallel Oxia/LocalStack pair pass. Checkpoint BN adds a separate
@@ -225,7 +227,11 @@ after correction their forced-parallel regression executed 127 and 129 fresh inn
 tasks in 2m28s. Checkpoint BP then fixes the standard TTL-policy/manual-expiry monitor race exposed by that run：the
 historical two-broker cursor gate now retries only the exact transient admin 409 and waits for authoritative backlog
 zero, while every other admin error and unchanged-object-count assertion remains strict. The complete method passes
-138/138 fresh Pulsar tasks on the new source lock. The BP-source-lock full rerun is still the completion boundary.
+138/138 fresh Pulsar tasks on the new source lock. Checkpoint BQ closes the completion boundary：
+`./gradlew phase4FinalCheck --rerun-tasks --console=plain` passes in 21m47s with all 203 outer tasks executed. The
+aggregate includes M1-M6 final gates、all prior Phase 1/1.5/2/3 final gates、all 52 mapped scenarios、real
+Oxia/LocalStack/two-broker evidence and the static Docker/checkout/fresh-inner audits. Both recorded source trees were
+clean and equal to their upstream commits before and after the run.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1982,11 +1988,11 @@ eviction, loads the exact ACTIVE-bound incarnation after unload, completes F3 lo
 WAL bytes, appends/reads after trim, rolls ownership again and keeps an independent BookKeeper topic writable/readable.
 The method passed with `testRetryCount=0` on the locked
 `master@0e9829a7453497910ab468669e644e88b4bc2f93` source. F4-M6 and the aggregate Phase 4 completion gate remain
-separate；BookKeeper primary-WAL profiles remain reserved.
+separate from this M5 claim and later pass at checkpoint BQ；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BP are implemented and focused/evidence-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BQ are implemented and final-gated. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -1995,8 +2001,7 @@ highest generation；the existing overflow fixture proves candidate 4,097 fails 
 scale fixture streams one million entries without constructing a million-entry list, asserts demand is exactly one,
 checks the exact publication/commit directory sizes and 3,907 sparse anchors, keeps staging below the configured
 384 MiB budget, verifies the uploaded object, performs first/middle/last sparse reads and releases all staging bytes.
-This is M6 evidence only；`phase4M6Check`、`phase4M6FinalCheck` and the aggregate Phase 4 tasks now exist, but their full
-rerun has not yet passed and no completion claim is made here. Exact deterministic evidence is
+The complete M6 and Phase 4 aggregate has now passed；the exact deterministic evidence is
 `RecoveryCheckpointMergeTest.mergesThirtyTwoActiveReferencesWithBoundedRemappingAndExactEntries` plus
 `RecoveryCheckpointCoordinatorTest.mergesThirtyTwoReferencesWithPinnedSourcesAndConvergesLostRootCasResponse`、
 `selectionDriftDuringMergePinLeavesOldRootAuthoritativeAndReleasesLease` and
@@ -2103,6 +2108,16 @@ consumer and exact unchanged-object-count assertions remain mandatory. The compl
 Checkstyle tasks pass 138/138 fresh Pulsar tasks in 1m52s on
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`.
 
+Checkpoint BQ is the final acceptance result. From clean, pushed Nereus
+`main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` and Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`, the exact command
+`./gradlew phase4FinalCheck --rerun-tasks --console=plain` completed successfully in 21m47s with 203/203 outer tasks
+executed. Every one of the seventeen nested Pulsar wrappers was serialized by the checkout service and forced fresh
+inner execution；Docker-owning gates were independently serialized. The aggregate completed `phase4M6Check`、
+`phase4M6FinalCheck`、`phase4Check` and `phase4FinalCheck`, including every M1-M6 predecessor and
+`phase3FinalCheck`. The source-lock、52-row executable evidence、production/test artifact、dependency-isolation、
+Docker ownership and nested-checkout audits all passed in the same run.
+
 ### 8.1 Required scenarios
 
 The final gate must cover all of the following as named deterministic or real-service test methods：
@@ -2203,7 +2218,8 @@ provider-neutral by rejecting a leaked logging implementation. Checkpoint BM bou
 Docker-owning task without disabling parallel compilation or ordinary verification. Checkpoint BN independently
 bounds all nested builds that mutate the single locked Pulsar checkout, including ordinary broker gates. Checkpoint
 BO additionally requires every nested wrapper to force fresh inner Gradle execution；the 194-task serialized run
-demonstrates graph compatibility but is intentionally non-final because it preceded that invariant.
+demonstrates graph compatibility but is intentionally non-final because it preceded that invariant. Checkpoint BQ is
+the qualifying post-BO/BP run：203/203 outer tasks execute and pass on the recorded clean source locks.
 
 ### 8.3 Gates
 
@@ -2226,8 +2242,8 @@ Both final tasks also depend on `checkPhase4FinalDockerIsolation` and
 share the independent checkout permit even when Gradle evaluates final-gate branches concurrently. The checkout
 audit also requires `--rerun-tasks` on every nested build, so an outer rerun cannot silently reuse selected broker
 test results.
-The tasks are implemented；until `phase4M6FinalCheck --rerun-tasks` and `phase4FinalCheck --rerun-tasks` both pass in
-this source-locked state, F4-M6 and Phase 4 remain in progress.
+Checkpoint BQ records both final tasks passing in this source-locked state. F4-M6 and Phase 4 are therefore
+`Implemented / final-gated`.
 
 ## 9. Gradle / Build Plan
 
@@ -2346,3 +2362,11 @@ Phase 4 may be labeled `Implemented / final-gated` only after：
 - no stale “Designed” claim remains for implemented F4 behavior and no future/BookKeeper behavior is overclaimed；
 - all prior phase final gates pass in the aggregate run；
 - physical delete has been proved on real Oxia/S3 with reader/cursor/task/reference races, not only mocked。
+
+**Result: PASS (checkpoint BQ, 2026-07-19).** The qualifying command was
+`./gradlew phase4FinalCheck --rerun-tasks --console=plain` at Nereus
+`main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` with Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`; it completed in 21m47s with 203/203 outer tasks executed. The
+52/52 executable matrix and planned-surface audits passed, all predecessor final gates were in the aggregate, and the
+real Oxia/S3/two-broker M4/M5/M6 fixtures cover the required reader/cursor/task/reference deletion races. BookKeeper
+primary-WAL profiles remain explicitly reserved and are not part of this completion claim.

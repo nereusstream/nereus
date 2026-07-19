@@ -31,7 +31,7 @@ protocol/table state = projection
 | F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
-| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | In progress / F4-M1–M5 final-gated；M4 implements recovery/retirement/physical+cursor GC、activation/global domains、restart/scale/late-PUT cuts、atomic readiness rollover and retry-disabled real source deletion；M5 implements durable registration/readiness/activation、protected async Object-WAL、pre-I/O lag admission、coupled production materialization、versioned exact-evidence retention/F3 trim、durable backlog eviction and exact Pulsar policy/admin routing，then final-gates MessageIds、unload/failover/rejoin/post-trim IO and BookKeeper coexistence；safe defaults keep production deletion disabled | Complete M6 and aggregate Phase 4 gates |
+| F4 Materialization/Compaction | Phase 4 F4-M0-M6 | Implemented/final-gated；M4 implements recovery/retirement/physical+cursor GC、activation/global domains、restart/scale/late-PUT cuts、atomic readiness rollover and retry-disabled real source deletion；M5 implements durable registration/readiness/activation、protected async Object-WAL、pre-I/O lag admission、coupled production materialization、versioned exact-evidence retention/F3 trim、durable backlog eviction and exact Pulsar policy/admin routing，then final-gates MessageIds、unload/failover/rejoin/post-trim IO and BookKeeper coexistence；M6 BD–BQ close scale/failure/compatibility and the clean 203/203-task aggregate；safe defaults keep production deletion disabled | F5/F6/F8 may consume the final-gated F4 contracts |
 | F5 KoP/Kafka | later phase | Designed | F2 facade + stable offset/projection + txn boundary |
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
@@ -39,8 +39,9 @@ protocol/table state = projection
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
-profile from the completed P15-M6 surface；BookKeeper and async profiles remain reservations until their adapters/state machines pass their
-own gates。
+profile from the completed P15-M6 surface。Future 4's explicit production composition now implements/final-gates
+`OBJECT_WAL_ASYNC_OBJECT` without changing that legacy boundary；all BookKeeper primary profiles remain reservations
+until their adapters/state machines pass independent gates。
 
 ## 3. Dependency graph
 

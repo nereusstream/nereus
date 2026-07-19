@@ -1,18 +1,17 @@
 # Nereus Future 4：Compaction + Generation Replacement
 
-> 状态：Implementation in progress；F4-M0 complete，F4-M1–M4 implemented/final-gated；F4-M3 real Parquet
+> 状态：Implemented / final-gated；F4-M0 design gate 与 F4-M1–M6 implementation/final gates complete；F4-M3 real Parquet
 > read/write、deterministic planner/task/recovery、exact-source worker、protection/checkpoint/service、Pulsar Entry/NCP1
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
 > F4-M4 real two-broker source-deletion gate and F4-M5 retry-disabled async-retention/MessageId/unload/failover/
-> restart/BookKeeper gate passed；F4-M1–M5 are final-gated；F4-M6 checkpoints BD–BP cover 32-ref merge、
+> restart/BookKeeper gate passed；F4-M1–M6 are final-gated；F4-M6 checkpoints BD–BQ cover 32-ref merge、
 > 4,096/4,097 candidates、million-entry NRC1、1,000+1,000 reference pagination and the schema-V2 128-source/
 > 1,048,576-record task boundary、exact 16,448-stream/64-shard registry cold restart and retry-disabled real
 > two-broker/two-worker compressed-read convergence、protected-intent retirement、partitioned admin compatibility、
 > provider-neutral Hadoop/Oxia logging composition、bounded Docker aggregate scheduling、exclusive locked-Pulsar
 > checkout builds、fresh inner execution across all seventeen nested broker gates、inherited cursor TTL expiry
-> convergence and
-> executable 52/52 traceability，while aggregate M6 remains pending
+> convergence、executable 52/52 traceability and the clean 203/203-task aggregate
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -720,15 +719,17 @@ readiness/activation/CAS/reload/final-read 阶段。最终 retry-disabled two-br
 删除后 compacted read 仍可用，普通/批内 MessageId 经 unload、owner failover、restart/reverse takeover 保持不变，
 并保留 stock BookKeeper 共存；F4-M4 已 final-gated。
 
-F4-M0 只是 design gate；F4-M1–M5 final gates 也不构成整个 Phase 4 完成声明。F4-M4 只在 exact activation/
+F4-M0 只是 design gate；F4-M1–M5 final gates 单独也不构成整个 Phase 4 完成声明。F4-M4 只在 exact activation/
 scope/proof 下 final-gate physical GC，safe defaults 仍不调度或删除；M5 final-gates the scoped Object-WAL async/
-Pulsar retention rollout but does not claim M6 scale/failure/compatibility certification. M6 checkpoints BD–BP are
-focused/evidence-green；BI closes the two-worker/two-broker composition row, BJ closes abandoned protected-intent
+Pulsar retention rollout but does not claim M6 scale/failure/compatibility certification. M6 checkpoints BD–BQ are
+final-gated；BI closes the two-worker/two-broker composition row, BJ closes abandoned protected-intent
 retirement, BK closes partitioned admin compatibility plus 52/52 executable traceability, and BL removes a leaked
 Hadoop reload4j backend that broke Oxia retry recovery in the combined runtime, while BM serializes only Docker-owning
 local and nested-Pulsar release tasks through one shared permit. BN independently serializes all seventeen nested
 builds that mutate the single locked Pulsar checkout. BO requires all seventeen wrappers to force fresh inner Gradle
 execution；the corrected historical pair passes 127/129 inner tasks. BP makes the inherited two-broker cursor TTL
-scenario wait through the standard Pulsar expiry-monitor 409 until durable backlog zero, but the complete BP-source-lock aggregate
-gate execution remains open. F4-M6 的确切文件、测试、
+scenario wait through the standard Pulsar expiry-monitor 409 until durable backlog zero. BQ then runs
+`phase4FinalCheck --rerun-tasks --console=plain` from clean Nereus
+`main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` and Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`; 203/203 outer tasks pass in 21m47s. F4-M6 的确切文件、测试、
 故障点和 aggregate release gates 见代码级实施计划。

@@ -1260,9 +1260,9 @@ Candidate selection:
 4. choose max visible generation；
 5. in Phase 1 only generation `0` exists, so one non-overlapping append entry is normally sufficient。
 
-The bounded lookahead is an extension point, not the complete Future 4 compaction resolver. Future 4 must
-define the exact coverage lookup strategy for large compacted ranges before enabling generation
-replacement.
+The bounded lookahead is an extension point, not the complete Future 4 compaction resolver. Final-gated Future 4 now
+owns the exact paged candidate lookup、revalidation and same-view coverage strategy for large compacted ranges；this
+does not alter the Phase 1 generation-zero resolver.
 
 ## 10. Trim Update
 

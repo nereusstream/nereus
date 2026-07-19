@@ -211,9 +211,9 @@ Failure classification：
 | head reachable, materialization/result fails | `KNOWN_COMMITTED` + attempt ID |
 | strict result returned | normal success and terminal attempt cached |
 
-Although the internal stable boundary now exists, `StorageProfileResolver` rejects public
-`WAL_DURABLE` before IO。Enabling it requires Future 4/task repair or a separately accepted primary-index repair SLA,
-not a one-line early return。
+The Phase 1.5 `StorageProfileResolver` continues to reject public `WAL_DURABLE` before IO. Final-gated Future 4 enables
+it only through the explicit Object-WAL async composition with activation proof、task repair and primary-index repair；
+the legacy resolver remains strict, and BookKeeper variants still require a separately accepted adapter/SLA.
 
 ## 6. Shared Stream Mutation Lane
 
@@ -268,9 +268,10 @@ cover requested offset
   -> repair missing generation zero from reachable commit
 ```
 
-Phase 1.5 accepts only generation zero。A decoded generation > 0 is not silently skipped when it is the highest
-published target；until Future 4 reader semantics exist it fails `UNSUPPORTED_READ_TARGET`/format as appropriate so a
-newer physical truth is not ignored accidentally。
+The Phase 1.5 resolver accepts only generation zero。A decoded generation > 0 is not silently skipped when it is the
+highest published target；it fails `UNSUPPORTED_READ_TARGET`/format so a newer physical truth is not ignored
+accidentally. Final-gated Future 4 supplies its separate generation-aware resolver through the explicit production
+composition seam；it does not weaken this legacy behavior.
 
 Positive cache identity includes：
 

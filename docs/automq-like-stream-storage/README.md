@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implemented / F4-M1–M5 final-gated；F4-M6 BD–BP evidence-green、52/52 traceability complete，aggregate compatibility pending；
+> 状态：Implemented / final-gated；F4-M1–M6 与 Phase 4 aggregate compatibility gate complete；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -137,7 +137,7 @@ Already present：
 Not present：
 
 - BookKeeper WAL writer/reader/location types；
-- BookKeeper-primary retention and the Phase 4 M6 scale/chaos matrix；
+- BookKeeper-primary retention and its independent compatibility gates；
 - mixed primary target resolver。
 
 The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default
@@ -375,17 +375,19 @@ acknowledged primary range merely because materialization lags。
 - F4-M5 ordinary/final gates and all predecessor regressions；
 - Phase 1/1.5/2/3 and overall docs updated in the same change。
 
-F4-M6 BD–BP cover the current merge/candidate/checkpoint/reference/task limits、the exact 16,448-stream all-shard
+F4-M6 BD–BQ cover the current merge/candidate/checkpoint/reference/task limits、the exact 16,448-stream all-shard
 registry restart、real two-broker/two-worker contention with compression-heavy exact Pulsar/BookKeeper reads、
 protected-intent retirement、partitioned admin compatibility、provider-neutral Hadoop/Oxia logging composition and
 exclusive scheduling for Docker-owning release tasks plus every nested build of the single locked Pulsar checkout
 under the otherwise parallel aggregate. BO additionally requires all seventeen nested builds to force fresh inner
-Gradle execution；its corrected historical pair passes 127/129 fresh inner tasks, while the BO-qualified full
-aggregate remains the completion boundary. BP additionally stabilizes inherited cursor-only TTL evidence across
+Gradle execution；its corrected historical pair passes 127/129 fresh inner tasks. BP additionally stabilizes inherited cursor-only TTL evidence across
 Pulsar's standard policy-triggered/manual expiry-monitor conflict without weakening backlog or object-count truth；
-the BP-source-lock aggregate remains the completion boundary.
-The executable matrix now traces all 52 scenarios；
-the still-unrun final aggregate gates remain the Phase 4-wide completion boundary. This is not permission to
+checkpoint BQ then passes the BP-source-lock aggregate from clean, pushed Nereus
+`main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` and Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`. The exact
+`./gradlew phase4FinalCheck --rerun-tasks --console=plain` invocation completes in 21m47s with 203/203 outer tasks
+executed. The executable matrix traces all 52 scenarios and every owning final gate passes in that aggregate. This is
+not permission to
 infer either BookKeeper primary profile from the implemented Object-WAL profile.
 
 BookKeeper async/sync profiles have an additional independent gate: a real BookKeeper writer/reader/location and

@@ -128,9 +128,9 @@ must not create a second temporary L0 API。
 | `AppendResult.cumulativeSize` public handoff | implemented/final-gated |
 | BookKeeper target value/codec | implemented reservation, no IO support |
 | BookKeeper profiles | reserved/rejected before IO |
-| `WAL_DURABLE` success | reserved/rejected before IO |
-| async materialization/higher generation | Future 4 designed, not implemented |
-| physical object deletion | not implemented |
+| `WAL_DURABLE` success | reserved/rejected by Phase 1.5；later implemented/final-gated for F4 `OBJECT_WAL_ASYNC_OBJECT` only |
+| async materialization/higher generation | reserved at Phase 1.5 exit；later F4 `OBJECT_WAL_ASYNC_OBJECT` implemented/final-gated；BookKeeper primary variants reserved |
+| physical object deletion | absent at Phase 1.5 exit；later F4 implementation is final-gated and exact-activation-only with safe defaults closed |
 
 ## 7. Aggregate Gates
 

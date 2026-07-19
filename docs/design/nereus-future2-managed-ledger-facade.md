@@ -498,4 +498,5 @@ complete。Future 3 已完成 design-only M0/M0R 并在不改变 F2 projection/M
 cursor contract；F3-M1 foundation 及 F3-M2 CursorStorage/retention state machines 与真实 Oxia/S3 gate 已
 final-gated，F3-M3 facade、F3-M4 broker integration、F3-M5 real recovery/retention/scale 与 F3-M6
 compatibility/incarnation/F4 handoff 均已完成最终 gate。Future 3 is complete；Future 4 remains a separate
-designed track。
+track and is now independently implemented/final-gated through F4-M6；its completion does not move correctness into
+the F2 projection layer。

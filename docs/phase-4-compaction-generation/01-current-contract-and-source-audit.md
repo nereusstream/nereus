@@ -6,8 +6,9 @@ This is the F4-M0 read-only audit. It records the exact current seams that Phase
 implementation from inventing a second append truth、cursor truth or broker policy path. No production source change
 is part of M0.
 
-> Post-audit status (2026-07-19)：F4-M4 is final-gated. Checkpoint B closed the generation-zero gap identified in
-> §3.1；checkpoints C–BC and the real two-broker acceptance close recovery/retirement/physical+cursor GC. The Nereus
+> Post-audit status (2026-07-19)：Phase 4 F4-M1–M6 is final-gated. Checkpoint B closed the generation-zero gap identified in
+> §3.1；checkpoints C–BC and the real two-broker acceptance close recovery/retirement/physical+cursor GC；X–BQ close
+> async/retention、scale/failure/compatibility and the final aggregate. The Nereus
 > M0 rows remain historical baseline evidence；the local Pulsar lock/table below tracks the current final-gate source.
 
 ## 2. Source Locks
@@ -129,16 +130,17 @@ NereusManagedLedger.asyncAddEntry
   -> callback success for strict profile
 ```
 
-The async profile enum and `WAL_DURABLE` name exist, but `Phase15StorageProfileResolver` rejects them before IO.
-F4 must reuse the same stable head commit and may only move generation-zero/index-confirmation and higher-generation
-work after the requested acknowledgement boundary.
+The async profile enum and `WAL_DURABLE` name exist, but `Phase15StorageProfileResolver` still rejects them before IO.
+F4's explicit resolver reuses the same stable head commit and moves only generation-zero/index-confirmation and
+higher-generation work after the requested acknowledgement boundary.
 
 At the M0 source lock, the implementation still created/reloaded the generic commit intent and performed the head CAS
 inside one `commitStableAppend` call. It had no interposed F4 physical-root/protection handshake and was safe only
 while product physical deletion was absent. Checkpoint B now implements document 03 §10's two-stage
 prepare/protect/head sequence：`REACHABLE_APPEND` precedes head visibility and generation-zero
-`VISIBLE_GENERATION` precedes strict success. Physical deletion remains disabled because the separate recovery-root、
-retirement and GC gates are not complete.
+`VISIBLE_GENERATION` precedes strict success. At checkpoint B physical deletion remained disabled because the separate
+recovery-root、retirement and GC gates were incomplete；M4/BQ later final-gate those paths, while safe broker defaults
+still schedule no deletion.
 
 ### 3.2 Ordinary resolve/read
 
@@ -211,8 +213,8 @@ physical-GC mapping、coverage/delete activation and production composition rows
 prove exact-scope ownerless restart/delete-response-loss、post-DELETE/pre-root-CAS independent recovery and applied-
 DELETED-CAS response-loss exact reload without repeated DELETE plus two-worker shared-intent convergence against real
 Oxia/LocalStack. Checkpoints AW–BC and the retry-disabled real two-broker fixture subsequently closed the M4 all-shard/
-scale/late-PUT/source-protection/readiness-rollover/ownership-failover matrix；F4-M4 is complete, while M5/M6 and the
-aggregate Phase 4 composition remain open.
+scale/late-PUT/source-protection/readiness-rollover/ownership-failover matrix. Checkpoints X–AI close M5；BD–BQ close
+M6 and the 203/203-task aggregate. Phase 4 is complete/final-gated.
 
 | Gap | Current fact | Phase 4 owner |
 | --- | --- | --- |

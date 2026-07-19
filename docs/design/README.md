@@ -6,7 +6,8 @@
 `docs/phase-2-managed-ledger-facade/`、
 `docs/phase-3-cursor-subscription/` 与
 `docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
-测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1–M4 实现和后续目标。
+测试优先；Phase 4 目录同时记录已通过 M0 的 target contract，以及已 final-gated 的 F4-M1–M6 实现和
+checkpoint-BQ aggregate evidence。
 
 建议阅读顺序：
 

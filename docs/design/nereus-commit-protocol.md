@@ -2,8 +2,8 @@
 
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
-> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M5
-> 已 implementation/final-gated，F4-M6 pending；
+> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M6
+> 已 implementation/final-gated，checkpoint-BQ aggregate passed；
 > txn、catalog 仍为 target design。
 
 ## 1. Purpose
@@ -319,8 +319,9 @@ lifecycle barrier waits for older exact append recovery, while remote races are 
 
 ## 9. AutoMQ-like async materialization
 
-> Status: In progress. M2/M3 publication、planner/worker/recovery/service building blocks are implemented/final-gated
-> and M4 NRC1 object bytes are implemented；the async profile admission/retention/Pulsar path remains disabled.
+> Status: Implemented / final-gated for `OBJECT_WAL_ASYNC_OBJECT`. M2/M3 publication、planner/worker/recovery/service,
+> M4 NRC1/GC, M5 async admission/retention/Pulsar wiring and the M6 aggregate have passed；runtime admission remains
+> proof-gated and BookKeeper primary profiles remain reserved.
 
 Async profile shares the entire stable append protocol。Only secondary publication is decoupled：
 
@@ -518,19 +519,19 @@ SDT terminal visibility belongs to target catalog。Timeout recovery queries the
 
 ## 15. GC protocol
 
-> Status: In progress. Physical reference values/leases/protections、NRC1 recovery-root publication/replay/index repair、
+> Status: Implemented / final-gated. Physical reference values/leases/protections、NRC1 recovery-root publication/replay/index repair、
 > typed source retirement、DELETED-root/Phase 1 audit retirement、guarded/protected/pinned cursor snapshots、all-shard
 > physical/cursor live-reference backfill、restart-reconstructable cursor/ownerless execution、current-writer inventory、
 > registration-last retirement、metadata-first lifecycle、typed broker GC config、configured-scope capability proof、
 > atomic deletion activation、provider/Pulsar restart fencing and shared reference-domain interpretation are
-> implemented through F4-M4 checkpoint AV. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
+> implemented through F4-M4 checkpoint BC. Real Oxia/LocalStack evidence covers scope mismatch、empty-list/lost-DELETE
 > response、post-DELETE/pre-DELETED-root-CAS independent recovery and applied-DELETED-CAS response-loss exact reload
 > without repeated DELETE, plus two-worker shared-intent/idempotent-delete convergence. F4-M5 checkpoints X–AI additionally implement
 > durable registration/readiness/activation、protected async Object-WAL acknowledgement/read repair、pre-I/O lag
 > admission、coupled materialization、stable retention planning/F3 trim delegation and exact Pulsar policy/admin
 > admission. Its retry-disabled real two-broker final gate covers durable backlog eviction、unloaded logical trim、
 > post-trim IO、exact ordinary/batched MessageIds、owner rejoin/failover and BookKeeper coexistence. Safe defaults keep
-> physical deletion disabled；F4-M6 remains the aggregate scale/failure/compatibility boundary.
+> physical deletion disabled；F4-M6 closed the aggregate scale/failure/compatibility boundary at checkpoint BQ.
 
 An object is deletable only when all relevant conditions are true：
 

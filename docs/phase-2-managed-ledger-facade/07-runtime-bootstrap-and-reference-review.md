@@ -1228,7 +1228,7 @@ rejection is converted to a failure completion and closes the topic rather than 
 | non-durable consumer acknowledgement | only the cumulative one-position whole-entry shape in 5.4；batched-entry ack is rejected even though producing/Reader-reading opaque batches is allowed |
 | every durable subscription/consumer | rejected before `openCursor`; F3 owns durable progress |
 | Shared / Key_Shared | rejected before cursor open |
-| read-compacted cursor / topic compaction | rejected; F4 not implemented |
+| read-compacted cursor / Pulsar topic-compaction admission | rejected; final-gated F4 keeps `TOPIC_COMPACTED` as an isolated storage view and does not enable this Pulsar surface |
 | BookKeeper offload policy/admin operation | rejected; Nereus Object WAL is not Pulsar offload |
 | transaction buffer / pending ack transaction | rejected; F8 not implemented |
 | delayed delivery / replicated subscription | rejected; F8 not implemented |

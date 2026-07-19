@@ -513,8 +513,8 @@ Lookahead rule:
 
 - Phase 1 append entries are non-overlapping, so the first covering generation-0 entry is enough；
 - the resolver API and cache should still allow a bounded lookahead；
-- Future 4 must define the exact coverage lookup strategy for larger compacted ranges before generation
-  replacement is enabled。
+- final-gated Future 4 defines the exact paged candidate lookup、revalidation and same-view coverage strategy for
+  larger compacted ranges；the Phase 1 resolver remains generation-zero-only。
 
 ### `BUILD_RESOLVED_RANGES`
 

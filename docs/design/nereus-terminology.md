@@ -59,7 +59,7 @@ broker-local offset”。任何成功 append 都必须返回 stable offset/proje
 | --- | --- | --- | --- | --- |
 | `OBJECT_WAL` | Object store | compatibility alias | strict | deprecated alias |
 | `OBJECT_WAL_SYNC_OBJECT` | Object store | generation-0 object target before ack | `WAL_DURABLE_AND_INDEX_COMMITTED` | Phase 1 target |
-| `OBJECT_WAL_ASYNC_OBJECT` | Object store | primary WAL committed first；read-optimized generation later | `WAL_DURABLE` | F4-M0 designed；implementation reserved until M5 |
+| `OBJECT_WAL_ASYNC_OBJECT` | Object store | primary WAL committed first；read-optimized generation later | `WAL_DURABLE` | implemented/final-gated in F4-M5；proof-gated at runtime，aggregate-certified by F4-M6 |
 | `BOOKKEEPER_WAL_ONLY` | BookKeeper | disabled | `WAL_DURABLE` | reserved |
 | `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | object-backed target published synchronously | `WAL_DURABLE_AND_INDEX_COMMITTED` | reserved |
 | `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | object-backed target published by worker | `WAL_DURABLE` | reserved |
@@ -249,7 +249,7 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M5**：Object-WAL async profile、durable registration/readiness/activation、pre-I/O lag、coupled
   materialization、exact retention/backlog projection、bounded F3 logical trim 和 Pulsar admin routing 里程碑；已于
   2026-07-19 通过 ordinary 与 retry-disabled real two-broker final gate。Complete 不表示 BookKeeper primary WAL
-  profile 已实现，也不替代 F4-M6 aggregate compatibility gate。
+  profile 已实现；F4-M6 aggregate compatibility gate 随后已由 checkpoint BQ 通过。
 - **F4-M6 checkpoint BD–BE**：32-reference NRC1 merge、4,096 admitted/4,097 rejected generation candidates 和
   streaming one-million-entry recovery checkpoint 的首批 final-acceptance foundation。
 - **F4-M6 checkpoint BF**：生产 Oxia adapter 对 1,000 reader leases 与 1,000 source protections 分别执行八页
@@ -260,6 +260,11 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M6 checkpoint BH**：以冻结的 64-shard SHA-256 路由挑选每分片精确 257 个有效 `StreamId`，通过生产
   Oxia codec/CAS adapter 真实写入 16,448 条 registration；process-wide scanner 以 page size 256 对每分片读取
   `256 + 1` 两页，并在全新 scanner/empty continuation 下逐键得到相同无重复 inventory 的 registry scale checkpoint。
+- **F4-M6 checkpoint BQ**：在 clean、pushed Nereus
+  `main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` 与 Pulsar
+  `master@eaf7b9a704890a9265c21f30d9f351e02d00c600` 上执行
+  `phase4FinalCheck --rerun-tasks --console=plain`；21m47s 内 203/203 外层 tasks 全部执行并通过，构成 Phase 4
+  `Implemented / final-gated` 的唯一 aggregate completion evidence。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

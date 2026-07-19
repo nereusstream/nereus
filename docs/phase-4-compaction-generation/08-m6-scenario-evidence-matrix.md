@@ -7,15 +7,18 @@ owning gates. Each row names at least one real test method; compound scenarios l
 
 The machine contract is intentionally strict：IDs are exactly `01` through `52`、every evidence file and annotated test
 method must exist、and every owning gate must be declared in the root build. `checkPhase4M6ScenarioEvidenceMatrix`
-enforces that contract against both clean source trees. A passing matrix check proves traceability；the owning gate and
-the final aggregate still have to execute the tests and prove behavior.
+enforces that contract against both clean source trees. A passing matrix check proves traceability；checkpoint BQ
+additionally records every owning gate executing successfully in the final aggregate.
 
 Checkpoint BK status：**52/52 scenarios traced** against Pulsar
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`. Checkpoints BM/BN make owning-gate execution deterministic by
 serializing Docker owners and, independently, every nested build of the single locked Pulsar checkout. Checkpoint BO
 also requires all seventeen nested builds to force fresh inner Gradle execution. Checkpoint BP makes the inherited
 cursor-expiry evidence converge across the standard TTL-policy/manual-admin monitor race；the complete BP-source-lock
-final aggregate remains pending.
+aggregate then passed as checkpoint BQ. On clean, pushed Nereus
+`main@fa533a934c33f5bcc4fda328c4df64cb96c6b485` and Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`,
+`./gradlew phase4FinalCheck --rerun-tasks --console=plain` completed in 21m47s with 203/203 outer tasks executed.
 
 | ID | Required scenario | Executable evidence | Owning gate |
 | --- | --- | --- | --- |
@@ -76,5 +79,6 @@ final aggregate remains pending.
 
 `phase4M6Check` owns the ordinary 52-row traceability audit and all affected Nereus module checks.
 `phase4M6FinalCheck` adds every real-service M6 fixture. `phase4FinalCheck` composes the M1-M6 final gates and
-`phase3FinalCheck`; both final tasks also audit Docker and locked-Pulsar checkout isolation. Only that clean, rerun
-aggregate may change Phase 4 from `in progress` to `Implemented / final-gated`.
+`phase3FinalCheck`; both final tasks also audit Docker and locked-Pulsar checkout isolation. Checkpoint BQ is that
+clean, forced-rerun aggregate, so the 52/52 matrix has executable passing evidence and Phase 4 is
+`Implemented / final-gated`.
