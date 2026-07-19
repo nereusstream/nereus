@@ -481,7 +481,7 @@ public final class ReadCoordinator implements StreamViewReader {
             ReadOptions options,
             List<ResolvedRange> ranges,
             PhysicalReadResult result) {
-        validateReadAccounting(ranges, result);
+        ProviderNeutralReadAccounting.validate(ranges, result);
         result.rangeStats().forEach(stats -> observe(() -> observer.onSliceRead(
                 stats.physicalPayloadBytesRead(),
                 stats.physicalAuxiliaryBytesRead(),
@@ -521,59 +521,6 @@ public final class ReadCoordinator implements StreamViewReader {
                     "WAL reader exceeded caller read limits");
         }
         return new ReadResult(streamId, startOffset, expectedOffset, result.batches(), false);
-    }
-
-    private static void validateReadAccounting(
-            List<ResolvedRange> ranges,
-            PhysicalReadResult result) {
-        Map<com.nereusstream.api.Checksum, Integer> expectedRanges = new HashMap<>();
-        ranges.forEach(range -> expectedRanges.merge(
-                com.nereusstream.api.ReadTargetIdentities.sha256(range.readTarget()), 1, Math::addExact));
-        Map<com.nereusstream.api.Checksum, Integer> observedRanges = new HashMap<>();
-        long statsReturned = 0;
-        long batchBytes = 0;
-        try {
-            for (PhysicalReadStats stats : result.rangeStats()) {
-                com.nereusstream.api.Checksum identity = stats.targetIdentity();
-                int expectedCount = expectedRanges.getOrDefault(identity, 0);
-                if (expectedCount == 0) {
-                    throw new NereusException(
-                            ErrorCode.METADATA_INVARIANT_VIOLATION,
-                            false,
-                            "WAL reader reported accounting for an unknown resolved range");
-                }
-                int observedCount = observedRanges.merge(identity, 1, Math::addExact);
-                if (observedCount > expectedCount) {
-                    throw new NereusException(
-                            ErrorCode.METADATA_INVARIANT_VIOLATION,
-                            false,
-                            "WAL reader reported duplicate accounting for one resolved range");
-                }
-                stats.amplificationBytes();
-                statsReturned = Math.addExact(statsReturned, stats.returnedPayloadBytes());
-            }
-            for (ReadBatch batch : result.batches()) {
-                if (!observedRanges.containsKey(batch.source().targetIdentity())) {
-                    throw new NereusException(
-                            ErrorCode.METADATA_INVARIANT_VIOLATION,
-                            false,
-                            "WAL reader omitted read accounting for a returned batch");
-                }
-                batchBytes = Math.addExact(batchBytes, batch.payload().length);
-            }
-        } catch (ArithmeticException e) {
-            throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "WAL reader accounting overflows",
-                    e);
-        }
-        if (statsReturned != batchBytes) {
-            throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "WAL reader returned-byte accounting does not match batches");
-        }
     }
 
     private static Throwable unwrap(Throwable error) {

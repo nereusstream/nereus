@@ -2,6 +2,7 @@
 package com.nereusstream.core.append;
 
 import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.metadata.oxia.CommittedAppend;
@@ -14,10 +15,16 @@ public final class GenerationZeroProtectionIdentities {
     }
 
     static String reachableAppendReferenceId(PreparedStableAppend prepared) {
+        if (prepared.request().readTarget() instanceof ObjectSliceReadTarget target) {
+            return reachableAppendReferenceId(
+                    prepared.request().streamId(),
+                    prepared.commitId(),
+                    ObjectKeyHash.from(target.objectKey()));
+        }
         return reachableAppendReferenceId(
                 prepared.request().streamId(),
                 prepared.commitId(),
-                prepared.objectKeyHash());
+                prepared.primaryTargetIdentitySha256());
     }
 
     static String visibleGenerationReferenceId(MaterializedGenerationZero materialized) {
@@ -40,6 +47,22 @@ public final class GenerationZeroProtectionIdentities {
                 streamId.value() + commitId + objectKeyHash.value());
     }
 
+    public static String reachableAppendReferenceId(
+            com.nereusstream.api.StreamId streamId,
+            String commitId,
+            com.nereusstream.api.Checksum targetIdentitySha256) {
+        java.util.Objects.requireNonNull(streamId, "streamId");
+        if (java.util.Objects.requireNonNull(commitId, "commitId").isBlank()) {
+            throw new IllegalArgumentException("commitId cannot be blank");
+        }
+        java.util.Objects.requireNonNull(targetIdentitySha256, "targetIdentitySha256");
+        if (targetIdentitySha256.type() != com.nereusstream.api.ChecksumType.SHA256) {
+            throw new IllegalArgumentException("targetIdentitySha256 must use SHA256");
+        }
+        return "ra1-" + DeterministicIds.stableHashComponent(
+                streamId.value() + commitId + targetIdentitySha256.value());
+    }
+
     public static String visibleGenerationReferenceId(
             com.nereusstream.api.StreamId streamId,
             String indexKey,
@@ -60,6 +83,11 @@ public final class GenerationZeroProtectionIdentities {
                         + indexRecordSha256.value());
     }
 
+    static com.nereusstream.api.Checksum targetIdentity(CommittedAppend append) {
+        return ReadTargetIdentities.sha256(append.readTarget());
+    }
+
+    @Deprecated(forRemoval = true)
     static ObjectKeyHash objectKeyHash(CommittedAppend append) {
         if (!(append.readTarget() instanceof ObjectSliceReadTarget target)) {
             throw new IllegalArgumentException("generation-zero append target must be an object slice");

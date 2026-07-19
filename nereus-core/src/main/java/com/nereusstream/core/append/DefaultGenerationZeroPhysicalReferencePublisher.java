@@ -6,6 +6,7 @@ import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadView;
+import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -15,13 +16,18 @@ import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.read.MetadataPhysicalObjectIdentityResolver;
 import com.nereusstream.core.read.PhysicalObjectIdentityResolver;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
+import com.nereusstream.metadata.oxia.ObjectPhysicalReferenceProof;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.PhysicalReferencePurpose;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -34,12 +40,23 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
     private final PhysicalObjectMetadataStore physicalStore;
     private final ObjectProtectionManager protections;
     private final PhysicalObjectIdentityResolver identityResolver;
+    private final PrimaryPhysicalReferenceAdapterRegistry adapters;
 
     public DefaultGenerationZeroPhysicalReferencePublisher(
             String cluster,
             OxiaMetadataStore metadata,
             PhysicalObjectMetadataStore physicalStore,
             ObjectProtectionManager protections) {
+        this(cluster, metadata, physicalStore, protections, List.of());
+    }
+
+    /** Installs additional provider adapters while retaining the exact Object-WAL implementation. */
+    public DefaultGenerationZeroPhysicalReferencePublisher(
+            String cluster,
+            OxiaMetadataStore metadata,
+            PhysicalObjectMetadataStore physicalStore,
+            ObjectProtectionManager protections,
+            Collection<? extends PrimaryPhysicalReferenceAdapter<?>> additionalAdapters) {
         this.cluster = requireText(cluster, "cluster");
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.physicalStore = Objects.requireNonNull(physicalStore, "physicalStore");
@@ -48,6 +65,10 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
                 cluster,
                 metadata,
                 physicalStore);
+        ArrayList<PrimaryPhysicalReferenceAdapter<?>> installed = new ArrayList<>();
+        installed.add(new ObjectPhysicalReferenceAdapter());
+        installed.addAll(Objects.requireNonNull(additionalAdapters, "additionalAdapters"));
+        this.adapters = new PrimaryPhysicalReferenceAdapterRegistry(installed);
     }
 
     @Override
@@ -82,13 +103,8 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
             PreparedStableAppend append,
             Duration timeout) {
         PreparedStableAppend exact = Objects.requireNonNull(append, "append");
-        AppendDeadline deadline = new AppendDeadline(timeout);
-        ObjectSliceReadTarget target = objectTarget(exact.request().readTarget());
-        return deadline.bound(
-                        () -> identityResolver.resolve(target, ReadView.COMMITTED),
-                        AppendOutcome.KNOWN_NOT_COMMITTED,
-                        "resolve Object WAL physical identity")
-                .thenCompose(object -> protectPrepared(exact, object, deadline));
+        ReadTarget target = exact.request().readTarget();
+        return protectBeforeHead(adapters.require(target), exact, target, timeout);
     }
 
     @Override
@@ -96,13 +112,63 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
             MaterializedGenerationZero append,
             Duration timeout) {
         MaterializedGenerationZero exact = Objects.requireNonNull(append, "append");
-        AppendDeadline deadline = new AppendDeadline(timeout);
-        ObjectSliceReadTarget target = objectTarget(exact.committedAppend().readTarget());
-        return deadline.bound(
-                        () -> identityResolver.resolve(target, ReadView.COMMITTED),
-                        AppendOutcome.KNOWN_COMMITTED,
-                        "resolve generation-zero physical identity")
-                .thenCompose(object -> protectMaterialized(exact, object, deadline));
+        ReadTarget target = exact.committedAppend().readTarget();
+        return protectVisibleIndex(adapters.require(target), exact, target, timeout);
+    }
+
+    private static <T extends ReadTarget> CompletableFuture<ProtectedStableAppend> protectBeforeHead(
+            PrimaryPhysicalReferenceAdapter<T> adapter,
+            PreparedStableAppend append,
+            ReadTarget target,
+            Duration timeout) {
+        return adapter.protectBeforeHead(append, adapter.targetClass().cast(target), timeout);
+    }
+
+    private static <T extends ReadTarget> CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
+            PrimaryPhysicalReferenceAdapter<T> adapter,
+            MaterializedGenerationZero append,
+            ReadTarget target,
+            Duration timeout) {
+        return adapter.protectVisibleIndex(append, adapter.targetClass().cast(target), timeout);
+    }
+
+    private final class ObjectPhysicalReferenceAdapter
+            implements PrimaryPhysicalReferenceAdapter<ObjectSliceReadTarget> {
+        @Override
+        public com.nereusstream.api.target.ReadTargetType targetType() {
+            return com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE;
+        }
+
+        @Override
+        public Class<ObjectSliceReadTarget> targetClass() {
+            return ObjectSliceReadTarget.class;
+        }
+
+        @Override
+        public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
+                PreparedStableAppend append,
+                ObjectSliceReadTarget target,
+                Duration timeout) {
+            AppendDeadline deadline = new AppendDeadline(timeout);
+            return deadline.bound(
+                            () -> identityResolver.resolve(target, ReadView.COMMITTED),
+                            AppendOutcome.KNOWN_NOT_COMMITTED,
+                            "resolve Object WAL physical identity")
+                    .thenCompose(object -> protectPrepared(append, object, deadline));
+        }
+
+        @Override
+        public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
+                MaterializedGenerationZero append,
+                ObjectSliceReadTarget target,
+                Duration timeout) {
+            AppendDeadline deadline = new AppendDeadline(timeout);
+            return deadline.bound(
+                            () -> identityResolver.resolve(target, ReadView.COMMITTED),
+                            AppendOutcome.KNOWN_COMMITTED,
+                            "resolve generation-zero physical identity")
+                    .thenCompose(object -> protectMaterialized(append, object, deadline));
+        }
     }
 
     private CompletableFuture<ProtectedStableAppend> protectPrepared(
@@ -279,12 +345,14 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
         }
         return new ProtectedStableAppend(
                 prepared,
-                object,
-                protection.identity(),
-                root.metadataVersion(),
-                root.value().lifecycleEpoch(),
-                protection.metadataVersion(),
-                protection.durableValueSha256());
+                new ObjectPhysicalReferenceProof(
+                        PhysicalReferencePurpose.REACHABLE_APPEND,
+                        prepared.primaryTargetIdentitySha256(),
+                        protection.identity(),
+                        root.metadataVersion(),
+                        root.value().lifecycleEpoch(),
+                        protection.metadataVersion(),
+                        protection.durableValueSha256()));
     }
 
     private static ProtectedGenerationZero protectedGenerationZero(
@@ -298,11 +366,15 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
         }
         return new ProtectedGenerationZero(
                 materialized,
-                protection.identity(),
-                root.metadataVersion(),
-                root.value().lifecycleEpoch(),
-                protection.metadataVersion(),
-                protection.durableValueSha256());
+                new ObjectPhysicalReferenceProof(
+                        PhysicalReferencePurpose.VISIBLE_GENERATION,
+                        GenerationZeroProtectionIdentities.targetIdentity(
+                                materialized.committedAppend()),
+                        protection.identity(),
+                        root.metadataVersion(),
+                        root.value().lifecycleEpoch(),
+                        protection.metadataVersion(),
+                        protection.durableValueSha256()));
     }
 
     private static boolean samePreparedIdentity(
@@ -313,14 +385,7 @@ public final class DefaultGenerationZeroPhysicalReferencePublisher
                 && left.commitKey().equals(right.commitKey())
                 && left.commitMetadataVersion() == right.commitMetadataVersion()
                 && left.commitRecordSha256().equals(right.commitRecordSha256())
-                && left.objectKeyHash().equals(right.objectKeyHash());
-    }
-
-    private static ObjectSliceReadTarget objectTarget(Object target) {
-        if (!(target instanceof ObjectSliceReadTarget objectSlice)) {
-            throw new IllegalArgumentException("generation-zero append target must be an object slice");
-        }
-        return objectSlice;
+                && left.primaryTargetIdentitySha256().equals(right.primaryTargetIdentitySha256());
     }
 
     private static NereusException invariant(String message, AppendOutcome outcome) {

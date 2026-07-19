@@ -2,9 +2,11 @@
 
 ## 1. Status and evidence levels
 
-BK-01 (the documentation/source-lock gate) executed successfully on 2026-07-19. BK-02 through BK-96 are required
-target evidence and are currently **not executed/not implemented**. During implementation, each row receives an exact
-test method、gate、source lock、date and result. No implementation row may be marked covered by prose only.
+BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrimaryWalM1Check` and the 199-task
+`bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-11 through BK-96 remain required target evidence and are
+currently **not executed/not implemented**. During implementation, each row receives an exact test method、gate、source
+lock、date and result. No implementation row may be marked covered by prose only.
 
 Evidence levels：
 
@@ -30,7 +32,7 @@ Evidence levels：
 | BK-05 | M1 | D | BK reader result contains target SHA and no fake ObjectId/index | `BookKeeperReadResultContractTest.usesOnlyCanonicalBookKeeperSourceIdentity` |
 | BK-06 | M1 | D | generic `ReadCoordinator` rejects missing/duplicate/wrong target stats | `ProviderNeutralReadAccountingTest.rejectsIdentityAndByteDrift` |
 | BK-07 | M1 | D | generic append commit/protection/gen0 accepts synthetic BK target without Object cast | `GenericPrimaryAppendContractTest.commitsTaggedBookKeeperTarget` |
-| BK-08 | M1 | D | Object append protocol bytes/result/error cuts remain unchanged | `ObjectPrimaryWalCompatibilityTest.preservesStableAppendContract` |
+| BK-08 | M1 | D | Object append protocol bytes/result/error cuts remain unchanged | `DefaultStreamStorageAppendTest.appendBuildsManifestAndAdvancesDenseOffsets` + `ObjectWalGuardedUploadTest` |
 | BK-09 | M1 | D | BookKeeper/ManagedLedger imports obey module DAG | `check-bookkeeper-module-boundaries.sh` |
 | BK-10 | M1 | D/O | config excludes secrets, alias cannot drift provider scope, namespace store rejects conflict/revoke, candidates round-trip prefix | `BookKeeperWalConfigurationTest.bindsNonSecretSemantics` + `BookKeeperLedgerIdNamespaceReservationStoreContractTest` |
 

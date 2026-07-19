@@ -6,7 +6,14 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 public interface PrimaryWalAppender<P extends PreparedPrimaryAppend> {
     ReadTargetType targetType();
+    Class<P> preparedClass();
     P prepare(PrimaryAppendRequest request);
     CompletableFuture<DurablePrimaryAppend> persist(P prepared, Duration timeout);
+    default CompletableFuture<Void> publishDurableMetadata(
+            DurablePrimaryAppend append,
+            AppendSession session,
+            Duration timeout) {
+        return CompletableFuture.completedFuture(null);
+    }
     CompletableFuture<Void> validateBeforeHeadCommit(DurablePrimaryAppend append, AppendSession session, Duration timeout);
 }

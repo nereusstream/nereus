@@ -52,7 +52,10 @@ import com.nereusstream.metadata.oxia.GcRetirementProtectionScanPage;
 import com.nereusstream.metadata.oxia.GcRetirementRemovalScanPage;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
+import com.nereusstream.metadata.oxia.ObjectPhysicalReferenceProof;
 import com.nereusstream.metadata.oxia.ObjectProtectionScanPage;
+import com.nereusstream.metadata.oxia.PhysicalReferenceProof;
+import com.nereusstream.metadata.oxia.PhysicalReferencePurpose;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectRootScanPage;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
@@ -793,11 +796,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
     public CompletableFuture<StableAppendResult> commitPreparedStableAppend(
             String cluster,
             PreparedStableAppend prepared,
-            ObjectProtectionIdentity protectionIdentity,
-            long rootMetadataVersion,
-            long rootLifecycleEpoch,
-            long protectionMetadataVersion,
-            Checksum protectionRecordSha256) {
+            PhysicalReferenceProof protectionProof) {
         AppendAttemptState attemptState = new AppendAttemptState();
         return completeAppend(attemptState, () -> {
             CommitAppendRequest request = prepared.request();
@@ -805,11 +804,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
             validateStableProtection(
                     cluster,
                     prepared,
-                    protectionIdentity,
-                    rootMetadataVersion,
-                    rootLifecycleEpoch,
-                    protectionMetadataVersion,
-                    protectionRecordSha256);
+                    protectionProof);
             String markerKey = new OxiaKeyspace(cluster).committedAppendKey(
                     request.streamId(),
                     request.commitId());
@@ -843,11 +838,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
             validateStableProtection(
                     cluster,
                     prepared,
-                    protectionIdentity,
-                    rootMetadataVersion,
-                    rootLifecycleEpoch,
-                    protectionMetadataVersion,
-                    protectionRecordSha256);
+                    protectionProof);
             validateTargetPreconditions(current, request);
             validateTargetAgainstHead(request, commit, current);
             StreamHeadRecord updated = withTargetCommit(current, commit, nextVersion());
@@ -938,18 +929,13 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
             boolean replayWasReachable) {
         String key = commitMapKey(cluster, request.streamId(), request.commitId());
         validateTargetReplay(request, commit, AppendOutcome.KNOWN_NOT_COMMITTED);
-        if (!(request.readTarget() instanceof ObjectSliceReadTarget target)
-                || target.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT) {
-            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
-                    "stable append intent does not reference an Object WAL slice");
-        }
         return new PreparedStableAppend(
                 request,
                 request.commitId(),
                 key,
                 commit.metadataVersion(),
                 sha256(targetCommitByKey.envelope(key)),
-                ObjectKeyHash.from(target.objectKey()),
+                com.nereusstream.api.ReadTargetIdentities.sha256(request.readTarget()),
                 replayWasReachable);
     }
 
@@ -982,11 +968,22 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
     private void validateStableProtection(
             String cluster,
             PreparedStableAppend prepared,
-            ObjectProtectionIdentity identity,
-            long rootMetadataVersion,
-            long rootLifecycleEpoch,
-            long protectionMetadataVersion,
-            Checksum protectionRecordSha256) {
+            PhysicalReferenceProof protectionProof) {
+        if (!(protectionProof instanceof ObjectPhysicalReferenceProof proof)) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "primary physical-reference proof type is not installed");
+        }
+        if (proof.purpose() != PhysicalReferencePurpose.REACHABLE_APPEND
+                || proof.targetType() != prepared.request().readTarget().type()
+                || !proof.targetIdentitySha256().equals(prepared.primaryTargetIdentitySha256())) {
+            throw failure(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "stable append physical-reference proof is non-canonical");
+        }
+        ObjectProtectionIdentity identity = proof.protectionIdentity();
+        long rootMetadataVersion = proof.rootMetadataVersion();
+        long rootLifecycleEpoch = proof.rootLifecycleEpoch();
+        long protectionMetadataVersion = proof.protectionMetadataVersion();
+        Checksum protectionRecordSha256 = proof.protectionRecordSha256();
         String expectedReferenceId = reachableAppendReferenceId(prepared);
         if (identity == null
                 || !identity.object().equals(prepared.objectKeyHash())

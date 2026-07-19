@@ -86,7 +86,7 @@ require_literal 'bookKeeperPrimaryWalDocumentationCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M0 design/source audit       documentation-gated on 2026-07-19' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
-require_literal 'BK-M1 provider-neutral foundation in progress' \
+require_literal 'BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalDocumentationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM1Check' "build.gradle.kts"
@@ -107,7 +107,7 @@ for ((number = 1; number <= 96; number++)); do
 done
 
 if [[ ! -d "$repo_root/nereus-bookkeeper" ]]; then
-    echo "nereus-bookkeeper is missing while F1-BK documents BK-M1 foundation implementation" >&2
+    echo "nereus-bookkeeper is missing while F1-BK documents BK-M1 as complete" >&2
     exit 1
 fi
 if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then

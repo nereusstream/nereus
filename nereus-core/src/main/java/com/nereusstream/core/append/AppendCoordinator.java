@@ -35,16 +35,17 @@ import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.core.profile.Phase15StorageProfileResolver;
+import com.nereusstream.core.profile.StorageExecutionPlan;
 import com.nereusstream.core.profile.StorageProfileResolver;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
 import com.nereusstream.core.recovery.AppendReplayEvidenceSource;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
+import com.nereusstream.core.wal.PreparedPrimaryAppend;
 import com.nereusstream.core.wal.PrimaryAppendRequest;
+import com.nereusstream.core.wal.PrimaryWalAppender;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
-import com.nereusstream.core.wal.object.ObjectPreparedPrimaryAppend;
 import com.nereusstream.core.wal.object.ObjectWalAppenderAdapter;
-import com.nereusstream.core.wal.object.ObjectWalCommitEvidence;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -85,7 +86,7 @@ public final class AppendCoordinator implements AutoCloseable {
 
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
-    private final ObjectWalAppenderAdapter primaryAppender;
+    private final PrimaryWalRegistry primaryWalRegistry;
     private final AppendSessionManager sessionManager;
     private final Clock clock;
     private final Executor callbackExecutor;
@@ -182,9 +183,39 @@ public final class AppendCoordinator implements AutoCloseable {
             AppendAdmissionGuard appendAdmissionGuard,
             Clock clock,
             Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                objectWalRegistry(
+                        config,
+                        metadataStore,
+                        walObjectWriter,
+                        physicalReferences,
+                        clock),
+                sessionManager,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                clock,
+                callbackExecutor);
+    }
+
+    /** Provider-neutral composition entry point used by additional primary-WAL modules. */
+    public AppendCoordinator(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            PrimaryWalRegistry primaryWalRegistry,
+            AppendSessionManager sessionManager,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            Clock clock,
+            Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
-        Objects.requireNonNull(walObjectWriter, "walObjectWriter");
+        this.primaryWalRegistry = Objects.requireNonNull(primaryWalRegistry, "primaryWalRegistry");
         this.sessionManager = Objects.requireNonNull(sessionManager, "sessionManager");
         this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
         this.recoverySearcher = Objects.requireNonNull(recoverySearcher, "recoverySearcher");
@@ -194,11 +225,6 @@ public final class AppendCoordinator implements AutoCloseable {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.callbackExecutor = Objects.requireNonNull(callbackExecutor, "callbackExecutor");
         this.writerRunIdHash = DeterministicIds.stableHashComponent(config.processRunId());
-        ObjectWalAppenderAdapter objectAppender = new ObjectWalAppenderAdapter(
-                config.cluster(), config.writerId(), writerRunIdHash, config.maxObjectBytes(), walObjectWriter);
-        PrimaryWalRegistry registry = new PrimaryWalRegistry(List.of(objectAppender), List.of());
-        this.primaryAppender = (ObjectWalAppenderAdapter) registry.requireAppender(
-                com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE);
         this.resourceLimiter = new AppendResourceLimiter(
                 config.maxInFlightAppends(), config.maxBufferedBytes());
         this.retainedAttemptPermits = new Semaphore(config.maxRetainedAppendAttempts());
@@ -214,6 +240,41 @@ public final class AppendCoordinator implements AutoCloseable {
             thread.setDaemon(true);
             return thread;
         });
+    }
+
+    private static PrimaryWalRegistry objectWalRegistry(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Clock clock) {
+        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(metadataStore, "metadataStore");
+        Objects.requireNonNull(walObjectWriter, "walObjectWriter");
+        Objects.requireNonNull(physicalReferences, "physicalReferences");
+        Objects.requireNonNull(clock, "clock");
+        String writerRunIdHash = DeterministicIds.stableHashComponent(config.processRunId());
+        ObjectWalAppenderAdapter objectAppender = new ObjectWalAppenderAdapter(
+                config.cluster(),
+                config.writerId(),
+                writerRunIdHash,
+                config.maxObjectBytes(),
+                walObjectWriter,
+                (prepared, object, key, providerAttempt, timeout) -> {
+                    if (!object.objectKey().equals(key) || providerAttempt <= 0) {
+                        return CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                false,
+                                "guarded Object WAL provider attempt has an invalid identity",
+                                AppendOutcome.KNOWN_NOT_COMMITTED));
+                    }
+                    return physicalReferences.authorizeUpload(
+                            prepared.request().session(), object, timeout);
+                },
+                (result, session, timeout) -> metadataStore.putObjectManifest(
+                        config.cluster(),
+                        toManifest(config, writerRunIdHash, clock, result, session)));
+        return new PrimaryWalRegistry(List.of(objectAppender), List.of());
     }
 
     public CompletableFuture<AppendResult> append(
@@ -270,8 +331,8 @@ public final class AppendCoordinator implements AutoCloseable {
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "load stream profile")
                 .thenApplyAsync(metadata -> validateProfile(metadata, options), callbackExecutor)
-                .thenComposeAsync(profile -> {
-                    attempt.setStorageProfile(profile);
+                .thenComposeAsync(plan -> {
+                    attempt.setExecutionPlan(plan);
                     return acceptAndEnqueue(attempt);
                 }, callbackExecutor);
         pipeline.whenComplete((value, error) -> {
@@ -427,7 +488,7 @@ public final class AppendCoordinator implements AutoCloseable {
                     }
                     return searchRecovery(attempt);
                 })
-                .thenApply(commit -> toAppendResult(commit, attempt.slice()))
+                .thenApply(commit -> toAppendResult(commit, attempt.durableAppend()))
                 .handle((result, error) -> finishRecovery(attempt, result, error)));
     }
 
@@ -646,33 +707,37 @@ public final class AppendCoordinator implements AutoCloseable {
             SessionAndOffset state,
             AppendResourceLimiter.Reservation reservation) {
         rejectClosedBeforeUpload();
-        attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "prepare WAL object");
+        attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "prepare primary WAL append");
         reservation.reserveBuffer(config.maxObjectBytes());
-        ObjectPreparedPrimaryAppend prepared = primaryAppender.prepare(new PrimaryAppendRequest(
+        PrimaryWalAppender<?> appender = primaryWalRegistry.requireAppender(
+                attempt.executionPlan().primaryTargetType());
+        PreparedPrimaryAppend prepared = appender.prepare(new PrimaryAppendRequest(
                 attempt.streamId(), attempt.batch(), state.session(), state.expectedOffset(), attempt.id(),
                 attempt.deadline().remaining()));
         if (prepared.reservedBytes() > config.maxObjectBytes()) {
+            closePrepared(prepared);
             throw new NereusException(
                     ErrorCode.INVALID_ARGUMENT,
                     false,
-                    "prepared WAL object exceeds maxObjectBytes",
+                    "prepared primary WAL append exceeds the configured buffer limit",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
         reservation.adjustToExactBytes(prepared.reservedBytes());
-        WalWriteResult writeResult = prepared.preparedObject().result();
-        if (writeResult.slices().size() != 1
-                || !writeResult.slices().get(0).streamId().equals(attempt.streamId())) {
+        if (!prepared.streamId().equals(attempt.streamId())
+                || prepared.recordCount() != attempt.batch().recordCount()
+                || prepared.entryCount() != attempt.batch().entryCount()
+                || prepared.logicalBytes() != logicalBytes(attempt.batch())) {
+            closePrepared(prepared);
             throw new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
                     false,
-                    "single-work-item planner produced an unexpected WAL slice set",
+                    "primary WAL preparation does not match the logical append",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        validateWrittenSlice(attempt.batch(), writeResult.slices().get(0));
-        return new PreparedAttempt(state.session(), state.expectedOffset(), prepared);
+        return new PreparedAttempt(state.session(), state.expectedOffset(), appender, prepared);
     }
 
-    private static void validateWrittenSlice(AppendBatch batch, WrittenStreamSlice slice) {
+    private static long logicalBytes(AppendBatch batch) {
         long logicalBytes = 0;
         try {
             for (com.nereusstream.api.AppendEntry entry : batch.entries()) {
@@ -686,19 +751,7 @@ public final class AppendCoordinator implements AutoCloseable {
                     e,
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        if (slice.recordCount() != batch.recordCount()
-                || slice.entryCount() != batch.entryCount()
-                || slice.logicalBytes() != logicalBytes
-                || slice.payloadFormat() != batch.payloadFormat()
-                || !slice.schemaRefs().equals(batch.schemaRefs())
-                || slice.minEventTimeMillis() != batch.minEventTimeMillis()
-                || slice.maxEventTimeMillis() != batch.maxEventTimeMillis()) {
-            throw new NereusException(
-                    ErrorCode.METADATA_INVARIANT_VIOLATION,
-                    false,
-                    "prepared WAL slice does not match the append batch",
-                    AppendOutcome.KNOWN_NOT_COMMITTED);
-        }
+        return logicalBytes;
     }
 
     private void rejectClosedBeforeUpload() {
@@ -716,80 +769,110 @@ public final class AppendCoordinator implements AutoCloseable {
             Attempt attempt,
             PreparedAttempt prepared) {
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start WAL upload");
-        PhysicalObjectIdentity object = walPhysicalObject(
-                prepared.primaryAppend().preparedObject().result());
-        return attempt.deadline().bound(
-                        () -> primaryAppender.persist(
-                                prepared.primaryAppend(),
-                                attempt.deadline().remaining(),
-                                (key, providerAttempt) -> authorizeWalUpload(
-                                        attempt,
-                                        prepared,
-                                        object,
-                                        key,
-                                        providerAttempt)),
+        CompletableFuture<DurablePrimaryAppend> providerPersistence;
+        try {
+            providerPersistence = persistPrimary(
+                    prepared.appender(),
+                    prepared.primaryAppend(),
+                    attempt.deadline().remaining());
+        } catch (Throwable failure) {
+            closePrepared(prepared.primaryAppend());
+            return CompletableFuture.failedFuture(failure);
+        }
+        CompletableFuture<DurablePrimaryAppend> cleanedPersistence = providerPersistence.whenComplete(
+                (ignored, failure) -> closePrepared(prepared.primaryAppend()));
+        CompletableFuture<DurablePrimaryAppend> persistence = attempt.deadline().bound(
+                        () -> cleanedPersistence,
                         AppendOutcome.KNOWN_NOT_COMMITTED,
-                        "upload WAL object")
+                        "persist primary WAL bytes");
+        return persistence
                 .thenCompose(durable -> {
-                    if (!(durable.providerCommitEvidence() instanceof ObjectWalCommitEvidence evidence)) {
-                        return CompletableFuture.failedFuture(new NereusException(
-                                ErrorCode.METADATA_INVARIANT_VIOLATION,
-                                false,
-                                "Object WAL adapter returned incompatible commit evidence",
-                                AppendOutcome.KNOWN_NOT_COMMITTED));
-                    }
-                    WalWriteResult writeResult = evidence.writeResult();
-                    if (!writeResult.equals(prepared.primaryAppend().preparedObject().result())) {
-                        return CompletableFuture.failedFuture(new NereusException(
-                                ErrorCode.METADATA_INVARIANT_VIOLATION, false,
-                                "WAL upload result does not match the prepared object",
-                                AppendOutcome.KNOWN_NOT_COMMITTED));
-                    }
-                    ObjectManifestRecord manifest = toManifest(writeResult, prepared.session());
+                    validateDurableAppend(attempt, prepared, durable);
                     return attempt.deadline().bound(
-                                    () -> metadataStore.putObjectManifest(config.cluster(), manifest),
+                                    () -> publishDurableMetadata(
+                                            prepared.appender(),
+                                            durable,
+                                            prepared.session(),
+                                            attempt.deadline().remaining()),
                                     AppendOutcome.KNOWN_NOT_COMMITTED,
-                                    "put WAL object manifest")
-                            .thenCompose(ignored -> primaryAppender.validateBeforeHeadCommit(
-                                    durable, prepared.session(), attempt.deadline().remaining()))
-                            .thenApply(ignored -> writeResult);
+                                    "publish primary WAL durable metadata")
+                            .thenCompose(ignored -> validateBeforeHeadCommit(
+                                    prepared.appender(),
+                                    durable,
+                                    prepared.session(),
+                                    attempt.deadline().remaining()))
+                            .thenApply(ignored -> durable);
                 })
-                .thenCompose(writeResult -> sessionManager.ensureCommitWindow(
+                .thenCompose(durable -> sessionManager.ensureCommitWindow(
                                 prepared.session(), attempt.deadline())
-                        .thenApply(session -> new UploadedAttempt(session, prepared.expectedOffset(), writeResult)))
+                        .thenApply(session -> new UploadedAttempt(session, prepared.expectedOffset(), durable)))
                 .thenCompose(uploaded -> commit(lane, attempt, uploaded));
     }
 
-    private CompletableFuture<Void> authorizeWalUpload(
+    private static void validateDurableAppend(
             Attempt attempt,
             PreparedAttempt prepared,
-            PhysicalObjectIdentity object,
-            ObjectKey key,
-            int providerAttempt) {
-        if (!object.objectKey().equals(key) || providerAttempt <= 0) {
-            return CompletableFuture.failedFuture(new NereusException(
+            DurablePrimaryAppend durable) {
+        if (!durable.streamId().equals(attempt.streamId())
+                || durable.readTarget().type() != attempt.executionPlan().primaryTargetType()
+                || durable.recordCount() != prepared.primaryAppend().recordCount()
+                || durable.entryCount() != prepared.primaryAppend().entryCount()
+                || durable.logicalBytes() != prepared.primaryAppend().logicalBytes()
+                || durable.payloadFormat() != attempt.batch().payloadFormat()
+                || !durable.schemaRefs().equals(attempt.batch().schemaRefs())
+                || durable.minEventTimeMillis() != attempt.batch().minEventTimeMillis()
+                || durable.maxEventTimeMillis() != attempt.batch().maxEventTimeMillis()) {
+            throw new NereusException(
                     ErrorCode.METADATA_INVARIANT_VIOLATION,
                     false,
-                    "guarded Object WAL provider attempt has an invalid identity",
-                    AppendOutcome.KNOWN_NOT_COMMITTED));
-        }
-        try {
-            return physicalReferences.authorizeUpload(
-                    prepared.session(), object, attempt.deadline().remaining());
-        } catch (Throwable failure) {
-            return CompletableFuture.failedFuture(failure);
+                    "durable primary WAL result does not match the prepared logical append",
+                    AppendOutcome.KNOWN_NOT_COMMITTED);
         }
     }
 
-    private static PhysicalObjectIdentity walPhysicalObject(WalWriteResult result) {
-        return PhysicalObjectIdentity.create(
-                result.objectKey(),
-                Optional.of(result.objectId()),
-                PhysicalObjectKind.OBJECT_WAL,
-                result.objectLength(),
-                result.storageChecksum(),
-                Optional.empty(),
-                Optional.empty());
+    private static <P extends PreparedPrimaryAppend> CompletableFuture<DurablePrimaryAppend> persistPrimary(
+            PrimaryWalAppender<P> appender,
+            PreparedPrimaryAppend prepared,
+            Duration timeout) {
+        if (!appender.preparedClass().equals(prepared.getClass())) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "primary WAL appender received an incompatible prepared value",
+                    AppendOutcome.KNOWN_NOT_COMMITTED));
+        }
+        return appender.persist(appender.preparedClass().cast(prepared), timeout);
+    }
+
+    private static CompletableFuture<Void> publishDurableMetadata(
+            PrimaryWalAppender<?> appender,
+            DurablePrimaryAppend durable,
+            AppendSession session,
+            Duration timeout) {
+        return appender.publishDurableMetadata(durable, session, timeout);
+    }
+
+    private static CompletableFuture<Void> validateBeforeHeadCommit(
+            PrimaryWalAppender<?> appender,
+            DurablePrimaryAppend durable,
+            AppendSession session,
+            Duration timeout) {
+        return appender.validateBeforeHeadCommit(durable, session, timeout);
+    }
+
+    private static void closePrepared(PreparedPrimaryAppend prepared) {
+        if (prepared instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception failure) {
+                throw new NereusException(
+                        ErrorCode.METADATA_INVARIANT_VIOLATION,
+                        false,
+                        "primary WAL prepared value failed to close",
+                        failure,
+                        AppendOutcome.KNOWN_NOT_COMMITTED);
+            }
+        }
     }
 
     private CompletableFuture<AppendResult> commit(
@@ -797,19 +880,7 @@ public final class AppendCoordinator implements AutoCloseable {
             Attempt attempt,
             UploadedAttempt uploaded) {
         attempt.deadline().check(AppendOutcome.KNOWN_NOT_COMMITTED, "start stream-head commit");
-        WrittenStreamSlice slice = uploaded.writeResult().slices().get(0);
-        ObjectSliceReadTarget target = new ObjectSliceReadTarget(
-                1,
-                uploaded.writeResult().objectId(),
-                uploaded.writeResult().objectKey(),
-                ObjectType.MULTI_STREAM_WAL_OBJECT,
-                "WAL_OBJECT_V1",
-                "OPAQUE_SLICE",
-                slice.sliceId(),
-                slice.objectOffset(),
-                slice.objectLength(),
-                slice.sliceChecksum(),
-                slice.entryIndexRef());
+        DurablePrimaryAppend durable = uploaded.primaryAppend();
         CommitAppendRequest request = new CommitAppendRequest(
                 attempt.streamId(),
                 config.writerId(),
@@ -817,16 +888,16 @@ public final class AppendCoordinator implements AutoCloseable {
                 uploaded.session().epoch(),
                 uploaded.session().fencingToken(),
                 uploaded.expectedOffset(),
-                target,
-                slice.payloadFormat(),
-                slice.recordCount(),
-                slice.entryCount(),
-                slice.logicalBytes(),
-                slice.schemaRefs(),
-                slice.minEventTimeMillis(),
-                slice.maxEventTimeMillis(),
+                durable.readTarget(),
+                durable.payloadFormat(),
+                durable.recordCount(),
+                durable.entryCount(),
+                durable.logicalBytes(),
+                durable.schemaRefs(),
+                durable.minEventTimeMillis(),
+                durable.maxEventTimeMillis(),
                 Optional.empty());
-        attempt.retainPhysical(request, uploaded.writeResult(), slice);
+        attempt.retainPhysical(request, durable);
         CompletableFuture<StableAppendResult> commitFuture = attempt.deadline().bound(
                         () -> stableCommitter.prepare(request),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
@@ -882,11 +953,11 @@ public final class AppendCoordinator implements AutoCloseable {
             attempt.markHeadKnownCommitted();
             lane.advanceExpectedOffset(commitResult.range().endOffset());
             attempt.deadline().check(AppendOutcome.KNOWN_COMMITTED, "ack append result");
-            return toAppendResult(commitResult, slice);
+            return toAppendResult(commitResult, durable);
         }, callbackExecutor);
     }
 
-    private StorageProfile validateProfile(
+    private StorageExecutionPlan validateProfile(
             StreamMetadataRecord metadata,
             AppendOptions options) {
         StreamState state;
@@ -909,11 +980,40 @@ public final class AppendCoordinator implements AutoCloseable {
                     "stream is not active",
                     AppendOutcome.KNOWN_NOT_COMMITTED);
         }
-        profileResolver.requireExecutable(profile, options.durabilityLevel(), true, true);
-        return profile;
+        StorageExecutionPlan candidate = profileResolver.requireExecutable(
+                profile,
+                options.durabilityLevel(),
+                primaryWalRegistry.hasAppender(
+                        profile.usesObjectWal()
+                                ? com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE
+                                : com.nereusstream.api.target.ReadTargetType.BOOKKEEPER_ENTRY_RANGE),
+                profile.usesObjectWal() || primaryWalRegistry.hasReader(
+                        com.nereusstream.api.target.ReadTargetType.BOOKKEEPER_ENTRY_RANGE));
+        if (!primaryWalRegistry.hasAppender(candidate.primaryTargetType())) {
+            throw new NereusException(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                    false,
+                    "storage profile primary WAL appender is not installed",
+                    AppendOutcome.KNOWN_NOT_COMMITTED);
+        }
+        if (candidate.primaryTargetType()
+                == com.nereusstream.api.target.ReadTargetType.BOOKKEEPER_ENTRY_RANGE
+                && !primaryWalRegistry.hasReader(candidate.primaryTargetType())) {
+            throw new NereusException(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                    false,
+                    "BookKeeper storage profile primary reader is not installed",
+                    AppendOutcome.KNOWN_NOT_COMMITTED);
+        }
+        return candidate;
     }
 
-    private ObjectManifestRecord toManifest(WalWriteResult result, AppendSession session) {
+    private static ObjectManifestRecord toManifest(
+            StreamStorageConfig config,
+            String writerRunIdHash,
+            Clock clock,
+            WalWriteResult result,
+            AppendSession session) {
         long uploadedAtMillis = clock.millis();
         long orphanExpiresAtMillis;
         try {
@@ -967,7 +1067,7 @@ public final class AppendCoordinator implements AutoCloseable {
 
     private static AppendResult toAppendResult(
             CommittedAppend commit,
-            WrittenStreamSlice slice) {
+            DurablePrimaryAppend durable) {
         return new AppendResult(
                 commit.streamId(),
                 commit.range(),
@@ -975,11 +1075,11 @@ public final class AppendCoordinator implements AutoCloseable {
                 commit.cumulativeSize(),
                 commit.generation(),
                 commit.readTarget(),
-                slice.payloadFormat(),
-                slice.recordCount(),
-                slice.entryCount(),
-                slice.logicalBytes(),
-                slice.schemaRefs(),
+                durable.payloadFormat(),
+                durable.recordCount(),
+                durable.entryCount(),
+                durable.logicalBytes(),
+                durable.schemaRefs(),
                 commit.projectionRef(),
                 commit.commitVersion());
     }
@@ -1097,10 +1197,9 @@ public final class AppendCoordinator implements AutoCloseable {
         private final CompletableFuture<Void> originalRunnerQuiesced = new CompletableFuture<>();
         private final CompletableFuture<AppendResult> terminalFuture = new CompletableFuture<>();
         private volatile CommitAppendRequest commitRequest;
-        private volatile WalWriteResult writeResult;
-        private volatile WrittenStreamSlice slice;
+        private volatile DurablePrimaryAppend durableAppend;
         private volatile StreamLane lane;
-        private volatile StorageProfile storageProfile;
+        private volatile StorageExecutionPlan executionPlan;
         private volatile CompletableFuture<StableAppendResult> headSource;
         private volatile CompletableFuture<AppendResult> recoveryFlight;
         private volatile com.nereusstream.metadata.oxia.AppendReplayCursor replayCursor;
@@ -1125,26 +1224,28 @@ public final class AppendCoordinator implements AutoCloseable {
 
         void attachLane(StreamLane value) { lane = value; }
         StreamLane lane() { return Objects.requireNonNull(lane, "attempt lane"); }
-        void setStorageProfile(StorageProfile value) {
-            if (storageProfile != null) {
+        void setExecutionPlan(StorageExecutionPlan value) {
+            if (executionPlan != null) {
                 throw new IllegalStateException(
-                        "append storage profile is already captured");
+                        "append storage execution plan is already captured");
             }
-            storageProfile = Objects.requireNonNull(
-                    value, "storageProfile").canonical();
+            executionPlan = Objects.requireNonNull(value, "executionPlan");
         }
         StorageProfile storageProfile() {
-            return Objects.requireNonNull(
-                    storageProfile, "storageProfile");
+            return executionPlan().profile();
+        }
+        StorageExecutionPlan executionPlan() {
+            return Objects.requireNonNull(executionPlan, "executionPlan");
         }
 
-        void retainPhysical(CommitAppendRequest request, WalWriteResult result, WrittenStreamSlice writtenSlice) {
+        void retainPhysical(CommitAppendRequest request, DurablePrimaryAppend durable) {
             commitRequest = Objects.requireNonNull(request);
-            writeResult = Objects.requireNonNull(result);
-            slice = Objects.requireNonNull(writtenSlice);
+            durableAppend = Objects.requireNonNull(durable);
         }
         CommitAppendRequest commitRequest() { return Objects.requireNonNull(commitRequest, "commitRequest"); }
-        WrittenStreamSlice slice() { return Objects.requireNonNull(slice, "slice"); }
+        DurablePrimaryAppend durableAppend() {
+            return Objects.requireNonNull(durableAppend, "durableAppend");
+        }
 
         void trackHeadSource(CompletableFuture<StableAppendResult> source) {
             headSource = source;
@@ -1225,13 +1326,14 @@ public final class AppendCoordinator implements AutoCloseable {
     private record PreparedAttempt(
             AppendSession session,
             long expectedOffset,
-            ObjectPreparedPrimaryAppend primaryAppend) {
+            PrimaryWalAppender<?> appender,
+            PreparedPrimaryAppend primaryAppend) {
     }
 
     private record UploadedAttempt(
             AppendSession session,
             long expectedOffset,
-            WalWriteResult writeResult) {
+            DurablePrimaryAppend primaryAppend) {
     }
 
     private static final class StreamLane {

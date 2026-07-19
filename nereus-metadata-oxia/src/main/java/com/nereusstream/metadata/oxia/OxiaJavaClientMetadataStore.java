@@ -377,19 +377,11 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     public CompletableFuture<StableAppendResult> commitPreparedStableAppend(
             String cluster,
             PreparedStableAppend prepared,
-            ObjectProtectionIdentity protectionIdentity,
-            long rootMetadataVersion,
-            long rootLifecycleEpoch,
-            long protectionMetadataVersion,
-            Checksum protectionRecordSha256) {
+            PhysicalReferenceProof protectionProof) {
         return completeAppend(() -> commitPreparedStableAppendSync(
                 new OxiaKeyspace(cluster),
                 prepared,
-                protectionIdentity,
-                rootMetadataVersion,
-                rootLifecycleEpoch,
-                protectionMetadataVersion,
-                protectionRecordSha256));
+                protectionProof));
     }
 
     @Override
@@ -669,11 +661,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private StableAppendResult commitPreparedStableAppendSync(
             OxiaKeyspace keyspace,
             PreparedStableAppend prepared,
-            ObjectProtectionIdentity protectionIdentity,
-            long rootMetadataVersion,
-            long rootLifecycleEpoch,
-            long protectionMetadataVersion,
-            Checksum protectionRecordSha256) {
+            PhysicalReferenceProof protectionProof) {
         PreparedStableAppend exact = Objects.requireNonNull(prepared, "prepared");
         CommitAppendRequest request = exact.request();
         DurableRecord<StreamCommitTargetRecord> initialIntent = requireExactPreparedIntent(
@@ -682,11 +670,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         validateStableAppendProtection(
                 keyspace,
                 exact,
-                protectionIdentity,
-                rootMetadataVersion,
-                rootLifecycleEpoch,
-                protectionMetadataVersion,
-                protectionRecordSha256);
+                protectionProof);
         ReachableCommittedAppend markerReplay = findGenericMarkerReplay(keyspace, request);
         if (markerReplay != null) {
             return new StableAppendResult(markerReplay, false);
@@ -719,11 +703,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             validateStableAppendProtection(
                     keyspace,
                     exact,
-                    protectionIdentity,
-                    rootMetadataVersion,
-                    rootLifecycleEpoch,
-                    protectionMetadataVersion,
-                    protectionRecordSha256);
+                    protectionProof);
             StreamHeadRecord head = headOrThrow(keyspace, request.streamId());
             if (!sameCommitAnchor(initialHead, head)) {
                 AppendReplaySearchResult replay = searchAppendReplaySync(
@@ -834,17 +814,13 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             throw invariant("prepared generic commit key is non-canonical");
         }
         validateReplay(request, durable.value(), AppendOutcome.KNOWN_NOT_COMMITTED);
-        if (!(request.readTarget() instanceof ObjectSliceReadTarget target)
-                || target.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT) {
-            throw invariant("stable append intent does not reference an Object WAL slice");
-        }
         return new PreparedStableAppend(
                 request,
                 request.commitId(),
                 durable.key(),
                 durable.metadataVersion(),
                 durable.durableValueSha256(),
-                ObjectKeyHash.from(target.objectKey()),
+                com.nereusstream.api.ReadTargetIdentities.sha256(request.readTarget()),
                 replayWasReachable);
     }
 
@@ -895,16 +871,24 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private void validateStableAppendProtection(
             OxiaKeyspace keyspace,
             PreparedStableAppend prepared,
-            ObjectProtectionIdentity protectionIdentity,
-            long rootMetadataVersion,
-            long rootLifecycleEpoch,
-            long protectionMetadataVersion,
-            Checksum protectionRecordSha256) {
-        ObjectProtectionIdentity identity = Objects.requireNonNull(
-                protectionIdentity,
-                "protectionIdentity");
+            PhysicalReferenceProof protectionProof) {
+        PhysicalReferenceProof genericProof = Objects.requireNonNull(
+                protectionProof,
+                "protectionProof");
+        if (!(genericProof instanceof ObjectPhysicalReferenceProof proof)) {
+            throw invariant("primary physical-reference proof type is not installed");
+        }
+        if (proof.purpose() != PhysicalReferencePurpose.REACHABLE_APPEND
+                || proof.targetType() != prepared.request().readTarget().type()
+                || !proof.targetIdentitySha256().equals(prepared.primaryTargetIdentitySha256())) {
+            throw invariant("stable append physical-reference proof is non-canonical");
+        }
+        ObjectProtectionIdentity identity = proof.protectionIdentity();
+        long rootMetadataVersion = proof.rootMetadataVersion();
+        long rootLifecycleEpoch = proof.rootLifecycleEpoch();
+        long protectionMetadataVersion = proof.protectionMetadataVersion();
         Checksum protectionSha = F4ValueValidation.sha256(
-                protectionRecordSha256,
+                proof.protectionRecordSha256(),
                 "protectionRecordSha256");
         if (rootMetadataVersion < 0 || rootLifecycleEpoch <= 0 || protectionMetadataVersion < 0) {
             throw new IllegalArgumentException("stable append protection versions are invalid");

@@ -5,6 +5,9 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.PhysicalReadStats;
+import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadSourceRef;
+import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.api.ResolvedRange;
@@ -42,6 +45,31 @@ public final class ObjectWalReaderAdapter implements PrimaryWalReader {
     private static PhysicalReadResult genericResult(
             List<ResolvedObjectRange> ranges,
             WalReadResult result) {
+        List<ReadBatch> batches = result.batches().stream().map(batch -> {
+            ResolvedObjectRange range = ranges.stream()
+                    .filter(candidate -> candidate.offsetRange().startOffset() <= batch.range().startOffset()
+                            && batch.range().endOffset() <= candidate.offsetRange().endOffset()
+                            && candidate.objectId().equals(batch.sourceObjectId()))
+                    .findFirst()
+                    .orElseThrow(() -> new NereusException(
+                            ErrorCode.METADATA_INVARIANT_VIOLATION,
+                            false,
+                            "Object reader batch has no exact resolved source"));
+            return new ReadBatch(
+                    batch.range(),
+                    batch.payloadFormat(),
+                    batch.payload(),
+                    batch.schemaRefs(),
+                    batch.projectionRef(),
+                    new ReadSourceRef(
+                            range.offsetRange(),
+                            range.generation(),
+                            range.commitVersion(),
+                            range.readTarget(),
+                            ReadTargetIdentities.sha256(range.readTarget())),
+                    batch.sourceObjectOffset(),
+                    batch.sourceObjectLength());
+        }).toList();
         List<PhysicalReadStats> stats = result.sliceStats().stream().map(value -> {
             ResolvedObjectRange range = ranges.stream()
                     .filter(candidate -> candidate.objectId().equals(value.objectId())
@@ -52,14 +80,31 @@ public final class ObjectWalReaderAdapter implements PrimaryWalReader {
                     .orElseThrow(() -> new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
                             "Object reader reported an unknown resolved source"));
             return new PhysicalReadStats(
-                    com.nereusstream.api.ReadTargetIdentities.sha256(range.readTarget()),
+                    ReadTargetIdentities.sha256(range.readTarget()),
                     value.fullSlicePayloadBytes(),
                     value.entryIndexBytes(),
                     value.downloadedPayloadBytes(),
                     value.downloadedEntryIndexBytes(),
                     value.returnedPayloadBytes());
         }).toList();
-        return new PhysicalReadResult(result.batches(), stats);
+        if (stats.isEmpty() && !ranges.isEmpty()) {
+            stats = ranges.stream()
+                    .filter(range -> batches.stream().anyMatch(batch -> batch.source().targetIdentity().equals(
+                            ReadTargetIdentities.sha256(range.readTarget()))))
+                    .map(range -> new PhysicalReadStats(
+                    ReadTargetIdentities.sha256(range.readTarget()),
+                    range.objectLength(),
+                    range.entryIndexRef().length(),
+                    range.objectLength(),
+                    range.entryIndexRef().length(),
+                    batches.stream()
+                            .filter(batch -> batch.source().targetIdentity().equals(
+                                    ReadTargetIdentities.sha256(range.readTarget())))
+                            .mapToLong(batch -> batch.payload().length)
+                            .reduce(0, Math::addExact)))
+                    .toList();
+        }
+        return new PhysicalReadResult(batches, stats);
     }
     @Override public long reservationBytes(ResolvedRange range) {
         ResolvedObjectRange object = ResolvedObjectRange.from(range);

@@ -592,7 +592,7 @@ tasks.register<Exec>("checkPhase4Documentation") {
 
 tasks.register<Exec>("bookKeeperPrimaryWalDocumentationCheck") {
     group = "verification"
-    description = "Verify the F1-BK code-level design, source locks, non-implementation status, and documentation links."
+    description = "Verify the F1-BK code-level design, source locks, BK-M1 status, and documentation links."
     workingDir = layout.projectDirectory.asFile
     commandLine("bash", "scripts/check-bookkeeper-primary-wal-documentation.sh")
 }

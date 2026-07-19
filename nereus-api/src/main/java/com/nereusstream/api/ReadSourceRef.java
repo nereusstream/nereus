@@ -25,5 +25,8 @@ public record ReadSourceRef(
                 || targetIdentity.type() != ChecksumType.SHA256) {
             throw new IllegalArgumentException("invalid read source reference");
         }
+        if (!ReadTargetIdentities.sha256(target).equals(targetIdentity)) {
+            throw new IllegalArgumentException("read source target identity is non-canonical");
+        }
     }
 }

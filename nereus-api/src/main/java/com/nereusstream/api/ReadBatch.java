@@ -138,17 +138,13 @@ public final class ReadBatch {
         ApiRangeValidation.requireNonNegativeNonOverflowingRange(objectOffset, objectLength, "source object");
         ObjectKey objectKey = entryIndexRef.objectKey().orElseGet(
                 () -> new ObjectKey("legacy/" + objectId.value()));
-        Checksum synthetic = ReadTargetIdentities.sha256(new ObjectSliceReadTarget(
-                1, objectId, objectKey, ObjectType.MULTI_STREAM_WAL_OBJECT,
-                "WAL_OBJECT_V1", "OPAQUE_SLICE", "legacy-" + objectId.value() + "-" + objectOffset,
-                objectOffset, objectLength,
-                new Checksum(ChecksumType.CRC32C, "00000000"), entryIndexRef));
+        long compatibilityTargetLength = Math.max(1, objectLength);
         ObjectSliceReadTarget target = new ObjectSliceReadTarget(
                 1, objectId, objectKey, ObjectType.MULTI_STREAM_WAL_OBJECT,
                 "WAL_OBJECT_V1", "OPAQUE_SLICE", "legacy-" + objectId.value() + "-" + objectOffset,
-                objectOffset, objectLength,
+                objectOffset, compatibilityTargetLength,
                 new Checksum(ChecksumType.CRC32C, "00000000"), entryIndexRef);
-        return new ReadSourceRef(range, 0, 1, target, synthetic);
+        return new ReadSourceRef(range, 0, 1, target, ReadTargetIdentities.sha256(target));
     }
 
     @Override

@@ -16,9 +16,5 @@ final class MetadataStableAppendCommitter implements StableAppendCommitter {
         return metadata.commitPreparedStableAppend(
                 cluster,
                 append.prepared(),
-                append.protectionIdentity(),
-                append.rootMetadataVersion(),
-                append.rootLifecycleEpoch(),
-                append.protectionMetadataVersion(),
-                append.protectionRecordSha256()); }
+                append.proof()); }
 }

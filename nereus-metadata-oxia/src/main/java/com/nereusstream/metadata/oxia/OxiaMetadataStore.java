@@ -92,11 +92,30 @@ public interface OxiaMetadataStore extends AutoCloseable {
     CompletableFuture<StableAppendResult> commitPreparedStableAppend(
             String cluster,
             PreparedStableAppend prepared,
+            PhysicalReferenceProof protectionProof);
+
+    /** Object-WAL compatibility entry point retained while callers migrate to provider-neutral proofs. */
+    @Deprecated(forRemoval = true)
+    default CompletableFuture<StableAppendResult> commitPreparedStableAppend(
+            String cluster,
+            PreparedStableAppend prepared,
             ObjectProtectionIdentity protectionIdentity,
             long rootMetadataVersion,
             long rootLifecycleEpoch,
             long protectionMetadataVersion,
-            Checksum protectionRecordSha256);
+            Checksum protectionRecordSha256) {
+        return commitPreparedStableAppend(
+                cluster,
+                prepared,
+                new ObjectPhysicalReferenceProof(
+                        PhysicalReferencePurpose.REACHABLE_APPEND,
+                        prepared.primaryTargetIdentitySha256(),
+                        protectionIdentity,
+                        rootMetadataVersion,
+                        rootLifecycleEpoch,
+                        protectionMetadataVersion,
+                        protectionRecordSha256));
+    }
 
     CompletableFuture<MaterializedGenerationZero> materializeGenerationZero(
             String cluster,
