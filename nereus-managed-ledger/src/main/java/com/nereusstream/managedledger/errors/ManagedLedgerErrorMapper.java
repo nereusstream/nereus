@@ -66,7 +66,8 @@ public final class ManagedLedgerErrorMapper {
             return unsupported(context.operation());
         }
         return new ManagedLedgerException(
-                "Nereus " + context.operation() + " failed [" + code + ", retriable=" + nereus.retriable() + "]",
+                "Nereus " + context.operation() + " failed [" + code + ", retriable=" + nereus.retriable()
+                        + "]: " + nereus.getMessage(),
                 nereus);
     }
 

@@ -42,6 +42,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 
 class DefaultMaterializationLagSnapshotReaderTest {
@@ -138,6 +140,41 @@ class DefaultMaterializationLagSnapshotReaderTest {
         }
     }
 
+    @Test
+    void ignoresReadObservationTimeWhenRevalidatingStableStreamHead() {
+        MaterializationPolicy policy =
+                MaterializationPlannerTestSupport.policy();
+        GenerationMetadataStore durable =
+                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        GenerationMetadataStore generations =
+                MaterializationPlannerTestSupport.generationStore(
+                        List.of(), List.of(), durable);
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor();
+        AtomicLong observedAt = new AtomicLong(10_000);
+        try {
+            MaterializationLagSnapshot snapshot = new DefaultMaterializationLagSnapshotReader(
+                            CLUSTER,
+                            l0(observedAt::incrementAndGet),
+                            generations,
+                            policy,
+                            16,
+                            16,
+                            scheduler,
+                            CLOCK)
+                    .measure(STREAM, Duration.ofSeconds(5))
+                    .join();
+
+            assertThat(snapshot.committedEndOffset()).isEqualTo(2);
+            assertThat(snapshot.observedHeadMetadataVersion())
+                    .isEqualTo(5);
+            assertThat(observedAt).hasValueGreaterThan(10_001);
+        } finally {
+            scheduler.shutdownNow();
+            generations.close();
+        }
+    }
+
     private static DefaultMaterializationLagSnapshotReader reader(
             MaterializationPolicy policy,
             GenerationMetadataStore generations,
@@ -154,7 +191,11 @@ class DefaultMaterializationLagSnapshotReaderTest {
     }
 
     private static OxiaMetadataStore l0() {
-        StreamMetadataSnapshot snapshot = snapshot();
+        return l0(() -> 1);
+    }
+
+    private static OxiaMetadataStore l0(
+            LongSupplier observedAtMillis) {
         AppendRecoveryAnchor anchor =
                 AppendRecoveryAnchor.genesis(STREAM);
         AppendRecoveryHead head =
@@ -190,7 +231,8 @@ class DefaultMaterializationLagSnapshotReaderTest {
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, arguments) -> switch (method.getName()) {
                     case "getStreamSnapshot" ->
-                        CompletableFuture.completedFuture(snapshot);
+                        CompletableFuture.completedFuture(
+                                snapshot(observedAtMillis.getAsLong()));
                     case "readAppendRecoveryTail" ->
                         CompletableFuture.completedFuture(tail);
                     case "close" -> null;
@@ -204,6 +246,11 @@ class DefaultMaterializationLagSnapshotReaderTest {
     }
 
     private static StreamMetadataSnapshot snapshot() {
+        return snapshot(1);
+    }
+
+    private static StreamMetadataSnapshot snapshot(
+            long trimUpdatedAtMillis) {
         return new StreamMetadataSnapshot(
                 new StreamMetadataRecord(
                         STREAM.value(),
@@ -218,7 +265,7 @@ class DefaultMaterializationLagSnapshotReaderTest {
                 new CommittedEndOffsetRecord(
                         STREAM.value(), 2, 30, 2, 5),
                 new TrimRecord(
-                        STREAM.value(), 0, "", 1, 5));
+                        STREAM.value(), 0, "", trimUpdatedAtMillis, 5));
     }
 
     private static AppendRecoveryCommit commit(

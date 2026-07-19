@@ -144,14 +144,16 @@ public final class DefaultMaterializationLagSnapshotReader
         }
 
         private CompletableFuture<MaterializationLagSnapshot> run() {
-            return attempt(0);
+            return attempt(0, "initial authority was not measured");
         }
 
         private CompletableFuture<MaterializationLagSnapshot> attempt(
-                int attempt) {
+                int attempt,
+                String lastInstability) {
             if (attempt >= MAX_STABILITY_ATTEMPTS) {
                 return CompletableFuture.failedFuture(condition(
-                        "materialization lag authority changed throughout measurement"));
+                        "materialization lag authority changed throughout measurement: "
+                                + lastInstability));
             }
             return loadAuthority()
                     .thenCompose(authority -> scanCoverage(
@@ -180,15 +182,18 @@ public final class DefaultMaterializationLagSnapshotReader
                                                         coverage,
                                                         measured.walk())
                                                         .thenCompose(
-                                                                stable ->
-                                                                        stable
+                                                                instability ->
+                                                                        instability
+                                                                                        .isEmpty()
                                                                                 ? CompletableFuture
                                                                                         .completedFuture(
                                                                                                 measured
                                                                                                         .snapshot())
                                                                                 : attempt(
                                                                                         attempt
-                                                                                                + 1)));
+                                                                                                + 1,
+                                                                                        instability
+                                                                                                .orElseThrow())));
                             }));
         }
 
@@ -802,7 +807,7 @@ public final class DefaultMaterializationLagSnapshotReader
                     false);
         }
 
-        private CompletableFuture<Boolean> finalRevalidate(
+        private CompletableFuture<Optional<String>> finalRevalidate(
                 Authority authority,
                 Coverage coverage,
                 AnchorAwareCommitWalk walk) {
@@ -823,18 +828,29 @@ public final class DefaultMaterializationLagSnapshotReader
                                                             streamId),
                                             "revalidate recovery root after materialization lag")
                                     .thenCompose(root -> {
-                                        if (!snapshot.equals(
-                                                        authority
-                                                                .snapshot())
-                                                || !registration.equals(
-                                                        Optional.of(
-                                                                authority
-                                                                        .registration()))
-                                                || !root.equals(
-                                                        walk.recoveryRoot())) {
+                                        if (!sameStreamAuthority(
+                                                snapshot,
+                                                authority.snapshot())) {
                                             return CompletableFuture
                                                     .completedFuture(
-                                                            false);
+                                                            Optional.of(
+                                                                    "stream snapshot changed"));
+                                        }
+                                        if (!registration.equals(
+                                                Optional.of(
+                                                        authority
+                                                                .registration()))) {
+                                            return CompletableFuture
+                                                    .completedFuture(
+                                                            Optional.of(
+                                                                    "stream registration changed"));
+                                        }
+                                        if (!root.equals(
+                                                walk.recoveryRoot())) {
+                                            return CompletableFuture
+                                                    .completedFuture(
+                                                            Optional.of(
+                                                                    "recovery root changed"));
                                         }
                                         return scanCoverage(
                                                         authority.bounds(),
@@ -843,7 +859,13 @@ public final class DefaultMaterializationLagSnapshotReader
                                                                 .value()
                                                                 .projectionRef())
                                                 .thenApply(
-                                                        coverage::equals);
+                                                        current ->
+                                                                coverage.equals(
+                                                                                current)
+                                                                        ? Optional
+                                                                                .<String>empty()
+                                                                        : Optional.of(
+                                                                                "committed generation coverage changed"));
                                     })));
         }
 
@@ -909,6 +931,20 @@ public final class DefaultMaterializationLagSnapshotReader
         }
         return Integer.compare(
                 leftBytes.length, rightBytes.length);
+    }
+
+    private static boolean sameStreamAuthority(
+            StreamMetadataSnapshot current,
+            StreamMetadataSnapshot expected) {
+        return current.metadata().equals(expected.metadata())
+                && current.committedEnd().equals(
+                        expected.committedEnd())
+                && current.trim().streamId().equals(
+                        expected.trim().streamId())
+                && current.trim().trimOffset()
+                        == expected.trim().trimOffset()
+                && current.trim().metadataVersion()
+                        == expected.trim().metadataVersion();
     }
 
     private static NereusException condition(

@@ -34,6 +34,11 @@ class ManagedLedgerErrorMapperTest {
                         OperationContext.ledger("read")))
                 .isInstanceOf(ManagedLedgerException.NonRecoverableLedgerException.class)
                 .hasCauseInstanceOf(NereusException.class);
+        assertThat(mapper.map(
+                        failure(ErrorCode.METADATA_CONDITION_FAILED),
+                        OperationContext.ledger("append")))
+                .hasMessage("Nereus append failed [METADATA_CONDITION_FAILED, retriable=false]: test failure")
+                .hasCauseInstanceOf(NereusException.class);
     }
 
     @Test
