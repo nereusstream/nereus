@@ -288,6 +288,13 @@ that wins its independent metadata-key race after the ledger root reaches `MARKE
 revalidation；the root advances back to `SEALED` and the physical ledger remains present。The same real fixture proves
 the disabled safe default and enabled dry-run modes return without mutating either the root or provider ledger。
 
+The reader lease implementation now matches the frozen process-scoped contract rather than consuming one durable slot
+per foreground call。Concurrent calls in one process/ledger share one hash-started slot and a renewable lease epoch；the
+slot is conditionally removed only after the final local reference。The deterministic maximum-slot test and real Oxia
+test fill every independent-process slot without duplicates, reject the next process before any BookKeeper open/read,
+and fail final revalidation when the exact durable pin disappears。A failed renewal retains the last known exact
+durable version for final conditional release, so a transient renewal failure cannot strand an otherwise owned row。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session

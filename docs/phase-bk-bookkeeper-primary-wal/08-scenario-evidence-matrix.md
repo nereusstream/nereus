@@ -10,7 +10,7 @@ immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256
 The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
 the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-32、BK-37、
 BK-38、BK-39、BK-40、
-BK-41、BK-47、BK-48、BK-49、BK-52、BK-53、BK-56
+BK-41、BK-42、BK-47、BK-48、BK-49、BK-52、BK-53、BK-56
 and BK-55, including
 a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
 does not claim the remaining M2 rows。The focused allocator gate also adds D checkpoints for every applied metadata
@@ -110,7 +110,7 @@ Evidence levels：
 | BK-39 | M2 | B/O | middle-offset clipped read verifies full target then returns dense suffix | `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift` |
 | BK-40 | M2 | B/O | checksum/count/id/config mismatch fails; no partial/empty result | `BookKeeperPrimaryWalReaderTest.checksumMismatchFailsClosedWithoutReturningPartialBytes` + `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift` + `realReaderFailsClosedOnCountIdAndConfigurationDrift` |
 | BK-41 | M2 | B/O/C | fresh process reads history with no cached handle | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
-| BK-42 | M2 | B/O | fixed reader slots cap concurrent processes race-free；lease blocks MARK/delete and final revalidation precedes return | `BookKeeperReaderLeaseIT.fencesPhysicalDeletion` |
+| BK-42 | M2 | D/B/O | fixed reader slots cap concurrent processes race-free；lease blocks MARK/delete and final revalidation precedes return | `BookKeeperReaderLeaseManagerTest.oneProcessSharesOneRenewableSlotUntilItsFinalLocalRelease` + `fixedSlotsBoundIndependentProcessesWithoutDeletingForeignOccupants` + `finalRevalidationFailsWhenTheExactDurableLeaseDisappears` + `renewalFailureDoesNotLeakTheRememberedDurableSlot` + `BookKeeperWalRetentionGateTest.admitsOnlyACompleteRetiredInventoryWithoutReaderPins` + `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderSlotsArePerProcessBoundedAndFinalPinRevalidationFailsClosed` |
 | BK-43 | M2 | P | raw Pulsar Entry properties/payload round-trip through BK generation zero | D checkpoint: `PulsarEntryOpaqueRoundTripTest.preservesUnbatchedAndCompressedBatchBytesPropertiesOrderingKeyAndMiddleBatchMessageId` + `NereusBookKeeperManagedLedgerIntegrationTest.facadePreservesEntryBytesAndVirtualPositionOverBookKeeperGenerationZero`; final: `NereusBookKeeperEntryIntegrationTest.preservesOpaqueEntryBytes` |
 | BK-44 | M2 | P | ordinary and batched `MessageIdAdv` use virtual identity, not BK ledger id | partial D checkpoint for ordinary virtual Position only: `NereusBookKeeperManagedLedgerIntegrationTest.facadePreservesEntryBytesAndVirtualPositionOverBookKeeperGenerationZero`; final: `NereusBookKeeperEntryIntegrationTest.preservesVirtualMessageIds` |
 | BK-45 | M2 | P | seek/history after rollover/restart returns same MessageIds | `NereusBookKeeperEntryIntegrationTest.preservesSeekAcrossRollover` |

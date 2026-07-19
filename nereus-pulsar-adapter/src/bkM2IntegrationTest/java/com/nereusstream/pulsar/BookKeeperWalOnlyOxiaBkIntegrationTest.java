@@ -811,6 +811,125 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
+    void realReaderSlotsArePerProcessBoundedAndFinalPinRevalidationFailsClosed() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-reader-slots-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(1_570_000), ZoneId.of("UTC"));
+        AtomicReference<CountingOperations> counting = new AtomicReference<>();
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-reader-slots",
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> counting(raw, counting))) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-reader-slots-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            long ledgerId = target(process.append(stream, new byte[] {1})).ledgerId();
+            var root = process.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), ledgerId)
+                    .join()
+                    .orElseThrow();
+
+            BookKeeperReaderLeaseManager sharedManager = new BookKeeperReaderLeaseManager(
+                    cluster,
+                    configuration,
+                    process.bookKeeperMetadata,
+                    clock,
+                    "reader-process-shared");
+            var firstSharedFuture = sharedManager.claim(root, TIMEOUT);
+            var secondSharedFuture = sharedManager.claim(root, TIMEOUT);
+            var firstShared = firstSharedFuture.join();
+            var secondShared = secondSharedFuture.join();
+            assertThat(firstShared.value().readerSlot()).isEqualTo(secondShared.value().readerSlot());
+            assertThat(process.bookKeeperMetadata.scanReaderLeases(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            ledgerId,
+                            Optional.empty(),
+                            configuration.maxReaderLeasesPerLedger())
+                    .join().values()).hasSize(1);
+            firstShared.release().join();
+
+            List<CompletableFuture<BookKeeperReaderLeaseManager.Lease>> claimFutures =
+                    java.util.stream.IntStream.range(1, configuration.maxReaderLeasesPerLedger())
+                            .mapToObj(index -> new BookKeeperReaderLeaseManager(
+                                            cluster,
+                                            configuration,
+                                            process.bookKeeperMetadata,
+                                            clock,
+                                            "reader-process-" + index)
+                                    .claim(root, TIMEOUT))
+                            .toList();
+            CompletableFuture.allOf(claimFutures.toArray(CompletableFuture[]::new)).join();
+            List<BookKeeperReaderLeaseManager.Lease> independent =
+                    claimFutures.stream().map(CompletableFuture::join).toList();
+            assertThat(process.bookKeeperMetadata.scanReaderLeases(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            ledgerId,
+                            Optional.empty(),
+                            configuration.maxReaderLeasesPerLedger())
+                    .join().values())
+                    .hasSize(configuration.maxReaderLeasesPerLedger())
+                    .extracting(value -> value.value().readerSlot())
+                    .doesNotHaveDuplicates();
+
+            BookKeeperReaderLeaseManager overflow = new BookKeeperReaderLeaseManager(
+                    cluster,
+                    configuration,
+                    process.bookKeeperMetadata,
+                    clock,
+                    "reader-process-overflow");
+            assertThatThrownBy(() -> overflow.claim(root, TIMEOUT).join())
+                    .hasCauseInstanceOf(NereusException.class)
+                    .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
+                            .isEqualTo(ErrorCode.BACKPRESSURE_REJECTED));
+            assertThat(counting.get().normalOpenCalls()).isZero();
+            assertThat(counting.get().recoveryOpenCalls()).isZero();
+
+            var sharedDurable = process.bookKeeperMetadata.getReaderLease(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            ledgerId,
+                            secondShared.value().readerSlot())
+                    .join()
+                    .orElseThrow();
+            process.bookKeeperMetadata.deleteReaderLease(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            ledgerId,
+                            sharedDurable.value().readerSlot(),
+                            sharedDurable.metadataVersion())
+                    .join();
+            assertThatThrownBy(() -> secondShared.revalidate().join())
+                    .hasCauseInstanceOf(NereusException.class)
+                    .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
+                            .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
+            secondShared.release().join();
+            independent.forEach(lease -> lease.release().join());
+            assertThat(process.bookKeeperMetadata.scanReaderLeases(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            ledgerId,
+                            Optional.empty(),
+                            configuration.maxReaderLeasesPerLedger())
+                    .join().values()).isEmpty();
+        }
+    }
+
+    @Test
     void restartRecoveryReusesCurrentSessionRangeAndFencesExpiredSessionRange() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "bk-m2-recovery-" + suffix;

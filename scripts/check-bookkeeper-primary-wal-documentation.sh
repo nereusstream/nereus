@@ -126,6 +126,21 @@ require_literal 'disabledAndDryRunGcNeverMutateRootOrProvider' \
 require_literal 'referenceAfterMarkUnmarksAndSafeGcModesNeverDelete' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'oneProcessSharesOneRenewableSlotUntilItsFinalLocalRelease' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
+require_literal 'fixedSlotsBoundIndependentProcessesWithoutDeletingForeignOccupants' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
+require_literal 'finalRevalidationFailsWhenTheExactDurableLeaseDisappears' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
+require_literal 'renewalFailureDoesNotLeakTheRememberedDurableSlot' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperReaderLeaseManagerTest.java"
+require_literal 'realReaderSlotsArePerProcessBoundedAndFinalPinRevalidationFailsClosed' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
