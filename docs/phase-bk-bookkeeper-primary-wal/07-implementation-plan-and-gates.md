@@ -262,6 +262,11 @@ same remaining monotonic budget passed through allocation。Caller cancellation 
 ambiguous provider attempt is still running；the permit is released only after that pipeline succeeds or fails and its
 seal/recovery path converges。Focused tests cover success、provider failure、timeout、cancel、capacity rejection and
 runtime close；the existing prepared-buffer/client-adapter ref-count tests remain the byte-buffer ownership evidence。
+The real-service deadline cut delays completion only after the real BookKeeper `CreateAdv` has succeeded，records the
+monotonic budget passed to create and the later exact-range write，and then completes the same stable-head/gen0 append。
+The write receives at least the injected delay less budget than create，while the final committed range remains cold
+readable；allocation、write and stable commit therefore remain under the caller's one outer append deadline rather
+than acquiring per-stage full budgets。
 
 Recovery now has deterministic applied-response-loss coverage for each writer/root CAS across
 `ACTIVE -> SEALING -> SEALED -> IDLE`，including exact closed LAC/length reload。A real BookKeeper/Oxia test keeps the

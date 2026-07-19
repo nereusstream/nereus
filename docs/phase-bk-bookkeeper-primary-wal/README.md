@@ -9,7 +9,8 @@
 > exact CreateAdv response loss、delayed matching create recovery through the bounded fixed-slot scanner、permanent
 > hazard/retention veto、cold all-256-root/all-16-allocation-slot shard coverage、rollover、fresh-client/runtime cold
 > restart、stable-target history、post-restart writer recovery、two independent recovery-process contention、
-> whole-ledger trim/deletion、lost DELETE response and a second fresh-process dual-absence convergence；it
+> monotonic allocation/write/commit deadline consumption、whole-ledger trim/deletion、lost DELETE response and a
+> second fresh-process dual-absence convergence；it
 > also found and fixed the
 > public BookKeeper client's consuming `ByteBuf` ownership boundary。These checkpoints are
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /

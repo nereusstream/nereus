@@ -102,6 +102,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -1354,10 +1355,59 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
     }
 
+    @Test
+    void realCreateDelayConsumesTheSingleAppendDeadlineBeforeWriteAndStableCommit() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-deadline-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(5_750_000), ZoneId.of("UTC"));
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        Duration createCompletionDelay = Duration.ofMillis(250);
+        AtomicReference<DeadlineRecordingOperations> deadlines = new AtomicReference<>();
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-deadline",
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> deadlineRecording(raw, createCompletionDelay, deadlines))) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-deadline-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            AppendResult committed = process.append(stream, new byte[] {1, 2, 3});
+            long createBudget = deadlines.get().createBudgetNanos();
+            long writeBudget = deadlines.get().writeBudgetNanos();
+
+            assertThat(createBudget).isPositive().isLessThanOrEqualTo(TIMEOUT.toNanos());
+            assertThat(writeBudget)
+                    .isPositive()
+                    .isLessThan(createBudget - Duration.ofMillis(150).toNanos());
+            assertThat(committed.range().startOffset()).isZero();
+            assertRead(process, stream, List.of(new byte[] {1, 2, 3}));
+        }
+    }
+
     private static CountingOperations counting(
             BookKeeperClientOperations raw,
             AtomicReference<CountingOperations> target) {
         CountingOperations operations = new CountingOperations(raw);
+        target.set(operations);
+        return operations;
+    }
+
+    private static DeadlineRecordingOperations deadlineRecording(
+            BookKeeperClientOperations raw,
+            Duration createCompletionDelay,
+            AtomicReference<DeadlineRecordingOperations> target) {
+        DeadlineRecordingOperations operations = new DeadlineRecordingOperations(raw, createCompletionDelay);
         target.set(operations);
         return operations;
     }
@@ -2161,6 +2211,85 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             } catch (InvocationTargetException failure) {
                 throw failure.getCause();
             }
+        }
+    }
+
+    private static final class DeadlineRecordingOperations implements BookKeeperClientOperations {
+        private final BookKeeperClientOperations delegate;
+        private final Duration createCompletionDelay;
+        private final AtomicLong createBudgetNanos = new AtomicLong(-1);
+        private final AtomicLong writeBudgetNanos = new AtomicLong(-1);
+
+        private DeadlineRecordingOperations(
+                BookKeeperClientOperations delegate,
+                Duration createCompletionDelay) {
+            this.delegate = delegate;
+            this.createCompletionDelay = createCompletionDelay;
+        }
+
+        @Override
+        public CompletableFuture<WriteAdvHandle> createAdvanced(
+                long ledgerId,
+                BookKeeperWalConfiguration configuration,
+                byte[] password,
+                Map<String, byte[]> customMetadata,
+                BookKeeperOperationDeadline deadline) {
+            createBudgetNanos.compareAndSet(-1, deadline.remaining().toNanos());
+            return delegate.createAdvanced(ledgerId, configuration, password, customMetadata, deadline)
+                    .thenCompose(handle -> CompletableFuture.supplyAsync(
+                            () -> handle,
+                            CompletableFuture.delayedExecutor(
+                                    createCompletionDelay.toNanos(),
+                                    java.util.concurrent.TimeUnit.NANOSECONDS)));
+        }
+
+        @Override
+        public CompletableFuture<ReadHandle> open(
+                long ledgerId,
+                BookKeeperDigestType digestType,
+                byte[] password,
+                boolean recovery,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.open(ledgerId, digestType, password, recovery, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Long> write(
+                WriteAdvHandle handle,
+                long entryId,
+                ByteBuf entry,
+                BookKeeperOperationDeadline deadline) {
+            writeBudgetNanos.compareAndSet(-1, deadline.remaining().toNanos());
+            return delegate.write(handle, entryId, entry, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerEntries> readUnconfirmed(
+                ReadHandle handle,
+                long firstEntryId,
+                long lastEntryIdInclusive,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerMetadata> metadata(
+                long ledgerId,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.metadata(ledgerId, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+            return delegate.delete(ledgerId, deadline);
+        }
+
+        private long createBudgetNanos() {
+            return createBudgetNanos.get();
+        }
+
+        private long writeBudgetNanos() {
+            return writeBudgetNanos.get();
         }
     }
 

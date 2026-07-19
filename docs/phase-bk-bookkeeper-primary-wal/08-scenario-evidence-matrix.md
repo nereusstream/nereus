@@ -8,7 +8,7 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 passed on 2026-07-19 under `bookKeeperPrimaryWalM2MetadataCheck`。BK-20 now passes its explicit D-level lifecycle /
 immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256-root/all-16-slot-shard scan。
 The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
-the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-32、BK-33、BK-37、
+the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-32、BK-33、BK-35、BK-37、
 BK-38、BK-39、BK-40、
 BK-41、BK-42、BK-47、BK-48、BK-49、BK-52、BK-53、BK-54、BK-56
 and BK-55, including
@@ -99,7 +99,7 @@ Evidence levels：
 | BK-32 | M2 | B/O | new owner recovery-open fences old handle; old owner cannot head-commit | `BookKeeperWalOnlyOxiaBkIntegrationTest.newOwnerRecoveryOpenFencesLiveOldHandleAndPreventsOldHeadCommit` |
 | BK-33 | M2 | D/B/O | two recovery owners contend; one new active ledger wins | `BookKeeperLedgerRecoveryTest.serializesTwoRecoveryOwners` + real independent Oxia-runtime/BK-client `BookKeeperWalOnlyOxiaBkIntegrationTest.twoIndependentRecoveryProcessesElectOneRealOxiaWinnerAndOneReplacementLedger` |
 | BK-34 | M2 | D | buffer/permit counts return to zero on success/failure/timeout/cancel/close | `BookKeeperAppenderResourceTest.releasesEveryOwnedResource` + `BookKeeperPreparedPrimaryAppendTest` + `BookKeeperClientApiContractTest` |
-| BK-35 | M2 | D/B | one monotonic deadline spans allocation/write/commit and does not reset | D checkpoint: `BookKeeperAppenderDeadlineTest.propagatesRemainingBudget`; real B deadline cut remains open |
+| BK-35 | M2 | D/B/O | one monotonic deadline spans allocation/write/commit and does not reset | `BookKeeperAppenderDeadlineTest.propagatesRemainingBudget` + real Oxia/BK delayed-create budget observation and committed cold read `BookKeeperWalOnlyOxiaBkIntegrationTest.realCreateDelayConsumesTheSingleAppendDeadlineBeforeWriteAndStableCommit` |
 | BK-36 | M2 | D | typed configuration has no write-flag escape hatch and production create always passes an empty flag set, making `DEFERRED_SYNC` unrepresentable | `BookKeeperClientApiContractTest.defaultAdapterMakesDeferredSyncUnrepresentableAndAlwaysUsesEmptyWriteFlags` |
 
 ## 5. Read and Pulsar compatibility
