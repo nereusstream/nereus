@@ -482,8 +482,8 @@ public final class ReadCoordinator implements StreamViewReader {
             WalReadResult result) {
         validateReadAccounting(ranges, result);
         result.sliceStats().forEach(stats -> observe(() -> observer.onSliceRead(
-                stats.fullSlicePayloadBytes(),
-                stats.entryIndexBytes(),
+                stats.downloadedPayloadBytes(),
+                stats.downloadedEntryIndexBytes(),
                 stats.returnedPayloadBytes())));
         if (result.batches().isEmpty()) {
             throw new NereusException(

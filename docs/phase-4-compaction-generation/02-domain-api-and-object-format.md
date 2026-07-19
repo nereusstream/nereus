@@ -904,6 +904,14 @@ The selected generation/index keeps the effective projection ref as an admission
 file metadata still prove the exact virtual-ledger projection. `PulsarEntryOpaqueRoundTripTest` covers unbatched and
 ZSTD-compressed batched entries with properties、ordering keys and a serialized middle-batch MessageId.
 
+Read accounting must not compare decompressed logical bytes with compressed object length as if they shared one byte
+domain. `WalSliceReadStats` therefore carries resolved target payload/index lengths for identity validation and
+separate measured payload/index downloads for metrics. `ParquetCompactedTargetReader` copies
+`CompactedObjectReadResult.physicalBytesRead/footerBytesRead` into those measured fields；returned logical bytes may
+legitimately exceed physical IO. `ioDeltaBytes` is signed, while `amplificationBytes` and
+`compressionSavingsBytes` expose its two non-negative parts. `readsCompressibleLogicalPayloadLargerThanPhysicalParquetIo`
+locks the case where two returned 256 KiB rows are larger than the ZSTD Parquet IO and still decode byte-for-byte。
+
 ### 7.4 Footer/index reference
 
 Every row group must cover one dense subrange and expose Parquet min/max statistics for `stream_offset`. The writer

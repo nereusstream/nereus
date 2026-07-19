@@ -165,6 +165,10 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                     target.objectOffset(),
                     target.objectLength(),
                     target.entryIndexRef().length(),
+                    Math.subtractExact(
+                            result.physicalBytesRead(),
+                            result.footerBytesRead()),
+                    result.footerBytesRead(),
                     rangeBytes));
             long records = Math.addExact(returnedRecords, result.rows().size());
             long payloadBytes = Math.addExact(returnedBytes, rangeBytes);

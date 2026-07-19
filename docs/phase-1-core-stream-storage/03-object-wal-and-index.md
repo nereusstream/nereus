@@ -670,10 +670,13 @@ public interface WalObjectReader {
 }
 ```
 
-`WalReadResult` returns caller batches plus one `WalSliceReadStats` for every slice actually downloaded and
-verified. Stats include object id/offset, full slice payload bytes, entry-index bytes and returned payload
-bytes；this lets M5 emit exact amplification metrics even when the reader downloads one extra slice before a
-byte-limit stop. The compatibility `read` method retains the original batch-only API。
+`WalReadResult` returns caller batches plus one `WalSliceReadStats` for every target actually downloaded and
+verified. Stats keep resolved object id/offset/full-slice/index lengths separately from actual downloaded payload/
+index bytes and returned logical payload bytes. The five-argument compatibility constructor records a Phase 1 WAL
+full-slice download by setting actual bytes equal to the resolved lengths；higher-generation compressed readers use
+the canonical constructor with their measured physical IO. This lets core validate target identity while emitting
+exact IO metrics even when a reader downloads one extra slice before a byte-limit stop. The compatibility `read`
+method retains the original batch-only API。
 
 Algorithm:
 
@@ -732,6 +735,11 @@ fullSliceAndIndexBytesDownloaded
 returnedPayloadBytes
 amplificationBytes = fullSliceAndIndexBytesDownloaded - returnedPayloadBytes
 ```
+
+For Phase 1 WAL objects the delta is non-negative because bytes are returned from the same uncompressed checksum
+domain. The shared stats carrier also serves compressed higher-generation targets：there `ioDeltaBytes` may be
+negative, `amplificationBytes` is the non-negative positive part, and `compressionSavingsBytes` is the non-negative
+negative part. Metrics observers receive measured downloaded bytes, not resolved target lengths。
 
 Entry index location handling:
 

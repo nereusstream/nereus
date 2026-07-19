@@ -17,30 +17,65 @@ package com.nereusstream.objectstore.wal;
 import com.nereusstream.api.ObjectId;
 import java.util.Objects;
 
-/** Exact byte accounting for one full slice whose checksum domain was read and verified. */
+/** Resolved-target identity plus exact physical/logical byte accounting for one verified read. */
 public record WalSliceReadStats(
         ObjectId objectId,
         long objectOffset,
         long fullSlicePayloadBytes,
         long entryIndexBytes,
+        long downloadedPayloadBytes,
+        long downloadedEntryIndexBytes,
         long returnedPayloadBytes) {
+    public WalSliceReadStats(
+            ObjectId objectId,
+            long objectOffset,
+            long fullSlicePayloadBytes,
+            long entryIndexBytes,
+            long returnedPayloadBytes) {
+        this(
+                objectId,
+                objectOffset,
+                fullSlicePayloadBytes,
+                entryIndexBytes,
+                fullSlicePayloadBytes,
+                entryIndexBytes,
+                returnedPayloadBytes);
+    }
+
     public WalSliceReadStats {
         Objects.requireNonNull(objectId, "objectId");
-        if (objectOffset < 0 || fullSlicePayloadBytes < 0 || entryIndexBytes < 0 || returnedPayloadBytes < 0) {
-            throw new IllegalArgumentException("WAL slice read byte counts must be non-negative");
+        if (objectOffset < 0
+                || fullSlicePayloadBytes < 0
+                || entryIndexBytes < 0
+                || downloadedPayloadBytes < 0
+                || downloadedEntryIndexBytes < 0
+                || returnedPayloadBytes < 0) {
+            throw new IllegalArgumentException("read byte counts must be non-negative");
         }
-        if (returnedPayloadBytes > fullSlicePayloadBytes) {
-            throw new IllegalArgumentException("returned payload bytes cannot exceed the full slice payload");
+    }
+
+    public long physicalBytesRead() {
+        try {
+            return Math.addExact(downloadedPayloadBytes, downloadedEntryIndexBytes);
+        } catch (ArithmeticException e) {
+            throw new IllegalStateException("physical read byte accounting overflows", e);
+        }
+    }
+
+    public long ioDeltaBytes() {
+        try {
+            return Math.subtractExact(physicalBytesRead(), returnedPayloadBytes);
+        } catch (ArithmeticException e) {
+            throw new IllegalStateException("read IO delta overflows", e);
         }
     }
 
     public long amplificationBytes() {
-        try {
-            return Math.subtractExact(
-                    Math.addExact(fullSlicePayloadBytes, entryIndexBytes),
-                    returnedPayloadBytes);
-        } catch (ArithmeticException e) {
-            throw new IllegalStateException("WAL slice read amplification overflows", e);
-        }
+        return Math.max(0, ioDeltaBytes());
+    }
+
+    public long compressionSavingsBytes() {
+        long delta = ioDeltaBytes();
+        return delta < 0 ? Math.negateExact(delta) : 0;
     }
 }

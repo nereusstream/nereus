@@ -147,6 +147,90 @@ class ParquetCompactedTargetReaderTest {
         }
     }
 
+    @Test
+    void readsCompressibleLogicalPayloadLargerThanPhysicalParquetIo() throws Exception {
+        StreamId streamId = new StreamId("stream-core-ncp1-compressed");
+        byte[] payload = new byte[256 * 1024];
+        java.util.Arrays.fill(payload, (byte) 'z');
+        long logicalBytes = Math.multiplyExact(payload.length, 4L);
+        CompactedObjectWriteRequest writeRequest = request(streamId, logicalBytes);
+        try (StagingFileManager staging = staging();
+                LocalFileObjectStore store =
+                        new LocalFileObjectStore(temporaryDirectory.resolve("compressed-objects"));
+                CompactedObjectWriteResult written = new ParquetCompactedObjectWriter(staging, Runnable::run)
+                        .write(writeRequest, publisher(List.of(
+                                row(40, payload),
+                                row(41, payload),
+                                row(42, payload),
+                                row(43, payload))))
+                        .join()) {
+            store.putObject(
+                            written.objectKey(),
+                            written.stagingFile(),
+                            new PutObjectOptions(
+                                    "application/vnd.apache.parquet",
+                                    written.storageCrc32c(),
+                                    true,
+                                    Map.of(),
+                                    Duration.ofSeconds(10)))
+                    .join();
+            ObjectSliceReadTarget target = new ObjectSliceReadTarget(
+                    1,
+                    written.objectId(),
+                    written.objectKey(),
+                    ObjectType.STREAM_COMPACTED_OBJECT,
+                    written.physicalFormat(),
+                    writeRequest.logicalFormat(),
+                    "40-44",
+                    0,
+                    written.objectLength(),
+                    written.storageCrc32c(),
+                    written.entryIndexRef());
+            ResolvedRange range = new ResolvedRange(
+                    writeRequest.sourceCoverage(),
+                    2,
+                    target,
+                    writeRequest.payloadFormat(),
+                    4,
+                    4,
+                    logicalBytes,
+                    List.of(),
+                    Optional.of(new ProjectionRef(
+                            ProjectionType.VIRTUAL_LEDGER, "nereus-ml-v1.core-compressed")),
+                    9);
+            ParquetCompactedTargetReader reader = new ParquetCompactedTargetReader(
+                    new ParquetCompactedObjectReader(store, Runnable::run));
+
+            WalReadResult read = reader.readWithStats(
+                            streamId,
+                            40,
+                            List.of(range),
+                            new ReadOptions(
+                                    2,
+                                    payload.length * 2,
+                                    ReadIsolation.COMMITTED,
+                                    Duration.ofSeconds(10)))
+                    .join();
+
+            assertThat(read.batches()).hasSize(2).allSatisfy(batch ->
+                    assertThat(batch.payload()).containsExactly(payload));
+            assertThat(read.sliceStats()).singleElement().satisfies(stats -> {
+                assertThat(stats.fullSlicePayloadBytes())
+                        .isEqualTo(written.objectLength());
+                assertThat(stats.entryIndexBytes())
+                        .isEqualTo(written.entryIndexRef().length());
+                assertThat(stats.returnedPayloadBytes())
+                        .isEqualTo(payload.length * 2L);
+                assertThat(stats.physicalBytesRead())
+                        .isLessThan(stats.returnedPayloadBytes());
+                assertThat(stats.amplificationBytes()).isZero();
+                assertThat(stats.compressionSavingsBytes())
+                        .isEqualTo(stats.returnedPayloadBytes()
+                                - stats.physicalBytesRead());
+            });
+        }
+    }
+
     private StagingFileManager staging() throws Exception {
         Path directory = Files.createDirectory(temporaryDirectory.resolve("staging"));
         Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwx------"));
