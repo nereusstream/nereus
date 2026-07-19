@@ -16,6 +16,7 @@ import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
+import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.StreamRegistrationScanPage;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
@@ -140,6 +141,66 @@ class RegisteredMaterializationStreamScannerTest {
         assertThat(readinessChecks).hasValue(2);
         assertThat(revalidations.get()).isGreaterThanOrEqualTo(3);
         assertThat(sourceRepairs).hasValue(2);
+    }
+
+    @Test
+    void freshProcessRediscoversUnloadedCommittedHeadWithoutTaskOrWatchState() {
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
+        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(clock);
+        MaterializationStreamRegistrationRecord hydrated =
+                MaterializationPlannerTestSupport.registration().value();
+        durable.createOrVerifyStreamRegistration(
+                        CLUSTER,
+                        new MaterializationStreamRegistrationRecord(
+                                hydrated.schemaVersion(),
+                                hydrated.streamId(),
+                                hydrated.projectionRef(),
+                                hydrated.projectionIdentitySha256(),
+                                hydrated.storageProfile(),
+                                hydrated.registeredAtMillis(),
+                                hydrated.lastHintCommitVersion(),
+                                hydrated.updatedAtMillis(),
+                                0))
+                .join();
+        List<VersionedGenerationCandidate> candidates = List.of(
+                MaterializationPlannerTestSupport.zero(
+                        "/index/restarted-2", 0, 2, 0, 100, 2),
+                MaterializationPlannerTestSupport.zero(
+                        "/index/restarted-4", 2, 4, 100, 100, 4));
+        MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
+        AtomicInteger dispatches = new AtomicInteger();
+
+        // Every object below is reconstructed. Only durable registry/L0/index metadata is shared.
+        RegisteredMaterializationStreamScanner restarted = liveStreamScanner(
+                durableGenerationStore(durable, candidates),
+                MaterializationPlannerTestSupport.l0Store(
+                        MaterializationPlannerTestSupport.snapshot(0, 4)),
+                policy,
+                clock,
+                dispatches);
+        RegisteredMaterializationScanResult recovered = restarted.scanOnce().join();
+
+        assertThat(recovered.shardsScanned())
+                .isEqualTo(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+        assertThat(recovered.registrationsScanned()).isOne();
+        assertThat(recovered.registrationsAdmitted()).isOne();
+        assertThat(recovered.existingTasksRecovered()).isZero();
+        assertThat(recovered.plannedTasksConverged()).isOne();
+
+        RegisteredMaterializationStreamScanner secondFreshProcess = liveStreamScanner(
+                durableGenerationStore(durable, candidates),
+                MaterializationPlannerTestSupport.l0Store(
+                        MaterializationPlannerTestSupport.snapshot(0, 4)),
+                policy,
+                clock,
+                dispatches);
+        RegisteredMaterializationScanResult converged =
+                secondFreshProcess.scanOnce().join();
+
+        assertThat(converged.existingTasksRecovered()).isOne();
+        assertThat(converged.plannedTasksConverged()).isZero();
+        assertThat(dispatches).hasValue(2);
+        durable.close();
     }
 
     @Test
@@ -285,6 +346,113 @@ class RegisteredMaterializationStreamScannerTest {
                 policy,
                 registryPageSize,
                 1);
+    }
+
+    private static RegisteredMaterializationStreamScanner liveStreamScanner(
+            GenerationMetadataStore generations,
+            OxiaMetadataStore l0Metadata,
+            MaterializationPolicy policy,
+            Clock clock,
+            AtomicInteger dispatches) {
+        MaterializationTaskStore taskStore = new MaterializationTaskStore(
+                CLUSTER, generations, clock);
+        MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
+                taskStore,
+                durableTask -> CompletableFuture.completedFuture(
+                        new MaterializationTaskProtections(
+                                durableTask, List.of(), Optional.empty())),
+                new GenerationPublicationReconciler((ignoredTask, ignoredOutput) ->
+                        CompletableFuture.completedFuture(null)),
+                (ignoredDurable, ignoredTask) -> {
+                    dispatches.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                },
+                clock,
+                Duration.ZERO,
+                Duration.ofSeconds(1));
+        DefaultMaterializationPlanner planner = new DefaultMaterializationPlanner(
+                CLUSTER, l0Metadata, generations, 2);
+        return new RegisteredMaterializationStreamScanner(
+                CLUSTER,
+                l0Metadata,
+                generations,
+                countingGuard(new AtomicInteger(), new AtomicInteger()),
+                streamId -> CompletableFuture.completedFuture(null),
+                planner,
+                taskStore,
+                recovery,
+                new TaskRecoveryScanner(taskStore, recovery, 1),
+                streamId -> CompletableFuture.completedFuture(
+                        com.nereusstream.materialization.recovery.RecoveryCheckpointRunResult.skipped(
+                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus
+                                        .NO_LIVE_TAIL)),
+                (streamId, exactPolicy, mutationGuard) -> mutationGuard.revalidate()
+                        .thenCompose(ignored -> generations.getOrCreateMaterializationCheckpoint(
+                                CLUSTER,
+                                streamId,
+                                exactPolicy.policyId(),
+                                exactPolicy.policyVersion(),
+                                exactPolicy.digestSha256())),
+                (streamId, exactPolicy, trim, mutationGuard) ->
+                        CompletableFuture.completedFuture(
+                                TerminalWorkflowMetadataRetirementResult.empty()),
+                policy,
+                1,
+                10);
+    }
+
+    private static GenerationMetadataStore durableGenerationStore(
+            GenerationMetadataStore delegate,
+            List<VersionedGenerationCandidate> candidates) {
+        return (GenerationMetadataStore) Proxy.newProxyInstance(
+                GenerationMetadataStore.class.getClassLoader(),
+                new Class<?>[] {GenerationMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return switch (method.getName()) {
+                            case "toString" -> "fresh-process-generation-store";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == args[0];
+                            default -> throw new UnsupportedOperationException(method.getName());
+                        };
+                    }
+                    if (method.getName().equals("scanIndex")) {
+                        StreamId stream = (StreamId) args[1];
+                        com.nereusstream.api.ReadView view =
+                                (com.nereusstream.api.ReadView) args[2];
+                        List<VersionedGenerationCandidate> page = candidates.stream()
+                                .filter(candidate -> candidate instanceof
+                                        com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex zero
+                                        && zero.value().streamId().equals(stream)
+                                        && view == com.nereusstream.api.ReadView.COMMITTED)
+                                .toList();
+                        return CompletableFuture.completedFuture(
+                                new GenerationScanPage(page, Optional.empty()));
+                    }
+                    if (method.getName().equals("getCandidate")) {
+                        StreamId stream = (StreamId) args[1];
+                        com.nereusstream.api.ReadView view =
+                                (com.nereusstream.api.ReadView) args[2];
+                        long offsetEnd = (long) args[3];
+                        long generation = (long) args[4];
+                        return CompletableFuture.completedFuture(candidates.stream()
+                                .filter(candidate -> candidate instanceof
+                                        com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex zero
+                                        && zero.value().streamId().equals(stream)
+                                        && view == com.nereusstream.api.ReadView.COMMITTED
+                                        && zero.value().offsetEnd() == offsetEnd
+                                        && zero.value().generation() == generation)
+                                .findFirst());
+                    }
+                    if (method.getName().equals("close")) {
+                        return null;
+                    }
+                    try {
+                        return method.invoke(delegate, args);
+                    } catch (InvocationTargetException failure) {
+                        throw failure.getCause();
+                    }
+                });
     }
 
     private static RegisteredMaterializationStreamScanner skippedStreamScanner(

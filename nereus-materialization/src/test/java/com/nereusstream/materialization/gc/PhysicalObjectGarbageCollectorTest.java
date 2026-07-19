@@ -243,6 +243,60 @@ class PhysicalObjectGarbageCollectorTest {
     }
 
     @Test
+    void abandonedReaderLeaseAfterProcessDeathBlocksUntilSkewSafeExpiry() {
+        PhysicalGcConfig config = config(true, false);
+        FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();
+        MutableClock clock = new MutableClock(1_000);
+        VersionedPhysicalObjectRoot active = createActiveRoot(store);
+        GcReferenceQuery query = query(active);
+        PhysicalObjectGarbageCollector collector = collector(
+                config,
+                store,
+                clock,
+                new TrackingActivationGuard(),
+                new TrackingDomain("projection-generation-v1"),
+                new TrackingDomain("generation-v1"));
+        GcPlan plan = collector.mark(
+                        candidate(config, active, query), List.of(), List.of())
+                .join()
+                .plan()
+                .orElseThrow();
+
+        clock.setMillis(12_001);
+        createLease(store, plan, "c".repeat(52), "d".repeat(52), 15_000);
+        PhysicalGcAdvanceResult protectedByDeadProcess =
+                collector.advanceToDeleteIntent(plan).join();
+
+        assertThat(protectedByDeadProcess.status())
+                .isEqualTo(PhysicalGcAdvanceStatus.WAITING_FOR_READERS);
+        assertThat(protectedByDeadProcess.retryAtMillis()).hasValue(15_006);
+        assertThat(store.scanReaderLeases(
+                                CLUSTER,
+                                plan.candidate().object().objectKeyHash(),
+                                Optional.empty(),
+                                10)
+                        .join()
+                        .values())
+                .hasSize(1);
+
+        // No release is issued: the durable lease is the only surviving fact from the dead process.
+        clock.setMillis(protectedByDeadProcess.retryAtMillis().orElseThrow());
+        PhysicalGcAdvanceResult afterSkewSafeExpiry =
+                collector.advanceToDeleteIntent(plan).join();
+
+        assertThat(afterSkewSafeExpiry.status())
+                .isEqualTo(PhysicalGcAdvanceStatus.DELETE_INTENT);
+        assertThat(store.scanReaderLeases(
+                                CLUSTER,
+                                plan.candidate().object().objectKeyHash(),
+                                Optional.empty(),
+                                10)
+                        .join()
+                        .values())
+                .hasSize(1);
+    }
+
+    @Test
     void deleteIntentReloadsExactJournalAtAdmissionAndFinalFence() {
         PhysicalGcConfig config = config(true, false);
         FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();

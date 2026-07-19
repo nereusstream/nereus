@@ -19,12 +19,16 @@ import com.nereusstream.managedledger.cursor.CursorIdentity;
 import com.nereusstream.managedledger.cursor.CursorLedgerIdentity;
 import com.nereusstream.managedledger.cursor.CursorSnapshotKeys;
 import com.nereusstream.managedledger.retention.CursorSnapshotGcScanner;
+import com.nereusstream.managedledger.retention.CursorSnapshotReferenceDomain;
+import com.nereusstream.materialization.gc.GcCandidate;
 import com.nereusstream.materialization.gc.DefaultGcRetirementJournal;
 import com.nereusstream.materialization.gc.GcMetadataRetirementRegistry;
+import com.nereusstream.materialization.gc.GcPlannedProtectionRemoval;
 import com.nereusstream.materialization.gc.GcReferenceDomainRegistry;
 import com.nereusstream.materialization.gc.PhysicalGcAdvanceStatus;
 import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.materialization.gc.PhysicalGcDeletionStatus;
+import com.nereusstream.materialization.gc.PhysicalGcMarkStatus;
 import com.nereusstream.materialization.gc.PhysicalObjectGarbageCollector;
 import com.nereusstream.materialization.gc.SourceRetirementCoordinator;
 import com.nereusstream.metadata.oxia.CursorKeyspace;
@@ -36,6 +40,8 @@ import com.nereusstream.metadata.oxia.ManagedLedgerProjectionNames;
 import com.nereusstream.metadata.oxia.VersionedCursorState;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.CursorRecordLifecycle;
+import com.nereusstream.metadata.oxia.records.CursorProtectionIntentRecord;
+import com.nereusstream.metadata.oxia.records.CursorProtectionKind;
 import com.nereusstream.metadata.oxia.records.CursorRetentionLifecycle;
 import com.nereusstream.metadata.oxia.records.CursorRetentionRecord;
 import com.nereusstream.metadata.oxia.records.CursorStateRecord;
@@ -58,6 +64,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,6 +75,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class CursorSnapshotGcExecutorTest {
     private static final String CLUSTER = "cluster/a";
@@ -149,6 +158,104 @@ class CursorSnapshotGcExecutorTest {
         }
     }
 
+    @ParameterizedTest
+    @EnumSource(
+            value = CursorRetentionLifecycle.class,
+            names = {"PROTECTION_PENDING", "TRIM_PENDING"})
+    void pendingCursorLifecycleAtInventoryVetoesDeletion(
+            CursorRetentionLifecycle lifecycle) {
+        try (Context context = new Context(temporaryDirectory.resolve(
+                "pending-inventory-" + lifecycle.name().toLowerCase()))) {
+            VersionedCursorState cursor = context.createCursor();
+            Snapshot snapshot = context.createSnapshot();
+            context.createProtection(cursor, snapshot);
+            context.setRetentionPending(lifecycle);
+
+            CursorSnapshotGcExecutor.ScanExecutionReport result =
+                    context.executor.scan(context.ledger).join();
+
+            assertThat(result.scan().eligibleCandidates()).isZero();
+            assertThat(result.executions()).isEmpty();
+            assertThat(context.currentRoot(snapshot).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(context.listSnapshots()).hasSize(1);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = CursorRetentionLifecycle.class,
+            names = {"PROTECTION_PENDING", "TRIM_PENDING"})
+    void pendingCursorLifecycleBetweenInventoryAndMarkBlocksMark(
+            CursorRetentionLifecycle lifecycle) {
+        try (Context context = new Context(temporaryDirectory.resolve(
+                "pending-mark-" + lifecycle.name().toLowerCase()))) {
+            VersionedCursorState cursor = context.createCursor();
+            Snapshot snapshot = context.createSnapshot();
+            context.createProtection(cursor, snapshot);
+            ArrayList<CursorSnapshotGcScanner.Candidate> candidates = new ArrayList<>();
+            context.scanner.scan(
+                            context.ledger,
+                            candidate -> {
+                                candidates.add(candidate);
+                                return CompletableFuture.completedFuture(null);
+                            })
+                    .join();
+            CursorSnapshotGcScanner.Candidate discovered = candidates.getFirst();
+
+            context.setRetentionPending(lifecycle);
+            GcCandidate candidate = GcCandidate.fromActiveRoot(
+                    context.gcConfig,
+                    "d".repeat(52),
+                    discovered.sourceRoot(),
+                    discovered.referenceQuery(),
+                    discovered.discoveryEvidenceSha256(),
+                    discovered.discoveredAtMillis(),
+                    discovered.notBeforeMillis());
+            var mark = context.collector.mark(
+                            candidate,
+                            discovered.plannedProtectionRemovals().stream()
+                                    .map(GcPlannedProtectionRemoval::new)
+                                    .toList(),
+                            List.of())
+                    .join();
+
+            assertThat(mark.status()).isEqualTo(PhysicalGcMarkStatus.DOMAIN_BLOCKED);
+            assertThat(context.currentRoot(snapshot).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(context.listSnapshots()).hasSize(1);
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = CursorRetentionLifecycle.class,
+            names = {"PROTECTION_PENDING", "TRIM_PENDING"})
+    void pendingCursorLifecycleDuringDrainUnmarksWithoutDeletingBytes(
+            CursorRetentionLifecycle lifecycle) {
+        try (Context context = new Context(temporaryDirectory.resolve(
+                "pending-drain-" + lifecycle.name().toLowerCase()))) {
+            VersionedCursorState cursor = context.createCursor();
+            Snapshot snapshot = context.createSnapshot();
+            context.createProtection(cursor, snapshot);
+            context.executor.scan(context.ledger).join();
+            VersionedPhysicalObjectRoot marked = context.currentRoot(snapshot);
+            assertThat(marked.value().lifecycle()).isEqualTo(PhysicalObjectLifecycle.MARKED);
+
+            context.setRetentionPending(lifecycle);
+            context.clock.advance(Duration.ofSeconds(12));
+            CursorSnapshotGcExecutor.CandidateExecutionResult result =
+                    context.executor.recoverMarked(context.ledger, marked).join();
+
+            assertThat(result.advance().orElseThrow().status())
+                    .isEqualTo(PhysicalGcAdvanceStatus.PLAN_DRIFT_UNMARKED);
+            assertThat(result.deletion()).isEmpty();
+            assertThat(context.currentRoot(snapshot).value().lifecycle())
+                    .isEqualTo(PhysicalObjectLifecycle.ACTIVE);
+            assertThat(context.listSnapshots()).hasSize(1);
+        }
+    }
+
     private static final class Context implements AutoCloseable {
         private final FakeCursorMetadataStore cursorStore = new FakeCursorMetadataStore();
         private final FakePhysicalObjectMetadataStore physicalStore =
@@ -162,6 +269,7 @@ class CursorSnapshotGcExecutorTest {
         private final CursorSnapshotGcScanner scanner;
         private final CursorSnapshotGcExecutor executor;
         private final PhysicalGcConfig gcConfig;
+        private final PhysicalObjectGarbageCollector collector;
 
         private Context(Path root) {
             objectStore = new LocalFileObjectStore(root);
@@ -212,11 +320,15 @@ class CursorSnapshotGcExecutorTest {
                     gcConfig,
                     scheduler,
                     List.of(
+                            new CursorSnapshotReferenceDomain(
+                                    CLUSTER,
+                                    cursorStore,
+                                    gcConfig.referenceDomainConfig()),
                             new EmptyDomain("generation-v1"),
                             new EmptyDomain("projection-generation-v1")));
             DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(
                     CLUSTER, physicalStore, gcConfig);
-            PhysicalObjectGarbageCollector collector = new PhysicalObjectGarbageCollector(
+            collector = new PhysicalObjectGarbageCollector(
                     CLUSTER,
                     gcConfig,
                     physicalStore,
@@ -246,6 +358,59 @@ class CursorSnapshotGcExecutorTest {
                     collector,
                     retirement,
                     () -> "c".repeat(52));
+        }
+
+        private void setRetentionPending(CursorRetentionLifecycle lifecycle) {
+            var current = cursorStore.getRetention(
+                            CLUSTER, new StreamId(projection.streamId()))
+                    .join()
+                    .orElseThrow();
+            CursorRetentionRecord value = current.value();
+            CursorRetentionRecord pending = switch (lifecycle) {
+                case PROTECTION_PENDING -> new CursorRetentionRecord(
+                        0,
+                        projection,
+                        OWNER_1,
+                        lifecycle,
+                        value.mutationSequence() + 1,
+                        0,
+                        0,
+                        Optional.of(new CursorProtectionIntentRecord(
+                                PROTECTION_ATTEMPT,
+                                CursorProtectionKind.CREATE,
+                                "pending-subscription",
+                                CursorNames.cursorNameHash("pending-subscription"),
+                                0,
+                                1,
+                                0,
+                                Optional.empty(),
+                                Map.of(),
+                                Map.of(),
+                                clock.millis())),
+                        Optional.empty(),
+                        OptionalLong.empty(),
+                        Optional.empty(),
+                        clock.millis());
+                case TRIM_PENDING -> new CursorRetentionRecord(
+                        0,
+                        projection,
+                        OWNER_1,
+                        lifecycle,
+                        value.mutationSequence() + 1,
+                        1,
+                        0,
+                        Optional.empty(),
+                        Optional.of(PROTECTION_ATTEMPT),
+                        OptionalLong.of(1),
+                        Optional.of("nereus-cursor-retention/"
+                                + PROTECTION_ATTEMPT + ":gc-race"),
+                        clock.millis());
+                case ACTIVE -> throw new IllegalArgumentException(
+                        "pending lifecycle test requires a pending value");
+            };
+            cursorStore.compareAndSetRetention(
+                            CLUSTER, pending, current.metadataVersion())
+                    .join();
         }
 
         private VersionedCursorState createCursor() {

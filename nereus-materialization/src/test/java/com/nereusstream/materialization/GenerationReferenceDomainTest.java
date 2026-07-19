@@ -17,6 +17,7 @@ import com.nereusstream.materialization.gc.GenerationReferenceDomain;
 import com.nereusstream.materialization.gc.PhysicalGcConfig;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex;
@@ -64,6 +65,62 @@ class GenerationReferenceDomainTest {
         assertThat(domain.stillMatches(query, snapshot).join()).isTrue();
         candidates.set(List.of(second));
         assertThat(domain.stillMatches(query, snapshot).join()).isFalse();
+    }
+
+    @Test
+    void multiStreamWalObjectRemainsReferencedWhileAnyStreamSliceIsLive() {
+        VersionedGenerationZeroIndex first = MaterializationPlannerTestSupport.zero(
+                "/index/shared-object-first", 0, 2, 0, 100, 2);
+        StreamId secondStream = new StreamId("stream-planner-second");
+        OffsetIndexEntry firstValue = first.value();
+        OffsetIndexEntry secondValue = new OffsetIndexEntry(
+                secondStream,
+                firstValue.range(),
+                firstValue.generation(),
+                firstValue.cumulativeSize(),
+                firstValue.readTarget(),
+                firstValue.payloadFormat(),
+                firstValue.recordCount(),
+                firstValue.entryCount(),
+                firstValue.logicalBytes(),
+                firstValue.schemaRefs(),
+                firstValue.projectionRef(),
+                firstValue.commitVersion(),
+                firstValue.tombstoned(),
+                firstValue.metadataVersion());
+        VersionedGenerationZeroIndex second = new VersionedGenerationZeroIndex(
+                "/index/shared-object-second",
+                first.encoding(),
+                secondValue,
+                first.metadataVersion(),
+                sha('f'));
+        AtomicReference<List<VersionedGenerationCandidate>> candidates =
+                new AtomicReference<>(List.of(first, second));
+        GenerationReferenceDomain domain = new GenerationReferenceDomain(
+                MaterializationPlannerTestSupport.CLUSTER,
+                store(candidates, new AtomicInteger()),
+                PhysicalGcConfig.defaults());
+        GcReferenceQuery query = GcReferenceQuery.create(
+                GcReferenceQueryKind.REFERENCED_OBJECT,
+                object(first),
+                List.of(MaterializationPlannerTestSupport.STREAM, secondStream),
+                EVIDENCE);
+
+        var bothLive = domain.snapshot(query).join();
+        assertThat(bothLive.complete()).isTrue();
+        assertThat(bothLive.references())
+                .extracting(value -> value.ownerKey())
+                .containsExactlyInAnyOrder(first.key(), second.key());
+
+        candidates.set(List.of(second));
+        var oneSliceStillLive = domain.snapshot(query).join();
+        assertThat(oneSliceStillLive.complete()).isTrue();
+        assertThat(oneSliceStillLive.references())
+                .extracting(value -> value.ownerKey())
+                .containsExactly(second.key());
+
+        candidates.set(List.of());
+        assertThat(domain.snapshot(query).join().references()).isEmpty();
     }
 
     @Test
@@ -263,14 +320,12 @@ class GenerationReferenceDomainTest {
                             scans.incrementAndGet();
                             StreamId stream = (StreamId) args[1];
                             ReadView view = (ReadView) args[2];
-                            List<VersionedGenerationCandidate> values = stream.equals(
-                                            MaterializationPlannerTestSupport.STREAM)
-                                    ? candidates.get().stream()
-                                            .filter(candidate -> view(candidate) == view)
-                                            .sorted(java.util.Comparator.comparing(
-                                                    VersionedGenerationCandidate::key))
-                                            .toList()
-                                    : List.of();
+                            List<VersionedGenerationCandidate> values = candidates.get().stream()
+                                    .filter(candidate -> stream(candidate).equals(stream))
+                                    .filter(candidate -> view(candidate) == view)
+                                    .sorted(java.util.Comparator.comparing(
+                                            VersionedGenerationCandidate::key))
+                                    .toList();
                             yield CompletableFuture.completedFuture(
                                     new GenerationScanPage(values, Optional.empty()));
                         }
@@ -284,6 +339,12 @@ class GenerationReferenceDomainTest {
         return candidate instanceof VersionedGenerationZeroIndex
                 ? ReadView.COMMITTED
                 : ReadView.fromWireId(((VersionedGenerationIndex) candidate).value().readViewId());
+    }
+
+    private static StreamId stream(VersionedGenerationCandidate candidate) {
+        return candidate instanceof VersionedGenerationZeroIndex zero
+                ? zero.value().streamId()
+                : new StreamId(((VersionedGenerationIndex) candidate).value().streamId());
     }
 
     private static PhysicalGcConfig withLimits(int authorities, int references) {
