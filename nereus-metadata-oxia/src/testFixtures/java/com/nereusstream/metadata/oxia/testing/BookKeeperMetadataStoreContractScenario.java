@@ -101,6 +101,10 @@ public final class BookKeeperMetadataStoreContractScenario {
                 ledgerStore.compareAndSetProtection(CLUSTER, PROVIDER_SCOPE,
                         protection(ledgerIdentity, ProtectionLifecycle.ACTIVE),
                         createdProtection.metadataVersion()).join();
+        BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> retiredProtection =
+                ledgerStore.compareAndSetProtection(CLUSTER, PROVIDER_SCOPE,
+                        protection(ledgerIdentity, ProtectionLifecycle.RETIRED),
+                        updatedProtection.metadataVersion()).join();
 
         BookKeeperLedgerReaderLeaseRecord lease = readerLease(ledgerIdentity, 1, 220);
         BookKeeperVersionedValue<BookKeeperLedgerReaderLeaseRecord> createdLease =
@@ -118,7 +122,7 @@ public final class BookKeeperMetadataStoreContractScenario {
                         .join().values().equals(List.of(updatedRoot)),
                 "root scan was incomplete");
         require(ledgerStore.scanProtections(CLUSTER, PROVIDER_SCOPE, ledgerId, Optional.empty(), 1)
-                        .join().values().equals(List.of(updatedProtection)),
+                        .join().values().equals(List.of(retiredProtection)),
                 "protection scan was incomplete");
         require(ledgerStore.scanReaderLeases(CLUSTER, PROVIDER_SCOPE, ledgerId, Optional.empty(), 1)
                         .join().values().equals(List.of(updatedLease)),
@@ -132,7 +136,7 @@ public final class BookKeeperMetadataStoreContractScenario {
         }
 
         ledgerStore.deleteProtection(CLUSTER, PROVIDER_SCOPE, ledgerId, 2, 0,
-                updatedProtection.metadataVersion()).join();
+                retiredProtection.metadataVersion()).join();
         ledgerStore.deleteReaderLease(CLUSTER, PROVIDER_SCOPE, ledgerId, 3,
                 updatedLease.metadataVersion()).join();
         writerStore.deleteReservation(CLUSTER, STREAM, reservation.reservationId(),
@@ -234,7 +238,7 @@ public final class BookKeeperMetadataStoreContractScenario {
 
     public static BookKeeperLedgerProtectionRecord protection(
             String ledgerIdentity, ProtectionLifecycle lifecycle) {
-        boolean active = lifecycle == ProtectionLifecycle.ACTIVE;
+        boolean active = lifecycle != ProtectionLifecycle.RESERVED;
         return new BookKeeperLedgerProtectionRecord(1, ledgerIdentity, "bk-a", 101, 2, 2, 0,
                 BookKeeperProtectionType.REACHABLE_APPEND.wireId(), "reference-1", 3, 2, RANGE_CHECKSUM,
                 STREAM.value(), 17, 19, 8, active ? "/owner/key" : "", active ? 5 : 0,

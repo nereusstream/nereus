@@ -55,9 +55,9 @@ import org.junit.jupiter.api.Test;
 
 class BookKeeperPrimaryWalAppenderTest {
     static final String CLUSTER = "cluster/bk-appender";
-    private static final String DEPLOYMENT = "deployment-1";
+    static final String DEPLOYMENT = "deployment-1";
     static final StreamId STREAM = new StreamId("stream-bk-appender");
-    private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
+    static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
 
     @Test
     void reservesWritesAndReturnsOneStableExactRange() {
@@ -240,7 +240,7 @@ class BookKeeperPrimaryWalAppenderTest {
         return new AppendSession(STREAM, "writer-1", 1, "token-1", 1, 10_000);
     }
 
-    private static BookKeeperLedgerIdNamespaceReservation reservation(BookKeeperWalConfiguration configuration) {
+    static BookKeeperLedgerIdNamespaceReservation reservation(BookKeeperWalConfiguration configuration) {
         return new BookKeeperLedgerIdNamespaceReservation(1,
                 configuration.ledgerIdNamespaceReservationId(), DEPLOYMENT, configuration.clusterAlias(),
                 configuration.providerScopeSha256(), configuration.ledgerIdPrefixBits(),
@@ -258,7 +258,7 @@ class BookKeeperPrimaryWalAppenderTest {
         final FakeOperations operations = new FakeOperations();
         final BookKeeperWriterStateMachine writerState = new BookKeeperWriterStateMachine(
                 CLUSTER, configuration, metadata, CLOCK, "process-run-1");
-        private final BookKeeperLedgerIdNamespaceReservationVerifier verifier =
+        final BookKeeperLedgerIdNamespaceReservationVerifier verifier =
                 new BookKeeperLedgerIdNamespaceReservationVerifier(
                         (scope, bits, prefix, timeout) -> CompletableFuture.completedFuture(
                                 Optional.of(reservation(configuration))), DEPLOYMENT);
@@ -267,7 +267,7 @@ class BookKeeperPrimaryWalAppenderTest {
                 CLUSTER, configuration, metadata, metadata, verifier, operations,
                 ignored -> "secret".getBytes(StandardCharsets.UTF_8), writerState, CLOCK, new Random(41),
                 () -> "allocation-" + allocationSequence.incrementAndGet());
-        private final BookKeeperLedgerRecovery recovery = new BookKeeperLedgerRecovery(
+        final BookKeeperLedgerRecovery recovery = new BookKeeperLedgerRecovery(
                 CLUSTER, configuration, metadata, metadata, verifier, operations,
                 ignored -> "secret".getBytes(StandardCharsets.UTF_8), writerState, CLOCK);
         final BookKeeperPrimaryWalAppender appender = new BookKeeperPrimaryWalAppender(
@@ -295,7 +295,8 @@ class BookKeeperPrimaryWalAppenderTest {
         private final Map<Long, LedgerState> ledgers = new LinkedHashMap<>();
         private int createCalls;
         private int writeCalls;
-        private int failWriteCall;
+        int failWriteCall;
+        boolean failDeleteAfterRemoval;
         int recoveryOpenCalls;
         int normalOpenCalls;
 
@@ -375,6 +376,11 @@ class BookKeeperPrimaryWalAppenderTest {
         @Override
         public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
             ledgers.remove(ledgerId);
+            if (failDeleteAfterRemoval) {
+                failDeleteAfterRemoval = false;
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.PRIMARY_WAL_WRITE_FAILED, true, "injected lost delete response"));
+            }
             return CompletableFuture.completedFuture(null);
         }
     }

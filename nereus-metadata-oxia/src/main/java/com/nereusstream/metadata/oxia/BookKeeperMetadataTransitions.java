@@ -88,9 +88,16 @@ public final class BookKeeperMetadataTransitions {
         require(!before.lateCreateHazard() || after.lateCreateHazard(), "ledger lateCreateHazard cleared");
         require(rootEdge(before.lifecycle(), after.lifecycle()), "illegal ledger lifecycle replacement");
         if (before.lifecycle() == after.lifecycle()) {
-            require(before.lifecycle() == BookKeeperLedgerLifecycle.ALLOCATING
-                    && !before.lateCreateHazard() && after.lateCreateHazard(),
-                    "same-state root CAS is reserved for ALLOCATING late-create hazard escalation");
+            boolean lateCreateEscalation = before.lifecycle() == BookKeeperLedgerLifecycle.ALLOCATING
+                    && !before.lateCreateHazard() && after.lateCreateHazard();
+            boolean firstDeleteAbsence = before.lifecycle() == BookKeeperLedgerLifecycle.DELETING
+                    && after.firstAbsentAtMillis() >= before.deleteStartedAtMillis()
+                    && after.firstAbsentAtMillis() > before.firstAbsentAtMillis()
+                    && after.deleteStartedAtMillis() == before.deleteStartedAtMillis()
+                    && after.gcAttemptId().equals(before.gcAttemptId())
+                    && after.referenceSetSha256().equals(before.referenceSetSha256());
+            require(lateCreateEscalation || firstDeleteAbsence,
+                    "same-state root CAS is reserved for hazard escalation or first delete absence");
         }
     }
 
@@ -139,13 +146,28 @@ public final class BookKeeperMetadataTransitions {
                 && before.offsetEnd() == after.offsetEnd()
                 && before.createdAtMillis() == after.createdAtMillis()
                 && before.expiresAtMillis() == after.expiresAtMillis(), "protection identity drift");
-        require(before.lifecycle() == ProtectionLifecycle.RESERVED && after.lifecycle() == ProtectionLifecycle.ACTIVE,
-                "only RESERVED -> ACTIVE protection replacement is legal");
-        require(before.ownerKey().isEmpty() && before.ownerMetadataVersion() == 0
-                && before.ownerIdentitySha256().isEmpty(), "RESERVED protection cannot already name an owner");
-        require(!after.referenceId().isBlank() && !after.ownerKey().isBlank()
-                && after.ownerMetadataVersion() > 0 && !after.ownerIdentitySha256().isBlank(),
-                "ACTIVE protection must bind its exact durable owner");
+        require((before.lifecycle() == ProtectionLifecycle.RESERVED
+                        && after.lifecycle() == ProtectionLifecycle.ACTIVE)
+                        || (before.lifecycle() == ProtectionLifecycle.RESERVED
+                        && after.lifecycle() == ProtectionLifecycle.RETIRED)
+                        || (before.lifecycle() == ProtectionLifecycle.ACTIVE
+                        && after.lifecycle() == ProtectionLifecycle.RETIRED),
+                "only RESERVED -> ACTIVE/RETIRED and ACTIVE -> RETIRED protection replacement is legal");
+        if (before.lifecycle() == ProtectionLifecycle.RESERVED) {
+            require(before.ownerKey().isEmpty() && before.ownerMetadataVersion() == 0
+                    && before.ownerIdentitySha256().isEmpty(),
+                    "RESERVED protection cannot already name an owner");
+            require(!after.referenceId().isBlank() && !after.ownerKey().isBlank()
+                    && after.ownerMetadataVersion() > 0 && !after.ownerIdentitySha256().isBlank(),
+                    "ACTIVE protection must bind its exact durable owner");
+        } else {
+            require(before.referenceId().equals(after.referenceId())
+                            && before.commitVersion() == after.commitVersion()
+                            && before.ownerKey().equals(after.ownerKey())
+                            && before.ownerMetadataVersion() == after.ownerMetadataVersion()
+                            && before.ownerIdentitySha256().equals(after.ownerIdentitySha256()),
+                    "RETIRED protection must retain its exact historical owner");
+        }
         require(after.commitVersion() >= before.commitVersion(), "protection commit version moved backward");
     }
 
@@ -216,7 +238,8 @@ public final class BookKeeperMetadataTransitions {
             case SEALED -> after == BookKeeperLedgerLifecycle.MARKED;
             case MARKED -> after == BookKeeperLedgerLifecycle.DELETING
                     || after == BookKeeperLedgerLifecycle.SEALED;
-            case DELETING -> after == BookKeeperLedgerLifecycle.DELETED;
+            case DELETING -> after == BookKeeperLedgerLifecycle.DELETING
+                    || after == BookKeeperLedgerLifecycle.DELETED;
             case DELETED, ABORTED, QUARANTINED -> false;
         };
     }

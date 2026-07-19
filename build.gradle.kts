@@ -641,6 +641,14 @@ tasks.register("bookKeeperPrimaryWalM2RuntimeCheck") {
     dependsOn(":nereus-core:test")
 }
 
+tasks.register("bookKeeperPrimaryWalM2RetentionCheck") {
+    group = "verification"
+    description = "Verify bounded BK-M2 protection retirement and mark/drain/delete/dual-absence convergence."
+    dependsOn("bookKeeperPrimaryWalM2RuntimeCheck")
+    dependsOn(":nereus-bookkeeper:test")
+    dependsOn(":nereus-metadata-oxia:test")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

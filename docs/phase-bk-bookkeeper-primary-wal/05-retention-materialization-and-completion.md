@@ -63,18 +63,21 @@ retirement rule：
 | `APPEND_RECOVERY` | recovery checkpoint/anchor has advanced past the source under existing exact commit-chain rules, or trim authorizes retirement |
 | `REPAIR` | bounded lease expired, owner is absent/terminal, and exact root/reference state is revalidated |
 
-The order is always：
+The implemented BK-M2 order is always：
 
 ```text
 freeze authoritative owner + protection versions/digests
 persist/reload retirement evidence where F4 requires it
-remove/transition owner metadata conditionally
-remove exact protection conditionally
-re-read owner/protection/root
+revalidate the exact monotonic owner-retirement authority
+CAS ACTIVE -> RETIRED (or verified abandoned RESERVED -> RETIRED)
+retain the fixed tombstone with exact historical owner facts
+revalidate the retirement authority again
 ```
 
-Deleting a protection first is forbidden. Absence accepted after a lost response must be journaled/reauthenticated in
-the same way as current F4 source/protection retirement.
+Deleting a protection row before whole-ledger GC is forbidden。`RETIRED` is non-protecting but remains part of the
+complete bounded ledger inventory；this avoids an unbounded stream-reservation scan when later compaction/GC is added。
+The verifier is owner-specific：logical trim、healthy higher generation and exact abandoned append are distinct
+authorities and elapsed time alone cannot produce a tombstone。
 
 ## 4. `BookKeeperWalRetentionGate`
 
@@ -83,11 +86,8 @@ The gate evaluates one sealed root and produces a process-local candidate, never
 ```java
 record BookKeeperLedgerRetirementCandidate(
     VersionedBookKeeperLedgerRoot root,
-    List<VersionedBookKeeperProtection> protections,
-    List<VersionedBookKeeperReaderLease> readerLeases,
     VersionedBookKeeperWriterState writerState,
-    List<VersionedBookKeeperAppendReservation> nonterminalReservations,
-    List<ReferenceAuthorityToken> referenceAuthorities,
+    List<VersionedBookKeeperProtection> retiredProtections,
     Checksum referenceSetSha256,
     BookKeeperProtocolActivationProof activationProof,
     long capturedAtMillis) { }
@@ -97,22 +97,30 @@ Candidate admission requires all of the following：
 
 1. root is exact `SEALED` with stable Oxia version/lifecycle epoch and matching closed BookKeeper metadata；
 2. complete protection and reader pages were scanned from empty continuations；
-3. no nonterminal/permanent protection remains；
+3. all existing protection rows are `RETIRED`；mandatory slots `0..2` exist for every contiguous range slot and their
+   range identities/checksums agree；a final abandoned/partial range may extend beyond the sealed LAC but never leave
+   an uncovered physical entry；
 4. no unexpired reader lease remains；expired leases are handled only after drain/revalidation；
-5. writer state does not select the ledger and no allocation/append reservation may still write/recover it；
-6. every current commit/generation/task/recovery/repair domain is complete and agrees with the protection inventory；
+5. writer state does not select the ledger and no allocation slot may still create/write/recover it；
+6. every commit/generation/task/recovery/repair/abandoned-reservation domain has already supplied exact retirement
+   authority recorded in its permanent tombstone；
 7. root's stream projection/profile remains a supported BookKeeper profile；
 8. exact cluster BK deletion activation/config/ledger-id-namespace binding/scope digest is current；
 9. candidate/reference count is within configured bounds; overflow is a veto；
-10. a second complete capture is byte-for-byte equal before `SEALED -> MARKED`。
+10. a second complete capture has the same exact SEALED root and the same canonical `NBKREF1` digest before
+    `SEALED -> MARKED`。
 
 Any retained `CREATE_UNCERTAIN` allocation slot or root `lateCreateHazard=true` is a non-expiring veto. The hazard
 survives later matching discovery/seal；repeated physical absence cannot retire it, authorize candidate reuse or
 permit whole-ledger delete. Because BookKeeper delete is not metadata-version conditional, loss of the exclusive
 advanced-ledger-id namespace proof also invalidates every in-flight MARK/DELETING mutation before the provider call.
 
-The reference digest includes key、record type、Oxia version、stored-value SHA and semantic identity for every row；it
-does not hash only counts.
+`NBKREF1` includes every tombstone key/version/stored-value SHA and the exact activation proof。For the root and
+stream-wide writer it hashes only immutable sealed-ledger identity plus the semantic “writer does not select this
+ledger” binding；it deliberately excludes mutable root GC version/bytes and unrelated later-ledger writer counters，
+so `SEALED -> MARKED -> DELETING` and later appends on a different ledger cannot manufacture false drift。Every pass
+still reloads the exact observed root version/digest and rechecks the writer predicate；the digest never hashes only
+counts。
 
 ## 5. Whole-ledger behavior by profile
 
@@ -386,8 +394,8 @@ never justified merely because an upload once succeeded.
 | BK read complete, Object upload absent | task retry reads same target; BK retained |
 | Object bytes uploaded, root/publication absent | F4 guarded output recovery; BK retained |
 | generation COMMITTED, task/checkpoint response lost | exact reload converges; task/source protection remains until retirement |
-| source index removed, BK protection delete response lost | retirement journal reauthenticates exact absence; root not deleted early |
-| all protections gone, reader lease exists | ledger remains SEALED/MARKED until lease drain and final revalidation |
+| source/index owner retirement response lost | retirement verifier reloads exact authority; protection stays ACTIVE or converges to the same RETIRED tombstone |
+| all protections RETIRED, reader lease exists | ledger remains SEALED/MARKED until lease drain and final revalidation |
 | BookKeeper DELETE response lost | reload exact metadata; never blind-delete foreign identity; dual absence proof |
 | matching ledger reappears during absence grace | validate allocation metadata, repeat delete under same intent, restart grace |
 | allocation create once entered unknown outcome | persist permanent slot + `lateCreateHazard`；matching ledger is recovery-opened/sealed because its writable handle cannot be reconstructed, and automatic delete remains forbidden |

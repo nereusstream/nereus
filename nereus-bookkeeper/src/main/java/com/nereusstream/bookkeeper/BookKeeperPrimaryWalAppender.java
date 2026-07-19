@@ -520,7 +520,7 @@ public final class BookKeeperPrimaryWalAppender
                 reservation.rangeChecksumSha256(), prepared.streamId().value(),
                 prepared.request().expectedStartOffset(),
                 Math.addExact(prepared.request().expectedStartOffset(), prepared.recordCount()),
-                0, "", 0, "", ProtectionLifecycle.RESERVED, clock.millis(), 0, 0);
+                0, "", 0, "", ProtectionLifecycle.RESERVED, reservation.createdAtMillis(), 0, 0);
     }
 
     private boolean requiresRollover(ActiveLedger active, BookKeeperPreparedPrimaryAppend prepared) {

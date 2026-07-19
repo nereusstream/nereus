@@ -366,7 +366,7 @@ record BookKeeperLedgerProtectionRecord(
     String ownerKey,
     long ownerMetadataVersion,
     String ownerIdentitySha256,
-    ProtectionLifecycle lifecycle,           // RESERVED, ACTIVE
+    ProtectionLifecycle lifecycle,           // RESERVED, ACTIVE, RETIRED
     long createdAtMillis,
     long expiresAtMillis,
     long metadataVersion) { }
@@ -382,17 +382,23 @@ Frozen V1 types：
 | 4 | `APPEND_RECOVERY` | append recovery root/checkpoint |
 | 5 | `REPAIR` | bounded repair intent; only type with expiry |
 
-Permanent types have `expiresAtMillis == 0`。Every owner removal is metadata-first and conditional：prove a replacement
-or trim, persist retirement journal/evidence where required, remove owner, then protection, then permit physical
-deletion. A protection whose owner cannot be read/revalidated is a veto, not stale garbage.
+Permanent types have `expiresAtMillis == 0`。Every owner release is metadata-first and conditional：prove a replacement
+or trim, persist/reload exact retirement evidence where required, then CAS the protection to `RETIRED` while retaining
+its historical owner key/version/digest。The fixed row is not deleted before ledger GC；it becomes the bounded negative
+inventory proof that this range/slot once existed and no longer protects physical bytes。A protection whose owner
+cannot be read/revalidated is a veto, not stale garbage.
 
-Protection lifecycle wire ids are `RESERVED=1` and `ACTIVE=2`；a RESERVED row is already a physical-GC veto but cannot
-stand in for its eventual owner.
+Protection lifecycle wire ids are `RESERVED=1`、`ACTIVE=2` and `RETIRED=3`；a RESERVED row is already a physical-GC
+veto but cannot stand in for its eventual owner。Normal release is `ACTIVE -> RETIRED`。A pre/during-write append that
+is durably `ABANDONED` may use `RESERVED -> RETIRED` only after the retirement verifier reloads the exact terminal
+reservation and installs that reservation's key/version/digest as the tombstone owner；elapsed time is insufficient。
 
 The fixed key、ledger/range identity、slot and type are immutable. A RESERVED row initially uses the append reservation
 id and has no owner fields；its single `RESERVED -> ACTIVE` CAS replaces `referenceId` with the canonical generic
 commit/index reference and installs monotonically nondecreasing `commitVersion` plus exact owner key/version/digest。
 Treating the placeholder reservation id as immutable would make the eventual owner unverifiable and is forbidden。
+`ACTIVE -> RETIRED` retains the canonical reference and owner facts byte-for-byte；the abandoned direct-retirement
+edge retains the reservation id and installs the exact terminal reservation owner facts。
 
 Every append range owns exactly `protectionSlotsPerRange` fixed keys. Slots `0`、`1` and `2` are created as RESERVED
 before physical write for `REACHABLE_APPEND`、`VISIBLE_GENERATION` and `APPEND_RECOVERY` respectively, then CASed to
@@ -402,8 +408,9 @@ append reservation/commit facts or conditionally removes after proven pre-write 
 Slots `[3, protectionSlotsPerRange)` admit materialization、repair and create-before-retire contenders by
 hash-started bounded probing plus exact put-if-absent. Each row represents one exact owner/reference, so multiple F4
 tasks may protect the same range without collapsing ownership. Replacement creates its new exact row first, proves the
-new owner, retires the old owner/row conditionally, then keeps or removes the new row according to that owner's normal
-lifecycle. Concurrent contenders win distinct fixed slots or fail before task/repair IO when all slots are occupied；
+new owner, retires the old owner/row conditionally, then transitions the new row under that owner's normal lifecycle。
+Claimed dynamic slots also remain as RETIRED tombstones until whole-ledger deletion；unclaimed dynamic slots remain
+absent。Concurrent contenders win distinct fixed slots or fail before task/repair IO when all slots are occupied；
 there is no scan-then-count race and GC scans the complete Cartesian slot bound from empty continuations.
 
 ### 3.6 `BookKeeperLedgerReaderLeaseRecord`

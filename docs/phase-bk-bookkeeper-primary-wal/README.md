@@ -4,9 +4,10 @@
 > `bookKeeperPrimaryWalM1FinalCheck` 通过 199-task aggregate（包含 Phase 1.5、Phase 4 与 pinned local Pulsar
 > regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：metadata/store/scanner and the
 > allocator、writer state machine、recovery-open sealing、ordered exact-range appender、fixed physical-reference
-> activation、non-recovery reader/lease/checksum runtime checkpoints are implemented and gated by
-> `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck`。Whole-ledger retention/GC、runtime
-> profile admission and local Pulsar integration remain incomplete，so the profile is still rejected before IO。
+> activation、non-recovery reader/lease/checksum and bounded whole-ledger retention checkpoints are implemented and
+> gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
+> `bookKeeperPrimaryWalM2RetentionCheck`。Runtime profile admission、remaining crash-cut/rollover suites and local
+> Pulsar integration remain incomplete，so the profile is still rejected before IO。
 
 ## 1. Delivery identity
 
@@ -181,7 +182,15 @@ The subsequent BK-M2 runtime checkpoint implements reserved-id `CreateAdv` alloc
 hazards；stream writer/allocation/range CAS；exact NBKL1 provider metadata；partial-write recovery-open sealing；ordered
 explicit entry-id writes；durable reservation plus mandatory protection slots；generic commit and generation-zero
 owner activation through `BookKeeperPhysicalReferenceProof`；fixed reader-slot deletion fencing；non-recovery full-range
-read、NBKR1 verification、middle-offset clipping and exact provider-neutral accounting。Tests cover normal allocation、
+read、NBKR1 verification、middle-offset clipping and exact provider-neutral accounting。The retention checkpoint adds
+`BookKeeperWalReferenceManager`、durable `RETIRED` protection tombstones、`BookKeeperWalRetentionGate` and
+`BookKeeperLedgerRetentionManager`。It performs bounded complete inventory capture、exact rollout/namespace/provider
+validation、double-capture mark、reader drain、unmark-on-drift、provider delete response-loss recovery and delayed dual
+absence before `DELETED`；GC remains disabled/dry-run by default and local config is never deletion authority。
+Tests cover normal allocation、
 uncertain create、stale-session pre-IO rejection、ownership-transfer sealing、contiguous/reused ranges、partial write
-seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads and checksum failure。Retention/physical deletion、
-profile registration and Pulsar routing are deliberately still absent。
+seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads、checksum failure、retirement-authority failure、
+reader veto and mark/drain/lost-delete-response/dual-absence convergence。Profile registration and Pulsar routing remain
+deliberately absent；the production logical-trim owner-retirement bridge and real-service deletion cuts remain BK-M2
+work。Recovery now reconstructs missing mandatory fixed slots from the still-selected active reservation before it may
+clear writer state，then terminalizes non-durable RESERVED/WRITING attempts as exact `ABANDONED` authorities。

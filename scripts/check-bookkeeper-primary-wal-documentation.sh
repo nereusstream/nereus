@@ -94,6 +94,7 @@ require_literal 'bookKeeperPrimaryWalDocumentationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM1Check' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2MetadataCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2RuntimeCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM2RetentionCheck' "build.gradle.kts"
 
 scenario_matrix="$design_dir/08-scenario-evidence-matrix.md"
 scenario_count="$(rg -c '^\| BK-[0-9]+ \|' "$scenario_matrix")"
@@ -118,9 +119,9 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|RuntimeCheck))|[3-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|RuntimeCheck|RetentionCheck))|[3-6])' \
     "$repo_root/build.gradle.kts"; then
-    echo "unfinished BK-M2 final/profile/retention and BK-M3-M6 tasks must not be registered before executable implementation exists" >&2
+    echo "unfinished BK-M2 final/profile and BK-M3-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1
 fi
 

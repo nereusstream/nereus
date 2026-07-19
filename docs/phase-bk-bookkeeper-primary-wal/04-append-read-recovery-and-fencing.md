@@ -232,6 +232,12 @@ Recovery reads the exact reserved entry range after fencing/sealing as needed：
 The original input need not remain in memory because the reservation holds logical metadata and the full physical
 range supplies exact bytes/checksum. It does not promise producer dedup across a newly generated `AppendAttemptId`.
 
+The current BK-M2 recovery checkpoint additionally closes the metadata-only cut before writer detach：while
+`activeReservationId` is still selected, it reloads that exact reservation and idempotently creates/reloads mandatory
+slots `0..2` from reservation/root facts。Only after the inventory is complete may RESERVED/WRITING become
+`ABANDONED` and the writer become IDLE。DURABLE or later reservations retain their recovery owner and activate slot 2；
+they are left for generic commit/head recovery rather than being misclassified as abandoned。
+
 ### 6.3 After full writes, before commit intent
 
 Same-session recovery may construct the exact BK target from the reservation and call the existing deterministic

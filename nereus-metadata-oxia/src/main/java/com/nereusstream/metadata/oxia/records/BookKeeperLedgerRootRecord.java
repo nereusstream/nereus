@@ -59,7 +59,9 @@ public record BookKeeperLedgerRootRecord(
                 || lifecycle == BookKeeperLedgerLifecycle.MARKED
                 || lifecycle == BookKeeperLedgerLifecycle.DELETING
                 || lifecycle == BookKeeperLedgerLifecycle.DELETED;
-        if (sealed != (sealedAtMillis > 0 && sealStartedAtMillis > 0 && !sealReason.isEmpty())) {
+        boolean completeSealFacts = sealedAtMillis > 0 && sealStartedAtMillis > 0 && !sealReason.isEmpty();
+        if ((sealed && !completeSealFacts)
+                || (!sealed && lifecycle != BookKeeperLedgerLifecycle.QUARANTINED && completeSealFacts)) {
             throw new IllegalArgumentException("sealed lifecycle must carry exact seal facts");
         }
         boolean marked = lifecycle == BookKeeperLedgerLifecycle.MARKED

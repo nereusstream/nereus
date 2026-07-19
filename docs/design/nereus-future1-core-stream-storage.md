@@ -4,7 +4,8 @@
 > 交付映射：`docs/phase-1-core-stream-storage/`
 > 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
 > 当前后续：F1-BK / BookKeeper Primary WAL Delivery 的 BK-M0 与 BK-M1 已 complete/final-gated；
-> BK-M2 `BOOKKEEPER_WAL_ONLY` implementation 已开始并完成 metadata/store/scanner checkpoint；BK-M3–M6
+> BK-M2 `BOOKKEEPER_WAL_ONLY` implementation 已完成 metadata/store、allocator/writer/recovery/reader 与
+> whole-ledger retention checkpoints；BK-M2 profile/Pulsar gate 与 BK-M3–M6
 > 尚未实现，三个 BookKeeper profile 仍为 pre-IO rejected；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 
@@ -90,7 +91,8 @@ and Future 4 workers remain deferred beyond it。
 F4 随后 final-gated `OBJECT_WAL_ASYNC_OBJECT`；BookKeeper primary-WAL 的真实 writer/reader、exact ledger
 lifecycle/fencing、whole-ledger retention 和 BK_ONLY/async/sync profile 则由 F1 的后续扩展 F1-BK 定义。代码级
 合同见 `../phase-bk-bookkeeper-primary-wal/README.md`。当前独立 BookKeeper 4.18 adapter/config/namespace/NBKR1
-foundation 已存在，但 writer/reader/lifecycle 尚未注册，三个 BookKeeper profiles 仍在 primary IO 前拒绝。
+foundation、writer/reader/lifecycle 与 safe-default retention convergence 已存在，但 profile/Pulsar runtime 尚未
+注册，三个 BookKeeper profiles 仍在 primary IO 前拒绝。
 
 ## 4. Layer and module boundary
 

@@ -73,7 +73,7 @@ class BookKeeperMetadataCodecContractTest {
         assertThatThrownBy(() -> BookKeeperLedgerLifecycle.fromWireId(10)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> AppendReservationLifecycle.fromWireId(7)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> BookKeeperProtectionType.fromWireId(6)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> ProtectionLifecycle.fromWireId(3)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ProtectionLifecycle.fromWireId(4)).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static List<Sample> samples() {

@@ -35,8 +35,8 @@ public record BookKeeperLedgerProtectionRecord(
         BookKeeperRecordValidation.nonNegative(expiresAtMillis, "expiresAtMillis");
         BookKeeperRecordValidation.metadataVersion(metadataVersion);
         boolean owner = !ownerKey.isEmpty() && ownerMetadataVersion > 0 && !ownerIdentitySha256.isEmpty();
-        if ((lifecycle == ProtectionLifecycle.ACTIVE) != owner) {
-            throw new IllegalArgumentException("ACTIVE protection requires exact owner facts");
+        if ((lifecycle != ProtectionLifecycle.RESERVED) != owner) {
+            throw new IllegalArgumentException("ACTIVE/RETIRED protection requires exact owner facts");
         }
         if (type == BookKeeperProtectionType.REPAIR) {
             if (expiresAtMillis <= createdAtMillis) throw new IllegalArgumentException("REPAIR protection must expire");

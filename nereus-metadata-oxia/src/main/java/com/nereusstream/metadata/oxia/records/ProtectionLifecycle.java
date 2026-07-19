@@ -3,7 +3,7 @@ package com.nereusstream.metadata.oxia.records;
 
 /** A reserved row already vetoes GC; ACTIVE additionally names a durable owner. */
 public enum ProtectionLifecycle {
-    RESERVED(1), ACTIVE(2);
+    RESERVED(1), ACTIVE(2), RETIRED(3);
 
     private final int wireId;
 

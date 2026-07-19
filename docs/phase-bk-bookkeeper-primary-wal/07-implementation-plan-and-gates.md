@@ -189,8 +189,20 @@ non-recovery open to verify the complete NBKR1 range before clipping。Focused f
 partial-write sealing、new-ledger retry、owner transfer、protection lifecycle、cold-handle read and checksum failure。
 `bookKeeperPrimaryWalM2RuntimeCheck` runs these plus metadata/core regressions。
 
-Still required before BK-M2 is complete：whole-ledger retention/GC；complete crash-cut/restart/rollover/resource suites；
-profile admission and local Pulsar gate。The profile remains rejected before primary IO。
+The retention checkpoint implements permanent `RETIRED` protection inventory tombstones、owner-specific
+`BookKeeperProtectionRetirementProof` revalidation、bounded `BookKeeperWalRetentionGate` captures and
+`BookKeeperLedgerRetentionManager`。The manager is a nonblocking convergence state machine：double-capture
+`SEALED -> MARKED`、drain/unmark、`MARKED -> DELETING`、exact authority/provider validation、delete response-loss
+reload、first absence CAS、`lateCreateAuditGrace` and second absence before `DELETED`。Matching reappearance retries
+under the same intent；foreign metadata quarantines。`bookKeeperPrimaryWalM2RetentionCheck` runs this checkpoint and
+the metadata/runtime regressions；safe defaults still keep physical deletion disabled/dry-run。
+
+Recovery also reconstructs missing mandatory fixed slots from the still-selected active reservation before clearing
+writer state，and terminalizes non-durable RESERVED/WRITING attempts as exact `ABANDONED` authorities。
+
+Still required before BK-M2 is complete：the production logical-trim owner-retirement bridge；complete crash-cut/
+restart/rollover/resource and real-service deletion suites；profile admission and local Pulsar gate。The profile
+remains rejected before primary IO。
 
 ### 5.1 Metadata/keyspace
 

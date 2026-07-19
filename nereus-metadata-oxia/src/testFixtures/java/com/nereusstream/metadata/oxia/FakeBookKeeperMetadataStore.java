@@ -19,6 +19,8 @@ import java.util.concurrent.CompletableFuture;
 public final class FakeBookKeeperMetadataStore
         implements BookKeeperWriterMetadataStore, BookKeeperLedgerMetadataStore {
     private final OxiaJavaBookKeeperMetadataStore delegate;
+    private int createProtectionCalls;
+    private int failCreateProtectionCall;
 
     public FakeBookKeeperMetadataStore(BookKeeperMetadataStoreConfig configuration) {
         this(configuration, Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC));
@@ -170,7 +172,18 @@ public final class FakeBookKeeperMetadataStore
     @Override
     public CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> createProtection(
             String cluster, String providerScopeSha256, BookKeeperLedgerProtectionRecord value) {
+        createProtectionCalls++;
+        if (createProtectionCalls == failCreateProtectionCall) {
+            failCreateProtectionCall = 0;
+            return CompletableFuture.failedFuture(new IllegalStateException(
+                    "injected BookKeeper protection create failure"));
+        }
         return delegate.createProtection(cluster, providerScopeSha256, value);
+    }
+
+    public void failCreateProtectionCall(int call) {
+        if (call <= 0) throw new IllegalArgumentException("call must be positive");
+        failCreateProtectionCall = call;
     }
 
     @Override

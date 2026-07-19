@@ -8,9 +8,14 @@ import com.nereusstream.metadata.oxia.BookKeeperLedgerMetadataStore;
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.BookKeeperWriterMetadataStore;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
+import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperAppendReservationRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterStateRecord;
+import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Arrays;
@@ -80,13 +85,148 @@ public final class BookKeeperLedgerRecovery {
                                                                 "active BookKeeper writer root is absent"));
                                                 requireWriterRoot(recovering.value(), root.value());
                                                 return seal(root, namespace, deadline, reason)
-                                                        .thenCompose(sealed -> writerState.finishRecovery(
-                                                                        recovering, session, reason)
+                                                        .thenCompose(sealed -> reconcileActiveReservation(
+                                                                        recovering, sealed, reason)
+                                                                .thenCompose(ignored -> writerState.finishRecovery(
+                                                                        recovering, session, reason))
                                                                 .thenApply(idle ->
                                                                         new BookKeeperLedgerRecoveryResult(
                                                                                 idle, sealed)));
                                             }));
                         }));
+    }
+
+    private CompletableFuture<Void> reconcileActiveReservation(
+            BookKeeperVersionedValue<BookKeeperWriterStateRecord> writer,
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> sealed,
+            String reason) {
+        String reservationId = writer.value().activeReservationId();
+        if (reservationId.isEmpty()) return CompletableFuture.completedFuture(null);
+        return writerMetadata.getReservation(
+                        cluster, new com.nereusstream.api.StreamId(writer.value().streamId()), reservationId)
+                .thenCompose(optional -> {
+                    BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation = optional.orElseThrow(
+                            () -> new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                                    "active BookKeeper recovery reservation is absent"));
+                    requireRecoveryReservation(writer.value(), sealed.value(), reservation.value());
+                    return reconcileMandatoryProtections(sealed.value(), reservation.value())
+                            .thenCompose(ignored -> terminalizeOrProtectReservation(reservation, reason));
+                });
+    }
+
+    private CompletableFuture<Void> reconcileMandatoryProtections(
+            BookKeeperLedgerRootRecord root,
+            BookKeeperAppendReservationRecord reservation) {
+        BookKeeperProtectionType[] types = {
+            BookKeeperProtectionType.REACHABLE_APPEND,
+            BookKeeperProtectionType.VISIBLE_GENERATION,
+            BookKeeperProtectionType.APPEND_RECOVERY
+        };
+        CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+        for (int slot = 0; slot < types.length; slot++) {
+            int exactSlot = slot;
+            chain = chain.thenCompose(ignored -> ledgerMetadata.createProtection(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            reservedProtection(root, reservation, exactSlot, types[exactSlot]))
+                    .thenApply(created -> null));
+        }
+        return chain;
+    }
+
+    private CompletableFuture<Void> terminalizeOrProtectReservation(
+            BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation,
+            String reason) {
+        AppendReservationLifecycle lifecycle = reservation.value().lifecycle();
+        if (lifecycle == AppendReservationLifecycle.RESERVED
+                || lifecycle == AppendReservationLifecycle.WRITING) {
+            BookKeeperAppendReservationRecord before = reservation.value();
+            BookKeeperAppendReservationRecord abandoned = new BookKeeperAppendReservationRecord(
+                    before.schemaVersion(), before.reservationId(), before.appendAttemptId(), before.streamId(),
+                    before.writerId(), before.writerRunIdHash(), before.appendSessionEpoch(),
+                    before.fencingTokenHash(), before.writerStateEpoch(), before.ledgerId(), before.ledgerRootEpoch(),
+                    before.ledgerRangeSlot(), before.firstEntryId(), before.entryCount(),
+                    before.rangeChecksumSha256(), before.expectedStartOffset(), before.payloadFormat(),
+                    before.recordCount(), before.logicalBytes(), before.physicalBytes(), before.schemaRefs(),
+                    before.projectionIdentity(), before.minEventTimeMillis(), before.maxEventTimeMillis(),
+                    AppendReservationLifecycle.ABANDONED, "", "", 0, "", before.createdAtMillis(),
+                    clock.millis(), text(reason, "reason"), 0);
+            return writerMetadata.compareAndSetReservation(cluster, abandoned, reservation.metadataVersion())
+                    .thenApply(ignored -> null);
+        }
+        if (lifecycle == AppendReservationLifecycle.DURABLE
+                || lifecycle == AppendReservationLifecycle.COMMIT_PREPARED
+                || lifecycle == AppendReservationLifecycle.HEAD_COMMITTED) {
+            return activateRecoveryProtection(reservation).thenApply(ignored -> null);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> activateRecoveryProtection(
+            BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation) {
+        BookKeeperAppendReservationRecord owner = reservation.value();
+        return ledgerMetadata.getProtection(
+                        cluster,
+                        configuration.providerScopeSha256(),
+                        owner.ledgerId(),
+                        owner.ledgerRangeSlot(),
+                        2)
+                .thenCompose(optional -> {
+                    BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> current = optional.orElseThrow(
+                            () -> new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                                    "APPEND_RECOVERY protection is absent after reconciliation"));
+                    if (current.value().lifecycle() == ProtectionLifecycle.ACTIVE) {
+                        if (!current.value().ownerKey().equals(reservation.key())
+                                || current.value().ownerMetadataVersion() != reservation.metadataVersion()
+                                || !current.value().ownerIdentitySha256()
+                                        .equals(reservation.durableValueSha256().value())) {
+                            throw new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                                    "APPEND_RECOVERY protection owner changed during recovery");
+                        }
+                        return CompletableFuture.completedFuture(current);
+                    }
+                    BookKeeperLedgerProtectionRecord before = current.value();
+                    BookKeeperLedgerProtectionRecord active = new BookKeeperLedgerProtectionRecord(
+                            before.schemaVersion(), before.ledgerIdentitySha256(), before.clusterAlias(),
+                            before.ledgerId(), before.rootLifecycleEpoch(), before.ledgerRangeSlot(),
+                            before.protectionSlot(), before.protectionTypeId(), owner.reservationId(),
+                            before.firstEntryId(), before.entryCount(), before.rangeChecksumSha256(),
+                            before.streamId(), before.offsetStart(), before.offsetEnd(), 0, reservation.key(),
+                            reservation.metadataVersion(), reservation.durableValueSha256().value(),
+                            ProtectionLifecycle.ACTIVE, before.createdAtMillis(), before.expiresAtMillis(), 0);
+                    return ledgerMetadata.compareAndSetProtection(
+                            cluster, configuration.providerScopeSha256(), active, current.metadataVersion());
+                });
+    }
+
+    private static BookKeeperLedgerProtectionRecord reservedProtection(
+            BookKeeperLedgerRootRecord root,
+            BookKeeperAppendReservationRecord reservation,
+            int protectionSlot,
+            BookKeeperProtectionType type) {
+        return new BookKeeperLedgerProtectionRecord(
+                1, root.ledgerIdentitySha256(), root.clusterAlias(), root.ledgerId(),
+                reservation.ledgerRootEpoch(), reservation.ledgerRangeSlot(), protectionSlot, type.wireId(),
+                reservation.reservationId(), reservation.firstEntryId(), reservation.entryCount(),
+                reservation.rangeChecksumSha256(), reservation.streamId(), reservation.expectedStartOffset(),
+                Math.addExact(reservation.expectedStartOffset(), reservation.recordCount()), 0, "", 0, "",
+                ProtectionLifecycle.RESERVED, reservation.createdAtMillis(), 0, 0);
+    }
+
+    private static void requireRecoveryReservation(
+            BookKeeperWriterStateRecord writer,
+            BookKeeperLedgerRootRecord root,
+            BookKeeperAppendReservationRecord reservation) {
+        if (!reservation.reservationId().equals(writer.activeReservationId())
+                || !reservation.streamId().equals(writer.streamId())
+                || reservation.ledgerId() != writer.activeLedgerId()
+                || reservation.ledgerId() != root.ledgerId()
+                || reservation.ledgerRootEpoch() > root.lifecycleEpoch()
+                || reservation.ledgerRangeSlot() >= writer.activeAppendRangeCount()
+                || Math.addExact(reservation.firstEntryId(), reservation.entryCount()) > writer.nextEntryId()) {
+            throw new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                    "active BookKeeper recovery reservation does not match writer/root counters");
+        }
     }
 
     public CompletableFuture<BookKeeperVersionedValue<BookKeeperLedgerRootRecord>> sealUnowned(
