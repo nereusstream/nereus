@@ -18,7 +18,8 @@ response-loss operation in BK-13、foreign collision/new-candidate behavior in B
 and randomized monotonic writer/range behavior in BK-18；their remaining O/B levels stay open。The deterministic
 append/read gate additionally proves pre-provider profile/oversize rejection (BK-23)、same-target/no-rewrite
 generation-zero repair (the D checkpoint of BK-29) and an unrepresentable `DEFERRED_SYNC` configuration plus an
-adapter-forced empty write-flag set (BK-36)。BK-13 through BK-96
+adapter-forced empty write-flag set (BK-36)。The deterministic retention-authority checkpoint adds complete BK-50 and
+BK-51 owner-domain cuts；only the reader and mandatory-range subsets currently have real B/O evidence。BK-13 through BK-96
 otherwise remain required target evidence and are currently
 **not complete**。During
 implementation, each row
@@ -123,8 +124,8 @@ Evidence levels：
 | BK-47 | M2 | O/B | BK_ONLY trim below range end cannot retire/delete range | `BookKeeperWalOnlyOxiaBkIntegrationTest.partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes` |
 | BK-48 | M2 | O/B | one ledger with trimmed + live ranges remains physical | `BookKeeperWalOnlyOxiaBkIntegrationTest.partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes` |
 | BK-49 | M2 | O/B | all ranges durably trimmed retire owners/protections then whole ledger | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
-| BK-50 | M2 | D/O | fixed protection-slot contention never exceeds Cartesian bound；invalid/unstable inventory vetoes collection | `BookKeeperWalRetentionGateTest.failsClosedOnIncompleteAuthority` |
-| BK-51 | M2 | O/B | reader/task/repair/reservation/writer vetoes are each enforced | `BookKeeperWalRetentionGateTest.enforcesEveryVetoDomain` |
+| BK-50 | M2 | D/O | fixed protection-slot contention never exceeds Cartesian bound；invalid/unstable inventory vetoes collection | D checkpoint: `BookKeeperWalRetentionGateTest.failsClosedOnIncompleteAuthority`；real O contention/scan cut remains open |
+| BK-51 | M2 | D/B/O | reader/task/repair/reservation/writer vetoes are each enforced | D complete-owner checkpoint: `BookKeeperWalRetentionGateTest.enforcesEveryVetoDomain`；real reader: `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderSlotsArePerProcessBoundedAndFinalPinRevalidationFailsClosed`；real mandatory-range protection: `partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes`；real task/repair/writer cuts remain open |
 | BK-52 | M2 | D/O/C | reference appears after MARKED; root unmarks to SEALED | D: `BookKeeperWalRetentionGateTest.referenceAppearingAfterMarkUnmarksToSealedBeforeDelete`; O/B: `BookKeeperWalOnlyOxiaBkIntegrationTest.referenceAfterMarkUnmarksAndSafeGcModesNeverDelete`; independent-process C remains open |
 | BK-53 | M2 | B/O/C | delete response loss reloads metadata before same-intent retry | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
 | BK-54 | M2 | B/O/C | namespace drift or late-create hazard stops before delete；foreign/reappeared same-id ledger is quarantined across validate/delete cut | B/O checkpoint: `BookKeeperWalOnlyOxiaBkIntegrationTest.foreignLedgerRecreationAndNamespaceDriftStopBeforePhysicalDelete`; independent-process C remains open |

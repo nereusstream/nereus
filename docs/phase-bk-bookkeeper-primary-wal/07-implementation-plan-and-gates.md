@@ -300,6 +300,15 @@ ledger id with foreign BookKeeper custom metadata。The next convergence pass pe
 manager delete calls against the new occupant。A separate exact namespace-reservation version/value drift after
 `DELETING` fails activation revalidation before provider delete and leaves both root and original ledger unchanged。
 
+The deterministic retention-authority gate now closes the previously stale BK-50/BK-51 evidence references。The
+metadata keyspace rejects every protection outside the configured `(ledgerRangeSlot, protectionSlot)` Cartesian
+product；a complete sealed inventory with one row missing remains blocked，and a scan returning more than the configured
+product records `INVENTORY_LIMIT_EXCEEDED` instead of yielding a deletion candidate。Independently isolated cuts keep
+each mandatory owner class (`REACHABLE_APPEND`、`VISIBLE_GENERATION`、`APPEND_RECOVERY`)、a materialization task、a
+bounded repair、a process reader lease and an ACTIVE writer selecting the ledger as exact vetoes。These tests establish
+the complete D-level owner-domain contract；the real-service reader and mandatory-range subsets remain the current
+B/O evidence，while real materialization-source coverage belongs to BK-M3。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session
