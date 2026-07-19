@@ -14,7 +14,10 @@ only.
 The deterministic BK-M2 checkpoint additionally executes
 `BookKeeperStreamStorageIntegrationTest.strictBkOnlyAppendAndColdReadTraverseTheProviderNeutralL0Pipeline`：the
 module-local profile resolver/runtime、exact pre-head BookKeeper proof reload、generation-zero index and cold range
-reader are integrated。It is supporting D-level evidence only；it does not replace the B/O/P final rows below。
+reader are integrated。`NereusBookKeeperManagedLedgerIntegrationTest.facadePreservesEntryBytesAndVirtualPositionOverBookKeeperGenerationZero`
+extends that D-level evidence through the
+ManagedLedger facade，while pinned-Pulsar `NereusManagedLedgerStorageBookKeeperClientTest` freezes the borrowed stock
+client boundary。These checkpoints do not replace the B/O/P final rows below。
 
 Evidence levels：
 
@@ -90,8 +93,8 @@ Evidence levels：
 | BK-40 | M2 | B/O | checksum/count/id/config mismatch fails; no partial/empty result | checkpoint: `BookKeeperPrimaryWalReaderTest.checksumMismatchFailsClosedWithoutReturningPartialBytes`; final: `BookKeeperPrimaryWalReaderCorruptionIT.failsClosed` |
 | BK-41 | M2 | B/O/C | fresh process reads history with no cached handle | `BookKeeperPrimaryWalReaderIT.readsAfterColdRestart` |
 | BK-42 | M2 | B/O | fixed reader slots cap concurrent processes race-free；lease blocks MARK/delete and final revalidation precedes return | `BookKeeperReaderLeaseIT.fencesPhysicalDeletion` |
-| BK-43 | M2 | P | raw Pulsar Entry properties/payload round-trip through BK generation zero | `NereusBookKeeperEntryIntegrationTest.preservesOpaqueEntryBytes` |
-| BK-44 | M2 | P | ordinary and batched `MessageIdAdv` use virtual identity, not BK ledger id | `NereusBookKeeperEntryIntegrationTest.preservesVirtualMessageIds` |
+| BK-43 | M2 | P | raw Pulsar Entry properties/payload round-trip through BK generation zero | D checkpoint: `PulsarEntryOpaqueRoundTripTest.preservesUnbatchedAndCompressedBatchBytesPropertiesOrderingKeyAndMiddleBatchMessageId` + `NereusBookKeeperManagedLedgerIntegrationTest.facadePreservesEntryBytesAndVirtualPositionOverBookKeeperGenerationZero`; final: `NereusBookKeeperEntryIntegrationTest.preservesOpaqueEntryBytes` |
+| BK-44 | M2 | P | ordinary and batched `MessageIdAdv` use virtual identity, not BK ledger id | partial D checkpoint for ordinary virtual Position only: `NereusBookKeeperManagedLedgerIntegrationTest.facadePreservesEntryBytesAndVirtualPositionOverBookKeeperGenerationZero`; final: `NereusBookKeeperEntryIntegrationTest.preservesVirtualMessageIds` |
 | BK-45 | M2 | P | seek/history after rollover/restart returns same MessageIds | `NereusBookKeeperEntryIntegrationTest.preservesSeekAcrossRollover` |
 | BK-46 | M2 | P | F3 ack/snapshot/hydration remains logical across physical ledgers | `NereusBookKeeperCursorIntegrationTest.preservesCursorTruth` |
 

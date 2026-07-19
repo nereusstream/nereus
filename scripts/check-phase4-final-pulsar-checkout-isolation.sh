@@ -35,6 +35,7 @@ pulsar_tasks=(
     phase4M5RetentionPolicyAdminPulsarCheck
     phase4M5AsyncRetentionMultiBrokerPulsarCheck
     phase4M6TwoBrokerWorkerContentionPulsarCheck
+    bookKeeperPrimaryWalM2PulsarCheck
 )
 
 for task in "${pulsar_tasks[@]}"; do

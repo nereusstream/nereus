@@ -62,4 +62,23 @@ class F2L0RequestFactoryTest {
         assertThatThrownBy(() -> requests.singleEntryReadOptions(0, Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void mapsBookKeeperWalOnlyToStableHeadDurability() {
+        F2L0RequestFactory bookKeeper = new F2L0RequestFactory(
+                StorageProfile.BOOKKEEPER_WAL_ONLY);
+        assertThat(bookKeeper.createOptions().profile())
+                .isEqualTo(StorageProfile.BOOKKEEPER_WAL_ONLY);
+        assertThat(bookKeeper.appendOptions(
+                        StorageProfile.BOOKKEEPER_WAL_ONLY,
+                        Duration.ofSeconds(7))
+                .durabilityLevel())
+                .isEqualTo(DurabilityLevel.WAL_DURABLE);
+        assertThatThrownBy(() -> new F2L0RequestFactory(
+                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new F2L0RequestFactory(
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -35,14 +35,16 @@ public record ProjectionCreateRequest(
         if ((emptyStream.profile()
                                 != StorageProfile.OBJECT_WAL_SYNC_OBJECT
                         && emptyStream.profile()
-                                != StorageProfile.OBJECT_WAL_ASYNC_OBJECT)
+                                != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                        && emptyStream.profile()
+                                != StorageProfile.BOOKKEEPER_WAL_ONLY)
                 || emptyStream.state() != StreamState.ACTIVE
                 || emptyStream.committedEndOffset() != 0
                 || emptyStream.cumulativeSize() != 0
                 || emptyStream.trimOffset() != 0
                 || !emptyStream.attributes().equals(REQUIRED_ATTRIBUTES)) {
             throw new IllegalArgumentException(
-                    "projection creation requires a canonical empty Object-WAL F2 stream");
+                    "projection creation requires a canonical empty executable F2 stream");
         }
     }
 

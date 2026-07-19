@@ -88,9 +88,11 @@ public record NereusManagedLedgerFactoryConfig(
         if (defaultStorageProfile
                         != StorageProfile.OBJECT_WAL_SYNC_OBJECT
                 && defaultStorageProfile
-                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                && defaultStorageProfile
+                        != StorageProfile.BOOKKEEPER_WAL_ONLY) {
             throw new IllegalArgumentException(
-                    "defaultStorageProfile must be an Object-WAL profile");
+                    "defaultStorageProfile has no executable managed-ledger mapping");
         }
     }
 

@@ -42,7 +42,8 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。
+`master@41d1cddb9d29451884002b96de2bc52367cbb8ca`。Phase 4 的 BQ historical acceptance lock 仍是
+`eaf7b9a704890a9265c21f30d9f351e02d00c600`；当前 commit 只在其上增加 F1-BK borrowed-client integration。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -52,7 +53,7 @@ Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
 | `pulsar-broker/.../nereus/GenerationRegistrationBackfillReport.java` | `e84406c679f44f04e50ba943a1f97d92abf8f95a` | topic-outcome versus broader traversal-failure accounting |
 | `pulsar-broker/.../nereus/NereusPhysicalGcMultiBrokerIntegrationTest.java` | `86dbbb8797887e89ee78d03b3fe729db882b833f` | retry-disabled real source deletion、MessageId、unload/failover/restart and BookKeeper final gate |
 | `pulsar-broker/.../nereus/NereusMaterializationContentionMultiBrokerIntegrationTest.java` | `b76bde8f98207655d74ef907c95e999bf53bda7b` | retry-disabled two-broker/two-worker shared-registry contention、compressed exact-read and BookKeeper coexistence gate |
-| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `3ca141fcfd0f8f6049fd40725d0007789bf088f7` | bounded broker-to-product proof completion and publication-activation delegate |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `ae81739e1dc6e512b8f758b21fec441b80a9b6c9` | bounded broker-to-product proof completion/publication activation plus fail-closed borrowed stock BookKeeper client handoff |
 | `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `14916134ed514fc0d2c2e6628e7317463798bb89` | current retention/compaction/admin denylist |
 | `pulsar-broker/.../nereus/NereusAdminOperation.java` | `a99c967347ce7b9edc29b57892b220f42bedf8be` | closed loaded/unloaded admin operation set |
 | `pulsar-broker/.../service/BacklogQuotaManager.java` | `686e2244b560a16c69303e854719016d610fb305` | cursor skip/mark-delete backlog eviction call path |

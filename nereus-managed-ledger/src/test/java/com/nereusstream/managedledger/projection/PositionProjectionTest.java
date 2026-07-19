@@ -161,9 +161,14 @@ class PositionProjectionTest {
         assertThatThrownBy(() -> positions.bounds(projection, wrongAttributes))
                 .isInstanceOf(ProjectionValidationException.class);
 
-        StreamMetadata wrongProfile = new StreamMetadata(
+        StreamMetadata bookKeeperWalOnly = new StreamMetadata(
                 snapshot.streamId(), snapshot.streamName(), StreamState.ACTIVE,
                 StorageProfile.BOOKKEEPER_WAL_ONLY, snapshot.attributes(), 0, 1, 1, 1, 0);
+        assertThat(positions.bounds(projection, bookKeeperWalOnly).committedEndOffset()).isEqualTo(1);
+
+        StreamMetadata wrongProfile = new StreamMetadata(
+                snapshot.streamId(), snapshot.streamName(), StreamState.ACTIVE,
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT, snapshot.attributes(), 0, 1, 1, 1, 0);
         assertThatThrownBy(() -> positions.bounds(projection, wrongProfile))
                 .isInstanceOf(ProjectionValidationException.class);
     }

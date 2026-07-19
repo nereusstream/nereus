@@ -404,6 +404,8 @@ public final class NereusManagedLedgerOpenCoordinator {
                                 != StorageProfile.OBJECT_WAL_SYNC_OBJECT
                         && metadata.profile()
                                 != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                        && metadata.profile()
+                                != StorageProfile.BOOKKEEPER_WAL_ONLY
                 || !metadata.attributes().equals(PAYLOAD_ATTRIBUTES)
                 || metadata.createdAtMillis() != topic.createdAtMillis()) {
             throw new NereusException(

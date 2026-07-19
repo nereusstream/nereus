@@ -17,6 +17,7 @@ dependencies {
     api(project(":nereus-core"))
     api(project(":nereus-managed-ledger"))
     api(project(":nereus-materialization"))
+    implementation(project(":nereus-bookkeeper"))
     api(libs.opentelemetry.api)
     implementation(project(":nereus-metadata-oxia"))
     implementation(project(":nereus-object-store"))
@@ -25,6 +26,10 @@ dependencies {
     testImplementation(testFixtures(project(":nereus-object-store")))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
+    testImplementation(platform(libs.grpc.bom))
+    testImplementation(platform(libs.opentelemetry.bom))
+    testImplementation(platform(libs.opentelemetry.bom.alpha))
+    testImplementation(libs.oxia.client)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

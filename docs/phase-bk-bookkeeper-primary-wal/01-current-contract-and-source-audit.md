@@ -39,14 +39,17 @@ All shortened paths are below `src/main/java/com/nereusstream/...`。
 ### 2.2 Local Pulsar and BookKeeper
 
 Local checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。The checkout pins
+`master@41d1cddb9d29451884002b96de2bc52367cbb8ca`。The original BK-M0 audit input was
+`eaf7b9a704890a9265c21f30d9f351e02d00c600`；the current commit adds the audited borrowed-client handoff and focused
+test without changing the pinned BookKeeper version。The checkout pins
 `org.apache.bookkeeper:*` to **4.18.0** in `gradle/libs.versions.toml`; it is local master, not an `M1-SNAPSHOT`.
 
 | Source | Git blob | Audit result |
 | --- | --- | --- |
 | `pulsar-broker/.../ManagedLedgerClientFactory.java` | `3dece00e89a7f0d2f72bff71eabe9d2dff519d37` | owns stock BK client lifecycle |
 | `pulsar-broker/.../storage/BookkeeperManagedLedgerStorageClass.java` | `1f05cde72a5b52c2e868abcd38a8e3cabf09a403` | exposes concrete borrowed `BookKeeper` client |
-| `pulsar-broker/.../storage/nereus/NereusManagedLedgerStorage.java` | `8888864320eb09f5fbdedc119bac7248d9ea6318` | creates stock class and Nereus runtime but does not pass BK client |
+| `pulsar-broker/.../storage/nereus/NereusManagedLedgerStorage.java` | `ae81739e1dc6e512b8f758b21fec441b80a9b6c9` | fail-closes on a non-BK/null stock class and passes the exact client as a borrowed runtime resource |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorageBookKeeperClientTest.java` | `c88aaf3848b20b00a2b6694260d0d1f293c098b6` | freezes same-instance handoff and both fail-closed cases |
 
 BookKeeper 4.18.0 public client API locally verified from the pinned jar：
 

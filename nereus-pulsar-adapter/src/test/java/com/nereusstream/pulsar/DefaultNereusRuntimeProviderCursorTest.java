@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.bookkeeper.client.api.BookKeeper;
 import org.junit.jupiter.api.Test;
 
 class DefaultNereusRuntimeProviderCursorTest {
@@ -56,6 +57,29 @@ class DefaultNereusRuntimeProviderCursorTest {
                 getClass().getClassLoader());
 
         assertThat(context.generationProtocolActivationEnabled()).isTrue();
+        assertThat(context.borrowedBookKeeperClient()).isEmpty();
+    }
+
+    @Test
+    void canonicalContextCarriesTheExactBorrowedBookKeeperClient() {
+        BookKeeper bookKeeper = (BookKeeper) Proxy.newProxyInstance(
+                BookKeeper.class.getClassLoader(),
+                new Class<?>[] {BookKeeper.class},
+                (instance, method, arguments) -> {
+                    throw new AssertionError("borrowed BookKeeper client is not used by this wiring test");
+                });
+        NereusRuntimeContext context = new NereusRuntimeContext(
+                eventLoopGroup(),
+                OpenTelemetry.noop(),
+                creationGuard(),
+                CursorProtocolActivationGuard.unavailable(),
+                GenerationCapabilityReadinessProvider.unavailable(),
+                false,
+                reference -> Optional.empty(),
+                getClass().getClassLoader(),
+                Optional.of(bookKeeper));
+
+        assertThat(context.borrowedBookKeeperClient()).containsSame(bookKeeper);
     }
 
     @Test

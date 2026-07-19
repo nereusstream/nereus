@@ -8,6 +8,8 @@ import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import io.netty.channel.EventLoopGroup;
 import io.opentelemetry.api.OpenTelemetry;
 import java.util.Objects;
+import java.util.Optional;
+import org.apache.bookkeeper.client.api.BookKeeper;
 
 /** Borrowed broker resources. The Nereus runtime never closes any value in this record. */
 public record NereusRuntimeContext(
@@ -18,7 +20,29 @@ public record NereusRuntimeContext(
         GenerationCapabilityReadinessProvider generationCapabilityReadinessProvider,
         boolean generationProtocolActivationEnabled,
         ObjectStoreSecretResolver secretResolver,
-        ClassLoader pluginClassLoader) {
+        ClassLoader pluginClassLoader,
+        Optional<BookKeeper> borrowedBookKeeperClient) {
+    public NereusRuntimeContext(
+            EventLoopGroup eventLoopGroup,
+            OpenTelemetry openTelemetry,
+            NereusCreationGuard creationGuard,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            GenerationCapabilityReadinessProvider generationCapabilityReadinessProvider,
+            boolean generationProtocolActivationEnabled,
+            ObjectStoreSecretResolver secretResolver,
+            ClassLoader pluginClassLoader) {
+        this(
+                eventLoopGroup,
+                openTelemetry,
+                creationGuard,
+                cursorProtocolActivationGuard,
+                generationCapabilityReadinessProvider,
+                generationProtocolActivationEnabled,
+                secretResolver,
+                pluginClassLoader,
+                Optional.empty());
+    }
+
     public NereusRuntimeContext(
             EventLoopGroup eventLoopGroup,
             OpenTelemetry openTelemetry,
@@ -35,7 +59,8 @@ public record NereusRuntimeContext(
                 generationCapabilityReadinessProvider,
                 false,
                 secretResolver,
-                pluginClassLoader);
+                pluginClassLoader,
+                Optional.empty());
     }
 
     public NereusRuntimeContext(
@@ -53,7 +78,8 @@ public record NereusRuntimeContext(
                 GenerationCapabilityReadinessProvider.unavailable(),
                 false,
                 secretResolver,
-                pluginClassLoader);
+                pluginClassLoader,
+                Optional.empty());
     }
 
     public NereusRuntimeContext(
@@ -70,7 +96,8 @@ public record NereusRuntimeContext(
                 GenerationCapabilityReadinessProvider.unavailable(),
                 false,
                 secretResolver,
-                pluginClassLoader);
+                pluginClassLoader,
+                Optional.empty());
     }
 
     public NereusRuntimeContext {
@@ -83,5 +110,7 @@ public record NereusRuntimeContext(
                 "generationCapabilityReadinessProvider");
         Objects.requireNonNull(secretResolver, "secretResolver");
         Objects.requireNonNull(pluginClassLoader, "pluginClassLoader");
+        borrowedBookKeeperClient = Objects.requireNonNull(
+                borrowedBookKeeperClient, "borrowedBookKeeperClient");
     }
 }

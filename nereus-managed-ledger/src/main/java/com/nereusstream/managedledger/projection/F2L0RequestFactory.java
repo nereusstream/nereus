@@ -17,7 +17,6 @@ package com.nereusstream.managedledger.projection;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.DeleteOptions;
-import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.SealOptions;
@@ -40,7 +39,7 @@ public final class F2L0RequestFactory {
     }
 
     public F2L0RequestFactory(StorageProfile createProfile) {
-        this.createProfile = requireObjectWalProfile(createProfile);
+        this.createProfile = requireManagedLedgerProfile(createProfile);
     }
 
     public StreamCreateOptions createOptions() {
@@ -60,13 +59,10 @@ public final class F2L0RequestFactory {
     public AppendOptions appendOptions(
             StorageProfile profile,
             Duration timeout) {
-        StorageProfile exact = requireObjectWalProfile(profile);
+        StorageProfile exact = requireManagedLedgerProfile(profile);
         return new AppendOptions(
                 Optional.empty(),
-                exact == StorageProfile.OBJECT_WAL_ASYNC_OBJECT
-                        ? DurabilityLevel.WAL_DURABLE
-                        : DurabilityLevel
-                                .WAL_DURABLE_AND_INDEX_COMMITTED,
+                exact.defaultDurabilityLevel(),
                 timeout,
                 true,
                 Map.of());
@@ -88,16 +84,18 @@ public final class F2L0RequestFactory {
         return new DeleteOptions(timeout, DELETE_REASON);
     }
 
-    private static StorageProfile requireObjectWalProfile(
+    private static StorageProfile requireManagedLedgerProfile(
             StorageProfile profile) {
         StorageProfile exact = Objects.requireNonNull(
                         profile, "profile")
                 .canonical();
         if (exact != StorageProfile.OBJECT_WAL_SYNC_OBJECT
                 && exact
-                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                && exact
+                        != StorageProfile.BOOKKEEPER_WAL_ONLY) {
             throw new IllegalArgumentException(
-                    "managed-ledger facade requires an Object-WAL profile");
+                    "managed-ledger facade has no executable profile mapping");
         }
         return exact;
     }

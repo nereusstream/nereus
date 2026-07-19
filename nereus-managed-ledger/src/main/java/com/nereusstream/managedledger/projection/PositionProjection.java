@@ -183,9 +183,11 @@ public final class PositionProjection {
         StorageProfile profile = snapshot.profile().canonical();
         if (profile != StorageProfile.OBJECT_WAL_SYNC_OBJECT
                 && profile
-                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+                        != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
+                && profile
+                        != StorageProfile.BOOKKEEPER_WAL_ONLY) {
             throw new ProjectionValidationException(
-                    "F2 requires an Object-WAL storage profile");
+                    "F2 has no executable mapping for the storage profile");
         }
         if (!snapshot.attributes().equals(REQUIRED_ATTRIBUTES)) {
             throw new ProjectionValidationException("stream payload mapping attributes do not match F2");

@@ -9,7 +9,10 @@ F4-M0 is complete against the original Nereus design input
 Docker-backed final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and
 retry-disabled real two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real
 two-broker async/retention boundary on 2026-07-19；F4-M6 and the aggregate Phase 4 boundary completed on 2026-07-19
-through checkpoint BQ. The following foundation parts are implemented and covered by focused and real-service tests：
+through checkpoint BQ. The current post-BQ Pulsar maintenance/source lock is
+`master@41d1cddb9d29451884002b96de2bc52367cbb8ca`；the newer commit adds only the F1-BK borrowed-client boundary and
+does not rewrite the historical BQ acceptance claim. The following foundation parts are implemented and covered by
+focused and real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
   delete surface；

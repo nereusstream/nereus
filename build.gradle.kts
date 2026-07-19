@@ -32,6 +32,7 @@ val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { reque
         // M1 consumes the final-gated F3 source composite. The Pulsar fork remains on the
         // frozen F2 development coordinate until the F4 broker rollout milestone changes both repos.
         || requested.substringAfterLast(':').startsWith("phase4")
+        || requested.substringAfterLast(':').startsWith("bookKeeperPrimaryWal")
         || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
 }
 version = gradle.startParameter.projectProperties["nereusVersion"]
@@ -78,6 +79,7 @@ val dockerBackedPulsarExecTasks = setOf(
     "phase4M4PhysicalGcMultiBrokerPulsarCheck",
     "phase4M5AsyncRetentionMultiBrokerPulsarCheck",
     "phase4M6TwoBrokerWorkerContentionPulsarCheck",
+    "bookKeeperPrimaryWalM2PulsarCheck",
 )
 val pulsarCheckoutExecTasks = setOf(
     "phase2PulsarCheck",
@@ -240,7 +242,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("eaf7b9a704890a9265c21f30d9f351e02d00c600")
+    .orElse("41d1cddb9d29451884002b96de2bc52367cbb8ca")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -297,6 +299,7 @@ val phase2PublishedModules = listOf(
     ":nereus-object-store",
     ":nereus-managed-ledger",
     ":nereus-materialization",
+    ":nereus-bookkeeper",
     ":nereus-pulsar-adapter",
 )
 
@@ -647,6 +650,27 @@ tasks.register("bookKeeperPrimaryWalM2RetentionCheck") {
     dependsOn("bookKeeperPrimaryWalM2RuntimeCheck")
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-metadata-oxia:test")
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM2PulsarCheck") {
+    group = "verification"
+    description = "Verify the BK_ONLY ManagedLedger facade and borrowed stock BookKeeper client boundary."
+    dependsOn("bookKeeperPrimaryWalM2RetentionCheck")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    dependsOn(":nereus-managed-ledger:test")
+    dependsOn(":nereus-pulsar-adapter:test")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusManagedLedgerStorageBookKeeperClientTest",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

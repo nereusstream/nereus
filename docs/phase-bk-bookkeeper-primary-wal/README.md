@@ -7,9 +7,11 @@
 > activation、non-recovery reader/lease/checksum、bounded whole-ledger retention and explicit module-local profile
 > composition checkpoints are implemented and
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
-> `bookKeeperPrimaryWalM2RetentionCheck`。`BookKeeperWalRuntime` can execute BK_ONLY through `DefaultStreamStorage`，
-> while remaining crash-cut/rollover/real-service suites and production/local-Pulsar integration remain incomplete；
-> the production broker provider therefore still rejects the profile before IO。
+> `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck`。`BookKeeperWalRuntime` can execute
+> BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade；the pinned local Pulsar broker passes the exact
+> borrowed stock-client boundary。Remaining crash-cut/rollover/real-service suites and production profile
+> composition/admission remain incomplete；the production broker provider therefore still rejects the profile before
+> primary IO。
 
 ## 1. Delivery identity
 
@@ -148,7 +150,7 @@ second commit protocol and is forbidden.
 
 The design is based only on this repository and the local Pulsar checkout at
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`。No internet or non-existent `M1-SNAPSHOT` artifact is an input.
-The target Pulsar source lock is `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。The Nereus pre-design audit
+The target Pulsar source lock is `master@41d1cddb9d29451884002b96de2bc52367cbb8ca`。The Nereus pre-design audit
 lock and BookKeeper client API surface are recorded in document 01；a changed lock requires re-audit, not silent
 compilation against a different checkout.
 
@@ -195,8 +197,8 @@ absence before `DELETED`；GC remains disabled/dry-run by default and local conf
 Tests cover normal allocation、
 uncertain create、stale-session pre-IO rejection、ownership-transfer sealing、contiguous/reused ranges、partial write
 seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads、checksum failure、retirement-authority failure、
-reader veto and mark/drain/lost-delete-response/dual-absence convergence。Profile registration and Pulsar routing remain
-deliberately absent；real-service deletion cuts and the Pulsar gate remain BK-M2 work。The module-local
+reader veto and mark/drain/lost-delete-response/dual-absence convergence。Profile registration and production Pulsar
+routing remain deliberately absent；real-service deletion cuts remain BK-M2 work。The module-local
 `BookKeeperStorageProfileResolver`、`BookKeeperWalRuntime` and generic `DefaultStreamStorage` composition now admit
 BK_ONLY only when the exact appender/reader are installed；strict append waits for generation zero and cold read
 resolves the same `BookKeeperEntryRangeReadTarget`。Production and fake L0 stores share
@@ -204,3 +206,12 @@ resolves the same `BookKeeperEntryRangeReadTarget`。Production and fake L0 stor
 head CAS rather than weakening the gate。Recovery reconstructs
 missing mandatory fixed slots from the still-selected active reservation before it may
 clear writer state，then terminalizes non-durable RESERVED/WRITING attempts as exact `ABANDONED` authorities。
+
+The focused ManagedLedger checkpoint admits BK_ONLY in projection creation/open/Position mapping and maps append to
+`WAL_DURABLE` without exposing the physical BK ledger id。`NereusBookKeeperManagedLedgerIntegrationTest` drives exact
+entry bytes through `NereusManagedLedger.addEntry/readEntry` over generation zero and proves the returned Position
+uses the virtual ledger。The pinned Pulsar fork now obtains the same stock
+`BookkeeperManagedLedgerStorageClass.getBookKeeperClient()` instance, passes it as an explicitly borrowed
+`NereusRuntimeContext` resource, rejects non-BK/null providers, and passes broker main/test Checkstyle plus its focused
+test。`DefaultNereusRuntimeProvider` does not yet compose that client into the production BK runtime；this checkpoint
+therefore does not enable first-create or claim a real broker BK_ONLY data path。

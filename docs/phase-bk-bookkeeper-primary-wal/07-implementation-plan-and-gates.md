@@ -16,8 +16,9 @@ BookKeeper ledger deletion      absent / safe default closed
 
 `bookKeeperPrimaryWalDocumentationCheck` remains the documentation gate. `bookKeeperPrimaryWalM1Check`、
 `bookKeeperPrimaryWalM1FinalCheck` and the focused `bookKeeperPrimaryWalM2MetadataCheck` /
-`bookKeeperPrimaryWalM2RuntimeCheck` / `bookKeeperPrimaryWalM2RetentionCheck` are executable and backed by real
-module/unit/predecessor dependencies；unfinished M2 Pulsar/final gates and M3–M6 names remain frozen target names and must
+`bookKeeperPrimaryWalM2RuntimeCheck` / `bookKeeperPrimaryWalM2RetentionCheck` /
+`bookKeeperPrimaryWalM2PulsarCheck` are executable and backed by real
+module/unit/predecessor dependencies；the unfinished M2 aggregate/final gates and M3–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
@@ -169,6 +170,10 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600` final regressions。BK-M1 is complete；no BookKeeper profile is
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
+The current local Pulsar integration/source lock is
+`master@41d1cddb9d29451884002b96de2bc52367cbb8ca`；it retains the BK-M1 historical evidence above and adds only the
+focused BK-M2 borrowed-client boundary。
+
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
 
 ### 5.0 Current checkpoint evidence (2026-07-19)
@@ -211,8 +216,14 @@ exact head/protection proof revalidation、generation-zero publication and cold 
 `DefaultStreamStorage`。The runtime closes only its appender/reader adapters and never closes a caller-owned BookKeeper
 client。
 
-Still required before BK-M2 is complete：complete crash-cut/restart/rollover/resource and real-service deletion suites；
-local Pulsar facade gate and production provider admission。The broker profile remains rejected before primary IO。
+The focused facade/Pulsar checkpoint now admits BK_ONLY through F2 projection/open/virtual Position mapping，drives
+exact entry bytes through the module-local BK generation-zero runtime，and source-locks the broker handoff of the exact
+stock BookKeeper client as a borrowed/non-closed context resource。`bookKeeperPrimaryWalM2PulsarCheck` publishes the
+exact development artifacts，runs the ManagedLedger/adapter/module tests，then forces fresh broker Checkstyle and the
+borrowed-client test against the clean pinned checkout。
+
+Still required before BK-M2 is complete：complete crash-cut/restart/rollover/resource and real-service deletion suites，
+plus production provider runtime composition/admission。The broker profile remains rejected before primary IO。
 
 ### 5.1 Metadata/keyspace
 
@@ -252,8 +263,11 @@ Unsupported durability/completion policies fail before allocation.
 
 ### 5.4 Focused Pulsar slice
 
-Test-only/local composition borrows the stock BK client and drives `NereusManagedLedger.asyncAddEntry/readEntries`
-through exact BK generation zero. Production-wide first-create/capability rollout remains disabled until M5.
+The implemented test-only/local composition drives `NereusManagedLedger.addEntry/readEntry` through exact BK
+generation zero and proves virtual Position identity is independent of the physical ledger。The pinned Pulsar storage
+provider extracts and passes the exact stock BK client through `NereusRuntimeContext`，with tests for identity and
+fail-closed provider/null cases。Production-wide client consumption、first-create and capability rollout remain
+disabled until the completed profile runtime is composed at M5。
 
 ### 5.5 Gates
 

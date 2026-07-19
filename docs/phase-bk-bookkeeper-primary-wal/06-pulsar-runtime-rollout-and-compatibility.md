@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@eaf7b9a704890a9265c21f30d9f351e02d00c600
+master@41d1cddb9d29451884002b96de2bc52367cbb8ca
 BookKeeper 4.18.0
 ```
 
@@ -16,7 +16,7 @@ checkout mechanism.
 ## 2. Borrowed BookKeeper client ownership
 
 Current `NereusManagedLedgerStorage` creates a `ManagedLedgerClientFactory`, obtains the default stock storage class,
-and closes that owner at broker shutdown. Extend initialization：
+and closes that owner at broker shutdown. The focused BK-M2 wiring now performs：
 
 ```java
 ManagedLedgerStorageClass raw = localBookkeeper.getDefaultStorageClass();
@@ -25,10 +25,7 @@ BookkeeperManagedLedgerStorageClass stock =
 org.apache.bookkeeper.client.api.BookKeeper borrowed =
     stock.getBookKeeperClient();
 
-NereusRuntimeContext context = new NereusRuntimeContext(
-    ...,
-    new BorrowedBookKeeperClient(borrowed),
-    ...);
+NereusRuntimeContext context = new NereusRuntimeContext(..., Optional.of(borrowed));
 ```
 
 Exact type/wrapper names may follow module conventions. Required ownership：
@@ -38,10 +35,15 @@ Exact type/wrapper names may follow module conventions. Required ownership：
 - Nereus never calls `BookKeeper.close()` and never closes broker event loops；
 - partial Nereus runtime initialization closes only Nereus-owned resources, then the existing storage error path closes
   the stock factory once；
-- a unit test injects a counting client/owner and freezes success/failure/normal-close counts。
+- `NereusManagedLedgerStorageBookKeeperClientTest` freezes exact instance identity plus non-BK/null rejection；the
+  normal/partial-close ownership counts remain required before production BK runtime composition。
 
 `nereus-api`/`nereus-core` do not import Pulsar or ManagedLedger classes. `nereus-bookkeeper` depends on BookKeeper
 client API, while `nereus-pulsar-adapter` is the composition boundary.
+
+This is a resource-boundary checkpoint only。`DefaultNereusRuntimeProvider` still assembles the Object-WAL runtime and
+does not consume `borrowedBookKeeperClient`；BK profile configuration/first-create therefore remains fail closed until
+the M5 rollout work installs the completed M2-M4 runtime and capabilities。
 
 ## 3. Runtime composition
 
