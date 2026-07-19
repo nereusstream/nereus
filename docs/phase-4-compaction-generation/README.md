@@ -166,6 +166,12 @@
 > entries plus stock BookKeeper coexistence with test retry disabled. The gate also locks separate resolved-target and
 > measured physical/logical read accounting, so ZSTD output smaller than returned Entry bytes is valid rather than a
 > false corruption signal.
+> Checkpoint BJ closes protected-head ordering and abandoned append-intent retirement. The production append future
+> cannot advance the durable head while `REACHABLE_APPEND` acquisition is held. A never-reachable protected intent is
+> admitted only after the root/intent/protection orphan boundary and exact six-domain proof；its commit owner and
+> protection are sealed into the ordinary GC journal, survive MARKED process loss, converge commit-delete response
+> loss and retire metadata before protection before bytes. A prior unmark leaves a stale protection epoch, which is
+> owner/absence-checked and rebound without MARK in that pass rather than becoming a permanent leak.
 > These are focused
 > M6 foundations, not the aggregate completion claim.
 >
@@ -2008,6 +2014,31 @@ broker gate both pass；the declared Spotless/Checkstyle/test gate executed 138 
 core/object-store/materialization checks and retry-disabled locked-Pulsar execution. BI closes only the required
 two-broker/two-worker scale row；the exact 52-scenario executable map and aggregate gates remain open.
 
+### 6.38 F4-M6 protected-head and abandoned append-intent checkpoint
+
+Checkpoint BJ closes required scenario 51 without introducing a second deletion state machine. The new
+`OxiaKeyspace.parseStreamCommitKey` is a strict same-cluster canonical router used when a permanent protection's owner
+record is already absent. `AbandonedAppendIntentPlanBuilder` admits only an Object-WAL root whose complete bounded
+protection set contains `REACHABLE_APPEND` values exclusively. Each value must have the canonical `ra1-*` identity；a
+present owner must retain the same generic commit encoding、version、durable SHA and Object-WAL target. Its deletion
+boundary is the maximum durable root、protection and owner time plus `orphanGrace + maximumClockSkew`.
+
+The builder performs no deletion. `OwnerlessObjectGcExecutor` passes its exact commit and protection removals to the
+existing sealed journal、six-domain `OWNERLESS_ORPHAN_CANDIDATE` proof、central collector and metadata-first retirement
+coordinator. Owner appearance/absence is reloaded at MARK、both drain scans and the final candidate fence. MARKED
+restart reconstructs the same root digest；a lost successful commit delete response converges from exact absence before
+protection and object retirement. If complete domain drift first unmarks the root, the old permanent protection is
+owner/absence-revalidated and rebound to the fresh ACTIVE epoch with no unprotected interval；that pass returns without
+MARK and the following pass starts from new durable facts.
+
+`AsyncAppendPhysicalProtectionTest.headRemainsUnchangedWhileReachableAppendProtectionIsPending` blocks the actual
+production call after deterministic intent prepare but before protection acquisition, verifies both incomplete append
+and unchanged head, then observes the protection before head visibility. The existing strict durability test keeps
+success behind exact generation-zero `VISIBLE_GENERATION`. The three abandoned-intent tests cover all-six-domain veto,
+orphan grace, process restart, response loss, drift/unmark/epoch rebind and owner-absence-to-presence drift.
+`phase4M6AbandonedAppendIntentCheck` composes checkpoint BI、affected module checks and the BJ static/document/source
+audits. The 52-scenario executable map and aggregate M6/Phase 4 gates remain open.
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -2018,7 +2049,7 @@ two-broker/two-worker scale row；the exact 52-scenario executable map and aggre
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BI focused-green, aggregate gates pending |
+| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BJ focused-green, aggregate gates pending |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

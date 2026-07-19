@@ -35,6 +35,8 @@ require_literal "Checkpoint BH" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint BI" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BJ" \
+    "docs/phase-4-compaction-generation/README.md"
 require_literal "scansOneThousandReaderLeasesAndProtectionsWithoutTruncationAndRestarts" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "plansAndDurablyRoundTripsOneTaskAtBothSourceAndRecordLimits" \
@@ -48,6 +50,10 @@ require_literal "phase4M6RegistryScaleCheck" \
 require_literal "phase4M6TwoBrokerWorkerContentionCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M6TwoBrokerWorkerContentionCheck" \
+    "build.gradle.kts"
+require_literal "phase4M6AbandonedAppendIntentCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M6AbandonedAppendIntentCheck" \
     "build.gradle.kts"
 require_literal "GcRetirementManifestRecord" \
     "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
@@ -352,4 +358,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, M6 BD-BI foundations, current source lock, gates, and local links verified."
+echo "Phase 4 M1-M5 final status, M6 BD-BJ foundations, current source lock, gates, and local links verified."

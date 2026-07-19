@@ -719,8 +719,12 @@ Generation-zero append uses a deliberate two-protection handoff. Before head CAS
 generation-zero index materialization creates `VISIBLE_GENERATION`, owned by the exact index key/version/value SHA.
 The first protection is retained through index lag and until an NRC1 root replaces live commit replay；the second is
 retained until the generation-zero index itself retires. An intent that never became reachable is not cleared by TTL：
-the reconciler waits orphan grace and proves unchanged intent、head、recovery root、index absence and reference domains
-before conditional removal. The complete ordering and deterministic reference ids are document 03 §10.
+`AbandonedAppendIntentPlanBuilder` waits the root/protection/intent maximum orphan boundary, validates the canonical
+commit key、reference id、owner version/SHA and Object-WAL target, then submits that exact owner plus protection to the
+same sealed journal and all-domain collector used by ordinary GC. A stale protection epoch is rebound without a gap
+under owner-present/absence post-checks and forces a fresh pass. Owner appearance/absence、head/recovery reachability、
+index/reference creation or scope incompleteness changes the plan or vetoes it before retirement. The complete
+ordering and deterministic reference ids are document 03 §10.
 
 ## 7. Reference-domain SPI
 
@@ -1758,10 +1762,15 @@ facts fail closed. `Phase4PhysicalGcRuntime` clears and repopulates one latest r
 start of each root pass；that immutable snapshot is diagnostics only.
 
 The generic ownerless executor derives candidate evidence from the immutable physical identity SHA, constructs an
-`OWNERLESS_ORPHAN_CANDIDATE` query and delegates every destructive transition to the central collector. A durable
-protection precheck may conservatively skip work, but absence from that precheck never authorizes deletion: the full
-reader/protection/metadata/domain proof and activation fence still run inside the collector. Restart from MARKED
-reconstructs the exact plan；complete drift unmarks, while incomplete/limit failure leaves MARKED.
+`OWNERLESS_ORPHAN_CANDIDATE` query and delegates every destructive transition to the central collector. An unprotected
+root carries empty retirement lists. A root protected only by canonical `REACHABLE_APPEND` values is handled by
+`AbandonedAppendIntentPlanBuilder`, which freezes the current exact commit-owner presence/absence, protection wrappers
+and protection/intent orphan boundary. Any other protection conservatively skips global work. Thus protection absence
+is not deletion authority, and protection presence is no longer a permanent liveness leak for a provably abandoned
+pre-head intent. The full reader/protection/metadata/six-domain proof and activation fence still run inside the
+collector. Restart from MARKED reconstructs the exact non-empty or empty plan；complete drift unmarks, while
+incomplete/limit failure leaves MARKED. Destructive execution remains exclusively metadata-first through the sealed
+journal；the planner contains no direct commit/protection delete call.
 
 `DefaultPhysicalGcLifecycleService` starts immediately only after explicit `start()`, permits at most one active pass,
 coalesces any number of hints during a pass into one immediate follow-up and otherwise schedules the next attempt at

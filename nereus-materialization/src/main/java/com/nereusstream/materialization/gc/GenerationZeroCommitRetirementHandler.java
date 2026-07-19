@@ -13,7 +13,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
-/** Exact, restart-safe deletion of one journaled checkpoint-replaced commit node. */
+/** Exact, restart-safe deletion of one journaled generation-zero commit node. */
 public final class GenerationZeroCommitRetirementHandler
         implements GcMetadataRetirementHandler {
     public static final String REMOVAL_TYPE = "generation-zero-commit";
@@ -65,7 +65,7 @@ public final class GenerationZeroCommitRetirementHandler
                             exact.key(),
                             exact.metadataVersion(),
                             exact.durableValueSha256()),
-                    "conditionally delete exact checkpoint-replaced commit node");
+                    "conditionally delete exact generation-zero commit node");
             return delete.handle((ignored, failure) -> {
                 if (failure == null) {
                     return CompletableFuture.completedFuture(
@@ -92,7 +92,7 @@ public final class GenerationZeroCommitRetirementHandler
             MaterializationDeadline deadline) {
         return deadline.bound(
                         () -> commitLoader.load(exactKey),
-                        "reload exact checkpoint-replaced commit node")
+                        "reload exact generation-zero commit node")
                 .thenApply(value -> Objects.requireNonNull(
                         value, "generation-zero commit lookup result"));
     }

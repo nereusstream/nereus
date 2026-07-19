@@ -1969,7 +1969,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BI are implemented and focused-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BJ are implemented and focused-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -2010,6 +2010,18 @@ separate resolved-target/measured-physical/logical-returned fields in `WalSliceR
 `physicalBytesRead < returnedPayloadBytes`, with zero positive amplification and explicit compression savings. The
 declared Spotless/Checkstyle/test broker gate passed 138 tasks with retry disabled on
 `master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`.
+
+Checkpoint BJ closes the previously missing abandoned protected-intent half of scenario 51.
+`AbandonedAppendIntentPlanBuilder` recognizes only complete sets of canonical `REACHABLE_APPEND` protections, reloads
+the exact generic commit owner or exact absence, validates its Object-WAL target and derives the maximum root/owner/
+protection `orphanGrace + maximumClockSkew` boundary. It journals present commit owners with every exact protection and
+uses the existing six-domain ownerless query、collector fences and metadata-first retirement. MARKED restart reproduces
+the same plan；commit delete response loss converges from exact absence. Complete domain drift unmarks, after which a
+stale permanent protection is owner/absence-checked and epoch-rebound without MARKing in that pass. The async append
+test `headRemainsUnchangedWhileReachableAppendProtectionIsPending` freezes the actual production call between prepared
+intent and protection acquisition, proves the durable head remains at zero and the append future remains incomplete,
+then releases protection and observes head one plus the durable `REACHABLE_APPEND`. The strict-success half remains
+directly covered by `AsyncObjectWalAppendCoordinatorTest.strictDurabilityWaitsForExactVisibleGenerationProtection`.
 
 ### 8.1 Required scenarios
 
@@ -2074,7 +2086,8 @@ The final gate must cover all of the following as named deterministic or real-se
     listing omission cannot falsely complete the coverage bit；
 51. after the backfill epoch, sync/async append prepare cannot make a head reachable before `REACHABLE_APPEND`, strict
     success cannot precede generation-zero `VISIBLE_GENERATION`, and an abandoned protected intent is reclaimed only
-    by the full orphan/head/recovery-domain proof；
+    by the full orphan/head/recovery-domain proof。Implemented/tested by checkpoint BJ；the focused aggregate is
+    `phase4M6AbandonedAppendIntentCheck`；
 52. DELETED-root retirement requires two separated exact HEAD-absence observations, unchanged owner/domain proofs and
     versioned reference/manifest cleanup；a first or retried PUT at every cut is rejected or uses a fresh key, and
     externally reappearing bytes return to the ownerless-orphan proof path。Implemented/tested by checkpoint BB；the
@@ -2103,13 +2116,15 @@ the frozen shard function；it traverses at least two pages per shard and then r
 Checkpoint BH implements the exact registry row；it does not treat registration or its scan order as stream-head/task
 truth, and all 16,448 stale-hint snapshots are safely skipped only after authoritative L0 inspection. Checkpoint BI
 implements the final two-broker/two-worker row through broker-owned production runtimes and shared durable services；it
-does not replace the still-required per-scenario executable audit.
+does not replace the still-required per-scenario executable audit. Checkpoint BJ closes scenario 51's protected-head
+ordering and abandoned-intent retirement path；it likewise remains one named scenario row rather than the 52-row map.
 
 ### 8.3 Gates
 
 ```text
 ./gradlew phase4M6RegistryScaleCheck
 ./gradlew phase4M6TwoBrokerWorkerContentionCheck
+./gradlew phase4M6AbandonedAppendIntentCheck
 ./gradlew phase4M6Check
 ./gradlew phase4M6FinalCheck --rerun-tasks
 ./gradlew phase4Check

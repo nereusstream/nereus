@@ -5,8 +5,6 @@ import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceQueryKind;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
-import com.nereusstream.materialization.MaterializationDeadline;
-import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import java.time.Clock;
@@ -14,33 +12,30 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledExecutorService;
 
 /** Restart-reconstructable execution path for ACTIVE roots with no durable owner metadata. */
 public final class OwnerlessObjectGcExecutor {
     private final PhysicalGcConfig config;
-    private final String cluster;
-    private final PhysicalObjectMetadataStore metadataStore;
+    private final AbandonedAppendIntentPlanBuilder abandonedAppendIntents;
     private final GcReferenceDomainRegistry referenceDomains;
     private final PhysicalObjectGarbageCollector garbageCollector;
     private final SourceRetirementCoordinator sourceRetirement;
     private final GcIdGenerator candidateIds;
     private final Clock clock;
-    private final ScheduledExecutorService scheduler;
 
     public OwnerlessObjectGcExecutor(
             String cluster,
             PhysicalGcConfig config,
-            PhysicalObjectMetadataStore metadataStore,
+            AbandonedAppendIntentPlanBuilder abandonedAppendIntents,
             GcReferenceDomainRegistry referenceDomains,
             PhysicalObjectGarbageCollector garbageCollector,
             SourceRetirementCoordinator sourceRetirement,
             GcIdGenerator candidateIds,
-            Clock clock,
-            ScheduledExecutorService scheduler) {
-        this.cluster = requireText(cluster, "cluster");
+            Clock clock) {
+        requireText(cluster, "cluster");
         this.config = Objects.requireNonNull(config, "config");
-        this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
+        this.abandonedAppendIntents = Objects.requireNonNull(
+                abandonedAppendIntents, "abandonedAppendIntents");
         this.referenceDomains = Objects.requireNonNull(
                 referenceDomains, "referenceDomains");
         this.garbageCollector = Objects.requireNonNull(
@@ -49,7 +44,6 @@ public final class OwnerlessObjectGcExecutor {
                 sourceRetirement, "sourceRetirement");
         this.candidateIds = Objects.requireNonNull(candidateIds, "candidateIds");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     /** Evaluates one exact ACTIVE root through the complete ownerless global-domain proof. */
@@ -66,12 +60,16 @@ public final class OwnerlessObjectGcExecutor {
         if (now < active.value().createdAtMillis()) {
             return CompletableFuture.completedFuture(ExecutionResult.skipped(object));
         }
-        return hasProtection(object).thenCompose(protectedRoot -> {
-            if (protectedRoot) {
+        return abandonedAppendIntents.inspectActive(active).thenCompose(inspection -> {
+            if (!inspection.eligible()) {
                 return CompletableFuture.completedFuture(ExecutionResult.skipped(object));
             }
-            GcCandidate candidate = candidate(active, now);
-            return garbageCollector.mark(candidate, List.of(), List.of())
+            GcCandidate candidate = candidate(
+                    active, now, inspection.notBeforeMillis());
+            return garbageCollector.mark(
+                            candidate,
+                            inspection.protectionRemovals(),
+                            inspection.metadataRemovals())
                     .thenCompose(mark -> {
                         if (mark.status() != PhysicalGcMarkStatus.MARKED) {
                             return CompletableFuture.completedFuture(
@@ -96,30 +94,39 @@ public final class OwnerlessObjectGcExecutor {
             return CompletableFuture.completedFuture(
                     ExecutionResult.skipped(object(marked)));
         }
-        GcCandidate candidate = candidate(marked, now);
-        return referenceDomains.snapshotForDeletion(candidate.referenceQuery())
-                .thenCompose(collection -> {
-                    if (!collection.clear()) {
-                        if (collection.status() == GcReferenceCollectionStatus.VETOED) {
-                            return unmark(marked);
-                        }
-                        return CompletableFuture.completedFuture(
-                                ExecutionResult.skipped(object(marked)));
-                    }
-                    final GcPlan plan;
-                    try {
-                        plan = GcPlan.fromMarkedRoot(
-                                config,
-                                marked.value().gcAttemptId(),
-                                candidate,
-                                collection.snapshots(),
-                                List.of(),
-                                List.of(),
-                                marked);
-                    } catch (IllegalArgumentException drift) {
+        GcCandidate candidate = candidate(
+                marked, now, marked.value().deleteNotBeforeMillis());
+        return abandonedAppendIntents.inspectMarked(marked)
+                .thenCompose(inspection -> {
+                    if (!inspection.eligible()) {
                         return unmark(marked);
                     }
-                    return advance(plan, Optional.empty());
+                    return referenceDomains.snapshotForDeletion(
+                                    candidate.referenceQuery())
+                            .thenCompose(collection -> {
+                                if (!collection.clear()) {
+                                    if (collection.status()
+                                            == GcReferenceCollectionStatus.VETOED) {
+                                        return unmark(marked);
+                                    }
+                                    return CompletableFuture.completedFuture(
+                                            ExecutionResult.skipped(object(marked)));
+                                }
+                                final GcPlan plan;
+                                try {
+                                    plan = GcPlan.fromMarkedRoot(
+                                            config,
+                                            marked.value().gcAttemptId(),
+                                            candidate,
+                                            collection.snapshots(),
+                                            inspection.protectionRemovals(),
+                                            inspection.metadataRemovals(),
+                                            marked);
+                                } catch (IllegalArgumentException drift) {
+                                    return unmark(marked);
+                                }
+                                return advance(plan, Optional.empty());
+                            });
                 });
     }
 
@@ -127,7 +134,10 @@ public final class OwnerlessObjectGcExecutor {
             GcPlan plan, Optional<PhysicalGcMarkResult> mark) {
         return garbageCollector.advanceToDeleteIntent(
                         plan,
-                        ignored -> CompletableFuture.completedFuture(true))
+                        ignored -> abandonedAppendIntents.reload(
+                                        plan.candidate(),
+                                        plan.plannedMetadataRemovals())
+                                .thenApply(plan.plannedMetadataRemovals()::equals))
                 .thenCompose(advance -> {
                     if (advance.status() != PhysicalGcAdvanceStatus.DELETE_INTENT) {
                         return CompletableFuture.completedFuture(
@@ -153,19 +163,10 @@ public final class OwnerlessObjectGcExecutor {
                         object, Optional.empty(), advance));
     }
 
-    private CompletableFuture<Boolean> hasProtection(ObjectKeyHash object) {
-        MaterializationDeadline deadline = new MaterializationDeadline(
-                config.operationTimeout(), scheduler);
-        CompletableFuture<Boolean> result = deadline.bound(
-                        () -> metadataStore.scanProtections(
-                                cluster, object, Optional.empty(), 1),
-                        "preflight ownerless physical-root protections")
-                .thenApply(page -> !page.values().isEmpty());
-        result.whenComplete((ignored, failure) -> deadline.close());
-        return result;
-    }
-
-    private GcCandidate candidate(VersionedPhysicalObjectRoot root, long now) {
+    private GcCandidate candidate(
+            VersionedPhysicalObjectRoot root,
+            long now,
+            long notBeforeMillis) {
         PhysicalObjectIdentity object = PhysicalObjectIdentity.from(root.value());
         GcReferenceQuery query = GcReferenceQuery.create(
                 GcReferenceQueryKind.OWNERLESS_ORPHAN_CANDIDATE,
@@ -180,7 +181,7 @@ public final class OwnerlessObjectGcExecutor {
                     query,
                     object.identitySha256(),
                     now,
-                    root.value().orphanNotBeforeMillis());
+                    notBeforeMillis);
         }
         return GcCandidate.fromMarkedRoot(
                 config,

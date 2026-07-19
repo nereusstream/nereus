@@ -22,6 +22,7 @@ import com.nereusstream.managedledger.retention.CursorSnapshotReferenceDomain;
 import com.nereusstream.managedledger.retention.ManagedLedgerStreamRetirementAuthorityReader;
 import com.nereusstream.managedledger.retention.ProjectionGenerationReferenceDomain;
 import com.nereusstream.materialization.MaterializationConfig;
+import com.nereusstream.materialization.gc.AbandonedAppendIntentPlanBuilder;
 import com.nereusstream.materialization.gc.AppendRecoveryReferenceDomain;
 import com.nereusstream.materialization.gc.DefaultPhysicalGcLifecycleService;
 import com.nereusstream.materialization.gc.DefaultPhysicalRootBackfillCoordinator;
@@ -300,6 +301,14 @@ public final class Phase4PhysicalGcRuntime
                         exactConfig,
                         exactClock,
                         exactScheduler);
+        AbandonedAppendIntentPlanBuilder abandonedAppendIntents =
+                new AbandonedAppendIntentPlanBuilder(
+                        exactCluster,
+                        exactPhysical,
+                        exactSourceRetirement,
+                        exactObjectProtection,
+                        exactConfig,
+                        exactScheduler);
         GcPlanMetadataRevalidator metadataRevalidator = (candidate, expected) -> {
             var kind = candidate.referenceQuery().kind();
             if (kind
@@ -307,15 +316,17 @@ public final class Phase4PhysicalGcRuntime
                             .REFERENCED_OBJECT) {
                 return sourcePlans.reload(candidate, expected);
             }
-            if ((kind
-                                    != com.nereusstream.core.physical.GcReferenceQueryKind
-                                            .CURSOR_SNAPSHOT_CANDIDATE
-                            && kind
-                                    != com.nereusstream.core.physical.GcReferenceQueryKind
-                                            .OWNERLESS_ORPHAN_CANDIDATE)
+            if (kind
+                    == com.nereusstream.core.physical.GcReferenceQueryKind
+                            .OWNERLESS_ORPHAN_CANDIDATE) {
+                return abandonedAppendIntents.reload(candidate, expected);
+            }
+            if (kind
+                            != com.nereusstream.core.physical.GcReferenceQueryKind
+                                    .CURSOR_SNAPSHOT_CANDIDATE
                     || !expected.isEmpty()) {
                 return CompletableFuture.failedFuture(new IllegalArgumentException(
-                        "runtime-managed cursor/ownerless GC accepts only empty metadata-removal plans"));
+                        "runtime-managed cursor GC accepts only empty metadata-removal plans"));
             }
             return CompletableFuture.completedFuture(List.of());
         };
@@ -388,13 +399,12 @@ public final class Phase4PhysicalGcRuntime
         OwnerlessObjectGcExecutor ownerlessExecutor = new OwnerlessObjectGcExecutor(
                 exactCluster,
                 exactConfig,
-                exactPhysical,
+                abandonedAppendIntents,
                 registry,
                 collector,
                 retirement,
                 new SecureGcIdGenerator(),
-                exactClock,
-                exactScheduler);
+                exactClock);
         var tombstones = new DefaultPhysicalRootTombstoneRetirementCoordinator(
                 exactCluster,
                 exactConfig,

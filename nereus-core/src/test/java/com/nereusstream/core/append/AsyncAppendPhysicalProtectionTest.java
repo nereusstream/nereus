@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.PayloadFormat;
@@ -29,12 +30,14 @@ import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.core.profile.Phase4StorageProfileResolver;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.PreparedStableAppend;
 import com.nereusstream.metadata.oxia.ReachableCommittedAppend;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
@@ -210,6 +213,117 @@ class AsyncAppendPhysicalProtectionTest {
                     .anyMatch(value -> ObjectProtectionType.fromWireId(
                                     value.value().protectionTypeId())
                             == ObjectProtectionType.VISIBLE_GENERATION);
+        } finally {
+            storage.close();
+            metadata.close();
+            objects.close();
+        }
+    }
+
+    @Test
+    void headRemainsUnchangedWhileReachableAppendProtectionIsPending() {
+        StreamStorageConfig config = StreamStorageConfig.defaults(
+                "protected-head-order-cluster", "writer");
+        FakeOxiaMetadataStore metadata =
+                new FakeOxiaMetadataStore(CLOCK::millis);
+        LocalFileObjectStore objects = new LocalFileObjectStore(
+                temporaryDirectory.resolve("protected-head-order"));
+        DefaultObjectProtectionManager protections =
+                new DefaultObjectProtectionManager(
+                        config.cluster(),
+                        metadata,
+                        Duration.ofMinutes(10),
+                        Duration.ZERO,
+                        Duration.ofHours(24),
+                        CLOCK);
+        GenerationZeroPhysicalReferencePublisher delegate =
+                new DefaultGenerationZeroPhysicalReferencePublisher(
+                        config.cluster(), metadata, metadata, protections);
+        CompletableFuture<Void> allowProtection = new CompletableFuture<>();
+        AtomicReference<PreparedStableAppend> prepared = new AtomicReference<>();
+        GenerationZeroPhysicalReferencePublisher blocked =
+                new GenerationZeroPhysicalReferencePublisher() {
+                    @Override
+                    public CompletableFuture<Void> authorizeUpload(
+                            AppendSession session,
+                            PhysicalObjectIdentity object,
+                            Duration timeout) {
+                        return delegate.authorizeUpload(session, object, timeout);
+                    }
+
+                    @Override
+                    public CompletableFuture<ProtectedStableAppend> protectBeforeHead(
+                            PreparedStableAppend append,
+                            Duration timeout) {
+                        prepared.set(append);
+                        return allowProtection.thenCompose(
+                                ignored -> delegate.protectBeforeHead(append, timeout));
+                    }
+
+                    @Override
+                    public CompletableFuture<ProtectedGenerationZero> protectVisibleIndex(
+                            MaterializedGenerationZero append,
+                            Duration timeout) {
+                        return delegate.protectVisibleIndex(append, timeout);
+                    }
+                };
+        DefaultStreamStorage storage = new DefaultStreamStorage(
+                config,
+                metadata,
+                new DefaultWalObjectWriter(objects, "test-writer", CLOCK),
+                new DefaultWalObjectReader(objects),
+                blocked,
+                new MetadataAppendRecoverySearcher(config.cluster(), metadata),
+                new Phase4StorageProfileResolver(),
+                CLOCK,
+                Runnable::run,
+                ReadMetricsObserver.noop(),
+                TrimMetricsObserver.noop());
+        try {
+            var stream = storage.createOrGetStream(
+                            new StreamName("protected-head-order"),
+                            new StreamCreateOptions(
+                                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+                                    Map.of()))
+                    .join();
+
+            CompletableFuture<?> append = storage.append(
+                    stream.streamId(),
+                    batch("head-must-wait"),
+                    new AppendOptions(
+                            Optional.empty(),
+                            DurabilityLevel.WAL_DURABLE,
+                            Duration.ofSeconds(5),
+                            true,
+                            Map.of()));
+
+            assertThat(prepared).doesNotHaveValue(null);
+            assertThat(append).isNotDone();
+            assertThat(metadata.getCommittedEndOffset(
+                                    config.cluster(), stream.streamId())
+                            .join()
+                            .committedEndOffset())
+                    .isZero();
+
+            allowProtection.complete(null);
+
+            assertThat(append.join()).isNotNull();
+            assertThat(metadata.getCommittedEndOffset(
+                                    config.cluster(), stream.streamId())
+                            .join()
+                            .committedEndOffset())
+                    .isOne();
+            assertThat(metadata.scanProtections(
+                                    config.cluster(),
+                                    prepared.get().objectKeyHash(),
+                                    Optional.empty(),
+                                    16)
+                            .join()
+                            .values())
+                    .anySatisfy(value -> assertThat(
+                                    ObjectProtectionType.fromWireId(
+                                            value.value().protectionTypeId()))
+                            .isEqualTo(ObjectProtectionType.REACHABLE_APPEND));
         } finally {
             storage.close();
             metadata.close();

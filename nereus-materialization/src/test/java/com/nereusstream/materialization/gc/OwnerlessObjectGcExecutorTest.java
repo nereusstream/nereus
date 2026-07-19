@@ -15,6 +15,8 @@ import com.nereusstream.core.physical.GcAuthorityToken;
 import com.nereusstream.core.physical.GcReferenceDomain;
 import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.core.physical.GcReferenceSnapshot;
+import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.PhysicalObjectKind;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
@@ -22,6 +24,7 @@ import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
+import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.PutObjectOptions;
 import com.nereusstream.objectstore.PutObjectResult;
@@ -29,6 +32,7 @@ import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -184,6 +188,22 @@ class OwnerlessObjectGcExecutorTest {
             ClearDomain domain,
             Clock clock) {
         PhysicalGcConfig config = config();
+        SourceRetirementMetadataStore sources = emptySourceStore();
+        ObjectProtectionManager protections = new DefaultObjectProtectionManager(
+                CLUSTER,
+                metadata,
+                config.pendingProtectionDuration(),
+                config.maximumClockSkew(),
+                config.orphanGrace(),
+                clock);
+        AbandonedAppendIntentPlanBuilder abandonedAppendIntents =
+                new AbandonedAppendIntentPlanBuilder(
+                        CLUSTER,
+                        metadata,
+                        sources,
+                        protections,
+                        config,
+                        scheduler);
         GcReferenceDomainRegistry domains = new GcReferenceDomainRegistry(
                 config, scheduler, List.of(domain));
         DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(
@@ -194,7 +214,7 @@ class OwnerlessObjectGcExecutorTest {
                 metadata,
                 domains,
                 activationGuard(),
-                (candidate, expected) -> CompletableFuture.completedFuture(expected),
+                abandonedAppendIntents,
                 journal,
                 new SecureGcIdGenerator(),
                 clock,
@@ -211,13 +231,34 @@ class OwnerlessObjectGcExecutorTest {
         return new OwnerlessObjectGcExecutor(
                 CLUSTER,
                 config,
-                metadata,
+                abandonedAppendIntents,
                 domains,
                 collector,
                 retirement,
                 new SecureGcIdGenerator(),
-                clock,
-                scheduler);
+                clock);
+    }
+
+    private static SourceRetirementMetadataStore emptySourceStore() {
+        return (SourceRetirementMetadataStore) Proxy.newProxyInstance(
+                SourceRetirementMetadataStore.class.getClassLoader(),
+                new Class<?>[] {SourceRetirementMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return switch (method.getName()) {
+                            case "toString" -> "empty-source-retirement-store";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == args[0];
+                            default -> throw new UnsupportedOperationException(method.getName());
+                        };
+                    }
+                    return switch (method.getName()) {
+                        case "getCommitNodeByKey", "getCommittedMarkerByKey", "getCommittedMarker" ->
+                                CompletableFuture.completedFuture(Optional.empty());
+                        case "close" -> null;
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    };
+                });
     }
 
     private static GenerationProtocolActivationGuard activationGuard() {

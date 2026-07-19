@@ -1987,3 +1987,27 @@ tasks.register("phase4M6TwoBrokerWorkerContentionCheck") {
     dependsOn(":nereus-core:check")
     dependsOn(":nereus-materialization:check")
 }
+
+tasks.register<Exec>("checkPhase4M6AbandonedAppendIntentContractSurface") {
+    group = "verification"
+    description = "Audit protected-head ordering and full-proof abandoned append-intent retirement."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m6-abandoned-append-intent-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M6AbandonedAppendIntentCheck") {
+    group = "verification"
+    description = "Verify checkpoint BJ protected append ordering and abandoned intent GC convergence."
+    dependsOn("phase4M6TwoBrokerWorkerContentionCheck")
+    dependsOn("checkPhase4M6AbandonedAppendIntentContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}

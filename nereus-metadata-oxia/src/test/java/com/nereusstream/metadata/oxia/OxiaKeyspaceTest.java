@@ -15,6 +15,7 @@
 package com.nereusstream.metadata.oxia;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.StreamId;
@@ -60,5 +61,27 @@ class OxiaKeyspaceTest {
 
         assertThat(keyspace.streamPartitionKey(new StreamId("s-stream")).value()).isEqualTo("s-stream");
         assertThat(keyspace.objectPartitionKey(new ObjectId("object-1")).value()).isEqualTo("object-1");
+    }
+
+    @Test
+    void parsesOnlyCanonicalCommitLogKeysFromTheSameCluster() {
+        OxiaKeyspace keys = new OxiaKeyspace("cluster/a");
+        StreamId stream = new StreamId("stream/one");
+        String commit = "commit/one";
+        String key = keys.streamCommitKey(stream, commit);
+
+        assertThat(keys.parseStreamCommitKey(key))
+                .isEqualTo(new StreamCommitKeyIdentity(stream, commit));
+        assertThatThrownBy(() -> keys.parseStreamCommitKey(
+                        new OxiaKeyspace("cluster/b").streamCommitKey(stream, commit)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("another cluster");
+        assertThatThrownBy(() -> keys.parseStreamCommitKey(
+                        key.replace("/commit-log/", "/committed-appends/")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown family");
+        assertThatThrownBy(() -> keys.parseStreamCommitKey(key + "/extra"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("identity depth");
     }
 }

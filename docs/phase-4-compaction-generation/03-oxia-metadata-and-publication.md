@@ -1542,10 +1542,29 @@ The append sequence is normative：
 8. WAL_DURABLE_AND_INDEX_COMMITTED may acknowledge only after step 7
 ```
 
-`REACHABLE_APPEND` is intentionally acquired before the intent is head-reachable. It never expires: if head CAS loses
-or the process dies, the abandoned-intent reconciler may remove it only after `orphanGrace`, exact head/recovery-root
-scan proves that commit id was never reachable, no generation-zero index cites the object and the intent version/SHA
-is unchanged. If head CAS did succeed but its response was lost, reconciliation repairs/retains the protection.
+`REACHABLE_APPEND` is intentionally acquired before the intent is head-reachable and never expires by TTL.
+`AbandonedAppendIntentPlanBuilder` is the only ownerless path allowed to classify it as removable. It scans the complete
+bounded protection set and admits a plan only when every protection is `REACHABLE_APPEND`; a visible generation、cursor、
+checkpoint、task or future protection keeps the generic ownerless fast path blocked. For each admitted protection it
+strictly decodes the same-cluster canonical `OxiaKeyspace.parseStreamCommitKey` identity, recomputes the `ra1-*`
+reference id, reloads the exact owner key and, when present, requires generic target encoding、the same owner
+version/durable SHA and an Object-WAL slice matching the whole physical root. Owner absence is an explicit captured
+fact, not permission inferred from a failed decode.
+
+The candidate boundary is the maximum of the root's durable `orphanNotBeforeMillis` and every protection/owner
+timestamp plus `orphanGrace + maximumClockSkew`. A prior complete GC drift may have changed `MARKED -> ACTIVE` and left
+the permanent protection on an older root epoch. The builder then uses `ObjectProtectionManager.transfer` with the
+same owner and two owner-present/owner-absent revalidations to bind the veto to the current ACTIVE epoch；the current
+pass returns `REBOUND` and may not MARK. It never directly deletes an intent or protection.
+
+On a fresh eligible pass, `OwnerlessObjectGcExecutor` places the exact commit removals and exact protection wrappers in
+the ordinary sealed GC journal and runs `OWNERLESS_ORPHAN_CANDIDATE` through all six registered global domains. The
+collector reloads both sets before MARK、at both drain fences and in the final candidate fence；an owner appearing or
+disappearing, a protection change, a reachable head/recovery tail, a generation-zero index or incomplete global scope
+prevents deletion. MARKED restart derives the same facts and accepts them only when they reproduce the root digest and
+sealed journal. `SourceRetirementCoordinator` then retires exact commit metadata, exact protections and object bytes in
+that order. If head CAS succeeded but its response was lost, append-recovery or generation domains veto and retain the
+object；only a full unchanged orphan/head/recovery/generation/projection proof reaches destructive retirement.
 
 A root in `MARKED/DELETING/DELETED/QUARANTINED`, an expired/lost append owner or any identity mismatch fails step 0
 before bytes are sent. Retry then allocates a fresh WAL object attempt/sequence. Even after the old `DELETED` root is

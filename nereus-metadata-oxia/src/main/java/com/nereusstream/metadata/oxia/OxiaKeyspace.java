@@ -59,6 +59,39 @@ public final class OxiaKeyspace {
         return streamPrefix(streamId) + "/commit-log/" + KeyComponentCodec.encodeComponent(commitId);
     }
 
+    /** Strict restart router for an exact L0 commit-log owner key. */
+    public StreamCommitKeyIdentity parseStreamCommitKey(String suppliedKey) {
+        String key = requireNonBlank(suppliedKey, "streamCommitKey");
+        String streamsPrefix = prefix + "/streams/";
+        if (!key.startsWith(streamsPrefix)) {
+            throw new IllegalArgumentException(
+                    "stream commit key belongs to another cluster namespace");
+        }
+        String remainder = key.substring(streamsPrefix.length());
+        int streamEnd = remainder.indexOf('/');
+        if (streamEnd <= 0 || streamEnd == remainder.length() - 1) {
+            throw new IllegalArgumentException(
+                    "stream commit key is missing its canonical stream scope");
+        }
+        StreamId streamId = new StreamId(KeyComponentCodec.decodeComponent(
+                remainder.substring(0, streamEnd)));
+        String suffix = remainder.substring(streamEnd + 1);
+        String commitPrefix = "commit-log/";
+        if (!suffix.startsWith(commitPrefix)) {
+            throw new IllegalArgumentException("stream commit key has an unknown family");
+        }
+        String encodedCommitId = suffix.substring(commitPrefix.length());
+        if (encodedCommitId.isEmpty() || encodedCommitId.indexOf('/') >= 0) {
+            throw new IllegalArgumentException("stream commit key has an invalid identity depth");
+        }
+        String commitId = KeyComponentCodec.decodeComponent(encodedCommitId);
+        StreamCommitKeyIdentity decoded = new StreamCommitKeyIdentity(streamId, commitId);
+        if (!streamCommitKey(streamId, commitId).equals(key)) {
+            throw new IllegalArgumentException("stream commit key is not canonical");
+        }
+        return decoded;
+    }
+
     public String offsetIndexKey(StreamId streamId, long offsetEnd, long generation) {
         return offsetIndexPrefix(streamId)
                 + "/"
