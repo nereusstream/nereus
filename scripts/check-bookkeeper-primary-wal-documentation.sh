@@ -102,6 +102,21 @@ require_literal 'reachableHeadRecoveryRepairsGenerationZeroWithoutRewritingBookK
 require_literal 'defaultAdapterMakesDeferredSyncUnrepresentableAndAlwaysUsesEmptyWriteFlags' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperClientApiContractTest.java"
+require_literal 'BookKeeperAppendReservationIds' \
+    "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperAppendReservationIds.java"
+require_literal 'BookKeeperAppendRecoveryCoordinator' \
+    "docs/phase-bk-bookkeeper-primary-wal/04-append-read-recovery-and-fencing.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinator.java"
+require_literal 'currentSessionCommitsTheSameDurableRangeWithoutAnotherBookKeeperWrite' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinatorTest.java"
+require_literal 'newSessionAbandonsUnreachableDurableRangeAndAllocatesAnotherLedger' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinatorTest.java"
+require_literal 'restartRecoveryReusesCurrentSessionRangeAndFencesExpiredSessionRange' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'bookKeeperPrimaryWalDocumentationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM1Check' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2MetadataCheck' "build.gradle.kts"

@@ -76,7 +76,11 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
         String referenceId = reachableReferenceId(prepared);
         return loadRoot(exactTarget, deadline)
                 .thenCompose(root -> {
-                    requireRoot(root.value(), prepared.request().streamId(), exactTarget, true);
+                    requireRoot(
+                            root.value(),
+                            prepared.request().streamId(),
+                            exactTarget,
+                            !prepared.replayWasReachable());
                     return locateProtection(
                                     exactTarget,
                                     prepared.request().streamId(),
@@ -99,7 +103,11 @@ public final class BookKeeperPrimaryPhysicalReferenceAdapter
                                             prepared.commitRecordSha256().value())))
                             .thenCompose(protection -> loadRoot(exactTarget, deadline)
                                     .thenApply(reloaded -> {
-                                        requireRoot(reloaded.value(), prepared.request().streamId(), exactTarget, true);
+                                        requireRoot(
+                                                reloaded.value(),
+                                                prepared.request().streamId(),
+                                                exactTarget,
+                                                !prepared.replayWasReachable());
                                         return new ProtectedStableAppend(
                                                 prepared,
                                                 proof(

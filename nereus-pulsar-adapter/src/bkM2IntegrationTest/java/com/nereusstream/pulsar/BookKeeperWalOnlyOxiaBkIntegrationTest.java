@@ -6,9 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
+import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
+import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.DurabilityLevel;
@@ -25,6 +27,7 @@ import com.nereusstream.api.StreamName;
 import com.nereusstream.api.TrimOptions;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.bookkeeper.BookKeeperClientOperations;
+import com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinator;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
 import com.nereusstream.bookkeeper.BookKeeperLedgerAllocationRequest;
 import com.nereusstream.bookkeeper.BookKeeperLedgerAllocator;
@@ -37,6 +40,7 @@ import com.nereusstream.bookkeeper.BookKeeperLedgerRecovery;
 import com.nereusstream.bookkeeper.BookKeeperLedgerRetentionManager;
 import com.nereusstream.bookkeeper.BookKeeperOperationDeadline;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
+import com.nereusstream.bookkeeper.BookKeeperPreparedPrimaryAppend;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppender;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalReader;
 import com.nereusstream.bookkeeper.BookKeeperProtocolActivationProof;
@@ -57,6 +61,8 @@ import com.nereusstream.core.append.AppendAdmissionGuard;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
+import com.nereusstream.core.wal.DurablePrimaryAppend;
+import com.nereusstream.core.wal.PrimaryAppendRequest;
 import com.nereusstream.metadata.oxia.BookKeeperKeyspace;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.BookKeeperScanToken;
@@ -67,6 +73,7 @@ import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.records.AllocationSlotLifecycle;
 import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
+import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
@@ -369,6 +376,132 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 }
             }
         }
+    }
+
+    @Test
+    void restartRecoveryReusesCurrentSessionRangeAndFencesExpiredSessionRange() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-recovery-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        MutableClock clock = new MutableClock(4_000_000);
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri)) {
+            StreamId currentStream;
+            AppendSession currentSession;
+            AppendAttemptId currentAttempt = new AppendAttemptId("attempt-current-" + suffix);
+            DurablePrimaryAppend currentDurable;
+            AtomicReference<CountingOperations> firstCounter = new AtomicReference<>();
+            try (Process first = Process.open(
+                    bookKeeperCluster,
+                    cluster,
+                    deployment,
+                    "process-recovery-first",
+                    configuration,
+                    reservation,
+                    clock,
+                    raw -> counting(raw, firstCounter))) {
+                currentStream = first.storage.createOrGetStream(
+                                new StreamName("persistent://tenant/namespace/bk-recovery-current-" + suffix),
+                                new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                        .join()
+                        .streamId();
+                currentSession = first.acquire(currentStream, "writer-1");
+                currentDurable = first.persistOnly(
+                        currentStream, currentSession, currentAttempt, new byte[] {1}, new byte[] {2});
+                assertThat(firstCounter.get().writeCalls()).isEqualTo(2);
+            }
+
+            AtomicReference<CountingOperations> restartCounter = new AtomicReference<>();
+            try (Process restarted = Process.open(
+                    bookKeeperCluster,
+                    cluster,
+                    deployment,
+                    "process-recovery-restarted",
+                    configuration,
+                    reservation,
+                    clock,
+                    raw -> counting(raw, restartCounter))) {
+                AppendResult recovered = restarted.recoveryCoordinator.recoverAfterRestart(
+                                currentSession,
+                                currentAttempt,
+                                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                                TIMEOUT)
+                        .join();
+                assertThat(recovered.readTarget()).isEqualTo(currentDurable.readTarget());
+                assertThat(restartCounter.get().writeCalls()).isZero();
+                assertRead(restarted, currentStream, List.of(new byte[] {1}, new byte[] {2}));
+            }
+
+            StreamId fencedStream;
+            AppendSession oldSession;
+            AppendAttemptId oldAttempt = new AppendAttemptId("attempt-fenced-" + suffix);
+            DurablePrimaryAppend oldDurable;
+            try (Process old = Process.open(
+                    bookKeeperCluster,
+                    cluster,
+                    deployment,
+                    "process-fenced-old",
+                    configuration,
+                    reservation,
+                    clock)) {
+                fencedStream = old.storage.createOrGetStream(
+                                new StreamName("persistent://tenant/namespace/bk-recovery-fenced-" + suffix),
+                                new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                        .join()
+                        .streamId();
+                oldSession = old.acquire(fencedStream, "writer-old");
+                oldDurable = old.persistOnly(
+                        fencedStream, oldSession, oldAttempt, new byte[] {3}, new byte[] {4});
+            }
+
+            clock.advance(Duration.ofMinutes(2));
+            try (Process newOwner = Process.open(
+                    bookKeeperCluster,
+                    cluster,
+                    deployment,
+                    "process-fenced-new",
+                    configuration,
+                    reservation,
+                    clock)) {
+                AppendSession replacementSession = newOwner.acquire(fencedStream, "writer-new");
+                assertThatThrownBy(() -> newOwner.recoveryCoordinator.recoverAfterRestart(
+                                replacementSession,
+                                oldAttempt,
+                                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                                TIMEOUT)
+                        .join()).hasCauseInstanceOf(NereusException.class);
+                var oldTarget = (BookKeeperEntryRangeReadTarget) oldDurable.readTarget();
+                assertThat(newOwner.bookKeeperMetadata.getReservation(
+                                cluster,
+                                fencedStream,
+                                com.nereusstream.bookkeeper.BookKeeperAppendReservationIds.forAttempt(
+                                        fencedStream, oldAttempt))
+                        .join()).get().satisfies(value ->
+                                assertThat(value.value().lifecycle())
+                                        .isEqualTo(AppendReservationLifecycle.ABANDONED));
+
+                DurablePrimaryAppend replacement = newOwner.persistOnly(
+                        fencedStream,
+                        replacementSession,
+                        new AppendAttemptId("attempt-replacement-" + suffix),
+                        new byte[] {9});
+                BookKeeperEntryRangeReadTarget replacementTarget =
+                        (BookKeeperEntryRangeReadTarget) replacement.readTarget();
+                assertThat(replacementTarget.ledgerId()).isNotEqualTo(oldTarget.ledgerId());
+                assertThat(replacementTarget.firstEntryId()).isZero();
+            }
+        }
+    }
+
+    private static CountingOperations counting(
+            BookKeeperClientOperations raw,
+            AtomicReference<CountingOperations> target) {
+        CountingOperations operations = new CountingOperations(raw);
+        target.set(operations);
+        return operations;
     }
 
     @Test
@@ -713,30 +846,39 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     private static final class Process implements AutoCloseable {
+        private final String clusterName;
         private final BookKeeper client;
         private final SharedOxiaClientRuntime oxiaRuntime;
         private final OxiaJavaClientMetadataStore l0;
         private final OxiaJavaBookKeeperMetadataStore bookKeeperMetadata;
         private final BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier;
         private final DefaultBookKeeperClientOperations rawOperations;
+        private final BookKeeperPrimaryWalAppender appender;
+        private final BookKeeperAppendRecoveryCoordinator recoveryCoordinator;
         private final BookKeeperWalRuntime runtime;
         private final DefaultStreamStorage storage;
 
         private Process(
+                String clusterName,
                 BookKeeper client,
                 SharedOxiaClientRuntime oxiaRuntime,
                 OxiaJavaClientMetadataStore l0,
                 OxiaJavaBookKeeperMetadataStore bookKeeperMetadata,
                 BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier,
                 DefaultBookKeeperClientOperations rawOperations,
+                BookKeeperPrimaryWalAppender appender,
+                BookKeeperAppendRecoveryCoordinator recoveryCoordinator,
                 BookKeeperWalRuntime runtime,
                 DefaultStreamStorage storage) {
+            this.clusterName = clusterName;
             this.client = client;
             this.oxiaRuntime = oxiaRuntime;
             this.l0 = l0;
             this.bookKeeperMetadata = bookKeeperMetadata;
             this.namespaceVerifier = namespaceVerifier;
             this.rawOperations = rawOperations;
+            this.appender = appender;
+            this.recoveryCoordinator = recoveryCoordinator;
             this.runtime = runtime;
             this.storage = storage;
         }
@@ -839,6 +981,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             BookKeeperPrimaryPhysicalReferenceAdapter references =
                     new BookKeeperPrimaryPhysicalReferenceAdapter(
                             clusterName, configuration, bookKeeperMetadata, bookKeeperMetadata, clock);
+            BookKeeperAppendRecoveryCoordinator recoveryCoordinator = new BookKeeperAppendRecoveryCoordinator(
+                    clusterName,
+                    configuration,
+                    bookKeeperMetadata,
+                    l0,
+                    references,
+                    recovery,
+                    clock);
             BookKeeperWalRuntime runtime = new BookKeeperWalRuntime(appender, reader, references);
             StreamStorageConfig storageConfiguration = StreamStorageConfig.defaults(clusterName, "writer-1");
             DefaultStreamStorage storage = runtime.newGenerationZeroStorage(
@@ -851,12 +1001,15 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     ReadMetricsObserver.noop(),
                     TrimMetricsObserver.noop());
             return new Process(
+                    clusterName,
                     client,
                     oxiaRuntime,
                     l0,
                     bookKeeperMetadata,
                     namespaceVerifier,
                     rawOperations,
+                    appender,
+                    recoveryCoordinator,
                     runtime,
                     storage);
         }
@@ -887,6 +1040,49 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .join();
         }
 
+        private AppendSession acquire(StreamId stream, String writerId) {
+            AppendSessionRecord record = l0.acquireAppendSession(
+                            storageConfigCluster(),
+                            stream,
+                            new AppendSessionOptions(writerId, Duration.ofMinutes(1), true))
+                    .join();
+            return new AppendSession(
+                    stream,
+                    record.writerId(),
+                    record.epoch(),
+                    record.fencingToken(),
+                    record.leaseVersion(),
+                    record.expiresAtMillis());
+        }
+
+        private DurablePrimaryAppend persistOnly(
+                StreamId stream,
+                AppendSession session,
+                AppendAttemptId attempt,
+                byte[]... payloads) {
+            List<AppendEntry> entries = java.util.stream.IntStream.range(0, payloads.length)
+                    .mapToObj(index -> new AppendEntry(payloads[index], 1, index + 1L, Map.of()))
+                    .toList();
+            AppendBatch batch = new AppendBatch(
+                    PayloadFormat.OPAQUE_RECORD_BATCH,
+                    entries,
+                    entries.size(),
+                    entries.size(),
+                    1,
+                    entries.size(),
+                    List.of(),
+                    Map.of(),
+                    Optional.empty());
+            try (BookKeeperPreparedPrimaryAppend prepared = appender.prepare(new PrimaryAppendRequest(
+                    stream, batch, session, 0, attempt, TIMEOUT))) {
+                return appender.persist(prepared, TIMEOUT).join();
+            }
+        }
+
+        private String storageConfigCluster() {
+            return clusterName;
+        }
+
         @Override
         public void close() throws Exception {
             storage.close();
@@ -894,6 +1090,69 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             l0.close();
             oxiaRuntime.close();
             client.close();
+        }
+    }
+
+    private static final class CountingOperations implements BookKeeperClientOperations {
+        private final BookKeeperClientOperations delegate;
+        private final AtomicInteger writes = new AtomicInteger();
+
+        private CountingOperations(BookKeeperClientOperations delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public CompletableFuture<WriteAdvHandle> createAdvanced(
+                long ledgerId,
+                BookKeeperWalConfiguration configuration,
+                byte[] password,
+                Map<String, byte[]> customMetadata,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.createAdvanced(ledgerId, configuration, password, customMetadata, deadline);
+        }
+
+        @Override
+        public CompletableFuture<ReadHandle> open(
+                long ledgerId,
+                BookKeeperDigestType digestType,
+                byte[] password,
+                boolean recovery,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.open(ledgerId, digestType, password, recovery, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Long> write(
+                WriteAdvHandle handle,
+                long entryId,
+                ByteBuf entry,
+                BookKeeperOperationDeadline deadline) {
+            writes.incrementAndGet();
+            return delegate.write(handle, entryId, entry, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerEntries> readUnconfirmed(
+                ReadHandle handle,
+                long firstEntryId,
+                long lastEntryIdInclusive,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerMetadata> metadata(
+                long ledgerId, BookKeeperOperationDeadline deadline) {
+            return delegate.metadata(ledgerId, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+            return delegate.delete(ledgerId, deadline);
+        }
+
+        private int writeCalls() {
+            return writes.get();
         }
     }
 

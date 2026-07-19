@@ -86,9 +86,13 @@ public final class BookKeeperStableAppendProtectionValidator {
             String expectedLedgerIdentity,
             BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root) {
         BookKeeperLedgerRootRecord value = root.value();
+        boolean readableReplay = prepared.replayWasReachable()
+                && (value.lifecycle() == BookKeeperLedgerLifecycle.ACTIVE
+                        || value.lifecycle() == BookKeeperLedgerLifecycle.SEALING
+                        || value.lifecycle() == BookKeeperLedgerLifecycle.SEALED);
         if (root.metadataVersion() != proof.rootMetadataVersion()
                 || !root.durableValueSha256().equals(proof.rootRecordSha256())
-                || value.lifecycle() != BookKeeperLedgerLifecycle.ACTIVE
+                || (!readableReplay && value.lifecycle() != BookKeeperLedgerLifecycle.ACTIVE)
                 || value.lifecycleEpoch() != proof.rootLifecycleEpoch()
                 || value.ledgerId() != target.ledgerId()
                 || !value.ledgerIdentitySha256().equals(expectedLedgerIdentity)
@@ -107,6 +111,9 @@ public final class BookKeeperStableAppendProtectionValidator {
             String expectedLedgerIdentity,
             BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord> protection) {
         BookKeeperLedgerProtectionRecord value = protection.value();
+        boolean rootEpochMatches = value.rootLifecycleEpoch() == proof.rootLifecycleEpoch()
+                || (prepared.replayWasReachable()
+                        && value.rootLifecycleEpoch() < proof.rootLifecycleEpoch());
         long expectedEnd = Math.addExact(
                 prepared.request().expectedStartOffset(), prepared.request().recordCount());
         if (protection.metadataVersion() != proof.protectionMetadataVersion()
@@ -115,7 +122,7 @@ public final class BookKeeperStableAppendProtectionValidator {
                 || value.protectionType() != BookKeeperProtectionType.REACHABLE_APPEND
                 || !value.ledgerIdentitySha256().equals(expectedLedgerIdentity)
                 || value.ledgerId() != target.ledgerId()
-                || value.rootLifecycleEpoch() != proof.rootLifecycleEpoch()
+                || !rootEpochMatches
                 || value.ledgerRangeSlot() != proof.ledgerRangeSlot()
                 || value.protectionSlot() != 0
                 || !value.referenceId().equals(expectedReferenceId)

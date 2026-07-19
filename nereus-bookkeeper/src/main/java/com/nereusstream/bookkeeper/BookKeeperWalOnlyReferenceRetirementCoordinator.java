@@ -75,9 +75,13 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
             return retire(protections, deadline, index + 1, newlyRetired);
         }
         CompletableFuture<Optional<BookKeeperProtectionRetirementProof>> proof =
-                protection.value().lifecycle() == ProtectionLifecycle.RESERVED
-                        ? authority.proveAbandonedAppend(protection, deadline.remaining())
-                        : authority.proveLogicalTrim(protection, deadline.remaining());
+                authority.proveAbandonedAppend(protection, deadline.remaining()).thenCompose(abandoned -> {
+                    if (abandoned.isPresent()
+                            || protection.value().lifecycle() == ProtectionLifecycle.RESERVED) {
+                        return CompletableFuture.completedFuture(abandoned);
+                    }
+                    return authority.proveLogicalTrim(protection, deadline.remaining());
+                });
         return proof.thenCompose(optional -> {
             if (optional.isEmpty()) return retire(protections, deadline, index + 1, newlyRetired);
             BookKeeperProtectionRetirementProof exactProof = optional.orElseThrow();

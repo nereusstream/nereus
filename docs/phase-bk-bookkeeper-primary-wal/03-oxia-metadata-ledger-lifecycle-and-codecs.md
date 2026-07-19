@@ -32,8 +32,10 @@ ${clusterPrefix}/streams/${S}/bookkeeper/v1/allocations/${allocationId}
 ${clusterPrefix}/streams/${S}/bookkeeper/v1/append-reservations/${reservationId}
 ```
 
-They use `OxiaKeyspace.streamPartitionKey(streamId)`。Allocation/reservation scans are bounded under exactly one
-stream and are used for recovery/terminal retirement, not ordinary append discovery.
+They use `OxiaKeyspace.streamPartitionKey(streamId)`。`reservationId` is the frozen
+`SHA-256("NBKR-RESERVATION-V2\\0" || streamId || "\\0" || appendAttemptId)` identity, so ordinary recovery resolves
+attempt -> immutable range with one point lookup and never scans an unbounded stream history。Allocation/reservation
+scans remain bounded maintenance/inventory tools under exactly one stream；they are not ordinary append discovery。
 
 ### 2.2 Physical-ledger keys
 
@@ -331,6 +333,8 @@ record BookKeeperAppendReservationRecord(
 
 `BookKeeperEntryRangeReadTarget` is deterministically reconstructed from ledger/range/checksum/alias. The reservation
 stores the bounded logical fields needed by `CommitAppendRequest`; it never stores entry payload bytes or secrets.
+`BookKeeperAppendReservationIds.forAttempt(streamId, appendAttemptId)` is the only constructor for the row/key
+identity；including ledger/range in that key is forbidden because a restart does not know those facts before lookup。
 `physicalBytes` is the checked sum of exact BookKeeper entry payload lengths and drives ledger rollover independently
 of protocol logical-size accounting. `ledgerRangeSlot` equals the pre-reservation writer
 `activeAppendRangeCount` and is never reused inside that ledger, including after abandonment.

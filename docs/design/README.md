@@ -68,7 +68,8 @@ scale/failure cuts、retry-disabled two-broker ownership/MessageId/stock-BookKee
 下一项底层交付是 F1-BK，其代码级 target 在 `../phase-bk-bookkeeper-primary-wal/README.md`；BK-M0/M1 已完成，
 BK-M2 已实现 metadata/store、真实 allocator/writer/recovery/reader、fixed protection/lease 和 safe-default
 whole-ledger retention checkpoints；真实 multi-entry 和 first/middle/last partial-write sealing/no-tail-reuse 也已
-落证。Crash-cut abandoned/durable reservation inventory repair、production profile admission 与 Pulsar rollout
+落证；crash-cut abandoned/durable reservation point recovery 的确定性层也已实现。真实 process/two-client cut、
+production profile admission 与 Pulsar rollout
 尚未完成，三个 BookKeeper profiles 继续在 IO 前拒绝。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution

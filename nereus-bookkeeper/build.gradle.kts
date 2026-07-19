@@ -39,6 +39,7 @@ registerFocusedTest(
     "Run BK-M2 append, exact read, buffer ownership, and L0 composition tests.",
     "com.nereusstream.bookkeeper.BookKeeperClientApiContractTest",
     "com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppenderTest",
+    "com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinatorTest",
     "com.nereusstream.bookkeeper.BookKeeperPrimaryWalReaderTest",
     "com.nereusstream.bookkeeper.BookKeeperStreamStorageIntegrationTest",
 )
@@ -48,5 +49,6 @@ registerFocusedTest(
     "Run BK-M2 uncertain-create, stale-session, ownership-transfer, and recovery-inventory tests.",
     "com.nereusstream.bookkeeper.BookKeeperLedgerAllocatorTest",
     "com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppenderTest",
+    "com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinatorTest",
     "com.nereusstream.bookkeeper.BookKeeperWalRetentionGateTest",
 )

@@ -8,7 +8,8 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 passed on 2026-07-19 under `bookKeeperPrimaryWalM2MetadataCheck`。BK-20 now passes its explicit D-level lifecycle /
 immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256-root/all-16-slot-shard scan。
 The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
-the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-30、BK-37、BK-41、BK-49、BK-53
+the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-37、
+BK-41、BK-49、BK-53
 and BK-55, including
 a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
 does not claim the remaining M2 rows。The focused allocator gate also adds D checkpoints for every applied metadata
@@ -82,11 +83,11 @@ Evidence levels：
 | BK-22 | M2 | B/O | multi-entry append occupies exact consecutive ids and one target checksum | `BookKeeperPrimaryWalAppenderTest.reservesWritesAndReturnsOneStableExactRange` + `BookKeeperWalOnlyOxiaBkIntegrationTest.multiEntryAppendUsesOneExactConsecutiveBookKeeperRange` |
 | BK-23 | M2 | D/B | future/missing-adapter profile、invalid configuration and oversize batch reject before BK calls；both V1 durability values remain valid | `BookKeeperStorageProfileResolverTest.rejectsObjectFutureBkProfilesAndMissingAdaptersBeforeIo` + `BookKeeperStreamStorageIntegrationTest.unsupportedProfileAndOversizeBatchReachNoBookKeeperOperation` + `BookKeeperWalConfigurationTest` |
 | BK-24 | M2 | D/B/O | first/middle/last write failure taints and seals ledger; no tail reuse | `BookKeeperPrimaryWalAppenderTest.partialWriteAbandonsRangeRecoverySealsLedgerAndNextAppendAllocatesFreshLedger` + `BookKeeperWalOnlyOxiaBkIntegrationTest.firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse` |
-| BK-25 | M2 | B/O/C | crash after range + three mandatory RESERVED protection slots but before write becomes known-not-committed | `BookKeeperAppendRecoveryIT.recoversReservedEmptyRange` |
-| BK-26 | M2 | B/O/C | full writes before commit intent resume only under unchanged session | `BookKeeperAppendRecoveryIT.resumesDurableRangeForCurrentSession` |
-| BK-27 | M2 | B/O/C | new session abandons unreachable old-writer full range and uses new ledger | `BookKeeperAppendRecoveryIT.doesNotCommitFencedWriterRange` |
-| BK-28 | M2 | O/C | commit intent/protection/head response loss returns same committed target/result | `BookKeeperAppendRecoveryIT.recoversSameReachableCommit` |
-| BK-29 | M2 | D/O/C | head reachable/gen0 missing repairs same target without BK write | D checkpoint: `BookKeeperStreamStorageIntegrationTest.reachableHeadRecoveryRepairsGenerationZeroWithoutRewritingBookKeeper`; production Oxia response-loss cut remains open |
+| BK-25 | M2 | D/B/O/C | crash after range + three mandatory RESERVED protection slots but before write becomes known-not-committed | D checkpoint: `BookKeeperAppendRecoveryCoordinatorTest.nonDurableWritingCutIsSealedAndProvenNotCommitted`; real process cut remains open |
+| BK-26 | M2 | D/B/O/C | full writes before commit intent resume only under unchanged session | `BookKeeperAppendRecoveryCoordinatorTest.currentSessionCommitsTheSameDurableRangeWithoutAnotherBookKeeperWrite` + real fresh-client/runtime `BookKeeperWalOnlyOxiaBkIntegrationTest.restartRecoveryReusesCurrentSessionRangeAndFencesExpiredSessionRange`；abrupt-kill cut remains open |
+| BK-27 | M2 | D/B/O/C | new session abandons unreachable old-writer full range and uses new ledger | `BookKeeperAppendRecoveryCoordinatorTest.newSessionAbandonsUnreachableDurableRangeAndAllocatesAnotherLedger` (including exact abandoned-owner retirement) + real expired-session/fresh-client `BookKeeperWalOnlyOxiaBkIntegrationTest.restartRecoveryReusesCurrentSessionRangeAndFencesExpiredSessionRange`；abrupt-kill cut remains open |
+| BK-28 | M2 | D/O/C | commit intent/protection/head response loss returns same committed target/result | D checkpoints: `BookKeeperAppendRecoveryCoordinatorTest.preparedIntentResponseLossRetriesTheSameRangeWithoutAnotherBookKeeperWrite` + `reachableHeadResponseLossRepairsFromTheSameRangeAfterLedgerSeal`; production Oxia response-loss cuts remain open |
+| BK-29 | M2 | D/O/C | head reachable/gen0 missing repairs same target without BK write | D checkpoints: `BookKeeperStreamStorageIntegrationTest.reachableHeadRecoveryRepairsGenerationZeroWithoutRewritingBookKeeper` + `BookKeeperAppendRecoveryCoordinatorTest.reachableHeadResponseLossRepairsFromTheSameRangeAfterLedgerSeal`; production Oxia response-loss cut remains open |
 | BK-30 | M2 | B/O | entry/physical-byte/append-range/age rollover occurs before batch, never splits it and keeps dense offsets | checkpoint: `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover`; remaining byte/range/age boundaries: `BookKeeperRolloverIT.preservesBatchAndLogicalDensity` |
 | BK-31 | M2 | B/O/C | crash in ACTIVE->SEALING->SEALED converges exact closed LAC/length | `BookKeeperLedgerRecoveryIT.recoversEverySealCut` |
 | BK-32 | M2 | B/O | new owner recovery-open fences old handle; old owner cannot head-commit | `BookKeeperFencingIT.alignsBookKeeperAndOxiaFences` |

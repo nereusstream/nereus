@@ -698,7 +698,7 @@ tasks.register<Exec>("bookKeeperPrimaryWalM2PulsarCheck") {
 
 tasks.register("bookKeeperPrimaryWalM2RealServiceCheck") {
     group = "verification"
-    description = "Run BK-M2 real Oxia/BookKeeper restart, rollover, and delete-response-loss acceptance."
+    description = "Run BK-M2 real Oxia/BookKeeper append recovery, restart, rollover, and delete-response-loss acceptance."
     dependsOn("bookKeeperPrimaryWalM2RetentionCheck")
     dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
 }

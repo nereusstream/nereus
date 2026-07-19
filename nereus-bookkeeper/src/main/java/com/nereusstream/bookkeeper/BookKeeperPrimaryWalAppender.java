@@ -241,9 +241,8 @@ public final class BookKeeperPrimaryWalAppender
         long firstEntryId = writer.nextEntryId();
         int rangeSlot = writer.activeAppendRangeCount();
         Checksum rangeChecksum = prepared.rangeChecksum(firstEntryId);
-        String reservationId = BookKeeperIdentityDigests.sha256(
-                "NBKR-RESERVATION\0" + prepared.request().attemptId().value() + "\0"
-                        + active.root().value().ledgerId() + "\0" + firstEntryId + "\0" + prepared.entryCount());
+        String reservationId = BookKeeperAppendReservationIds.forAttempt(
+                prepared.streamId(), prepared.request().attemptId());
         BookKeeperAppendReservationRecord desired = reservation(
                 active, prepared, reservationId, firstEntryId, rangeSlot, rangeChecksum);
         return writerMetadata.createReservation(cluster, desired).thenCompose(reservation ->

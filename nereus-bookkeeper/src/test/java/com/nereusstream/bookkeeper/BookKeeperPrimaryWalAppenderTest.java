@@ -296,6 +296,8 @@ class BookKeeperPrimaryWalAppenderTest {
         private int createCalls;
         private int writeCalls;
         int failWriteCall;
+        int hangWriteCall;
+        private CompletableFuture<Long> hungWrite;
         boolean failDeleteAfterRemoval;
         int recoveryOpenCalls;
         int normalOpenCalls;
@@ -306,6 +308,13 @@ class BookKeeperPrimaryWalAppenderTest {
 
         int providerCalls() {
             return createCalls + writeCalls + recoveryOpenCalls + normalOpenCalls;
+        }
+
+        void failHungWrite() {
+            CompletableFuture<Long> pending = java.util.Objects.requireNonNull(hungWrite, "hungWrite");
+            hungWrite = null;
+            pending.completeExceptionally(new NereusException(
+                    ErrorCode.PRIMARY_WAL_WRITE_FAILED, true, "terminated simulated crashed write"));
         }
 
         private List<Map.Entry<Long, byte[]>> entries(long ledgerId) {
@@ -349,6 +358,11 @@ class BookKeeperPrimaryWalAppenderTest {
                 failWriteCall = 0;
                 return CompletableFuture.failedFuture(new NereusException(
                         ErrorCode.PRIMARY_WAL_WRITE_FAILED, true, "injected entry write failure"));
+            }
+            if (writeCalls == hangWriteCall) {
+                hangWriteCall = 0;
+                hungWrite = new CompletableFuture<>();
+                return hungWrite;
             }
             byte[] bytes = new byte[entry.readableBytes()];
             entry.getBytes(entry.readerIndex(), bytes);

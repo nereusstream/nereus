@@ -220,6 +220,15 @@ proves reachable-head generation-zero repair reuses the exact target with zero a
 profiles/oversize batches fail before provider IO。`DEFERRED_SYNC` is unrepresentable in
 `BookKeeperWalConfiguration`; the production adapter is contract-tested to pass an empty `WriteFlag` set。
 
+`BookKeeperAppendReservationIds` and `BookKeeperAppendRecoveryCoordinator` now provide the first restart-recovery
+checkpoint for BK-25–BK-29：point lookup by stream/attempt、WRITING seal/abandon、same-session durable replay without a
+provider rewrite、new-session fence plus abandoned-range retirement、intent/head response-loss replay and sealed-root
+generation-zero repair。These are deterministic D-level cuts；real Oxia/process/two-client evidence remains open where
+the matrix says so。
+The production-adapter real-service test additionally covers graceful first-process loss/fresh-client recovery for
+BK-26 and an expired-session owner replacement for BK-27；the current-session path performs zero writes in the new
+client and the fenced path moves the replacement to a new ledger。Abrupt kill remains an explicit C-level gap。
+
 The focused ManagedLedger checkpoint admits BK_ONLY in projection creation/open/Position mapping and maps append to
 `WAL_DURABLE` without exposing the physical BK ledger id。`NereusBookKeeperManagedLedgerIntegrationTest` drives exact
 entry bytes through `NereusManagedLedger.addEntry/readEntry` over generation zero and proves the returned Position

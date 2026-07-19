@@ -73,6 +73,12 @@ delayed matching create recovered by the bounded fixed-slot scanner、permanent 
 client/runtime cold restart、all-256-root/all-16-slot cold Oxia scans、stable historical targets、real multi-entry
 advanced-ledger ranges、first/middle/last partial-write sealing/no-tail-reuse、same-target generation-zero repair、trim、
 lost delete response and fresh-process dual absence。
+The following deterministic restart-recovery checkpoint adds O(1) stream/attempt reservation identity、same-session
+durable range replay with zero BK rewrite、new-session abandon/seal/retire、intent/head response-loss convergence and
+generation-zero repair after the source ledger is already sealed；the corresponding real process cuts remain in the
+open M2 matrix。
+The same checkpoint now has production Oxia + BookKeeper B/O evidence across a fresh runtime for same-session durable
+replay and expired-session fencing/new-ledger retry；only the abrupt-kill C variants remain open for those rows。
 Remaining M2 matrix and aggregate/final evidence is still incomplete。BK_ONLY is executable only through the explicit module-local runtime；
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 

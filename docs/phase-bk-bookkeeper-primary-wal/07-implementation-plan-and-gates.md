@@ -252,6 +252,21 @@ before any create/open/write call。`DEFERRED_SYNC` is not a configuration value
 no write-flag field and `DefaultBookKeeperClientOperations` always passes `EnumSet.noneOf(WriteFlag.class)`；the public
 4.18 adapter contract test freezes both facts。
 
+The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
+`BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
+hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session
+DURABLE -> exact stable head/gen0 with zero provider rewrite、new-session DURABLE -> abandoned/sealed/retired plus a
+fresh-ledger retry、prepared-intent response loss and reachable-head response loss followed by sealed-root gen0 repair。
+The shared stable-proof validator admits a non-ACTIVE root only for an already-reachable replay and still reloads exact
+root/protection bytes。Abandoned retirement now separates the durable abandoned authority from an already-ACTIVE
+APPEND_RECOVERY protection's immutable original owner。
+
+The real-service gate now repeats BK-26/BK-27 against production Oxia and BookKeeper 4.18 clients：a first runtime
+persists a range without a generic commit and closes；a fresh client/runtime with the still-current session publishes
+the identical target with zero BK writes, while an expired old session is replaced by a new owner that abandons/seals
+the old range and allocates a different ledger at entry zero。This is real B/O restart evidence, not yet the abrupt
+process-kill C cut。
+
 Still required before BK-M2 is complete：close the remaining BK-M2 scenario/evidence rows and execute the ordinary /
 aggregate final tasks against the current source locks。Production provider composition、first-create admission and
 loaded/unloaded/two-broker ownership rollout are BK-M5 responsibilities, not hidden BK-M2 completion criteria；until

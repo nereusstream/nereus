@@ -86,13 +86,19 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperPro
                         return Optional.empty();
                     }
                     requireReservation(exact.value(), reservation.value());
+                    String ownerKey = exact.value().lifecycle() == ProtectionLifecycle.RESERVED
+                            ? reservation.key() : exact.value().ownerKey();
+                    long ownerVersion = exact.value().lifecycle() == ProtectionLifecycle.RESERVED
+                            ? reservation.metadataVersion() : exact.value().ownerMetadataVersion();
+                    Checksum ownerIdentity = exact.value().lifecycle() == ProtectionLifecycle.RESERVED
+                            ? reservation.durableValueSha256() : sha(exact.value().ownerIdentitySha256());
                     return Optional.of(new BookKeeperProtectionRetirementProof(
                             exact.key(),
                             exact.metadataVersion(),
                             exact.durableValueSha256(),
-                            reservation.key(),
-                            reservation.metadataVersion(),
-                            reservation.durableValueSha256(),
+                            ownerKey,
+                            ownerVersion,
+                            ownerIdentity,
                             reservation.key(),
                             reservation.metadataVersion(),
                             reservation.durableValueSha256(),
@@ -147,13 +153,19 @@ public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperPro
                     var reservation = optional.orElseThrow(() -> condition(
                             "abandoned BookKeeper reservation disappeared during protection retirement"));
                     requireReservation(protection.value(), reservation.value());
+                    String expectedOwnerKey = protection.value().lifecycle() == ProtectionLifecycle.RESERVED
+                            ? reservation.key() : protection.value().ownerKey();
+                    long expectedOwnerVersion = protection.value().lifecycle() == ProtectionLifecycle.RESERVED
+                            ? reservation.metadataVersion() : protection.value().ownerMetadataVersion();
+                    Checksum expectedOwnerIdentity = protection.value().lifecycle() == ProtectionLifecycle.RESERVED
+                            ? reservation.durableValueSha256() : sha(protection.value().ownerIdentitySha256());
                     if (reservation.value().lifecycle() != AppendReservationLifecycle.ABANDONED
                             || !proof.authorityKey().equals(reservation.key())
                             || proof.authorityMetadataVersion() != reservation.metadataVersion()
                             || !proof.authorityRecordSha256().equals(reservation.durableValueSha256())
-                            || !proof.ownerKey().equals(reservation.key())
-                            || proof.ownerMetadataVersion() != reservation.metadataVersion()
-                            || !proof.ownerIdentitySha256().equals(reservation.durableValueSha256())) {
+                            || !proof.ownerKey().equals(expectedOwnerKey)
+                            || proof.ownerMetadataVersion() != expectedOwnerVersion
+                            || !proof.ownerIdentitySha256().equals(expectedOwnerIdentity)) {
                         throw condition("abandoned BookKeeper reservation authority changed");
                     }
                 });

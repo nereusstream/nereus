@@ -239,17 +239,33 @@ slots `0..2` from reservation/root facts。Only after the inventory is complete 
 `ABANDONED` and the writer become IDLE。DURABLE or later reservations retain their recovery owner and activate slot 2；
 they are left for generic commit/head recovery rather than being misclassified as abandoned。
 
+`BookKeeperAppendRecoveryCoordinator` now implements the process-loss continuation using one
+`BookKeeperAppendReservationIds` point lookup。A WRITING cut is recovery-opened/sealed and becomes
+`KNOWN_NOT_COMMITTED`；the pending old provider future cannot publish a head afterward。
+
 ### 6.3 After full writes, before commit intent
 
 Same-session recovery may construct the exact BK target from the reservation and call the existing deterministic
 generic commit preparation. A newer append session cannot commit the old writer's previously unreachable range；it
 abandons/seals it. This preserves metadata fencing even though physical orphan entries may exist.
 
+The implemented restart coordinator validates the current L0 session first, reuses the reservation's old
+`writerRunIdHash` plus the current raw fencing token, and never invokes `BookKeeperClientOperations.write`。After a
+terminal recovery it finishes generation zero even for a requested `WAL_DURABLE` boundary, then recovery-opens the old
+writer ledger before returning；this intentionally stronger recovery boundary leaves a cold-readable result。For a new
+session and a DURABLE reservation with no commit facts, it CASes `ABANDONED`, seals the old ledger and allows only a
+fresh-ledger retry。The abandoned record is retirement authority for RESERVED slots while an already-ACTIVE
+APPEND_RECOVERY slot keeps its original exact owner；retirement proof carries these two identities separately。
+
 ### 6.4 After commit intent/protection, before head CAS
 
 Reload exact commit/reservation/protection. If the original session remains current, retry the same head CAS. If the
 session was replaced, the old commit remains unreachable and later retirement removes its protection/metadata before
 ledger deletion. Never allocate another offset or target within the same recovery attempt.
+
+Applied intent response loss is deterministic：the retry reloads the same generic intent, activates/reloads the same
+range protection and commits the same range。A mismatched session after COMMIT_PREPARED is conservatively
+`MAY_HAVE_COMMITTED`；it is never rewritten or abandoned without reachable-head proof。
 
 ### 6.5 Head CAS response loss
 
@@ -264,6 +280,12 @@ else:
 ```
 
 Generation-zero or higher-generation failure after a reachable head cannot make the append uncommitted.
+
+For an already reachable replay, pre-head validation changes meaning from “root must still be ACTIVE” to “the exact
+ACTIVE/SEALING/SEALED source remains readable”。`BookKeeperStableAppendProtectionValidator` still reloads the current
+root bytes/version and exact original REACHABLE_APPEND owner；a sealed-root replay may have a later root lifecycle
+epoch, but this exception is admitted only when `PreparedStableAppend.replayWasReachable()` is true and no head CAS is
+being newly authorized。
 
 ### 6.6 Head committed, generation-zero missing
 
