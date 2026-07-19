@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`4d9d5bbd0230770cd2692088bf7d0644d4b46f94`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`eaf7b9a704890a9265c21f30d9f351e02d00c600`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and retry-disabled real
 two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real two-broker async/
 retention boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and real-
@@ -222,7 +222,10 @@ in serialized order. Checkpoint BO then makes every one of those nested builds f
 static inventory audit to reject stale-inner-output wrappers. The first serialized aggregate passed 194/194 outer
 tasks in 20m03s but was not accepted because two historical ordinary wrappers reported inner `UP-TO-DATE` results；
 after correction their forced-parallel regression executed 127 and 129 fresh inner tasks and passed 103/103 outer
-tasks in 2m28s. The BO-qualified full rerun is still the completion boundary.
+tasks in 2m28s. Checkpoint BP then fixes the standard TTL-policy/manual-expiry monitor race exposed by that run：the
+historical two-broker cursor gate now retries only the exact transient admin 409 and waits for authoritative backlog
+zero, while every other admin error and unchanged-object-count assertion remains strict. The complete method passes
+138/138 fresh Pulsar tasks on the new source lock. The BP-source-lock full rerun is still the completion boundary.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1983,7 +1986,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BO are implemented and focused/evidence-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BP are implemented and focused/evidence-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -2045,7 +2048,7 @@ existence、nearby test annotations and gate declarations against this repositor
 The root `checkPhase4M6ScenarioEvidenceMatrix` task executes that audit.
 
 Scenario 30 now has real partitioned coverage on Pulsar
-`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`. Pulsar creates zero-byte `/managed-ledgers/...` catalog
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`. Pulsar creates zero-byte `/managed-ledgers/...` catalog
 placeholders for exact partitions before their first durable open. `NereusStorageClassBindingStore` therefore treats
 only non-empty ManagedLedger metadata as BookKeeper durable state, but fails closed if a positive existence
 observation disappears. `PersistentTopicsBase` expands a base partitioned topic to every exact child. A locally loaded
@@ -2091,6 +2094,14 @@ completed 194/194 outer tasks in 20m03s, but completion audit found that `phase2
 `UP-TO-DATE`, so the run was not promoted to final evidence. Both wrappers now forward the flag, and
 `checkPhase4FinalPulsarCheckoutIsolation` rejects any current or future checkout-owning `Exec` without it. Their exact
 forced-parallel regression executes 127/127 and 129/129 fresh inner tasks and passes 103/103 outer tasks in 2m28s.
+
+Checkpoint BP records the next aggregate-discovered compatibility race. Applying namespace TTL schedules Pulsar's
+asynchronous expiry monitor, so a concurrent manual expiry request is allowed to return HTTP 409 while that monitor
+owns the subscription. The historical F3 two-broker fixture now ignores only this exact conflict and continues until
+the loaded subscription's authoritative backlog is zero. Other admin failures still escape immediately；the reopened
+consumer and exact unchanged-object-count assertions remain mandatory. The complete fixture, Spotless and both
+Checkstyle tasks pass 138/138 fresh Pulsar tasks in 1m52s on
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`.
 
 ### 8.1 Required scenarios
 

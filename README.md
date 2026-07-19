@@ -110,7 +110,7 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Phase 4
-Pulsar source lock 已推进到 `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`。M6 增加
+Pulsar source lock 已推进到 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace/partitioned admin route
@@ -438,7 +438,7 @@ durable size backlog eviction、卸载后 exact ACTIVE-binding logical trim、tr
 logical trim 不删除 WAL bytes，stock BookKeeper control topic 始终可写可读。`phase4M5Check` 与
 `phase4M5FinalCheck` 是该里程碑的 ordinary/final completion boundary；F4-M6 和 Phase 4 aggregate final gate
 仍待完成。
-F4-M6 checkpoints BD–BO 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
+F4-M6 checkpoints BD–BP 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
 generation candidates、streaming 1,000,000-entry checkpoint、1,000 reader leases + 1,000 protections 的完整分页
 重扫、同时达到 128 sources / 1,048,576 records 的单 task durable round trip，以及每个 64 registry shards
 精确 257 条、page size 256 的 16,448-stream cold-restart 扫描。BI 又在真实 shared Oxia、LocalStack、BookKeeper
@@ -460,8 +460,11 @@ test-results；真实 Phase 2 双 broker gate 与 M4 config gate 的 forced-para
 BO 再把 `--rerun-tasks` 固化到全部十七个 nested Pulsar builds，并让静态 checkout gate 拒绝任何可复用旧内层
 输出的 wrapper。首次完全串行化的 aggregate 已执行通过 194/194 外层任务（20m03s），但完成审计发现两个历史
 ordinary wrappers 的内层结果仍显示 `UP-TO-DATE`，因此不作为 final 证据；修复后它们的 forced-parallel 回归
-分别全量执行通过 127/127 与 129/129 个内层任务，外层 103/103 tasks 在 2m28s 通过。M6/Phase 4 aggregate
-tasks 已声明，但 BO 修复后的完整 fresh rerun 尚待执行。
+分别全量执行通过 127/127 与 129/129 个内层任务，外层 103/103 tasks 在 2m28s 通过。BP 记录 BO-qualified
+aggregate 暴露的标准 Pulsar TTL-policy/admin expiry monitor 竞争：原两 broker cursor gate 把合法的瞬态 HTTP
+409 当成失败。测试现只忽略该精确 conflict，并以 authoritative subscription backlog 归零作为完成条件；其他
+管理异常仍 fail fast。完整两 broker cursor 场景已在新 source lock 上 fresh 138/138 通过。M6/Phase 4 aggregate
+tasks 已声明，但 BP source lock 上的完整 fresh rerun 尚待执行。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

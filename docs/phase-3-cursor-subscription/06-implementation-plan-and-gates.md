@@ -651,6 +651,13 @@ inactive-subscription expiry with unchanged object count，and stock BookKeeper 
 uses fresh topic identities，and the failover phase reconnects directly to the authoritative surviving owner so the
 gate measures broker recovery rather than a stale client bootstrap connection。
 
+The 2026-07-19 Phase 4 aggregate rerun exposed a standard Pulsar control-plane race in this historical gate：applying
+namespace TTL starts an asynchronous expiry monitor, while the immediately following manual expiry request may
+legitimately receive HTTP 409 until that monitor finishes. The gate now treats only that exact conflict as transient
+and waits for the authoritative subscription backlog to reach zero；every other admin failure still fails immediately.
+The full two-broker method then passed Spotless、main/test Checkstyle and 138/138 fresh Pulsar tasks on
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`，without weakening the unchanged-object-count assertion.
+
 The same real gate requires the very first topic persistence-policy write to succeed。M5 found that lazy policy-system-
 topic creation could recursively request the namespace storage-class lock while the outer policy mutation held it；
 `BrokerService.updateTopicPersistence` now initializes that system topic before entering the critical section and

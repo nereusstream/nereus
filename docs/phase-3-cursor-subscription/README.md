@@ -3,6 +3,9 @@
 > 状态：Implemented / final-gated；F3-M0 / F3-M0R design gates 和 F3-M1-M6 implementation gates complete
 >
 > Gate 日期：2026-07-14
+>
+> 最近兼容性回归同步：2026-07-19；当前 Phase 4 Pulsar source lock
+> `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`
 
 本目录是 Future 3 的代码级实现合同。它把 Future 2 已稳定的
 `managedLedgerName -> streamId -> virtualLedgerId -> offset` 投影扩展为 durable
@@ -27,7 +30,8 @@ Pulsar ManagedCursor API
 | Nereus baseline | `nereusstream/nereus@623662d9796af1bf2ff929f41df1a8c946a02279`；F2 final-gated |
 | Pulsar fork checkout | `/Users/liusinan/apps/ideaproject/nereusstream/pulsar` |
 | Pulsar M0 source/API audit baseline | local `master@7efae25af39a15407c1397d9e1f4ac4658d09daa`；historical blob/member evidence remains pinned |
-| Pulsar current implementation/source lock | local `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；contains F3-M6 MessageId/property/incarnation gate、unloaded binding-aware admin validation and the M5 recovery fixes |
+| Pulsar F3 final implementation/source lock | local `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；historical F3-M6 MessageId/property/incarnation gate、unloaded binding-aware admin validation and M5 recovery evidence |
+| Current Phase 4 compatibility source lock | local `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`；preserves the F3 contract and makes TTL policy-triggered expiry acceptance wait for durable cursor backlog convergence across the standard transient admin 409 |
 | Pulsar version interpretation | checkout 中的 `5.0.0-M1-SNAPSHOT` 只是本地 master 的 source-project selector，不是已发布的 M1 snapshot |
 | Executable Nereus profile inherited from F2 | `OBJECT_WAL_SYNC_OBJECT` only |
 | Coordinate contract | one Pulsar Entry = one Nereus stream offset；`Position.entryId == offset` |

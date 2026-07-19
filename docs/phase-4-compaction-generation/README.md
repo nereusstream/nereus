@@ -199,6 +199,12 @@
 > audit found the two historical ordinary wrappers reporting inner `UP-TO-DATE` results, so that run is deliberately
 > not a final claim. After the fix, a forced-parallel `phase2PulsarCheck + phase3M4PulsarCheck` request executed
 > 127 and 129 fresh inner tasks and passed all 103 outer tasks in 2m28s. A fresh complete aggregate remains required.
+> Checkpoint BP fixes the first product-scenario race exposed by that BO-qualified run. Namespace TTL policy
+> application legitimately starts Pulsar's asynchronous expiry monitor；an immediately concurrent manual expiry can
+> return HTTP 409 until the monitor releases the subscription. The historical F3 two-broker test now ignores only
+> that exact transient conflict and waits for authoritative subscription backlog zero, while preserving fail-fast
+> behavior for every other admin error and the unchanged-object-count proof. The complete method passes 138/138 fresh
+> Pulsar tasks on `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`；the aggregate must restart on this source lock.
 > These are focused
 > M6 foundations, not the aggregate completion claim.
 >
@@ -207,7 +213,7 @@
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`
+> `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`
 
 > 实现状态日期：2026-07-19
 
@@ -2092,7 +2098,7 @@ fact boundary. `NereusCursorMultiBrokerIntegrationTest`
 rejects base-topic compaction while loaded, unloads both partitions, then rejects shadow-policy mutation from durable
 bindings without installing the policy. The focused binding suite、retry-disabled two-broker method and declared
 Spotless/Checkstyle checks pass on Pulsar
-`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`.
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`.
 
 ### 6.40 F4-M6 broker logging-backend isolation checkpoint
 
@@ -2154,6 +2160,21 @@ outside the exclusive service or lacks fresh inner execution. A forced-parallel 
 historical wrappers completed 127/127 and 129/129 inner tasks, then passed all 103 outer tasks in 2m28s. This validates
 the correction without promoting the earlier aggregate run；the BO-qualified full aggregate remains required.
 
+### 6.44 F4-M6 cursor-expiry convergence checkpoint
+
+Checkpoint BP fixes the next failure exposed by the BO-qualified aggregate. The historical
+`NereusCursorMultiBrokerIntegrationTest.preservesDurableCursorTruthAcrossUnloadFailoverRestartExpiryAndBookKeeper`
+sets namespace TTL and then requests immediate manual expiry. Pulsar policy application itself schedules an
+asynchronous expiry check；if that check owns the subscription monitor, the concurrent admin request correctly
+returns HTTP 409. The prior test incorrectly required its first manual request to win that race.
+
+The acceptance loop now reads the loaded subscription's authoritative backlog, retries only across
+`PulsarAdminException.ConflictException`, and completes only after backlog reaches zero. Any other admin exception
+still fails immediately；the reopened consumer must still receive no message and S3 object count must remain exactly
+unchanged, so the cursor-only TTL contract is not weakened. On source lock
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`, the full two-broker cursor method plus Spotless and both Checkstyle
+tasks passes 138/138 fresh tasks in 1m52s. A new complete aggregate on this source lock remains required.
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -2164,7 +2185,7 @@ the correction without promoting the earlier aggregate run；the BO-qualified fu
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BO focused/evidence-green、52/52 executable traceability complete、aggregate tasks declared；BO-qualified full rerun aggregate pending |
+| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BP focused/evidence-green、52/52 executable traceability complete、aggregate tasks declared；BP-source-lock full rerun aggregate pending |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

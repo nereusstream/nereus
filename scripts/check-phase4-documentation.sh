@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="4d9d5bbd0230770cd2692088bf7d0644d4b46f94"
+current_pulsar_lock="eaf7b9a704890a9265c21f30d9f351e02d00c600"
 
 require_literal() {
     local literal="$1"
@@ -46,6 +46,8 @@ require_literal "Checkpoint BM" \
 require_literal "Checkpoint BN" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint BO" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BP" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "checkPhase4FinalPulsarCheckoutIsolation" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
@@ -388,4 +390,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, M6 BD-BO evidence, 52/52 matrix, current source lock, gates, and links verified."
+echo "Phase 4 M1-M5 final status, M6 BD-BP evidence, 52/52 matrix, current source lock, gates, and links verified."

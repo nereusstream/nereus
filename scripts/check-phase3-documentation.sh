@@ -51,6 +51,7 @@ require_literal 'terminal `DELETED`' "docs/phase-2-managed-ledger-facade/README.
 require_literal "immediate same-name open" "docs/phase-2-managed-ledger-facade/06-code-level-interface-contract.md"
 require_literal "Cursor snapshot inventory" "docs/design/nereus-terminology.md"
 require_literal "never authorizes deletion" "docs/design/nereus-terminology.md"
+require_literal "TTL policy-triggered expiry" "docs/phase-3-cursor-subscription/README.md"
 
 for gate in phase3M6Check phase3M6FinalCheck phase3Check phase3FinalCheck; do
     require_literal "$gate" "build.gradle.kts"

@@ -11,10 +11,11 @@ enforces that contract against both clean source trees. A passing matrix check p
 the final aggregate still have to execute the tests and prove behavior.
 
 Checkpoint BK status：**52/52 scenarios traced** against Pulsar
-`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`. Checkpoints BM/BN make owning-gate execution deterministic by
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`. Checkpoints BM/BN make owning-gate execution deterministic by
 serializing Docker owners and, independently, every nested build of the single locked Pulsar checkout. Checkpoint BO
-also requires all seventeen nested builds to force fresh inner Gradle execution；the complete BO-qualified final
-aggregate remains pending.
+also requires all seventeen nested builds to force fresh inner Gradle execution. Checkpoint BP makes the inherited
+cursor-expiry evidence converge across the standard TTL-policy/manual-admin monitor race；the complete BP-source-lock
+final aggregate remains pending.
 
 | ID | Required scenario | Executable evidence | Owning gate |
 | --- | --- | --- | --- |
