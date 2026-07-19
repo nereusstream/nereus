@@ -1745,8 +1745,9 @@ Registered-stream scanner 是普通 sync topic 的首个 generation-publication 
 
 Physical delete 只接受 `DomainValidatedDeletionSubject`，除 ACTIVE/publication 条件外还要求 physical/cursor
 delete bits、同 epoch physical-root/cursor backfill proof、object-store capability，以及 exact complete、
-non-vetoed `projection-generation-v1` snapshot。Logical trim 同样要求 deletion capability，但继续使用 live
-projection subject。Runtime provider 使用 shared projection/L0/generation/activation stores 构造 guard，
+non-vetoed `projection-generation-v1` snapshot。Logical trim 继续使用 live projection subject，只要求 ACTIVE
+publication、当前 registration coverage 和 topic marker；它不消费、不设置任何 deletion capability bit。
+Runtime provider 使用 shared projection/L0/generation/activation stores 构造 guard，
 `NereusManagedLedgerRuntime` 只暴露 typed guard，不把 raw activation metadata 交给 broker。
 
 Pulsar fork 新增默认 `false` 的 `nereusGenerationProtocolEnabled`，checked broker configuration 把它作为
@@ -1906,7 +1907,9 @@ or overflowing retention values before publication. `NereusTopicOpenContext` car
 `PersistentTopic` waits for ownership、registration-backed marker activation/revalidation and a fresh equal policy
 input tuple before installing config/policy/features；a stale async completion cannot install its snapshot. Loaded
 admin uses that exact feature snapshot；unloaded bound topics require current cluster generation readiness before
-`TRIM_TOPIC` loads, and the loaded route validates again before `trimConsumedLedgersInBackground`. Size eviction and
+`TRIM_TOPIC` uses the ACTIVE Nereus binding as its existence proof and loads that exact bound incarnation，and the loaded
+route validates again before `trimConsumedLedgersInBackground`. It never creates an unbound topic or a synthetic
+BookKeeper catalog entry. Size eviction and
 precise time eviction are admitted only with generation readiness；non-precise time eviction stays rejected, while
 producer hold/exception remains non-destructive. The service repeats durable activation/ownership/policy/planner/F3
 checks at mutation time, so the broker projection is not a correctness owner. `phase4M5RetentionPolicyAdminCheck`

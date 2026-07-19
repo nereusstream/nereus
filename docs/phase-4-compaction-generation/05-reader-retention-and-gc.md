@@ -1134,7 +1134,9 @@ NereusManagedLedgerRetentionService.trim(reason)
 ```
 
 The returned/admin promise completes after F3 proves logical trim ACTIVE/completed. Physical deletion is scheduled
-later and is not included in that promise. No Phase 4 caller invokes `StreamStorage.trim` directly.
+later and is not included in that promise. Logical trim requires ACTIVE publication、current registration coverage and
+the exact live projection, but never requires or enables either physical-deletion capability bit. No Phase 4 caller
+invokes `StreamStorage.trim` directly.
 
 Checkpoint AG implements that exact order in `NereusManagedLedgerRetentionService`. Only retriable
 `METADATA_CONDITION_FAILED` failures before `requestTrim` are retried, at most four times；once the F3 call starts it

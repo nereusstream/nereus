@@ -109,6 +109,19 @@ class GcReferenceValueTest {
                 10);
         assertThat(publication.subjectSha256())
                 .isEqualTo(GenerationActivationProof.subjectSha256(live));
+        GenerationActivationProof logicalTrim =
+                GenerationActivationProof.create(
+                        GenerationOperation.LOGICAL_TRIM,
+                        live,
+                        7,
+                        8,
+                        9,
+                        SHA_B,
+                        true,
+                        false,
+                        10);
+        assertThat(logicalTrim.publicationEnabled()).isTrue();
+        assertThat(logicalTrim.deletionEnabled()).isFalse();
 
         GcReferenceQuery query = GcReferenceQuery.create(
                 GcReferenceQueryKind.REFERENCED_OBJECT,

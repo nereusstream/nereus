@@ -45,8 +45,8 @@ public record GenerationActivationProof(
         } else if (operation == GenerationOperation.PHYSICAL_DELETE) {
             throw new IllegalArgumentException("physical delete requires a domain-validated subject");
         }
-        boolean requiresDeletion = operation == GenerationOperation.PHYSICAL_DELETE
-                || operation == GenerationOperation.LOGICAL_TRIM;
+        boolean requiresDeletion =
+                operation == GenerationOperation.PHYSICAL_DELETE;
         if ((requiresDeletion && !deletionEnabled) || (!requiresDeletion && !publicationEnabled)) {
             throw new IllegalArgumentException("operation-specific F4 capability is not enabled");
         }

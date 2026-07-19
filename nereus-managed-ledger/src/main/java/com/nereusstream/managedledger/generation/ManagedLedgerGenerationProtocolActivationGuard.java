@@ -665,8 +665,7 @@ public final class ManagedLedgerGenerationProtocolActivationGuard
 
     private static boolean requiresDeletion(
             GenerationOperation operation) {
-        return operation == GenerationOperation.PHYSICAL_DELETE
-                || operation == GenerationOperation.LOGICAL_TRIM;
+        return operation == GenerationOperation.PHYSICAL_DELETE;
     }
 
     private static boolean deletionEnabled(

@@ -1109,15 +1109,24 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     @Override
     public long getEstimatedBacklogSize() {
         ManagedCursor slowest = getSlowestConsumer();
-        return slowest == null ? 0 : getEstimatedBacklogSize(slowest.getReadPosition());
+        return slowest == null
+                ? 0
+                : getEstimatedBacklogSize(
+                        slowest.getMarkDeletedPosition());
     }
 
     @Override
     public long getEstimatedBacklogSize(Position position) {
         StreamMetadata metadata = snapshots.current().metadata();
-        long offset = requireVirtualLedgerPosition(position);
-        offset = Math.max(metadata.trimOffset(), Math.min(offset, metadata.committedEndOffset()));
-        long entries = metadata.committedEndOffset() - offset;
+        long markDeleteOffset = requireVirtualLedgerPosition(position);
+        long firstBacklogOffset = incrementSaturated(markDeleteOffset);
+        firstBacklogOffset = Math.max(
+                metadata.trimOffset(),
+                Math.min(
+                        firstBacklogOffset,
+                        metadata.committedEndOffset()));
+        long entries = metadata.committedEndOffset()
+                - firstBacklogOffset;
         if (entries == 0 || metadata.committedEndOffset() == 0) {
             return 0;
         }
@@ -1183,7 +1192,6 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
     public ManagedCursor getSlowestConsumer() {
         return cursors.values().stream()
                 .filter(NereusManagedCursor::isDurable)
-                .filter(NereusManagedCursor::isActive)
                 .min(java.util.Comparator.comparing(NereusManagedCursor::getMarkDeletedPosition))
                 .orElse(null);
     }

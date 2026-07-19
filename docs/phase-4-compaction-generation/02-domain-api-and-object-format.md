@@ -291,6 +291,10 @@ establish cluster binding/projection absence rather than treating emptiness as p
 `GenerationActivationProof.subjectSha256` hashes the canonical subject fields and `subjectValidationVersion` is the
 current projection version for a live subject or exactly zero for a deletion subject. Unknown subject/operation
 combinations fail before any metadata mutation.
+`GENERATION_PUBLISH`、`RECOVERY_CHECKPOINT`、`TOPIC_COMPACTED_PUBLISH` and `LOGICAL_TRIM` consume ACTIVE publication
+authority and a live projection subject；`LOGICAL_TRIM` deliberately does not require either physical-deletion bit.
+Only `PHYSICAL_DELETE` consumes both deletion bits、their same-epoch backfill/capability proof and a
+`DomainValidatedDeletionSubject`.
 
 The implemented V1 proof-value digests are domain-tagged SHA-256 over big-endian、length-delimited UTF-8 fields；
 optional fields carry an explicit presence byte and checksums include both algorithm name and canonical value.

@@ -465,6 +465,9 @@ site may invoke `StreamStorage.trim` directly。If the topic has no cursor marke
 F3 capability guard and activates the projection marker；the current F3 writable open must already have created or
 claimed the owner-only retention root at current L0 trim。“currently no cursor” is not permission to race a first
 cursor create with direct trim，and an absent/mismatched root forces a fresh writable open rather than direct trim。
+The F4 activation proof for `LOGICAL_TRIM` consumes publication/registration/topic-marker authority only；it never
+requires or enables physical/cursor-snapshot deletion bits. Those bits are consumed exclusively by the later
+domain-validated `PHYSICAL_DELETE` path.
 
 F4 may route a lagging cursor to a lossless higher `COMMITTED` generation because offsets/Entry bytes are unchanged；
 cursor lag protects the logical range from trim, not a particular old physical generation。

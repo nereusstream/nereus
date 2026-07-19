@@ -178,12 +178,24 @@ class NereusManagedLedgerFacadeTest {
             ManagedCursor durableCursor = ledger.openCursor("subscription");
             assertThat(durableCursor.isDurable()).isTrue();
             assertThat(durableCursor.getNumberOfEntriesInBacklog(true)).isEqualTo(1);
+            assertThat(ledger.getSlowestConsumer()).isSameAs(durableCursor);
+            assertThat(ledger.getEstimatedBacklogSize())
+                    .isEqualTo(payload.length);
+            durableCursor.setInactive();
+            assertThat(ledger.getActiveCursors()).doesNotContain(durableCursor);
+            assertThat(ledger.getSlowestConsumer()).isSameAs(durableCursor);
+            assertThat(ledger.getEstimatedBacklogSize())
+                    .isEqualTo(payload.length);
+            durableCursor.setActive();
             List<Entry> durableRead = durableCursor.readEntries(1);
             assertThat(durableRead).hasSize(1);
             durableRead.forEach(Entry::release);
+            assertThat(ledger.getEstimatedBacklogSize())
+                    .isEqualTo(payload.length);
             durableCursor.markDelete(position);
             assertThat(durableCursor.getMarkDeletedPosition()).isEqualTo(position);
             assertThat(durableCursor.getNumberOfEntriesInBacklog(true)).isZero();
+            assertThat(ledger.getEstimatedBacklogSize()).isZero();
             ManagedCursor nonDurable = ledger.newNonDurableCursor(
                     PositionFactory.EARLIEST, "reader");
             assertThat(nonDurable.isDurable()).isFalse();

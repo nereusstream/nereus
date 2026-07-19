@@ -146,6 +146,9 @@ AI installs the exact effective topic `RetentionPolicySnapshot` from the same im
 and revalidates registration-backed generation authority before an F4-mutating policy becomes visible, reloads the
 policy tuple after activation, and admits loaded/unloaded `TRIM_TOPIC` only with generation readiness. The retention
 service still repeats activation、ownership、policy and planner revalidation before delegating the only mutation to F3.
+For an unloaded topic, an exact ACTIVE Nereus binding is the existence proof: the admin route loads that same bound
+incarnation, then repeats loaded-topic feature validation before invoking the facade. It neither fabricates a
+BookKeeper managed-ledger catalog node nor creates an unbound topic.
 
 On construction failure it closes exact reverse order. Product close first rejects ledger opens, closes all loaded
 ledgers/cursors, stops materialization/GC, then closes metadata/object/executors. A worker is never allowed to outlive
@@ -692,7 +695,8 @@ The method：
 ManagedLedger/cursor backlog stays logical：
 
 - entry count is offset count from cursor to committed end；
-- backlog bytes use cumulative logical bytes, not compacted object size；
+- backlog bytes use cumulative logical bytes from the slowest durable cursor's mark-delete successor, not its local
+  read position or compacted object size；an inactive subscription continues protecting backlog；
 - generation replacement does not alter rates、last confirmed entry or mark-delete position；
 - physical storage/lag/GC bytes are separate Nereus metrics；
 - no virtual ledger rollover is synthesized from Parquet row groups。
@@ -827,7 +831,7 @@ pulsar-broker/.../service/persistent/PersistentTopic.java
   store/revalidate F4 feature snapshot and loaded admin decision
 
 pulsar-broker/.../admin/impl/PersistentTopicsBase.java
-  retain TRIM_TOPIC validation ordering and exact async completion
+  retain TRIM_TOPIC validation ordering, load only ACTIVE bound Nereus topics and preserve exact async completion
 
 pulsar-broker/.../service/BacklogQuotaManager.java
   no semantic fork for size/precise paths; add Nereus rejection/route tests

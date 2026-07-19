@@ -103,6 +103,30 @@ class ManagedLedgerGenerationProtocolActivationGuardTest {
     }
 
     @Test
+    void logicalTrimUsesPublicationAuthorityWithoutPhysicalDeletion() {
+        try (Fixture fixture = new Fixture()) {
+            fixture.installActivation(false, true);
+            ManagedLedgerGenerationProtocolActivationGuard guard =
+                    fixture.guard(true);
+
+            GenerationActivationProof proof = guard.requireReady(
+                            GenerationOperation.LOGICAL_TRIM,
+                            fixture.subject,
+                            true)
+                    .join();
+
+            assertThat(proof.operation())
+                    .isEqualTo(GenerationOperation.LOGICAL_TRIM);
+            assertThat(proof.publicationEnabled()).isTrue();
+            assertThat(proof.deletionEnabled()).isFalse();
+            assertThat(ManagedLedgerGenerationProtocol.isActivated(
+                            fixture.currentProjection()))
+                    .isTrue();
+            guard.revalidate(proof).join();
+        }
+    }
+
+    @Test
     void markerWriteResponseLossConvergesByExactProjectionReload() {
         try (Fixture fixture = new Fixture()) {
             fixture.installActivation(false, true);
