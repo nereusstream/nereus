@@ -6,6 +6,7 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.HeadObjectOptions;
@@ -25,11 +26,15 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -37,12 +42,16 @@ import java.util.concurrent.Flow;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /** Private-staging NRC1 writer and exact object-store range reader. */
 public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpointCodecV1 {
     private static final int PUBLICATION_DIRECTORY_ENTRY_BYTES = Integer.BYTES + Long.BYTES;
     private static final int COMMIT_DIRECTORY_ENTRY_BYTES = Long.BYTES * 3;
     private static final int PUBLICATION_FACT_BYTES = Integer.BYTES + Long.BYTES * 2 + Integer.BYTES;
+    private static final int MAX_MERGE_SOURCE_COUNT = 32;
+    private static final int MAX_MERGE_PAGE_RECORDS = 65_536;
+    private static final long MAX_MERGE_PAGE_BYTES = 8L << 20;
 
     private final ObjectStore objectStore;
     private final StagingFileManager stagingFiles;
@@ -100,6 +109,63 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
                 WriteCoordinator coordinator = admitted.get();
                 if (coordinator != null) {
                     coordinator.cancel();
+                }
+            }
+        });
+        return result;
+    }
+
+    @Override
+    public CompletableFuture<RecoveryCheckpointMergeResult> merge(
+            List<RecoveryCheckpointObject> sources,
+            long checkpointSequence,
+            String checkpointAttemptId,
+            Duration timeout) {
+        final List<RecoveryCheckpointObject> exactSources;
+        try {
+            exactSources = validateMergeInputs(
+                    sources, checkpointSequence, checkpointAttemptId, timeout);
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(
+                    mapWriteFailure("validate recovery checkpoint merge", failure));
+        }
+
+        CompletableFuture<RecoveryCheckpointMergeResult> result = new CompletableFuture<>();
+        AtomicReference<MergeOperation> admitted = new AtomicReference<>();
+        try {
+            codecExecutor.execute(() -> {
+                if (result.isCancelled()) {
+                    return;
+                }
+                MergeOperation operation = new MergeOperation(
+                        exactSources,
+                        checkpointSequence,
+                        checkpointAttemptId,
+                        timeout);
+                admitted.set(operation);
+                operation.run().whenComplete((merged, failure) -> {
+                    if (failure == null) {
+                        if (!result.complete(merged)) {
+                            merged.close();
+                        }
+                    } else {
+                        result.completeExceptionally(mapWriteFailure(
+                                "merge recovery checkpoint objects", failure));
+                    }
+                });
+            });
+        } catch (RejectedExecutionException failure) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.STORAGE_CLOSED,
+                    false,
+                    "recovery checkpoint executor rejected the merge",
+                    failure));
+        }
+        result.whenComplete((ignored, failure) -> {
+            if (result.isCancelled()) {
+                MergeOperation operation = admitted.get();
+                if (operation != null) {
+                    operation.cancel();
                 }
             }
         });
@@ -912,6 +978,704 @@ public final class DefaultRecoveryCheckpointCodecV1 implements RecoveryCheckpoin
             current = current.getCause();
         }
         return current;
+    }
+
+    private static List<RecoveryCheckpointObject> validateMergeInputs(
+            List<RecoveryCheckpointObject> sources,
+            long checkpointSequence,
+            String checkpointAttemptId,
+            Duration timeout) {
+        List<RecoveryCheckpointObject> exact = List.copyOf(
+                Objects.requireNonNull(sources, "sources"));
+        if (exact.size() < 2 || exact.size() > MAX_MERGE_SOURCE_COUNT) {
+            throw new IllegalArgumentException("checkpoint merge requires 2..32 source objects");
+        }
+        if (checkpointSequence <= 0) {
+            throw new IllegalArgumentException("merged checkpoint sequence must be positive");
+        }
+        RecoveryCheckpointValidation.requireBase32Id(
+                checkpointAttemptId, "checkpointAttemptId");
+        requireTimeout(timeout);
+
+        RecoveryCheckpointWriteRequest first = exact.get(0).header();
+        RecoveryCheckpointWriteRequest previous = null;
+        Set<ObjectKey> objectKeys = new HashSet<>();
+        long totalEntries = 0;
+        long totalPublications = 0;
+        for (RecoveryCheckpointObject source : exact) {
+            Objects.requireNonNull(source, "source checkpoint");
+            RecoveryCheckpointWriteRequest header = source.header();
+            if (!objectKeys.add(source.objectKey())) {
+                throw new IllegalArgumentException("checkpoint merge source object is duplicated");
+            }
+            if (!header.cluster().equals(first.cluster())
+                    || !header.streamId().equals(first.streamId())
+                    || !header.projectionIdentitySha256().equals(
+                            first.projectionIdentitySha256())) {
+                throw new IllegalArgumentException(
+                        "checkpoint merge sources disagree on cluster/stream/projection identity");
+            }
+            if (previous != null) {
+                long nextVersion;
+                try {
+                    nextVersion = Math.addExact(previous.lastCommitVersion(), 1);
+                } catch (ArithmeticException overflow) {
+                    throw new IllegalArgumentException(
+                            "checkpoint merge commit version overflows", overflow);
+                }
+                if (header.checkpointSequence() <= previous.checkpointSequence()
+                        || header.coverage().startOffset()
+                                != previous.coverage().endOffset()
+                        || header.firstCommitVersion() != nextVersion
+                        || header.cumulativeSizeAtStart()
+                                != previous.cumulativeSizeAtEnd()) {
+                    throw new IllegalArgumentException(
+                            "checkpoint merge sources are not strictly ordered and gap-free");
+                }
+            }
+            totalEntries = Math.addExact(
+                    totalEntries, header.expectedEntryCount());
+            totalPublications = Math.addExact(
+                    totalPublications, header.expectedPublicationCount());
+            previous = header;
+        }
+        if (totalEntries > RecoveryCheckpointFormatV1.MAX_ENTRY_COUNT
+                || totalPublications
+                        > RecoveryCheckpointFormatV1.MAX_PUBLICATION_COUNT) {
+            throw new IllegalArgumentException(
+                    "checkpoint merge source counts exceed the bounded NRC1 merge workspace");
+        }
+        if (checkpointSequence <= Objects.requireNonNull(previous).checkpointSequence()) {
+            throw new IllegalArgumentException(
+                    "merged checkpoint sequence must follow every source checkpoint");
+        }
+        return exact;
+    }
+
+    /**
+     * Streaming merge state machine. It retains only source directories, one bounded publication page per source,
+     * and one primitive local-to-merged publication-index array per source.
+     */
+    private final class MergeOperation {
+        private final List<RecoveryCheckpointObject> objects;
+        private final long checkpointSequence;
+        private final String checkpointAttemptId;
+        private final CheckpointReadDeadline deadline;
+        private final SerialExecutor serial = new SerialExecutor(codecExecutor);
+        private final AtomicBoolean cancelled = new AtomicBoolean();
+        private volatile CheckpointSink sink;
+
+        private MergeOperation(
+                List<RecoveryCheckpointObject> objects,
+                long checkpointSequence,
+                String checkpointAttemptId,
+                Duration timeout) {
+            this.objects = objects;
+            this.checkpointSequence = checkpointSequence;
+            this.checkpointAttemptId = checkpointAttemptId;
+            this.deadline = new CheckpointReadDeadline(timeout);
+        }
+
+        private CompletableFuture<RecoveryCheckpointMergeResult> run() {
+            return loadSources()
+                    .thenCompose(sources -> resume(() -> planPublications(sources)
+                            .thenCompose(uniquePublicationCount ->
+                                    writeMerged(sources, uniquePublicationCount))))
+                    .whenComplete((ignored, failure) -> {
+                        if (failure != null) {
+                            closeSink();
+                        }
+                    });
+        }
+
+        private CompletableFuture<List<MergeSource>> loadSources() {
+            ensureActive();
+            List<CompletableFuture<MergeSource>> loads = new ArrayList<>(objects.size());
+            for (int index = 0; index < objects.size(); index++) {
+                RecoveryCheckpointObject object = objects.get(index);
+                CompletableFuture<PublicationOffsets> publications = readPublicationDirectory(
+                        object.objectKey(), object.directory(), deadline);
+                CompletableFuture<CommitOffsets> commits = readCommitDirectory(
+                        object.objectKey(), object.directory(), deadline);
+                int sourceIndex = index;
+                loads.add(publications.thenCombine(commits, (publicationOffsets, commitOffsets) -> {
+                    ensureActive();
+                    RecoveryCheckpointWriteRequest header = object.header();
+                    int expectedCommitDirectories = Math.toIntExact(
+                            (header.expectedEntryCount()
+                                            + (long) RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE
+                                            - 1)
+                                    / RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
+                    if (publicationOffsets.fileOffsets().length
+                                    != header.expectedPublicationCount()
+                            || commitOffsets.fileOffsets().length
+                                    != expectedCommitDirectories) {
+                        throw corrupt(
+                                "NRC1 merge source directory counts differ from its verified header");
+                    }
+                    int[] publicationRemap = new int[header.expectedPublicationCount()];
+                    Arrays.fill(publicationRemap, -1);
+                    return new MergeSource(
+                            sourceIndex,
+                            object,
+                            publicationOffsets,
+                            commitOffsets,
+                            publicationRemap);
+                }));
+            }
+            return CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new))
+                    .thenApply(ignored -> loads.stream().map(CompletableFuture::join).toList());
+        }
+
+        private CompletableFuture<Integer> planPublications(
+                List<MergeSource> sources) {
+            return mergePublications(sources, (publication, items, mergedIndex) -> {
+                for (PublicationItem item : items) {
+                    int[] remap = sources.get(item.sourceIndex()).publicationRemap();
+                    if (remap[item.localIndex()] != -1) {
+                        throw corrupt("NRC1 merge planned one source publication twice");
+                    }
+                    remap[item.localIndex()] = mergedIndex;
+                }
+            }).thenApply(count -> {
+                if (count <= 0) {
+                    throw corrupt("NRC1 merge produced an empty publication table");
+                }
+                for (MergeSource source : sources) {
+                    for (int mapped : source.publicationRemap()) {
+                        if (mapped < 0) {
+                            throw corrupt("NRC1 merge omitted a source publication mapping");
+                        }
+                    }
+                }
+                return count;
+            });
+        }
+
+        private CompletableFuture<RecoveryCheckpointMergeResult> writeMerged(
+                List<MergeSource> sources,
+                int uniquePublicationCount) {
+            ensureActive();
+            RecoveryCheckpointWriteRequest request = mergedRequest(
+                    sources, uniquePublicationCount);
+            try {
+                sink = new CheckpointSink(request);
+            } catch (IOException failure) {
+                return CompletableFuture.failedFuture(failure);
+            }
+            return mergePublications(sources, (publication, items, mergedIndex) -> {
+                        for (PublicationItem item : items) {
+                            if (sources.get(item.sourceIndex())
+                                            .publicationRemap()[item.localIndex()]
+                                    != mergedIndex) {
+                                throw corrupt(
+                                        "NRC1 publication identity changed between merge passes");
+                            }
+                        }
+                        sink.writePublication(publication);
+                    })
+                    .thenCompose(actualCount -> resume(() -> {
+                        if (actualCount != uniquePublicationCount) {
+                            throw corrupt(
+                                    "NRC1 publication count changed between merge passes");
+                        }
+                        sink.finishPublications();
+                        return writeEntries(sources, 0, 0);
+                    }))
+                    .thenApply(ignored -> {
+                        ensureActive();
+                        RecoveryCheckpointWriteResult completed;
+                        try {
+                            completed = sink.finish();
+                        } catch (IOException failure) {
+                            throw new CompletionException(failure);
+                        }
+                        sink = null;
+                        return new RecoveryCheckpointMergeResult(
+                                request, completed, sources.size());
+                    });
+        }
+
+        private RecoveryCheckpointWriteRequest mergedRequest(
+                List<MergeSource> sources,
+                int uniquePublicationCount) {
+            RecoveryCheckpointWriteRequest first =
+                    sources.get(0).object().header();
+            RecoveryCheckpointWriteRequest last =
+                    sources.get(sources.size() - 1).object().header();
+            long entryCount = 0;
+            for (MergeSource source : sources) {
+                entryCount = Math.addExact(
+                        entryCount, source.object().header().expectedEntryCount());
+            }
+            return new RecoveryCheckpointWriteRequest(
+                    first.cluster(),
+                    first.streamId(),
+                    checkpointSequence,
+                    checkpointAttemptId,
+                    new OffsetRange(
+                            first.coverage().startOffset(),
+                            last.coverage().endOffset()),
+                    first.firstCommitVersion(),
+                    last.lastCommitVersion(),
+                    first.cumulativeSizeAtStart(),
+                    last.cumulativeSizeAtEnd(),
+                    first.firstCommitId(),
+                    last.lastCommitId(),
+                    last.sourceHeadCommitId(),
+                    last.sourceHeadCommitVersion(),
+                    first.projectionIdentitySha256(),
+                    Math.toIntExact(entryCount),
+                    uniquePublicationCount);
+        }
+
+        private CompletableFuture<Integer> mergePublications(
+                List<MergeSource> sources,
+                MergePublicationConsumer consumer) {
+            ensureActive();
+            List<PublicationCursor> cursors = sources.stream()
+                    .map(PublicationCursor::new)
+                    .toList();
+            List<CompletableFuture<Void>> initial = cursors.stream()
+                    .map(this::loadPublicationPage)
+                    .toList();
+            PublicationMergeState state = new PublicationMergeState(consumer);
+            return CompletableFuture.allOf(initial.toArray(CompletableFuture[]::new))
+                    .thenCompose(ignored -> resume(() -> {
+                        for (PublicationCursor cursor : cursors) {
+                            if (!cursor.hasCurrent()) {
+                                throw corrupt("NRC1 merge source publication table is empty");
+                            }
+                            state.queue.add(cursor);
+                        }
+                        return drainPublications(state);
+                    }))
+                    .thenApply(ignored -> state.uniqueCount);
+        }
+
+        private CompletableFuture<Void> drainPublications(
+                PublicationMergeState state) {
+            ensureActive();
+            List<PublicationCursor> reload = new ArrayList<>();
+            while (!state.queue.isEmpty()) {
+                PublicationCursor firstCursor = state.queue.remove();
+                PublicationItem first = firstCursor.current();
+                List<PublicationCursor> duplicates = new ArrayList<>();
+                duplicates.add(firstCursor);
+                while (!state.queue.isEmpty()
+                        && comparePublicationKeys(
+                                        state.queue.peek().current().value(),
+                                        first.value())
+                                == 0) {
+                    duplicates.add(state.queue.remove());
+                }
+                List<PublicationItem> items = duplicates.stream()
+                        .map(PublicationCursor::current)
+                        .toList();
+                for (PublicationItem item : items) {
+                    if (!item.value().equals(first.value())) {
+                        throw corrupt(
+                                "NRC1 merge found conflicting bytes for one publication identity");
+                    }
+                }
+                if (state.previous != null
+                        && comparePublicationKeys(first.value(), state.previous) <= 0) {
+                    throw corrupt(
+                            "NRC1 merge source publication tables are not unique and ordered");
+                }
+                if (state.uniqueCount
+                        >= RecoveryCheckpointFormatV1.MAX_PUBLICATION_COUNT) {
+                    throw corrupt("NRC1 merged publication table exceeds its hard limit");
+                }
+                try {
+                    state.consumer.accept(
+                            first.value(), items, state.uniqueCount);
+                } catch (Exception failure) {
+                    throw new CompletionException(failure);
+                }
+                state.previous = first.value();
+                state.uniqueCount++;
+
+                for (PublicationCursor cursor : duplicates) {
+                    cursor.consume();
+                    if (cursor.hasCurrent()) {
+                        state.queue.add(cursor);
+                    } else if (cursor.hasRemaining()) {
+                        reload.add(cursor);
+                    }
+                }
+                if (!reload.isEmpty()) {
+                    List<PublicationCursor> exactReload = List.copyOf(reload);
+                    List<CompletableFuture<Void>> loads = exactReload.stream()
+                            .map(this::loadPublicationPage)
+                            .toList();
+                    return CompletableFuture.allOf(loads.toArray(CompletableFuture[]::new))
+                            .thenCompose(ignored -> resume(() -> {
+                                for (PublicationCursor cursor : exactReload) {
+                                    if (!cursor.hasCurrent()) {
+                                        throw corrupt(
+                                                "NRC1 merge continuation returned no publication");
+                                    }
+                                    state.queue.add(cursor);
+                                }
+                                return drainPublications(state);
+                            }));
+                }
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+
+        private CompletableFuture<Void> loadPublicationPage(
+                PublicationCursor cursor) {
+            ensureActive();
+            MergeSource source = cursor.source();
+            int count = source.object().header().expectedPublicationCount();
+            int start = cursor.nextLoadIndex();
+            if (start >= count) {
+                return CompletableFuture.completedFuture(null);
+            }
+            int maximumEnd = Math.min(
+                    count, Math.addExact(start, MAX_MERGE_PAGE_RECORDS));
+            long startOffset = source.publications().fileOffsets()[start];
+            int end = start + 1;
+            while (end < maximumEnd) {
+                long candidateEnd = publicationBoundary(source, end);
+                if (candidateEnd - startOffset > MAX_MERGE_PAGE_BYTES) {
+                    break;
+                }
+                end++;
+            }
+            long endOffset = publicationBoundary(source, end);
+            long length = endOffset - startOffset;
+            if (length <= 0
+                    || (length > MAX_MERGE_PAGE_BYTES && end > start + 1)
+                    || length > Integer.MAX_VALUE) {
+                return CompletableFuture.failedFuture(corrupt(
+                        "NRC1 merge publication page exceeds its bounded range"));
+            }
+            int pageEnd = end;
+            return readExact(
+                            source.object().objectKey(),
+                            startOffset,
+                            length,
+                            deadline)
+                    .thenAccept(bytes -> {
+                        ensureActive();
+                        List<PublicationItem> values = new ArrayList<>(pageEnd - start);
+                        for (int index = start; index < pageEnd; index++) {
+                            long recordStart = source.publications().fileOffsets()[index];
+                            long recordEnd = publicationBoundary(source, index + 1);
+                            int relativeStart = Math.toIntExact(recordStart - startOffset);
+                            int recordLength = Math.toIntExact(recordEnd - recordStart);
+                            if (recordLength <= 0
+                                    || recordLength
+                                            > RecoveryCheckpointFormatV1.MAX_RECORD_BYTES) {
+                                throw corrupt(
+                                        "NRC1 merge publication directory has an invalid record range");
+                            }
+                            ByteBuffer record = bytes.asReadOnlyBuffer();
+                            record.position(relativeStart);
+                            record.limit(Math.addExact(relativeStart, recordLength));
+                            RecoveryCheckpointBinary.Decoded<RecoveryCheckpointPublication> decoded =
+                                    RecoveryCheckpointBinary.decodePublication(record.slice());
+                            if (decoded.bytesConsumed() != recordLength) {
+                                throw corrupt(
+                                        "NRC1 merge publication range does not delimit one record");
+                            }
+                            validatePublication(source.object().header(), decoded.value());
+                            values.add(new PublicationItem(
+                                    source.sourceIndex(), index, decoded.value()));
+                        }
+                        cursor.install(values, pageEnd);
+                    });
+        }
+
+        private long publicationBoundary(MergeSource source, int index) {
+            return index < source.publications().fileOffsets().length
+                    ? source.publications().fileOffsets()[index]
+                    : source.commits().fileOffsets()[0];
+        }
+
+        private CompletableFuture<Void> writeEntries(
+                List<MergeSource> sources,
+                int sourceIndex,
+                int blockIndex) {
+            ensureActive();
+            if (sourceIndex == sources.size()) {
+                return CompletableFuture.completedFuture(null);
+            }
+            MergeSource source = sources.get(sourceIndex);
+            int blockCount = source.commits().fileOffsets().length;
+            if (blockIndex == blockCount) {
+                return resume(() -> writeEntries(sources, sourceIndex + 1, 0));
+            }
+
+            long start = source.commits().fileOffsets()[blockIndex];
+            int endBlock = blockIndex + 1;
+            while (endBlock < blockCount) {
+                long candidateEnd = commitBoundary(source, endBlock + 1);
+                if (candidateEnd - start > MAX_MERGE_PAGE_BYTES) {
+                    break;
+                }
+                endBlock++;
+            }
+            long end = commitBoundary(source, endBlock);
+            long length = end - start;
+            long maximumBlock = (long) RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE
+                    * RecoveryCheckpointFormatV1.MAX_RECORD_BYTES;
+            if (length <= 0
+                    || (length > MAX_MERGE_PAGE_BYTES
+                            && endBlock > blockIndex + 1)
+                    || length > maximumBlock * (endBlock - blockIndex)
+                    || length > Integer.MAX_VALUE) {
+                return CompletableFuture.failedFuture(corrupt(
+                        "NRC1 merge commit page exceeds its bounded range"));
+            }
+            int nextBlock = endBlock;
+            return readExact(
+                            source.object().objectKey(),
+                            start,
+                            length,
+                            deadline)
+                    .thenAccept(bytes -> writeEntryPage(
+                            source, blockIndex, nextBlock, bytes))
+                    .thenCompose(ignored -> resume(() ->
+                            writeEntries(sources, sourceIndex, nextBlock)));
+        }
+
+        private long commitBoundary(MergeSource source, int blockIndex) {
+            return blockIndex < source.commits().fileOffsets().length
+                    ? source.commits().fileOffsets()[blockIndex]
+                    : source.object().directory().publicationDirectoryOffset();
+        }
+
+        private void writeEntryPage(
+                MergeSource source,
+                int firstBlock,
+                int endBlock,
+                ByteBuffer bytes) {
+            ensureActive();
+            int firstEntry = Math.multiplyExact(
+                    firstBlock, RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE);
+            int endEntry = Math.min(
+                    source.object().header().expectedEntryCount(),
+                    Math.multiplyExact(
+                            endBlock,
+                            RecoveryCheckpointFormatV1.COMMIT_DIRECTORY_STRIDE));
+            ByteBuffer cursor = bytes.asReadOnlyBuffer();
+            for (int index = firstEntry; index < endEntry; index++) {
+                if (!cursor.hasRemaining()) {
+                    throw corrupt("NRC1 merge commit page ended before its directory count");
+                }
+                RecoveryCheckpointBinary.Decoded<RecoveryCheckpointEntry> decoded =
+                        RecoveryCheckpointBinary.decodeEntry(cursor);
+                cursor.position(Math.addExact(
+                        cursor.position(), decoded.bytesConsumed()));
+                RecoveryCheckpointEntry entry = decoded.value();
+                validateEntryBounds(source.object().header(), entry);
+                verifier.verifyEntry(source.object().header(), entry);
+                List<Integer> remapped = new ArrayList<>(
+                        entry.coveringPublicationIndexes().size());
+                for (int local : entry.coveringPublicationIndexes()) {
+                    if (local < 0 || local >= source.publicationRemap().length) {
+                        throw corrupt(
+                                "NRC1 merge entry references a publication outside its source table");
+                    }
+                    int merged = source.publicationRemap()[local];
+                    if (merged < 0) {
+                        throw corrupt("NRC1 merge entry uses an unmapped publication");
+                    }
+                    remapped.add(merged);
+                }
+                RecoveryCheckpointEntry rewritten = new RecoveryCheckpointEntry(
+                        entry.commitVersion(),
+                        entry.range(),
+                        entry.cumulativeSizeAtEnd(),
+                        entry.commitId(),
+                        entry.previousCommitId(),
+                        entry.canonicalCommitRecord(),
+                        entry.canonicalCommitRecordSha256(),
+                        remapped);
+                try {
+                    sink.writeEntry(rewritten);
+                } catch (IOException failure) {
+                    throw new CompletionException(failure);
+                }
+            }
+            if (cursor.hasRemaining()) {
+                throw corrupt("NRC1 merge commit directory page has trailing records");
+            }
+        }
+
+        private <T> CompletableFuture<T> resume(
+                Supplier<CompletableFuture<T>> next) {
+            CompletableFuture<T> result = new CompletableFuture<>();
+            try {
+                serial.execute(() -> {
+                    if (cancelled.get()) {
+                        result.completeExceptionally(cancelledFailure());
+                        return;
+                    }
+                    CompletableFuture<T> future;
+                    try {
+                        future = Objects.requireNonNull(next.get(), "merge continuation");
+                    } catch (Throwable failure) {
+                        result.completeExceptionally(failure);
+                        return;
+                    }
+                    future.whenComplete((value, failure) -> {
+                        if (failure == null) {
+                            result.complete(value);
+                        } else {
+                            result.completeExceptionally(unwrap(failure));
+                        }
+                    });
+                });
+            } catch (RejectedExecutionException failure) {
+                result.completeExceptionally(new NereusException(
+                        ErrorCode.STORAGE_CLOSED,
+                        false,
+                        "recovery checkpoint executor rejected a merge continuation",
+                        failure));
+            }
+            return result;
+        }
+
+        private void ensureActive() {
+            if (cancelled.get()) {
+                throw cancelledFailure();
+            }
+        }
+
+        private NereusException cancelledFailure() {
+            return new NereusException(
+                    ErrorCode.STORAGE_CLOSED,
+                    false,
+                    "recovery checkpoint merge was cancelled");
+        }
+
+        private void cancel() {
+            if (cancelled.compareAndSet(false, true)) {
+                closeSink();
+            }
+        }
+
+        private void closeSink() {
+            CheckpointSink active = sink;
+            sink = null;
+            if (active != null) {
+                active.close();
+            }
+        }
+
+        private final class PublicationMergeState {
+            private final PriorityQueue<PublicationCursor> queue = new PriorityQueue<>(
+                    Comparator.comparing(
+                                    (PublicationCursor cursor) ->
+                                            cursor.current().value().generation())
+                            .thenComparing(cursor ->
+                                    cursor.current().value().publicationId().value())
+                            .thenComparingInt(cursor ->
+                                    cursor.current().sourceIndex()));
+            private final MergePublicationConsumer consumer;
+            private RecoveryCheckpointPublication previous;
+            private int uniqueCount;
+
+            private PublicationMergeState(MergePublicationConsumer consumer) {
+                this.consumer = consumer;
+            }
+        }
+    }
+
+    private static int comparePublicationKeys(
+            RecoveryCheckpointPublication left,
+            RecoveryCheckpointPublication right) {
+        int generation = Long.compare(left.generation(), right.generation());
+        return generation != 0
+                ? generation
+                : left.publicationId().value().compareTo(
+                        right.publicationId().value());
+    }
+
+    @FunctionalInterface
+    private interface MergePublicationConsumer {
+        void accept(
+                RecoveryCheckpointPublication publication,
+                List<PublicationItem> sourceItems,
+                int mergedIndex) throws Exception;
+    }
+
+    private record MergeSource(
+            int sourceIndex,
+            RecoveryCheckpointObject object,
+            PublicationOffsets publications,
+            CommitOffsets commits,
+            int[] publicationRemap) {
+    }
+
+    private record PublicationItem(
+            int sourceIndex,
+            int localIndex,
+            RecoveryCheckpointPublication value) {
+    }
+
+    private static final class PublicationCursor {
+        private final MergeSource source;
+        private List<PublicationItem> page = List.of();
+        private int pageIndex;
+        private int nextLoadIndex;
+
+        private PublicationCursor(MergeSource source) {
+            this.source = source;
+        }
+
+        private MergeSource source() {
+            return source;
+        }
+
+        private int nextLoadIndex() {
+            return nextLoadIndex;
+        }
+
+        private boolean hasCurrent() {
+            return pageIndex < page.size();
+        }
+
+        private boolean hasRemaining() {
+            return nextLoadIndex
+                    < source.object().header().expectedPublicationCount();
+        }
+
+        private PublicationItem current() {
+            if (!hasCurrent()) {
+                throw new IllegalStateException("publication cursor has no current value");
+            }
+            return page.get(pageIndex);
+        }
+
+        private void consume() {
+            if (!hasCurrent()) {
+                throw new IllegalStateException("publication cursor cannot consume an empty page");
+            }
+            pageIndex++;
+            if (pageIndex == page.size()) {
+                page = List.of();
+                pageIndex = 0;
+            }
+        }
+
+        private void install(List<PublicationItem> values, int continuation) {
+            if (hasCurrent()
+                    || values.isEmpty()
+                    || continuation <= nextLoadIndex
+                    || continuation
+                            > source.object().header().expectedPublicationCount()) {
+                throw new IllegalStateException("invalid publication cursor page");
+            }
+            page = List.copyOf(values);
+            pageIndex = 0;
+            nextLoadIndex = continuation;
+        }
     }
 
     private final class WriteCoordinator {

@@ -5,6 +5,7 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.PublicationId;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +17,19 @@ public interface RecoveryCheckpointCodecV1 {
             RecoveryCheckpointWriteRequest request,
             Flow.Publisher<RecoveryCheckpointPublication> publications,
             Flow.Publisher<RecoveryCheckpointEntry> entries);
+
+    /**
+     * Rewrites an ordered, gap-free checkpoint chain into one canonical NRC1 object.
+     *
+     * <p>The implementation must stream source records, deduplicate the canonical publication table, remap every
+     * commit entry's publication indexes, and retain only bounded directory/mapping state. The returned staged object
+     * is close-owned by the caller.
+     */
+    CompletableFuture<RecoveryCheckpointMergeResult> merge(
+            List<RecoveryCheckpointObject> sources,
+            long checkpointSequence,
+            String checkpointAttemptId,
+            Duration timeout);
 
     CompletableFuture<RecoveryCheckpointObject> openAndVerify(
             ObjectKey key,
