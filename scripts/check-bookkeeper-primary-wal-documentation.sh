@@ -98,6 +98,10 @@ require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'No online migration in BK-M0–M6' \
     "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
 require_literal 'BK-96' \
@@ -214,8 +218,18 @@ require_literal 'bookKeeperPrimaryWalM3PhysicalRetirementCheck' "build.gradle.kt
 require_literal 'bookKeeperPrimaryWalM3ResponseLossCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' "build.gradle.kts"
 require_literal 'realOxiaStableAppendResponseLossReusesOneBookKeeperRangeAndRepairsGenerationZero' \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'foreignLedgerCreatedAtProviderBoundaryIsQuarantinedAndNeverDeletedBeforeFreshCandidateWins' \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'realOxiaProtectionCartesianBoundPreservesTaskRepairAndMandatoryVetoes' \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'productionAdapterReloadsEveryAppliedBookKeeperMutationResponseLoss' \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/metadata/oxia/BookKeeperMetadataOxiaResponseLossIntegrationTest.java"
+require_literal 'twoStreamsChoosingOneCandidateConvergeToTwoOwnedLedgersWithoutDelete' \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/bookkeeper/BookKeeperAllocatorOxiaBkContentionIntegrationTest.java"
 require_literal 'stableHeadFallsBackToBookKeeperThenFreshRuntimePublishesAndReadsExactObject' \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'freshRuntimesConvergeAppliedTaskSourceOutputAndPublicationResponseLoss' \
@@ -281,7 +295,7 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck|StableRecoveryCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check))|[4-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck|StableRecoveryCheck|IsolationRetentionCheck|AllocationAuthorityCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check))|[4-6])' \
     "$repo_root/build.gradle.kts"; then
     echo "unfinished BK-M2 final/profile, BK-M3 final, and BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1

@@ -80,9 +80,12 @@ import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationLifecycle;
+import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
 import com.nereusstream.metadata.oxia.testing.BookKeeperMetadataStoreContractScenario;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -825,6 +828,90 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
+    void realOxiaProtectionCartesianBoundPreservesTaskRepairAndMandatoryVetoes() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-protection-bound-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        MutableClock clock = new MutableClock(1_900_000);
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-protection-bound",
+                        configuration,
+                        reservation,
+                        clock)) {
+            EligibleLedger eligible = eligibleSealedLedger(
+                    process, cluster, configuration, suffix + "-cartesian");
+            int maximum = Math.multiplyExact(
+                    configuration.maxAppendRangesPerLedger(),
+                    configuration.protectionSlotsPerRange());
+
+            for (int rangeSlot = 0; rangeSlot < configuration.maxAppendRangesPerLedger(); rangeSlot++) {
+                BookKeeperLedgerProtectionRecord canonical = process.bookKeeperMetadata.getProtection(
+                                cluster,
+                                configuration.providerScopeSha256(),
+                                eligible.ledgerId(),
+                                rangeSlot,
+                                0)
+                        .join()
+                        .orElseThrow()
+                        .value();
+                for (int protectionSlot = 3;
+                        protectionSlot < configuration.protectionSlotsPerRange();
+                        protectionSlot++) {
+                    BookKeeperProtectionType type = protectionSlot % 2 == 0
+                            ? BookKeeperProtectionType.REPAIR
+                            : BookKeeperProtectionType.MATERIALIZATION_SOURCE;
+                    process.bookKeeperMetadata.createProtection(
+                                    cluster,
+                                    configuration.providerScopeSha256(),
+                                    activeProtection(canonical, rangeSlot, protectionSlot, type, clock.millis()))
+                            .join();
+                }
+            }
+
+            var inventory = process.bookKeeperMetadata.scanProtections(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            eligible.ledgerId(),
+                            Optional.empty(),
+                            maximum)
+                    .join();
+            assertThat(inventory.values()).hasSize(maximum);
+            assertThat(inventory.continuation()).isEmpty();
+            assertThat(inventory.values().stream()
+                            .filter(value -> value.value().lifecycle() == ProtectionLifecycle.ACTIVE)
+                            .map(value -> BookKeeperProtectionType.fromWireId(value.value().protectionTypeId()))
+                            .toList())
+                    .contains(BookKeeperProtectionType.REPAIR, BookKeeperProtectionType.MATERIALIZATION_SOURCE);
+
+            BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
+            BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
+                    cluster,
+                    configuration,
+                    gc,
+                    process.bookKeeperMetadata,
+                    process.bookKeeperMetadata,
+                    process.namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation(configuration, reservation)),
+                    process.rawOperations,
+                    clock);
+            assertThat(gate.evaluate(eligible.root(), TIMEOUT).join().blockers())
+                    .containsExactly(BookKeeperRetentionBlocker.PROTECTION_PRESENT);
+            assertThat(process.rawOperations.metadata(
+                            eligible.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLedgerId()).isEqualTo(eligible.ledgerId());
+        }
+    }
+
+    @Test
     void byteRangeAndAgeRolloverPreserveWholeBatchesAndDenseOffsets() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
@@ -1491,6 +1578,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         return operations;
     }
 
+    private static ForeignCollisionOperations foreignCollision(
+            BookKeeperClientOperations raw,
+            AtomicReference<ForeignCollisionOperations> target) {
+        ForeignCollisionOperations operations = new ForeignCollisionOperations(raw);
+        target.set(operations);
+        return operations;
+    }
+
     private static CountingOperations counting(
             BookKeeperClientOperations raw,
             AtomicReference<CountingOperations> target,
@@ -1634,6 +1729,101 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     .contains(BookKeeperRetentionBlocker.LATE_CREATE_HAZARD)
                     .contains(BookKeeperRetentionBlocker.ALLOCATION_SLOT_PRESENT);
             delayedHandle.closeAsync().join();
+
+            CountingOperations foreignCounting = new CountingOperations(raw);
+            DelayedCreateOperations foreignDelayed = new DelayedCreateOperations(foreignCounting);
+            StreamId foreignLateStream = new StreamId("stream-foreign-late-create-" + suffix);
+            AppendSession foreignLateSession = new AppendSession(
+                    foreignLateStream, "writer-3", 1, "token-3", 1, 10_000);
+            BookKeeperWriterStateMachine foreignLateWriter = new BookKeeperWriterStateMachine(
+                    cluster, configuration, metadata, clock, "process-foreign-late-create");
+            BookKeeperLedgerAllocator foreignLateAllocator = new BookKeeperLedgerAllocator(
+                    cluster,
+                    configuration,
+                    metadata,
+                    metadata,
+                    namespaceVerifier,
+                    foreignDelayed,
+                    ignored -> password.clone(),
+                    foreignLateWriter,
+                    clock);
+            assertThatThrownBy(() -> foreignLateAllocator.allocate(
+                            new BookKeeperLedgerAllocationRequest(
+                                    foreignLateStream, foreignLateSession, TIMEOUT))
+                    .join()).hasCauseInstanceOf(NereusException.class);
+
+            WriteAdvHandle foreignLateHandle = foreignDelayed.createForeignNow().join();
+            long foreignLateLedger = foreignLateHandle.getId();
+            foreignLateAllocator.reconcileUncertainAllocations(TIMEOUT).join();
+            assertThat(metadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), foreignLateLedger)
+                    .join()).get().satisfies(root -> {
+                        assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
+                        assertThat(root.value().lateCreateHazard()).isTrue();
+                    });
+            assertThat(raw.metadata(foreignLateLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                            .join().getCustomMetadata())
+                    .containsKey("stock-owner");
+            assertThat(foreignCounting.deleteCalls()).isZero();
+            foreignLateHandle.closeAsync().join();
+        }
+    }
+
+    @Test
+    void foreignLedgerCreatedAtProviderBoundaryIsQuarantinedAndNeverDeletedBeforeFreshCandidateWins()
+            throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-foreign-collision-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(6_250_000), ZoneId.of("UTC"));
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        AtomicReference<ForeignCollisionOperations> operations = new AtomicReference<>();
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-foreign-collision",
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> foreignCollision(raw, operations))) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-foreign-collision-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            AppendSession session = process.acquire(stream, "writer-1");
+
+            assertThatThrownBy(() -> process.allocator.allocate(
+                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+                    .join()).hasCauseInstanceOf(NereusException.class);
+
+            long foreignLedger = operations.get().foreignLedgerId();
+            assertThat(process.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), foreignLedger)
+                    .join()).get().satisfies(root -> {
+                        assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
+                        assertThat(root.value().lateCreateHazard()).isTrue();
+                    });
+            assertThat(process.rawOperations.metadata(
+                            foreignLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getCustomMetadata())
+                    .containsKey("stock-owner");
+            assertThat(operations.get().deleteCalls()).isZero();
+
+            var replacement = process.allocator.allocate(
+                            new BookKeeperLedgerAllocationRequest(stream, session, TIMEOUT))
+                    .join();
+            assertThat(replacement.root().value().ledgerId()).isNotEqualTo(foreignLedger);
+            replacement.handle().closeAsync().join();
+            assertThat(process.rawOperations.metadata(
+                            foreignLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLedgerId()).isEqualTo(foreignLedger);
+            assertThat(operations.get().deleteCalls()).isZero();
         }
     }
 
@@ -1741,6 +1931,38 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
     private static BookKeeperEntryRangeReadTarget target(AppendResult result) {
         return (BookKeeperEntryRangeReadTarget) result.readTarget();
+    }
+
+    private static BookKeeperLedgerProtectionRecord activeProtection(
+            BookKeeperLedgerProtectionRecord canonical,
+            int rangeSlot,
+            int protectionSlot,
+            BookKeeperProtectionType type,
+            long now) {
+        return new BookKeeperLedgerProtectionRecord(
+                canonical.schemaVersion(),
+                canonical.ledgerIdentitySha256(),
+                canonical.clusterAlias(),
+                canonical.ledgerId(),
+                canonical.rootLifecycleEpoch(),
+                rangeSlot,
+                protectionSlot,
+                type.wireId(),
+                "real-cartesian-" + rangeSlot + "-" + protectionSlot,
+                canonical.firstEntryId(),
+                canonical.entryCount(),
+                canonical.rangeChecksumSha256(),
+                canonical.streamId(),
+                canonical.offsetStart(),
+                canonical.offsetEnd(),
+                canonical.commitVersion(),
+                "/real-cartesian-owner/" + rangeSlot + "/" + protectionSlot,
+                17,
+                sha('e').value(),
+                ProtectionLifecycle.ACTIVE,
+                now,
+                type == BookKeeperProtectionType.REPAIR ? Math.addExact(now, 60_000) : 0,
+                0);
     }
 
     private static NereusException requireNereusFailure(Throwable failure) {
@@ -2750,6 +2972,88 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
     }
 
+    private static final class ForeignCollisionOperations implements BookKeeperClientOperations {
+        private final BookKeeperClientOperations delegate;
+        private final AtomicBoolean inject = new AtomicBoolean(true);
+        private final AtomicLong foreignLedgerId = new AtomicLong(-1);
+        private final AtomicInteger deletes = new AtomicInteger();
+
+        private ForeignCollisionOperations(BookKeeperClientOperations delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public CompletableFuture<WriteAdvHandle> createAdvanced(
+                long ledgerId,
+                BookKeeperWalConfiguration configuration,
+                byte[] password,
+                Map<String, byte[]> customMetadata,
+                BookKeeperOperationDeadline deadline) {
+            if (!inject.compareAndSet(true, false)) {
+                return delegate.createAdvanced(ledgerId, configuration, password, customMetadata, deadline);
+            }
+            foreignLedgerId.set(ledgerId);
+            return delegate.createAdvanced(
+                            ledgerId,
+                            configuration,
+                            password,
+                            Map.of("stock-owner", "foreign-control-topic".getBytes(StandardCharsets.UTF_8)),
+                            deadline)
+                    .thenCompose(foreign -> foreign.closeAsync().thenCompose(ignored ->
+                            delegate.createAdvanced(
+                                    ledgerId, configuration, password, customMetadata, deadline)));
+        }
+
+        @Override
+        public CompletableFuture<ReadHandle> open(
+                long ledgerId,
+                BookKeeperDigestType digestType,
+                byte[] password,
+                boolean recovery,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.open(ledgerId, digestType, password, recovery, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Long> write(
+                WriteAdvHandle handle,
+                long entryId,
+                ByteBuf entry,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.write(handle, entryId, entry, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerEntries> readUnconfirmed(
+                ReadHandle handle,
+                long firstEntryId,
+                long lastEntryIdInclusive,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
+        }
+
+        @Override
+        public CompletableFuture<LedgerMetadata> metadata(
+                long ledgerId,
+                BookKeeperOperationDeadline deadline) {
+            return delegate.metadata(ledgerId, deadline);
+        }
+
+        @Override
+        public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+            deletes.incrementAndGet();
+            return delegate.delete(ledgerId, deadline);
+        }
+
+        private long foreignLedgerId() {
+            return foreignLedgerId.get();
+        }
+
+        private int deleteCalls() {
+            return deletes.get();
+        }
+    }
+
     private static final class DelayedCreateOperations implements BookKeeperClientOperations {
         private final BookKeeperClientOperations delegate;
         private PendingCreate pending;
@@ -2788,6 +3092,18 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                             exact.configuration(),
                             exact.password(),
                             exact.customMetadata(),
+                            exact.deadline())
+                    .whenComplete((ignored, failure) -> java.util.Arrays.fill(exact.password(), (byte) 0));
+        }
+
+        private synchronized CompletableFuture<WriteAdvHandle> createForeignNow() {
+            PendingCreate exact = java.util.Objects.requireNonNull(pending, "pending delayed create");
+            pending = null;
+            return delegate.createAdvanced(
+                            exact.ledgerId(),
+                            exact.configuration(),
+                            exact.password(),
+                            Map.of("stock-owner", "late-foreign-topic".getBytes(StandardCharsets.UTF_8)),
                             exact.deadline())
                     .whenComplete((ignored, failure) -> java.util.Arrays.fill(exact.password(), (byte) 0));
         }

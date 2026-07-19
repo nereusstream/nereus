@@ -20,7 +20,8 @@ BookKeeper ledger deletion      implemented and real-service tested / production
 `bookKeeperPrimaryWalM2AllocatorCheck` / `bookKeeperPrimaryWalM2AppendReadCheck` /
 `bookKeeperPrimaryWalM2RecoveryFencingCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` and
-`bookKeeperPrimaryWalM2RealServiceCheck` / `bookKeeperPrimaryWalM2StableRecoveryCheck` are executable and backed by real
+`bookKeeperPrimaryWalM2RealServiceCheck` / `bookKeeperPrimaryWalM2StableRecoveryCheck` /
+`bookKeeperPrimaryWalM2IsolationRetentionCheck` / `bookKeeperPrimaryWalM2AllocationAuthorityCheck` are executable and backed by real
 module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPrimaryWalM3ExactSourceCheck` /
 `bookKeeperPrimaryWalM3ProtectionCheck` / `bookKeeperPrimaryWalM3AsyncProfileCheck` /
 `bookKeeperPrimaryWalM3LagCheck` / `bookKeeperPrimaryWalM3SourceRetirementCheck` /
@@ -355,6 +356,24 @@ same range，perform exactly the original two BookKeeper entry writes and leave 
 This closes the real O/B portions of BK-28 and BK-29；independent-process transport chaos remains BK-M6 evidence。
 `bookKeeperPrimaryWalM2StableRecoveryCheck --rerun-tasks` passed 63/63 executable tasks on 2026-07-20。
 
+The next isolation/retention checkpoint creates a foreign BookKeeper ledger exactly after Nereus has reserved the
+candidate root，proves the root becomes permanent `QUARANTINED`、performs zero delete calls and lets a fresh candidate
+win。Its uncertain-create chain also materializes a delayed foreign ledger after the original absent probe；the bounded
+16-shard reconciler quarantines it without delete。A separate real Oxia/BK chain fills the complete
+`maxAppendRangesPerLedger * protectionSlotsPerRange` inventory with durable mandatory tombstones plus ACTIVE task and
+repair owners，scans the exact Cartesian bound with no continuation and vetoes deletion while the ledger remains
+physical。This closes the remaining real foreign cuts in BK-15/BK-17 and the real inventory/task/repair portions of
+BK-50/BK-51；writer and independent-process chaos variants remain assigned to BK-M6。
+`bookKeeperPrimaryWalM2IsolationRetentionCheck --rerun-tasks` passed 63/63 executable tasks on 2026-07-20。
+
+The allocation-authority checkpoint wraps the real Oxia client below the production BK metadata adapter and injects
+applied-response loss for `putIfAbsent`、versioned CAS and conditional delete；exact reload returns the durable value or
+absence across a fresh adapter。It also uses the allocator's package-private deterministic candidate seam against real
+Oxia + BookKeeper：two streams choose one first ledger id concurrently，the global root admits exactly one owner and the
+loser advances to a second owned ledger without any provider delete。This closes BK-13 and BK-16 at their real O/B
+levels；the broader independent-process transport matrix remains BK-M6。
+`bookKeeperPrimaryWalM2AllocationAuthorityCheck --rerun-tasks` passed on 2026-07-20。
+
 Still required before BK-M2 is complete：close the remaining BK-M2 scenario/evidence rows and execute the ordinary /
 aggregate final tasks against the current source locks。Production provider composition、first-create admission and
 loaded/unloaded/two-broker ownership rollout are BK-M5 responsibilities, not hidden BK-M2 completion criteria；until
@@ -418,6 +437,8 @@ bookKeeperPrimaryWalM2RetentionCheck
 bookKeeperPrimaryWalM2PulsarCheck
 bookKeeperPrimaryWalM2RealServiceCheck       real Oxia + real BK + restart/delete-response-loss checkpoint
 bookKeeperPrimaryWalM2StableRecoveryCheck    real intent/head/gen0 response-loss + same-range recovery
+bookKeeperPrimaryWalM2IsolationRetentionCheck real foreign isolation + exact protection Cartesian bound
+bookKeeperPrimaryWalM2AllocationAuthorityCheck real Oxia mutation reload + global candidate contention
 bookKeeperPrimaryWalM2Check                 ordinary aggregate, delete remains dry-run
 bookKeeperPrimaryWalM2FinalCheck            real Oxia + real BK + restart/delete-response-loss
 ```

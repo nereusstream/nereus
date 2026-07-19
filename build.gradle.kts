@@ -709,6 +709,20 @@ tasks.register("bookKeeperPrimaryWalM2StableRecoveryCheck") {
     dependsOn("bookKeeperPrimaryWalM2RealServiceCheck")
 }
 
+tasks.register("bookKeeperPrimaryWalM2IsolationRetentionCheck") {
+    group = "verification"
+    description = "Verify real foreign-ledger isolation and the exact BK protection Cartesian retention bound."
+    dependsOn("bookKeeperPrimaryWalM2StableRecoveryCheck")
+    dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
+}
+
+tasks.register("bookKeeperPrimaryWalM2AllocationAuthorityCheck") {
+    group = "verification"
+    description = "Verify real Oxia mutation-response-loss reload and global BK ledger-id contention authority."
+    dependsOn("bookKeeperPrimaryWalM2IsolationRetentionCheck")
+    dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
+}
+
 tasks.register("bookKeeperPrimaryWalM3ExactSourceCheck") {
     group = "verification"
     description = "Verify BK task V2 target round-trip and provider-neutral exact-source reads."

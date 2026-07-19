@@ -15,9 +15,13 @@
 > public BookKeeper client's consuming `ByteBuf` ownership boundary。These checkpoints are
 > extended by a real intent/head/generation-zero applied-response-loss matrix that reuses one exact BK range with no
 > duplicate provider write and preserves the frozen pre-head no-public-attempt-id boundary。These checkpoints are
+> further extended by provider-boundary foreign-ledger isolation、delayed foreign-create quarantine and a real Oxia
+> exact-Cartesian task/repair protection inventory veto，then by real-Oxia mutation-response-loss reload and two-stream
+> global ledger-id contention with zero delete。These checkpoints are
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 > `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` /
-> `bookKeeperPrimaryWalM2StableRecoveryCheck`。`BookKeeperWalRuntime` can execute
+> `bookKeeperPrimaryWalM2StableRecoveryCheck` / `bookKeeperPrimaryWalM2IsolationRetentionCheck` /
+> `bookKeeperPrimaryWalM2AllocationAuthorityCheck`。`BookKeeperWalRuntime` can execute
 > BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade，including three-ledger rollover、unload/reopen、
 > historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes the exact
 > borrowed stock-client boundary。BK-M3 is now in progress：task V2 preserves exact tagged BK sources，F4 exact-source
@@ -68,6 +72,10 @@
 > 2026-07-20：`bookKeeperPrimaryWalM2StableRecoveryCheck --rerun-tasks` passes 63/63 executable tasks against real
 > Oxia + BookKeeper，including applied commit-intent、stream-head and generation-zero response loss with one exact BK
 > range and no duplicate write。This is a focused M2 checkpoint，not the still-unregistered M2 aggregate/final gate。
+> `bookKeeperPrimaryWalM2IsolationRetentionCheck --rerun-tasks` also passes 63/63 executable tasks，adding real
+> provider-boundary/delayed foreign-ledger quarantine and exact-Cartesian protection inventory evidence。
+> `bookKeeperPrimaryWalM2AllocationAuthorityCheck --rerun-tasks` also passes，adding real Oxia mutation-response-loss
+> reload and global candidate contention evidence。
 
 ## 1. Delivery identity
 

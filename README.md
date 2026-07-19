@@ -76,6 +76,10 @@ lost delete response and fresh-process dual absence。
 The same real-service path now injects applied commit-intent、head and generation-zero response loss，then recovers the
 same exact range with no duplicate BookKeeper write；the pre-head cut remains intentionally internal-reservation recovery
 under the frozen Phase 1.5 no-public-attempt-id contract。
+Provider-boundary and delayed foreign-ledger cuts now also prove permanent quarantine with zero deletes and fresh-candidate
+progress；the real Oxia retention fixture fills and scans the exact fixed protection Cartesian bound before vetoing GC。
+The allocation-authority fixture additionally loses real Oxia mutation responses below the production adapter and
+forces two streams onto one candidate id，proving exact reload and one global owner without provider deletion。
 The following deterministic restart-recovery checkpoint adds O(1) stream/attempt reservation identity、same-session
 durable range replay with zero BK rewrite、new-session abandon/seal/retire、intent/head response-loss convergence and
 generation-zero repair after the source ledger is already sealed；the corresponding real process cuts remain in the
