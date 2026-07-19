@@ -46,10 +46,10 @@ Evidence levels：
 | BK-11 | M2 | D/O | seven V1 writer/allocation/slot/root/reservation/protection/lease codecs share production/fake golden/failure contracts | `BookKeeperMetadataCodecContractTest` + `BookKeeperMetadataStoreContractScenario` |
 | BK-12 | M2 | D | key strict inverse rejects wrong cluster/shard/depth/noncanonical components | `BookKeeperKeyspaceTest.strictlyInvertsEveryWriterPrefix` |
 | BK-13 | M2 | O | intent -> durable slot CLAIMED/CREATE_STARTED -> root -> active writer survives every Oxia CAS response loss | `BookKeeperAllocatorOxiaIT.convergesEveryAllocationCut` |
-| BK-14 | M2 | B/O | exact create response loss persists slot + permanent hazard；matching metadata restores owned IO but never automatic delete | `BookKeeperAllocatorIT.recoversExactCreateResponseLoss` |
+| BK-14 | M2 | B/O | exact create response loss persists slot + permanent hazard；matching metadata is recovery-opened/sealed because the write handle is unrecoverable | `BookKeeperAllocatorIT.recoversExactCreateResponseLoss` |
 | BK-15 | M2 | B/O | candidate already owned by stock/foreign ledger is never deleted and a new id wins | `BookKeeperAllocatorIT.doesNotDeleteForeignCollision` |
 | BK-16 | M2 | D/O | two streams choose the same candidate; global root admits one allocation | `BookKeeperAllocatorContentionIT.serializesGlobalLedgerIdentity` |
-| BK-17 | M2 | B/O/C | `CREATE_UNCERTAIN` stays slot-consuming；matching late create activates/stale-seals with permanent GC veto, foreign quarantines | `BookKeeperAllocationLateCreateIT.recoversLatePhysicalCreate` |
+| BK-17 | M2 | B/O/C | `CREATE_UNCERTAIN` stays slot-consuming；matching late create seals with permanent GC veto, foreign quarantines | `BookKeeperAllocationLateCreateIT.recoversLatePhysicalCreate` |
 | BK-18 | M2 | D/O | writer state never reuses segment/entry ids and physical-byte/range counters never move backward after conflict/restart | `BookKeeperWriterStatePropertyTest.isMonotonicAcrossCasSchedules` |
 | BK-19 | M2 | O | all 256 root + 16 fixed allocation-slot shards scan empty opaque continuations without omission | `BookKeeperLedgerRootScannerOxiaIT.scansEveryShardFromEmptyContinuation` |
 | BK-20 | M2 | D | invalid lifecycle fields/transitions and immutable identity drift fail closed | `BookKeeperLedgerTransitionsTest.rejectsIllegalTransitions` |
@@ -59,9 +59,9 @@ Evidence levels：
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
 | BK-21 | M2 | B/O | one ordinary entry is quorum durable, head reachable and returns stable offset | `BookKeeperWalOnlyIT.appendsOneEntryThroughStableHead` |
-| BK-22 | M2 | B/O | multi-entry append occupies exact consecutive ids and one target checksum | `BookKeeperWalOnlyIT.appendsOneContiguousRange` |
+| BK-22 | M2 | B/O | multi-entry append occupies exact consecutive ids and one target checksum | checkpoint: `BookKeeperPrimaryWalAppenderTest.reservesWritesAndReturnsOneStableExactRange`; final: `BookKeeperWalOnlyIT.appendsOneContiguousRange` |
 | BK-23 | M2 | D/B | unsupported profile/durability/config/oversize batch performs zero BK calls | `BookKeeperAppendAdmissionTest.rejectsBeforePrimaryIo` |
-| BK-24 | M2 | D/B | first/middle/last write failure taints and seals ledger; no tail reuse | `BookKeeperPartialWriteIT.sealsEveryUncertainPrefix` |
+| BK-24 | M2 | D/B | first/middle/last write failure taints and seals ledger; no tail reuse | checkpoint: `BookKeeperPrimaryWalAppenderTest.partialWriteAbandonsRangeRecoverySealsLedgerAndNextAppendAllocatesFreshLedger`; final: `BookKeeperPartialWriteIT.sealsEveryUncertainPrefix` |
 | BK-25 | M2 | B/O/C | crash after range + three mandatory RESERVED protection slots but before write becomes known-not-committed | `BookKeeperAppendRecoveryIT.recoversReservedEmptyRange` |
 | BK-26 | M2 | B/O/C | full writes before commit intent resume only under unchanged session | `BookKeeperAppendRecoveryIT.resumesDurableRangeForCurrentSession` |
 | BK-27 | M2 | B/O/C | new session abandons unreachable old-writer full range and uses new ledger | `BookKeeperAppendRecoveryIT.doesNotCommitFencedWriterRange` |
@@ -79,10 +79,10 @@ Evidence levels：
 
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
-| BK-37 | M2 | B/O | non-recovery open reads exact complete range and verifies NBKR1 | `BookKeeperPrimaryWalReaderIT.readsAndVerifiesExactRange` |
+| BK-37 | M2 | B/O | non-recovery open reads exact complete range and verifies NBKR1 | checkpoint: `BookKeeperPrimaryWalReaderTest.nonRecoveryOpenVerifiesWholeRangeBeforeReturningClippedExactEntries`; final: `BookKeeperPrimaryWalReaderIT.readsAndVerifiesExactRange` |
 | BK-38 | M2 | D/B | ordinary read never invokes recovery-open/fences writer | `BookKeeperPrimaryWalReaderIT.neverRecoveryOpensForRead` |
 | BK-39 | M2 | B/O | middle-offset clipped read verifies full target then returns dense suffix | `BookKeeperPrimaryWalReaderIT.verifiesBeforeClipping` |
-| BK-40 | M2 | B/O | checksum/count/id/config mismatch fails; no partial/empty result | `BookKeeperPrimaryWalReaderCorruptionIT.failsClosed` |
+| BK-40 | M2 | B/O | checksum/count/id/config mismatch fails; no partial/empty result | checkpoint: `BookKeeperPrimaryWalReaderTest.checksumMismatchFailsClosedWithoutReturningPartialBytes`; final: `BookKeeperPrimaryWalReaderCorruptionIT.failsClosed` |
 | BK-41 | M2 | B/O/C | fresh process reads history with no cached handle | `BookKeeperPrimaryWalReaderIT.readsAfterColdRestart` |
 | BK-42 | M2 | B/O | fixed reader slots cap concurrent processes race-free；lease blocks MARK/delete and final revalidation precedes return | `BookKeeperReaderLeaseIT.fencesPhysicalDeletion` |
 | BK-43 | M2 | P | raw Pulsar Entry properties/payload round-trip through BK generation zero | `NereusBookKeeperEntryIntegrationTest.preservesOpaqueEntryBytes` |

@@ -43,6 +43,14 @@ public record CommitAppendRequest(
     public ReadTargetRecord readTargetRecord() { return ReadTargetCodecRegistry.phase15().encode(readTarget); }
 
     public String projectionIdentity() {
+        return projectionIdentity(projectionRef);
+    }
+
+    public static String absentProjectionIdentity() {
+        return projectionIdentity(Optional.empty());
+    }
+
+    private static String projectionIdentity(Optional<ProjectionRef> projectionRef) {
         StringBuilder value = new StringBuilder();
         add(value, "projectionRef");
         projectionRef.ifPresentOrElse(projection -> {

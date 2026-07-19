@@ -107,7 +107,7 @@ Candidate admission requires all of the following：
 10. a second complete capture is byte-for-byte equal before `SEALED -> MARKED`。
 
 Any retained `CREATE_UNCERTAIN` allocation slot or root `lateCreateHazard=true` is a non-expiring veto. The hazard
-survives later matching activation/seal；repeated physical absence cannot retire it, authorize candidate reuse or
+survives later matching discovery/seal；repeated physical absence cannot retire it, authorize candidate reuse or
 permit whole-ledger delete. Because BookKeeper delete is not metadata-version conditional, loss of the exclusive
 advanced-ledger-id namespace proof also invalidates every in-flight MARK/DELETING mutation before the provider call.
 
@@ -390,7 +390,7 @@ never justified merely because an upload once succeeded.
 | all protections gone, reader lease exists | ledger remains SEALED/MARKED until lease drain and final revalidation |
 | BookKeeper DELETE response lost | reload exact metadata; never blind-delete foreign identity; dual absence proof |
 | matching ledger reappears during absence grace | validate allocation metadata, repeat delete under same intent, restart grace |
-| allocation create once entered unknown outcome | persist permanent slot + `lateCreateHazard`；matching activation may restore IO but automatic delete remains forbidden |
+| allocation create once entered unknown outcome | persist permanent slot + `lateCreateHazard`；matching ledger is recovery-opened/sealed because its writable handle cannot be reconstructed, and automatic delete remains forbidden |
 | namespace readiness/reservation changes before delete | invalidate activation and stop before provider delete；never trust prior metadata check |
 | physical ledger appears for ABORTED/DELETED tombstone | conditional escalation to QUARANTINED；no automatic delete/reuse |
 | reference appears after MARKED | unmark to SEALED; no physical delete |

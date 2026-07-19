@@ -453,7 +453,8 @@ public final class OxiaJavaBookKeeperMetadataStore
                 }
                 BookKeeperVersionedValue<T> result = existing.orElseThrow();
                 if (!result.durableValueSha256().equals(expectedDigest)) {
-                    throw F4MetadataStoreSupport.invariant("BookKeeper metadata exact-key identity conflict");
+                    throw new BookKeeperMetadataConditionFailedException(
+                            "BookKeeper metadata exact key is occupied by another identity");
                 }
                 return result;
             });
@@ -470,10 +471,10 @@ public final class OxiaJavaBookKeeperMetadataStore
             BiConsumer<T, T> transition) {
         return reload.get().thenCompose(optional -> {
             BookKeeperVersionedValue<T> current = optional.orElseThrow(
-                    () -> new F4MetadataConditionFailedException("BookKeeper metadata is absent"));
+                    () -> new BookKeeperMetadataConditionFailedException("BookKeeper metadata is absent"));
             if (current.metadataVersion() != expectedVersion) {
                 return F4MetadataStoreSupport.failed(
-                        new F4MetadataConditionFailedException("BookKeeper metadata version mismatch"));
+                        new BookKeeperMetadataConditionFailedException("BookKeeper metadata version mismatch"));
             }
             transition.accept(current.value(), replacement);
             var expectedDigest = support.encodedDigest(replacement, type);
@@ -492,7 +493,7 @@ public final class OxiaJavaBookKeeperMetadataStore
                             return CompletableFuture.completedFuture(observed);
                         }
                         if (observed.metadataVersion() != expectedVersion) {
-                            return F4MetadataStoreSupport.failed(new F4MetadataConditionFailedException(
+                            return F4MetadataStoreSupport.failed(new BookKeeperMetadataConditionFailedException(
                                     "BookKeeper metadata changed after uncertain CAS"));
                         }
                     }
@@ -517,7 +518,7 @@ public final class OxiaJavaBookKeeperMetadataStore
                     return CompletableFuture.<Void>completedFuture(null);
                 }
                 if (observed.orElseThrow().metadataVersion() != expectedVersion) {
-                    return F4MetadataStoreSupport.<Void>failed(new F4MetadataConditionFailedException(
+                    return F4MetadataStoreSupport.<Void>failed(new BookKeeperMetadataConditionFailedException(
                             "BookKeeper metadata changed after uncertain conditional delete"));
                 }
                 return F4MetadataStoreSupport.<Void>failed(F4MetadataStoreSupport.unwrap(failure));

@@ -196,7 +196,8 @@ the fixed slot set from a hash-derived start and claims with put-if-absent；no 
 A slot is conditionally removed after exact activation only when the original provider future durably reached a
 terminal create result without ever entering unknown-outcome recovery, or after a proven pre-transmission abort. If a
 deadline/process cut leaves `CREATE_STARTED`, recovery first CASes slot + intent/root `lateCreateHazard=true` and slot
-`CREATE_UNCERTAIN`。A later matching ledger may be activated or sealed, but that slot and hazard remain permanently in
+`CREATE_UNCERTAIN`。A later matching ledger is recovery-opened and sealed, because BookKeeper 4.18 public APIs cannot
+reconstruct a writable `WriteAdvHandle` after the create future/handle is lost；the slot and hazard remain permanently in
 BK-M0–M6；provider absence、matching metadata、elapsed grace and eventual trim do not prove a delayed original create
 cannot execute after delete. Slot-delete response loss reloads the exact slot/allocation/root before accepting
 absence, so capacity may leak safe but can never undercount uncertainty.
@@ -270,8 +271,8 @@ reach `ABORTED` only when its durable slot never advanced beyond `CLAIMED`, whic
 transmission was forbidden. Once the slot reaches `CREATE_STARTED`, transmission is
 possible, timeout/absence moves the intent to `CREATE_UNCERTAIN` while the root remains `ALLOCATING` and permanently
 consumes the id. Before recovery can adopt matching bytes it persists `lateCreateHazard=true` in intent/root and leaves
-the exact allocation slot occupied. A bounded scanner keeps exact-checking it；matching late bytes are activated for
-the same still-current session or fenced/sealed-and-retained, while mismatching metadata quarantines. Time alone never
+the exact allocation slot occupied. A bounded scanner keeps exact-checking it；matching late bytes are
+fenced/sealed-and-retained, while mismatching metadata quarantines. Time alone never
 proves non-creation or physical-delete safety.
 
 `lifecycleEpoch` starts at one and increments on every root CAS. Immutable identity/quorum/custom-metadata fields never
@@ -388,6 +389,11 @@ deletion. A protection whose owner cannot be read/revalidated is a veto, not sta
 Protection lifecycle wire ids are `RESERVED=1` and `ACTIVE=2`；a RESERVED row is already a physical-GC veto but cannot
 stand in for its eventual owner.
 
+The fixed key、ledger/range identity、slot and type are immutable. A RESERVED row initially uses the append reservation
+id and has no owner fields；its single `RESERVED -> ACTIVE` CAS replaces `referenceId` with the canonical generic
+commit/index reference and installs monotonically nondecreasing `commitVersion` plus exact owner key/version/digest。
+Treating the placeholder reservation id as immutable would make the eventual owner unverifiable and is forbidden。
+
 Every append range owns exactly `protectionSlotsPerRange` fixed keys. Slots `0`、`1` and `2` are created as RESERVED
 before physical write for `REACHABLE_APPEND`、`VISIBLE_GENERATION` and `APPEND_RECOVERY` respectively, then CASed to
 ACTIVE only after the exact owner exists. A crash may leave a RESERVED veto that recovery either activates from the
@@ -497,7 +503,7 @@ monotonic stages. It never creates a second ledger because one stage's response 
   the root `ALLOCATING` for bounded scanner reconciliation. A matching metadata reload proves ownership/bytes, but it
   does not clear the hazard or release the slot because it cannot prove that every older create request is terminal。
 - Repeated `NoSuchLedger` observations pace alerts/audit but never convert a transmitted uncertain create to
-  `ABORTED`. The id/root remain consumed；matching late bytes resume exact activation or stale-session seal-and-retain,
+  `ABORTED`. The id/root remain consumed；matching late bytes are recovery-opened and sealed-and-retained,
   and a foreign ledger quarantines. `ABORTED` is reserved for pre-transmission/definitively-not-sent paths。
 - Listing is diagnostic only. Exact id/root/metadata lookup is the correctness path。
 
@@ -510,10 +516,10 @@ An uncertain create does not immediately block one stream. After persisting inte
 `CREATE_UNCERTAIN`, a CAS may
 detach that exact allocation from writer `ALLOCATING -> IDLE` while consuming its segment sequence；the append is
 `KNOWN_NOT_COMMITTED` because no entry write was possible. The stream may allocate a fresh candidate subject to the
-remaining fixed-slot budget. If matching physical metadata appears later, the scanner must not reactivate a
-detached/stale allocation：it drives `ALLOCATING -> SEALING -> SEALED` as an empty-or-provider-reported owned ledger,
-but the permanent hazard vetoes automatic physical deletion. A still-selected/current-session allocation may instead
-finish normal activation while retaining the same hazard/slot. These branches are chosen only after exact
+remaining fixed-slot budget. If matching physical metadata appears later, the scanner must not reactivate the
+allocation：it drives `ALLOCATING -> SEALING -> SEALED` as an empty-or-provider-reported owned ledger, because the
+public client has no operation that recreates the lost advanced write handle；the permanent hazard also vetoes automatic
+physical deletion. This branch is chosen only after exact
 writer/root/intent/slot CAS reload. Reaching the configured slot maximum therefore fails new ledger allocation closed；
 it never silently clears a hazard to regain availability.
 
@@ -530,9 +536,11 @@ it never silently clears a hazard to regain availability.
 6. reload writer/reservation/root/all three slots; CAS reservation RESERVED -> WRITING
 7. perform explicit-id writes
 8. CAS reservation WRITING -> DURABLE
-9. generic commit/protection/head protocol
-10. CAS reservation -> COMMIT_PREPARED/HEAD_COMMITTED as facts become provable
-11. CAS writer clear activeReservation; never decrement nextEntryId
+9. activate APPEND_RECOVERY under the exact durable reservation
+10. CAS writer clear activeReservation; never decrement nextEntryId；the durable reservation/protection inventory is
+    the restart authority after this point
+11. generic commit/protection/head protocol
+12. CAS reservation -> COMMIT_PREPARED/HEAD_COMMITTED as facts become provable
 ```
 
 If step 4 fails, no BK write is permitted and an unreferenced reservation can be retired after exact state/head/commit

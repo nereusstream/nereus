@@ -35,7 +35,7 @@ public record BookKeeperAppendReservationRecord(
         payloadFormat = BookKeeperRecordValidation.text(payloadFormat, "payloadFormat");
         BookKeeperRecordValidation.positive(recordCount, "recordCount");
         BookKeeperRecordValidation.nonNegative(logicalBytes, "logicalBytes");
-        BookKeeperRecordValidation.positive(physicalBytes, "physicalBytes");
+        BookKeeperRecordValidation.nonNegative(physicalBytes, "physicalBytes");
         schemaRefs = BookKeeperRecordValidation.schemaRefs(schemaRefs);
         projectionIdentity = BookKeeperRecordValidation.text(projectionIdentity, "projectionIdentity");
         BookKeeperRecordValidation.nonNegative(minEventTimeMillis, "minEventTimeMillis");

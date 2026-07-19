@@ -79,6 +79,9 @@ public record BookKeeperWalConfiguration(
         if (readerLeaseRenewInterval.compareTo(readerLeaseTtl) >= 0) {
             throw new IllegalArgumentException("reader lease renewal interval must be below its TTL");
         }
+        if (readerLeaseTtl.compareTo(operationTimeout) <= 0) {
+            throw new IllegalArgumentException("reader lease TTL must exceed the maximum foreground operation");
+        }
     }
 
     public Checksum configurationBindingSha256() {

@@ -185,6 +185,7 @@ final class F4MetadataStoreSupport {
         return cause instanceof KeyAlreadyExistsException
                 || cause instanceof UnexpectedVersionIdException
                 || cause instanceof F4MetadataConditionFailedException
+                || cause instanceof BookKeeperMetadataConditionFailedException
                 || cause instanceof CursorMetadataConditionFailedException
                 || cause instanceof ProjectionMetadataConditionFailedException;
     }

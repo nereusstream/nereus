@@ -34,6 +34,7 @@ import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
@@ -41,6 +42,10 @@ import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
 import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.AppendSessionSnapshotRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.CommittedAppendRecord;
 import com.nereusstream.metadata.oxia.records.CommittedSliceRecord;
@@ -53,6 +58,7 @@ import com.nereusstream.metadata.oxia.records.OffsetIndexRecord;
 import com.nereusstream.metadata.oxia.records.OffsetIndexTargetRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
+import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
 import com.nereusstream.metadata.oxia.records.ReadTargetRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitRecord;
 import com.nereusstream.metadata.oxia.records.StreamCommitTargetRecord;
@@ -99,6 +105,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     private final boolean ownsRuntime;
     private final PartitionedOxiaClient client;
     private final F4MetadataStoreSupport f4Support;
+    private final BookKeeperMetadataStoreConfig bookKeeperMetadataConfiguration;
     private final Clock clock;
     private final ExecutorService operationExecutor;
     private final CopyOnWriteArrayList<WatchRegistration> watches = new CopyOnWriteArrayList<>();
@@ -109,28 +116,43 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             Clock clock) {
         Objects.requireNonNull(configuration, "configuration");
         SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, clock);
-        return new OxiaJavaClientMetadataStore(configuration, runtime, clock, true);
+        return new OxiaJavaClientMetadataStore(configuration, runtime, clock, true, null);
     }
 
     public static OxiaJavaClientMetadataStore usingSharedRuntime(
             OxiaClientConfiguration configuration,
             SharedOxiaClientRuntime runtime,
             Clock clock) {
-        return new OxiaJavaClientMetadataStore(configuration, runtime, clock, false);
+        return new OxiaJavaClientMetadataStore(configuration, runtime, clock, false, null);
+    }
+
+    /** Installs exact BookKeeper proof validation over the same shared Oxia runtime. */
+    public static OxiaJavaClientMetadataStore usingSharedRuntime(
+            OxiaClientConfiguration configuration,
+            SharedOxiaClientRuntime runtime,
+            Clock clock,
+            BookKeeperMetadataStoreConfig bookKeeperMetadataConfiguration) {
+        return new OxiaJavaClientMetadataStore(
+                configuration,
+                runtime,
+                clock,
+                false,
+                Objects.requireNonNull(bookKeeperMetadataConfiguration, "bookKeeperMetadataConfiguration"));
     }
 
     OxiaJavaClientMetadataStore(
             OxiaClientConfiguration configuration,
             SyncOxiaClient oxiaClient,
             Clock clock) {
-        this(configuration, SharedOxiaClientRuntime.usingClient(configuration, oxiaClient, clock), clock, true);
+        this(configuration, SharedOxiaClientRuntime.usingClient(configuration, oxiaClient, clock), clock, true, null);
     }
 
     private OxiaJavaClientMetadataStore(
             OxiaClientConfiguration configuration,
             SharedOxiaClientRuntime runtime,
             Clock clock,
-            boolean ownsRuntime) {
+            boolean ownsRuntime,
+            BookKeeperMetadataStoreConfig bookKeeperMetadataConfiguration) {
         this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         runtime.requireCompatible(configuration);
@@ -138,6 +160,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.client = runtime.client();
         this.f4Support = new F4MetadataStoreSupport(client, clock);
+        this.bookKeeperMetadataConfiguration = bookKeeperMetadataConfiguration;
         this.operationExecutor = boundedExecutor(
                 4, configuration.maxPendingOperations(), "nereus-oxia-operation");
     }
@@ -875,6 +898,10 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
         PhysicalReferenceProof genericProof = Objects.requireNonNull(
                 protectionProof,
                 "protectionProof");
+        if (genericProof instanceof BookKeeperPhysicalReferenceProof proof) {
+            validateBookKeeperStableAppendProtection(keyspace, prepared, proof);
+            return;
+        }
         if (!(genericProof instanceof ObjectPhysicalReferenceProof proof)) {
             throw invariant("primary physical-reference proof type is not installed");
         }
@@ -933,6 +960,86 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                 || protectionValue.rootLifecycleEpoch() != rootLifecycleEpoch
                 || protectionValue.expiresAtMillis() != 0) {
             throw invariant("REACHABLE_APPEND protection changed before head commit");
+        }
+    }
+
+    private void validateBookKeeperStableAppendProtection(
+            OxiaKeyspace keyspace,
+            PreparedStableAppend prepared,
+            BookKeeperPhysicalReferenceProof proof) {
+        if (bookKeeperMetadataConfiguration == null) {
+            throw invariant("BookKeeper physical-reference proof validation is not installed");
+        }
+        if (!(prepared.request().readTarget() instanceof BookKeeperEntryRangeReadTarget target)) {
+            throw invariant("BookKeeper proof was supplied for another primary target type");
+        }
+        String expectedReferenceId = "ra1-" + DeterministicIds.stableHashComponent(
+                prepared.request().streamId().value()
+                        + prepared.commitId()
+                        + prepared.primaryTargetIdentitySha256().value());
+        if (proof.purpose() != PhysicalReferencePurpose.REACHABLE_APPEND
+                || !proof.targetIdentitySha256().equals(prepared.primaryTargetIdentitySha256())
+                || !proof.referenceId().equals(expectedReferenceId)
+                || proof.ledgerId() != target.ledgerId()
+                || !proof.clusterAlias().equals(target.clusterAlias())
+                || proof.protectionSlot() != 0) {
+            throw invariant("BookKeeper stable append proof is non-canonical");
+        }
+        BookKeeperKeyspace keys = bookKeeperMetadataConfiguration.keyspace(keyspace.cluster());
+        String expectedLedgerIdentity = keys.ledgerIdentitySha256(
+                proof.providerScopeSha256(), target.ledgerId());
+        if (!proof.ledgerIdentitySha256().equals(expectedLedgerIdentity)) {
+            throw invariant("BookKeeper proof ledger identity digest is non-canonical");
+        }
+        F4MetadataStoreSupport.Decoded<BookKeeperLedgerRootRecord> root = join(f4Support.get(
+                        keys.ledgerRootKey(proof.providerScopeSha256(), target.ledgerId()),
+                        keys.ledgerPartitionKey(proof.providerScopeSha256(), target.ledgerId()),
+                        BookKeeperLedgerRootRecord.class))
+                .orElseThrow(() -> invariant("BookKeeper ledger root is absent before head commit"));
+        BookKeeperLedgerRootRecord rootValue = root.value();
+        if (root.version() != proof.rootMetadataVersion()
+                || !root.durableSha256().equals(proof.rootRecordSha256())
+                || rootValue.lifecycle() != BookKeeperLedgerLifecycle.ACTIVE
+                || rootValue.lifecycleEpoch() != proof.rootLifecycleEpoch()
+                || rootValue.ledgerId() != target.ledgerId()
+                || !rootValue.ledgerIdentitySha256().equals(expectedLedgerIdentity)
+                || !rootValue.providerScopeSha256().equals(proof.providerScopeSha256())
+                || !rootValue.clusterAlias().equals(target.clusterAlias())
+                || !rootValue.streamId().equals(prepared.request().streamId().value())) {
+            throw invariant("BookKeeper ledger root changed before head commit");
+        }
+        F4MetadataStoreSupport.Decoded<BookKeeperLedgerProtectionRecord> protection = join(f4Support.get(
+                        keys.protectionKey(
+                                proof.providerScopeSha256(),
+                                target.ledgerId(),
+                                proof.ledgerRangeSlot(),
+                                proof.protectionSlot()),
+                        keys.ledgerPartitionKey(proof.providerScopeSha256(), target.ledgerId()),
+                        BookKeeperLedgerProtectionRecord.class))
+                .orElseThrow(() -> invariant("BookKeeper REACHABLE_APPEND protection is absent"));
+        BookKeeperLedgerProtectionRecord value = protection.value();
+        long expectedEnd = Math.addExact(prepared.request().expectedStartOffset(), prepared.request().recordCount());
+        if (protection.version() != proof.protectionMetadataVersion()
+                || !protection.durableSha256().equals(proof.protectionRecordSha256())
+                || value.lifecycle() != ProtectionLifecycle.ACTIVE
+                || value.protectionType() != BookKeeperProtectionType.REACHABLE_APPEND
+                || !value.ledgerIdentitySha256().equals(expectedLedgerIdentity)
+                || value.ledgerId() != target.ledgerId()
+                || value.rootLifecycleEpoch() != proof.rootLifecycleEpoch()
+                || value.ledgerRangeSlot() != proof.ledgerRangeSlot()
+                || value.protectionSlot() != 0
+                || !value.referenceId().equals(expectedReferenceId)
+                || value.firstEntryId() != target.firstEntryId()
+                || value.entryCount() != target.entryCount()
+                || !value.rangeChecksumSha256().equals(target.rangeChecksum().value())
+                || !value.streamId().equals(prepared.request().streamId().value())
+                || value.offsetStart() != prepared.request().expectedStartOffset()
+                || value.offsetEnd() != expectedEnd
+                || !value.ownerKey().equals(prepared.commitKey())
+                || value.ownerMetadataVersion() != prepared.commitMetadataVersion()
+                || !value.ownerIdentitySha256().equals(prepared.commitRecordSha256().value())
+                || value.expiresAtMillis() != 0) {
+            throw invariant("BookKeeper REACHABLE_APPEND protection changed before head commit");
         }
     }
 

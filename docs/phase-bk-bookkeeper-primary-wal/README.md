@@ -2,10 +2,11 @@
 
 > 状态：BK-M0 design gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；
 > `bookKeeperPrimaryWalM1FinalCheck` 通过 199-task aggregate（包含 Phase 1.5、Phase 4 与 pinned local Pulsar
-> regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：strict keyspace、7 类 V1 durable
-> records/codecs、focused production/fake stores、exact CAS/delete response-loss recovery and bounded scanners are
-> implemented and gated by `bookKeeperPrimaryWalM2MetadataCheck`；physical allocator/writer/reader/retention runtime
-> remains incomplete，so the profile is still rejected before IO。
+> regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：metadata/store/scanner and the
+> allocator、writer state machine、recovery-open sealing、ordered exact-range appender、fixed physical-reference
+> activation、non-recovery reader/lease/checksum runtime checkpoints are implemented and gated by
+> `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck`。Whole-ledger retention/GC、runtime
+> profile admission and local Pulsar integration remain incomplete，so the profile is still rejected before IO。
 
 ## 1. Delivery identity
 
@@ -164,9 +165,9 @@ BK-M1 implements and final-gates：
   accounting while rejecting noncanonical provider results；
 - synthetic tagged BK commit/protection/gen0 evidence plus executable module-boundary、focused and predecessor gates。
 
-BK-M1 does not register `BookKeeperPrimaryWalAppender`/reader/lifecycle runtime. Production metadata admits only the
-fully validated Object reference proof until BK-M2 installs the exact BookKeeper proof adapter and lifecycle stores；
-unknown proof types fail closed。
+BK-M1 itself did not register a BookKeeper writer/reader. The current BK-M2 checkpoint now supplies the exact
+BookKeeper proof adapter and production Oxia proof revalidation, while unknown/unconfigured proof types still fail
+closed before head CAS。
 
 The BK-M2 metadata checkpoint implements `BookKeeperKeyspace` with strict
 root/protection/reader/allocation-slot inverse、all seven V1 record models and explicit enum wire ids、seven envelope
@@ -174,5 +175,13 @@ codecs registered in `MetadataRecordCodecFactory`、frozen envelope SHA-256 vect
 checksum tests。It also implements focused `BookKeeperWriterMetadataStore`/`BookKeeperLedgerMetadataStore` surfaces、
 `OxiaJavaBookKeeperMetadataStore`、the deterministic fake adapter、protocol-edge transition validation、idempotent
 create、exact-version CAS/delete recovery after applied-response loss、scope/page-size-bound pagination and complete
-256-root/16-allocation-slot shard tests。This remains metadata groundwork；it does not make
-`BOOKKEEPER_WAL_ONLY` executable。
+256-root/16-allocation-slot shard tests。
+
+The subsequent BK-M2 runtime checkpoint implements reserved-id `CreateAdv` allocation with permanent uncertain-create
+hazards；stream writer/allocation/range CAS；exact NBKL1 provider metadata；partial-write recovery-open sealing；ordered
+explicit entry-id writes；durable reservation plus mandatory protection slots；generic commit and generation-zero
+owner activation through `BookKeeperPhysicalReferenceProof`；fixed reader-slot deletion fencing；non-recovery full-range
+read、NBKR1 verification、middle-offset clipping and exact provider-neutral accounting。Tests cover normal allocation、
+uncertain create、stale-session pre-IO rejection、ownership-transfer sealing、contiguous/reused ranges、partial write
+seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads and checksum failure。Retention/physical deletion、
+profile registration and Pulsar routing are deliberately still absent。

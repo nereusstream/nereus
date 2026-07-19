@@ -633,6 +633,14 @@ tasks.register("bookKeeperPrimaryWalM2MetadataCheck") {
     dependsOn(":nereus-metadata-oxia:test")
 }
 
+tasks.register("bookKeeperPrimaryWalM2RuntimeCheck") {
+    group = "verification"
+    description = "Verify the BK-M2 allocator, writer, recovery, physical-reference, lease, and exact reader runtime checkpoint."
+    dependsOn("bookKeeperPrimaryWalM2MetadataCheck")
+    dependsOn(":nereus-bookkeeper:test")
+    dependsOn(":nereus-core:test")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

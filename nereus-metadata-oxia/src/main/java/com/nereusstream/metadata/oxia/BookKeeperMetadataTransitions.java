@@ -36,9 +36,17 @@ public final class BookKeeperMetadataTransitions {
 
     public static void allocation(LedgerAllocationIntentRecord before, LedgerAllocationIntentRecord after) {
         require(before.allocationId().equals(after.allocationId()) && before.streamId().equals(after.streamId())
+                && before.segmentSequence() == after.segmentSequence()
+                && before.clusterAlias().equals(after.clusterAlias())
                 && before.candidateLedgerId() == after.candidateLedgerId()
                 && before.allocationSlot() == after.allocationSlot()
-                && before.configurationBindingSha256().equals(after.configurationBindingSha256()), "allocation identity drift");
+                && before.configurationBindingSha256().equals(after.configurationBindingSha256())
+                && before.writerId().equals(after.writerId())
+                && before.writerRunIdHash().equals(after.writerRunIdHash())
+                && before.appendSessionEpoch() == after.appendSessionEpoch()
+                && before.fencingTokenHash().equals(after.fencingTokenHash())
+                && before.writerStateEpoch() == after.writerStateEpoch()
+                && before.createdAtMillis() == after.createdAtMillis(), "allocation identity drift");
         require(allocationEdge(before.lifecycle(), after.lifecycle()), "illegal allocation lifecycle replacement");
         require(!before.lateCreateHazard() || after.lateCreateHazard(), "lateCreateHazard cleared");
         require(after.updatedAtMillis() >= before.updatedAtMillis(), "allocation update time moved backward");
@@ -47,7 +55,10 @@ public final class BookKeeperMetadataTransitions {
     public static void allocationSlot(BookKeeperAllocationSlotRecord before, BookKeeperAllocationSlotRecord after) {
         require(before.slot() == after.slot() && before.allocationId().equals(after.allocationId())
                 && before.candidateLedgerId() == after.candidateLedgerId()
-                && before.ledgerIdentitySha256().equals(after.ledgerIdentitySha256()), "allocation slot identity drift");
+                && before.streamId().equals(after.streamId())
+                && before.ledgerIdentitySha256().equals(after.ledgerIdentitySha256())
+                && before.configurationBindingSha256().equals(after.configurationBindingSha256())
+                && before.createdAtMillis() == after.createdAtMillis(), "allocation slot identity drift");
         require(allocationSlotEdge(before.lifecycle(), after.lifecycle()),
                 "illegal allocation slot lifecycle replacement");
         require(after.updatedAtMillis() >= before.updatedAtMillis(), "allocation slot update time moved backward");
@@ -55,12 +66,24 @@ public final class BookKeeperMetadataTransitions {
 
     public static void root(BookKeeperLedgerRootRecord before, BookKeeperLedgerRootRecord after) {
         require(before.ledgerIdentitySha256().equals(after.ledgerIdentitySha256())
+                && before.clusterAlias().equals(after.clusterAlias())
                 && before.providerScopeSha256().equals(after.providerScopeSha256())
                 && before.ledgerId() == after.ledgerId() && before.streamId().equals(after.streamId())
                 && before.segmentSequence() == after.segmentSequence()
                 && before.allocationId().equals(after.allocationId())
+                && before.allocationSlot() == after.allocationSlot()
                 && before.configurationBindingSha256().equals(after.configurationBindingSha256())
-                && before.customMetadataSha256().equals(after.customMetadataSha256()), "ledger root identity drift");
+                && before.ledgerIdNamespaceSha256().equals(after.ledgerIdNamespaceSha256())
+                && before.writerId().equals(after.writerId())
+                && before.writerRunIdHash().equals(after.writerRunIdHash())
+                && before.appendSessionEpoch() == after.appendSessionEpoch()
+                && before.fencingTokenHash().equals(after.fencingTokenHash())
+                && before.ensembleSize() == after.ensembleSize()
+                && before.writeQuorumSize() == after.writeQuorumSize()
+                && before.ackQuorumSize() == after.ackQuorumSize()
+                && before.digestType().equals(after.digestType())
+                && before.customMetadataSha256().equals(after.customMetadataSha256())
+                && before.createdAtMillis() == after.createdAtMillis(), "ledger root identity drift");
         require(after.lifecycleEpoch() == before.lifecycleEpoch() + 1, "ledger lifecycleEpoch must increment exactly once");
         require(!before.lateCreateHazard() || after.lateCreateHazard(), "ledger lateCreateHazard cleared");
         require(rootEdge(before.lifecycle(), after.lifecycle()), "illegal ledger lifecycle replacement");
@@ -74,9 +97,27 @@ public final class BookKeeperMetadataTransitions {
     public static void reservation(BookKeeperAppendReservationRecord before, BookKeeperAppendReservationRecord after) {
         require(before.reservationId().equals(after.reservationId())
                 && before.appendAttemptId().equals(after.appendAttemptId())
+                && before.streamId().equals(after.streamId())
+                && before.writerId().equals(after.writerId())
+                && before.writerRunIdHash().equals(after.writerRunIdHash())
+                && before.appendSessionEpoch() == after.appendSessionEpoch()
+                && before.fencingTokenHash().equals(after.fencingTokenHash())
+                && before.writerStateEpoch() == after.writerStateEpoch()
                 && before.ledgerId() == after.ledgerId() && before.firstEntryId() == after.firstEntryId()
+                && before.ledgerRootEpoch() == after.ledgerRootEpoch()
+                && before.ledgerRangeSlot() == after.ledgerRangeSlot()
                 && before.entryCount() == after.entryCount()
-                && before.rangeChecksumSha256().equals(after.rangeChecksumSha256()), "reservation identity drift");
+                && before.rangeChecksumSha256().equals(after.rangeChecksumSha256())
+                && before.expectedStartOffset() == after.expectedStartOffset()
+                && before.payloadFormat().equals(after.payloadFormat())
+                && before.recordCount() == after.recordCount()
+                && before.logicalBytes() == after.logicalBytes()
+                && before.physicalBytes() == after.physicalBytes()
+                && before.schemaRefs().equals(after.schemaRefs())
+                && before.projectionIdentity().equals(after.projectionIdentity())
+                && before.minEventTimeMillis() == after.minEventTimeMillis()
+                && before.maxEventTimeMillis() == after.maxEventTimeMillis()
+                && before.createdAtMillis() == after.createdAtMillis(), "reservation identity drift");
         require(reservationEdge(before.lifecycle(), after.lifecycle()),
                 "illegal reservation lifecycle replacement");
         require(after.updatedAtMillis() >= before.updatedAtMillis(), "reservation update time moved backward");
@@ -84,19 +125,37 @@ public final class BookKeeperMetadataTransitions {
 
     public static void protection(BookKeeperLedgerProtectionRecord before, BookKeeperLedgerProtectionRecord after) {
         require(before.ledgerIdentitySha256().equals(after.ledgerIdentitySha256())
+                && before.clusterAlias().equals(after.clusterAlias())
+                && before.ledgerId() == after.ledgerId()
+                && before.rootLifecycleEpoch() == after.rootLifecycleEpoch()
                 && before.ledgerRangeSlot() == after.ledgerRangeSlot()
                 && before.protectionSlot() == after.protectionSlot()
-                && before.referenceId().equals(after.referenceId())
-                && before.protectionTypeId() == after.protectionTypeId(), "protection identity drift");
+                && before.protectionTypeId() == after.protectionTypeId()
+                && before.firstEntryId() == after.firstEntryId()
+                && before.entryCount() == after.entryCount()
+                && before.rangeChecksumSha256().equals(after.rangeChecksumSha256())
+                && before.streamId().equals(after.streamId())
+                && before.offsetStart() == after.offsetStart()
+                && before.offsetEnd() == after.offsetEnd()
+                && before.createdAtMillis() == after.createdAtMillis()
+                && before.expiresAtMillis() == after.expiresAtMillis(), "protection identity drift");
         require(before.lifecycle() == ProtectionLifecycle.RESERVED && after.lifecycle() == ProtectionLifecycle.ACTIVE,
                 "only RESERVED -> ACTIVE protection replacement is legal");
+        require(before.ownerKey().isEmpty() && before.ownerMetadataVersion() == 0
+                && before.ownerIdentitySha256().isEmpty(), "RESERVED protection cannot already name an owner");
+        require(!after.referenceId().isBlank() && !after.ownerKey().isBlank()
+                && after.ownerMetadataVersion() > 0 && !after.ownerIdentitySha256().isBlank(),
+                "ACTIVE protection must bind its exact durable owner");
+        require(after.commitVersion() >= before.commitVersion(), "protection commit version moved backward");
     }
 
     public static void readerLease(BookKeeperLedgerReaderLeaseRecord before, BookKeeperLedgerReaderLeaseRecord after) {
         require(before.ledgerIdentitySha256().equals(after.ledgerIdentitySha256())
                 && before.readerSlot() == after.readerSlot()
                 && before.processRunId().equals(after.processRunId())
-                && before.rootLifecycleEpoch() == after.rootLifecycleEpoch(), "reader lease identity drift");
+                && before.ledgerId() == after.ledgerId()
+                && before.rootLifecycleEpoch() == after.rootLifecycleEpoch()
+                && before.acquiredAtMillis() == after.acquiredAtMillis(), "reader lease identity drift");
         require(after.leaseEpoch() == before.leaseEpoch() + 1 && after.expiresAtMillis() > before.expiresAtMillis(),
                 "reader lease renewal must increment epoch and expiry");
     }
