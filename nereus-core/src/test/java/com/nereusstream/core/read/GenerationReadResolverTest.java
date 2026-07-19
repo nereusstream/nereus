@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class GenerationReadResolverTest {
+    private static final String BASE32 = "abcdefghijklmnopqrstuvwxyz234567";
     private static final String CLUSTER = "cluster";
     private static final StreamId STREAM = new StreamId("stream");
     private static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000_000), ZoneOffset.UTC);
@@ -146,6 +147,60 @@ class GenerationReadResolverTest {
         assertThat(store.scannedViews).containsOnly(ReadView.COMMITTED);
         assertThat(store.scanCalls).hasValue(2);
         second.release().join();
+    }
+
+    @Test
+    void admitsExactlyFourThousandNinetySixGenerationCandidates() throws Exception {
+        AtomicInteger pages = new AtomicInteger();
+        F4ScanToken continuation = scanToken();
+        GenerationMetadataStore admitted = (GenerationMetadataStore) Proxy.newProxyInstance(
+                GenerationReadResolverTest.class.getClassLoader(),
+                new Class<?>[] {GenerationMetadataStore.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "scanIndex" -> {
+                        int page = pages.getAndIncrement();
+                        List<VersionedGenerationCandidate> values = page < 8
+                                ? java.util.stream.IntStream.range(0, 512)
+                                        .mapToObj(index -> (VersionedGenerationCandidate) higher(
+                                                page * 512L + index + 1,
+                                                GenerationLifecycle.COMMITTED,
+                                                "NEREUS_COMPACTED_PARQUET_V1",
+                                                ReadView.COMMITTED))
+                                        .sorted(Comparator.comparing(
+                                                VersionedGenerationCandidate::key))
+                                        .toList()
+                                : List.of();
+                        yield CompletableFuture.completedFuture(new GenerationScanPage(
+                                values,
+                                page < 8
+                                        ? Optional.of(continuation)
+                                        : Optional.empty()));
+                    }
+                    case "getCandidate" -> {
+                        long generation = (long) args[4];
+                        yield CompletableFuture.completedFuture(Optional.of(higher(
+                                generation,
+                                GenerationLifecycle.COMMITTED,
+                                "NEREUS_COMPACTED_PARQUET_V1",
+                                ReadView.COMMITTED)));
+                    }
+                    case "close" -> null;
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+        TestPinManager pins = new TestPinManager();
+        GenerationReadResolver resolver = resolver(
+                admitted, pins, readers(true));
+
+        PinnedResolvedRange selected = resolver.resolve(
+                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().generation()).isEqualTo(
+                GenerationReadResolver.MAX_GENERATION_CANDIDATES_PER_RESOLVE);
+        assertThat(pages).hasValue(9);
+        assertThat(pins.validations).hasValue(1);
+        selected.release().join();
     }
 
     @Test
@@ -426,7 +481,16 @@ class GenerationReadResolverTest {
     }
 
     private static String publication(long generation) {
-        return "p".repeat(25) + (char) ('a' + Math.toIntExact(generation % 20));
+        if (generation < 0 || generation >= 1L << 20) {
+            throw new IllegalArgumentException("test generation is outside the base32 fixture range");
+        }
+        char[] value = "p".repeat(26).toCharArray();
+        long remaining = generation;
+        for (int index = value.length - 1; index >= value.length - 4; index--) {
+            value[index] = BASE32.charAt((int) (remaining & 31));
+            remaining >>>= 5;
+        }
+        return new String(value);
     }
 
     private static String identity(VersionedGenerationCandidate candidate) {

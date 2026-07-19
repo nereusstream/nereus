@@ -187,8 +187,13 @@ publication deduplication/entry-index remap、the shared guarded PUT/pending-pro
 reload、new-root permanent-protection reconciliation and source-lease release only after that reconciliation. The
 focused fixture proves all 32 leases are durable at the successful CAS, the response may be lost, one replacement
 reference preserves all 32 entries/publications, and selection drift after the first lease write leaves the old root
-authoritative with no leaked lease/staging reservation. Remaining M6 scale fixtures、52-scenario evidence and the
-aggregate Phase 4 completion boundary remain pending.
+authoritative with no leaked lease/staging reservation. Checkpoint BE adds the first two exact M6 scale-boundary
+fixtures：the generation resolver admits all 4,096 candidates across eight full pages, performs exact candidate
+revalidation and pins generation 4,096, while the existing 4,097th-candidate fixture still fails closed；the NRC1
+codec consumes exactly 1,000,000 generated commit entries with demand one, builds the exact 3,907-anchor sparse
+directory within the frozen object/directory/staging bounds, uploads and verifies the object, then reads its first、
+middle、last and out-of-range boundaries. Remaining M6 scale fixtures、52-scenario evidence and the aggregate Phase 4
+completion boundary remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1944,16 +1949,24 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoint (2026-07-19)：BD is implemented and focused-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BE are implemented and focused-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
-reconciles the new root's permanent protections, and releases source leases afterward. This is M6 foundation evidence
-only；`phase4M6Check`、`phase4M6FinalCheck` and the aggregate Phase 4 gates do not yet exist/pass and no completion claim
-is made here. Exact deterministic evidence is
+reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
+fixture scans 4,096 candidates plus an empty terminal page, revalidates the exact selected metadata key and pins the
+highest generation；the existing overflow fixture proves candidate 4,097 fails rather than being truncated. The NRC1
+scale fixture streams one million entries without constructing a million-entry list, asserts demand is exactly one,
+checks the exact publication/commit directory sizes and 3,907 sparse anchors, keeps staging below the configured
+384 MiB budget, verifies the uploaded object, performs first/middle/last sparse reads and releases all staging bytes.
+This is M6 foundation evidence only；`phase4M6Check`、`phase4M6FinalCheck` and the aggregate Phase 4 gates do not yet
+exist/pass and no completion claim is made here. Exact deterministic evidence is
 `RecoveryCheckpointMergeTest.mergesThirtyTwoActiveReferencesWithBoundedRemappingAndExactEntries` plus
 `RecoveryCheckpointCoordinatorTest.mergesThirtyTwoReferencesWithPinnedSourcesAndConvergesLostRootCasResponse`、
 `selectionDriftDuringMergePinLeavesOldRootAuthoritativeAndReleasesLease` and
-`cancellationWhileMergePinReturnsReleasesLateLeaseWithoutStaging`.
+`cancellationWhileMergePinReturnsReleasesLateLeaseWithoutStaging`；the new scale evidence is
+`GenerationReadResolverTest.admitsExactlyFourThousandNinetySixGenerationCandidates`、
+`GenerationReadResolverTest.candidateOverflowFailsInsteadOfSilentlyIgnoringAHigherGeneration` and
+`RecoveryCheckpointMillionEntryScaleTest.streamsOneMillionEntriesAndReadsSparseDirectoryBoundaries`.
 
 ### 8.1 Required scenarios
 
