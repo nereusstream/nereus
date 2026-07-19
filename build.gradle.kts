@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("5e5ca658ad278fd92151bd6707bee2dda3614b01")
+    .orElse("9e3ac18107ba57bca88ee74f39c0c10581c24e8b")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1938,5 +1938,52 @@ tasks.register("phase4M6RegistryScaleCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn("checkPhase4PulsarSourceLock")
     dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-materialization:check")
+}
+
+tasks.register<Exec>("checkPhase4M6TwoBrokerWorkerContentionContractSurface") {
+    group = "verification"
+    description = "Audit exact two-broker/two-worker contention, compressed-read, and coexistence evidence."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m6-two-broker-worker-contention-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M6TwoBrokerWorkerContentionPulsarCheck") {
+    group = "verification"
+    description = "Run the retry-disabled real two-broker/two-worker materialization contention gate."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M6RegistryScaleCheck")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusMaterializationContentionMultiBrokerIntegrationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+        "-PtestRetryCount=0",
+    )
+}
+
+tasks.register("phase4M6TwoBrokerWorkerContentionCheck") {
+    group = "verification"
+    description = "Verify checkpoint BI two-process materialization contention and exact compressed Pulsar reads."
+    dependsOn("phase4M6RegistryScaleCheck")
+    dependsOn("checkPhase4M6TwoBrokerWorkerContentionContractSurface")
+    dependsOn("phase4M6TwoBrokerWorkerContentionPulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-core:check")
     dependsOn(":nereus-materialization:check")
 }

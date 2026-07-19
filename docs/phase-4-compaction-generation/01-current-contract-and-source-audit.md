@@ -33,13 +33,15 @@ Repository baseline：`e330969cd5c2c11cd38d0bd7f687185171ae91e2`。
 | `nereus-managed-ledger/.../generation/DefaultManagedLedgerGenerationRegistrationBackfillProofCoordinator.java` | `6181f43e7966c2b8aa958486c1eecb36d6cdc9aa` | current product-owned exact readiness/proof CAS and monotonic deadline owner |
 | `nereus-managed-ledger/.../NereusManagedLedgerRuntime.java` | `a91a7c36498091fa29a442250a8733751e68fc24` | current activation-store/proof-coordinator lifecycle owner |
 | `nereus-pulsar-adapter/.../DefaultNereusRuntimeProvider.java` | `6f96b29762d06bf1ab013693973f6ac40c59f0c7` | current product composition/close owner |
+| `nereus-object-store/.../wal/WalSliceReadStats.java` | `2e6e11400eaca9ec79ca1e8af5748052fdecd215` | resolved-target identity separated from measured physical/logical compressed-read accounting |
+| `nereus-core/.../read/ParquetCompactedTargetReader.java` | `bd4d1d8691d26b002c54e9f993d0af394ccc583f` | exact NCP1 rows plus measured Parquet/footer IO without a false logical-byte ceiling |
 
 All paths above are under `src/main/java/com/nereusstream/...`; shortened prefixes are only for table readability.
 
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@5e5ca658ad278fd92151bd6707bee2dda3614b01`。
+`master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -48,6 +50,7 @@ Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
 | `pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java` | `97912566a045eddbb763e9b2bd7563a07d7abe69` | tenant-local namespace canonicalization plus exact remaining-budget/concurrency proof handoff |
 | `pulsar-broker/.../nereus/GenerationRegistrationBackfillReport.java` | `e84406c679f44f04e50ba943a1f97d92abf8f95a` | topic-outcome versus broader traversal-failure accounting |
 | `pulsar-broker/.../nereus/NereusPhysicalGcMultiBrokerIntegrationTest.java` | `86dbbb8797887e89ee78d03b3fe729db882b833f` | retry-disabled real source deletion、MessageId、unload/failover/restart and BookKeeper final gate |
+| `pulsar-broker/.../nereus/NereusMaterializationContentionMultiBrokerIntegrationTest.java` | `b76bde8f98207655d74ef907c95e999bf53bda7b` | retry-disabled two-broker/two-worker shared-registry contention、compressed exact-read and BookKeeper coexistence gate |
 | `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `3ca141fcfd0f8f6049fd40725d0007789bf088f7` | bounded broker-to-product proof completion and publication-activation delegate |
 | `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `14916134ed514fc0d2c2e6628e7317463798bb89` | current retention/compaction/admin denylist |
 | `pulsar-broker/.../nereus/NereusAdminOperation.java` | `a99c967347ce7b9edc29b57892b220f42bedf8be` | closed loaded/unloaded admin operation set |

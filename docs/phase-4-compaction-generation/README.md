@@ -161,6 +161,11 @@
 > capability to `nereus.generation-protocol=2`；the durable topic marker/activation record remain V1. Checkpoint BH
 > writes exactly 257 deterministic valid registrations into each of 64 frozen registry shards, scans every `256 + 1`
 > page through the production adapter, and repeats the identical 16,448-key inventory from fresh empty continuations.
+> Checkpoint BI starts two distinct broker-owned materialization runtimes at one barrier over that shared durable
+> registry, converges both complete 64-shard scans, and proves exact direct/facade reads of highly compressible 128 KiB
+> entries plus stock BookKeeper coexistence with test retry disabled. The gate also locks separate resolved-target and
+> measured physical/logical read accounting, so ZSTD output smaller than returned Entry bytes is valid rather than a
+> false corruption signal.
 > These are focused
 > M6 foundations, not the aggregate completion claim.
 >
@@ -169,7 +174,7 @@
 > Nereus 输入基线：`nereusstream/nereus@e330969cd5c2c11cd38d0bd7f687185171ae91e2`
 >
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
-> `master@5e5ca658ad278fd92151bd6707bee2dda3614b01`
+> `master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`
 
 > 实现状态日期：2026-07-19
 
@@ -1973,7 +1978,35 @@ snapshots are deliberately `DELETED`, so the scale fixture exercises discovery a
 creating 16,448 unrelated tasks；the existing admitted-stream fixtures separately prove authoritative head/task work
 is not skipped. `phase4M6RegistryScaleCheck` composes the M5 final predecessor、static contract/document/module/source
 audits and complete metadata/materialization checks. Checkpoint BH remains focused M6 evidence；two-worker/two-broker
-composition、the exact 52-scenario executable map and aggregate M6/Phase 4 gates remain open.
+composition is closed by checkpoint BI；the exact 52-scenario executable map and aggregate M6/Phase 4 gates remain
+open.
+
+### 6.37 F4-M6 two-broker/two-worker contention checkpoint
+
+Checkpoint BI adds
+`NereusMaterializationContentionMultiBrokerIntegrationTest`
+`.twoBrokerWorkerRuntimesContendOnTheSameStreamsAndConvergeExactReads` to the locked Pulsar fork. The fixture starts
+real shared Oxia、pinned LocalStack、stock BookKeeper and two Pulsar brokers, then creates Nereus topics until at least
+one is owned by each broker. Every candidate receives one owner probe and sixteen non-batched 128 KiB Entries. After
+generation activation it extracts the two brokers' distinct process-wide `Phase4ObjectWalRuntime` instances, proves
+different runtime identities and `processRunId` values, and releases both `scanNow()` calls from the same two-party
+barrier. A successful complete pass or an explicitly retriable contention loser is accepted only for that simultaneous
+attempt；each runtime must then independently converge a complete 64-shard pass with the exact registered/admitted
+count from durable truth.
+
+The acceptance half first invokes each owner ledger's direct higher-generation read for every offset, then creates a
+fresh Pulsar reader at `MessageId.earliest` and compares every payload byte、property and all ledger/entry/partition/
+batch coordinates in `MessageIdAdv`. A separate unbound topic proves stock BookKeeper write/read coexistence. The
+initial real run exposed a production defect at this exact compression boundary：`ParquetCompactedTargetReader` used
+compressed `objectLength` as the maximum returned logical payload and `WalSliceReadStats` rejected valid decompressed
+bytes. The fix keeps resolved target lengths for identity, adds measured payload/footer IO, permits signed IO delta and
+exports non-negative amplification/compression-savings parts. The focused 256 KiB-row core regression and the real
+broker gate both pass；the declared Spotless/Checkstyle/test gate executed 138 tasks with `testRetryCount=0` on
+`master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`.
+
+`phase4M6TwoBrokerWorkerContentionCheck` composes checkpoint BH、the static contract/document/module/source audits、
+core/object-store/materialization checks and retry-disabled locked-Pulsar execution. BI closes only the required
+two-broker/two-worker scale row；the exact 52-scenario executable map and aggregate gates remain open.
 
 ## 7. Milestones
 
@@ -1985,7 +2018,7 @@ composition、the exact 52-scenario executable map and aggregate M6/Phase 4 gate
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BH focused-green, aggregate gates pending |
+| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BI focused-green, aggregate gates pending |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

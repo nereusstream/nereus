@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="5e5ca658ad278fd92151bd6707bee2dda3614b01"
+current_pulsar_lock="9e3ac18107ba57bca88ee74f39c0c10581c24e8b"
 
 require_literal() {
     local literal="$1"
@@ -33,6 +33,8 @@ require_literal "Checkpoint BG" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint BH" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BI" \
+    "docs/phase-4-compaction-generation/README.md"
 require_literal "scansOneThousandReaderLeasesAndProtectionsWithoutTruncationAndRestarts" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "plansAndDurablyRoundTripsOneTaskAtBothSourceAndRecordLimits" \
@@ -42,6 +44,10 @@ require_literal "scansSixteenThousandFourHundredFortyEightRegistrationsAcrossCol
 require_literal "phase4M6RegistryScaleCheck" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "phase4M6RegistryScaleCheck" \
+    "build.gradle.kts"
+require_literal "phase4M6TwoBrokerWorkerContentionCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M6TwoBrokerWorkerContentionCheck" \
     "build.gradle.kts"
 require_literal "GcRetirementManifestRecord" \
     "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
@@ -346,4 +352,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, M6 BD-BH foundations, current source lock, gates, and local links verified."
+echo "Phase 4 M1-M5 final status, M6 BD-BI foundations, current source lock, gates, and local links verified."

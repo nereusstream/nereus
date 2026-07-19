@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`5e5ca658ad278fd92151bd6707bee2dda3614b01`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`9e3ac18107ba57bca88ee74f39c0c10581c24e8b`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and retry-disabled real
 two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real two-broker async/
 retention boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and real-
@@ -203,8 +203,12 @@ capability advances to version `2`, epoch `36151462167742895` and digest
 protocols remain V1. Checkpoint BH writes 257 deterministic valid stream registrations into every frozen registry
 shard through the production Oxia adapter. The process-wide scanner starts every shard with an empty continuation,
 consumes exactly `256 + 1` entries over two pages, compares all 16,448 ordered keys without duplicates/truncation, then
-repeats from a new scanner and new empty continuations using no watch/process hint. Two-broker/two-worker evidence、
-52-scenario mapping and aggregate gates remain pending.
+repeats from a new scanner and new empty continuations using no watch/process hint. Checkpoint BI starts the two
+distinct broker-owned worker runtimes at one barrier over the same registered topics, converges a complete 64-shard
+pass through each runtime, and proves direct plus Pulsar-facade exact reads of sixteen 128 KiB ZSTD-materialized
+entries per topic with unchanged properties/`MessageIdAdv` and a stock BookKeeper control topic. The real fixture also
+forced and fixed compressed-physical versus returned-logical byte accounting. The 52-scenario executable mapping and
+aggregate gates remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1820,7 +1824,7 @@ does not modify the local Pulsar fork, advertise generation capability, activate
 topics, or publish a cluster backfill proof. The ordinary gate passed with `--rerun-tasks` on 2026-07-16.
 
 `phase4M5GenerationCapabilityCheck` is the checkpoint-Y capability gate. It now consumes the exact clean current
-fork `master@5e5ca658ad278fd92151bd6707bee2dda3614b01`, audits the capability/readiness/invalidation surface, publishes
+fork `master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`, audits the capability/readiness/invalidation surface, publishes
 the existing Nereus development composite, and runs broker spotless、checkstyle plus focused generation/cursor/
 binding suites. The readiness identity is domain-separated SHA-256 over sorted persistent broker registry keys、
 advertised broker ids、start timestamps and sorted required protocol pairs. Checkpoint Y originally froze lookup
@@ -1965,7 +1969,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BH are implemented and focused-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BI are implemented and focused-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -1993,6 +1997,19 @@ capability `2` before such roots may be admitted by the broker cluster. Checkpoi
 `.scansSixteenThousandFourHundredFortyEightRegistrationsAcrossColdRestarts`：it uses the production metadata adapter,
 records both request/response continuation state, proves exact `256 + 1` pagination in every shard, compares every
 ordered durable key, and repeats from a fresh scanner with empty continuations.
+Checkpoint BI is
+`NereusMaterializationContentionMultiBrokerIntegrationTest`
+`.twoBrokerWorkerRuntimesContendOnTheSameStreamsAndConvergeExactReads` on the locked Pulsar fork. It starts real shared
+Oxia、LocalStack、BookKeeper and two brokers；places at least one Nereus topic on each owner；publishes one probe plus
+sixteen non-batched 128 KiB entries per registered topic；and obtains the two distinct process-wide
+`Phase4ObjectWalRuntime`/`processRunId` identities. A two-party `CountDownLatch` barrier starts both full-registry
+worker scans concurrently. Each runtime must subsequently complete an exact 64-shard convergence pass. Direct ledger
+reads and fresh earliest Pulsar readers then compare every byte/property and all `MessageIdAdv` coordinates, while an
+independent topic proves stock BookKeeper coexistence. The compression-heavy workload exposed and now locks the
+separate resolved-target/measured-physical/logical-returned fields in `WalSliceReadStats`；valid ZSTD output may have
+`physicalBytesRead < returnedPayloadBytes`, with zero positive amplification and explicit compression savings. The
+declared Spotless/Checkstyle/test broker gate passed 138 tasks with retry disabled on
+`master@9e3ac18107ba57bca88ee74f39c0c10581c24e8b`.
 
 ### 8.1 Required scenarios
 
@@ -2083,13 +2100,16 @@ two brokers + at least two worker runtimes contending on the same streams
 The million-entry checkpoint test may use generated streaming bytes rather than holding all entries in heap；it must
 exercise writer/reader/directory bounds. The registry fixture uses deterministic valid `StreamId` inputs selected by
 the frozen shard function；it traverses at least two pages per shard and then restarts with empty continuations.
-Checkpoint BH implements this exact registry row；it does not treat registration or its scan order as stream-head/task
-truth, and all 16,448 stale-hint snapshots are safely skipped only after authoritative L0 inspection.
+Checkpoint BH implements the exact registry row；it does not treat registration or its scan order as stream-head/task
+truth, and all 16,448 stale-hint snapshots are safely skipped only after authoritative L0 inspection. Checkpoint BI
+implements the final two-broker/two-worker row through broker-owned production runtimes and shared durable services；it
+does not replace the still-required per-scenario executable audit.
 
 ### 8.3 Gates
 
 ```text
 ./gradlew phase4M6RegistryScaleCheck
+./gradlew phase4M6TwoBrokerWorkerContentionCheck
 ./gradlew phase4M6Check
 ./gradlew phase4M6FinalCheck --rerun-tasks
 ./gradlew phase4Check
