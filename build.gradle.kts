@@ -597,6 +597,34 @@ tasks.register<Exec>("bookKeeperPrimaryWalDocumentationCheck") {
     commandLine("bash", "scripts/check-bookkeeper-primary-wal-documentation.sh")
 }
 
+tasks.register<Exec>("checkBookKeeperModuleBoundaries") {
+    group = "verification"
+    description = "Verify BookKeeper provider code stays outside L0 and ManagedLedger implementation types."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-bookkeeper-module-boundaries.sh")
+}
+
+tasks.register("bookKeeperPrimaryWalM1Check") {
+    group = "verification"
+    description = "Verify the provider-neutral read/append seam and BookKeeper 4.18 adapter foundation."
+    dependsOn("bookKeeperPrimaryWalDocumentationCheck")
+    dependsOn("checkBookKeeperModuleBoundaries")
+    dependsOn(":nereus-api:test")
+    dependsOn(":nereus-core:test")
+    dependsOn(":nereus-metadata-oxia:test")
+    dependsOn(":nereus-object-store:test")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-bookkeeper:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM1FinalCheck") {
+    group = "verification"
+    description = "Run BK-M1 plus every final-gated Phase 1.5 and Phase 4 predecessor."
+    dependsOn("bookKeeperPrimaryWalM1Check")
+    dependsOn("phase15FinalCheck")
+    dependsOn("phase4FinalCheck")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

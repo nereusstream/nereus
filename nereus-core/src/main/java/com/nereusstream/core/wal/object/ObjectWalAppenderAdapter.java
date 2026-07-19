@@ -58,14 +58,16 @@ public final class ObjectWalAppenderAdapter implements PrimaryWalAppender<Object
             ObjectSliceReadTarget target = new ObjectSliceReadTarget(1, result.objectId(), result.objectKey(),
                     ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1", "OPAQUE_SLICE", slice.sliceId(),
                     slice.objectOffset(), slice.objectLength(), slice.sliceChecksum(), slice.entryIndexRef());
-            return new DurablePrimaryAppend(prepared.streamId(), target, slice.payloadFormat(), slice.recordCount(),
+            return new DurablePrimaryAppend(prepared.streamId(), target,
+                    ObjectPrimaryPhysicalIdentity.from(target), slice.sliceChecksum(),
+                    slice.payloadFormat(), slice.recordCount(),
                     slice.entryCount(), slice.logicalBytes(), slice.schemaRefs(), slice.minEventTimeMillis(),
                     slice.maxEventTimeMillis(), new ObjectWalCommitEvidence(result));
         });
     }
     @Override public CompletableFuture<Void> validateBeforeHeadCommit(
             DurablePrimaryAppend append, AppendSession session, Duration timeout) {
-        if (!(append.providerCommitEvidence() instanceof ObjectWalCommitEvidence))
+        if (!(append.providerToken() instanceof ObjectWalCommitEvidence))
             return CompletableFuture.failedFuture(new IllegalArgumentException("wrong provider evidence"));
         return CompletableFuture.completedFuture(null);
     }

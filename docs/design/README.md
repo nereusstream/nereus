@@ -9,7 +9,8 @@
 `docs/phase-bk-bookkeeper-primary-wal/` 共同构成仓库内设计基线。已实现合同由代码/
 测试优先；Phase 4 目录同时记录已通过 M0 的 target contract，以及已 final-gated 的 F4-M1–M6 实现和
 checkpoint-BQ aggregate evidence；F1-BK 目录是下一项底层交付的代码级 target，当前不表示实现。
-BK-M0 documentation gate passed on 2026-07-19；BK-M1–M6 remain not implemented。
+BK-M0 documentation gate passed on 2026-07-19；BK-M1 foundation implementation is in progress，BK-M2–M6 remain
+not implemented。
 
 建议阅读顺序：
 
@@ -62,7 +63,8 @@ registration/readiness/activation、protected async Object-WAL、materialization
 scale/failure cuts、retry-disabled two-broker ownership/MessageId/stock-BookKeeper coexistence，以及 checkpoint-BQ
 203/203-task aggregate 均通过。完整细节与 safe-default deletion 边界以 Phase 4 目录为准。
 下一项底层交付是 F1-BK，其代码级 target 在 `../phase-bk-bookkeeper-primary-wal/README.md`；当前只完成设计，
-真实 BookKeeper writer/reader/ledger lifecycle/retention 尚未实现，三个 BookKeeper profiles 继续在 IO 前拒绝。
+BookKeeper 4.18 module/config/namespace/NBKR1/resource foundation 已实现；真实 writer/reader/ledger
+lifecycle/retention 尚未实现，三个 BookKeeper profiles 继续在 IO 前拒绝。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

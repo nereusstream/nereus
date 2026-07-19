@@ -23,6 +23,8 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadSourceRef;
+import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.ObjectStore;
@@ -179,9 +181,13 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                     range.payloadFormat(),
                     entryPayload,
                     range.schemaRefs(),
-                    range.entryIndexRef(),
                     range.projectionRef(),
-                    range.objectId(),
+                    new ReadSourceRef(
+                            range.offsetRange(),
+                            range.generation(),
+                            range.commitVersion(),
+                            range.readTarget(),
+                            ReadTargetIdentities.sha256(range.readTarget())),
                     range.objectOffset() + item.payloadOffset(),
                     item.payloadLength()));
             recordsReturned += item.recordCount();

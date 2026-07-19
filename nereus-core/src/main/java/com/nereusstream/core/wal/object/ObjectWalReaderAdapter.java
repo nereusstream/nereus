@@ -3,6 +3,8 @@ package com.nereusstream.core.wal.object;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectType;
+import com.nereusstream.api.PhysicalReadResult;
+import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.api.ResolvedRange;
@@ -25,12 +27,39 @@ public final class ObjectWalReaderAdapter implements PrimaryWalReader {
     private final WalObjectReader reader;
     public ObjectWalReaderAdapter(WalObjectReader reader) { this.reader = Objects.requireNonNull(reader); }
     @Override public ReadTargetReaderKey key() { return KEY; }
-    @Override public CompletableFuture<WalReadResult> readWithStats(
+    @Override public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
             StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
         Objects.requireNonNull(streamId, "streamId");
-        try { return reader.readWithStats(startOffset, ranges.stream().map(ResolvedObjectRange::from).toList(), options); }
+        try {
+            List<ResolvedObjectRange> objectRanges = ranges.stream().map(ResolvedObjectRange::from).toList();
+            return reader.readWithStats(startOffset, objectRanges, options)
+                    .thenApply(result -> genericResult(objectRanges, result));
+        }
         catch (IllegalArgumentException e) { return NereusException.failedFuture(ErrorCode.UNSUPPORTED_READ_TARGET,
                 false, "Object WAL reader received a non-object target", e); }
+    }
+
+    private static PhysicalReadResult genericResult(
+            List<ResolvedObjectRange> ranges,
+            WalReadResult result) {
+        List<PhysicalReadStats> stats = result.sliceStats().stream().map(value -> {
+            ResolvedObjectRange range = ranges.stream()
+                    .filter(candidate -> candidate.objectId().equals(value.objectId())
+                            && candidate.objectOffset() == value.objectOffset()
+                            && candidate.objectLength() == value.fullSlicePayloadBytes()
+                            && candidate.entryIndexRef().length() == value.entryIndexBytes())
+                    .findFirst()
+                    .orElseThrow(() -> new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false,
+                            "Object reader reported an unknown resolved source"));
+            return new PhysicalReadStats(
+                    com.nereusstream.api.ReadTargetIdentities.sha256(range.readTarget()),
+                    value.fullSlicePayloadBytes(),
+                    value.entryIndexBytes(),
+                    value.downloadedPayloadBytes(),
+                    value.downloadedEntryIndexBytes(),
+                    value.returnedPayloadBytes());
+        }).toList();
+        return new PhysicalReadResult(result.batches(), stats);
     }
     @Override public long reservationBytes(ResolvedRange range) {
         ResolvedObjectRange object = ResolvedObjectRange.from(range);

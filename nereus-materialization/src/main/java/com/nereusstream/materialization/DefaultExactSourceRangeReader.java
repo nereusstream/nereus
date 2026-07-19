@@ -5,6 +5,7 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
@@ -16,7 +17,6 @@ import com.nereusstream.core.read.PhysicalObjectIdentityResolver;
 import com.nereusstream.core.read.ReadTargetDispatcher;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
-import com.nereusstream.objectstore.wal.WalReadResult;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -173,7 +173,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
         private final MessageDigest payloadDigest = sha256();
 
         private Flow.Subscriber<? super ReadBatch> subscriber;
-        private CompletableFuture<WalReadResult> inFlight;
+        private CompletableFuture<PhysicalReadResult> inFlight;
         private long demand;
         private long cursor;
         private int records;
@@ -326,7 +326,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                 fail(failure, true);
                 return;
             }
-            CompletableFuture<WalReadResult> exactFuture = inFlight;
+            CompletableFuture<PhysicalReadResult> exactFuture = inFlight;
             exactFuture.whenComplete((result, failure) -> submit(() -> {
                 if (terminal || inFlight != exactFuture) {
                     return;
@@ -354,7 +354,6 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
             long pageCursor = cursor;
             long pageRecords = 0;
             long pageBytes = 0;
-            ObjectSliceReadTarget target = (ObjectSliceReadTarget) source.readTarget();
             for (ReadBatch batch : batches) {
                 Objects.requireNonNull(batch, "read batch");
                 if (batch.range().startOffset() != pageCursor
@@ -362,8 +361,9 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                         || batch.payloadFormat() != source.payloadFormat()
                         || !batch.schemaRefs().equals(source.schemaRefs())
                         || !batch.projectionRef().equals(source.projectionRef())
-                        || !batch.sourceObjectId().equals(target.objectId())
-                        || !batch.entryIndexRef().equals(target.entryIndexRef())) {
+                        || !batch.source().resolvedRange().equals(source.range())
+                        || !batch.source().target().equals(source.readTarget())
+                        || !batch.source().targetIdentity().equals(source.targetIdentitySha256())) {
                     throw outputInvariant("exact source reader returned a non-canonical batch");
                 }
                 pageCursor = batch.range().endOffset();
@@ -431,7 +431,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                 return;
             }
             terminal = true;
-            CompletableFuture<WalReadResult> current = inFlight;
+            CompletableFuture<PhysicalReadResult> current = inFlight;
             inFlight = null;
             if (current != null) {
                 current.cancel(true);

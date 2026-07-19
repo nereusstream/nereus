@@ -2,17 +2,19 @@
 
 ## 1. Status discipline
 
-This document is a code-level implementation plan, not implementation evidence. Current status：
+This document contains the frozen plan and explicit implementation evidence. Current status：
 
 ```text
 BK-M0 design/source audit       documentation-gated on 2026-07-19
-BK-M1 .. BK-M6                  not implemented
+BK-M1 provider-neutral foundation in progress (first checkpoint implemented on 2026-07-19)
+BK-M2 .. BK-M6                  not implemented
 all BookKeeper profiles         reserved / rejected before primary IO
 BookKeeper ledger deletion      absent / safe default closed
 ```
 
-Only `bookKeeperPrimaryWalDocumentationCheck` is added by the design delivery. The implementation task names below
-are frozen target names; they must not be registered as empty/success-only Gradle tasks. A milestone becomes complete
+`bookKeeperPrimaryWalDocumentationCheck` remains the documentation gate. `bookKeeperPrimaryWalM1Check` and
+`bookKeeperPrimaryWalM1FinalCheck` are executable and backed by real module/unit/predecessor dependencies；M2–M6 names
+remain frozen target names and must not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
 ## 2. Delivery dependency graph
@@ -149,6 +151,17 @@ bookKeeperPrimaryWalM1FinalCheck
 
 Do not begin profile IO until Object-WAL passes unchanged through the new seams and a synthetic BK target can traverse
 commit/gen0 metadata without Object fields. Review buffer lifetime、deadline propagation and public API compatibility.
+
+### 4.7 Implemented checkpoint evidence (2026-07-19)
+
+Implemented：module/BOM/catalog wiring；generic read source/result/stats and canonical target identity；generic physical
+append identity/token and completion-policy values；BookKeeper configuration/GC safe default/namespace/reservation
+verifier；NBKR1；prepared buffer ownership；4.18 public client operations；deadline/error mapping；bounded handle cache；
+module-boundary script and focused tests。
+
+Still required before BK-M1 is complete：generic commit/protection/gen0 registry without Object casts；provider-neutral
+coordinator selection；remaining BK-02/04/06/07/08 evidence；full M1 predecessor final gate。No BookKeeper profile is
+executable at this checkpoint。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
 

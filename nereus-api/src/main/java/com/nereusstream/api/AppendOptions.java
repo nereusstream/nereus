@@ -23,12 +23,24 @@ import java.util.Optional;
 public record AppendOptions(
         Optional<AppendSession> appendSession,
         DurabilityLevel durabilityLevel,
+        AppendCompletionPolicy completionPolicy,
         Duration timeout,
         boolean autoAcquireSession,
         Map<String, String> tags) {
+    public AppendOptions(
+            Optional<AppendSession> appendSession,
+            DurabilityLevel durabilityLevel,
+            Duration timeout,
+            boolean autoAcquireSession,
+            Map<String, String> tags) {
+        this(appendSession, durabilityLevel, AppendCompletionPolicy.PROFILE_DEFAULT,
+                timeout, autoAcquireSession, tags);
+    }
+
     public AppendOptions {
         appendSession = Objects.requireNonNull(appendSession, "appendSession");
         Objects.requireNonNull(durabilityLevel, "durabilityLevel");
+        Objects.requireNonNull(completionPolicy, "completionPolicy");
         Objects.requireNonNull(timeout, "timeout");
         tags = MetadataCanonicalizer.canonicalStringMap(tags, Integer.MAX_VALUE, "tags");
         if (timeout.isZero() || timeout.isNegative()) {

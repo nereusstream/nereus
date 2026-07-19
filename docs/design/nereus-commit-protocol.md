@@ -386,7 +386,8 @@ does not prove an Object generation. F1-BK therefore keeps `DurabilityLevel` mea
 `KNOWN_COMMITTED`; recovery reuses the same BK range、stable append result and deterministic materialization task。
 
 Exact allocation、fencing、read checksum、retention、F4 reuse and rollout state machines are frozen in
-`../phase-bk-bookkeeper-primary-wal/README.md`。Until BK-M1–M6 executable gates pass, all three profiles fail before
+`../phase-bk-bookkeeper-primary-wal/README.md`。BK-M1 foundation is in progress；until the profile-specific executable
+gates pass, all three profiles fail before
 BookKeeper IO。
 
 ## 11. Generation publish protocol

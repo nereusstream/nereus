@@ -52,7 +52,7 @@ require_literal 'DeleteBuilder.withLedgerId(long)' \
     "docs/phase-bk-bookkeeper-primary-wal/01-current-contract-and-source-audit.md"
 require_literal "F1-BK / BookKeeper Primary WAL Delivery" \
     "docs/phase-bk-bookkeeper-primary-wal/README.md"
-require_literal "not implementation evidence" \
+require_literal "explicit implementation evidence" \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md"
@@ -86,7 +86,10 @@ require_literal 'bookKeeperPrimaryWalDocumentationCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M0 design/source audit       documentation-gated on 2026-07-19' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'BK-M1 provider-neutral foundation in progress' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalDocumentationCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM1Check' "build.gradle.kts"
 
 scenario_matrix="$design_dir/08-scenario-evidence-matrix.md"
 scenario_count="$(rg -c '^\| BK-[0-9]+ \|' "$scenario_matrix")"
@@ -103,12 +106,16 @@ for ((number = 1; number <= 96; number++)); do
     fi
 done
 
-if [[ -d "$repo_root/nereus-bookkeeper" ]]; then
-    echo "nereus-bookkeeper exists while F1-BK documentation still declares BK-M1-M6 not implemented" >&2
+if [[ ! -d "$repo_root/nereus-bookkeeper" ]]; then
+    echo "nereus-bookkeeper is missing while F1-BK documents BK-M1 foundation implementation" >&2
     exit 1
 fi
-if rg -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM[1-6]' "$repo_root/build.gradle.kts"; then
-    echo "implementation milestone tasks must not be registered while F1-BK remains design-only" >&2
+if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
+    echo "BookKeeper module-boundary gate is missing or not executable" >&2
+    exit 1
+fi
+if rg -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM[2-6]' "$repo_root/build.gradle.kts"; then
+    echo "BK-M2-M6 tasks must not be registered before their executable implementation exists" >&2
     exit 1
 fi
 
@@ -156,4 +163,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "$design_dir")
 
-echo "BookKeeper primary-WAL design status, source locks, contracts, links, and scenario range verified."
+echo "BookKeeper primary-WAL design/implementation status, source locks, contracts, links, and scenario range verified."

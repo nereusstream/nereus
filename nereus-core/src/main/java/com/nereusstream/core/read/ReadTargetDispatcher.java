@@ -2,11 +2,11 @@
 package com.nereusstream.core.read;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.PhysicalReadResult;
+import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
-import com.nereusstream.objectstore.wal.WalReadResult;
-import com.nereusstream.objectstore.wal.WalSliceReadStats;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -30,7 +30,7 @@ public final class ReadTargetDispatcher {
                 registry.require(range.readTarget()).reservationBytes(range)).max().orElseThrow();
     }
 
-    public CompletableFuture<WalReadResult> read(
+    public CompletableFuture<PhysicalReadResult> read(
             StreamId streamId,
             long startOffset,
             List<ResolvedRange> ranges,
@@ -50,20 +50,20 @@ public final class ReadTargetDispatcher {
                 0);
     }
 
-    private CompletableFuture<WalReadResult> readRun(
+    private CompletableFuture<PhysicalReadResult> readRun(
             StreamId streamId,
             List<Run> runs, int index, long startOffset, ReadOptions options,
-            List<ReadBatch> batches, List<WalSliceReadStats> stats, long records, long bytes) {
+            List<ReadBatch> batches, List<PhysicalReadStats> stats, long records, long bytes) {
         if (index >= runs.size() || records >= options.maxRecords() || bytes >= options.maxBytes()) {
-            return CompletableFuture.completedFuture(new WalReadResult(batches, stats));
+            return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
         }
         Run run = runs.get(index);
         ReadOptions remaining = new ReadOptions(
                 Math.toIntExact(options.maxRecords() - records), Math.toIntExact(options.maxBytes() - bytes),
                 options.isolation(), options.timeout());
         ReadTargetReader reader = registry.require(run.key());
-        return reader.readWithStats(streamId, startOffset, run.ranges(), remaining).thenCompose(result -> {
-            batches.addAll(result.batches()); stats.addAll(result.sliceStats());
+        return reader.readPhysicalWithStats(streamId, startOffset, run.ranges(), remaining).thenCompose(result -> {
+            batches.addAll(result.batches()); stats.addAll(result.rangeStats());
             long next = startOffset;
             long newRecords = records;
             long newBytes = bytes;
@@ -74,7 +74,7 @@ public final class ReadTargetDispatcher {
             }
             if (result.batches().isEmpty()
                     || next < run.ranges().get(run.ranges().size() - 1).offsetRange().endOffset()) {
-                return CompletableFuture.completedFuture(new WalReadResult(batches, stats));
+                return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
             }
             return readRun(
                     streamId,

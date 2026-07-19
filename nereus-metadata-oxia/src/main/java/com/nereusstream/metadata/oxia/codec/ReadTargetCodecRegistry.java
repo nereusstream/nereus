@@ -3,6 +3,7 @@ package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.metadata.oxia.records.ReadTargetRecord;
@@ -38,7 +39,7 @@ public final class ReadTargetCodecRegistry {
             throw new MetadataCodecException("target discriminator and Java type disagree");
         }
         byte[] payload = codec.encode(target);
-        String identity = identity(target.type().name(), target.version(), payload);
+        String identity = ReadTargetIdentities.sha256(target).value();
         return new ReadTargetRecord(target.type().name(), target.version(), PAYLOAD_ENCODING,
                 payload, ChecksumType.SHA256.name(), identity);
     }

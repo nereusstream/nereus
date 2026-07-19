@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
@@ -35,7 +36,7 @@ class ReadTargetDispatcherMixedFormatTest {
                 range(2, ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1"),
                 range(3, ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"));
 
-        WalReadResult result = dispatcher.read(
+        PhysicalReadResult result = dispatcher.read(
                         new StreamId("stream"),
                         0,
                         ranges,

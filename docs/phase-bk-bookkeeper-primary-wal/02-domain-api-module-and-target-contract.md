@@ -19,8 +19,8 @@ Exact dependency rules：
 
 ```text
 nereus-bookkeeper
-  implementation(project(":nereus-api"))
-  implementation(project(":nereus-core"))
+  api(project(":nereus-api"))
+  api(project(":nereus-core"))
   implementation(project(":nereus-metadata-oxia"))
   implementation(bookkeeper-client-api/server client artifact needed by public implementation)
 
@@ -87,8 +87,7 @@ public record DurablePrimaryAppend(
     long logicalBytes,
     ProviderAppendToken providerToken) { }
 
-public sealed interface PrimaryPhysicalIdentity
-    permits ObjectPrimaryPhysicalIdentity, BookKeeperPrimaryPhysicalIdentity {
+public interface PrimaryPhysicalIdentity {
     ReadTargetType targetType();
     byte[] canonicalIdentity();
 }
@@ -102,7 +101,9 @@ public record BookKeeperPrimaryPhysicalIdentity(
     Checksum rangeChecksum) implements PrimaryPhysicalIdentity { }
 ```
 
-`ProviderAppendToken` is process-local and opaque. Common commit/recovery code must not serialize or require it；BK
+The interface is extensible rather than Java-sealed because concrete providers live in independent Gradle modules；
+registry admission plus exact target type/canonical identity checks close the set at runtime. `ProviderAppendToken` is
+process-local and opaque. Common commit/recovery code must not serialize or require it；BK
 post-write validation can use it when live and reload exact target/root/session facts when absent after restart.
 
 ### 3.3 Common coordinator split
@@ -197,8 +198,10 @@ Exact names may change only if the same semantics remain. `targetIdentity` is SH
 `ReadTarget` including codec tag/version. It is not just the target's content checksum.
 
 The current `WalReadResult`/`WalSliceReadStats` become Object adapter compatibility types or are migrated to these
-values. `ReadTargetReader` returns the provider-neutral result. Tests must prove an Object read produces identical
-logical batches/metrics after migration before BK code is registered.
+values. `ReadTargetReader.readPhysicalWithStats` returns the provider-neutral result. During BK-M1, the previous
+Object-only `readWithStats` is a deprecated compatibility surface and its default adapter normalizes to exact generic
+values before common correctness code observes them. Tests must prove an Object read produces identical logical
+batches/metrics after migration before BK code is registered.
 
 ### 5.2 Why `EntryIndexRef` leaves `ReadBatch`
 
@@ -301,7 +304,6 @@ protection row identity never enter `MessageIdAdv` or become a second compatibil
 record BookKeeperPreparedPrimaryAppend(
     PrimaryAppendRequest request,
     List<ByteBuf> retainedEntries,
-    Checksum rangeChecksum,
     int entryCount,
     long logicalBytes,
     long physicalBytes) implements PreparedPrimaryAppend, AutoCloseable { }
@@ -311,6 +313,7 @@ Implementation may use another reference-count-safe holder. Requirements：
 
 - preserve exact Pulsar Entry bytes and ordering；
 - compute/check exact payload physical bytes independently from logical/cumulative size before BookKeeper IO；
+- compute final NBKR1 only after reservation fixes `firstEntryId`, because entry ids are part of the checksum frame；
 - release each retained buffer exactly once on success/failure/cancel/close；
 - never log payload、password or digest secret；
 - one provider call owns the monotonic remaining deadline across allocation/write/validation。

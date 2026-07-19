@@ -5,8 +5,12 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
+import com.nereusstream.api.PhysicalReadResult;
+import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadSourceRef;
+import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
@@ -63,7 +67,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
     }
 
     @Override
-    public CompletableFuture<WalReadResult> readWithStats(
+    public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
             StreamId streamId,
             long startOffset,
             List<ResolvedRange> ranges,
@@ -90,7 +94,30 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
         }
     }
 
-    private CompletableFuture<WalReadResult> readNext(
+    /** Transitional Object-only result used by existing direct reader callers. */
+    @Override
+    @Deprecated(forRemoval = true)
+    public CompletableFuture<WalReadResult> readWithStats(
+            StreamId streamId,
+            long startOffset,
+            List<ResolvedRange> ranges,
+            ReadOptions options) {
+        return readPhysicalWithStats(streamId, startOffset, ranges, options).thenApply(result -> {
+            List<WalSliceReadStats> legacy = result.rangeStats().stream().map(stats -> {
+                ObjectSliceReadTarget target = ranges.stream()
+                        .map(ParquetCompactedTargetReader::requireTarget)
+                        .filter(candidate -> ReadTargetIdentities.sha256(candidate).equals(stats.targetIdentity()))
+                        .findFirst().orElseThrow();
+                return new WalSliceReadStats(target.objectId(), target.objectOffset(),
+                        stats.resolvedPayloadBytes(), stats.resolvedAuxiliaryBytes(),
+                        stats.physicalPayloadBytesRead(), stats.physicalAuxiliaryBytesRead(),
+                        stats.returnedPayloadBytes());
+            }).toList();
+            return new WalReadResult(result.batches(), legacy);
+        });
+    }
+
+    private CompletableFuture<PhysicalReadResult> readNext(
             StreamId streamId,
             long cursor,
             List<ResolvedRange> ranges,
@@ -98,13 +125,13 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             ReadOptions options,
             Deadline deadline,
             List<ReadBatch> batches,
-            List<WalSliceReadStats> stats,
+            List<PhysicalReadStats> stats,
             long returnedRecords,
             long returnedBytes) {
         if (index >= ranges.size()
                 || returnedRecords >= options.maxRecords()
                 || returnedBytes >= options.maxBytes()) {
-            return CompletableFuture.completedFuture(new WalReadResult(batches, stats));
+            return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
         }
         ResolvedRange range = ranges.get(index);
         if (cursor >= range.offsetRange().endOffset()) {
@@ -151,18 +178,17 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
                         range.payloadFormat(),
                         payload,
                         range.schemaRefs(),
-                        target.entryIndexRef(),
                         // The generation-level projection reference is an admission/compatibility identity. It is
                         // not per-entry payload metadata and the locked PULSAR_ENTRY_V1 codec requires logical
                         // batches to keep the original empty projection-ref surface.
                         Optional.empty(),
-                        target.objectId(),
+                        new ReadSourceRef(range.offsetRange(), range.generation(), range.commitVersion(), target,
+                                ReadTargetIdentities.sha256(target)),
                         target.objectOffset(),
                         target.objectLength()));
             }
-            stats.add(new WalSliceReadStats(
-                    target.objectId(),
-                    target.objectOffset(),
+            stats.add(new PhysicalReadStats(
+                    ReadTargetIdentities.sha256(target),
                     target.objectLength(),
                     target.entryIndexRef().length(),
                     Math.subtractExact(
@@ -174,7 +200,7 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             long payloadBytes = Math.addExact(returnedBytes, rangeBytes);
             long next = result.sourceCoverageEndOffset();
             if (next < range.offsetRange().endOffset()) {
-                return CompletableFuture.completedFuture(new WalReadResult(batches, stats));
+                return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
             }
             return readNext(
                     streamId,

@@ -283,9 +283,19 @@ class ApiValueValidationTest {
                 PayloadFormat.OPAQUE_RECORD_BATCH,
                 new byte[] {1},
                 List.of(),
-                objectFooterRef(),
                 Optional.empty(),
-                objectId,
+                new ReadSourceRef(
+                        new OffsetRange(0, 1),
+                        0,
+                        1,
+                        new com.nereusstream.api.target.ObjectSliceReadTarget(
+                                1, objectId, objectKey, ObjectType.MULTI_STREAM_WAL_OBJECT,
+                                "WAL_OBJECT_V1", "OPAQUE_SLICE", "slice", 0, 1,
+                                checksum(), objectFooterRef()),
+                        ReadTargetIdentities.sha256(new com.nereusstream.api.target.ObjectSliceReadTarget(
+                                1, objectId, objectKey, ObjectType.MULTI_STREAM_WAL_OBJECT,
+                                "WAL_OBJECT_V1", "OPAQUE_SLICE", "slice", 0, 1,
+                                checksum(), objectFooterRef()))),
                 Long.MAX_VALUE,
                 1))
                 .isInstanceOf(IllegalArgumentException.class);

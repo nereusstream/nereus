@@ -3,7 +3,8 @@
 > 状态：Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 implemented/final-gated
 > 交付映射：`docs/phase-1-core-stream-storage/`
 > 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
-> 当前后续：F1-BK / BookKeeper Primary WAL Delivery 的 BK-M0 documentation gate 已通过，BK-M1–M6 尚未实现；
+> 当前后续：F1-BK / BookKeeper Primary WAL Delivery 的 BK-M0 gate 已通过，BK-M1 foundation implementation
+> 已开始；BK-M2–M6 尚未实现，三个 BookKeeper profile 仍为 pre-IO rejected；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
@@ -87,8 +88,8 @@ and Future 4 workers remain deferred beyond it。
 
 F4 随后 final-gated `OBJECT_WAL_ASYNC_OBJECT`；BookKeeper primary-WAL 的真实 writer/reader、exact ledger
 lifecycle/fencing、whole-ledger retention 和 BK_ONLY/async/sync profile 则由 F1 的后续扩展 F1-BK 定义。代码级
-合同见 `../phase-bk-bookkeeper-primary-wal/README.md`。当前仅为 designed/not implemented，三个 BookKeeper
-profiles 仍在 primary IO 前拒绝。
+合同见 `../phase-bk-bookkeeper-primary-wal/README.md`。当前独立 BookKeeper 4.18 adapter/config/namespace/NBKR1
+foundation 已存在，但 writer/reader/lifecycle 尚未注册，三个 BookKeeper profiles 仍在 primary IO 前拒绝。
 
 ## 4. Layer and module boundary
 

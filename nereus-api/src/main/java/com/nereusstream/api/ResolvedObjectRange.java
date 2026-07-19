@@ -35,7 +35,29 @@ public record ResolvedObjectRange(
         List<SchemaRef> schemaRefs,
         EntryIndexRef entryIndexRef,
         Optional<ProjectionRef> projectionRef,
-        long commitVersion) {
+        long commitVersion,
+        ObjectSliceReadTarget readTarget) {
+    public ResolvedObjectRange(
+            OffsetRange offsetRange,
+            long generation,
+            ObjectId objectId,
+            ObjectKey objectKey,
+            ObjectType objectType,
+            long objectOffset,
+            long objectLength,
+            Checksum sliceChecksum,
+            PayloadFormat payloadFormat,
+            List<SchemaRef> schemaRefs,
+            EntryIndexRef entryIndexRef,
+            Optional<ProjectionRef> projectionRef,
+            long commitVersion) {
+        this(offsetRange, generation, objectId, objectKey, objectType, objectOffset, objectLength, sliceChecksum,
+                payloadFormat, schemaRefs, entryIndexRef, projectionRef, commitVersion,
+                new ObjectSliceReadTarget(1, objectId, objectKey, objectType, "WAL_OBJECT_V1", "OPAQUE_SLICE",
+                        "legacy-" + objectId.value() + "-" + objectOffset, objectOffset, Math.max(1, objectLength),
+                        sliceChecksum, entryIndexRef));
+    }
+
     public ResolvedObjectRange {
         Objects.requireNonNull(offsetRange, "offsetRange");
         Objects.requireNonNull(objectId, "objectId");
@@ -46,9 +68,21 @@ public record ResolvedObjectRange(
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         Objects.requireNonNull(entryIndexRef, "entryIndexRef");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
+        Objects.requireNonNull(readTarget, "readTarget");
         ApiRangeValidation.requireNonNegativeNonOverflowingRange(objectOffset, objectLength, "object");
         if (generation < 0 || commitVersion < 0) {
             throw new IllegalArgumentException("range numeric fields must be non-negative");
+        }
+        if (!readTarget.objectId().equals(objectId)
+                || !readTarget.objectKey().equals(objectKey)
+                || readTarget.objectType() != objectType
+                || readTarget.objectOffset() != objectOffset
+                || (readTarget.objectLength() != objectLength
+                        && !(objectLength == 0 && readTarget.objectLength() == 1
+                                && readTarget.sliceId().startsWith("legacy-")))
+                || !readTarget.sliceChecksum().equals(sliceChecksum)
+                || !readTarget.entryIndexRef().equals(entryIndexRef)) {
+            throw new IllegalArgumentException("Object compatibility view does not match exact read target");
         }
     }
 
@@ -70,6 +104,7 @@ public record ResolvedObjectRange(
                 range.schemaRefs(),
                 target.entryIndexRef(),
                 range.projectionRef(),
-                range.commitVersion());
+                range.commitVersion(),
+                target);
     }
 }

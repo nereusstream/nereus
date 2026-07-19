@@ -28,6 +28,7 @@ dependencies {
         api(project(":nereus-metadata-oxia"))
         api(project(":nereus-object-store"))
         api(project(":nereus-materialization"))
+        api(project(":nereus-bookkeeper"))
         api(project(":nereus-managed-ledger"))
         api(project(":nereus-pulsar-adapter"))
         api(project(":nereus-kop-adapter"))

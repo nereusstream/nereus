@@ -27,7 +27,7 @@
 > source-verified retention planning and ownership-safe F3 logical-trim delegation；M6 checkpoints BD–BQ close the
 > scale/failure/compatibility matrix and the clean 203/203-task aggregate
 > 下一项底层交付 F1-BK 已形成 `docs/phase-bk-bookkeeper-primary-wal/` 代码级 target，BK-M0 documentation
-> gate passed on 2026-07-19；BK-M1–M6 尚未实现，
+> gate passed on 2026-07-19；BK-M1 foundation implementation 已开始，BK-M2–M6 尚未实现，
 > BookKeeper primary profiles 仍为 pre-IO rejected。
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
@@ -69,8 +69,8 @@ streamId + offset
 3. **当前 Phase 4 代码级合同**：`docs/phase-4-compaction-generation/` 的 F4-M0 target、已 final-gated 的
    F4-M1–M6 implementation checkpoints 与 checkpoint-BQ aggregate evidence；它优先于 F4 north-star 摘要，但已实现部分仍以
    代码/测试为最高权威；
-4. **当前 F1-BK 代码级 target**：`docs/phase-bk-bookkeeper-primary-wal/` 的 BK-M0–M6 implementation contract；
-   当前为 designed/not implemented，不能覆盖已实现行为；
+4. **当前 F1-BK 代码级 target + BK-M1 evidence**：`docs/phase-bk-bookkeeper-primary-wal/` 的 BK-M0–M6
+   implementation contract；BK-M1 foundation in progress，不能把 foundation 解释为 profile 可执行；
 5. **已接受决策**：`docs/decisions/`；
 6. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
 7. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
@@ -101,7 +101,7 @@ streamId + offset
 | `nereus-core` | `Implemented`（P15 + F4-M1–M6 final-gated） | stable L0 core plus F4 resolver/pin/fallback、exact NCP1 adapter、durable protections/reference domains、protected async Object-WAL acknowledgement/repair and compression-safe higher-generation read metrics；M4 runtime GC remains exact-activation gated |
 | `nereus-materialization` | `Implemented`（F4-M1–M6 final-gated） | M1–M3 planner/worker/publication/topic engine、M4 NRC1/recovery/retirement/physical+cursor GC/scale/failure matrix、M5 coupled async read-repair/materialization/lag runtime and M6 32-ref/4,096-candidate/million-entry/128-source task、16,448-stream registry、two-broker/two-worker contention and abandoned protected-intent retirement boundaries are implemented；the current broker safe defaults keep scheduling/deletion disabled |
 | Phase 1.5 foundation | `Implemented`（P15-M0-M6 final-gated） | generic target/adapter、recovery、seal/delete and cumulative-result handoff pass ordinary/Docker gates |
-| BookKeeper primary WAL | `Designed / Reserved`（F1-BK BK-M0 documentation-gated） | `../phase-bk-bookkeeper-primary-wal/` freezes provider-neutral seam、ledger lifecycle/fencing/retention、BK_ONLY/async/sync and rollout；writer/reader/runtime remain absent and profiles are rejected before IO |
+| BookKeeper primary WAL | `BK-M1 foundation in progress`（BK-M0 documentation-gated） | independent module、generic read/append values、BookKeeper 4.18 client/config/namespace/NBKR1/resource foundation implemented；generic commit/protection、writer/reader/runtime remain incomplete and profiles are rejected before IO |
 | Async object materialization | `Implemented / final-gated`（F4-M5 profile + F4-M6 aggregate） | Object-WAL `WAL_DURABLE` boundary、generation-zero repair、pre-I/O proof/lag admission、coupled production read-repair/materialization runtime and exact Pulsar logical-retention rollout pass the retry-disabled real two-broker and Phase 4 aggregate gates；BookKeeper primary profiles remain reserved |
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6 + F4-M1-M6） | F2 ledger facade/cursor boundary plus F3 state machines、F4 projection/cursor reference domains、strict NPR1 authority、restart-reconstructable cursor candidates、AL ownerless snapshot-key inverse、AM exact cursor/retention retirement authority、durable registration/proof/activation、AR exact-scope deletion guard and factory/runtime activation surface、AS shared projection/global-scope interpretation、AT durable DELETING restart evidence、BC bounded atomic readiness-rollover handoff、pre-I/O async admission、versioned stable retention planner/F3 trim service、shared bounded lane、durable backlog accounting、per-ledger facade and registration-backed policy admission are implemented/tested；safe defaults do not activate physical deletion |
 | `nereus-pulsar-adapter` | `Implemented`（F2 + F3 + F4 complete/final-gated） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、durable generation registration/readiness/activation、checkpoint-AF coupled Object-WAL composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin admission、checkpoint-AN metadata-first root/registration/inventory lifecycle、checkpoint-AO broker physical-GC config mapping、checkpoint-AQ ordered proof/atomic delete activation、checkpoint-AR provider/Pulsar/restart-scope composition、checkpoint-AS exact shared reference-domain assembly、checkpoint-AT real post-DELETE independent recovery、checkpoint-AU applied-DELETED-CAS response-loss exact reload、checkpoint-AV two-worker shared-intent convergence、checkpoint-AW all-256-shard mixed-state recovery/opaque LIST progress、checkpoint-AX real-Oxia hot-shard bounded pagination、checkpoint-AY remove-on-cancel shared runtime scheduler、checkpoint-AZ 10,000-cursor-root exact GC、checkpoint-BA source/protection post-delete recovery、checkpoint-BB real post-root external-reappearance inventory/GC、checkpoint-BC atomic deletion-active readiness rollover and checkpoint-BI real two-broker process-wide worker contention/exact read coexistence are implemented/tested；safe defaults keep destructive execution disabled |
@@ -262,7 +262,7 @@ decision behind items 14 and 16-18。
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
 | `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | implemented / final-gated（F4-M1–M6 + checkpoint BQ） |
-| `../phase-bk-bookkeeper-primary-wal/README.md` | F1-BK writer/reader/ledger lifecycle/retention/profile rollout code-level target | designed / not implemented（BK-M0–M6 target） |
+| `../phase-bk-bookkeeper-primary-wal/README.md` | F1-BK writer/reader/ledger lifecycle/retention/profile rollout code-level target | BK-M1 foundation implementation in progress；BK-M2–M6 not implemented |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | implemented / final-gated（F4-M5 profile + F4-M6 aggregate） |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |

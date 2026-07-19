@@ -16,6 +16,8 @@ package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.PhysicalReadResult;
+import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
@@ -23,18 +25,14 @@ import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
-import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.objectstore.wal.WalObjectReader;
-import com.nereusstream.objectstore.wal.WalReadResult;
-import com.nereusstream.objectstore.wal.WalSliceReadStats;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -345,10 +343,13 @@ public final class ReadCoordinator implements StreamViewReader {
                                 : pinned.resolvedRange().offsetRange().endOffset()));
             }
             Throwable cause = unwrap(failure);
-            if (!isObjectReadFailure(cause)) {
+            java.util.Optional<PhysicalReadFailureKind> physicalFailure = PhysicalReadFailures.classify(cause);
+            if (physicalFailure.isEmpty()) {
                 return CompletableFuture.<ViewReadResult>failedFuture(cause);
             }
-            if (isRetriableTransientRead(cause)) {
+            if (physicalFailure.orElseThrow() == PhysicalReadFailureKind.TRANSIENT_IO
+                    && cause instanceof NereusException nereus
+                    && nereus.retriable()) {
                 int completedRetries = transientRetries.getOrDefault(pinned.candidate(), 0);
                 if (generationRetryPolicy.retryAfter(completedRetries)) {
                     Map<GenerationReadCandidate, Integer> nextRetries =
@@ -417,7 +418,7 @@ public final class ReadCoordinator implements StreamViewReader {
         }
         return attempted.exceptionallyCompose(error -> {
             Throwable cause = unwrap(error);
-            if (!isObjectReadFailure(cause)) {
+            if (PhysicalReadFailures.classify(cause).isEmpty()) {
                 return CompletableFuture.failedFuture(cause);
             }
             resolver.invalidate(streamId);
@@ -466,7 +467,7 @@ public final class ReadCoordinator implements StreamViewReader {
             reservation.close();
             return CompletableFuture.failedFuture(e);
         }
-        CompletableFuture<WalReadResult> walRead = deadline.bound(
+        CompletableFuture<PhysicalReadResult> walRead = deadline.bound(
                 () -> targetDispatcher.read(streamId, startOffset, ranges, boundedOptions),
                 "read resolved WAL ranges");
         return walRead.whenComplete((ignored, error) -> reservation.close())
@@ -479,11 +480,11 @@ public final class ReadCoordinator implements StreamViewReader {
             long startOffset,
             ReadOptions options,
             List<ResolvedRange> ranges,
-            WalReadResult result) {
+            PhysicalReadResult result) {
         validateReadAccounting(ranges, result);
-        result.sliceStats().forEach(stats -> observe(() -> observer.onSliceRead(
-                stats.downloadedPayloadBytes(),
-                stats.downloadedEntryIndexBytes(),
+        result.rangeStats().forEach(stats -> observe(() -> observer.onSliceRead(
+                stats.physicalPayloadBytesRead(),
+                stats.physicalAuxiliaryBytesRead(),
                 stats.returnedPayloadBytes())));
         if (result.batches().isEmpty()) {
             throw new NereusException(
@@ -524,39 +525,35 @@ public final class ReadCoordinator implements StreamViewReader {
 
     private static void validateReadAccounting(
             List<ResolvedRange> ranges,
-            WalReadResult result) {
-        Set<RangeIdentity> expectedRanges = new HashSet<>();
-        ranges.stream().map(ResolvedObjectRange::from).forEach(range -> expectedRanges.add(new RangeIdentity(
-                range.objectId(), range.objectOffset(), range.objectLength(), range.entryIndexRef().length())));
-        Set<RangeIdentity> observedRanges = new HashSet<>();
-        Set<com.nereusstream.api.ObjectId> observedObjects = new HashSet<>();
+            PhysicalReadResult result) {
+        Map<com.nereusstream.api.Checksum, Integer> expectedRanges = new HashMap<>();
+        ranges.forEach(range -> expectedRanges.merge(
+                com.nereusstream.api.ReadTargetIdentities.sha256(range.readTarget()), 1, Math::addExact));
+        Map<com.nereusstream.api.Checksum, Integer> observedRanges = new HashMap<>();
         long statsReturned = 0;
         long batchBytes = 0;
         try {
-            for (WalSliceReadStats stats : result.sliceStats()) {
-                RangeIdentity identity = new RangeIdentity(
-                        stats.objectId(),
-                        stats.objectOffset(),
-                        stats.fullSlicePayloadBytes(),
-                        stats.entryIndexBytes());
-                if (!expectedRanges.contains(identity)) {
+            for (PhysicalReadStats stats : result.rangeStats()) {
+                com.nereusstream.api.Checksum identity = stats.targetIdentity();
+                int expectedCount = expectedRanges.getOrDefault(identity, 0);
+                if (expectedCount == 0) {
                     throw new NereusException(
                             ErrorCode.METADATA_INVARIANT_VIOLATION,
                             false,
                             "WAL reader reported accounting for an unknown resolved range");
                 }
-                if (!observedRanges.add(identity)) {
+                int observedCount = observedRanges.merge(identity, 1, Math::addExact);
+                if (observedCount > expectedCount) {
                     throw new NereusException(
                             ErrorCode.METADATA_INVARIANT_VIOLATION,
                             false,
                             "WAL reader reported duplicate accounting for one resolved range");
                 }
-                observedObjects.add(stats.objectId());
                 stats.amplificationBytes();
                 statsReturned = Math.addExact(statsReturned, stats.returnedPayloadBytes());
             }
             for (ReadBatch batch : result.batches()) {
-                if (!observedObjects.contains(batch.sourceObjectId())) {
+                if (!observedRanges.containsKey(batch.source().targetIdentity())) {
                     throw new NereusException(
                             ErrorCode.METADATA_INVARIANT_VIOLATION,
                             false,
@@ -577,19 +574,6 @@ public final class ReadCoordinator implements StreamViewReader {
                     false,
                     "WAL reader returned-byte accounting does not match batches");
         }
-    }
-
-    private static boolean isObjectReadFailure(Throwable cause) {
-        return cause instanceof NereusException nereus
-                && (nereus.code() == ErrorCode.OBJECT_NOT_FOUND
-                        || nereus.code() == ErrorCode.OBJECT_READ_FAILED
-                        || nereus.code() == ErrorCode.OBJECT_CHECKSUM_MISMATCH);
-    }
-
-    private static boolean isRetriableTransientRead(Throwable cause) {
-        return cause instanceof NereusException nereus
-                && nereus.code() == ErrorCode.OBJECT_READ_FAILED
-                && nereus.retriable();
     }
 
     private static Throwable unwrap(Throwable error) {

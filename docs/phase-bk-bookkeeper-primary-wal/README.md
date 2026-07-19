@@ -1,9 +1,9 @@
 # BookKeeper Primary WAL Delivery Detailed Design
 
-> 状态：BK-M0 code-level design/documentation gate passed on 2026-07-19；本目录冻结实现合同，不表示
-> BookKeeper primary-WAL writer、reader、ledger lifecycle、retention 或三个 BookKeeper profile 已经可用。实现完成前，
-> `BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT` 与 `BOOKKEEPER_WAL_SYNC_OBJECT` 必须继续在任何
-> BookKeeper IO 之前 fail closed。
+> 状态：BK-M0 design gate passed；BK-M1 implementation in progress on 2026-07-19。第一批 provider-neutral
+> read/append values、独立 `nereus-bookkeeper` 模块、BookKeeper 4.18 公共 API adapter、配置/namespace/NBKR1/
+> resource foundation 已实现并测试。generic commit/protection/gen0、writer、reader、ledger lifecycle、retention
+> 尚未完成，因此三个 BookKeeper profile 继续在任何 BookKeeper IO 之前 fail closed。
 
 ## 1. Delivery identity
 
@@ -144,3 +144,16 @@ The design is based only on this repository and the local Pulsar checkout at
 The target Pulsar source lock is `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。The Nereus pre-design audit
 lock and BookKeeper client API surface are recorded in document 01；a changed lock requires re-audit, not silent
 compilation against a different checkout.
+
+## 9. Current implementation evidence
+
+The first BK-M1 checkpoint adds：
+
+- `nereus-bookkeeper` compiled against BookKeeper `4.18.0` and exported from `nereus-bom`；
+- generic `ReadSourceRef`、`PhysicalReadStats`、`PhysicalReadResult` and canonical `ReadTargetIdentities`；
+- generic `PrimaryPhysicalIdentity`、opaque `ProviderAppendToken` and independent append completion values；
+- configuration/GC safe defaults、positive-63-bit namespace generator、read-only provisioned reservation verifier；
+- NBKR1、prepared-entry ownership、public-client operations、deadline/error mapping and bounded handle cache；
+- executable module-boundary and focused unit gates。
+
+No `BookKeeperPrimaryWalAppender`/reader/lifecycle runtime is registered at this checkpoint.
