@@ -30,7 +30,7 @@
 > `bookKeeperPrimaryWalM3LagCheck`、`bookKeeperPrimaryWalM3SourceRetirementCheck`、
 > `bookKeeperPrimaryWalM3LiveReadCheck`、`bookKeeperPrimaryWalM3SealedLedgerCheck`、
 > `bookKeeperPrimaryWalM3Check`、`bookKeeperPrimaryWalM3RealServiceCheck` and
-> `bookKeeperPrimaryWalM3PhysicalRetirementCheck`。The live checkpoint fresh-resolves and
+> `bookKeeperPrimaryWalM3PhysicalRetirementCheck`、`bookKeeperPrimaryWalM3ResponseLossCheck`。The live checkpoint fresh-resolves and
 > reads the full exact higher generation under normal durable Object pins before BK retirement，while generation-zero
 > fallback delegates protection to the BK reader lease。The first real-service chain now proves stable-head ack with no
 > Object generation，BK fallback before/after a fresh runtime，durable task reconstruction from committed metadata，exact
@@ -38,7 +38,12 @@
 > real Oxia + BookKeeper + LocalStack。The same chain now advances the shared audit grace，releases the exact dynamic BK
 > source protection，retires all three mandatory range references from the healthy Object authority，runs the existing
 > mark/drain/delete/dual-absence ledger-retention protocol，and continues exact Object reads after the old BK ledger is
-> physically absent。Task/protection/publication response-loss cuts remain pending，so BK-M3 is not complete。The remaining
+> physically absent。The response-loss checkpoint then uses four fresh runtimes to prove applied task-create loss leaves
+> one deterministic PLANNED task and no premature dynamic source；applied BK-source create plus compacted-Object PUT
+> loss reaches durable `RETRY_WAIT`、releases the dynamic source and preserves BK fallback；a final runtime reuses the
+> same task/source/object identity and converges claim、output-ready、source transfer、publishing、generation attachment、
+> COMMITTED publication、PUBLISHED and source-release response loss before exact Object read。Real-load lag admission
+> and remaining negative failure cuts remain pending，so BK-M3 is not complete。The remaining
 > M2 scenario/evidence rows and aggregate/final gate are not yet closed；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
@@ -46,6 +51,8 @@
 > 2026-07-19：the deterministic checkpoint `bookKeeperPrimaryWalM3Check --rerun-tasks` passes 62/62 executable tasks；
 > `bookKeeperPrimaryWalM3PhysicalRetirementCheck` extends the real Oxia + BookKeeper + S3-compatible end-to-end evidence
 > through physical source deletion and passes 65/65 executable tasks with `--rerun-tasks`，
+> while `bookKeeperPrimaryWalM3ResponseLossCheck --rerun-tasks` adds the fresh-runtime response-loss matrix and also
+> passes 65/65 executable tasks；
 > but is intentionally not the still-unregistered `bookKeeperPrimaryWalM3FinalCheck`。
 
 ## 1. Delivery identity

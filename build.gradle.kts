@@ -783,6 +783,13 @@ tasks.register("bookKeeperPrimaryWalM3PhysicalRetirementCheck") {
     dependsOn("bookKeeperPrimaryWalM3RealServiceCheck")
 }
 
+tasks.register("bookKeeperPrimaryWalM3ResponseLossCheck") {
+    group = "verification"
+    description = "Verify BK-M3 fresh-runtime task, source, output, and publication response-loss convergence."
+    dependsOn("bookKeeperPrimaryWalM3PhysicalRetirementCheck")
+    dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

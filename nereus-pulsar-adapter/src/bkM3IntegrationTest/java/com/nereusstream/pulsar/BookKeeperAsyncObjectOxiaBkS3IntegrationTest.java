@@ -11,6 +11,9 @@ import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.DurabilityLevel;
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
+import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
@@ -67,9 +70,13 @@ import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.materialization.MaterializationConfig;
+import com.nereusstream.metadata.oxia.BookKeeperLedgerMetadataStore;
+import com.nereusstream.metadata.oxia.BookKeeperMetadataConditionFailedException;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.BookKeeperScanToken;
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
+import com.nereusstream.metadata.oxia.F4MetadataConditionFailedException;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
@@ -84,15 +91,28 @@ import com.nereusstream.metadata.oxia.VersionedMaterializationCheckpoint;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
+import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
+import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
+import com.nereusstream.metadata.oxia.records.TaskLifecycle;
+import com.nereusstream.objectstore.HeadObjectOptions;
+import com.nereusstream.objectstore.HeadObjectResult;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
 import com.nereusstream.objectstore.ObjectStoreSecretResolver;
+import com.nereusstream.objectstore.PutObjectAttemptGuard;
+import com.nereusstream.objectstore.PutObjectOptions;
+import com.nereusstream.objectstore.PutObjectResult;
+import com.nereusstream.objectstore.RangeReadOptions;
+import com.nereusstream.objectstore.RangeReadResult;
+import com.nereusstream.objectstore.ReplayableObjectUpload;
 import com.nereusstream.objectstore.S3CompatibleObjectStoreProvider;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
 import io.oxia.testcontainers.OxiaContainer;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -101,6 +121,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -110,7 +133,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
+import java.util.function.BooleanSupplier;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.common.allocator.PoolingPolicy;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -290,6 +316,103 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
         }
     }
 
+    @Test
+    void freshRuntimesConvergeAppliedTaskSourceOutputAndPublicationResponseLoss() throws Exception {
+        Fixture fixture = Fixture.create();
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri)) {
+            StreamId stream;
+            AppendResult append;
+            List<byte[]> expected = List.of(new byte[] {10, 11}, new byte[] {12, 13, 14});
+            try (Process first = Process.open(
+                    fixture, bookKeeperCluster, "cuts-first", temporaryDirectory.resolve("cuts-first"))) {
+                stream = first.storage.createOrGetStream(
+                                new StreamName("persistent://tenant/namespace/cuts-" + fixture.suffix),
+                                new StreamCreateOptions(
+                                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, Map.of()))
+                        .join()
+                        .streamId();
+                append = first.append(stream, expected);
+                first.register(stream, append.commitVersion());
+                assertExactRead(first.storage, stream, expected, BookKeeperEntryRangeReadTarget.class);
+            }
+
+            long ledgerId = ((BookKeeperEntryRangeReadTarget) append.readTarget()).ledgerId();
+            ResponseLossPlan taskCreateLoss = ResponseLossPlan.of(ResponseCut.TASK_CREATE);
+            try (Process taskCut = Process.open(
+                    fixture,
+                    bookKeeperCluster,
+                    "cuts-task",
+                    temporaryDirectory.resolve("cuts-task"),
+                    taskCreateLoss)) {
+                taskCut.phase4.start();
+                assertThatThrownBy(() -> taskCut.phase4.materializationService().scanNow().join())
+                        .hasRootCauseInstanceOf(F4MetadataConditionFailedException.class);
+                assertThat(taskCreateLoss.allInjected()).isTrue();
+                assertThat(taskCut.taskLifecycles(stream)).containsOnly(TaskLifecycle.PLANNED);
+                assertThat(taskCut.bookKeeperProtections(ledgerId))
+                        .extracting(value -> value.value().protectionType())
+                        .doesNotContain(BookKeeperProtectionType.MATERIALIZATION_SOURCE);
+            }
+
+            ResponseLossPlan outputLoss = ResponseLossPlan.of(
+                    ResponseCut.BK_SOURCE_CREATE,
+                    ResponseCut.OBJECT_PUT);
+            try (Process outputCut = Process.open(
+                    fixture,
+                    bookKeeperCluster,
+                    "cuts-output",
+                    temporaryDirectory.resolve("cuts-output"),
+                    outputLoss)) {
+                outputCut.phase4.start();
+                assertThatThrownBy(() -> outputCut.phase4.materializationService().scanNow().join())
+                        .hasRootCauseInstanceOf(NereusException.class)
+                        .rootCause()
+                        .extracting(failure -> ((NereusException) failure).code())
+                        .isEqualTo(ErrorCode.OBJECT_UPLOAD_FAILED);
+                await(TIMEOUT, () -> outputCut.taskLifecycles(stream).contains(TaskLifecycle.RETRY_WAIT));
+                assertThat(outputLoss.allInjected()).isTrue();
+                assertThat(outputCut.committedHigherGenerations(stream)).isEmpty();
+                assertThat(outputCut.bookKeeperProtections(ledgerId))
+                        .extracting(value -> value.value().protectionType())
+                        .doesNotContain(BookKeeperProtectionType.MATERIALIZATION_SOURCE);
+                assertExactRead(outputCut.storage, stream, expected, BookKeeperEntryRangeReadTarget.class);
+            }
+
+            fixture.clock.advance(Duration.ofSeconds(2));
+            ResponseLossPlan publicationLoss = ResponseLossPlan.of(
+                    ResponseCut.TASK_CLAIM,
+                    ResponseCut.TASK_OUTPUT_READY,
+                    ResponseCut.BK_SOURCE_TRANSFER,
+                    ResponseCut.TASK_PUBLISHING,
+                    ResponseCut.TASK_GENERATION_ATTACHMENT,
+                    ResponseCut.GENERATION_COMMITTED,
+                    ResponseCut.TASK_PUBLISHED,
+                    ResponseCut.BK_SOURCE_RELEASE);
+            try (Process recovered = Process.open(
+                    fixture,
+                    bookKeeperCluster,
+                    "cuts-recovered",
+                    temporaryDirectory.resolve("cuts-recovered"),
+                    publicationLoss)) {
+                recovered.phase4.start();
+                recovered.phase4.materializationService().scanNow().join();
+                await(TIMEOUT, () -> !recovered.committedHigherGenerations(stream).isEmpty());
+                assertExactRead(recovered.storage, stream, expected, ObjectSliceReadTarget.class);
+                assertThat(publicationLoss.injectedExcept(ResponseCut.BK_SOURCE_RELEASE)).isTrue();
+
+                fixture.clock.advance(recovered.materializationConfig.metadataAuditGrace().plusMillis(1));
+                recovered.phase4.materializationService().scanNow().join();
+                await(TIMEOUT, publicationLoss::allInjected);
+                assertThat(recovered.bookKeeperProtections(ledgerId))
+                        .extracting(value -> value.value().protectionType())
+                        .doesNotContain(BookKeeperProtectionType.MATERIALIZATION_SOURCE);
+                assertThat(recovered.taskLifecycles(stream)).isEmpty();
+                assertExactRead(recovered.storage, stream, expected, ObjectSliceReadTarget.class);
+            }
+        }
+    }
+
     private static void assertExactRead(
             DefaultStreamStorage storage,
             StreamId stream,
@@ -414,6 +537,20 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                 BKCluster bookKeeperCluster,
                 String process,
                 Path processDirectory) throws Exception {
+            return open(
+                    fixture,
+                    bookKeeperCluster,
+                    process,
+                    processDirectory,
+                    ResponseLossPlan.none());
+        }
+
+        private static Process open(
+                Fixture fixture,
+                BKCluster bookKeeperCluster,
+                String process,
+                Path processDirectory,
+                ResponseLossPlan responseLosses) throws Exception {
             OxiaClientConfiguration oxia = oxiaConfiguration();
             SharedOxiaClientRuntime oxiaRuntime = SharedOxiaClientRuntime.connect(oxia, fixture.clock);
             BookKeeperMetadataStoreConfig metadataConfig = new BookKeeperMetadataStoreConfig(
@@ -430,6 +567,9 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                     OxiaJavaGenerationMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, fixture.clock);
             OxiaJavaPhysicalObjectMetadataStore physical =
                     OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(oxia, oxiaRuntime, fixture.clock);
+            GenerationMetadataStore runtimeGenerations = responseLosses.generations(generations);
+            BookKeeperLedgerMetadataStore runtimeBookKeeperMetadata =
+                    responseLosses.bookKeeperMetadata(bookKeeperMetadata);
             StreamStorageConfig storageConfig = StreamStorageConfig.defaults(
                     fixture.cluster, "writer-" + process);
             BookKeeper client = bookKeeperCluster.newClient();
@@ -500,6 +640,7 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
 
             S3CompatibleObjectStoreProvider objectStoreProvider = new S3CompatibleObjectStoreProvider();
             ObjectStore objectStore = createObjectStore(objectStoreProvider, fixture.bucket);
+            ObjectStore runtimeObjectStore = responseLosses.objectStore(objectStore);
             ObjectProtectionManager protections = new DefaultObjectProtectionManager(
                     fixture.cluster,
                     physical,
@@ -527,10 +668,10 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                     materializationConfig,
                     Duration.ofMinutes(1),
                     l0,
-                    generations,
+                    runtimeGenerations,
                     physical,
-                    objectStore,
-                    new DefaultWalObjectReader(objectStore),
+                    runtimeObjectStore,
+                    new DefaultWalObjectReader(runtimeObjectStore),
                     bookKeeperRuntime.generationZeroPhysicalReferences(),
                     protections,
                     readPins,
@@ -539,7 +680,7 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                             new BookKeeperMaterializationSourceProtectionAdapter(
                                     fixture.cluster,
                                     fixture.bookKeeper,
-                                    bookKeeperMetadata,
+                                    runtimeBookKeeperMetadata,
                                     fixture.clock))),
                     scheduler,
                     workers,
@@ -656,6 +797,12 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                     .withFailMessage("exact checkpoint=%s", exact)
                     .containsExactlyElementsOf(exact.stream().toList());
             return page.values();
+        }
+
+        private List<TaskLifecycle> taskLifecycles(StreamId stream) {
+            var page = generations.scanTasks(fixture.cluster, stream, Optional.empty(), 100).join();
+            assertThat(page.continuation()).isEmpty();
+            return page.values().stream().map(value -> value.value().lifecycle()).toList();
         }
 
         private List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> bookKeeperProtections(
@@ -893,6 +1040,232 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                 "access".equals(reference)
                         ? LOCALSTACK.getAccessKey().toCharArray()
                         : LOCALSTACK.getSecretKey().toCharArray());
+    }
+
+    private static void await(Duration timeout, BooleanSupplier condition) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            LockSupport.parkNanos(Duration.ofMillis(25).toNanos());
+        }
+        throw new AssertionError("condition did not converge within " + timeout);
+    }
+
+    private enum ResponseCut {
+        TASK_CREATE,
+        BK_SOURCE_CREATE,
+        OBJECT_PUT,
+        TASK_CLAIM,
+        TASK_OUTPUT_READY,
+        BK_SOURCE_TRANSFER,
+        TASK_PUBLISHING,
+        TASK_GENERATION_ATTACHMENT,
+        GENERATION_COMMITTED,
+        TASK_PUBLISHED,
+        BK_SOURCE_RELEASE
+    }
+
+    private static final class ResponseLossPlan {
+        private final EnumMap<ResponseCut, AtomicBoolean> pending;
+
+        private ResponseLossPlan(EnumSet<ResponseCut> cuts) {
+            pending = new EnumMap<>(ResponseCut.class);
+            cuts.forEach(cut -> pending.put(cut, new AtomicBoolean(true)));
+        }
+
+        private static ResponseLossPlan none() {
+            return new ResponseLossPlan(EnumSet.noneOf(ResponseCut.class));
+        }
+
+        private static ResponseLossPlan of(ResponseCut... cuts) {
+            EnumSet<ResponseCut> values = EnumSet.noneOf(ResponseCut.class);
+            values.addAll(Arrays.asList(cuts));
+            return new ResponseLossPlan(values);
+        }
+
+        private boolean inject(ResponseCut cut) {
+            var value = pending.get(cut);
+            return value != null && value.compareAndSet(true, false);
+        }
+
+        private boolean allInjected() {
+            return pending.values().stream().noneMatch(AtomicBoolean::get);
+        }
+
+        private boolean injectedExcept(ResponseCut excluded) {
+            return pending.entrySet().stream()
+                    .filter(entry -> entry.getKey() != excluded)
+                    .noneMatch(entry -> entry.getValue().get());
+        }
+
+        private GenerationMetadataStore generations(GenerationMetadataStore delegate) {
+            return (GenerationMetadataStore) Proxy.newProxyInstance(
+                    GenerationMetadataStore.class.getClassLoader(),
+                    new Class<?>[] {GenerationMetadataStore.class},
+                    (proxy, method, args) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return method.invoke(delegate, args);
+                        }
+                        Object result = invoke(delegate, method, args);
+                        if (method.getName().equals("createTask")) {
+                            return loseSuccessfulResponse(
+                                    ResponseCut.TASK_CREATE,
+                                    result,
+                                    new F4MetadataConditionFailedException(
+                                            "injected lost task-create response"));
+                        }
+                        if (method.getName().equals("compareAndSetTask")
+                                && args[1] instanceof MaterializationTaskRecord replacement) {
+                            ResponseCut cut = switch (replacement.lifecycle()) {
+                                case CLAIMED -> ResponseCut.TASK_CLAIM;
+                                case OUTPUT_READY -> ResponseCut.TASK_OUTPUT_READY;
+                                case PUBLISHING -> replacement.allocatedGeneration().isPresent()
+                                        ? ResponseCut.TASK_GENERATION_ATTACHMENT
+                                        : ResponseCut.TASK_PUBLISHING;
+                                case PUBLISHED -> ResponseCut.TASK_PUBLISHED;
+                                default -> null;
+                            };
+                            if (cut != null) {
+                                return loseSuccessfulResponse(
+                                        cut,
+                                        result,
+                                        new F4MetadataConditionFailedException(
+                                                "injected lost " + cut + " response"));
+                            }
+                        }
+                        if (method.getName().equals("compareAndSetIndex")
+                                && args[1] instanceof GenerationIndexRecord replacement
+                                && replacement.lifecycle() == GenerationLifecycle.COMMITTED) {
+                            return loseSuccessfulResponse(
+                                    ResponseCut.GENERATION_COMMITTED,
+                                    result,
+                                    new F4MetadataConditionFailedException(
+                                            "injected lost committed-generation response"));
+                        }
+                        return result;
+                    });
+        }
+
+        private BookKeeperLedgerMetadataStore bookKeeperMetadata(
+                BookKeeperLedgerMetadataStore delegate) {
+            return (BookKeeperLedgerMetadataStore) Proxy.newProxyInstance(
+                    BookKeeperLedgerMetadataStore.class.getClassLoader(),
+                    new Class<?>[] {BookKeeperLedgerMetadataStore.class},
+                    (proxy, method, args) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return method.invoke(delegate, args);
+                        }
+                        Object result = invoke(delegate, method, args);
+                        if (method.getName().equals("createProtection")
+                                && args[2] instanceof BookKeeperLedgerProtectionRecord replacement
+                                && replacement.protectionType()
+                                        == BookKeeperProtectionType.MATERIALIZATION_SOURCE) {
+                            return loseSuccessfulResponse(
+                                    ResponseCut.BK_SOURCE_CREATE,
+                                    result,
+                                    new BookKeeperMetadataConditionFailedException(
+                                            "injected lost BK source-create response"));
+                        }
+                        if (method.getName().equals("compareAndSetProtection")
+                                && args[2] instanceof BookKeeperLedgerProtectionRecord replacement
+                                && replacement.protectionType()
+                                        == BookKeeperProtectionType.MATERIALIZATION_SOURCE) {
+                            return loseSuccessfulResponse(
+                                    ResponseCut.BK_SOURCE_TRANSFER,
+                                    result,
+                                    new BookKeeperMetadataConditionFailedException(
+                                            "injected lost BK source-transfer response"));
+                        }
+                        if (method.getName().equals("deleteProtection")) {
+                            return loseSuccessfulResponse(
+                                    ResponseCut.BK_SOURCE_RELEASE,
+                                    result,
+                                    new BookKeeperMetadataConditionFailedException(
+                                            "injected lost BK source-release response"));
+                        }
+                        return result;
+                    });
+        }
+
+        private ObjectStore objectStore(ObjectStore delegate) {
+            return new ObjectStore() {
+                @Override
+                public CompletableFuture<PutObjectResult> putObject(
+                        ObjectKey key,
+                        ReplayableObjectUpload source,
+                        PutObjectOptions options) {
+                    return delegate.putObject(key, source, options);
+                }
+
+                @Override
+                public CompletableFuture<PutObjectResult> putObject(
+                        ObjectKey key,
+                        ReplayableObjectUpload source,
+                        PutObjectOptions options,
+                        PutObjectAttemptGuard attemptGuard) {
+                    CompletableFuture<PutObjectResult> applied =
+                            delegate.putObject(key, source, options, attemptGuard);
+                    if (!key.value().contains("/compacted/v1/")) {
+                        return applied;
+                    }
+                    return applied.thenCompose(value -> inject(ResponseCut.OBJECT_PUT)
+                            ? CompletableFuture.failedFuture(new NereusException(
+                                    ErrorCode.OBJECT_UPLOAD_FAILED,
+                                    true,
+                                    "injected lost compacted-object PUT response"))
+                            : CompletableFuture.completedFuture(value));
+                }
+
+                @Override
+                public CompletableFuture<RangeReadResult> readRange(
+                        ObjectKey key,
+                        long offset,
+                        long length,
+                        RangeReadOptions options) {
+                    return delegate.readRange(key, offset, length, options);
+                }
+
+                @Override
+                public CompletableFuture<HeadObjectResult> headObject(
+                        ObjectKey key,
+                        HeadObjectOptions options) {
+                    return delegate.headObject(key, options);
+                }
+
+                @Override
+                public void close() {
+                    // Process owns the concrete ObjectStore and closes it exactly once.
+                }
+            };
+        }
+
+        private Object loseSuccessfulResponse(
+                ResponseCut cut,
+                Object result,
+                RuntimeException failure) {
+            if (!pending.containsKey(cut)) {
+                return result;
+            }
+            if (!(result instanceof CompletableFuture<?> future)) {
+                throw new IllegalStateException("response-loss cut requires an async operation: " + cut);
+            }
+            return future.thenCompose(value -> inject(cut)
+                    ? CompletableFuture.failedFuture(failure)
+                    : CompletableFuture.completedFuture(value));
+        }
+
+        private static Object invoke(
+                Object delegate,
+                java.lang.reflect.Method method,
+                Object[] args) throws Throwable {
+            try {
+                return method.invoke(delegate, args);
+            } catch (InvocationTargetException failure) {
+                throw failure.getCause();
+            }
+        }
     }
 
     private static final class MutableClock extends Clock {

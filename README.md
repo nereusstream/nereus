@@ -84,7 +84,10 @@ BK-M3 now has executable checkpoints for BK task V2/exact-source reads、durable
 `MATERIALIZATION_SOURCE` ownership and restart transfer、shared F4 runtime provider composition、the async
 stable-head profile plan、common authoritative lag reader、source-retirement authority and sealed-ledger trigger。
 The first real Oxia + BookKeeper + Object chain also proves BK fallback across a fresh runtime、NCP1 publication、
-higher-generation normal reads and the exact retirement proof。Response-loss and physical source release/delete cuts
+higher-generation normal reads and the exact retirement proof。The physical-retirement extension releases the dynamic
+source protection、retires all mandatory range references、deletes the sealed ledger and keeps Object reads exact；the
+fresh-runtime response-loss extension converges applied task create、source protection、Object PUT and every publication
+CAS without rewriting BK or allocating another task/generation。Real-load lag admission and remaining negative cuts
 remain open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 

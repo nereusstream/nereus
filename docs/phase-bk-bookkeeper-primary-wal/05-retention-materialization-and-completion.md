@@ -117,8 +117,13 @@ extension advances the shared metadata-audit grace and proves that terminal task
 `MATERIALIZATION_SOURCE` slot；`BookKeeperAsyncObjectRetirementAuthority` then uses the same healthy Object proof to
 retire `REACHABLE_APPEND`、`VISIBLE_GENERATION` and `APPEND_RECOVERY`。The existing whole-ledger gate and retention
 manager mark、drain、physically delete、record two separated absence observations and reach `DELETED`，after which the
-normal resolver still reads the complete range from Object。Task/protection/publication response-loss cuts remain
-required before the M3 final gate and broker registration。
+normal resolver still reads the complete range from Object。The fresh-runtime response-loss checkpoint now covers an
+applied task-create response loss before source protection、an applied BK-source create response loss、an applied
+compacted-Object PUT response loss followed by durable `RETRY_WAIT` and source release，and the entire recovered
+claim/output/source-transfer/publish/generation-commit/task-published/source-release CAS chain。Every process reloads
+the same deterministic task/source/output identity，and BK remains the readable generation-zero fallback until the
+exact higher generation is COMMITTED。Real-load lag admission and remaining negative failure cuts are still required
+before the M3 final gate and broker registration。
 
 ## 4. `BookKeeperWalRetentionGate`
 

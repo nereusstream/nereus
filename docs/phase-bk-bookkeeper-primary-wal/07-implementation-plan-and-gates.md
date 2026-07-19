@@ -8,7 +8,7 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)
-BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (real-service physical-retirement checkpoint)
+BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (real-service response-loss checkpoint)
 BK-M4 .. BK-M6                  not implemented
 BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
@@ -25,7 +25,8 @@ module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPr
 `bookKeeperPrimaryWalM3ProtectionCheck` / `bookKeeperPrimaryWalM3AsyncProfileCheck` /
 `bookKeeperPrimaryWalM3LagCheck` / `bookKeeperPrimaryWalM3SourceRetirementCheck` /
 `bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` /
-`bookKeeperPrimaryWalM3RealServiceCheck` / `bookKeeperPrimaryWalM3PhysicalRetirementCheck` are also executable。The
+`bookKeeperPrimaryWalM3RealServiceCheck` / `bookKeeperPrimaryWalM3PhysicalRetirementCheck` /
+`bookKeeperPrimaryWalM3ResponseLossCheck` are also executable。The
 unfinished M2 aggregate/final gates、M3 failure-cut
 final gate and M4–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
@@ -509,6 +510,15 @@ COMMITTED Object proof to retire the sealed range's three fixed protections，th
 verified absent through the real BookKeeper client while the normal generation resolver continues returning all bytes
 from Object。
 
+The response-loss checkpoint reopens the real Oxia、BookKeeper and S3-compatible services through four independent
+runtime compositions。Applied task-create response loss is recovered as the one deterministic PLANNED task before any
+BK dynamic source exists。Applied BK-source create and compacted-Object PUT response loss then converge to durable
+`RETRY_WAIT` with no committed higher generation、no leaked dynamic source and exact BK fallback。After retry backoff，
+the final runtime reuses that same task/source/object identity and injects applied response loss after claim、
+`OUTPUT_READY`、source-owner transfer、`PUBLISHING` freeze、generation attachment、generation `COMMITTED`、task
+`PUBLISHED` and dynamic-source release；exact reload converges every cut and the normal resolver returns the Object
+generation。No cut appends another BK range or allocates another task/generation。
+
 ### 6.3 Gates
 
 ```text
@@ -522,6 +532,7 @@ bookKeeperPrimaryWalM3SealedLedgerCheck
 bookKeeperPrimaryWalM3Check
 bookKeeperPrimaryWalM3RealServiceCheck       first real Oxia + BK + Object end-to-end chain
 bookKeeperPrimaryWalM3PhysicalRetirementCheck real source release + fixed-reference retirement + ledger delete
+bookKeeperPrimaryWalM3ResponseLossCheck      fresh-runtime task/source/output/publication response-loss matrix
 bookKeeperPrimaryWalM3FinalCheck             real Oxia + BK + Object store, fresh-runtime cuts
 ```
 
@@ -530,10 +541,13 @@ sealed-trigger contracts。`bookKeeperPrimaryWalM3RealServiceCheck` now proves s
 real BK fallback across process replacement、fresh-runtime task creation、NCP1 exact bytes、COMMITTED publication、
 higher-generation selection and exact live-read retirement proof。`bookKeeperPrimaryWalM3PhysicalRetirementCheck`
 extends that real chain through terminal dynamic-source release、all fixed-reference retirement、whole-ledger physical
-delete and post-delete Object reads。Final gate still adds task/source-protection/output/publication response-loss
-cuts、lag admission under real load and fresh-runtime failure cuts。`bookKeeperPrimaryWalM3Check --rerun-tasks` passed
+delete and post-delete Object reads。`bookKeeperPrimaryWalM3ResponseLossCheck` adds applied task create、dynamic source
+create/transfer/release、Object PUT and every task/generation publication response-loss cut across fresh runtimes。
+Final gate still adds lag admission under real load and remaining fresh-runtime negative failure cuts。
+`bookKeeperPrimaryWalM3Check --rerun-tasks` passed
 62/62 deterministic tasks and `bookKeeperPrimaryWalM3PhysicalRetirementCheck --rerun-tasks` passed 65/65 executable
-tasks on 2026-07-19；the
+tasks；`bookKeeperPrimaryWalM3ResponseLossCheck --rerun-tasks` also passed its 65/65 executable aggregate on
+2026-07-19。The
 `bookKeeperPrimaryWalM3FinalCheck` task remains intentionally unregistered。
 
 ### 6.4 Mandatory review stop D
