@@ -268,7 +268,9 @@ Recovery now has deterministic applied-response-loss coverage for each writer/ro
 old process and `WriteAdvHandle` live while a newer session recovery-opens the ledger；the stale owner then fails both
 pre-head validation and an explicit advanced-ledger write, while the replacement range starts on a different ledger
 at entry zero。Two process-run state machines also contend from the same observed writer version and only one recovery
-owner/replacement ledger wins；the remaining independent-process contention cut stays open in the matrix。
+owner/replacement ledger wins。The real-service successor repeats that race with two independently opened `Process`
+fixtures，each owning its own Oxia runtime and BookKeeper client：one exact writer CAS wins，the winner recovery-seals
+the old ledger and allocates the sole replacement，and durable writer state selects only that replacement。
 
 The real reader gate now keeps the exact three-entry ledger range intact for a logical read beginning at offset one：
 the provider call remains `[0,2]` with `withRecovery(false)`，NBKR1 is verified over all three entries, and only then

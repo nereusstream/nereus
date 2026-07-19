@@ -1276,6 +1276,84 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
     }
 
+    @Test
+    void twoIndependentRecoveryProcessesElectOneRealOxiaWinnerAndOneReplacementLedger() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-recovery-contenders-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        MutableClock clock = new MutableClock(5_500_000);
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process oldProcess = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-contender-old",
+                        configuration,
+                        reservation,
+                        clock);
+                Process contenderA = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-contender-a",
+                        configuration,
+                        reservation,
+                        clock);
+                Process contenderB = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-contender-b",
+                        configuration,
+                        reservation,
+                        clock)) {
+            StreamId stream = oldProcess.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-recovery-contenders-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            AppendSession oldSession = oldProcess.acquire(stream, "writer-old");
+            DurablePrimaryAppend oldDurable = oldProcess.persistOnly(
+                    stream,
+                    oldSession,
+                    new AppendAttemptId("attempt-contender-old-" + suffix),
+                    new byte[] {1});
+            long oldLedger = ((BookKeeperEntryRangeReadTarget) oldDurable.readTarget()).ledgerId();
+
+            clock.advance(Duration.ofMinutes(1).plusMillis(1));
+            AppendSession newSession = contenderA.acquire(stream, "writer-new");
+            var observed = contenderA.bookKeeperMetadata.getWriter(cluster, stream).join().orElseThrow();
+            CompletableFuture<?> adoptionA = contenderA.writerState.adoptForRecovery(
+                    observed, newSession, "real Oxia contender a");
+            CompletableFuture<?> adoptionB = contenderB.writerState.adoptForRecovery(
+                    observed, newSession, "real Oxia contender b");
+            CompletableFuture.allOf(
+                            adoptionA.handle((value, failure) -> null),
+                            adoptionB.handle((value, failure) -> null))
+                    .join();
+            assertThat(adoptionA.isCompletedExceptionally() ^ adoptionB.isCompletedExceptionally()).isTrue();
+
+            Process winner = adoptionA.isCompletedExceptionally() ? contenderB : contenderA;
+            winner.recovery.recoverWriter(newSession, TIMEOUT, "real Oxia recovery winner").join();
+            var replacement = winner.allocator.allocate(new BookKeeperLedgerAllocationRequest(
+                            stream, newSession, TIMEOUT))
+                    .join();
+            assertThat(replacement.root().value().ledgerId()).isNotEqualTo(oldLedger);
+            assertThat(winner.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), oldLedger)
+                    .join()).get().satisfies(root ->
+                            assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED));
+            assertThat(winner.bookKeeperMetadata.getWriter(cluster, stream).join()).get().satisfies(writer -> {
+                assertThat(writer.value().lifecycle()).isEqualTo(BookKeeperWriterLifecycle.ACTIVE);
+                assertThat(writer.value().activeLedgerId()).isEqualTo(replacement.root().value().ledgerId());
+            });
+        }
+    }
+
     private static CountingOperations counting(
             BookKeeperClientOperations raw,
             AtomicReference<CountingOperations> target) {
@@ -1685,6 +1763,9 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         private final OxiaJavaBookKeeperMetadataStore bookKeeperMetadata;
         private final BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier;
         private final DefaultBookKeeperClientOperations rawOperations;
+        private final BookKeeperWriterStateMachine writerState;
+        private final BookKeeperLedgerAllocator allocator;
+        private final BookKeeperLedgerRecovery recovery;
         private final BookKeeperPrimaryWalAppender appender;
         private final BookKeeperAppendRecoveryCoordinator recoveryCoordinator;
         private final BookKeeperPrimaryWalReader reader;
@@ -1699,6 +1780,9 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 OxiaJavaBookKeeperMetadataStore bookKeeperMetadata,
                 BookKeeperLedgerIdNamespaceReservationVerifier namespaceVerifier,
                 DefaultBookKeeperClientOperations rawOperations,
+                BookKeeperWriterStateMachine writerState,
+                BookKeeperLedgerAllocator allocator,
+                BookKeeperLedgerRecovery recovery,
                 BookKeeperPrimaryWalAppender appender,
                 BookKeeperAppendRecoveryCoordinator recoveryCoordinator,
                 BookKeeperPrimaryWalReader reader,
@@ -1711,6 +1795,9 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             this.bookKeeperMetadata = bookKeeperMetadata;
             this.namespaceVerifier = namespaceVerifier;
             this.rawOperations = rawOperations;
+            this.writerState = writerState;
+            this.allocator = allocator;
+            this.recovery = recovery;
             this.appender = appender;
             this.recoveryCoordinator = recoveryCoordinator;
             this.reader = reader;
@@ -1843,6 +1930,9 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                     bookKeeperMetadata,
                     namespaceVerifier,
                     rawOperations,
+                    writerState,
+                    allocator,
+                    recovery,
                     appender,
                     recoveryCoordinator,
                     reader,
