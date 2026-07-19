@@ -24,6 +24,7 @@ dependencies {
 
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testImplementation(testFixtures(project(":nereus-object-store")))
+    testImplementation(testFixtures(project(":nereus-managed-ledger")))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
     testImplementation(platform(libs.grpc.bom))

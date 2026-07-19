@@ -15,7 +15,8 @@
 > public BookKeeper client's consuming `ByteBuf` ownership boundary。These checkpoints are
 > gated by `bookKeeperPrimaryWalM2MetadataCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 > `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck`。`BookKeeperWalRuntime` can execute
-> BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade；the pinned local Pulsar broker passes the exact
+> BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade，including three-ledger rollover、unload/reopen、
+> historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes the exact
 > borrowed stock-client boundary。The remaining M2 scenario/evidence rows and aggregate/final gate are not yet closed；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。

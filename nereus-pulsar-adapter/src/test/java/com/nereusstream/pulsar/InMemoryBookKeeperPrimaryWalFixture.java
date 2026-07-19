@@ -129,7 +129,7 @@ final class InMemoryBookKeeperPrimaryWalFixture implements AutoCloseable {
                 2,
                 BookKeeperDigestType.CRC32C,
                 new BookKeeperSecretRef("secret://bookkeeper/password", "v7"),
-                100_000,
+                2,
                 256L * 1024 * 1024,
                 1_000,
                 8,

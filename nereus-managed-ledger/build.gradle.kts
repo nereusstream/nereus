@@ -12,6 +12,10 @@
  * limitations under the License.
  */
 
+plugins {
+    `java-test-fixtures`
+}
+
 dependencies {
     api(project(":nereus-api"))
     api(project(":nereus-core"))
@@ -31,6 +35,8 @@ dependencies {
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testImplementation(testFixtures(project(":nereus-object-store")))
     testRuntimeOnly(libs.junit.platform.launcher)
+
+    testFixturesImplementation(libs.pulsar.managed.ledger)
 }
 
 val cursorS3IntegrationTest by sourceSets.creating {

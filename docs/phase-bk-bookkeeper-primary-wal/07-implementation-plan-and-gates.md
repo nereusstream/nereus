@@ -219,8 +219,11 @@ exact head/protection proof revalidation、generation-zero publication and cold 
 client。
 
 The focused facade/Pulsar checkpoint now admits BK_ONLY through F2 projection/open/virtual Position mapping，drives
-exact entry bytes through the module-local BK generation-zero runtime，and source-locks the broker handoff of the exact
-stock BookKeeper client as a borrowed/non-closed context resource。`bookKeeperPrimaryWalM2PulsarCheck` publishes the
+exact entry bytes through the module-local BK generation-zero runtime，forces three physical ledgers behind one stable
+virtual ledger，then unloads/reopens the facade and proves historical seek plus durable F3 cursor mark-delete/hydration
+remain logical。The shared `TestCursorStorage` fixture is exported from `nereus-managed-ledger` test fixtures so this
+cross-module proof uses the same cursor state machine as the F3 suite。The checkpoint also source-locks the broker
+handoff of the exact stock BookKeeper client as a borrowed/non-closed context resource。`bookKeeperPrimaryWalM2PulsarCheck` publishes the
 exact development artifacts，runs the ManagedLedger/adapter/module tests，then forces fresh broker Checkstyle and the
 borrowed-client test against the clean pinned checkout。
 
@@ -382,7 +385,9 @@ Unsupported durability/completion policies fail before allocation.
 ### 5.4 Focused Pulsar slice
 
 The implemented test-only/local composition drives `NereusManagedLedger.addEntry/readEntry` through exact BK
-generation zero and proves virtual Position identity is independent of the physical ledger。The pinned Pulsar storage
+generation zero and proves virtual Position identity is independent of the physical ledger。A second composition
+forces two-entry rollover across three physical ledgers，closes/reopens the ManagedLedger，then verifies direct history、
+cursor seek、mark-delete and cursor hydration retain the same virtual Positions and exact bytes。The pinned Pulsar storage
 provider extracts and passes the exact stock BK client through `NereusRuntimeContext`，with tests for identity and
 fail-closed provider/null cases。Production-wide client consumption、first-create and capability rollout remain
 disabled until the completed profile runtime is composed at M5。
