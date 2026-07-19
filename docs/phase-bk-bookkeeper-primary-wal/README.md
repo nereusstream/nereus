@@ -3,8 +3,9 @@
 > 状态：BK-M0 design gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；
 > `bookKeeperPrimaryWalM1FinalCheck` 通过 199-task aggregate（包含 Phase 1.5、Phase 4 与 pinned local Pulsar
 > regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：strict keyspace、7 类 V1 durable
-> records/codecs、factory dispatch 与 focused golden/negative tests 已实现；store、writer、reader、ledger
-> lifecycle、retention 尚未完成，因此三个 BookKeeper profile 继续在任何 BookKeeper IO 之前 fail closed。
+> records/codecs、focused production/fake stores、exact CAS/delete response-loss recovery and bounded scanners are
+> implemented and gated by `bookKeeperPrimaryWalM2MetadataCheck`；physical allocator/writer/reader/retention runtime
+> remains incomplete，so the profile is still rejected before IO。
 
 ## 1. Delivery identity
 
@@ -167,7 +168,11 @@ BK-M1 does not register `BookKeeperPrimaryWalAppender`/reader/lifecycle runtime.
 fully validated Object reference proof until BK-M2 installs the exact BookKeeper proof adapter and lifecycle stores；
 unknown proof types fail closed。
 
-The first BK-M2 checkpoint implements `BookKeeperKeyspace` with strict root/protection/reader/allocation-slot inverse、
-all seven V1 record models and explicit enum wire ids、seven envelope codecs registered in
-`MetadataRecordCodecFactory`、frozen envelope SHA-256 vectors and malformed/truncated/trailing/checksum tests。This is
-metadata groundwork only；it does not make `BOOKKEEPER_WAL_ONLY` executable。
+The BK-M2 metadata checkpoint implements `BookKeeperKeyspace` with strict
+root/protection/reader/allocation-slot inverse、all seven V1 record models and explicit enum wire ids、seven envelope
+codecs registered in `MetadataRecordCodecFactory`、frozen envelope SHA-256 vectors and malformed/truncated/trailing/
+checksum tests。It also implements focused `BookKeeperWriterMetadataStore`/`BookKeeperLedgerMetadataStore` surfaces、
+`OxiaJavaBookKeeperMetadataStore`、the deterministic fake adapter、protocol-edge transition validation、idempotent
+create、exact-version CAS/delete recovery after applied-response loss、scope/page-size-bound pagination and complete
+256-root/16-allocation-slot shard tests。This remains metadata groundwork；it does not make
+`BOOKKEEPER_WAL_ONLY` executable。

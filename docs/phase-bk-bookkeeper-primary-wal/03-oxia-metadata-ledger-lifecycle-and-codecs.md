@@ -623,6 +623,17 @@ interface BookKeeperLedgerMetadataStore { get/create/cas/scan root; create/get/c
 Production Oxia and fake stores must pass one shared contract scenario, including put/CAS/delete response loss and
 fresh-process pagination. A generic unbounded metadata delete/list API is not introduced.
 
+Implementation checkpoint (2026-07-19)：`BookKeeperWriterMetadataStore` and
+`BookKeeperLedgerMetadataStore` expose only the focused operations above；`OxiaJavaBookKeeperMetadataStore` borrows
+the existing shared Oxia runtime and validates every decoded key against record identity/configured slot bounds；the
+test-fixture adapter runs the identical public contract over deterministic durable state。Create reloads after either
+condition failure or ambiguous response loss and succeeds only for the same stored envelope digest；CAS reloads and
+accepts only the exact replacement digest at a version greater than the expected version；conditional delete reloads
+and accepts only observed absence。All other races fail closed。Scan continuations bind cluster、kind、scope digest、
+fixed-depth prefix and page size；the adapter reads at most `limit + 1` rows for a validated `[1,1024]` page and never
+exposes an unbounded list primitive。`BookKeeperMetadataStoreContractTest` covers the production/fake shared scenario、
+fresh adapter construction、all 256 root shards、all 16 allocation-slot shards and applied-response-loss recovery。
+
 ## 10. Scale bounds
 
 - 256 root shards; page size validated in `[1, 1024]`；

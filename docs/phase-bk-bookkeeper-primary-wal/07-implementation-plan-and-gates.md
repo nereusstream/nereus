@@ -7,15 +7,16 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 ```text
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
-BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (metadata/keyspace/codec checkpoint)
+BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (metadata/store/scanner checkpoint)
 BK-M3 .. BK-M6                  not implemented
 all BookKeeper profiles         reserved / rejected before primary IO
 BookKeeper ledger deletion      absent / safe default closed
 ```
 
-`bookKeeperPrimaryWalDocumentationCheck` remains the documentation gate. `bookKeeperPrimaryWalM1Check` and
-`bookKeeperPrimaryWalM1FinalCheck` are executable and backed by real module/unit/predecessor dependencies；M2–M6 names
-remain frozen target names and must not be registered as empty/success-only Gradle tasks. A milestone becomes complete
+`bookKeeperPrimaryWalDocumentationCheck` remains the documentation gate. `bookKeeperPrimaryWalM1Check`、
+`bookKeeperPrimaryWalM1FinalCheck` and the focused `bookKeeperPrimaryWalM2MetadataCheck` are executable and backed by
+real module/unit/predecessor dependencies；unfinished M2 runtime and M3–M6 names remain frozen target names and must
+not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
 ## 2. Delivery dependency graph
@@ -172,13 +173,15 @@ executable until BK-M2/M3/M4 installs and gates its exact writer、reader、life
 
 Implemented：`BookKeeperKeyspace` and strict root/protection/reader/allocation-slot inverse；all seven V1 records with
 explicit lifecycle wire ids、bounds and immutable metadata-version wrappers；seven binary-v1/envelope codecs and
-`MetadataRecordCodecFactory` dispatch；shared canonical samples；frozen envelope SHA-256、round-trip、truncation、
-trailing-byte、envelope-checksum、unknown-wire-id and key negative tests。The focused tests and the complete
-`:nereus-metadata-oxia:test` regression pass。
+`MetadataRecordCodecFactory` dispatch；focused writer/ledger store interfaces；production shared-Oxia and deterministic
+fake adapters；protocol-edge transition validation；idempotent put-if-absent、exact-version CAS/delete plus
+applied-response-loss reload；scope/page-size-bound `limit+1` pagination；all 256 root and 16 allocation-slot shard
+coverage。Frozen envelope SHA-256、round-trip、malformed codec、store、fresh-store and failure-injection tests pass under
+`:nereus-metadata-oxia:test` and `bookKeeperPrimaryWalM2MetadataCheck`。
 
-Still required before BK-M2 is complete：production/fake store contracts and scanners；allocation/writer/lifecycle
-state machines；real BookKeeper writer/reader/fencing/restart tests；whole-ledger retention/GC；profile admission and
-local Pulsar gate。The profile remains rejected before primary IO。
+Still required before BK-M2 is complete：allocation/writer/physical-ledger lifecycle state machines；real BookKeeper
+writer/reader/fencing/restart tests；whole-ledger retention/GC；profile admission and local Pulsar gate。The profile
+remains rejected before primary IO。
 
 ### 5.1 Metadata/keyspace
 

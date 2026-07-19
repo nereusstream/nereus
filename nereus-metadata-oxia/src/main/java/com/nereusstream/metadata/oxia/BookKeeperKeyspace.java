@@ -121,6 +121,22 @@ public final class BookKeeperKeyspace {
         return slot & 0x0f;
     }
 
+    public void requireLedgerRangeSlot(int rangeSlot) {
+        requireIndex(rangeSlot, maxAppendRangesPerLedger, "rangeSlot");
+    }
+
+    public void requireProtectionSlot(int protectionSlot) {
+        requireIndex(protectionSlot, protectionSlotsPerRange, "protectionSlot");
+    }
+
+    public void requireReaderSlot(int readerSlot) {
+        requireIndex(readerSlot, maxReaderLeasesPerLedger, "readerSlot");
+    }
+
+    public void requireAllocationSlot(int slot) {
+        requireIndex(slot, maxUncertainAllocations, "slot");
+    }
+
     public PartitionKey allocationSlotPartitionKey(int slotShard) {
         requireIndex(slotShard, ALLOCATION_SLOT_SHARDS, "slotShard");
         return new PartitionKey("physical-bookkeeper-allocation-v1-" + digits(slotShard, 2));

@@ -55,8 +55,10 @@ public record BookKeeperLedgerRootRecord(
         BookKeeperRecordValidation.nonNegative(deletedAtMillis, "deletedAtMillis");
         stateReason = BookKeeperRecordValidation.optional(stateReason, "stateReason");
         BookKeeperRecordValidation.metadataVersion(metadataVersion);
-        boolean sealed = lifecycle.ordinal() >= BookKeeperLedgerLifecycle.SEALED.ordinal()
-                && lifecycle != BookKeeperLedgerLifecycle.ABORTED && lifecycle != BookKeeperLedgerLifecycle.QUARANTINED;
+        boolean sealed = lifecycle == BookKeeperLedgerLifecycle.SEALED
+                || lifecycle == BookKeeperLedgerLifecycle.MARKED
+                || lifecycle == BookKeeperLedgerLifecycle.DELETING
+                || lifecycle == BookKeeperLedgerLifecycle.DELETED;
         if (sealed != (sealedAtMillis > 0 && sealStartedAtMillis > 0 && !sealReason.isEmpty())) {
             throw new IllegalArgumentException("sealed lifecycle must carry exact seal facts");
         }

@@ -4,9 +4,10 @@
 
 BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrimaryWalM1Check` and the 199-task
 `bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
-`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-11 through BK-96 remain required target evidence and are
-currently **not complete** except BK-12, whose strict key-inverse evidence passed on 2026-07-19。BK-11 codec evidence
-is implemented and passing, while its production/fake store half remains open. During implementation, each row
+`master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-11、BK-12 and the deterministic all-shard portion of BK-19
+passed on 2026-07-19 under `bookKeeperPrimaryWalM2MetadataCheck`；BK-19 still requires its real-Oxia final evidence。
+BK-13 through BK-96 otherwise remain required target evidence and are currently **not complete**。During
+implementation, each row
 receives an exact test method、gate、source lock、date and result. No implementation row may be marked covered by prose
 only.
 

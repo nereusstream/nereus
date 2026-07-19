@@ -27,7 +27,11 @@ public record LedgerAllocationIntentRecord(
         BookKeeperRecordValidation.times(createdAtMillis, updatedAtMillis);
         stateReason = BookKeeperRecordValidation.optional(stateReason, "stateReason");
         BookKeeperRecordValidation.metadataVersion(metadataVersion);
-        if (lateCreateHazard && lifecycle.ordinal() < LedgerAllocationLifecycle.CREATE_UNCERTAIN.ordinal()) {
+        boolean createMayHaveBeenTransmitted = lifecycle == LedgerAllocationLifecycle.CREATE_UNCERTAIN
+                || lifecycle == LedgerAllocationLifecycle.PHYSICAL_CREATED
+                || lifecycle == LedgerAllocationLifecycle.ACTIVATED
+                || lifecycle == LedgerAllocationLifecycle.FOREIGN_COLLISION;
+        if (lateCreateHazard && !createMayHaveBeenTransmitted) {
             throw new IllegalArgumentException("pre-transmission allocation cannot carry lateCreateHazard");
         }
         if ((lifecycle == LedgerAllocationLifecycle.PHYSICAL_CREATED || lifecycle == LedgerAllocationLifecycle.ACTIVATED)

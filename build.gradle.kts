@@ -625,6 +625,14 @@ tasks.register("bookKeeperPrimaryWalM1FinalCheck") {
     dependsOn("phase4FinalCheck")
 }
 
+tasks.register("bookKeeperPrimaryWalM2MetadataCheck") {
+    group = "verification"
+    description = "Verify BK-M2 keyspace, durable codecs, exact Oxia/fake stores, and bounded shard scanners."
+    dependsOn("bookKeeperPrimaryWalDocumentationCheck")
+    dependsOn("checkBookKeeperModuleBoundaries")
+    dependsOn(":nereus-metadata-oxia:test")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

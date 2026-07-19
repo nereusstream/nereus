@@ -21,6 +21,13 @@ import com.nereusstream.metadata.oxia.records.ObjectReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
 import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperAppendReservationRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperWriterStateRecord;
+import com.nereusstream.metadata.oxia.records.LedgerAllocationIntentRecord;
 import io.oxia.client.api.exceptions.KeyAlreadyExistsException;
 import io.oxia.client.api.exceptions.UnexpectedVersionIdException;
 import java.nio.charset.StandardCharsets;
@@ -101,6 +108,11 @@ final class F4MetadataStoreSupport {
 
     Checksum decodeDigest(byte[] exactStoredValue) {
         return sha256(Objects.requireNonNull(exactStoredValue, "exactStoredValue"));
+    }
+
+    <T> Checksum encodedDigest(T value, Class<T> type) {
+        ensureOpen();
+        return sha256(encodeForWrite(value, type));
     }
 
     F4ScanToken validateToken(
@@ -245,6 +257,20 @@ final class F4MetadataStoreSupport {
             metadataVersion = record.metadataVersion();
         } else if (value instanceof GcRetirementRemovalRecord record) {
             metadataVersion = record.metadataVersion();
+        } else if (value instanceof BookKeeperWriterStateRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof LedgerAllocationIntentRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof BookKeeperAllocationSlotRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof BookKeeperLedgerRootRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof BookKeeperAppendReservationRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof BookKeeperLedgerProtectionRecord record) {
+            metadataVersion = record.metadataVersion();
+        } else if (value instanceof BookKeeperLedgerReaderLeaseRecord record) {
+            metadataVersion = record.metadataVersion();
         } else {
             throw new IllegalArgumentException("unsupported F4 record type: " + value.getClass());
         }
@@ -283,6 +309,20 @@ final class F4MetadataStoreSupport {
         } else if (value instanceof GcRetirementProtectionRecord record) {
             hydrated = record.withMetadataVersion(version);
         } else if (value instanceof GcRetirementRemovalRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof BookKeeperWriterStateRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof LedgerAllocationIntentRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof BookKeeperAllocationSlotRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof BookKeeperLedgerRootRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof BookKeeperAppendReservationRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof BookKeeperLedgerProtectionRecord record) {
+            hydrated = record.withMetadataVersion(version);
+        } else if (value instanceof BookKeeperLedgerReaderLeaseRecord record) {
             hydrated = record.withMetadataVersion(version);
         } else {
             throw new IllegalArgumentException("unsupported F4 record type: " + value.getClass());
