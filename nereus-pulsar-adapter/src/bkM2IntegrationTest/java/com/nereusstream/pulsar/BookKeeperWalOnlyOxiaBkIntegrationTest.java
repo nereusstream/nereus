@@ -679,6 +679,149 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
+    void foreignLedgerRecreationAndNamespaceDriftStopBeforePhysicalDelete() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-gc-authority-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        MutableClock clock = new MutableClock(1_700_000);
+        AtomicReference<CountingOperations> counting = new AtomicReference<>();
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-gc-authority",
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> counting(raw, counting))) {
+            BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
+            BookKeeperProtocolActivationProof activation = activation(configuration, reservation);
+
+            EligibleLedger foreign = eligibleSealedLedger(
+                    process, cluster, configuration, suffix + "-foreign");
+            BookKeeperWalRetentionGate foreignGate = new BookKeeperWalRetentionGate(
+                    cluster,
+                    configuration,
+                    gc,
+                    process.bookKeeperMetadata,
+                    process.bookKeeperMetadata,
+                    process.namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    counting.get(),
+                    clock);
+            BookKeeperLedgerRetentionManager foreignRetention = new BookKeeperLedgerRetentionManager(
+                    cluster,
+                    configuration,
+                    gc,
+                    process.bookKeeperMetadata,
+                    process.namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    counting.get(),
+                    foreignGate,
+                    clock);
+            var foreignCandidate = foreignGate.evaluate(foreign.root(), TIMEOUT)
+                    .join().candidate().orElseThrow();
+            var foreignMarked = foreignRetention.mark(foreignCandidate, TIMEOUT).join();
+            clock.advance(Duration.ofMinutes(2).plusMillis(1));
+            var foreignDeleting = foreignRetention.converge(
+                    foreignMarked.root().orElseThrow(), TIMEOUT).join();
+            assertThat(foreignDeleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
+
+            process.rawOperations.delete(
+                    foreign.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT)).join();
+            WriteAdvHandle foreignHandle = process.rawOperations.createAdvanced(
+                            foreign.ledgerId(),
+                            configuration,
+                            "bk-m2-secret".getBytes(StandardCharsets.UTF_8),
+                            Map.of("foreign.owner", "stock-bookkeeper".getBytes(StandardCharsets.UTF_8)),
+                            new BookKeeperOperationDeadline(TIMEOUT))
+                    .join();
+            foreignHandle.closeAsync().join();
+
+            var quarantined = foreignRetention.converge(
+                    foreignDeleting.root().orElseThrow(), TIMEOUT).join();
+            assertThat(quarantined.action()).isEqualTo(BookKeeperLedgerGcAction.QUARANTINED);
+            assertThat(quarantined.root().orElseThrow().value().lifecycle())
+                    .isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
+            assertThat(process.rawOperations.metadata(
+                            foreign.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getCustomMetadata()).containsKey("foreign.owner");
+            assertThat(counting.get().deleteCalls()).isZero();
+
+            EligibleLedger drift = eligibleSealedLedger(
+                    process, cluster, configuration, suffix + "-namespace");
+            AtomicReference<BookKeeperLedgerIdNamespaceReservation> namespace =
+                    new AtomicReference<>(reservation);
+            BookKeeperLedgerIdNamespaceReservationVerifier driftVerifier =
+                    new BookKeeperLedgerIdNamespaceReservationVerifier(
+                            (scope, bits, prefix, timeout) ->
+                                    CompletableFuture.completedFuture(Optional.of(namespace.get())),
+                            deployment);
+            BookKeeperWalRetentionGate driftGate = new BookKeeperWalRetentionGate(
+                    cluster,
+                    configuration,
+                    gc,
+                    process.bookKeeperMetadata,
+                    process.bookKeeperMetadata,
+                    driftVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    counting.get(),
+                    clock);
+            BookKeeperLedgerRetentionManager driftRetention = new BookKeeperLedgerRetentionManager(
+                    cluster,
+                    configuration,
+                    gc,
+                    process.bookKeeperMetadata,
+                    driftVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    counting.get(),
+                    driftGate,
+                    clock);
+            var driftCandidate = driftGate.evaluate(drift.root(), TIMEOUT)
+                    .join().candidate().orElseThrow();
+            var driftMarked = driftRetention.mark(driftCandidate, TIMEOUT).join();
+            clock.advance(Duration.ofMinutes(2).plusMillis(1));
+            var driftDeleting = driftRetention.converge(
+                    driftMarked.root().orElseThrow(), TIMEOUT).join();
+            assertThat(driftDeleting.action()).isEqualTo(BookKeeperLedgerGcAction.DELETING);
+            namespace.set(new BookKeeperLedgerIdNamespaceReservation(
+                    reservation.schemaVersion(),
+                    reservation.reservationId(),
+                    reservation.nereusDeploymentId(),
+                    reservation.clusterAlias(),
+                    reservation.bookKeeperProviderScopeSha256(),
+                    reservation.ledgerIdPrefixBits(),
+                    reservation.ledgerIdPrefixValue(),
+                    reservation.lifecycle(),
+                    reservation.reservationEpoch() + 1,
+                    reservation.createdAtMillis(),
+                    reservation.revokedAtMillis(),
+                    reservation.operatorEvidenceSha256(),
+                    reservation.metadataVersion() + 1,
+                    sha('c'),
+                    reservation.canonicalKey()));
+
+            assertThatThrownBy(() -> driftRetention.converge(
+                            driftDeleting.root().orElseThrow(), TIMEOUT).join())
+                    .hasRootCauseMessage(
+                            "BookKeeper deletion activation does not match the exact WAL/namespace binding");
+            assertThat(process.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), drift.ledgerId())
+                    .join()).contains(driftDeleting.root().orElseThrow());
+            assertThat(process.rawOperations.metadata(
+                            drift.ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLedgerId()).isEqualTo(drift.ledgerId());
+            assertThat(counting.get().deleteCalls()).isZero();
+        }
+    }
+
+    @Test
     void byteRangeAndAgeRolloverPreserveWholeBatchesAndDenseOffsets() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
@@ -1358,6 +1501,37 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
     }
 
+    private static EligibleLedger eligibleSealedLedger(
+            Process process,
+            String cluster,
+            BookKeeperWalConfiguration configuration,
+            String suffix) {
+        StreamId stream = process.storage.createOrGetStream(
+                        new StreamName("persistent://tenant/namespace/bk-eligible-" + suffix),
+                        new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                .join()
+                .streamId();
+        AppendResult first = process.append(stream, new byte[] {1}, new byte[] {2});
+        process.append(stream, new byte[] {3});
+        process.append(stream, new byte[] {4});
+        long ledgerId = target(first).ledgerId();
+        var root = process.bookKeeperMetadata.getRoot(
+                        cluster, configuration.providerScopeSha256(), ledgerId)
+                .join()
+                .orElseThrow();
+        assertThat(root.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+        process.storage.trim(stream, 3, new TrimOptions(TIMEOUT, "eligible ledger helper")).join();
+        BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
+                cluster, process.l0, process.bookKeeperMetadata);
+        BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+                cluster, configuration, process.bookKeeperMetadata, authority);
+        assertThat(new BookKeeperWalOnlyReferenceRetirementCoordinator(
+                        cluster, configuration, process.bookKeeperMetadata, authority, references)
+                .retireEligible(root, TIMEOUT)
+                .join().fullyRetired()).isTrue();
+        return new EligibleLedger(ledgerId, root);
+    }
+
     private static BookKeeperEntryRangeReadTarget target(AppendResult result) {
         return (BookKeeperEntryRangeReadTarget) result.readTarget();
     }
@@ -1498,6 +1672,10 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 .clearOldData(true)
                 .build();
     }
+
+    private record EligibleLedger(
+            long ledgerId,
+            BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root) { }
 
     private static final class Process implements AutoCloseable {
         private final String clusterName;
@@ -1758,6 +1936,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         private final AtomicInteger normalOpens = new AtomicInteger();
         private final AtomicInteger recoveryOpens = new AtomicInteger();
         private final AtomicInteger reads = new AtomicInteger();
+        private final AtomicInteger deletes = new AtomicInteger();
         private final AtomicReference<WriteAdvHandle> createdHandle = new AtomicReference<>();
         private final AtomicReference<long[]> lastReadRange = new AtomicReference<>();
 
@@ -1833,6 +2012,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         @Override
         public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
+            deletes.incrementAndGet();
             return delegate.delete(ledgerId, deadline);
         }
 
@@ -1854,6 +2034,10 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
         private int readCalls() {
             return reads.get();
+        }
+
+        private int deleteCalls() {
+            return deletes.get();
         }
 
         private long[] lastReadRange() {

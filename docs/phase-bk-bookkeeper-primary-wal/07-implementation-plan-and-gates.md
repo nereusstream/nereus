@@ -295,6 +295,11 @@ test fill every independent-process slot without duplicates, reject the next pro
 and fail final revalidation when the exact durable pin disappears。A failed renewal retains the last known exact
 durable version for final conditional release, so a transient renewal failure cannot strand an otherwise owned row。
 
+The real deletion-authority cut now removes an admitted Nereus ledger after `MARKED -> DELETING` and recreates the same
+ledger id with foreign BookKeeper custom metadata。The next convergence pass persists `QUARANTINED` and performs zero
+manager delete calls against the new occupant。A separate exact namespace-reservation version/value drift after
+`DELETING` fails activation revalidation before provider delete and leaves both root and original ledger unchanged。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session

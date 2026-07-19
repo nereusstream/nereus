@@ -10,7 +10,7 @@ immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256
 The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
 the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-32、BK-37、
 BK-38、BK-39、BK-40、
-BK-41、BK-42、BK-47、BK-48、BK-49、BK-52、BK-53、BK-56
+BK-41、BK-42、BK-47、BK-48、BK-49、BK-52、BK-53、BK-54、BK-56
 and BK-55, including
 a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
 does not claim the remaining M2 rows。The focused allocator gate also adds D checkpoints for every applied metadata
@@ -127,7 +127,7 @@ Evidence levels：
 | BK-51 | M2 | O/B | reader/task/repair/reservation/writer vetoes are each enforced | `BookKeeperWalRetentionGateTest.enforcesEveryVetoDomain` |
 | BK-52 | M2 | D/O/C | reference appears after MARKED; root unmarks to SEALED | D: `BookKeeperWalRetentionGateTest.referenceAppearingAfterMarkUnmarksToSealedBeforeDelete`; O/B: `BookKeeperWalOnlyOxiaBkIntegrationTest.referenceAfterMarkUnmarksAndSafeGcModesNeverDelete`; independent-process C remains open |
 | BK-53 | M2 | B/O/C | delete response loss reloads metadata before same-intent retry | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
-| BK-54 | M2 | B/O/C | namespace drift or late-create hazard stops before delete；foreign/reappeared same-id ledger is quarantined across validate/delete cut | `BookKeeperLedgerGcIT.protectsRecreatedForeignLedger` |
+| BK-54 | M2 | B/O/C | namespace drift or late-create hazard stops before delete；foreign/reappeared same-id ledger is quarantined across validate/delete cut | B/O checkpoint: `BookKeeperWalOnlyOxiaBkIntegrationTest.foreignLedgerRecreationAndNamespaceDriftStopBeforePhysicalDelete`; independent-process C remains open |
 | BK-55 | M2 | B/O/C | two separated absence observations and root CAS loss converge DELETED | checkpoint fresh-process dual absence: `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover`; remaining root-CAS-loss cut: `BookKeeperLedgerGcIT.convergesDualAbsenceAcrossRestart` |
 | BK-56 | M2 | D/O | dry-run/default-off mode performs no root/provider mutation | `BookKeeperWalRetentionGateTest.disabledAndDryRunGcNeverMutateRootOrProvider` + `BookKeeperWalOnlyOxiaBkIntegrationTest.referenceAfterMarkUnmarksAndSafeGcModesNeverDelete` |
 

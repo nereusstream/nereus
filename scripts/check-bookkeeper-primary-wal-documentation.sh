@@ -141,6 +141,9 @@ require_literal 'renewalFailureDoesNotLeakTheRememberedDurableSlot' \
 require_literal 'realReaderSlotsArePerProcessBoundedAndFinalPinRevalidationFailsClosed' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'foreignLedgerRecreationAndNamespaceDriftStopBeforePhysicalDelete' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
