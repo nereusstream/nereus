@@ -26,14 +26,11 @@
 > pre-I/O lag admission and coupled production read-repair/materialization composition；checkpoint AG adds stable
 > source-verified retention planning and ownership-safe F3 logical-trim delegation；M6 checkpoints BD–BQ close the
 > scale/failure/compatibility matrix and the clean 203/203-task aggregate
-> 下一项底层交付 F1-BK 已形成 `docs/phase-bk-bookkeeper-primary-wal/` 代码级 target，BK-M0 与 BK-M1
-> 已于 2026-07-19 complete/final-gated；BK-M2 `BOOKKEEPER_WAL_ONLY` 已推进到 module/facade runtime 和
-> real Oxia + BookKeeper create-response-loss / late-create / restart / delete checkpoints plus cold all-shard Oxia
-> evidence，remaining
-> matrix/aggregate pending；BK-M3 provider-neutral source/protection/profile/lag、retirement-metadata authority、
-> sealed shared-scanner and first real Oxia/BK/Object publication/read/retirement-proof checkpoints 已实现，
-> physical-release、fresh-runtime response-loss、real lag and unreadable-output fail-closed checkpoints 已实现；
-> predecessor/aggregate final gate 与 BK-M4–M6 尚未实现，
+> 下一项底层交付 F1-BK 已形成 `docs/phase-bk-bookkeeper-primary-wal/` 代码级 target；BK-M0–BK-M3
+> 已 complete/final-gated。BK-M2 covers module/facade runtime、real Oxia/BookKeeper create-response-loss、late-create、
+> restart、delete and cold all-shard evidence；BK-M3 covers provider-neutral source/protection/profile/lag、
+> retirement-metadata authority、sealed shared-scanner、real Oxia/BK/Object publication/read/physical release、
+> fresh-runtime response-loss、real lag and unreadable-output fail-closed evidence。BK-M4–M6 尚未实现，
 > production broker 的 BookKeeper primary profiles 仍为 pre-IO rejected。
 
 本文定义文档权威性、当前代码边界和阅读顺序。目标是让 north-star 设计、当前实现合同、
@@ -268,7 +265,7 @@ decision behind items 14 and 16-18。
 | `../phase-2-managed-ledger-facade/README.md` | F2 facade code-level contract and final gates | implemented / final-gated |
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
 | `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | implemented / final-gated（F4-M1–M6 + checkpoint BQ） |
-| `../phase-bk-bookkeeper-primary-wal/README.md` | F1-BK writer/reader/ledger lifecycle/retention/profile rollout code-level target | BK-M1/BK-M2 complete/final-gated；BK-M3 through real Oxia/BK/Object publication/read/retirement、response-loss and lag/failure checkpoints；BK-M4–M6 not implemented |
+| `../phase-bk-bookkeeper-primary-wal/README.md` | F1-BK writer/reader/ledger lifecycle/retention/profile rollout code-level target | BK-M1–BK-M3 complete/final-gated；BK-M4–M6 not implemented |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | implemented / final-gated（F4-M5 profile + F4-M6 aggregate） |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |

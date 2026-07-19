@@ -25,7 +25,7 @@
 > `bookKeeperPrimaryWalM2FinalCheck`。`BookKeeperWalRuntime` can execute
 > BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade，including three-ledger rollover、unload/reopen、
 > historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes the exact
-> borrowed stock-client boundary。BK-M3 focused implementation is complete：task V2 preserves exact tagged BK sources，F4 exact-source
+> borrowed stock-client boundary。BK-M3 completed/final-gated on 2026-07-20：task V2 preserves exact tagged BK sources，F4 exact-source
 > reads and source protection are provider-registered，BK `MATERIALIZATION_SOURCE` uses bounded durable dynamic slots
 > with restart-safe owner transfer，the shared F4 runtime accepts the matched BK reader/protection provider，the async
 > profile freezes `BOOKKEEPER_ENTRY_RANGE + ASYNCHRONOUS + STABLE_HEAD`，and the existing F4 lag authority admits the
@@ -55,8 +55,7 @@
 > installs the thin BK-async adapter over the shared F4 lag gate，proves real backlog rejection before writer/BK mutation
 > and recovery after Object coverage，then physically removes a COMMITTED Object and proves retirement fails closed、
 > every fixed BK reference remains ACTIVE、the ledger remains present and normal reads quarantine/fall back to the exact
-> BK range。BK-M3 focused implementation evidence is therefore closed and its BK-M2 predecessor is now final-gated；the
-> BK-M3 milestone final task remains to be registered and executed over those chains。Abrupt-process/chaos evidence
+> BK range。BK-M3 implementation evidence and its BK-M2 predecessor are now final-gated。Abrupt-process/chaos evidence
 > remains assigned to BK-M6 rather than retroactively blocking the BK-M2 storage milestone；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
@@ -67,8 +66,8 @@
 > while `bookKeeperPrimaryWalM3ResponseLossCheck --rerun-tasks` adds the fresh-runtime response-loss matrix and also
 > passes 65/65 executable tasks；
 > `bookKeeperPrimaryWalM3LagFailureCheck --rerun-tasks` adds real shared-lag and unreadable-output fail-closed evidence
-> and passes 65/65 executable tasks；
-> but is intentionally not the still-unregistered `bookKeeperPrimaryWalM3FinalCheck`。
+> and passes 65/65 executable tasks。`bookKeeperPrimaryWalM3FinalCheck` then passes its 223-task aggregate on
+> 2026-07-20，including the final-gated BK-M2 and Phase 1.5–4 predecessor chains。
 
 > 2026-07-20：`bookKeeperPrimaryWalM2StableRecoveryCheck --rerun-tasks` passes 63/63 executable tasks against real
 > Oxia + BookKeeper，including applied commit-intent、stream-head and generation-zero response loss with one exact BK

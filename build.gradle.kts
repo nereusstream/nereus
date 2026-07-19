@@ -837,6 +837,13 @@ tasks.register("bookKeeperPrimaryWalM3LagFailureCheck") {
     dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
 }
 
+tasks.register("bookKeeperPrimaryWalM3FinalCheck") {
+    group = "verification"
+    description = "Run BK-M3 ordinary and real Oxia/BookKeeper/Object acceptance over the final-gated BK_ONLY predecessor."
+    dependsOn("bookKeeperPrimaryWalM3LagFailureCheck")
+    dependsOn("bookKeeperPrimaryWalM2FinalCheck")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

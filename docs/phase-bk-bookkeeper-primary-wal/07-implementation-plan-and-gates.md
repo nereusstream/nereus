@@ -8,7 +8,7 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20
-BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT focused implementation complete (final gate next)
+BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20
 BK-M4 .. BK-M6                  not implemented
 BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
@@ -29,8 +29,8 @@ module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPr
 `bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` /
 `bookKeeperPrimaryWalM3RealServiceCheck` / `bookKeeperPrimaryWalM3PhysicalRetirementCheck` /
 `bookKeeperPrimaryWalM3ResponseLossCheck` / `bookKeeperPrimaryWalM3LagFailureCheck` are also executable。The
-The M2 ordinary/final gates are complete。The M3 final gate and M4–M6 names remain frozen target names and must not be
-registered as empty/success-only Gradle tasks. A milestone becomes complete
+The M2 and M3 ordinary/final gates are complete over their real focused chains。M4–M6 names
+remain frozen target names and must not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
 ## 2. Delivery dependency graph
@@ -586,14 +586,14 @@ extends that real chain through terminal dynamic-source release、all fixed-refe
 delete and post-delete Object reads。`bookKeeperPrimaryWalM3ResponseLossCheck` adds applied task create、dynamic source
 create/transfer/release、Object PUT and every task/generation publication response-loss cut across fresh runtimes。
 `bookKeeperPrimaryWalM3LagFailureCheck` closes real-load lag admission and an unreadable-Object negative retirement cut。
-The focused M3 implementation is closed，but the final task remains unregistered until the BK-M2 predecessor aggregate
-and later abrupt-process/chaos aggregate are executable；this avoids calling a dependent milestone final while M2 is not。
+The M3 implementation is closed and its final task runs over the final-gated BK-M2 predecessor plus the real
+lag/failure chain。Abrupt-process/chaos remains assigned to BK-M6 and is not a hidden M3 prerequisite。
 `bookKeeperPrimaryWalM3Check --rerun-tasks` passed
 62/62 deterministic tasks and `bookKeeperPrimaryWalM3PhysicalRetirementCheck --rerun-tasks` passed 65/65 executable
 tasks；`bookKeeperPrimaryWalM3ResponseLossCheck --rerun-tasks` also passed its 65/65 executable aggregate on
 2026-07-19；`bookKeeperPrimaryWalM3LagFailureCheck --rerun-tasks` passed the same 65/65 executable aggregate and adds
 real shared-lag admission/recovery plus unreadable-Object retirement veto/fallback evidence。The
-`bookKeeperPrimaryWalM3FinalCheck` task remains intentionally unregistered。
+`bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate on 2026-07-20。
 
 ### 6.4 Mandatory review stop D
 

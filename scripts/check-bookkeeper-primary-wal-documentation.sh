@@ -96,6 +96,8 @@ require_literal 'bookKeeperPrimaryWalM3ResponseLossCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM3FinalCheck' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' \
@@ -118,7 +120,11 @@ require_literal 'BK-M1 provider-neutral foundation complete/final-gated on 2026-
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'multiEntryAppendUsesOneExactConsecutiveBookKeeperRange' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
@@ -223,6 +229,7 @@ require_literal 'bookKeeperPrimaryWalM3RealServiceCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3PhysicalRetirementCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3ResponseLossCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM3FinalCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' "build.gradle.kts"
@@ -303,9 +310,9 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck|StableRecoveryCheck|IsolationRetentionCheck|AllocationAuthorityCheck|Check|FinalCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check))|[4-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck|StableRecoveryCheck|IsolationRetentionCheck|AllocationAuthorityCheck|Check|FinalCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check|FinalCheck))|[4-6])' \
     "$repo_root/build.gradle.kts"; then
-    echo "unfinished BK-M3 final and BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
+    echo "unfinished BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1
 fi
 
@@ -326,9 +333,9 @@ for path in "${global_links[@]}"; do
 done
 
 if rg -n --glob '*.md' \
-    'BK-M[1-6][[:space:]:=-]+(complete|final-gated)|BookKeeper primary WAL[[:space:]:=-]+Implemented|Implemented[[:space:]:=-]+BookKeeper primary WAL' \
+    'BK-M[4-6][[:space:]:=-]+(complete|final-gated)|BookKeeper primary WAL[[:space:]:=-]+Implemented|Implemented[[:space:]:=-]+BookKeeper primary WAL' \
     "$design_dir"; then
-    echo "BookKeeper primary-WAL design incorrectly claims implementation completion" >&2
+    echo "BookKeeper primary-WAL design incorrectly claims BK-M4-M6 or whole-delivery completion" >&2
     exit 1
 fi
 

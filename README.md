@@ -89,7 +89,7 @@ replay and expired-session fencing/new-ledger retry；only the abrupt-kill C var
 `bookKeeperPrimaryWalM2Check --rerun-tasks` passed 107/107 executable tasks and
 `bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate on 2026-07-20。BK_ONLY is final-gated but remains
 executable only through the explicit module-local runtime；
-BK-M3 now has executable checkpoints for BK task V2/exact-source reads、durable fixed-slot
+BK-M3 is also complete/final-gated and covers BK task V2/exact-source reads、durable fixed-slot
 `MATERIALIZATION_SOURCE` ownership and restart transfer、shared F4 runtime provider composition、the async
 stable-head profile plan、common authoritative lag reader、source-retirement authority and sealed-ledger trigger。
 The first real Oxia + BookKeeper + Object chain also proves BK fallback across a fresh runtime、NCP1 publication、
@@ -98,8 +98,9 @@ source protection、retires all mandatory range references、deletes the sealed 
 fresh-runtime response-loss extension converges applied task create、source protection、Object PUT and every publication
 CAS without rewriting BK or allocating another task/generation。The focused lag/failure checkpoint now rejects a real
 backlog before BK mutation、re-admits after Object coverage and keeps all BK references/bytes on a physically missing
-COMMITTED Object while normal reads fall back to BK。The BK-M2 predecessor is now closed；the dependent BK-M3 final
-gate and later rollout gates remain open，so `BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
+COMMITTED Object while normal reads fall back to BK。`bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate
+on 2026-07-20；BK-M4 sync completion and later rollout gates remain open，so
+`BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。

@@ -35,6 +35,10 @@ append。A separate real chain deletes the exact COMMITTED Object and proves `OB
 fixed BK references still ACTIVE、ledger presence and normal-read BK fallback。Abrupt process-kill variants remain in
 the later chaos aggregate rather than this focused M3 checkpoint。
 
+The 2026-07-20 `bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate over the final-gated BK-M2 predecessor
+and every focused M3 chain。BK-57 through BK-67 are therefore complete at their declared M3 D/O/B/S levels；row suffixes
+that explicitly require production broker rollout or abrupt-process C remain assigned to BK-M5/BK-M6。
+
 The same deterministic recovery gate now converges applied-response-loss for every writer/root CAS from ACTIVE through
 IDLE (BK-31 D) and serializes two process-run recovery contenders onto one replacement ledger (BK-33 D)。Their remaining
 independent-process levels stay explicit in the rows below。
