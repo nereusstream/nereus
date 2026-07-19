@@ -45,6 +45,8 @@ require_literal "Checkpoint BM" \
     "docs/phase-4-compaction-generation/README.md"
 require_literal "Checkpoint BN" \
     "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BO" \
+    "docs/phase-4-compaction-generation/README.md"
 require_literal "checkPhase4FinalPulsarCheckoutIsolation" \
     "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "objectStoreLibraryDoesNotSelectTheBrokerLoggingBackend" \
@@ -386,4 +388,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, M6 BD-BN evidence, 52/52 matrix, current source lock, gates, and links verified."
+echo "Phase 4 M1-M5 final status, M6 BD-BO evidence, 52/52 matrix, current source lock, gates, and links verified."

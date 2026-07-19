@@ -218,7 +218,11 @@ the otherwise parallel build, eliminating aggregate-only Oxia readiness starvati
 parallelism. Its static inventory gate and a forced parallel Oxia/LocalStack pair pass. Checkpoint BN adds a separate
 one-permit checkout service to all seventeen nested Pulsar builds after the next aggregate exposed concurrent writes
 to the same broker classes/test-result directories；the exact Phase 2 final + M4 config forced-parallel pair now passes
-in serialized order. The full rerun is still the completion boundary.
+in serialized order. Checkpoint BO then makes every one of those nested builds forward `--rerun-tasks` and extends the
+static inventory audit to reject stale-inner-output wrappers. The first serialized aggregate passed 194/194 outer
+tasks in 20m03s but was not accepted because two historical ordinary wrappers reported inner `UP-TO-DATE` results；
+after correction their forced-parallel regression executed 127 and 129 fresh inner tasks and passed 103/103 outer
+tasks in 2m28s. The BO-qualified full rerun is still the completion boundary.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1979,7 +1983,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BN are implemented and focused/evidence-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BO are implemented and focused/evidence-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -2081,6 +2085,13 @@ both resources. `checkPhase4FinalPulsarCheckoutIsolation` audits the declared se
 directory is the locked checkout. A forced parallel Phase 2 final + M4 physical-GC config request executes the nested
 125-task and 132-task builds strictly in sequence and passes all 67 root tasks in 2m11s.
 
+Checkpoint BO requires fresh inner evidence from that serialized checkout. The first fully serialized aggregate
+completed 194/194 outer tasks in 20m03s, but completion audit found that `phase2PulsarCheck` and
+`phase3M4PulsarCheck` had not forwarded `--rerun-tasks`；their inner selected tests were therefore eligible for
+`UP-TO-DATE`, so the run was not promoted to final evidence. Both wrappers now forward the flag, and
+`checkPhase4FinalPulsarCheckoutIsolation` rejects any current or future checkout-owning `Exec` without it. Their exact
+forced-parallel regression executes 127/127 and 129/129 fresh inner tasks and passes 103/103 outer tasks in 2m28s.
+
 ### 8.1 Required scenarios
 
 The final gate must cover all of the following as named deterministic or real-service test methods：
@@ -2179,7 +2190,9 @@ every one of these facts into the executable 52-row audit；the map proves trace
 all run in the current aggregate. Checkpoint BL keeps that aggregate's combined Hadoop/Oxia broker runtime
 provider-neutral by rejecting a leaked logging implementation. Checkpoint BM bounds the aggregate itself to one
 Docker-owning task without disabling parallel compilation or ordinary verification. Checkpoint BN independently
-bounds all nested builds that mutate the single locked Pulsar checkout, including ordinary broker gates.
+bounds all nested builds that mutate the single locked Pulsar checkout, including ordinary broker gates. Checkpoint
+BO additionally requires every nested wrapper to force fresh inner Gradle execution；the 194-task serialized run
+demonstrates graph compatibility but is intentionally non-final because it preceded that invariant.
 
 ### 8.3 Gates
 
@@ -2199,7 +2212,9 @@ bounds all nested builds that mutate the single locked Pulsar checkout, includin
 `phase4FinalCheck` composes every M1-M6 final gate plus `phase3FinalCheck`. It is the only Phase 4 completion claim.
 Both final tasks also depend on `checkPhase4FinalDockerIsolation` and
 `checkPhase4FinalPulsarCheckoutIsolation`；all real-service owners share the Docker permit and all nested broker builds
-share the independent checkout permit even when Gradle evaluates final-gate branches concurrently.
+share the independent checkout permit even when Gradle evaluates final-gate branches concurrently. The checkout
+audit also requires `--rerun-tasks` on every nested build, so an outer rerun cannot silently reuse selected broker
+test results.
 The tasks are implemented；until `phase4M6FinalCheck --rerun-tasks` and `phase4FinalCheck --rerun-tasks` both pass in
 this source-locked state, F4-M6 and Phase 4 remain in progress.
 

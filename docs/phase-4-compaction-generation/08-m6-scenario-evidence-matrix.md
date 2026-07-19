@@ -12,8 +12,9 @@ the final aggregate still have to execute the tests and prove behavior.
 
 Checkpoint BK status：**52/52 scenarios traced** against Pulsar
 `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`. Checkpoints BM/BN make owning-gate execution deterministic by
-serializing Docker owners and, independently, every nested build of the single locked Pulsar checkout；the complete
-final aggregate remains pending.
+serializing Docker owners and, independently, every nested build of the single locked Pulsar checkout. Checkpoint BO
+also requires all seventeen nested builds to force fresh inner Gradle execution；the complete BO-qualified final
+aggregate remains pending.
 
 | ID | Required scenario | Executable evidence | Owning gate |
 | --- | --- | --- | --- |

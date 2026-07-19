@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implemented / F4-M1–M5 final-gated；F4-M6 BD–BN evidence-green、52/52 traceability complete，aggregate compatibility pending；
+> 状态：Implemented / F4-M1–M5 final-gated；F4-M6 BD–BO evidence-green、52/52 traceability complete，aggregate compatibility pending；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -375,11 +375,13 @@ acknowledged primary range merely because materialization lags。
 - F4-M5 ordinary/final gates and all predecessor regressions；
 - Phase 1/1.5/2/3 and overall docs updated in the same change。
 
-F4-M6 BD–BN cover the current merge/candidate/checkpoint/reference/task limits、the exact 16,448-stream all-shard
+F4-M6 BD–BO cover the current merge/candidate/checkpoint/reference/task limits、the exact 16,448-stream all-shard
 registry restart、real two-broker/two-worker contention with compression-heavy exact Pulsar/BookKeeper reads、
 protected-intent retirement、partitioned admin compatibility、provider-neutral Hadoop/Oxia logging composition and
 exclusive scheduling for Docker-owning release tasks plus every nested build of the single locked Pulsar checkout
-under the otherwise parallel aggregate.
+under the otherwise parallel aggregate. BO additionally requires all seventeen nested builds to force fresh inner
+Gradle execution；its corrected historical pair passes 127/129 fresh inner tasks, while the BO-qualified full
+aggregate remains the completion boundary.
 The executable matrix now traces all 52 scenarios；
 the still-unrun final aggregate gates remain the Phase 4-wide completion boundary. This is not permission to
 infer either BookKeeper primary profile from the implemented Object-WAL profile.

@@ -62,7 +62,33 @@ if [[ "$declared_pulsar_tasks" != "$expected_pulsar_tasks" ]]; then
     exit 1
 fi
 
+non_rerun_pulsar_tasks="$({
+    LC_ALL=C perl -ne '
+        if (/tasks\.register<Exec>\("([^"]+)"\)/) {
+            if (defined $task && $pulsar && !$rerun) {
+                print "$task\n";
+            }
+            $task = $1;
+            $pulsar = 0;
+            $rerun = 0;
+        }
+        $pulsar = 1 if /workingDir = file\(pulsarCheckoutPath\.get\(\)\)/;
+        $rerun = 1 if /"--rerun-tasks"/;
+        END {
+            if (defined $task && $pulsar && !$rerun) {
+                print "$task\n";
+            }
+        }
+    ' "$build"
+} | LC_ALL=C sort)"
+
+if [[ -n "$non_rerun_pulsar_tasks" ]]; then
+    echo "nested Pulsar Exec tasks may not reuse stale inner Gradle outputs:" >&2
+    printf '%s\n' "$non_rerun_pulsar_tasks" >&2
+    exit 1
+fi
+
 require_literal 'tasks.register<Exec>("checkPhase4FinalPulsarCheckoutIsolation")'
 require_literal 'dependsOn("checkPhase4FinalPulsarCheckoutIsolation")'
 
-echo "All nested builds of the locked Pulsar checkout share one exclusive Gradle build service."
+echo "All nested builds of the locked Pulsar checkout are exclusive and force fresh inner Gradle execution."
