@@ -16,6 +16,7 @@ import com.nereusstream.core.read.ParquetCompactedTargetReader;
 import com.nereusstream.core.read.Phase4ReadComponents;
 import com.nereusstream.core.read.ReadAfterStableCommitRepair;
 import com.nereusstream.core.read.ReadTargetDispatcher;
+import com.nereusstream.core.read.ReadTargetReader;
 import com.nereusstream.core.read.ReadTargetReaderRegistry;
 import com.nereusstream.core.recovery.AnchorAwareCommitWalker;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
@@ -39,7 +40,11 @@ import com.nereusstream.materialization.GenerationPublicationReconciler;
 import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.materialization.MaterializationMetricsObserver;
 import com.nereusstream.materialization.MaterializationService;
+import com.nereusstream.materialization.MaterializationSourceProtectionAdapter;
+import com.nereusstream.materialization.MaterializationSourceProtectionRegistry;
+import com.nereusstream.materialization.MaterializationSourceProvider;
 import com.nereusstream.materialization.MaterializationSourceRepairer;
+import com.nereusstream.materialization.ObjectMaterializationSourceProtectionAdapter;
 import com.nereusstream.materialization.MaterializationTaskRecovery;
 import com.nereusstream.materialization.MaterializationTaskStore;
 import com.nereusstream.materialization.RegisteredMaterializationStreamScanner;
@@ -63,6 +68,7 @@ import com.nereusstream.objectstore.wal.WalObjectReader;
 import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
@@ -113,6 +119,48 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
             ExecutorService workerExecutor,
             Executor callbackExecutor,
             Clock clock) {
+        this(
+                cluster,
+                processRunId,
+                streamConfig,
+                config,
+                recoveryCheckpointPendingProtectionDuration,
+                l0Metadata,
+                generations,
+                physicalMetadata,
+                objectStore,
+                walObjectReader,
+                physicalReferences,
+                protections,
+                readPins,
+                activationGuard,
+                List.of(),
+                scheduler,
+                workerExecutor,
+                callbackExecutor,
+                clock);
+    }
+
+    public Phase4ObjectWalRuntime(
+            String cluster,
+            String processRunId,
+            StreamStorageConfig streamConfig,
+            MaterializationConfig config,
+            Duration recoveryCheckpointPendingProtectionDuration,
+            OxiaMetadataStore l0Metadata,
+            GenerationMetadataStore generations,
+            PhysicalObjectMetadataStore physicalMetadata,
+            ObjectStore objectStore,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            ObjectProtectionManager protections,
+            ObjectReadPinManager readPins,
+            GenerationProtocolActivationGuard activationGuard,
+            List<MaterializationSourceProvider> additionalPrimarySources,
+            ScheduledExecutorService scheduler,
+            ExecutorService workerExecutor,
+            Executor callbackExecutor,
+            Clock clock) {
         String exactCluster = requireText(cluster, "cluster");
         String exactProcessRunId = requireText(
                 processRunId, "processRunId");
@@ -146,6 +194,9 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
         GenerationProtocolActivationGuard exactActivation =
                 Objects.requireNonNull(
                         activationGuard, "activationGuard");
+        List<MaterializationSourceProvider> exactAdditionalPrimarySources =
+                List.copyOf(Objects.requireNonNull(
+                        additionalPrimarySources, "additionalPrimarySources"));
         ScheduledExecutorService exactScheduler =
                 Objects.requireNonNull(scheduler, "scheduler");
         ExecutorService exactWorkerExecutor =
@@ -176,16 +227,30 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
         ParquetCompactedObjectReader compactedReader =
                 new ParquetCompactedObjectReader(
                         exactObjectStore, exactWorkerExecutor);
+        List<ReadTargetReader> targetReaders = new ArrayList<>();
+        targetReaders.add(new ObjectWalReaderAdapter(exactWalReader));
+        targetReaders.add(new ParquetCompactedTargetReader(compactedReader));
+        exactAdditionalPrimarySources.stream()
+                .map(MaterializationSourceProvider::reader)
+                .forEach(targetReaders::add);
         ReadTargetReaderRegistry readers =
-                new ReadTargetReaderRegistry(List.of(
-                        new ObjectWalReaderAdapter(exactWalReader),
-                        new ParquetCompactedTargetReader(
-                                compactedReader)));
+                new ReadTargetReaderRegistry(targetReaders);
         ReadTargetDispatcher targetDispatcher =
                 new ReadTargetDispatcher(readers);
         MetadataPhysicalObjectIdentityResolver identities =
                 new MetadataPhysicalObjectIdentityResolver(
                         exactCluster, exactL0, exactPhysical);
+        List<MaterializationSourceProtectionAdapter<?>> sourceProtectionAdapters =
+                new ArrayList<>();
+        sourceProtectionAdapters.add(
+                new ObjectMaterializationSourceProtectionAdapter(
+                        identities, exactProtections));
+        exactAdditionalPrimarySources.stream()
+                .map(MaterializationSourceProvider::protectionAdapter)
+                .forEach(sourceProtectionAdapters::add);
+        MaterializationSourceProtectionRegistry sourceProtections =
+                new MaterializationSourceProtectionRegistry(
+                        sourceProtectionAdapters);
         AnchorAwareCommitWalker walker =
                 new AnchorAwareCommitWalker(
                         exactCluster, exactL0, exactGenerations);
@@ -322,6 +387,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactGenerations,
                         identities,
                         exactProtections,
+                        sourceProtections,
                         sourceReaders,
                         new ParquetCompactedObjectWriter(
                                 stagingFiles,
@@ -347,6 +413,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactGenerations,
                         exactPhysical,
                         exactProtections,
+                        sourceProtections,
                         exactActivation,
                         outputVerifier,
                         exactConfig.operationTimeout(),
@@ -368,6 +435,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                                 exactGenerations,
                                 identities,
                                 exactProtections,
+                                sourceProtections,
                                 exactConfig.operationTimeout(),
                                 exactScheduler);
         MaterializationTaskRecovery taskRecovery =

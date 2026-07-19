@@ -70,6 +70,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final GenerationMetadataStore generations;
     private final PhysicalObjectIdentityResolver identities;
     private final ObjectProtectionManager protections;
+    private final MaterializationSourceProtectionRegistry sourceProtectionAdapters;
     private final ExactSourceRangeReaderFactory sourceReaders;
     private final CompactedObjectWriter writer;
     private final ObjectStore objectStore;
@@ -136,6 +137,56 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 scheduler,
                 callbackExecutor,
                 clock);
+    }
+
+    public DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
+            ExactSourceRangeReaderFactory sourceReaders,
+            CompactedObjectWriter writer,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                writer,
+                objectStore,
+                outputVerifier,
+                new SecureWorkerClaimIdGenerator(),
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                TopicSupport.disabled(),
+                sourceProtectionAdapters);
     }
 
     public DefaultMaterializationWorker(
@@ -312,12 +363,68 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             Executor callbackExecutor,
             Clock clock,
             TopicSupport topicSupport) {
+        this(
+                cluster,
+                processRunId,
+                tasks,
+                generations,
+                identities,
+                protections,
+                sourceReaders,
+                writer,
+                objectStore,
+                outputVerifier,
+                claimIds,
+                sourceReadPageRecords,
+                sourceReadPageBytes,
+                claimDuration,
+                claimRenewInterval,
+                retryDelay,
+                maxTaskAttempts,
+                operationTimeout,
+                writerBuild,
+                scheduler,
+                callbackExecutor,
+                clock,
+                topicSupport,
+                new MaterializationSourceProtectionRegistry(List.of(
+                        new ObjectMaterializationSourceProtectionAdapter(
+                                identities, protections))));
+    }
+
+    private DefaultMaterializationWorker(
+            String cluster,
+            String processRunId,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            ExactSourceRangeReaderFactory sourceReaders,
+            CompactedObjectWriter writer,
+            ObjectStore objectStore,
+            MaterializationOutputVerifier outputVerifier,
+            WorkerClaimIdGenerator claimIds,
+            int sourceReadPageRecords,
+            int sourceReadPageBytes,
+            Duration claimDuration,
+            Duration claimRenewInterval,
+            Duration retryDelay,
+            int maxTaskAttempts,
+            Duration operationTimeout,
+            String writerBuild,
+            ScheduledExecutorService scheduler,
+            Executor callbackExecutor,
+            Clock clock,
+            TopicSupport topicSupport,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters) {
         this.cluster = requireText(cluster, "cluster");
         this.processRunId = requireBase32(processRunId, "processRunId");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.identities = Objects.requireNonNull(identities, "identities");
         this.protections = Objects.requireNonNull(protections, "protections");
+        this.sourceProtectionAdapters = Objects.requireNonNull(
+                sourceProtectionAdapters, "sourceProtectionAdapters");
         this.sourceReaders = Objects.requireNonNull(sourceReaders, "sourceReaders");
         this.writer = Objects.requireNonNull(writer, "writer");
         this.objectStore = Objects.requireNonNull(objectStore, "objectStore");
@@ -388,7 +495,7 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
     private final class Operation {
         private final MaterializationTask task;
         private final MaterializationDeadline deadline;
-        private final List<ObjectProtection> sourceProtections = new ArrayList<>();
+        private final List<MaterializationSourceProtection> sourceProtections = new ArrayList<>();
         private final Object heartbeatLock = new Object();
         private volatile VersionedMaterializationTask claimed;
         private ObjectProtection outputProtection;
@@ -537,28 +644,15 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 return CompletableFuture.completedFuture(null);
             }
             SourceGeneration source = task.sources().get(index);
-            if (!(source.readTarget() instanceof ObjectSliceReadTarget target)) {
-                return CompletableFuture.failedFuture(execution(
-                        TaskFailureClass.UNSUPPORTED_MAPPING,
-                        ErrorCode.UNSUPPORTED_READ_TARGET,
-                        false,
-                        "materialization source is not an object-slice target",
-                        null));
-            }
             return deadline.bound(
-                            () -> identities.resolve(target, source.view()),
-                            "resolve materialization source identity")
-                    .thenCompose(identity -> deadline.bound(
-                            () -> protections.acquireOrTransfer(
-                                    new ObjectProtectionRequest(
-                                            identity,
-                                            ObjectProtectionType.MATERIALIZATION_SOURCE,
-                                            MaterializationProtectionIdentities.sourceReferenceId(
-                                                    cluster, task, source),
-                                            MaterializationProtectionIdentities.taskOwner(claimed),
-                                            0),
+                            () -> sourceProtectionAdapters.acquireOrTransfer(
+                                    task.streamId(),
+                                    source,
+                                    MaterializationProtectionIdentities.sourceReferenceId(
+                                            cluster, task, source),
+                                    MaterializationProtectionIdentities.taskOwner(claimed),
                                     this::revalidateClaimOwner),
-                            "acquire materialization source protection"))
+                            "acquire materialization source protection")
                     .thenCompose(protection -> {
                         sourceProtections.add(protection);
                         return revalidateSource(source)
@@ -845,22 +939,26 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
                 claimed = outputReady;
                 return CompletableFuture.completedFuture(null);
             }
-            ObjectProtection current = index < sourceProtections.size()
-                    ? sourceProtections.get(index)
-                    : outputProtection;
+            if (index < sourceProtections.size()) {
+                return deadline.bound(
+                                () -> sourceProtectionAdapters.transfer(
+                                        sourceProtections.get(index),
+                                        MaterializationProtectionIdentities.taskOwner(outputReady),
+                                        expected -> revalidateOutputOwner(expected, outputReady, output)),
+                                "transfer materialization source protection to OUTPUT_READY")
+                        .thenCompose(transferred -> {
+                            sourceProtections.set(index, transferred);
+                            return transferProtections(outputReady, output, index + 1);
+                        });
+            }
             return deadline.bound(
                             () -> protections.transfer(
-                                    current,
+                                    outputProtection,
                                     MaterializationProtectionIdentities.taskOwner(outputReady),
-                                    expected -> revalidateOutputOwner(
-                                            expected, outputReady, output)),
-                            "transfer materialization protection to OUTPUT_READY")
+                                    expected -> revalidateOutputOwner(expected, outputReady, output)),
+                            "transfer materialization output protection to OUTPUT_READY")
                     .thenCompose(transferred -> {
-                        if (index < sourceProtections.size()) {
-                            sourceProtections.set(index, transferred);
-                        } else {
-                            outputProtection = transferred;
-                        }
+                        outputProtection = transferred;
                         return transferProtections(outputReady, output, index + 1);
                     });
         }
@@ -898,17 +996,18 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
         }
 
         private CompletableFuture<Void> releaseProtections(int index) {
-            List<ObjectProtection> all = new ArrayList<>(sourceProtections);
-            if (outputProtection != null) {
-                all.add(outputProtection);
-            }
-            if (index == all.size()) {
+            int total = sourceProtections.size() + (outputProtection == null ? 0 : 1);
+            if (index == total) {
                 return CompletableFuture.completedFuture(null);
             }
-            ObjectProtection protection = all.get(index);
-            return protections.release(
-                            protection,
+            CompletableFuture<Void> release = index < sourceProtections.size()
+                    ? sourceProtectionAdapters.release(
+                            sourceProtections.get(index),
                             exact -> revalidateClaim(claimed))
+                    : protections.release(
+                            outputProtection,
+                            exact -> revalidateClaim(claimed));
+            return release
                     .thenCompose(ignored -> releaseProtections(index + 1));
         }
 
@@ -1029,10 +1128,9 @@ public final class DefaultMaterializationWorker implements MaterializationWorker
             if (index == sourceProtections.size()) {
                 return CompletableFuture.completedFuture(null);
             }
-            ObjectProtection current = sourceProtections.get(index);
             return deadline.bound(
-                            () -> protections.transfer(
-                                    current,
+                            () -> sourceProtectionAdapters.transfer(
+                                    sourceProtections.get(index),
                                     MaterializationProtectionIdentities.taskOwner(updated),
                                     expectedOwner -> revalidateHeartbeatOwner(
                                             expectedOwner, updated)),

@@ -5,6 +5,7 @@ plugins {
 dependencies {
     api(project(":nereus-api"))
     api(project(":nereus-core"))
+    implementation(project(":nereus-materialization"))
     implementation(project(":nereus-metadata-oxia"))
     implementation(libs.bookkeeper.server)
 

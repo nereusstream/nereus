@@ -11,7 +11,6 @@ import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
-import com.nereusstream.core.physical.ObjectReadLease;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.read.PhysicalObjectIdentityResolver;
 import com.nereusstream.core.read.ReadTargetDispatcher;
@@ -33,7 +32,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Task-stream-scoped exact reader that pins one physical target and never performs generation selection.
+ * Task-stream-scoped exact reader that protects one physical target and never performs generation selection.
  *
  * <p>{@link ReadOptions#maxRecords()} and {@link ReadOptions#maxBytes()} bound each physical page. A successful
  * completion always consumes and verifies the entire frozen source range.
@@ -86,25 +85,31 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
         try {
             SourceGeneration source = Objects.requireNonNull(expected, "expected");
             ReadOptions exactOptions = Objects.requireNonNull(options, "options");
-            if (!(source.readTarget() instanceof ObjectSliceReadTarget target)) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.UNSUPPORTED_READ_TARGET,
-                        false,
-                        "F4 exact source reads require an object-slice target"));
-            }
             ResolvedRange resolved = resolved(source);
-            // Fails before pin admission when the exact target has no registered physical reader.
+            // Fails before protection admission when the exact target has no registered physical reader.
             dispatcher.reservationBytes(List.of(resolved));
             long maximumReadDeadlineMillis = deadlineMillis(clock.millis(), exactOptions.timeout());
             long deadlineNanos = deadlineNanos(exactOptions.timeout());
-            return revalidate(source)
-                    .thenCompose(ignored -> identities.resolve(target, source.view()))
-                    .thenCompose(identity -> pins.acquire(
-                            identity,
-                            maximumReadDeadlineMillis,
-                            () -> revalidate(source)))
-                    .thenCompose(lease -> createRead(
-                            source, resolved, exactOptions, deadlineNanos, lease));
+            if (source.readTarget() instanceof ObjectSliceReadTarget target) {
+                return revalidate(source)
+                        .thenCompose(ignored -> identities.resolve(target, source.view()))
+                        .thenCompose(identity -> pins.acquire(
+                                identity,
+                                maximumReadDeadlineMillis,
+                                () -> revalidate(source)))
+                        .thenCompose(lease -> createRead(
+                                source,
+                                resolved,
+                                exactOptions,
+                                deadlineNanos,
+                                () -> lease.release().thenCompose(ignored -> revalidate(source))));
+            }
+            return revalidate(source).thenCompose(ignored -> createRead(
+                    source,
+                    resolved,
+                    exactOptions,
+                    deadlineNanos,
+                    () -> revalidate(source)));
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -115,7 +120,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
             ResolvedRange resolved,
             ReadOptions options,
             long deadlineNanos,
-            ObjectReadLease lease) {
+            ExactSourceLease lease) {
         try {
             return CompletableFuture.completedFuture(new Session(
                     source, resolved, options, deadlineNanos, lease));
@@ -164,7 +169,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
         private final ResolvedRange resolved;
         private final ReadOptions options;
         private final long deadlineNanos;
-        private final ObjectReadLease lease;
+        private final ExactSourceLease lease;
         private final SerialExecutor serial = new SerialExecutor(callbackExecutor);
         private final AtomicBoolean subscribed = new AtomicBoolean();
         private final AtomicBoolean cancellationRequested = new AtomicBoolean();
@@ -186,7 +191,7 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
                 ResolvedRange resolved,
                 ReadOptions options,
                 long deadlineNanos,
-                ObjectReadLease lease) {
+                ExactSourceLease lease) {
             this.source = source;
             this.resolved = resolved;
             this.options = options;
@@ -596,6 +601,11 @@ public final class DefaultExactSourceRangeReader implements ExactSourceRangeRead
         @Override
         public void cancel() {
         }
+    }
+
+    @FunctionalInterface
+    private interface ExactSourceLease {
+        CompletableFuture<Void> release();
     }
 
     private static final class SerialExecutor implements Executor {

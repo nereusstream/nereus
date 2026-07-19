@@ -259,12 +259,7 @@ public final class DefaultMaterializationLagSnapshotReader
             if ((state != StreamState.ACTIVE
                             && state != StreamState.SEALED)
                     || profile != registeredProfile
-                    || (profile
-                                    != StorageProfile
-                                            .OBJECT_WAL_SYNC_OBJECT
-                            && profile
-                                    != StorageProfile
-                                            .OBJECT_WAL_ASYNC_OBJECT)) {
+                    || !profile.objectMaterializationEnabled()) {
                 throw condition(
                         "stream no longer admits materialization lag measurement");
             }

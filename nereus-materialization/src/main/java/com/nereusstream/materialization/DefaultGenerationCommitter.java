@@ -112,12 +112,71 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             GenerationMetadataStore generationStore,
             PhysicalObjectMetadataStore physicalStore,
             ObjectProtectionManager protectionManager,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
+            GenerationProtocolActivationGuard activationGuard,
+            MaterializationOutputVerifier outputVerifier,
+            Duration operationTimeout,
+            ScheduledExecutorService scheduler,
+            Clock clock) {
+        this(
+                cluster,
+                l0Store,
+                generationStore,
+                physicalStore,
+                protectionManager,
+                activationGuard,
+                outputVerifier,
+                new SecurePublicationIdGenerator(),
+                operationTimeout,
+                scheduler,
+                clock,
+                sourceProtectionAdapters);
+    }
+
+    public DefaultGenerationCommitter(
+            String cluster,
+            OxiaMetadataStore l0Store,
+            GenerationMetadataStore generationStore,
+            PhysicalObjectMetadataStore physicalStore,
+            ObjectProtectionManager protectionManager,
             GenerationProtocolActivationGuard activationGuard,
             MaterializationOutputVerifier outputVerifier,
             PublicationIdGenerator publicationIds,
             Duration operationTimeout,
             ScheduledExecutorService scheduler,
             Clock clock) {
+        this(
+                cluster,
+                l0Store,
+                generationStore,
+                physicalStore,
+                protectionManager,
+                activationGuard,
+                outputVerifier,
+                publicationIds,
+                operationTimeout,
+                scheduler,
+                clock,
+                new MaterializationSourceProtectionRegistry(List.of(
+                        new ObjectMaterializationSourceProtectionAdapter(
+                                new MetadataPhysicalObjectIdentityResolver(
+                                        cluster, l0Store, physicalStore),
+                                protectionManager))));
+    }
+
+    private DefaultGenerationCommitter(
+            String cluster,
+            OxiaMetadataStore l0Store,
+            GenerationMetadataStore generationStore,
+            PhysicalObjectMetadataStore physicalStore,
+            ObjectProtectionManager protectionManager,
+            GenerationProtocolActivationGuard activationGuard,
+            MaterializationOutputVerifier outputVerifier,
+            PublicationIdGenerator publicationIds,
+            Duration operationTimeout,
+            ScheduledExecutorService scheduler,
+            Clock clock,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Store = Objects.requireNonNull(l0Store, "l0Store");
         this.generationStore = Objects.requireNonNull(generationStore, "generationStore");
@@ -137,6 +196,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 new MetadataPhysicalObjectIdentityResolver(
                         this.cluster, this.l0Store, this.physicalStore),
                 this.protectionManager,
+                Objects.requireNonNull(sourceProtectionAdapters, "sourceProtectionAdapters"),
                 this.operationTimeout,
                 this.scheduler);
     }

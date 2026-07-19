@@ -181,6 +181,16 @@ require_literal 'bookKeeperPrimaryWalM2RuntimeCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2RetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2PulsarCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2RealServiceCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM3ExactSourceCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM3ProtectionCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM3AsyncProfileCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM3LagCheck' "build.gradle.kts"
+require_literal 'readsBookKeeperSourceThroughRegisteredProviderWithoutObjectIdentityOrPin' \
+    "nereus-materialization/src/test/java/com/nereusstream/materialization/ExactSourceRangeReaderTest.java"
+require_literal 'reconstructsBookKeeperProtectionThroughTheProviderRegistry' \
+    "nereus-materialization/src/test/java/com/nereusstream/materialization/MaterializationTaskProtectionReconcilerTest.java"
+require_literal 'measuresBookKeeperAsyncObjectWithTheSharedLagAuthority' \
+    "nereus-materialization/src/test/java/com/nereusstream/materialization/DefaultMaterializationLagSnapshotReaderTest.java"
 require_literal 'BookKeeperUncertainAllocationReconciler' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'class BookKeeperUncertainAllocationReconciler' \
@@ -216,9 +226,9 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck))|[3-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck))|[4-6])' \
     "$repo_root/build.gradle.kts"; then
-    echo "unfinished BK-M2 final/profile and BK-M3-M6 tasks must not be registered before executable implementation exists" >&2
+    echo "unfinished BK-M2 final/profile, BK-M3 retirement/final, and BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1
 fi
 

@@ -9,6 +9,7 @@ import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperProtectionType;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterStateRecord;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationIntentRecord;
@@ -146,20 +147,32 @@ public final class BookKeeperMetadataTransitions {
                 && before.offsetEnd() == after.offsetEnd()
                 && before.createdAtMillis() == after.createdAtMillis()
                 && before.expiresAtMillis() == after.expiresAtMillis(), "protection identity drift");
+        boolean materializationOwnerTransfer = before.lifecycle() == ProtectionLifecycle.ACTIVE
+                && after.lifecycle() == ProtectionLifecycle.ACTIVE
+                && before.protectionType() == BookKeeperProtectionType.MATERIALIZATION_SOURCE;
         require((before.lifecycle() == ProtectionLifecycle.RESERVED
                         && after.lifecycle() == ProtectionLifecycle.ACTIVE)
                         || (before.lifecycle() == ProtectionLifecycle.RESERVED
                         && after.lifecycle() == ProtectionLifecycle.RETIRED)
                         || (before.lifecycle() == ProtectionLifecycle.ACTIVE
-                        && after.lifecycle() == ProtectionLifecycle.RETIRED),
-                "only RESERVED -> ACTIVE/RETIRED and ACTIVE -> RETIRED protection replacement is legal");
+                        && after.lifecycle() == ProtectionLifecycle.RETIRED)
+                        || materializationOwnerTransfer,
+                "only RESERVED -> ACTIVE/RETIRED, ACTIVE -> RETIRED, and materialization owner transfer are legal");
         if (before.lifecycle() == ProtectionLifecycle.RESERVED) {
             require(before.ownerKey().isEmpty() && before.ownerMetadataVersion() == 0
                     && before.ownerIdentitySha256().isEmpty(),
                     "RESERVED protection cannot already name an owner");
             require(!after.referenceId().isBlank() && !after.ownerKey().isBlank()
-                    && after.ownerMetadataVersion() > 0 && !after.ownerIdentitySha256().isBlank(),
+                    && after.ownerMetadataVersion() >= 0 && !after.ownerIdentitySha256().isBlank(),
                     "ACTIVE protection must bind its exact durable owner");
+        } else if (materializationOwnerTransfer) {
+            require(before.referenceId().equals(after.referenceId())
+                            && before.commitVersion() == after.commitVersion()
+                            && before.ownerKey().equals(after.ownerKey())
+                            && after.ownerMetadataVersion() >= before.ownerMetadataVersion()
+                            && (after.ownerMetadataVersion() != before.ownerMetadataVersion()
+                            || before.ownerIdentitySha256().equals(after.ownerIdentitySha256())),
+                    "materialization source owner transfer must be monotonic and retain its task key");
         } else {
             require(before.referenceId().equals(after.referenceId())
                             && before.commitVersion() == after.commitVersion()

@@ -8,7 +8,8 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)
-BK-M3 .. BK-M6                  not implemented
+BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (source/protection/profile/lag checkpoint)
+BK-M4 .. BK-M6                  not implemented
 BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
 BookKeeper ledger deletion      implemented and real-service tested / production safe default closed
@@ -20,7 +21,10 @@ BookKeeper ledger deletion      implemented and real-service tested / production
 `bookKeeperPrimaryWalM2RecoveryFencingCheck` / `bookKeeperPrimaryWalM2RuntimeCheck` /
 `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck` and
 `bookKeeperPrimaryWalM2RealServiceCheck` are executable and backed by real
-module/unit/Oxia/BookKeeper/predecessor dependencies；the unfinished M2 aggregate/final gates and M3–M6 names remain frozen target names and must
+module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPrimaryWalM3ExactSourceCheck` /
+`bookKeeperPrimaryWalM3ProtectionCheck` / `bookKeeperPrimaryWalM3AsyncProfileCheck` /
+`bookKeeperPrimaryWalM3LagCheck` are also executable。The unfinished M2 aggregate/final gates、M3
+source-retirement/aggregate/final gates and M4–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
@@ -437,6 +441,12 @@ DefaultMaterializationLagSnapshotReader profile admission
 
 Every switch is on registered target/provider identity. Output Object protocols/formats/codecs remain unchanged.
 
+Current implementation checkpoint：`SourceGeneration`/task V2 round-trips BK targets；
+`DefaultExactSourceRangeReader` dispatches BK through the common `ReadTargetReaderRegistry` without Object identity/pins；
+worker、committer and recovery reconciliation use `MaterializationSourceProtectionRegistry`；and
+`Phase4ObjectWalRuntime` accepts additional matched `MaterializationSourceProvider` pairs while retaining one shared
+reader registry、worker pool、task store and checkpoint authority。
+
 ### 6.2 Async profile
 
 Add：
@@ -451,6 +461,13 @@ profile resolver plan: BOOKKEEPER_ENTRY_RANGE + ASYNCHRONOUS + STABLE_HEAD
 
 The sealed-ledger/stream flush may create one-source normal F4 tasks. There is still one task store、worker pool、lag
 reader and checkpoint truth.
+
+Implemented in the current checkpoint：`BookKeeperMaterializationSourceProtectionAdapter` acquires bounded fixed-slot
+`MATERIALIZATION_SOURCE` rows only while the exact ACTIVE `VISIBLE_GENERATION` anchor and ledger root remain valid；
+same-task owner transfer is monotonic and response-loss convergent，slot exhaustion is retriable backpressure before
+source IO，and `BookKeeperWalRuntime` exports its owned reader paired with that adapter。The BK resolver now admits only
+`BOOKKEEPER_WAL_ASYNC_OBJECT + WAL_DURABLE` at `STABLE_HEAD` with `ASYNCHRONOUS` publication，and the shared lag reader
+uses `StorageProfile.objectMaterializationEnabled()` instead of an Object-WAL-only allow-list。
 
 ### 6.3 Gates
 

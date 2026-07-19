@@ -185,6 +185,12 @@ BK-M3 changes these seams：
 No F4 durable codec changes are needed merely because the source target is BK; current task V2 already stores tagged
 `ReadTargetRecord` descriptors.
 
+Current code implements this provider-neutral seam through `MaterializationSourceProtection`、
+`MaterializationSourceProtectionAdapter`、`MaterializationSourceProtectionRegistry` and the matched
+`MaterializationSourceProvider` runtime pair。Object sources keep their existing adapter；BK sources use durable bounded
+`MATERIALIZATION_SOURCE` slots and the exact BK reader。The worker、generation committer and task recovery reconciler
+receive the same registry instance，so recovery cannot silently fall back to an Object-only protection path。
+
 ### 6.3 Task/protection ordering
 
 ```text

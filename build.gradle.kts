@@ -703,6 +703,35 @@ tasks.register("bookKeeperPrimaryWalM2RealServiceCheck") {
     dependsOn(":nereus-pulsar-adapter:bkM2IntegrationTest")
 }
 
+tasks.register("bookKeeperPrimaryWalM3ExactSourceCheck") {
+    group = "verification"
+    description = "Verify BK task V2 target round-trip and provider-neutral exact-source reads."
+    dependsOn("bookKeeperPrimaryWalDocumentationCheck")
+    dependsOn(":nereus-metadata-oxia:test")
+    dependsOn(":nereus-materialization:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM3ProtectionCheck") {
+    group = "verification"
+    description = "Verify durable BK materialization-source slots and shared F4 protection reconciliation."
+    dependsOn("bookKeeperPrimaryWalM3ExactSourceCheck")
+    dependsOn(":nereus-bookkeeper:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM3AsyncProfileCheck") {
+    group = "verification"
+    description = "Verify the BK async stable-head plan and shared F4 runtime source-provider composition."
+    dependsOn("bookKeeperPrimaryWalM3ProtectionCheck")
+    dependsOn(":nereus-pulsar-adapter:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM3LagCheck") {
+    group = "verification"
+    description = "Verify BK async uses the shared authoritative F4 lag calculation."
+    dependsOn("bookKeeperPrimaryWalM3AsyncProfileCheck")
+    dependsOn(":nereus-materialization:test")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

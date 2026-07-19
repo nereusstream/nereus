@@ -309,7 +309,8 @@ watch/process-local hint 丢失和无 task 的 committed head 重建。F4-M3 当
 disabled，直到 M4–M6 完成 recovery-root/anchor-aware reachability、physical GC、async/Pulsar wiring 与最终兼容门禁。
 这些后续门禁现已全部完成，Phase 4 为 `Implemented / final-gated`。`OBJECT_WAL_ASYNC_OBJECT` 已实现但受
 generation activation proof 约束；physical delete 已实现但只在 exact coverage/capability activation 下运行，
-safe broker defaults 仍为 `enabled=false, dryRun=true`。BookKeeper primary-WAL profiles 继续保留。
+safe broker defaults 仍为 `enabled=false, dryRun=true`。BookKeeper primary-WAL profiles 的 production rollout
+继续保留；后续 F1-BK BK-M3 已开始把 BK source/protection/profile/lag 接入这套共享 F4 truth。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
 per-stream、read-optimized 的 higher generation，并补齐 reader pin、source retirement、recovery checkpoint、
@@ -346,7 +347,7 @@ task/checkpoint/stream registration/watch/object listing
 | Cursor/retention | F3 single-root cursor CAS、owner-session claim、`PROTECTION_PENDING`、`TRIM_PENDING` and read-only `CursorSnapshotInventory` are final-gated inputs |
 | Oxia primitive | only per-key create/version-CAS/range-scan/watch is assumed；Phase 4 adds conditional delete but assumes no cross-key transaction |
 | Object store | immutable put/range-read/head plus Phase 4 guarded streaming PUT、bounded list and idempotent conditional delete are implemented/final-gated；GC still requires durable authority proofs |
-| Current executable profile | `OBJECT_WAL_SYNC_OBJECT` and proof-gated `OBJECT_WAL_ASYNC_OBJECT`；BookKeeper primary IO remains reserved |
+| Current executable profile | `OBJECT_WAL_SYNC_OBJECT` and proof-gated `OBJECT_WAL_ASYNC_OBJECT`；F1-BK module-local BK_ONLY and BK async source/profile checkpoints exist，but production BookKeeper primary IO remains reserved |
 | Pulsar source interpretation | checkout is local master source；the declared `5.0.0-M1-SNAPSHOT` is not a published dependency |
 
 Any change to either locked commit requires re-running document 01's member/call-path audit before implementation
@@ -2248,4 +2249,5 @@ Phase 4 is complete only when all of the following are executable evidence：
 Checkpoint BQ satisfies this definition. The clean source-locked `phase4FinalCheck --rerun-tasks --console=plain`
 run completed all 203 outer tasks in 21m47s and included the M1–M6、predecessor、52-scenario、real-service and
 artifact/isolation audits. The completion claim remains scoped to Object-WAL profiles；BookKeeper primary adapters are
-not inferred.
+not inferred。The later F1-BK delivery owns those adapters and is currently at the BK-M3 source/protection/profile/lag
+checkpoint，outside this F4 completion claim。

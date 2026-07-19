@@ -34,7 +34,10 @@ public record BookKeeperLedgerProtectionRecord(
         BookKeeperRecordValidation.nonNegative(createdAtMillis, "createdAtMillis");
         BookKeeperRecordValidation.nonNegative(expiresAtMillis, "expiresAtMillis");
         BookKeeperRecordValidation.metadataVersion(metadataVersion);
-        boolean owner = !ownerKey.isEmpty() && ownerMetadataVersion > 0 && !ownerIdentitySha256.isEmpty();
+        boolean owner = !ownerKey.isEmpty() && !ownerIdentitySha256.isEmpty();
+        if (ownerKey.isEmpty() != ownerIdentitySha256.isEmpty()) {
+            throw new IllegalArgumentException("protection owner facts must be fully absent or fully present");
+        }
         if ((lifecycle != ProtectionLifecycle.RESERVED) != owner) {
             throw new IllegalArgumentException("ACTIVE/RETIRED protection requires exact owner facts");
         }

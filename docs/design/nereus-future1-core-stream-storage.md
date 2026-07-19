@@ -7,7 +7,8 @@
 > BK-M2 `BOOKKEEPER_WAL_ONLY` implementation 已完成 metadata/store、allocator/writer/recovery/reader、
 > bounded uncertain-allocation reconciliation、whole-ledger retention、module-local profile/facade 和 real Oxia +
 > BookKeeper create-response-loss / late-create / restart / delete checkpoints plus cold all-shard Oxia coverage；
-> BK-M2 remaining matrix/aggregate gate 与 BK-M3–M6 尚未完成，production broker 的三个 BookKeeper profile
+> BK-M2 remaining matrix/aggregate gate 尚未完成；BK-M3 已进入 provider-neutral exact-source、durable source
+> protection、async profile/runtime composition 与 shared lag checkpoint，source retirement/final gate 及 BK-M4–M6 尚未完成。Production broker 的三个 BookKeeper profile
 > 仍为 pre-IO rejected；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 

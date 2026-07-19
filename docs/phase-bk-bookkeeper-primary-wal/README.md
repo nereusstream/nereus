@@ -17,7 +17,14 @@
 > `bookKeeperPrimaryWalM2RetentionCheck` / `bookKeeperPrimaryWalM2PulsarCheck`。`BookKeeperWalRuntime` can execute
 > BK_ONLY through `DefaultStreamStorage` and the ManagedLedger facade，including three-ledger rollover、unload/reopen、
 > historical seek and durable F3 cursor hydration over stable virtual Positions；the pinned local Pulsar broker passes the exact
-> borrowed stock-client boundary。The remaining M2 scenario/evidence rows and aggregate/final gate are not yet closed；
+> borrowed stock-client boundary。BK-M3 is now in progress：task V2 preserves exact tagged BK sources，F4 exact-source
+> reads and source protection are provider-registered，BK `MATERIALIZATION_SOURCE` uses bounded durable dynamic slots
+> with restart-safe owner transfer，the shared F4 runtime accepts the matched BK reader/protection provider，the async
+> profile freezes `BOOKKEEPER_ENTRY_RANGE + ASYNCHRONOUS + STABLE_HEAD`，and the existing F4 lag authority admits the
+> BK async profile。These checkpoints are executable through `bookKeeperPrimaryWalM3ExactSourceCheck`、
+> `bookKeeperPrimaryWalM3ProtectionCheck`、`bookKeeperPrimaryWalM3AsyncProfileCheck` and
+> `bookKeeperPrimaryWalM3LagCheck`。Source retirement、sealed-ledger final flush and real BK-to-Object publication/failure
+> cuts are still pending，so BK-M3 is not complete。The remaining M2 scenario/evidence rows and aggregate/final gate are not yet closed；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
 

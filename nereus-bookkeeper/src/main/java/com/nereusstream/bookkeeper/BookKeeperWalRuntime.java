@@ -9,6 +9,7 @@ import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
+import com.nereusstream.materialization.MaterializationSourceProvider;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import java.time.Clock;
 import java.util.List;
@@ -48,6 +49,15 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
     public BookKeeperStorageProfileResolver profileResolver() {
         ensureOpen();
         return profileResolver;
+    }
+
+    /** Pairs the owned BK reader with its durable F4 source-protection authority. */
+    public MaterializationSourceProvider materializationSourceProvider(
+            BookKeeperMaterializationSourceProtectionAdapter sourceProtections) {
+        ensureOpen();
+        return new MaterializationSourceProvider(
+                reader,
+                Objects.requireNonNull(sourceProtections, "sourceProtections"));
     }
 
     public DefaultStreamStorage newGenerationZeroStorage(

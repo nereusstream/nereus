@@ -150,8 +150,10 @@ profile.
 
 Phase 4 的首个执行范围只是 `OBJECT_WAL_ASYNC_OBJECT`。该 profile 仍在 success 前完成
 primary Object WAL upload 和 stable head commit；后台化的是 secondary/read-optimized generation。
-`BOOKKEEPER_WAL_ASYNC_OBJECT` 需要以后的 BookKeeper primary adapter，不能由 F4 的 worker
-名义推导为已支持。
+`BOOKKEEPER_WAL_ASYNC_OBJECT` 的 BK-M3 已实现 tagged source、exact BK reader dispatch、durable source
+protection、shared worker runtime composition、stable-head profile plan 与 shared lag checkpoint；但 source
+retirement、sealed-ledger flush、real BK-to-Object publication/failure gate 尚未完成，production broker 仍在 IO
+前拒绝。不能仅由 F4 worker 存在推导为 profile 已支持。
 
 ## 3. Profile matrix
 

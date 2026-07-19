@@ -66,7 +66,7 @@ broker-local offset”。任何成功 append 都必须返回 stable offset/proje
 | `OBJECT_WAL_ASYNC_OBJECT` | Object store | primary WAL committed first；read-optimized generation later | `WAL_DURABLE` | implemented/final-gated in F4-M5；proof-gated at runtime，aggregate-certified by F4-M6 |
 | `BOOKKEEPER_WAL_ONLY` | BookKeeper | disabled | `WAL_DURABLE` | BK-M2 module/facade runtime plus real Oxia/BookKeeper restart/delete checkpoint implemented；aggregate pending，production broker pre-IO rejected until BK-M5 |
 | `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | higher Object generation required before producer completion | profile durability + `REQUIRED_OBJECT_GENERATION` completion | BK-M1 foundation complete；profile not implemented |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | object-backed target published by shared F4 worker | `WAL_DURABLE` | BK-M1 foundation complete；profile not implemented |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | object-backed target published by shared F4 worker | `WAL_DURABLE` | BK-M3 source/protection/profile/lag checkpoint implemented；source retirement、real publication/final gate pending；production pre-IO rejected |
 
 Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套 engine：
 
@@ -158,7 +158,8 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F1-BK / BookKeeper Primary WAL Delivery**：Future 1 的后续扩展，不是 Future 5；BK-M0–M6 的代码级
   target 位于 `../phase-bk-bookkeeper-primary-wal/README.md`；BK-M0 documentation gate 已于 2026-07-19
   通过，BK-M1 foundation 已 complete/final-gated；BK-M2 已推进到 real Oxia/BookKeeper restart/delete checkpoint，
-  remaining matrix/aggregate pending，BK-M3–M6 仍未实现。
+  remaining matrix/aggregate pending；BK-M3 source/protection/profile/lag checkpoint in progress，source retirement/final
+  gate and BK-M4–M6 remain open。
 - **P15-M6**：F2-M0R2 新发现的窄结果交接；把 internal committed truth 已有的 cumulative logical size
   加入 generic `AppendResult`，不改变 durable format/profile/commit boundary；已于 2026-07-12 final-gated。
 - **M0-M8**：Phase 1 内部里程碑；M7 是 production Oxia adapter gate，M8 是最终端到端验收/冻结。

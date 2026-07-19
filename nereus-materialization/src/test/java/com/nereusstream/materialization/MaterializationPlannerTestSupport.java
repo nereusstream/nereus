@@ -18,6 +18,7 @@ import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.GenerationZeroIndexEncoding;
@@ -80,13 +81,25 @@ final class MaterializationPlannerTestSupport {
             List<VersionedGenerationCandidate> candidates,
             List<VersionedMaterializationTask> tasks,
             GenerationMetadataStore delegate) {
+        return generationStore(
+                candidates,
+                tasks,
+                delegate,
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
+
+    static GenerationMetadataStore generationStore(
+            List<VersionedGenerationCandidate> candidates,
+            List<VersionedMaterializationTask> tasks,
+            GenerationMetadataStore delegate,
+            StorageProfile profile) {
         List<VersionedGenerationCandidate> orderedCandidates = candidates.stream()
                 .sorted(Comparator.comparing(VersionedGenerationCandidate::key))
                 .toList();
         List<VersionedMaterializationTask> orderedTasks = tasks.stream()
                 .sorted(Comparator.comparing(VersionedMaterializationTask::key))
                 .toList();
-        VersionedMaterializationStreamRegistration registration = registration();
+        VersionedMaterializationStreamRegistration registration = registration(profile);
         return (GenerationMetadataStore) Proxy.newProxyInstance(
                 GenerationMetadataStore.class.getClassLoader(),
                 new Class<?>[] {GenerationMetadataStore.class},
@@ -135,11 +148,29 @@ final class MaterializationPlannerTestSupport {
             long cumulativeStart,
             long logicalBytes,
             long commitVersion) {
-        long metadataVersion = 10 + commitVersion;
         ObjectSliceReadTarget target = target(
                 "l0-" + start + "-" + end,
                 ObjectType.MULTI_STREAM_WAL_OBJECT,
                 "WAL_OBJECT_V1");
+        return zero(
+                key,
+                start,
+                end,
+                cumulativeStart,
+                logicalBytes,
+                commitVersion,
+                target);
+    }
+
+    static VersionedGenerationZeroIndex zero(
+            String key,
+            long start,
+            long end,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion,
+            ReadTarget target) {
+        long metadataVersion = 10 + commitVersion;
         OffsetIndexEntry value = new OffsetIndexEntry(
                 STREAM,
                 new OffsetRange(start, end),
@@ -307,13 +338,18 @@ final class MaterializationPlannerTestSupport {
     }
 
     static VersionedMaterializationStreamRegistration registration() {
+        return registration(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
+
+    static VersionedMaterializationStreamRegistration registration(
+            StorageProfile profile) {
         long metadataVersion = 7;
         MaterializationStreamRegistrationRecord record = new MaterializationStreamRegistrationRecord(
                 1,
                 STREAM.value(),
                 MaterializationRecordMapper.projectionIdentity(Optional.of(PROJECTION)),
                 sha('e').value(),
-                StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                profile.canonical().name(),
                 100,
                 4,
                 100,

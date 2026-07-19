@@ -17,7 +17,7 @@ class BookKeeperStorageProfileResolverTest {
     private final BookKeeperStorageProfileResolver resolver = new BookKeeperStorageProfileResolver();
 
     @Test
-    void admitsOnlyBkOnlyWithBothExactAdapters() {
+    void admitsBkOnlyWithBothExactAdapters() {
         for (DurabilityLevel durability : DurabilityLevel.values()) {
             var plan = resolver.requireExecutable(
                     StorageProfile.BOOKKEEPER_WAL_ONLY, durability, true, true);
@@ -32,9 +32,34 @@ class BookKeeperStorageProfileResolverTest {
     }
 
     @Test
+    void admitsAsyncObjectAtStableHeadOnly() {
+        var plan = resolver.requireExecutable(
+                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                DurabilityLevel.WAL_DURABLE,
+                true,
+                true);
+        assertThat(plan.primaryTargetType()).isEqualTo(ReadTargetType.BOOKKEEPER_ENTRY_RANGE);
+        assertThat(plan.publicationMode()).isEqualTo(ObjectPublicationMode.ASYNCHRONOUS);
+        assertThat(plan.ackBoundary()).isEqualTo(AppendAckBoundary.STABLE_HEAD);
+
+        assertThatThrownBy(() -> resolver.requireExecutable(
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                        DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                        true,
+                        true))
+                .isInstanceOfSatisfying(
+                        NereusException.class,
+                        failure -> assertThat(failure.code())
+                                .isEqualTo(ErrorCode.UNSUPPORTED_DURABILITY_LEVEL));
+    }
+
+    @Test
     void rejectsObjectFutureBkProfilesAndMissingAdaptersBeforeIo() {
         for (StorageProfile profile : StorageProfile.values()) {
-            if (profile.canonical() == StorageProfile.BOOKKEEPER_WAL_ONLY) continue;
+            if (profile.canonical() == StorageProfile.BOOKKEEPER_WAL_ONLY
+                    || profile.canonical() == StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT) {
+                continue;
+            }
             assertUnsupported(() -> resolver.requireExecutable(
                     profile, profile.defaultDurabilityLevel(), true, true));
         }
@@ -53,9 +78,10 @@ class BookKeeperStorageProfileResolverTest {
         assertUnsupported(() -> resolver.requireReadable(
                 StorageProfile.BOOKKEEPER_WAL_ONLY,
                 type -> false));
-        assertUnsupported(() -> resolver.requireReadable(
+        assertThat(resolver.requireReadable(
                 StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
-                type -> true));
+                type -> type == ReadTargetType.BOOKKEEPER_ENTRY_RANGE))
+                .isEqualTo(ReadTargetType.BOOKKEEPER_ENTRY_RANGE);
     }
 
     private static void assertUnsupported(Runnable operation) {

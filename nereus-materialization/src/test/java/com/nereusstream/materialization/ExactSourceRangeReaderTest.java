@@ -12,11 +12,17 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
+import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadSourceRef;
+import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.target.BookKeeperEntryMapping;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectReadLease;
 import com.nereusstream.core.physical.ObjectReadPinManager;
@@ -26,6 +32,8 @@ import com.nereusstream.core.read.ReadTargetDispatcher;
 import com.nereusstream.core.read.ReadTargetReader;
 import com.nereusstream.core.read.ReadTargetReaderKey;
 import com.nereusstream.core.read.ReadTargetReaderRegistry;
+import com.nereusstream.metadata.oxia.GenerationZeroIndexEncoding;
+import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.VersionedGenerationZeroIndex;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import com.nereusstream.objectstore.wal.WalSliceReadStats;
@@ -90,6 +98,112 @@ class ExactSourceRangeReaderTest {
                 .isInstanceOf(CompletionException.class)
                 .hasRootCauseInstanceOf(NereusException.class)
                 .hasRootCauseMessage("task-frozen materialization source changed");
+        assertThat(pins.releases).hasValue(0);
+    }
+
+    @Test
+    void readsBookKeeperSourceThroughRegisteredProviderWithoutObjectIdentityOrPin() {
+        BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
+                1,
+                "primary",
+                4_201,
+                7,
+                2,
+                BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                new Checksum(ChecksumType.SHA256, "b".repeat(64)));
+        long metadataVersion = 12;
+        VersionedGenerationZeroIndex candidate = new VersionedGenerationZeroIndex(
+                "/index/bookkeeper-source-2",
+                GenerationZeroIndexEncoding.GENERIC_OFFSET_INDEX_TARGET_RECORD,
+                new OffsetIndexEntry(
+                        STREAM,
+                        new OffsetRange(0, 2),
+                        0,
+                        100,
+                        target,
+                        PayloadFormat.PULSAR_ENTRY_BATCH,
+                        2,
+                        2,
+                        100,
+                        SCHEMAS,
+                        Optional.empty(),
+                        2,
+                        false,
+                        metadataVersion),
+                metadataVersion,
+                new Checksum(ChecksumType.SHA256, "c".repeat(64)));
+        SourceGeneration source = source(candidate);
+        AtomicInteger physicalReads = new AtomicInteger();
+        AtomicInteger objectIdentityCalls = new AtomicInteger();
+        TrackingPins pins = new TrackingPins();
+        ReadTargetReader physical = new ReadTargetReader() {
+            @Override
+            public ReadTargetReaderKey key() {
+                return ReadTargetReaderKey.from(target);
+            }
+
+            @Override
+            public long reservationBytes(ResolvedRange range) {
+                return range.logicalBytes();
+            }
+
+            @Override
+            public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
+                    StreamId streamId,
+                    long startOffset,
+                    List<ResolvedRange> ranges,
+                    ReadOptions options) {
+                physicalReads.incrementAndGet();
+                ResolvedRange range = ranges.get(0);
+                byte[] payload = new byte[50];
+                java.util.Arrays.fill(payload, (byte) (startOffset + 1));
+                return CompletableFuture.completedFuture(new PhysicalReadResult(
+                        List.of(new ReadBatch(
+                                new OffsetRange(startOffset, startOffset + 1),
+                                range.payloadFormat(),
+                                payload,
+                                range.schemaRefs(),
+                                range.projectionRef(),
+                                new ReadSourceRef(
+                                        range.offsetRange(),
+                                        range.generation(),
+                                        range.commitVersion(),
+                                        range.readTarget(),
+                                        ReadTargetIdentities.sha256(range.readTarget())))),
+                        List.of()));
+            }
+        };
+        var store = MaterializationPlannerTestSupport.generationStore(
+                new ArrayList<>(List.of(candidate)), List.of(), null);
+        DefaultExactSourceRangeReader reader = new DefaultExactSourceRangeReader(
+                CLUSTER,
+                STREAM,
+                store,
+                (ignoredTarget, ignoredView) -> {
+                    objectIdentityCalls.incrementAndGet();
+                    return CompletableFuture.failedFuture(new AssertionError(
+                            "BookKeeper source must not enter Object identity resolution"));
+                },
+                pins,
+                new ReadTargetDispatcher(new ReadTargetReaderRegistry(List.of(physical))),
+                1,
+                64 * 1024,
+                CLOCK,
+                Runnable::run);
+
+        ExactSourceRead exact = reader.read(source, options()).join();
+        CollectingSubscriber subscriber = new CollectingSubscriber();
+        exact.batches().subscribe(subscriber);
+        ExactSourceReadSummary summary = exact.completion().join();
+
+        assertThat(subscriber.terminal.join()).isNull();
+        assertThat(subscriber.batches).extracting(ReadBatch::range)
+                .containsExactly(new OffsetRange(0, 1), new OffsetRange(1, 2));
+        assertThat(summary.coverage()).isEqualTo(source.range());
+        assertThat(summary.logicalBytes()).isEqualTo(100);
+        assertThat(physicalReads).hasValue(2);
+        assertThat(objectIdentityCalls).hasValue(0);
+        assertThat(pins.revalidations).hasValue(0);
         assertThat(pins.releases).hasValue(0);
     }
 

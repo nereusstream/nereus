@@ -13,7 +13,8 @@ BK-M0 documentation gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19
 `BOOKKEEPER_WAL_ONLY` 已实现 keyspace/record/codec、production/fake store、exact allocator/writer/recovery/reader、
 whole-ledger retention、module/facade runtime，以及 real Oxia + BookKeeper create-response-loss / late-create / restart /
 delete checkpoints and cold all-shard Oxia coverage；remaining matrix/aggregate pending，production broker rollout
-属于 BK-M5；BK-M3–M6 未实现。
+属于 BK-M5。BK-M3 已实现 provider-neutral exact-source、durable source protection、async profile/runtime
+composition 与 shared lag checkpoints；source retirement/final gate 和 BK-M4–M6 未实现。
 
 建议阅读顺序：
 

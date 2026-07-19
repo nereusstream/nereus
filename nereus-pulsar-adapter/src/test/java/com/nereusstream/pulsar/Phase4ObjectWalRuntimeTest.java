@@ -3,12 +3,21 @@ package com.nereusstream.pulsar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
+import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
+import com.nereusstream.core.read.ReadTargetReader;
+import com.nereusstream.core.read.ReadTargetReaderKey;
 import com.nereusstream.materialization.MaterializationConfig;
+import com.nereusstream.materialization.MaterializationSourceProtection;
+import com.nereusstream.materialization.MaterializationSourceProtectionAdapter;
+import com.nereusstream.materialization.MaterializationSourceProvider;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
@@ -19,6 +28,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -88,6 +99,7 @@ class Phase4ObjectWalRuntimeTest {
                 protections,
                 readPins,
                 unavailableActivationGuard(),
+                List.of(bookKeeperSourceProvider()),
                 scheduler,
                 workers,
                 callbacks,
@@ -119,6 +131,76 @@ class Phase4ObjectWalRuntimeTest {
         assertThat(workers.isShutdown()).isTrue();
         assertThat(runtime.materializationService().isRunning())
                 .isFalse();
+    }
+
+    private static MaterializationSourceProvider bookKeeperSourceProvider() {
+        ReadTargetReader reader = new ReadTargetReader() {
+            @Override
+            public ReadTargetReaderKey key() {
+                return new ReadTargetReaderKey(
+                        ReadTargetType.BOOKKEEPER_ENTRY_RANGE,
+                        1,
+                        Optional.empty(),
+                        Optional.empty());
+            }
+
+            @Override
+            public long reservationBytes(com.nereusstream.api.ResolvedRange range) {
+                return 1;
+            }
+        };
+        MaterializationSourceProtectionAdapter<BookKeeperEntryRangeReadTarget> protections =
+                new MaterializationSourceProtectionAdapter<>() {
+                    @Override
+                    public ReadTargetType targetType() {
+                        return ReadTargetType.BOOKKEEPER_ENTRY_RANGE;
+                    }
+
+                    @Override
+                    public Class<BookKeeperEntryRangeReadTarget> targetClass() {
+                        return BookKeeperEntryRangeReadTarget.class;
+                    }
+
+                    @Override
+                    public CompletableFuture<MaterializationSourceProtection> acquireOrTransfer(
+                            com.nereusstream.api.StreamId streamId,
+                            com.nereusstream.materialization.SourceGeneration source,
+                            String referenceId,
+                            com.nereusstream.core.physical.ObjectProtectionOwner owner,
+                            OwnerRevalidator ownerRevalidator) {
+                        return unavailable();
+                    }
+
+                    @Override
+                    public CompletableFuture<MaterializationSourceProtection> revalidate(
+                            MaterializationSourceProtection protection,
+                            OwnerRevalidator ownerRevalidator) {
+                        return unavailable();
+                    }
+
+                    @Override
+                    public CompletableFuture<MaterializationSourceProtection> transfer(
+                            MaterializationSourceProtection protection,
+                            com.nereusstream.core.physical.ObjectProtectionOwner newOwner,
+                            OwnerRevalidator newOwnerRevalidator) {
+                        return unavailable();
+                    }
+
+                    @Override
+                    public CompletableFuture<Void> release(
+                            MaterializationSourceProtection protection,
+                            RemovalAuthorizer removalAuthorizer) {
+                        return unavailable();
+                    }
+
+                    private <T> CompletableFuture<T> unavailable() {
+                        return CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                false,
+                                "empty runtime registry must not use the BK source provider"));
+                    }
+                };
+        return new MaterializationSourceProvider(reader, protections);
     }
 
     private static StreamStorageConfig streamConfig() {

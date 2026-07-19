@@ -3,7 +3,6 @@ package com.nereusstream.materialization;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectProtection;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectProtectionOwner;
@@ -30,6 +29,7 @@ public final class DefaultMaterializationTaskProtectionReconciler
     private final GenerationMetadataStore generations;
     private final PhysicalObjectIdentityResolver identities;
     private final ObjectProtectionManager protections;
+    private final MaterializationSourceProtectionRegistry sourceProtectionAdapters;
     private final Duration operationTimeout;
     private final ScheduledExecutorService scheduler;
 
@@ -41,11 +41,35 @@ public final class DefaultMaterializationTaskProtectionReconciler
             ObjectProtectionManager protections,
             Duration operationTimeout,
             ScheduledExecutorService scheduler) {
+        this(
+                cluster,
+                tasks,
+                generations,
+                identities,
+                protections,
+                new MaterializationSourceProtectionRegistry(List.of(
+                        new ObjectMaterializationSourceProtectionAdapter(
+                                identities, protections))),
+                operationTimeout,
+                scheduler);
+    }
+
+    public DefaultMaterializationTaskProtectionReconciler(
+            String cluster,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectIdentityResolver identities,
+            ObjectProtectionManager protections,
+            MaterializationSourceProtectionRegistry sourceProtectionAdapters,
+            Duration operationTimeout,
+            ScheduledExecutorService scheduler) {
         this.cluster = requireText(cluster, "cluster");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.identities = Objects.requireNonNull(identities, "identities");
         this.protections = Objects.requireNonNull(protections, "protections");
+        this.sourceProtectionAdapters = Objects.requireNonNull(
+                sourceProtectionAdapters, "sourceProtectionAdapters");
         this.operationTimeout = requirePositive(operationTimeout, "operationTimeout");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
@@ -68,7 +92,7 @@ public final class DefaultMaterializationTaskProtectionReconciler
         private final MaterializationTask task;
         private final MaterializationDeadline deadline;
         private final ObjectProtectionOwner owner;
-        private final List<ObjectProtection> sourceProtections = new ArrayList<>();
+        private final List<MaterializationSourceProtection> sourceProtections = new ArrayList<>();
 
         private Operation(
                 VersionedMaterializationTask durable,
@@ -93,26 +117,15 @@ public final class DefaultMaterializationTaskProtectionReconciler
                 return CompletableFuture.completedFuture(null);
             }
             SourceGeneration source = task.sources().get(index);
-            if (!(source.readTarget() instanceof ObjectSliceReadTarget target)) {
-                return CompletableFuture.failedFuture(new NereusException(
-                        ErrorCode.UNSUPPORTED_READ_TARGET,
-                        false,
-                        "materialization source protection requires an object-slice target"));
-            }
             return deadline.bound(
-                            () -> identities.resolve(target, source.view()),
-                            "resolve materialization source protection identity")
-                    .thenCompose(identity -> deadline.bound(
-                            () -> protections.acquireOrTransfer(
-                                    new ObjectProtectionRequest(
-                                            identity,
-                                            ObjectProtectionType.MATERIALIZATION_SOURCE,
-                                            MaterializationProtectionIdentities.sourceReferenceId(
-                                                    cluster, task, source),
-                                            owner,
-                                            0),
+                            () -> sourceProtectionAdapters.acquireOrTransfer(
+                                    task.streamId(),
+                                    source,
+                                    MaterializationProtectionIdentities.sourceReferenceId(
+                                            cluster, task, source),
+                                    owner,
                                     this::revalidateTaskOwner),
-                            "reconcile materialization source protection"))
+                            "reconcile materialization source protection")
                     .thenCompose(protection -> revalidateSource(source)
                             .thenApply(ignored -> {
                                 sourceProtections.add(protection);

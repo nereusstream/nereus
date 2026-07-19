@@ -10,7 +10,7 @@ import java.util.Optional;
 /** Exact protection handles converged to one durable materialization-task version. */
 public record MaterializationTaskProtections(
         VersionedMaterializationTask task,
-        List<ObjectProtection> sources,
+        List<MaterializationSourceProtection> sources,
         Optional<ObjectProtection> output) {
     public MaterializationTaskProtections {
         Objects.requireNonNull(task, "task");

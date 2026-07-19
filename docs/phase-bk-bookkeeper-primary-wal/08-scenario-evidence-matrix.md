@@ -136,13 +136,13 @@ Evidence levels：
 
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
-| BK-57 | M3 | D/O | BK `SourceGeneration` task V2 round-trips exact tagged target/identity | `BookKeeperMaterializationTaskCodecTest.roundTripsBookKeeperSource` |
-| BK-58 | M3 | B/O/S | async append acks at head while Object generation is held absent | `BookKeeperAsyncObjectIT.acksBeforeObjectPublication` |
-| BK-59 | M3 | B/O/S | reads use BK while task pending, then exact higher Object generation | `BookKeeperAsyncObjectIT.switchesGenerationWithoutByteDrift` |
-| BK-60 | M3 | O/C | task exists before source protection; gen0 retains and restart reconciles | `BookKeeperSourceProtectionIT.recoversTaskProtectionCut` |
+| BK-57 | M3 | D/O | BK `SourceGeneration` task V2 round-trips exact tagged target/identity | D checkpoint: `BookKeeperMaterializationTaskCodecTest.roundTripsBookKeeperSource`; real Oxia recovery remains O |
+| BK-58 | M3 | B/O/S | async append acks at head while Object generation is held absent | D contract checkpoint: `BookKeeperStorageProfileResolverTest.admitsAsyncObjectAtStableHeadOnly`; `BookKeeperAsyncObjectIT.acksBeforeObjectPublication` remains open |
+| BK-59 | M3 | B/O/S | reads use BK while task pending, then exact higher Object generation | D exact-source checkpoint: `ExactSourceRangeReaderTest.readsBookKeeperSourceThroughRegisteredProviderWithoutObjectIdentityOrPin`; higher-generation switch IT remains open |
+| BK-60 | M3 | O/C | task exists before source protection; gen0 retains and restart reconciles | D checkpoints: `BookKeeperMaterializationSourceProtectionAdapterTest.acquiresTransfersRevalidatesAndReleasesExactDynamicSlot` + `MaterializationTaskProtectionReconcilerTest.reconstructsBookKeeperProtectionThroughTheProviderRegistry`; fresh-runtime cut remains open |
 | BK-61 | M3 | B/O/S/C | worker restart re-reads exact BK range and reuses task/output intent | `BookKeeperMaterializationRecoveryIT.recoversEveryWorkerCut` |
 | BK-62 | M3 | B/O/S | ordinary/batched Entry bytes and MessageIds equal before/after NCP1 | `BookKeeperAsyncObjectEntryIT.preservesPulsarProjection` |
-| BK-63 | M3 | D/O | lag records/bytes/age derive from coverage, not ledger/task count | `BookKeeperMaterializationLagTest.usesSharedAuthoritativeLag` |
+| BK-63 | M3 | D/O | lag records/bytes/age derive from coverage, not ledger/task count | D checkpoint: `DefaultMaterializationLagSnapshotReaderTest.measuresBookKeeperAsyncObjectWithTheSharedLagAuthority`; real-service O evidence remains open |
 | BK-64 | M3 | D/B | lag throttle remeasures; reject occurs before next BK IO | `BookKeeperAsyncAdmissionTest.throttlesAndRejectsBeforeWal` |
 | BK-65 | M3 | O/S | sealed ledger final single source creates normal deterministic task | `BookKeeperSealedLedgerFlushIT.materializesOneRemainingSource` |
 | BK-66 | M3 | O/B/S | healthy replacement retires BK source; broken/PREPARED output does not | `BookKeeperSourceRetirementIT.requiresReadableCommittedReplacement` |

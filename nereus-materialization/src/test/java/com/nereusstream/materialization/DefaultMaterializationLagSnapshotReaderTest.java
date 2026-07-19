@@ -93,6 +93,41 @@ class DefaultMaterializationLagSnapshotReaderTest {
     }
 
     @Test
+    void measuresBookKeeperAsyncObjectWithTheSharedLagAuthority() {
+        MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
+        GenerationMetadataStore durable =
+                GenerationMetadataStoreTestFactory.inMemory(CLOCK);
+        GenerationMetadataStore generations =
+                MaterializationPlannerTestSupport.generationStore(
+                        List.of(),
+                        List.of(),
+                        durable,
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+        ScheduledExecutorService scheduler =
+                Executors.newSingleThreadScheduledExecutor();
+        try {
+            MaterializationLagSnapshot snapshot = new DefaultMaterializationLagSnapshotReader(
+                            CLUSTER,
+                            l0(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT),
+                            generations,
+                            policy,
+                            16,
+                            16,
+                            scheduler,
+                            CLOCK)
+                    .measure(STREAM, Duration.ofSeconds(5))
+                    .join();
+
+            assertThat(snapshot.committedEndOffset()).isEqualTo(2);
+            assertThat(snapshot.lagRecords()).isEqualTo(2);
+            assertThat(snapshot.lagBytes()).isEqualTo(30);
+        } finally {
+            scheduler.shutdownNow();
+            generations.close();
+        }
+    }
+
+    @Test
     void rejectsAnAdvisoryCheckpointAheadOfVerifiedCoverage() {
         MaterializationPolicy policy =
                 MaterializationPlannerTestSupport.policy();
@@ -194,8 +229,18 @@ class DefaultMaterializationLagSnapshotReaderTest {
         return l0(() -> 1);
     }
 
+    private static OxiaMetadataStore l0(StorageProfile profile) {
+        return l0(() -> 1, profile);
+    }
+
     private static OxiaMetadataStore l0(
             LongSupplier observedAtMillis) {
+        return l0(observedAtMillis, StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
+
+    private static OxiaMetadataStore l0(
+            LongSupplier observedAtMillis,
+            StorageProfile profile) {
         AppendRecoveryAnchor anchor =
                 AppendRecoveryAnchor.genesis(STREAM);
         AppendRecoveryHead head =
@@ -232,7 +277,7 @@ class DefaultMaterializationLagSnapshotReaderTest {
                 (proxy, method, arguments) -> switch (method.getName()) {
                     case "getStreamSnapshot" ->
                         CompletableFuture.completedFuture(
-                                snapshot(observedAtMillis.getAsLong()));
+                                snapshot(observedAtMillis.getAsLong(), profile));
                     case "readAppendRecoveryTail" ->
                         CompletableFuture.completedFuture(tail);
                     case "close" -> null;
@@ -251,13 +296,21 @@ class DefaultMaterializationLagSnapshotReaderTest {
 
     private static StreamMetadataSnapshot snapshot(
             long trimUpdatedAtMillis) {
+        return snapshot(
+                trimUpdatedAtMillis,
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
+
+    private static StreamMetadataSnapshot snapshot(
+            long trimUpdatedAtMillis,
+            StorageProfile profile) {
         return new StreamMetadataSnapshot(
                 new StreamMetadataRecord(
                         STREAM.value(),
                         "persistent://tenant/ns/lag-topic",
                         "stream-name-hash",
                         StreamState.ACTIVE.name(),
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        profile.canonical().name(),
                         Map.of(),
                         1,
                         1,
