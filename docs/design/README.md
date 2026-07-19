@@ -4,10 +4,11 @@
 自 2026-07-10 起，这里与 `docs/phase-1-core-stream-storage/`、
 `docs/phase-1.5-core-storage-foundation/`、
 `docs/phase-2-managed-ledger-facade/`、
-`docs/phase-3-cursor-subscription/` 与
-`docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
+`docs/phase-3-cursor-subscription/`、
+`docs/phase-4-compaction-generation/` 与
+`docs/phase-bk-bookkeeper-primary-wal/` 共同构成仓库内设计基线。已实现合同由代码/
 测试优先；Phase 4 目录同时记录已通过 M0 的 target contract，以及已 final-gated 的 F4-M1–M6 实现和
-checkpoint-BQ aggregate evidence。
+checkpoint-BQ aggregate evidence；F1-BK 目录是下一项底层交付的代码级 target，当前不表示实现。
 
 建议阅读顺序：
 
@@ -16,7 +17,8 @@ checkpoint-BQ aggregate evidence。
 3. `nereus-overall-architecture.md`：目标架构与已实现边界；
 4. `nereus-commit-protocol.md`：append、read-index 和物化发布协议；
 5. `nereus-futures.md`：能力轨道、依赖关系和交付顺序；
-6. 文件名以 `nereus-futureN-` 开头的文档：各能力轨道详细设计。
+6. 文件名以 `nereus-futureN-` 开头的文档：各能力轨道详细设计；
+7. `../phase-bk-bookkeeper-primary-wal/README.md`：F1-BK BookKeeper primary-WAL 代码级设计与 BK-M0–M6 gate。
 
 Future 1 / Phase 1 和 Phase 1.5 P15-M0-M6 已完成并通过普通/Docker gate；F2-M0 API spike、F2-M0R
 和 2026-07-12 F2-M0R2 code-level review 也已完成。M0R2 使用用户提供的 exact Pulsar checkout 关闭了
@@ -54,40 +56,12 @@ checkpoints、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral
 workflow-metadata retirement，以及 topic-compaction COMMITTED-source bootstrap、tagged-v1 key encoding、
 sorted-spill two-pass engine/worker/publication focused tests 已落地。`phase4M3Check` 与真实
 Oxia/LocalStack-backed `phase4M3FinalCheck --rerun-tasks` 已于 2026-07-15 通过；
-F4-M3 已 final-gated。F4-M4 也已于 2026-07-19 通过 retry-disabled 真实双 broker final gate：NRC1 recovery、
-retirement/GC fences、generation
-registration/readiness/activation、protected async Object-WAL acknowledgement、pre-I/O materialization-lag
-admission，以及 coupled production generation-aware read/repair/materialization runtime 已落地；M5 正在实现，
-当前到 checkpoint AI。local Pulsar fork 也已映射 exact sync/async first-create profile 和 bounded materialization config。Sync
-仍是默认，async 仍受 durable activation proof 约束；retention/admin 与 cursor snapshot execution 已有实现
-slices，checkpoints AL–AM 已实现 current-writer object inventory/missing-root registration 与 registration-last
-retirement；checkpoint AN 已装配 metadata-first root/registration/inventory lifecycle 和恢复路由；checkpoint AO
-已完成 typed physical-GC broker config mapping，并统一 provider 的 protection/lease/orphan timing 来源；checkpoint
-AP 又实现 configured-scope guarded PUT/HEAD/LIST/exact-DELETE capability probe 和非 secret deterministic digest。
-Checkpoint AQ 已原子组合 coverage/capability proof 和双 deletion bits，AR 已接入 provider/Pulsar 并加入 exact
-scope restart fence；checkpoint AS 又统一 activation guard/GC registry 的 ownerless reference-domain assembly，
-并以真实 Oxia/LocalStack 验证 wrong-scope 拒绝、empty-LIST MARKED recovery 和 lost DELETE response 收敛；
-checkpoint AT 又验证 real DELETE 后、DELETED-root CAS 前的 process loss 可由独立 runtime 从 durable DELETING
-authority 完成；checkpoint AU 又验证 DELETED-root CAS 已在真实 Oxia 生效但响应丢失时，exact reload 收敛且
-LocalStack object DELETE 不会重复；checkpoint AV 再验证两个独立 runtime 竞争同一 MARKED root 时，一个 raw
-DELETING CAS 获胜、失败方 reload 同一 durable intent，幂等 exact-delete 路径收敛同一 DELETED root；
-checkpoint AW 进一步让全新 runtime 在 LIST 恒空时恢复覆盖 256 shard 的 mixed MARKED/DELETING roots，
-并修正 inventory 只能依赖 opaque continuation、不能假设跨页 logical-key 顺序的合同；checkpoint AX 再以
-真实四分片 Oxia 证明首进程写入 1,001 个同 shard root 加其余每 shard 一个后，全新 scanner 从空 continuation
-以 16 个热点页加 255 个单页无重复、无遗漏地读取全部 1,256 个 identity；checkpoint AY 又让 10,000 个
-DELETED root 经过持久化 first-absence 与独立 orphan window 两轮生产扫描，按 references → manifest → root
-顺序退休，并修复 materialization/S3 cancelled deadline timer 在高基数成功请求后滞留的问题；checkpoint AZ
-再以 10,000 个同步候选证明 scanner 的迭代 future chain 无递归 stack 增长，并在 10,000 durable cursor roots +
-10,000 objects 上保留 9,997 个 current reference，只删除 old、expired CAS-lost 和 deleted-cursor 三类对象；
-checkpoint BA 再覆盖 journaled source/protection 删除后的 process loss 和 protection 删除已生效但响应丢失，
-fresh coordinator/runtime 只从同一 DELETING root、sealed journal 与 exact planned absence 继续，真实 LocalStack
-对象在全部前置阶段完成前保持存在。checkpoint BB 又把 guarded Object-WAL session/root proof 接到每个
-provider transmission，覆盖 references/manifest 删除切点的 exact late PUT，并以真实 Oxia/LocalStack 证明 root
-退休后外部重现的同 key bytes 会被 missing-root inventory 注册为新的 ACTIVE ownerless root、经过完整 grace
-后再删除。checkpoint BC 又让 deletion-active readiness 变化通过 non-publishing physical/cursor scan、fresh
-scope canary 和单个 epoch/three-proof/capability CAS 恢复 authority，两个 delete bits 不回退。当前 broker safe
-defaults 不启动该服务；locked-Pulsar exact traversal bounds 与实际 two-broker ownership/unload/failover 矩阵、
-M4/M6 最终兼容门禁仍未完成。
+F4-M3 已 final-gated。F4-M4–M6 也已于 2026-07-19 完成：NRC1 recovery、retirement/GC、generation
+registration/readiness/activation、protected async Object-WAL、materialization lag、logical retention、all-shard/
+scale/failure cuts、retry-disabled two-broker ownership/MessageId/stock-BookKeeper coexistence，以及 checkpoint-BQ
+203/203-task aggregate 均通过。完整细节与 safe-default deletion 边界以 Phase 4 目录为准。
+下一项底层交付是 F1-BK，其代码级 target 在 `../phase-bk-bookkeeper-primary-wal/README.md`；当前只完成设计，
+真实 BookKeeper writer/reader/ledger lifecycle/retention 尚未实现，三个 BookKeeper profiles 继续在 IO 前拒绝。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以
@@ -96,3 +70,5 @@ F3 target contract、M0/M0R 结论和 M1-M6 计划以
 `../phase-3-cursor-subscription/README.md` 及该目录下的 `01` 到 `06` 为准。
 F4 target contract、M0 结论和 M1-M6 实施计划以
 `../phase-4-compaction-generation/README.md` 及该目录下的 `01` 到 `07` 为准。
+F1-BK target、BK-M0–M6 顺序和场景矩阵以
+`../phase-bk-bookkeeper-primary-wal/README.md` 及该目录下的 `01` 到 `08` 为准。

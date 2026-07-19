@@ -590,6 +590,13 @@ tasks.register<Exec>("checkPhase4Documentation") {
     commandLine("bash", "scripts/check-phase4-documentation.sh")
 }
 
+tasks.register<Exec>("bookKeeperPrimaryWalDocumentationCheck") {
+    group = "verification"
+    description = "Verify the F1-BK code-level design, source locks, non-implementation status, and documentation links."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-bookkeeper-primary-wal-documentation.sh")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

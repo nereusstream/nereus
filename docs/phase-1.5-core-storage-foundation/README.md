@@ -132,6 +132,10 @@ must not create a second temporary L0 API。
 | async materialization/higher generation | reserved at Phase 1.5 exit；later F4 `OBJECT_WAL_ASYNC_OBJECT` implemented/final-gated；BookKeeper primary variants reserved |
 | physical object deletion | absent at Phase 1.5 exit；later F4 implementation is final-gated and exact-activation-only with safe defaults closed |
 
+Phase 1.5 之后的 BookKeeper primary-WAL 实现合同已单独冻结为 F1-BK：
+`../phase-bk-bookkeeper-primary-wal/README.md`。它复用这里的 tagged target、registry、stable-head/gen0 split 和
+generic recovery，但当前仍是 design-only；不能把 reserved codec/registry seam 当成 profile support。
+
 ## 7. Aggregate Gates
 
 The implementation provides and passes these aggregate tasks：

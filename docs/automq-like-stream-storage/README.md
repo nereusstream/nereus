@@ -140,6 +140,9 @@ Not present：
 - BookKeeper-primary retention and its independent compatibility gates；
 - mixed primary target resolver。
 
+The exact follow-on is now designed as F1-BK in `../phase-bk-bookkeeper-primary-wal/README.md`。That document is a
+code-level target, not implementation evidence；all BookKeeper profiles remain rejected before primary IO。
+
 The production provider now installs the complete Object-WAL Phase 4 unit. Merely setting the async broker default
 still does not bypass rollout safety：it affects only first-create projections, and every async append must obtain and
 revalidate the durable generation activation/marker proof before primary IO. Existing topics retain their stored
@@ -152,13 +155,13 @@ primary Object WAL upload 和 stable head commit；后台化的是 secondary/rea
 
 ## 3. Profile matrix
 
-| Profile | Primary read source immediately after stable commit | Background publication | Default level |
+| Profile | Read source after stable head | Object publication | Producer completion |
 | --- | --- | --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | BK range | none | `WAL_DURABLE` |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | object-backed generation | compaction only | `WAL_DURABLE_AND_INDEX_COMMITTED` |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BK range | object-backed/read-optimized generation | `WAL_DURABLE` |
-| `OBJECT_WAL_SYNC_OBJECT` | Object WAL generation 0 | compaction only | `WAL_DURABLE_AND_INDEX_COMMITTED` |
-| `OBJECT_WAL_ASYNC_OBJECT` | Object WAL/repairable generation 0 | read-optimized generation | `WAL_DURABLE` |
+| `BOOKKEEPER_WAL_ONLY` | BK generation-zero range | none | `WAL_DURABLE` by default |
+| `BOOKKEEPER_WAL_SYNC_OBJECT` | BK generation-zero range until higher generation is admitted | shared F4 path, awaited | `REQUIRED_OBJECT_GENERATION` completion in addition to profile durability |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BK generation-zero range | shared F4 background generation | `WAL_DURABLE` |
+| `OBJECT_WAL_SYNC_OBJECT` | Object WAL generation zero | compaction only | `WAL_DURABLE_AND_INDEX_COMMITTED` |
+| `OBJECT_WAL_ASYNC_OBJECT` | Object WAL/repairable generation zero | read-optimized generation | `WAL_DURABLE` |
 
 `OBJECT_WAL` is the deprecated alias of `OBJECT_WAL_SYNC_OBJECT`。
 

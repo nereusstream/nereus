@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M6 complete/final-gated；F4-M4/M5 passed retry-disabled two-broker acceptance；F4-M6 BD–BQ and the 52/52/203-task aggregate are green
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M6 complete/final-gated；F1-BK BookKeeper primary-WAL code-level target frozen, not implemented
 > 最近设计/实现同步：2026-07-19
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -193,7 +193,8 @@ alias。
 
 ### 2.3 仅设计或占位
 
-- BookKeeper primary WAL execution；
+- F1-BK BookKeeper primary WAL execution；exact target 见
+  `../phase-bk-bookkeeper-primary-wal/README.md`，当前不表示 writer/reader/ledger lifecycle/retention 已实现；
 - BookKeeper-backed `WAL_DURABLE` fast boundary、`BOOKKEEPER_WAL_ASYNC_OBJECT` writer/reader and mixed-primary
   resolver；Object-WAL async execution/runtime 已由 checkpoint AD–AF 实现但仍受 generation activation proof；
 - KoP、routing、production topic-compaction admission、lakehouse、advanced Pulsar semantics；
@@ -296,9 +297,9 @@ Profile 由两个决策组成：primary WAL 和 object publication mode。
 
 | Profile | Primary WAL | Producer success boundary | Secondary publication | Current status |
 | --- | --- | --- | --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | BookKeeper | WAL durable + stable head commit | disabled | Reserved |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | stable commit + required object/read index | synchronous | Reserved |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | WAL durable + stable head commit | background | Reserved |
+| `BOOKKEEPER_WAL_ONLY` | BookKeeper | WAL durable + stable head commit | disabled | F1-BK Designed / Reserved |
+| `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | stable head + gen0 BK index + `REQUIRED_OBJECT_GENERATION` COMMITTED/read proof | synchronous via shared F4 task/path | F1-BK Designed / Reserved |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | WAL durable + stable head commit after lag admission | background via shared F4 task/path | F1-BK Designed / Reserved |
 | `OBJECT_WAL_SYNC_OBJECT` | object store | object WAL durable + stable head + generation-0 indexes | generation 0 on append path | Phase 1 target |
 | `OBJECT_WAL_ASYNC_OBJECT` | object store | object WAL durable + stable head commit | read-optimized generation background | Implemented/final-gated in Phase 4；activation-proof gated |
 
@@ -403,6 +404,7 @@ flowchart TB
 | `nereus-core` | coordinators and state machines | primary-WAL adapters、protected prepare/head/materialize、exact recovery、seal/delete、F4 physical lease/protection/reference SPI、protocol-neutral global reference scope、projection/stream-retirement authority capture contracts and public generation-zero protection identities implemented；M4 recovery/root/GC consumers and same-owner ACTIVE-root-epoch protection reconciliation are final-gated |
 | `nereus-metadata-oxia` | durable key/record/codec and Oxia client | legacy/new dual-read、generic new-write、mixed repair/replay and F4-M1–M6 metadata/publication/GC/scale gates implemented；includes canonical projection refs、task schema V2 and bounded registry/reference evidence |
 | `nereus-object-store` | object IO and Object WAL | M3 formats、F4-M4 configured-scope destructive-capability proof、M5 async Object-WAL and M6 compression/scale evidence implemented/final-gated；the AP probe alone is not activation authority |
+| `nereus-bookkeeper` | BookKeeper primary-WAL adapter/lifecycle/retention | F1-BK planned module；not present until BK-M1；must use public BookKeeper client API and must not expose ManagedLedger types to L0 |
 | `nereus-materialization` | planner/task/worker/publication/checkpoint/recovery/GC orchestration | module present；M1–M6 final-gated；M4 implements NRC1 publication/replay/index repair、root/journal fences、typed source retirement、completed-trim/COMMITTED/TOPIC_COMPACTED eligibility、future sentinel、referenced and ownerless global storage domains、dual-absence DELETED-root retirement、the managed-ledger cursor protection frontier、all-shard physical/cursor live-reference backfill、cursor/referenced/ownerless post-drain/restart execution、current-writer missing-root inventory、proof-driven registration retirement and metadata-first fixed-delay lifecycle；checkpoint BC adds exact-old-wrapper non-publishing rollover scans；checkpoint AF composes source repair plus the production materialization/checkpoint lifecycle，while AR composes this module's backfill through the adapter；M6 final-gates bounded merge/candidate/task/checkpoint/registry and two-worker contention evidence；depends on core, never the reverse |
 | `nereus-managed-ledger` | ManagedLedger facade | F2-M1-M4 plus F3-M1-M6 implemented/tested；F4 snapshot inventory/NPR1 authority、restart-reconstructable cursor candidates、durable registration/proof/activation、AR exact-scope deletion guard and typed factory/runtime activation surface、BC bounded atomic readiness-rollover handoff、pre-I/O async admission、checkpoint-AF materialization ownership、checkpoint-AN physical-GC lifecycle ownership and checkpoints AG–AI retention planner/F3 trim/shared-lane/per-ledger facade/policy admission complete；safe defaults keep physical deletion disabled |
 | `nereus-pulsar-adapter` | broker integration/config/policy | product runtime/S3 provider、fork binding/admission/capability/policy/admin paths、shared generation/registration/proof/activation ownership、checkpoint-AF coupled Object-WAL/NRC1 checkpoint composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin mapping、checkpoint-AN metadata-first cursor/referenced/ownerless GC lifecycle、checkpoint-AO exact physical-GC config、checkpoint-AQ atomic activation、checkpoint-AR provider/Pulsar/restart-scope composition and checkpoint-BC atomic deletion-active readiness rollover implemented；M4/M5 retry-disabled and M6 aggregate broker gates are complete；safe defaults keep destructive execution disabled |
@@ -410,7 +412,8 @@ flowchart TB
 
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、
 generic durable target records、exact recovery 和 lifecycle。BookKeeper profile 在其真实 writer/reader 注册前
-仍被拒绝；不得用伪造 `ObjectKey` 表示 BK ledger range。
+仍被拒绝；不得用伪造 `ObjectKey` 表示 BK ledger range。F1-BK 的 provider-neutral read-result seam、exact-id
+ledger allocation、fencing/retention 和 completion policy 见 `../phase-bk-bookkeeper-primary-wal/README.md`。
 
 ## 9. Metadata model
 

@@ -133,4 +133,6 @@ second commit protocol and is forbidden.
 
 The design is based only on this repository and the local Pulsar checkout at
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`。No internet or non-existent `M1-SNAPSHOT` artifact is an input.
-The exact source locks and BookKeeper client API surface are recorded in document 01.
+The target Pulsar source lock is `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。The Nereus pre-design audit
+lock and BookKeeper client API surface are recorded in document 01；a changed lock requires re-audit, not silent
+compilation against a different checkout.

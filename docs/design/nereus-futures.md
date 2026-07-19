@@ -28,7 +28,7 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 | Implemented/final-gated | F2/F4 consume the stable L0 surface |
+| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 + F1-BK BK-M0-M6 | Phase 1/1.5 implemented/final-gated；F1-BK code-level designed, not implemented | `bookKeeperPrimaryWalDocumentationCheck`, then BK-M1 provider-neutral foundation |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
 | F4 Materialization/Compaction | Phase 4 F4-M0-M6 | Implemented/final-gated；M4 implements recovery/retirement/physical+cursor GC、activation/global domains、restart/scale/late-PUT cuts、atomic readiness rollover and retry-disabled real source deletion；M5 implements durable registration/readiness/activation、protected async Object-WAL、pre-I/O lag admission、coupled production materialization、versioned exact-evidence retention/F3 trim、durable backlog eviction and exact Pulsar policy/admin routing，then final-gates MessageIds、unload/failover/rejoin/post-trim IO and BookKeeper coexistence；M6 BD–BQ close scale/failure/compatibility and the clean 203/203-task aggregate；safe defaults keep production deletion disabled | F5/F6/F8 may consume the final-gated F4 contracts |
@@ -41,7 +41,8 @@ Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes t
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
 profile from the completed P15-M6 surface。Future 4's explicit production composition now implements/final-gates
 `OBJECT_WAL_ASYNC_OBJECT` without changing that legacy boundary；all BookKeeper primary profiles remain reservations
-until their adapters/state machines pass independent gates。
+until their adapters/state machines pass independent gates。The exact F1-BK target is
+`../phase-bk-bookkeeper-primary-wal/README.md`；it is not Future 5 and does not renumber F5–F8。
 
 ## 3. Dependency graph
 
@@ -52,6 +53,10 @@ flowchart LR
     P15 --> F4["F4 Materialization / Compaction"]
     F1 --> F7["F7 Routing / Elasticity"]
     F2 --> F3["F3 Cursor / Subscription"]
+    P15 --> FBK["F1-BK BookKeeper Primary WAL"]
+    F2 --> FBK
+    F3 --> FBK
+    F4 --> FBK
     F2 --> F5["F5 KoP / Kafka"]
     F4 --> F5
     F4 --> F6["F6 Lakehouse"]
@@ -116,6 +121,13 @@ P15-M0-M6 before F2-M1：
 
 Phase 1.5 P15-M0-M6 still supports only strict Object WAL。BookKeeper IO、`WAL_DURABLE` success、async
 workers and higher generations remain outside this delivery。
+
+### F1-BK delivery extension (designed, not implemented)
+
+Code-level target：`../phase-bk-bookkeeper-primary-wal/README.md`。It consumes Phase 1.5 generic target/head/recovery,
+F2/F3 logical projection/cursor and final-gated F4 task/generation/retention contracts. BK-M0–M6 implement, in order,
+provider-neutral seams、BK_ONLY、BK_ASYNC_OBJECT、BK_SYNC_OBJECT、Pulsar rollout and aggregate compatibility. Until
+those executable gates pass, no BookKeeper profile is supported and no online profile migration exists。
 
 ## 5. F2 — ManagedLedger Facade
 
@@ -196,7 +208,9 @@ scanner landed. The exact-source claim-to-output-ready worker、task-protection 
 reconciliation、bounded service lifecycle and Pulsar Entry/NCP1 exact-byte round trip checkpoints are also implemented,
 as are the topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source bootstrap、
 tagged-v1 key encoding、shared-budget sorted-spill two-pass engine and isolated NTC1 worker/publication path.
-`phase4M3Check` and the real Oxia/LocalStack-backed final gate pass；M4 GC and the M5 async path do not exist yet.
+`phase4M3Check` and the real Oxia/LocalStack-backed final gate pass；F4-M4–M6 and checkpoint-BQ have since completed
+the GC、async/retention、scale/failure/compatibility and aggregate final gates. BookKeeper primary-WAL work consumes
+those final contracts through `../phase-bk-bookkeeper-primary-wal/README.md` rather than extending F4's scope.
 
 ### Owns
 

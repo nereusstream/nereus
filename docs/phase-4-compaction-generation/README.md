@@ -381,7 +381,9 @@ The Phase 4 code-level design closes the following choices：
    owner session. `PROTECTION_PENDING` and `TRIM_PENDING` veto a new trim/GC decision；snapshot inventory alone never
    authorizes deletion.
 12. Phase 4 enables async materialization only for `OBJECT_WAL_ASYNC_OBJECT`. BookKeeper writer/reader/ledger
-   retention remains a later, separate profile implementation that reuses this protocol.
+   retention remains a later, separate profile implementation that reuses this protocol. Its code-level F1-BK target
+   is `../phase-bk-bookkeeper-primary-wal/README.md`；generation zero remains the BK range, while all Object outputs
+   are higher generations and use this same task/worker/publication/lag/checkpoint truth.
 13. Pulsar retention and compatible backlog eviction may be admitted only behind a separately negotiated
     `nereus.generation-protocol=2` broker lookup capability. Pulsar compaction/offload/truncate/read-compacted remain rejected in
     Phase 4；full topic-compaction compatibility belongs to F8.

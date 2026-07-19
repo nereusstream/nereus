@@ -24,6 +24,8 @@ Phase 1.5 target records/state machines见 `../phase-1.5-core-storage-foundation
 F3 cursor exact contract见 `../phase-3-cursor-subscription/README.md`。
 F4 generation/async/recovery/GC exact target contract见
 `../phase-4-compaction-generation/README.md`。
+F1-BK BookKeeper primary-WAL exact target contract见
+`../phase-bk-bookkeeper-primary-wal/README.md`；当前为 design-only，不能作为实现证据。
 
 ## 2. Commit domains
 
@@ -357,19 +359,27 @@ recovery protocol and a new API contract。It is explicitly outside the current 
 
 ## 10. BookKeeper primary WAL
 
-> Status: Designed/Reserved
+> Status: F1-BK code-level target frozen；writer/reader/ledger lifecycle/retention/profile execution not implemented
 
 BookKeeper provides primary bytes durability only。The same head/commit-log protocol assigns logical
-offsets。The commit record/read target must eventually represent a real BK ledger/entry range：
+offsets。The commit record/read target uses the existing tagged `BookKeeperEntryRangeReadTarget`；one Nereus offset
+maps to one exact BK entry, and the physical ledger id never becomes Pulsar `MessageId` identity：
 
-| Profile | After stable append |
-| --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | generation 0 continues to reference BK range；no Nereus object task |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | object-backed target is published before strict success |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BK range serves reads until background generation publish |
+| Profile | Logical visibility | Producer completion | Read/source behavior |
+| --- | --- | --- | --- |
+| `BOOKKEEPER_WAL_ONLY` | reachable head commit | stable head by default；strict caller may also wait for gen0 | generation 0 remains the exact BK range；no object task |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | reachable head commit | stable head after shared lag admission | BK range serves reads until normal F4 higher-generation publication |
+| `BOOKKEEPER_WAL_SYNC_OBJECT` | reachable head commit | `REQUIRED_OBJECT_GENERATION` COMMITTED + exact resolve/read proof | consumers may read committed BK bytes while producer waits；same F4 task/path as async |
 
 Phase 1.5 freezes a generic BookKeeper entry-range target value/codec and adapter registry, but the final-gated runtime registers
-only Object WAL IO。A real BookKeeper adapter/client/retention implementation remains a separate profile gate。
+only Object WAL IO。`WAL_DURABLE_AND_INDEX_COMMITTED` confirms generation zero, which is still the BK target；it
+does not prove an Object generation. F1-BK therefore keeps `DurabilityLevel` meanings unchanged and adds an independent
+`AppendCompletionPolicy`/internal `AppendAckBoundary` with `REQUIRED_OBJECT_GENERATION`。Failure after head success is
+`KNOWN_COMMITTED`; recovery reuses the same BK range、stable append result and deterministic materialization task。
+
+Exact allocation、fencing、read checksum、retention、F4 reuse and rollout state machines are frozen in
+`../phase-bk-bookkeeper-primary-wal/README.md`。Until BK-M1–M6 executable gates pass, all three profiles fail before
+BookKeeper IO。
 
 ## 11. Generation publish protocol
 

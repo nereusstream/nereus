@@ -28,6 +28,7 @@ nereus/
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
+  docs/phase-bk-bookkeeper-primary-wal/  F1-BK code-level target; design only, not implemented
   docs/automq-like-stream-storage/       async materialization profile design
 ```
 
@@ -55,6 +56,12 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 
 Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
 materialization profiles are reserved design/API boundaries, not implemented support.
+
+The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. Its code-level
+target is frozen in [`docs/phase-bk-bookkeeper-primary-wal/`](docs/phase-bk-bookkeeper-primary-wal/README.md)：
+BK-M0–M6 cover provider-neutral append/read seams、exact ledger allocation/lifecycle/fencing、BK_ONLY retention、F4
+async/sync reuse and Pulsar rollout. This is design-only status；all three BookKeeper profiles remain rejected before
+primary IO until their executable gates pass.
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the

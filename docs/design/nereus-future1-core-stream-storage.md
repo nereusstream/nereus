@@ -3,7 +3,8 @@
 > 状态：Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 implemented/final-gated
 > 交付映射：`docs/phase-1-core-stream-storage/`
 > 后继交付：Phase 1.5 final-gated；`docs/phase-1.5-core-storage-foundation/`
-> 当前里程碑：F2-M1-M6 have consumed the completed L0 foundation；Future 2 final-gated
+> 当前后续：F1-BK / BookKeeper Primary WAL Delivery 已完成代码级 target，尚未实现；
+> `docs/phase-bk-bookkeeper-primary-wal/`
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、
 Oxia keys、failure injection 和测试 gate 以代码级文档为准；本文不复制那些合同。
@@ -83,6 +84,11 @@ handoff。P15-M0-M6 code and gates pass。
 
 Phase 1.5 P15-M0-M6 deliberately keeps the same supported profile/durability as Phase 1。BookKeeper adapters、non-strict success
 and Future 4 workers remain deferred beyond it。
+
+F4 随后 final-gated `OBJECT_WAL_ASYNC_OBJECT`；BookKeeper primary-WAL 的真实 writer/reader、exact ledger
+lifecycle/fencing、whole-ledger retention 和 BK_ONLY/async/sync profile 则由 F1 的后续扩展 F1-BK 定义。代码级
+合同见 `../phase-bk-bookkeeper-primary-wal/README.md`。当前仅为 designed/not implemented，三个 BookKeeper
+profiles 仍在 primary IO 前拒绝。
 
 ## 4. Layer and module boundary
 
