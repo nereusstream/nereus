@@ -1918,3 +1918,25 @@ tasks.register("phase4M5FinalCheck") {
     dependsOn("checkPhase4ModuleBoundaries")
     dependsOn("checkPhase4PulsarSourceLock")
 }
+
+tasks.register<Exec>("checkPhase4M6RegistryScaleContractSurface") {
+    group = "verification"
+    description = "Audit exact 16,448-stream all-shard registry pagination and cold-restart evidence."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m6-registry-scale-contract-surface.sh",
+    )
+}
+
+tasks.register("phase4M6RegistryScaleCheck") {
+    group = "verification"
+    description = "Verify checkpoint BH scans 257 registrations in each of 64 shards across cold restarts."
+    dependsOn("phase4M5FinalCheck")
+    dependsOn("checkPhase4M6RegistryScaleContractSurface")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-materialization:check")
+}

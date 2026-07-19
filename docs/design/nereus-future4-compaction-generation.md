@@ -5,9 +5,9 @@
 > exact-byte round trip、topic-compaction SPI/registry、terminal workflow-metadata retirement、COMMITTED-source
 > bootstrap、tagged-v1/sorted-spill topic engine/worker/publication passed deterministic and real Oxia/LocalStack gates；
 > F4-M4 real two-broker source-deletion gate and F4-M5 retry-disabled async-retention/MessageId/unload/failover/
-> restart/BookKeeper gate passed；F4-M1–M5 are final-gated；F4-M6 checkpoints BD–BG cover 32-ref merge、
+> restart/BookKeeper gate passed；F4-M1–M5 are final-gated；F4-M6 checkpoints BD–BH cover 32-ref merge、
 > 4,096/4,097 candidates、million-entry NRC1、1,000+1,000 reference pagination and the schema-V2 128-source/
-> 1,048,576-record task boundary，while aggregate M6 remains pending
+> 1,048,576-record task boundary plus exact 16,448-stream/64-shard registry cold restart，while aggregate M6 remains pending
 > 前置：Future 1 generation-0 contract、Phase 1.5 generic target/stable-commit split、
 > Phase 3 cursor retention/snapshot-reference contract、reader reference hooks
 
@@ -717,7 +717,7 @@ readiness/activation/CAS/reload/final-read 阶段。最终 retry-disabled two-br
 
 F4-M0 只是 design gate；F4-M1–M5 final gates 也不构成整个 Phase 4 完成声明。F4-M4 只在 exact activation/
 scope/proof 下 final-gate physical GC，safe defaults 仍不调度或删除；M5 final-gates the scoped Object-WAL async/
-Pulsar retention rollout but does not claim M6 scale/failure/compatibility certification. M6 checkpoints BD–BG are
-focused foundation evidence only；registry scale、two-worker/two-broker composition、52-scenario mapping and aggregate
+Pulsar retention rollout but does not claim M6 scale/failure/compatibility certification. M6 checkpoints BD–BH are
+focused foundation evidence only；two-worker/two-broker composition、52-scenario mapping and aggregate
 gates remain open. F4-M6 的确切文件、测试、
 故障点和 aggregate release gates 见代码级实施计划。

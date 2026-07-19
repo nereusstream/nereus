@@ -158,7 +158,10 @@
 > 1,000 reader leases and 1,000 source protections through the production Oxia adapter. Checkpoint BG proves one task
 > at both hard limits—128 exact sources and 1,048,576 records—fits the 64 KiB durable envelope and round-trips after
 > exact source revalidation. BG introduces the explicit dual-reader task schema V2 and advances only the broker lookup
-> capability to `nereus.generation-protocol=2`；the durable topic marker/activation record remain V1. These are focused
+> capability to `nereus.generation-protocol=2`；the durable topic marker/activation record remain V1. Checkpoint BH
+> writes exactly 257 deterministic valid registrations into each of 64 frozen registry shards, scans every `256 + 1`
+> page through the production adapter, and repeats the identical 16,448-key inventory from fresh empty continuations.
+> These are focused
 > M6 foundations, not the aggregate completion claim.
 >
 > 设计基线日期：2026-07-14
@@ -1953,6 +1956,25 @@ eviction、unload 后 logical trim、trim 后 append/read、第二次 ownership 
 捕获的 physical WAL keys 仍存在；物理删除只属于已经 final-gated 的 M4 exact activation path。该方法于
 2026-07-19 在 locked Pulsar `master@0e9829a7453497910ab468669e644e88b4bc2f93`、`testRetryCount=0` 下通过。
 
+### 6.36 F4-M6 exact registry-scale checkpoint
+
+Checkpoint BH closes the registered-stream scale row without promoting the registry from a liveness hint into
+correctness truth. `RegisteredMaterializationStreamScannerTest`
+`.scansSixteenThousandFourHundredFortyEightRegistrationsAcrossColdRestarts` deterministically selects 257 valid
+`StreamId` values for every one of the 64 shards using the production `F4Keyspace.materializationRegistryShard`
+function, then writes all 16,448 records through `OxiaJavaGenerationMetadataStore`'s production codec/CAS path over
+the partitioned in-memory backend. With page size 256, an instrumented delegating store proves each shard starts from
+an empty continuation, returns exactly `256 + 1` ordered keys across two pages, advances only through the opaque token,
+and has no duplicate or truncated identity.
+
+The fixture then discards the scanner、trace and every process-local continuation/watch hint and repeats the full
+scan against only the durable registry. Every shard again begins empty and returns the identical sorted key set. L0
+snapshots are deliberately `DELETED`, so the scale fixture exercises discovery and safe stale-hint skipping without
+creating 16,448 unrelated tasks；the existing admitted-stream fixtures separately prove authoritative head/task work
+is not skipped. `phase4M6RegistryScaleCheck` composes the M5 final predecessor、static contract/document/module/source
+audits and complete metadata/materialization checks. Checkpoint BH remains focused M6 evidence；two-worker/two-broker
+composition、the exact 52-scenario executable map and aggregate M6/Phase 4 gates remain open.
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -1963,7 +1985,7 @@ eviction、unload 后 logical trim、trim 后 append/read、第二次 ownership 
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BG focused-green, aggregate gates pending |
+| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BH focused-green, aggregate gates pending |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

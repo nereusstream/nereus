@@ -436,14 +436,15 @@ durable size backlog eviction、卸载后 exact ACTIVE-binding logical trim、tr
 logical trim 不删除 WAL bytes，stock BookKeeper control topic 始终可写可读。`phase4M5Check` 与
 `phase4M5FinalCheck` 是该里程碑的 ordinary/final completion boundary；F4-M6 和 Phase 4 aggregate final gate
 仍待完成。
-F4-M6 checkpoints BD–BG 已完成 focused foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
+F4-M6 checkpoints BD–BH 已完成 focused foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
 generation candidates、streaming 1,000,000-entry checkpoint、1,000 reader leases + 1,000 protections 的完整分页
-重扫，以及同时达到 128 sources / 1,048,576 records 的单 task durable round trip。最后一项要求新增显式
+重扫、同时达到 128 sources / 1,048,576 records 的单 task durable round trip，以及每个 64 registry shards
+精确 257 条、page size 256 的 16,448-stream cold-restart 扫描。Task boundary 要求新增显式
 `MaterializationTaskRecord` schema V2 dual reader；旧 V1 bytes 继续可读，新 task 使用 `2 / 2` envelope，并把
 broker lookup capability 提升为 `nereus.generation-protocol=2`。Topic projection marker 与 durable activation
 record 仍为 V1。新 source lock 上的完整 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已以 166/166 tasks
-通过，并重跑通过 retry-disabled 真实 M4 final predecessor。剩余 registry scale、multi-worker/two-broker、
-52-scenario mapping 和 aggregate gates 未完成。
+通过，并重跑通过 retry-disabled 真实 M4 final predecessor。剩余 multi-worker/two-broker、52-scenario mapping
+和 aggregate gates 未完成。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

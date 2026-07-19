@@ -200,8 +200,11 @@ admission、exact source revalidation、Oxia create and exact round trip. The re
 V2 with V1 dual-read compatibility and payload/envelope anti-alias checks；the locked broker generation lookup
 capability advances to version `2`, epoch `36151462167742895` and digest
 `80806f90349e89afb16f65d2e90f06339f48babe836f9954ad41fefc2869ab75`. Topic marker and durable activation-record
-protocols remain V1. Registry scale、two-broker/two-worker evidence、52-scenario mapping and aggregate gates remain
-pending.
+protocols remain V1. Checkpoint BH writes 257 deterministic valid stream registrations into every frozen registry
+shard through the production Oxia adapter. The process-wide scanner starts every shard with an empty continuation,
+consumes exactly `256 + 1` entries over two pages, compares all 16,448 ordered keys without duplicates/truncation, then
+repeats from a new scanner and new empty continuations using no watch/process hint. Two-broker/two-worker evidence、
+52-scenario mapping and aggregate gates remain pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1962,7 +1965,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BG are implemented and focused-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BH are implemented and focused-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -1985,7 +1988,11 @@ Checkpoint BG is
 `MaterializationPlannerScaleTest.plansAndDurablyRoundTripsOneTaskAtBothSourceAndRecordLimits` plus
 `F4MetadataCodecGoldenTest.taskEnvelopeAndPayloadSchemaVersionsCannotAlias` and the frozen `task-v2.planned` golden
 envelope. BG keeps V1 bytes unchanged, creates new tasks as schema/min-reader `2 / 2`, and requires generation lookup
-capability `2` before such roots may be admitted by the broker cluster.
+capability `2` before such roots may be admitted by the broker cluster. Checkpoint BH is
+`RegisteredMaterializationStreamScannerTest`
+`.scansSixteenThousandFourHundredFortyEightRegistrationsAcrossColdRestarts`：it uses the production metadata adapter,
+records both request/response continuation state, proves exact `256 + 1` pagination in every shard, compares every
+ordered durable key, and repeats from a fresh scanner with empty continuations.
 
 ### 8.1 Required scenarios
 
@@ -2076,10 +2083,13 @@ two brokers + at least two worker runtimes contending on the same streams
 The million-entry checkpoint test may use generated streaming bytes rather than holding all entries in heap；it must
 exercise writer/reader/directory bounds. The registry fixture uses deterministic valid `StreamId` inputs selected by
 the frozen shard function；it traverses at least two pages per shard and then restarts with empty continuations.
+Checkpoint BH implements this exact registry row；it does not treat registration or its scan order as stream-head/task
+truth, and all 16,448 stale-hint snapshots are safely skipped only after authoritative L0 inspection.
 
 ### 8.3 Gates
 
 ```text
+./gradlew phase4M6RegistryScaleCheck
 ./gradlew phase4M6Check
 ./gradlew phase4M6FinalCheck --rerun-tasks
 ./gradlew phase4Check

@@ -12,16 +12,19 @@ import com.nereusstream.api.StreamState;
 import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
+import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.StreamRegistrationScanPage;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
@@ -37,6 +40,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class RegisteredMaterializationStreamScannerTest {
+    private static final int SCALE_STREAMS_PER_SHARD = 257;
+    private static final int SCALE_REGISTRY_PAGE_SIZE = 256;
+    private static final int SCALE_STREAM_COUNT =
+            F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS * SCALE_STREAMS_PER_SHARD;
+
     @Test
     void scansAllShardsAndConvergesAnUnownedStreamIntoOneDurableTask() {
         List<VersionedGenerationCandidate> candidates = List.of(
@@ -160,7 +168,8 @@ class RegisteredMaterializationStreamScannerTest {
                         readinessChecks,
                         revalidations,
                         plannerCalls,
-                        clock)
+                        clock,
+                        1)
                 .scanOnce()
                 .join();
         // A new scanner has no watch state, queue contents, or process-local stream hints to reuse.
@@ -171,7 +180,8 @@ class RegisteredMaterializationStreamScannerTest {
                         readinessChecks,
                         revalidations,
                         plannerCalls,
-                        clock)
+                        clock,
+                        1)
                 .scanOnce()
                 .join();
 
@@ -182,6 +192,47 @@ class RegisteredMaterializationStreamScannerTest {
         assertThat(plannerCalls).hasValue(0);
     }
 
+    @Test
+    void scansSixteenThousandFourHundredFortyEightRegistrationsAcrossColdRestarts() {
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
+        try (GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(clock)) {
+            F4Keyspace keyspace = new F4Keyspace(CLUSTER);
+            Map<Integer, List<StreamId>> streamsByShard = streamsPerShard(
+                    keyspace, SCALE_STREAMS_PER_SHARD);
+            Map<Integer, List<String>> expectedKeysByShard = new LinkedHashMap<>();
+            streamsByShard.forEach((shard, streams) -> {
+                List<String> keys = streams.stream()
+                        .map(RegisteredMaterializationStreamScannerTest::registration)
+                        .map(registration -> durable.createOrVerifyStreamRegistration(
+                                        CLUSTER, registration)
+                                .join()
+                                .key())
+                        .sorted()
+                        .toList();
+                expectedKeysByShard.put(shard, keys);
+            });
+
+            RegistryScanTrace firstTrace = new RegistryScanTrace();
+            RegisteredMaterializationScanResult first = skippedStreamScanner(
+                            tracingStore(durable, firstTrace), clock)
+                    .scanOnce()
+                    .join();
+
+            // This scanner and trace have no process-local continuation or watch state from the
+            // first pass. The durable registry is the only retained input.
+            RegistryScanTrace restartedTrace = new RegistryScanTrace();
+            RegisteredMaterializationScanResult restarted = skippedStreamScanner(
+                            tracingStore(durable, restartedTrace), clock)
+                    .scanOnce()
+                    .join();
+
+            assertCompleteSkippedScaleScan(first);
+            assertCompleteSkippedScaleScan(restarted);
+            firstTrace.assertExact(expectedKeysByShard);
+            restartedTrace.assertExact(expectedKeysByShard);
+        }
+    }
+
     private static RegisteredMaterializationStreamScanner emptyStreamScanner(
             GenerationMetadataStore durable,
             OxiaMetadataStore l0Metadata,
@@ -189,7 +240,8 @@ class RegisteredMaterializationStreamScannerTest {
             AtomicInteger readinessChecks,
             AtomicInteger revalidations,
             AtomicInteger plannerCalls,
-            Clock clock) {
+            Clock clock,
+            int registryPageSize) {
         MaterializationTaskStore taskStore = new MaterializationTaskStore(CLUSTER, durable, clock);
         MaterializationTaskRecovery recovery = new MaterializationTaskRecovery(
                 taskStore,
@@ -231,24 +283,51 @@ class RegisteredMaterializationStreamScannerTest {
                         CompletableFuture.completedFuture(
                                 TerminalWorkflowMetadataRetirementResult.empty()),
                 policy,
-                1,
+                registryPageSize,
                 1);
     }
 
+    private static RegisteredMaterializationStreamScanner skippedStreamScanner(
+            GenerationMetadataStore generations,
+            Clock clock) {
+        return emptyStreamScanner(
+                generations,
+                skippedL0Store(),
+                MaterializationPlannerTestSupport.policy(),
+                new AtomicInteger(),
+                new AtomicInteger(),
+                new AtomicInteger(),
+                clock,
+                SCALE_REGISTRY_PAGE_SIZE);
+    }
+
     private static Map<Integer, List<StreamId>> twoStreamsPerShard(F4Keyspace keyspace) {
+        return streamsPerShard(keyspace, 2);
+    }
+
+    private static Map<Integer, List<StreamId>> streamsPerShard(
+            F4Keyspace keyspace,
+            int streamsPerShard) {
         Map<Integer, List<StreamId>> result = new LinkedHashMap<>();
+        for (int shard = 0; shard < F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS; shard++) {
+            result.put(shard, new ArrayList<>(streamsPerShard));
+        }
         int discovered = 0;
-        for (int candidate = 0; candidate < 100_000 && discovered < 128; candidate++) {
+        int target = Math.multiplyExact(
+                F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS, streamsPerShard);
+        for (int candidate = 0; candidate < 2_000_000 && discovered < target; candidate++) {
             StreamId streamId = new StreamId("paged-registry-stream-" + candidate);
             int shard = keyspace.materializationRegistryShard(streamId);
-            List<StreamId> shardStreams = result.computeIfAbsent(shard, ignored -> new ArrayList<>());
-            if (shardStreams.size() < 2) {
+            List<StreamId> shardStreams = result.get(shard);
+            if (shardStreams.size() < streamsPerShard) {
                 shardStreams.add(streamId);
                 discovered++;
             }
         }
         assertThat(result).hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
-        assertThat(result.values()).allSatisfy(streams -> assertThat(streams).hasSize(2));
+        assertThat(result.values())
+                .allSatisfy(streams -> assertThat(streams).hasSize(streamsPerShard));
+        assertThat(discovered).isEqualTo(target);
         return result;
     }
 
@@ -268,6 +347,14 @@ class RegisteredMaterializationStreamScannerTest {
     }
 
     private static OxiaMetadataStore emptyL0Store() {
+        return l0Store(StreamState.ACTIVE);
+    }
+
+    private static OxiaMetadataStore skippedL0Store() {
+        return l0Store(StreamState.DELETED);
+    }
+
+    private static OxiaMetadataStore l0Store(StreamState state) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
@@ -282,21 +369,21 @@ class RegisteredMaterializationStreamScannerTest {
                     }
                     return switch (method.getName()) {
                         case "getStreamSnapshot" -> CompletableFuture.completedFuture(
-                                emptySnapshot((StreamId) args[1]));
+                                emptySnapshot((StreamId) args[1], state));
                         case "close" -> null;
                         default -> throw new UnsupportedOperationException(method.getName());
                     };
                 });
     }
 
-    private static StreamMetadataSnapshot emptySnapshot(StreamId streamId) {
+    private static StreamMetadataSnapshot emptySnapshot(StreamId streamId, StreamState state) {
         long metadataVersion = 5;
         return new StreamMetadataSnapshot(
                 new StreamMetadataRecord(
                         streamId.value(),
                         "persistent://tenant/namespace/" + streamId.value(),
                         "name-hash-" + streamId.value(),
-                        StreamState.ACTIVE.name(),
+                        state.name(),
                         StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
                         Map.of(),
                         1,
@@ -314,6 +401,100 @@ class RegisteredMaterializationStreamScannerTest {
         assertThat(result.existingTasksRecovered()).isZero();
         assertThat(result.plannedTasksConverged()).isZero();
         assertThat(result.workflowMetadataRetired()).isZero();
+    }
+
+    private static void assertCompleteSkippedScaleScan(RegisteredMaterializationScanResult result) {
+        assertThat(result.shardsScanned()).isEqualTo(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+        assertThat(result.registrationsScanned()).isEqualTo(SCALE_STREAM_COUNT);
+        assertThat(result.registrationsAdmitted()).isZero();
+        assertThat(result.registrationsSkipped()).isEqualTo(SCALE_STREAM_COUNT);
+        assertThat(result.existingTasksRecovered()).isZero();
+        assertThat(result.plannedTasksConverged()).isZero();
+        assertThat(result.workflowMetadataRetired()).isZero();
+    }
+
+    private static GenerationMetadataStore tracingStore(
+            GenerationMetadataStore delegate,
+            RegistryScanTrace trace) {
+        return (GenerationMetadataStore) Proxy.newProxyInstance(
+                GenerationMetadataStore.class.getClassLoader(),
+                new Class<?>[] {GenerationMetadataStore.class},
+                (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return switch (method.getName()) {
+                            case "toString" -> "traced-generation-metadata-store";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == args[0];
+                            default -> throw new UnsupportedOperationException(method.getName());
+                        };
+                    }
+                    try {
+                        Object result = method.invoke(delegate, args);
+                        if (!method.getName().equals("scanStreamRegistrations")) {
+                            return result;
+                        }
+                        @SuppressWarnings("unchecked")
+                        CompletableFuture<StreamRegistrationScanPage> pageFuture =
+                                (CompletableFuture<StreamRegistrationScanPage>) result;
+                        int shard = (int) args[1];
+                        @SuppressWarnings("unchecked")
+                        Optional<F4ScanToken> continuation = (Optional<F4ScanToken>) args[2];
+                        return pageFuture.thenApply(page -> {
+                            trace.record(shard, continuation, page);
+                            return page;
+                        });
+                    } catch (InvocationTargetException failure) {
+                        throw failure.getCause();
+                    }
+                });
+    }
+
+    private static final class RegistryScanTrace {
+        private final Map<Integer, List<Boolean>> emptyContinuationByShard = new LinkedHashMap<>();
+        private final Map<Integer, List<Integer>> pageSizesByShard = new LinkedHashMap<>();
+        private final Map<Integer, List<Boolean>> nextContinuationByShard = new LinkedHashMap<>();
+        private final Map<Integer, List<String>> returnedKeysByShard = new LinkedHashMap<>();
+
+        private void record(
+                int shard,
+                Optional<F4ScanToken> continuation,
+                StreamRegistrationScanPage page) {
+            emptyContinuationByShard
+                    .computeIfAbsent(shard, ignored -> new ArrayList<>())
+                    .add(continuation.isEmpty());
+            pageSizesByShard
+                    .computeIfAbsent(shard, ignored -> new ArrayList<>())
+                    .add(page.values().size());
+            nextContinuationByShard
+                    .computeIfAbsent(shard, ignored -> new ArrayList<>())
+                    .add(page.continuation().isPresent());
+            returnedKeysByShard
+                    .computeIfAbsent(shard, ignored -> new ArrayList<>())
+                    .addAll(page.values().stream()
+                            .map(value -> value.key())
+                            .toList());
+        }
+
+        private void assertExact(Map<Integer, List<String>> expectedKeysByShard) {
+            assertThat(emptyContinuationByShard)
+                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            assertThat(pageSizesByShard)
+                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            assertThat(nextContinuationByShard)
+                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            assertThat(returnedKeysByShard)
+                    .hasSize(F4Keyspace.MATERIALIZATION_REGISTRY_SHARDS);
+            expectedKeysByShard.forEach((shard, expectedKeys) -> {
+                assertThat(emptyContinuationByShard.get(shard)).containsExactly(true, false);
+                assertThat(pageSizesByShard.get(shard))
+                        .containsExactly(SCALE_REGISTRY_PAGE_SIZE, 1);
+                assertThat(nextContinuationByShard.get(shard)).containsExactly(true, false);
+                assertThat(returnedKeysByShard.get(shard))
+                        .hasSize(SCALE_STREAMS_PER_SHARD)
+                        .doesNotHaveDuplicates()
+                        .containsExactlyElementsOf(expectedKeys);
+            });
+        }
     }
 
     private static GenerationProtocolActivationGuard countingGuard(

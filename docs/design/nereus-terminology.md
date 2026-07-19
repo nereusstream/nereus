@@ -257,6 +257,9 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 - **F4-M6 checkpoint BG**：单 task 同时达到 128 exact source ranges 与 1,048,576 records，经过 64 KiB
   admission、exact source revalidation、durable create/round trip；同时冻结 task schema V2 dual reader 与 broker
   generation lookup capability V2 的 scale/schema checkpoint。
+- **F4-M6 checkpoint BH**：以冻结的 64-shard SHA-256 路由挑选每分片精确 257 个有效 `StreamId`，通过生产
+  Oxia codec/CAS adapter 真实写入 16,448 条 registration；process-wide scanner 以 page size 256 对每分片读取
+  `256 + 1` 两页，并在全新 scanner/empty continuation 下逐键得到相同无重复 inventory 的 registry scale checkpoint。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 
