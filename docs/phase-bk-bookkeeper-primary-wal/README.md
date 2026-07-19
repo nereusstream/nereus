@@ -214,6 +214,12 @@ head CAS rather than weakening the gate。Recovery reconstructs
 missing mandatory fixed slots from the still-selected active reservation before it may
 clear writer state，then terminalizes non-durable RESERVED/WRITING attempts as exact `ABANDONED` authorities。
 
+The latest append checkpoint adds real multi-entry range evidence and real first/middle/last write cuts against
+BookKeeper 4.18：each tainted ledger is recovery-opened closed and never tail-reused。The deterministic L0 test also
+proves reachable-head generation-zero repair reuses the exact target with zero additional BK writes and that future
+profiles/oversize batches fail before provider IO。`DEFERRED_SYNC` is unrepresentable in
+`BookKeeperWalConfiguration`; the production adapter is contract-tested to pass an empty `WriteFlag` set。
+
 The focused ManagedLedger checkpoint admits BK_ONLY in projection creation/open/Position mapping and maps append to
 `WAL_DURABLE` without exposing the physical BK ledger id。`NereusBookKeeperManagedLedgerIntegrationTest` drives exact
 entry bytes through `NereusManagedLedger.addEntry/readEntry` over generation zero and proves the returned Position

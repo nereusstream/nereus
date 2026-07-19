@@ -243,6 +243,15 @@ ledger, injects a successful provider delete with a lost response, then recreate
 absence CAS reaches `DELETED`。The first run exposed that BookKeeper consumes the `ByteBuf` passed to `writeAsync`；the
 adapter now transmits a retained duplicate and the SPI explicitly keeps caller ownership, with a focused ref-count test。
 
+The current append/recovery checkpoint also closes BK-22 and BK-24 at the real-service level：one logical multi-entry
+append is written as one exact consecutive advanced-ledger range and returned as one stable target；separate first、
+middle and last write cuts recovery-open/close the tainted ledger, persist `ABANDONED`, and force the retry onto a new
+ledger at entry zero。At the deterministic L0 boundary, a reachable head with a missing generation-zero index repairs
+the same `BookKeeperEntryRangeReadTarget` without another provider write；future profiles and oversize batches reject
+before any create/open/write call。`DEFERRED_SYNC` is not a configuration value to reject：the typed configuration has
+no write-flag field and `DefaultBookKeeperClientOperations` always passes `EnumSet.noneOf(WriteFlag.class)`；the public
+4.18 adapter contract test freezes both facts。
+
 Still required before BK-M2 is complete：close the remaining BK-M2 scenario/evidence rows and execute the ordinary /
 aggregate final tasks against the current source locks。Production provider composition、first-create admission and
 loaded/unloaded/two-broker ownership rollout are BK-M5 responsibilities, not hidden BK-M2 completion criteria；until

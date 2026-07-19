@@ -90,6 +90,18 @@ require_literal 'BK-M1 provider-neutral foundation complete/final-gated on 2026-
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'multiEntryAppendUsesOneExactConsecutiveBookKeeperRange' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'reachableHeadRecoveryRepairsGenerationZeroWithoutRewritingBookKeeper' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperStreamStorageIntegrationTest.java"
+require_literal 'defaultAdapterMakesDeferredSyncUnrepresentableAndAlwaysUsesEmptyWriteFlags' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperClientApiContractTest.java"
 require_literal 'bookKeeperPrimaryWalDocumentationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM1Check' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2MetadataCheck' "build.gradle.kts"

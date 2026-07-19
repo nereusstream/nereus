@@ -90,7 +90,8 @@ is legal only if it preserves these rules：
 - each retained/derived `ByteBuf` is released exactly once after BookKeeper has stopped using it；
 - cancellation does not imply the RPC did not reach BookKeeper。
 
-`DEFERRED_SYNC` is rejected at configuration/runtime creation. Normal `writeAsync` completion is the V1 physical
+`DEFERRED_SYNC` is intentionally absent from typed configuration and the production create adapter always supplies an
+empty `WriteFlag` set。Normal `writeAsync` completion is the V1 physical
 durability predicate.
 
 ## 3. Rollover

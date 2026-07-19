@@ -8,11 +8,15 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 passed on 2026-07-19 under `bookKeeperPrimaryWalM2MetadataCheck`。BK-20 now passes its explicit D-level lifecycle /
 immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256-root/all-16-slot-shard scan。
 The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
-the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-30、BK-37、BK-41、BK-49、BK-53 and BK-55, including
+the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-30、BK-37、BK-41、BK-49、BK-53
+and BK-55, including
 a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
 does not claim the remaining M2 rows。The focused allocator gate also adds D checkpoints for every applied metadata
 response-loss operation in BK-13、foreign collision/new-candidate behavior in BK-15、global-root contention in BK-16
-and randomized monotonic writer/range behavior in BK-18；their remaining O/B levels stay open。BK-13 through BK-96
+and randomized monotonic writer/range behavior in BK-18；their remaining O/B levels stay open。The deterministic
+append/read gate additionally proves pre-provider profile/oversize rejection (BK-23)、same-target/no-rewrite
+generation-zero repair (the D checkpoint of BK-29) and an unrepresentable `DEFERRED_SYNC` configuration plus an
+adapter-forced empty write-flag set (BK-36)。BK-13 through BK-96
 otherwise remain required target evidence and are currently
 **not complete**。During
 implementation, each row
@@ -75,21 +79,21 @@ Evidence levels：
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
 | BK-21 | M2 | B/O | one ordinary entry is quorum durable, head reachable and returns stable offset | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
-| BK-22 | M2 | B/O | multi-entry append occupies exact consecutive ids and one target checksum | checkpoint: `BookKeeperPrimaryWalAppenderTest.reservesWritesAndReturnsOneStableExactRange`; final: `BookKeeperWalOnlyIT.appendsOneContiguousRange` |
-| BK-23 | M2 | D/B | unsupported profile/durability/config/oversize batch performs zero BK calls | `BookKeeperAppendAdmissionTest.rejectsBeforePrimaryIo` |
-| BK-24 | M2 | D/B | first/middle/last write failure taints and seals ledger; no tail reuse | checkpoint: `BookKeeperPrimaryWalAppenderTest.partialWriteAbandonsRangeRecoverySealsLedgerAndNextAppendAllocatesFreshLedger`; final: `BookKeeperPartialWriteIT.sealsEveryUncertainPrefix` |
+| BK-22 | M2 | B/O | multi-entry append occupies exact consecutive ids and one target checksum | `BookKeeperPrimaryWalAppenderTest.reservesWritesAndReturnsOneStableExactRange` + `BookKeeperWalOnlyOxiaBkIntegrationTest.multiEntryAppendUsesOneExactConsecutiveBookKeeperRange` |
+| BK-23 | M2 | D/B | future/missing-adapter profile、invalid configuration and oversize batch reject before BK calls；both V1 durability values remain valid | `BookKeeperStorageProfileResolverTest.rejectsObjectFutureBkProfilesAndMissingAdaptersBeforeIo` + `BookKeeperStreamStorageIntegrationTest.unsupportedProfileAndOversizeBatchReachNoBookKeeperOperation` + `BookKeeperWalConfigurationTest` |
+| BK-24 | M2 | D/B/O | first/middle/last write failure taints and seals ledger; no tail reuse | `BookKeeperPrimaryWalAppenderTest.partialWriteAbandonsRangeRecoverySealsLedgerAndNextAppendAllocatesFreshLedger` + `BookKeeperWalOnlyOxiaBkIntegrationTest.firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse` |
 | BK-25 | M2 | B/O/C | crash after range + three mandatory RESERVED protection slots but before write becomes known-not-committed | `BookKeeperAppendRecoveryIT.recoversReservedEmptyRange` |
 | BK-26 | M2 | B/O/C | full writes before commit intent resume only under unchanged session | `BookKeeperAppendRecoveryIT.resumesDurableRangeForCurrentSession` |
 | BK-27 | M2 | B/O/C | new session abandons unreachable old-writer full range and uses new ledger | `BookKeeperAppendRecoveryIT.doesNotCommitFencedWriterRange` |
 | BK-28 | M2 | O/C | commit intent/protection/head response loss returns same committed target/result | `BookKeeperAppendRecoveryIT.recoversSameReachableCommit` |
-| BK-29 | M2 | O/C | head reachable/gen0 missing repairs same target without BK write | `BookKeeperGenerationZeroRepairIT.repairsFromReachableCommit` |
+| BK-29 | M2 | D/O/C | head reachable/gen0 missing repairs same target without BK write | D checkpoint: `BookKeeperStreamStorageIntegrationTest.reachableHeadRecoveryRepairsGenerationZeroWithoutRewritingBookKeeper`; production Oxia response-loss cut remains open |
 | BK-30 | M2 | B/O | entry/physical-byte/append-range/age rollover occurs before batch, never splits it and keeps dense offsets | checkpoint: `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover`; remaining byte/range/age boundaries: `BookKeeperRolloverIT.preservesBatchAndLogicalDensity` |
 | BK-31 | M2 | B/O/C | crash in ACTIVE->SEALING->SEALED converges exact closed LAC/length | `BookKeeperLedgerRecoveryIT.recoversEverySealCut` |
 | BK-32 | M2 | B/O | new owner recovery-open fences old handle; old owner cannot head-commit | `BookKeeperFencingIT.alignsBookKeeperAndOxiaFences` |
 | BK-33 | M2 | B/O | two recovery owners contend; one new active ledger wins | `BookKeeperFencingIT.serializesTwoRecoveryOwners` |
 | BK-34 | M2 | D | buffer/permit counts return to zero on success/failure/timeout/cancel/close | `BookKeeperAppenderResourceTest.releasesEveryOwnedResource` |
 | BK-35 | M2 | D/B | one monotonic deadline spans allocation/write/commit and does not reset | `BookKeeperAppenderDeadlineTest.propagatesRemainingBudget` |
-| BK-36 | M2 | D | `DEFERRED_SYNC` configuration is rejected before runtime registration | `BookKeeperWalConfigurationTest.rejectsDeferredSync` |
+| BK-36 | M2 | D | typed configuration has no write-flag escape hatch and production create always passes an empty flag set, making `DEFERRED_SYNC` unrepresentable | `BookKeeperClientApiContractTest.defaultAdapterMakesDeferredSyncUnrepresentableAndAlwaysUsesEmptyWriteFlags` |
 
 ## 5. Read and Pulsar compatibility
 

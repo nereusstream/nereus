@@ -300,6 +300,14 @@ class BookKeeperPrimaryWalAppenderTest {
         int recoveryOpenCalls;
         int normalOpenCalls;
 
+        int writeCalls() {
+            return writeCalls;
+        }
+
+        int providerCalls() {
+            return createCalls + writeCalls + recoveryOpenCalls + normalOpenCalls;
+        }
+
         private List<Map.Entry<Long, byte[]>> entries(long ledgerId) {
             return ledgers.get(ledgerId).entries.entrySet().stream()
                     .map(entry -> Map.entry(entry.getKey(), entry.getValue().clone()))

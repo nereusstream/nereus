@@ -414,8 +414,10 @@ record BookKeeperLedgerGcConfiguration(
     boolean dryRun) { }
 ```
 
-Validation includes `ensemble >= writeQuorum >= ackQuorum > 0`、all bounds positive/non-overflowing、timeouts below
-the broker close budget, and no `DEFERRED_SYNC` flag. Prefix bits/value must encode a nonzero subset of the positive
+Validation includes `ensemble >= writeQuorum >= ackQuorum > 0`、all bounds positive/non-overflowing and timeouts below
+the broker close budget。The typed record intentionally exposes no write-flag field；the production adapter always
+passes `EnumSet.noneOf(WriteFlag.class)`, so `DEFERRED_SYNC` is unrepresentable rather than a late rejected value。
+Prefix bits/value must encode a nonzero subset of the positive
 63-bit domain：`ledgerIdPrefixBits` is `[8,24]`、the prefix's highest bit must be one、and the random suffix is therefore
 at least 39 bits；every candidate must round-trip the namespace predicate. The
 nonblank reservation id names an externally enforced deployment allocation, not a trust-me toggle. The durable

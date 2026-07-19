@@ -8,13 +8,19 @@ import io.netty.buffer.Unpooled;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.bookkeeper.client.api.BookKeeper;
 import org.apache.bookkeeper.client.api.CreateAdvBuilder;
+import org.apache.bookkeeper.client.api.CreateBuilder;
 import org.apache.bookkeeper.client.api.DeleteBuilder;
 import org.apache.bookkeeper.client.api.OpenBuilder;
 import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.client.api.WriteAdvHandle;
+import org.apache.bookkeeper.client.api.WriteFlag;
 import org.junit.jupiter.api.Test;
 
 class BookKeeperClientApiContractTest {
@@ -54,6 +60,57 @@ class BookKeeperClientApiContractTest {
         } finally {
             callerOwned.release();
         }
+    }
+
+    @Test
+    void defaultAdapterMakesDeferredSyncUnrepresentableAndAlwaysUsesEmptyWriteFlags() {
+        AtomicReference<EnumSet<WriteFlag>> observedFlags = new AtomicReference<>();
+        AtomicReference<CreateBuilder> createRef = new AtomicReference<>();
+        AtomicReference<CreateAdvBuilder> advancedRef = new AtomicReference<>();
+        WriteAdvHandle handle = proxy(WriteAdvHandle.class, (method, arguments) -> switch (method.getName()) {
+            case "closeAsync" -> CompletableFuture.completedFuture(null);
+            default -> throw new UnsupportedOperationException(method.getName());
+        });
+        CreateAdvBuilder advanced = proxy(CreateAdvBuilder.class, (method, arguments) -> switch (method.getName()) {
+            case "withLedgerId" -> advancedRef.get();
+            case "execute" -> CompletableFuture.completedFuture(handle);
+            default -> throw new UnsupportedOperationException(method.getName());
+        });
+        advancedRef.set(advanced);
+        CreateBuilder create = proxy(CreateBuilder.class, (method, arguments) -> switch (method.getName()) {
+            case "withWriteFlags" -> {
+                @SuppressWarnings("unchecked")
+                EnumSet<WriteFlag> flags = (EnumSet<WriteFlag>) arguments[0];
+                observedFlags.set(EnumSet.copyOf(flags));
+                yield createRef.get();
+            }
+            case "makeAdv" -> advanced;
+            case "withEnsembleSize", "withWriteQuorumSize", "withAckQuorumSize", "withPassword",
+                    "withCustomMetadata", "withDigestType" -> createRef.get();
+            default -> throw new UnsupportedOperationException(method.getName());
+        });
+        createRef.set(create);
+        BookKeeper client = proxy(BookKeeper.class, (method, arguments) -> {
+            if (method.getName().equals("newCreateLedgerOp")) return create;
+            throw new UnsupportedOperationException(method.getName());
+        });
+        BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
+        long ledgerId = configuration.ledgerIdNamespace().candidate(new Random(7));
+
+        WriteAdvHandle created = new DefaultBookKeeperClientOperations(client)
+                .createAdvanced(
+                        ledgerId,
+                        configuration,
+                        new byte[] {1},
+                        Map.of(),
+                        new BookKeeperOperationDeadline(Duration.ofSeconds(1)))
+                .join();
+
+        assertThat(created).isSameAs(handle);
+        assertThat(observedFlags).hasValueSatisfying(flags -> assertThat(flags).isEmpty());
+        assertThat(BookKeeperWalConfiguration.class.getRecordComponents())
+                .extracting(component -> component.getName().toLowerCase(java.util.Locale.ROOT))
+                .noneMatch(name -> name.contains("writeflag") || name.contains("deferredsync"));
     }
 
     @SuppressWarnings("unchecked")
