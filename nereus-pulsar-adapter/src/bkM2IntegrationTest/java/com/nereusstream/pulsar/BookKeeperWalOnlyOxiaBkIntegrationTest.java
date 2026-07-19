@@ -77,6 +77,7 @@ import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationLifecycle;
@@ -84,11 +85,15 @@ import com.nereusstream.metadata.oxia.testing.BookKeeperMetadataStoreContractSce
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.oxia.testcontainers.OxiaContainer;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -388,6 +393,71 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
+    void realReaderFailsClosedOnCountIdAndConfigurationDrift() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-reader-drift-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(1_560_000), ZoneId.of("UTC"));
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri)) {
+            StreamId stream;
+            try (Process writer = Process.open(
+                    bookKeeperCluster,
+                    cluster,
+                    deployment,
+                    "process-reader-drift-writer",
+                    configuration,
+                    reservation,
+                    clock)) {
+                stream = writer.storage.createOrGetStream(
+                                new StreamName("persistent://tenant/namespace/bk-reader-drift-" + suffix),
+                                new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                        .join()
+                        .streamId();
+                writer.append(stream, new byte[] {1}, new byte[] {2}, new byte[] {3});
+            }
+
+            for (ReadCorruption corruption : List.of(
+                    ReadCorruption.SHORT_COUNT,
+                    ReadCorruption.WRONG_ENTRY_ID,
+                    ReadCorruption.WRONG_CONFIGURATION)) {
+                AtomicReference<CountingOperations> counting = new AtomicReference<>();
+                try (Process reader = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-reader-drift-" + corruption.name().toLowerCase(java.util.Locale.ROOT),
+                        configuration,
+                        reservation,
+                        clock,
+                        raw -> counting(raw, counting, corruption))) {
+                    ResolvedRange resolved = reader.storage.resolve(
+                                    stream, 0, new ResolveOptions(10, false, true))
+                            .join()
+                            .ranges()
+                            .get(0);
+
+                    assertThatThrownBy(() -> reader.reader.readPhysicalWithStats(
+                                    stream,
+                                    0,
+                                    List.of(resolved),
+                                    new ReadOptions(100, 1024, ReadIsolation.COMMITTED, TIMEOUT))
+                            .join()).hasCauseInstanceOf(NereusException.class)
+                            .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
+                                    .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION));
+                    assertThat(counting.get().normalOpenCalls()).isOne();
+                    assertThat(counting.get().recoveryOpenCalls()).isZero();
+                    assertThat(counting.get().readCalls())
+                            .isEqualTo(corruption == ReadCorruption.WRONG_CONFIGURATION ? 0 : 1);
+                }
+            }
+        }
+    }
+
+    @Test
     void partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String cluster = "bk-m2-retain-live-" + suffix;
@@ -464,6 +534,147 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                             mixedLedger, new BookKeeperOperationDeadline(TIMEOUT))
                     .join().getLastEntryId()).isEqualTo(2);
             assertRead(process, mixedStream, List.of(new byte[] {12}, new byte[] {13}, new byte[] {14}), 1);
+        }
+    }
+
+    @Test
+    void referenceAfterMarkUnmarksAndSafeGcModesNeverDelete() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-gc-negative-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        BookKeeperWalConfiguration configuration = configuration(8);
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        MutableClock clock = new MutableClock(1_600_000);
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-gc-negative",
+                        configuration,
+                        reservation,
+                        clock)) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-gc-negative-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            AppendResult first = process.append(stream, new byte[] {1}, new byte[] {2});
+            process.append(stream, new byte[] {3});
+            process.append(stream, new byte[] {4});
+            long ledgerId = target(first).ledgerId();
+            var sealed = process.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), ledgerId)
+                    .join()
+                    .orElseThrow();
+            assertThat(sealed.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+            process.storage.trim(stream, 3, new TrimOptions(TIMEOUT, "gc negative boundaries")).join();
+            BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
+                    cluster, process.l0, process.bookKeeperMetadata);
+            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+                    cluster, configuration, process.bookKeeperMetadata, authority);
+            assertThat(new BookKeeperWalOnlyReferenceRetirementCoordinator(
+                            cluster, configuration, process.bookKeeperMetadata, authority, references)
+                    .retireEligible(sealed, TIMEOUT)
+                    .join().fullyRetired()).isTrue();
+
+            BookKeeperLedgerGcConfiguration enabled = new BookKeeperLedgerGcConfiguration(
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, false);
+            BookKeeperProtocolActivationProof activation = activation(configuration, reservation);
+            BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
+                    cluster,
+                    configuration,
+                    enabled,
+                    process.bookKeeperMetadata,
+                    process.bookKeeperMetadata,
+                    process.namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    process.rawOperations,
+                    clock);
+            BookKeeperLedgerRetentionManager retention = new BookKeeperLedgerRetentionManager(
+                    cluster,
+                    configuration,
+                    enabled,
+                    process.bookKeeperMetadata,
+                    process.namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    process.rawOperations,
+                    gate,
+                    clock);
+            var candidate = gate.evaluate(sealed, TIMEOUT).join().candidate().orElseThrow();
+            var marked = retention.mark(candidate, TIMEOUT).join();
+            assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
+
+            var lateReader = process.bookKeeperMetadata.createReaderLease(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            new BookKeeperLedgerReaderLeaseRecord(
+                                    1,
+                                    sealed.value().ledgerIdentitySha256(),
+                                    ledgerId,
+                                    sealed.value().lifecycleEpoch(),
+                                    0,
+                                    "reader-racing-real-mark/0",
+                                    1,
+                                    clock.millis(),
+                                    clock.millis() + Duration.ofMinutes(10).toMillis(),
+                                    0))
+                    .join();
+            clock.advance(Duration.ofMinutes(2).plusMillis(1));
+            var unmarked = retention.converge(marked.root().orElseThrow(), TIMEOUT).join();
+            assertThat(unmarked.action()).isEqualTo(BookKeeperLedgerGcAction.UNMARKED);
+            assertThat(unmarked.root().orElseThrow().value().lifecycle())
+                    .isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+            assertThat(process.rawOperations.metadata(ledgerId, new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLedgerId()).isEqualTo(ledgerId);
+            process.bookKeeperMetadata.deleteReaderLease(
+                            cluster,
+                            configuration.providerScopeSha256(),
+                            ledgerId,
+                            lateReader.value().readerSlot(),
+                            lateReader.metadataVersion())
+                    .join();
+
+            var currentRoot = unmarked.root().orElseThrow();
+            var currentCandidate = gate.evaluate(currentRoot, TIMEOUT).join().candidate().orElseThrow();
+            BookKeeperLedgerRetentionManager disabled = new BookKeeperLedgerRetentionManager(
+                    cluster,
+                    configuration,
+                    BookKeeperLedgerGcConfiguration.safeDefault(),
+                    process.bookKeeperMetadata,
+                    process.namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    process.rawOperations,
+                    gate,
+                    clock);
+            assertThat(disabled.mark(currentCandidate, TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DISABLED);
+            assertThat(disabled.converge(currentRoot, TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DISABLED);
+
+            BookKeeperLedgerGcConfiguration dryRunConfiguration = new BookKeeperLedgerGcConfiguration(
+                    1, Duration.ZERO, Duration.ofMinutes(2), Duration.ofSeconds(10), true, true);
+            BookKeeperLedgerRetentionManager dryRun = new BookKeeperLedgerRetentionManager(
+                    cluster,
+                    configuration,
+                    dryRunConfiguration,
+                    process.bookKeeperMetadata,
+                    process.namespaceVerifier,
+                    ignored -> CompletableFuture.completedFuture(activation),
+                    process.rawOperations,
+                    gate,
+                    clock);
+            assertThat(dryRun.mark(currentCandidate, TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
+            assertThat(dryRun.converge(currentRoot, TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
+            assertThat(process.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), ledgerId)
+                    .join()).contains(currentRoot);
+            assertThat(process.rawOperations.metadata(ledgerId, new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLedgerId()).isEqualTo(ledgerId);
         }
     }
 
@@ -807,6 +1018,15 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             BookKeeperClientOperations raw,
             AtomicReference<CountingOperations> target) {
         CountingOperations operations = new CountingOperations(raw);
+        target.set(operations);
+        return operations;
+    }
+
+    private static CountingOperations counting(
+            BookKeeperClientOperations raw,
+            AtomicReference<CountingOperations> target,
+            ReadCorruption corruption) {
+        CountingOperations operations = new CountingOperations(raw, corruption);
         target.set(operations);
         return operations;
     }
@@ -1414,14 +1634,21 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
     private static final class CountingOperations implements BookKeeperClientOperations {
         private final BookKeeperClientOperations delegate;
+        private final ReadCorruption readCorruption;
         private final AtomicInteger writes = new AtomicInteger();
         private final AtomicInteger normalOpens = new AtomicInteger();
         private final AtomicInteger recoveryOpens = new AtomicInteger();
+        private final AtomicInteger reads = new AtomicInteger();
         private final AtomicReference<WriteAdvHandle> createdHandle = new AtomicReference<>();
         private final AtomicReference<long[]> lastReadRange = new AtomicReference<>();
 
         private CountingOperations(BookKeeperClientOperations delegate) {
+            this(delegate, ReadCorruption.NONE);
+        }
+
+        private CountingOperations(BookKeeperClientOperations delegate, ReadCorruption readCorruption) {
             this.delegate = delegate;
+            this.readCorruption = readCorruption;
         }
 
         @Override
@@ -1447,7 +1674,10 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 BookKeeperOperationDeadline deadline) {
             if (recovery) recoveryOpens.incrementAndGet();
             else normalOpens.incrementAndGet();
-            return delegate.open(ledgerId, digestType, password, recovery, deadline);
+            return delegate.open(ledgerId, digestType, password, recovery, deadline)
+                    .thenApply(handle -> !recovery && readCorruption == ReadCorruption.WRONG_CONFIGURATION
+                            ? withWrongConfiguration(handle)
+                            : handle);
         }
 
         @Override
@@ -1467,7 +1697,13 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 long lastEntryIdInclusive,
                 BookKeeperOperationDeadline deadline) {
             lastReadRange.set(new long[] {firstEntryId, lastEntryIdInclusive});
-            return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline);
+            reads.incrementAndGet();
+            return delegate.readUnconfirmed(handle, firstEntryId, lastEntryIdInclusive, deadline)
+                    .thenApply(entries -> switch (readCorruption) {
+                        case SHORT_COUNT -> new CorruptLedgerEntries(entries, true, false);
+                        case WRONG_ENTRY_ID -> new CorruptLedgerEntries(entries, false, true);
+                        default -> entries;
+                    });
         }
 
         @Override
@@ -1497,9 +1733,106 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
             return recoveryOpens.get();
         }
 
+        private int readCalls() {
+            return reads.get();
+        }
+
         private long[] lastReadRange() {
             return java.util.Objects.requireNonNull(lastReadRange.get(), "BookKeeper read range").clone();
         }
+
+        private static ReadHandle withWrongConfiguration(ReadHandle handle) {
+            LedgerMetadata exact = handle.getLedgerMetadata();
+            LedgerMetadata corrupt = (LedgerMetadata) Proxy.newProxyInstance(
+                    LedgerMetadata.class.getClassLoader(),
+                    new Class<?>[] {LedgerMetadata.class},
+                    (ignored, method, arguments) -> {
+                        if (method.getName().equals("getAckQuorumSize")) {
+                            return exact.getAckQuorumSize() + 1;
+                        }
+                        return invoke(method, exact, arguments);
+                    });
+            return (ReadHandle) Proxy.newProxyInstance(
+                    ReadHandle.class.getClassLoader(),
+                    new Class<?>[] {ReadHandle.class},
+                    (ignored, method, arguments) -> {
+                        if (method.getName().equals("getLedgerMetadata")) return corrupt;
+                        return invoke(method, handle, arguments);
+                    });
+        }
+
+        private static Object invoke(
+                java.lang.reflect.Method method, Object target, Object[] arguments) throws Throwable {
+            try {
+                return method.invoke(target, arguments);
+            } catch (InvocationTargetException failure) {
+                throw failure.getCause();
+            }
+        }
+    }
+
+    private enum ReadCorruption {
+        NONE,
+        SHORT_COUNT,
+        WRONG_ENTRY_ID,
+        WRONG_CONFIGURATION
+    }
+
+    private static final class CorruptLedgerEntries implements LedgerEntries {
+        private final LedgerEntries delegate;
+        private final List<org.apache.bookkeeper.client.api.LedgerEntry> entries;
+
+        private CorruptLedgerEntries(
+                LedgerEntries delegate, boolean omitLast, boolean changeFirstEntryId) {
+            this.delegate = delegate;
+            List<org.apache.bookkeeper.client.api.LedgerEntry> copied = new ArrayList<>();
+            delegate.forEach(copied::add);
+            if (omitLast && !copied.isEmpty()) copied.remove(copied.size() - 1);
+            if (changeFirstEntryId && !copied.isEmpty()) {
+                var first = copied.get(0);
+                copied.set(0, new CorruptLedgerEntry(first, first.getEntryId() + 1));
+            }
+            entries = List.copyOf(copied);
+        }
+
+        @Override
+        public org.apache.bookkeeper.client.api.LedgerEntry getEntry(long entryId) {
+            return entries.stream()
+                    .filter(entry -> entry.getEntryId() == entryId)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        @Override
+        public Iterator<org.apache.bookkeeper.client.api.LedgerEntry> iterator() {
+            return entries.iterator();
+        }
+
+        @Override
+        public void close() {
+            delegate.close();
+        }
+    }
+
+    private static final class CorruptLedgerEntry implements org.apache.bookkeeper.client.api.LedgerEntry {
+        private final org.apache.bookkeeper.client.api.LedgerEntry delegate;
+        private final long entryId;
+
+        private CorruptLedgerEntry(org.apache.bookkeeper.client.api.LedgerEntry delegate, long entryId) {
+            this.delegate = delegate;
+            this.entryId = entryId;
+        }
+
+        @Override public long getLedgerId() { return delegate.getLedgerId(); }
+        @Override public long getEntryId() { return entryId; }
+        @Override public long getLength() { return delegate.getLength(); }
+        @Override public byte[] getEntryBytes() { return delegate.getEntryBytes(); }
+        @Override public java.nio.ByteBuffer getEntryNioBuffer() { return delegate.getEntryNioBuffer(); }
+        @Override public ByteBuf getEntryBuffer() { return delegate.getEntryBuffer(); }
+        @Override public org.apache.bookkeeper.client.api.LedgerEntry duplicate() {
+            return new CorruptLedgerEntry(delegate.duplicate(), entryId);
+        }
+        @Override public void close() { delegate.close(); }
     }
 
     private static final class FailNthWriteOperations implements BookKeeperClientOperations {

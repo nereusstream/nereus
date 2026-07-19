@@ -18,6 +18,7 @@ import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PreparedStableAppend;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerProtectionRecord;
+import com.nereusstream.metadata.oxia.records.BookKeeperLedgerReaderLeaseRecord;
 import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
 import com.nereusstream.metadata.oxia.records.CommittedEndOffsetRecord;
 import com.nereusstream.metadata.oxia.records.ProtectionLifecycle;
@@ -257,6 +258,132 @@ class BookKeeperWalRetentionGateTest {
             var retired = references.retire(
                     ledger.target().ledgerId(), 0, 0, refreshed, TIMEOUT).join();
             assertThat(retired.value().lifecycle()).isEqualTo(ProtectionLifecycle.RETIRED);
+        }
+    }
+
+    @Test
+    void referenceAppearingAfterMarkUnmarksToSealedBeforeDelete() {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+            StableLedger ledger = appendCommitAndSeal(runtime);
+            retireAll(runtime, ledger);
+            MutableClock clock = new MutableClock(1_000);
+            BookKeeperLedgerGcConfiguration gc = new BookKeeperLedgerGcConfiguration(
+                    1,
+                    Duration.ZERO,
+                    Duration.ofMinutes(2),
+                    Duration.ofSeconds(10),
+                    true,
+                    false);
+            BookKeeperProtocolActivationProof activation = activation(runtime);
+            BookKeeperWalRetentionGate gate = new BookKeeperWalRetentionGate(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    runtime.configuration,
+                    gc,
+                    runtime.metadata,
+                    runtime.metadata,
+                    runtime.verifier,
+                    timeout -> CompletableFuture.completedFuture(activation),
+                    runtime.operations,
+                    clock);
+            BookKeeperLedgerRetentionManager manager = new BookKeeperLedgerRetentionManager(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    runtime.configuration,
+                    gc,
+                    runtime.metadata,
+                    runtime.verifier,
+                    timeout -> CompletableFuture.completedFuture(activation),
+                    runtime.operations,
+                    gate,
+                    clock);
+            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().candidate().orElseThrow();
+            var marked = manager.mark(candidate, TIMEOUT).join();
+            assertThat(marked.action()).isEqualTo(BookKeeperLedgerGcAction.MARKED);
+
+            BookKeeperLedgerReaderLeaseRecord lateReader = new BookKeeperLedgerReaderLeaseRecord(
+                    1,
+                    ledger.sealedRoot().value().ledgerIdentitySha256(),
+                    ledger.target().ledgerId(),
+                    ledger.sealedRoot().value().lifecycleEpoch(),
+                    0,
+                    "reader-racing-mark/0",
+                    1,
+                    1_000,
+                    301_000,
+                    0);
+            runtime.metadata.createReaderLease(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration.providerScopeSha256(),
+                            lateReader)
+                    .join();
+
+            clock.setMillis(121_001);
+            var unmarked = manager.converge(marked.root().orElseThrow(), TIMEOUT).join();
+            assertThat(unmarked.action()).isEqualTo(BookKeeperLedgerGcAction.UNMARKED);
+            assertThat(unmarked.root().orElseThrow().value().lifecycle())
+                    .isEqualTo(com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle.SEALED);
+            assertThat(runtime.operations.metadata(
+                            ledger.target().ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLedgerId()).isEqualTo(ledger.target().ledgerId());
+        }
+    }
+
+    @Test
+    void disabledAndDryRunGcNeverMutateRootOrProvider() {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+            StableLedger ledger = appendCommitAndSeal(runtime);
+            retireAll(runtime, ledger);
+            BookKeeperProtocolActivationProof activation = activation(runtime);
+            BookKeeperWalRetentionGate gate = gate(runtime, activation);
+            var candidate = gate.evaluate(ledger.sealedRoot(), TIMEOUT).join().candidate().orElseThrow();
+            int providerCalls = runtime.operations.providerCalls();
+
+            BookKeeperLedgerGcConfiguration disabled = BookKeeperLedgerGcConfiguration.safeDefault();
+            BookKeeperLedgerRetentionManager disabledManager = new BookKeeperLedgerRetentionManager(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    runtime.configuration,
+                    disabled,
+                    runtime.metadata,
+                    runtime.verifier,
+                    timeout -> CompletableFuture.completedFuture(activation),
+                    runtime.operations,
+                    gate,
+                    BookKeeperPrimaryWalAppenderTest.CLOCK);
+            assertThat(disabledManager.mark(candidate, TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DISABLED);
+            assertThat(disabledManager.converge(ledger.sealedRoot(), TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DISABLED);
+
+            BookKeeperLedgerGcConfiguration dryRun = new BookKeeperLedgerGcConfiguration(
+                    1,
+                    Duration.ZERO,
+                    Duration.ofMinutes(2),
+                    Duration.ofSeconds(10),
+                    true,
+                    true);
+            BookKeeperLedgerRetentionManager dryRunManager = new BookKeeperLedgerRetentionManager(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    runtime.configuration,
+                    dryRun,
+                    runtime.metadata,
+                    runtime.verifier,
+                    timeout -> CompletableFuture.completedFuture(activation),
+                    runtime.operations,
+                    gate,
+                    BookKeeperPrimaryWalAppenderTest.CLOCK);
+            assertThat(dryRunManager.mark(candidate, TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
+            assertThat(dryRunManager.converge(ledger.sealedRoot(), TIMEOUT).join().action())
+                    .isEqualTo(BookKeeperLedgerGcAction.DRY_RUN_ADMITTED);
+
+            assertThat(runtime.operations.providerCalls()).isEqualTo(providerCalls);
+            assertThat(runtime.metadata.getRoot(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration.providerScopeSha256(),
+                            ledger.target().ledgerId())
+                    .join()).contains(ledger.sealedRoot());
+            assertThat(runtime.operations.metadata(
+                            ledger.target().ledgerId(), new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLedgerId()).isEqualTo(ledger.target().ledgerId());
         }
     }
 

@@ -9,8 +9,8 @@ passed on 2026-07-19 under `bookKeeperPrimaryWalM2MetadataCheck`。BK-20 now pas
 immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256-root/all-16-slot-shard scan。
 The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
 the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-32、BK-37、
-BK-38、BK-39、the checksum portion of BK-40、
-BK-41、BK-47、BK-48、BK-49、BK-53
+BK-38、BK-39、BK-40、
+BK-41、BK-47、BK-48、BK-49、BK-52、BK-53、BK-56
 and BK-55, including
 a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
 does not claim the remaining M2 rows。The focused allocator gate also adds D checkpoints for every applied metadata
@@ -108,7 +108,7 @@ Evidence levels：
 | BK-37 | M2 | B/O | non-recovery open reads exact complete range and verifies NBKR1 | `BookKeeperPrimaryWalReaderTest.nonRecoveryOpenVerifiesWholeRangeBeforeReturningClippedExactEntries` + `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
 | BK-38 | M2 | D/B | ordinary read never invokes recovery-open/fences writer | `BookKeeperPrimaryWalReaderTest` + real `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift` |
 | BK-39 | M2 | B/O | middle-offset clipped read verifies full target then returns dense suffix | `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift` |
-| BK-40 | M2 | B/O | checksum/count/id/config mismatch fails; no partial/empty result | checksum D/B/O: `BookKeeperPrimaryWalReaderTest.checksumMismatchFailsClosedWithoutReturningPartialBytes` + real `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift`; remaining count/id/config real cuts stay open |
+| BK-40 | M2 | B/O | checksum/count/id/config mismatch fails; no partial/empty result | `BookKeeperPrimaryWalReaderTest.checksumMismatchFailsClosedWithoutReturningPartialBytes` + `BookKeeperWalOnlyOxiaBkIntegrationTest.realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift` + `realReaderFailsClosedOnCountIdAndConfigurationDrift` |
 | BK-41 | M2 | B/O/C | fresh process reads history with no cached handle | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
 | BK-42 | M2 | B/O | fixed reader slots cap concurrent processes race-free；lease blocks MARK/delete and final revalidation precedes return | `BookKeeperReaderLeaseIT.fencesPhysicalDeletion` |
 | BK-43 | M2 | P | raw Pulsar Entry properties/payload round-trip through BK generation zero | D checkpoint: `PulsarEntryOpaqueRoundTripTest.preservesUnbatchedAndCompressedBatchBytesPropertiesOrderingKeyAndMiddleBatchMessageId` + `NereusBookKeeperManagedLedgerIntegrationTest.facadePreservesEntryBytesAndVirtualPositionOverBookKeeperGenerationZero`; final: `NereusBookKeeperEntryIntegrationTest.preservesOpaqueEntryBytes` |
@@ -125,11 +125,11 @@ Evidence levels：
 | BK-49 | M2 | O/B | all ranges durably trimmed retire owners/protections then whole ledger | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
 | BK-50 | M2 | D/O | fixed protection-slot contention never exceeds Cartesian bound；invalid/unstable inventory vetoes collection | `BookKeeperWalRetentionGateTest.failsClosedOnIncompleteAuthority` |
 | BK-51 | M2 | O/B | reader/task/repair/reservation/writer vetoes are each enforced | `BookKeeperWalRetentionGateTest.enforcesEveryVetoDomain` |
-| BK-52 | M2 | O/C | reference appears after MARKED; root unmarks to SEALED | `BookKeeperLedgerGcIT.unmarksOnReferenceDrift` |
+| BK-52 | M2 | D/O/C | reference appears after MARKED; root unmarks to SEALED | D: `BookKeeperWalRetentionGateTest.referenceAppearingAfterMarkUnmarksToSealedBeforeDelete`; O/B: `BookKeeperWalOnlyOxiaBkIntegrationTest.referenceAfterMarkUnmarksAndSafeGcModesNeverDelete`; independent-process C remains open |
 | BK-53 | M2 | B/O/C | delete response loss reloads metadata before same-intent retry | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
 | BK-54 | M2 | B/O/C | namespace drift or late-create hazard stops before delete；foreign/reappeared same-id ledger is quarantined across validate/delete cut | `BookKeeperLedgerGcIT.protectsRecreatedForeignLedger` |
 | BK-55 | M2 | B/O/C | two separated absence observations and root CAS loss converge DELETED | checkpoint fresh-process dual absence: `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover`; remaining root-CAS-loss cut: `BookKeeperLedgerGcIT.convergesDualAbsenceAcrossRestart` |
-| BK-56 | M2 | D/O | dry-run/default-off mode performs no root/provider mutation | `BookKeeperLedgerGcActivationTest.safeDefaultsDoNothing` |
+| BK-56 | M2 | D/O | dry-run/default-off mode performs no root/provider mutation | `BookKeeperWalRetentionGateTest.disabledAndDryRunGcNeverMutateRootOrProvider` + `BookKeeperWalOnlyOxiaBkIntegrationTest.referenceAfterMarkUnmarksAndSafeGcModesNeverDelete` |
 
 ## 7. Async materialization
 

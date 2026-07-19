@@ -273,13 +273,20 @@ owner/replacement ledger wins；the remaining independent-process contention cut
 The real reader gate now keeps the exact three-entry ledger range intact for a logical read beginning at offset one：
 the provider call remains `[0,2]` with `withRecovery(false)`，NBKR1 is verified over all three entries, and only then
 are entries one and two returned。Replaying the same real range with an incorrect target checksum fails the whole
-future with `PRIMARY_WAL_CHECKSUM_MISMATCH` and still performs no recovery-open；count/id/config real corruptions remain
-open separately。
+future with `PRIMARY_WAL_CHECKSUM_MISMATCH` and still performs no recovery-open。A second real BookKeeper-backed cut
+decorates only the provider response after physical IO and proves short entry count、unexpected entry id and immutable
+ledger-configuration drift all fail the whole read with `METADATA_INVARIANT_VIOLATION`；configuration drift is rejected
+before the first entry read and none of the cuts invokes recovery-open。
 
 The real retention gate now freezes both negative deletion boundaries。A trim inside a three-entry logical range
 retires none of its fixed protections；a separate sealed ledger with one fully trimmed range and two live ranges retires
 only the first range's three slots。Both ledgers remain physically present in BookKeeper, and the mixed ledger's live
 suffix remains readable with dense logical offsets。
+
+The mark/drain boundary is now executable at both deterministic and real Oxia + BookKeeper levels。A reader reference
+that wins its independent metadata-key race after the ledger root reaches `MARKED` is detected by the final inventory
+revalidation；the root advances back to `SEALED` and the physical ledger remains present。The same real fixture proves
+the disabled safe default and enabled dry-run modes return without mutating either the root or provider ledger。
 
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a

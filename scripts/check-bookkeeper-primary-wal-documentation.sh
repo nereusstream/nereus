@@ -114,6 +114,18 @@ require_literal 'newOwnerRecoveryOpenFencesLiveOldHandleAndPreventsOldHeadCommit
 require_literal 'realReaderNeverRecoveryOpensVerifiesWholeRangeBeforeClippingAndFailsClosedOnChecksumDrift' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'realReaderFailsClosedOnCountIdAndConfigurationDrift' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'referenceAppearingAfterMarkUnmarksToSealedBeforeDelete' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperWalRetentionGateTest.java"
+require_literal 'disabledAndDryRunGcNeverMutateRootOrProvider' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperWalRetentionGateTest.java"
+require_literal 'referenceAfterMarkUnmarksAndSafeGcModesNeverDelete' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
