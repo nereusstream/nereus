@@ -112,9 +112,13 @@ live `CommittedGenerationRetirementAuthority` for BK composition。The first rea
 over real Oxia + BookKeeper + LocalStack：stable-head append with no Object generation，BK read across a fresh runtime，
 ordinary scanner/worker NCP1 publication，higher-generation normal read and exact retirement proof all pass。It also
 locks two shared prerequisites uncovered by the composition：default process IDs are canonical base32 publication
-identities，and Oxia checkpoint scans use the checkpoint key's exact two descendant segments。Task/protection/
-publication response-loss and physical BK release/delete cuts remain required before the M3 final gate and broker
-registration。
+identities，and Oxia checkpoint scans use the checkpoint key's exact two descendant segments。The physical-retirement
+extension advances the shared metadata-audit grace and proves that terminal task cleanup releases the exact dynamic
+`MATERIALIZATION_SOURCE` slot；`BookKeeperAsyncObjectRetirementAuthority` then uses the same healthy Object proof to
+retire `REACHABLE_APPEND`、`VISIBLE_GENERATION` and `APPEND_RECOVERY`。The existing whole-ledger gate and retention
+manager mark、drain、physically delete、record two separated absence observations and reach `DELETED`，after which the
+normal resolver still reads the complete range from Object。Task/protection/publication response-loss cuts remain
+required before the M3 final gate and broker registration。
 
 ## 4. `BookKeeperWalRetentionGate`
 

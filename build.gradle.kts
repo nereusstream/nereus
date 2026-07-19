@@ -772,9 +772,15 @@ tasks.register("bookKeeperPrimaryWalM3Check") {
 
 tasks.register("bookKeeperPrimaryWalM3RealServiceCheck") {
     group = "verification"
-    description = "Run BK-M3 real Oxia/BookKeeper/Object stable-head, fallback, fresh-runtime publication, and read proof."
+    description = "Run BK-M3 real Oxia/BookKeeper/Object stable-head, fallback, fresh-runtime publication, read, and retirement proof."
     dependsOn("bookKeeperPrimaryWalM3Check")
     dependsOn(":nereus-pulsar-adapter:bkM3IntegrationTest")
+}
+
+tasks.register("bookKeeperPrimaryWalM3PhysicalRetirementCheck") {
+    group = "verification"
+    description = "Verify BK-M3 real source release, mandatory-reference retirement, and whole-ledger physical deletion."
+    dependsOn("bookKeeperPrimaryWalM3RealServiceCheck")
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

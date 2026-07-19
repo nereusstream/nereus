@@ -8,7 +8,7 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (real-service storage checkpoint)
-BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (first real-service publication/read checkpoint)
+BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT implementation in progress (real-service physical-retirement checkpoint)
 BK-M4 .. BK-M6                  not implemented
 BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
@@ -25,7 +25,8 @@ module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPr
 `bookKeeperPrimaryWalM3ProtectionCheck` / `bookKeeperPrimaryWalM3AsyncProfileCheck` /
 `bookKeeperPrimaryWalM3LagCheck` / `bookKeeperPrimaryWalM3SourceRetirementCheck` /
 `bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` /
-`bookKeeperPrimaryWalM3RealServiceCheck` are also executable。The unfinished M2 aggregate/final gates、M3 failure-cut
+`bookKeeperPrimaryWalM3RealServiceCheck` / `bookKeeperPrimaryWalM3PhysicalRetirementCheck` are also executable。The
+unfinished M2 aggregate/final gates、M3 failure-cut
 final gate and M4–M6 names remain frozen target names and must
 not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
@@ -500,6 +501,14 @@ Object target and `CommittedObjectGenerationAuthority` proves it through a fresh
 read。This fixture also exposed and fixed the default UUID-hex `processRunId` incompatibility with read-pin publication
 identity and the real Oxia two-descendant checkpoint scan boundary；both now have direct regression evidence。
 
+The physical-retirement checkpoint drives the same production composition through the final source lifecycle。A
+two-entry first append fills one ledger and the next append seals it；after Object publication the terminal workflow
+releases its exact dynamic source slot only after `metadataAuditGrace`。The async retirement authority reuses the live
+COMMITTED Object proof to retire the sealed range's three fixed protections，then the M2 retention gate/manager performs
+`SEALED -> MARKED -> DELETING -> DELETED` with drain and two separated provider-absence observations。The ledger is
+verified absent through the real BookKeeper client while the normal generation resolver continues returning all bytes
+from Object。
+
 ### 6.3 Gates
 
 ```text
@@ -512,15 +521,19 @@ bookKeeperPrimaryWalM3LiveReadCheck
 bookKeeperPrimaryWalM3SealedLedgerCheck
 bookKeeperPrimaryWalM3Check
 bookKeeperPrimaryWalM3RealServiceCheck       first real Oxia + BK + Object end-to-end chain
+bookKeeperPrimaryWalM3PhysicalRetirementCheck real source release + fixed-reference retirement + ledger delete
 bookKeeperPrimaryWalM3FinalCheck             real Oxia + BK + Object store, fresh-runtime cuts
 ```
 
 The ordinary M3 gate proves all deterministic source/protection/profile/lag/retirement-metadata/live-read/
 sealed-trigger contracts。`bookKeeperPrimaryWalM3RealServiceCheck` now proves stable-head ack before Object generation、
 real BK fallback across process replacement、fresh-runtime task creation、NCP1 exact bytes、COMMITTED publication、
-higher-generation selection and exact live-read retirement proof。Final gate still adds task/source-protection/output/
-publication response-loss cuts、lag admission under real load、trim/replacement release and whole-ledger delete against
-fresh runtimes。`bookKeeperPrimaryWalM3Check --rerun-tasks` passed 62/62 deterministic tasks on 2026-07-19；the
+higher-generation selection and exact live-read retirement proof。`bookKeeperPrimaryWalM3PhysicalRetirementCheck`
+extends that real chain through terminal dynamic-source release、all fixed-reference retirement、whole-ledger physical
+delete and post-delete Object reads。Final gate still adds task/source-protection/output/publication response-loss
+cuts、lag admission under real load and fresh-runtime failure cuts。`bookKeeperPrimaryWalM3Check --rerun-tasks` passed
+62/62 deterministic tasks and `bookKeeperPrimaryWalM3PhysicalRetirementCheck --rerun-tasks` passed 65/65 executable
+tasks on 2026-07-19；the
 `bookKeeperPrimaryWalM3FinalCheck` task remains intentionally unregistered。
 
 ### 6.4 Mandatory review stop D

@@ -26,6 +26,11 @@ implementation, each row
 receives an exact test method、gate、source lock、date and result. No implementation row may be marked covered by prose
 only.
 
+The 2026-07-19 `bookKeeperPrimaryWalM3PhysicalRetirementCheck --rerun-tasks` passed 65/65 executable tasks。Its real
+O/B/S chain covers the positive path of BK-58、BK-59、BK-61、BK-62、BK-65、BK-66 and BK-67 through dynamic source
+release、three mandatory-reference retirements、whole-ledger physical deletion and exact post-delete Object reads；the
+failure-cut portions called out in those rows remain open。
+
 The same deterministic recovery gate now converges applied-response-loss for every writer/root CAS from ACTIVE through
 IDLE (BK-31 D) and serializes two process-run recovery contenders onto one replacement ledger (BK-33 D)。Their remaining
 independent-process levels stay explicit in the rows below。
@@ -146,7 +151,7 @@ Evidence levels：
 | BK-64 | M3 | D/B | lag throttle remeasures; reject occurs before next BK IO | `BookKeeperAsyncAdmissionTest.throttlesAndRejectsBeforeWal` |
 | BK-65 | M3 | D/O/S | sealed ledger final single source uses the one normal deterministic planner/task path | D: `MaterializationPlannerTest.plansFinalSingleBookKeeperGenerationZeroThroughTheOrdinaryPlanner` + `BookKeeperWalRetentionGateTest.sealedLedgerTriggerRevalidatesExactRootAndUsesTheSharedMaterializationScanner`; real ordinary scanner/worker single-source path: `BookKeeperAsyncObjectOxiaBkS3IntegrationTest.stableHeadFallsBackToBookKeeperThenFreshRuntimePublishesAndReadsExactObject` |
 | BK-66 | M3 | D/O/B/S | healthy replacement retires BK source; broken/PREPARED/missing-protection/checkpoint/unreadable output does not | D: `CommittedObjectGenerationAuthorityTest.requiresExactCommittedIndexActiveRootVisibleProtectionAndCoveringCheckpoint` + `NormalPathCommittedObjectGenerationReadVerifierTest.retirementProofAcquiresNormalPinsAndReadsTheExactGenerationEndToEnd` + `BookKeeperWalRetentionGateTest.healthyCommittedObjectGenerationRetiresOnlyMandatoryAsyncSourceReferences`; real positive proof: `BookKeeperAsyncObjectOxiaBkS3IntegrationTest.stableHeadFallsBackToBookKeeperThenFreshRuntimePublishesAndReadsExactObject`; real negative cuts remain open |
-| BK-67 | M3 | D/O/B/S/C | generation/source/protection response-loss cuts precede whole-ledger delete | D terminal/provider release: `TerminalWorkflowMetadataRetirementTest.retiresTerminalTaskWithProviderOwnedBookKeeperSourceProtection`；real response-loss/process-cut evidence remains open |
+| BK-67 | M3 | D/O/B/S/C | generation/source/protection response-loss cuts precede whole-ledger delete | D terminal/provider release: `TerminalWorkflowMetadataRetirementTest.retiresTerminalTaskWithProviderOwnedBookKeeperSourceProtection`；real positive release/retire/delete/post-delete-read chain: `BookKeeperAsyncObjectOxiaBkS3IntegrationTest.stableHeadFallsBackToBookKeeperThenFreshRuntimePublishesAndReadsExactObject`；response-loss/process-cut evidence remains open |
 
 ## 8. Sync completion
 
