@@ -2,6 +2,7 @@
 package com.nereusstream.metadata.oxia.codec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.metadata.oxia.F4MetadataTestValues;
 import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
@@ -53,6 +54,49 @@ class F4MetadataCodecGoldenTest {
         vectors().forEach(F4MetadataCodecGoldenTest::assertRoundTrip);
     }
 
+    @Test
+    void taskEnvelopeAndPayloadSchemaVersionsCannotAlias() {
+        byte[] v1 = F4MetadataCodecs.encodeEnvelope(
+                F4MetadataTestValues.task(TaskLifecycle.PLANNED),
+                MaterializationTaskRecord.class);
+        byte[] v2 = F4MetadataCodecs.encodeEnvelope(
+                F4MetadataTestValues.taskV2(),
+                MaterializationTaskRecord.class);
+        MetadataRecordEnvelope.DecodedEnvelope v1Envelope =
+                MetadataRecordEnvelope.decode(v1);
+        MetadataRecordEnvelope.DecodedEnvelope v2Envelope =
+                MetadataRecordEnvelope.decode(v2);
+
+        assertThat(v1Envelope.schemaVersion()).isEqualTo(1);
+        assertThat(v1Envelope.minReaderSchemaVersion()).isEqualTo(1);
+        assertThat(v2Envelope.schemaVersion())
+                .isEqualTo(MaterializationTaskRecord.CURRENT_SCHEMA_VERSION);
+        assertThat(v2Envelope.minReaderSchemaVersion())
+                .isEqualTo(MaterializationTaskRecord.CURRENT_SCHEMA_VERSION);
+
+        byte[] v1PayloadInV2Envelope = MetadataRecordEnvelope.encode(
+                v1Envelope.recordType(),
+                MaterializationTaskRecord.CURRENT_SCHEMA_VERSION,
+                MaterializationTaskRecord.CURRENT_SCHEMA_VERSION,
+                v1Envelope.payloadEncoding(),
+                v1Envelope.payload());
+        byte[] v2PayloadInV1Envelope = MetadataRecordEnvelope.encode(
+                v2Envelope.recordType(),
+                1,
+                1,
+                v2Envelope.payloadEncoding(),
+                v2Envelope.payload());
+
+        assertThatThrownBy(() -> F4MetadataCodecs.decodeEnvelope(
+                        v1PayloadInV2Envelope, MaterializationTaskRecord.class))
+                .isInstanceOf(MetadataCodecException.class)
+                .hasMessageContaining("payload schema");
+        assertThatThrownBy(() -> MetadataRecordCodecFactory.decodeEnvelope(
+                        v2PayloadInV1Envelope, MaterializationTaskRecord.class))
+                .isInstanceOf(MetadataCodecException.class)
+                .hasMessageContaining("payload schema");
+    }
+
     private static Map<String, String> canonicalEnvelopeHex() {
         Map<String, String> result = new LinkedHashMap<>();
         vectors().forEach(sample -> result.put(
@@ -100,6 +144,10 @@ class F4MetadataCodecGoldenTest {
         values.add(sample(
                 "task.publishing-unallocated",
                 F4MetadataTestValues.publishingTaskWithoutGeneration(),
+                MaterializationTaskRecord.class));
+        values.add(sample(
+                "task-v2.planned",
+                F4MetadataTestValues.taskV2(),
                 MaterializationTaskRecord.class));
         values.add(sample(
                 "checkpoint.empty",

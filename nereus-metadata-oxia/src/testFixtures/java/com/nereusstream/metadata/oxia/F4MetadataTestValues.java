@@ -350,6 +350,37 @@ public final class F4MetadataTestValues {
                 allocated.updatedAtMillis(), 0);
     }
 
+    public static MaterializationTaskRecord taskV2() {
+        MaterializationTaskRecord value = task(TaskLifecycle.PLANNED);
+        return new MaterializationTaskRecord(
+                MaterializationTaskRecord.CURRENT_SCHEMA_VERSION,
+                value.taskId(),
+                value.taskSequence(),
+                value.streamId(),
+                value.readViewId(),
+                value.taskKindId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.sources(),
+                value.sourceSetSha256(),
+                value.policyId(),
+                value.policyVersion(),
+                value.policySha256(),
+                value.policy(),
+                value.lifecycle(),
+                value.attempt(),
+                value.workerClaim(),
+                value.output(),
+                value.allocatedGeneration(),
+                value.publicationId(),
+                value.failureClassId(),
+                value.failureMessage(),
+                value.retryNotBeforeMillis(),
+                value.createdAtMillis(),
+                value.updatedAtMillis(),
+                value.metadataVersion());
+    }
+
     public static MaterializationPolicyRecord policy() {
         return new MaterializationPolicyRecord(
                 "policy-f4",

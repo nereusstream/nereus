@@ -34,8 +34,13 @@ public record MaterializationTaskRecord(
         long createdAtMillis,
         long updatedAtMillis,
         long metadataVersion) {
+    public static final int CURRENT_SCHEMA_VERSION = 2;
+
     public MaterializationTaskRecord {
-        F4RecordValidation.requireSchemaVersion(schemaVersion);
+        if (schemaVersion != 1 && schemaVersion != CURRENT_SCHEMA_VERSION) {
+            throw new IllegalArgumentException(
+                    "materialization task schemaVersion must be 1 or 2");
+        }
         taskId = F4RecordValidation.requireText(taskId, "taskId", 256, false);
         F4RecordValidation.requirePositive(taskSequence, "taskSequence");
         streamId = F4RecordValidation.requireText(streamId, "streamId");

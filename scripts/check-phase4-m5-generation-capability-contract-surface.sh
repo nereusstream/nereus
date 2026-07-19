@@ -44,7 +44,7 @@ for path in \
 done
 
 require_literal 'PROPERTY = "nereus.generation-protocol"' "$capability"
-require_literal 'VERSION = "1"' "$capability"
+require_literal 'VERSION = "2"' "$capability"
 require_literal 'NereusGenerationProtocolCapability.requireUnreserved' "$cursor_capability"
 
 require_literal "long brokerReadinessEpoch" "$readiness"
@@ -68,8 +68,8 @@ require_literal "stableSnapshotProducesOrderIndependentFrozenReadiness" "$genera
 require_literal "sameBrokerIdRestartBetweenSnapshotsInvalidatesReadiness" "$generation_test"
 require_literal "registryNotificationInvalidatesCachedGenerationEpoch" "$generation_test"
 require_literal "registryNotificationBetweenEqualSnapshotsRejectsGenerationEpoch" "$generation_test"
-require_literal "4351585672493013605L" "$generation_test"
-require_literal "bc63f01d0aa01a65c7205625a2714f0246d8ba7e7b88b8a653137abbc719cc0d" \
+require_literal "36151462167742895L" "$generation_test"
+require_literal "80806f90349e89afb16f65d2e90f06339f48babe836f9954ad41fefc2869ab75" \
     "$generation_test"
 require_literal "publishesThreeIndependentReservedCapabilities" "$cursor_test"
 require_literal "nereus.generation-protocol is reserved by the broker" "$binding_test"

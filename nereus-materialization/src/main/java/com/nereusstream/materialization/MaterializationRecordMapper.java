@@ -72,7 +72,7 @@ final class MaterializationRecordMapper {
             throw new IllegalArgumentException("nowMillis must be non-negative");
         }
         return new MaterializationTaskRecord(
-                1,
+                MaterializationTaskRecord.CURRENT_SCHEMA_VERSION,
                 task.taskId(),
                 task.taskSequence(),
                 task.streamId().value(),

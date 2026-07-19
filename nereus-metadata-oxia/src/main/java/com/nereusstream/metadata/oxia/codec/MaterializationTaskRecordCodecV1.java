@@ -120,7 +120,7 @@ public final class MaterializationTaskRecordCodecV1
         }
     }
 
-    private static void writePolicy(F4Binary.Writer writer, MaterializationPolicyRecord value) {
+    static void writePolicy(F4Binary.Writer writer, MaterializationPolicyRecord value) {
         writer.writeString(value.policyId());
         writer.writeLong(value.policyVersion());
         writer.writeUnsignedShort(value.readViewId());
@@ -137,7 +137,7 @@ public final class MaterializationTaskRecordCodecV1
         writer.writeString(value.topicKeyCodecId());
     }
 
-    private static MaterializationPolicyRecord readPolicy(F4Binary.Reader reader) {
+    static MaterializationPolicyRecord readPolicy(F4Binary.Reader reader) {
         return new MaterializationPolicyRecord(
                 reader.readString("policySnapshotId"),
                 reader.readLong("policySnapshotVersion"),
@@ -200,7 +200,7 @@ public final class MaterializationTaskRecordCodecV1
                 reader.readLong("sourceCumulativeSizeAtEnd"));
     }
 
-    private static void writeClaim(F4Binary.Writer writer, WorkerClaimRecord value) {
+    static void writeClaim(F4Binary.Writer writer, WorkerClaimRecord value) {
         writer.writeString(value.claimId());
         writer.writeString(value.processRunId());
         writer.writeLong(value.attempt());
@@ -208,7 +208,7 @@ public final class MaterializationTaskRecordCodecV1
         writer.writeLong(value.expiresAtMillis());
     }
 
-    private static WorkerClaimRecord readClaim(F4Binary.Reader reader) {
+    static WorkerClaimRecord readClaim(F4Binary.Reader reader) {
         return new WorkerClaimRecord(
                 reader.readString("claimId"),
                 reader.readString("processRunId"),
@@ -217,7 +217,7 @@ public final class MaterializationTaskRecordCodecV1
                 reader.readLong("claimExpiresAtMillis"));
     }
 
-    private static void writeOutput(F4Binary.Writer writer, MaterializationOutputRecord value) {
+    static void writeOutput(F4Binary.Writer writer, MaterializationOutputRecord value) {
         writer.writeString(value.outputAttemptId());
         writer.writeString(value.objectId());
         writer.writeString(value.objectKey());
@@ -241,7 +241,7 @@ public final class MaterializationTaskRecordCodecV1
         writer.writeString(value.projectionRef());
     }
 
-    private static MaterializationOutputRecord readOutput(F4Binary.Reader reader) {
+    static MaterializationOutputRecord readOutput(F4Binary.Reader reader) {
         return new MaterializationOutputRecord(
                 reader.readString("outputAttemptId"),
                 reader.readString("outputObjectId"),

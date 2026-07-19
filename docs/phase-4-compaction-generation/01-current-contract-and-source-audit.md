@@ -39,7 +39,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@0e9829a7453497910ab468669e644e88b4bc2f93`。
+`master@5e5ca658ad278fd92151bd6707bee2dda3614b01`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
@@ -77,6 +77,19 @@ policy/admin and real acceptance cuts.
 | `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `8e9e71b4bd6ca52ca9f64e3ad1b834ee092244ce` | loaded、partition-child and ACTIVE-bound unloaded `TRIM_TOPIC` route |
 | `pulsar-broker/.../nereus/NereusMultiBrokerIntegrationTest.java` | `e5fa56c345a29ad7cdc9154901d0f46fcaf1e971` | shared real Oxia、LocalStack、BookKeeper and broker ownership fixture |
 | `pulsar-broker/.../nereus/NereusAsyncRetentionMultiBrokerIntegrationTest.java` | `e6437cd197ab3d39f08145b023e08c5e53a5ac88` | retry-disabled M5 async/retention/failover/restart/BookKeeper final gate |
+
+The current M6 task-schema overlay changes only the generation lookup capability and its frozen identity fixture in
+the fork；all M5-final blobs above remain unchanged：
+
+| Current M6 source | Current Git blob | F4 relevance |
+| --- | --- | --- |
+| `pulsar-broker/.../nereus/NereusGenerationProtocolCapability.java` | `4ad0753c0d6d1efed54a8d240469826dd4361859` | exact broker lookup version `2`, required before task schema V2 is writable |
+| `pulsar-broker/.../nereus/NereusGenerationProtocolCapabilityTest.java` | `b32c80f96c1fcfb49746d0c9b5dab3689a6b11c8` | frozen epoch `36151462167742895` and full digest `80806f90349e89afb16f65d2e90f06339f48babe836f9954ad41fefc2869ab75` |
+
+The topic projection's monotonic `nereus.generation-protocol=1` marker and
+`GenerationProtocolActivationRecord.PROTOCOL_VERSION == 1` are separate durable protocols and did not change.
+Capability `2` means a broker can dual-read task V1/V2 and write V2；a lookup-capability-1 broker is excluded from a
+stable V2-writing readiness set.
 
 At the checkpoint-AC source lock, the fork additionally contained
 `NereusGenerationProtocolCapability`、`NereusGenerationCapabilityReadiness` and the generation extension to

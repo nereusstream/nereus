@@ -18,7 +18,7 @@ import com.nereusstream.metadata.oxia.records.RecoveryCheckpointRootRecord;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Explicit Phase 4 metadata record family using NRM1/binary-v1 envelopes. */
+/** Explicit Phase 4 record family using NRM1/binary-v1 envelopes and per-value schema dispatch. */
 public final class F4MetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
             registered(GenerationSequenceRecord.class, new GenerationSequenceRecordCodecV1()),
@@ -27,7 +27,7 @@ public final class F4MetadataCodecs {
                     new GenerationProtocolActivationRecordCodecV1()),
             registered(MaterializationStreamRegistrationRecord.class,
                     new MaterializationStreamRegistrationRecordCodecV1()),
-            registered(MaterializationTaskRecord.class, new MaterializationTaskRecordCodecV1()),
+            registered(MaterializationTaskRecord.class, new MaterializationTaskRecordCodecV2()),
             registered(MaterializationCheckpointRecord.class, new MaterializationCheckpointRecordCodecV1()),
             registered(RangeRetentionStatsRecord.class, new RangeRetentionStatsRecordCodecV1()),
             registered(RecoveryCheckpointRootRecord.class, new RecoveryCheckpointRootRecordCodecV1()),
@@ -49,8 +49,8 @@ public final class F4MetadataCodecs {
         MetadataRecordCodec<T> codec = REGISTRY.codecForClass(recordClass);
         return MetadataRecordEnvelope.encode(
                 codec.recordType(),
-                codec.schemaVersion(),
-                codec.minReaderSchemaVersion(),
+                codec.schemaVersion(record),
+                codec.minReaderSchemaVersion(record),
                 MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
                 codec.encode(record));
     }
@@ -60,11 +60,18 @@ public final class F4MetadataCodecs {
         MetadataRecordCodec<T> codec = REGISTRY.codecForClass(recordClass);
         if (!codec.recordType().equals(envelope.recordType())
                 || !MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())
-                || envelope.schemaVersion() != codec.schemaVersion()
-                || envelope.minReaderSchemaVersion() != codec.minReaderSchemaVersion()) {
+                || !codec.supportsEnvelopeSchema(
+                        envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
             throw new MetadataCodecException("unsupported F4 metadata envelope for " + recordClass.getSimpleName());
         }
-        return codec.decode(envelope.payload());
+        T value = codec.decode(envelope.payload());
+        if (codec.schemaVersion(value) != envelope.schemaVersion()
+                || codec.minReaderSchemaVersion(value)
+                        != envelope.minReaderSchemaVersion()) {
+            throw new MetadataCodecException(
+                    "F4 metadata payload schema does not match its envelope");
+        }
+        return value;
     }
 
     public static String envelopeHex(Object record, Class<?> recordClass) {

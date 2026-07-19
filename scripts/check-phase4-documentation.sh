@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="0e9829a7453497910ab468669e644e88b4bc2f93"
+current_pulsar_lock="5e5ca658ad278fd92151bd6707bee2dda3614b01"
 
 require_literal() {
     local literal="$1"
@@ -24,7 +24,17 @@ for path in "${lock_docs[@]}"; do
     require_literal "$current_pulsar_lock" "$path"
 done
 
-require_literal "activation schema 的 49 个 envelope vectors" "docs/phase-4-compaction-generation/README.md"
+require_literal "activation/task-V2 schema 的 50 个 envelope vectors" "docs/phase-4-compaction-generation/README.md"
+require_literal "MaterializationTaskRecordCodecV2" \
+    "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
+require_literal "Checkpoint BF" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "Checkpoint BG" \
+    "docs/phase-4-compaction-generation/README.md"
+require_literal "scansOneThousandReaderLeasesAndProtectionsWithoutTruncationAndRestarts" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "plansAndDurablyRoundTripsOneTaskAtBothSourceAndRecordLimits" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
 require_literal "GcRetirementManifestRecord" \
     "docs/phase-4-compaction-generation/03-oxia-metadata-and-publication.md"
 require_literal "PREPARE RETIREMENT JOURNAL" \
@@ -328,4 +338,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M5 final status, current source lock, gates, and local links verified."
+echo "Phase 4 M1-M5 final status, M6 BD-BG foundations, current source lock, gates, and local links verified."

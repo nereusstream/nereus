@@ -1359,7 +1359,7 @@ F4 records use existing `MetadataRecordEnvelope(NRM1, binary-v1)` and a new `F4M
 | `GenerationSequenceRecord` | `GenerationSequenceRecordCodecV1` | `1 / 1` |
 | `GenerationIndexRecord` | `GenerationIndexRecordCodecV1` | `1 / 1` |
 | `MaterializationStreamRegistrationRecord` | `MaterializationStreamRegistrationRecordCodecV1` | `1 / 1` |
-| `MaterializationTaskRecord` | `MaterializationTaskRecordCodecV1` | `1 / 1` |
+| `MaterializationTaskRecord` | `MaterializationTaskRecordCodecV2` dual reader (`V1` + `V2`) | `1 / 1` or `2 / 2` |
 | `MaterializationCheckpointRecord` | `MaterializationCheckpointRecordCodecV1` | `1 / 1` |
 | `RangeRetentionStatsRecord` | `RangeRetentionStatsRecordCodecV1` | `1 / 1` |
 | `RecoveryCheckpointRootRecord` | `RecoveryCheckpointRootRecordCodecV1` | `1 / 1` |
@@ -1376,8 +1376,53 @@ order、no trailing bytes and a 64 KiB payload limit. Booleans/optionals are one
 unsigned short wire ids. `ReadTargetRecord` is embedded as length + exact existing target-codec bytes；it is decoded
 through `ReadTargetCodecRegistry`, not Java serialization.
 
-Each codec writes fields in record declaration order. Collection elements use their declared record field order.
-Changing order/type/requiredness requires schema V2, new golden bytes and a rollout capability update.
+Every V1 codec writes fields in record declaration order. Collection elements use their declared record field order.
+Changing order/type/requiredness requires a new schema, new golden bytes and a rollout capability update.
+
+`MaterializationTaskRecordCodecV2` is the first such upgrade. It is an explicit dual reader, not trial decode：a task
+whose payload declares schema `1` is delegated byte-for-byte to `MaterializationTaskRecordCodecV1` and must have a
+`1 / 1` envelope；a task whose payload declares schema `2` uses the compact V2 layout and must have a `2 / 2`
+envelope. `F4MetadataCodecs` and `MetadataRecordCodecFactory` validate the envelope pair before decode and compare the
+decoded task schema back to the envelope afterward. A V1 payload wrapped as V2, a V2 payload wrapped as V1, `1 / 2`,
+`2 / 1` and any unknown pair fail closed. Existing durable V1 tasks therefore remain readable, while
+`MaterializationRecordMapper` creates all new tasks with `MaterializationTaskRecord.CURRENT_SCHEMA_VERSION == 2`.
+
+The V2 payload is written in this exact order：
+
+```text
+schemaVersion=2
+taskId, taskSequence, streamId, readViewId, taskKindId, offsetStart, offsetEnd
+sourceFactCount <= 128
+  repeated (readViewId, payloadFormat, projectionRef, schemaRefs)
+targetDescriptorCount <= 128
+  repeated (targetType, targetVersion, payloadEncoding, identityChecksumType)
+sourceCount <= 128
+  repeated (
+    sourceFactIndex,
+    offsetStart, offsetEnd, generation, commitVersion,
+    indexKey, indexMetadataVersion, indexRecordSha256[32],
+    targetDescriptorIndex, exact target payload, targetIdentitySha256[32],
+    optional materializationPolicySha256[32],
+    recordCount, entryCount, logicalBytes,
+    cumulativeSizeAtStart, cumulativeSizeAtEnd)
+sourceSetSha256, policyId, policyVersion, policySha256, embedded policy
+lifecycle, attempt, optional worker claim, optional output, optional allocated generation
+publicationId, failureClassId, failureMessage, retryNotBeforeMillis
+createdAtMillis, updatedAtMillis, metadataVersion
+```
+
+The two dictionaries preserve first-occurrence order from the canonical source list. Decoder table indexes are
+strictly bounds checked；each reconstructed target is decoded through `ReadTargetCodecRegistry.phase15()`；the target
+identity must equal the embedded target checksum；SHA-256 values use an exact length-prefixed 32-byte representation
+rather than repeated 64-character hex. Every range/count/target/policy invariant is still enforced by the immutable
+record constructors. This compaction is what lets the admitted 128-source / 1,048,576-record task remain at or below
+the frozen 64 KiB enveloped-task limit without weakening exact source identity.
+
+Because a broker that can pass the generation barrier may later read or recover these task roots, the broker lookup
+capability is now `nereus.generation-protocol=2`. That lookup capability version is distinct from the topic
+projection's durable `GenerationProtocolActivationRecord.PROTOCOL_VERSION == 1` and monotonic topic marker
+`nereus.generation-protocol=1`；the latter two durable formats did not change. A broker advertising lookup capability
+`1` cannot join the V2 task-schema readiness set.
 
 The three GC retirement records are recovery evidence for one physical-object GC attempt. The manifest fixes
 reference-set protocol `2`、query SHA、canonical domain snapshot proofs、entry counts and final digest. Protection

@@ -3,7 +3,7 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`0e9829a7453497910ab468669e644e88b4bc2f93`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+`5e5ca658ad278fd92151bd6707bee2dda3614b01`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
 final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and retry-disabled real
 two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real two-broker async/
 retention boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and real-
@@ -25,7 +25,7 @@ service tests：
   generation-index/task create recovery with immutable identity checks；
 - `GenerationMetadataTransitions` guards closed index/task lifecycles、the publication-before-allocation task shape、
   monotonic checkpoint/registration/recovery progress and immutable retention boundaries；
-- 49 frozen F4 metadata envelope vectors cover every lifecycle/optional branch、retirement-journal and activation record；focused real Oxia covers slash-aware
+- 50 frozen F4 metadata envelope vectors cover every lifecycle/optional branch、retirement-journal、activation record and the task-V2 schema；focused real Oxia covers slash-aware
   fixed-depth ranges、restart、CAS、pagination and conditional metadata delete；
 - M1 contract/document/module/source-lock/guarded-PUT audits and the `phase4M1Check`/`phase4M1FinalCheck` tasks exist。
 
@@ -192,8 +192,16 @@ fixtures：the generation resolver admits all 4,096 candidates across eight full
 revalidation and pins generation 4,096, while the existing 4,097th-candidate fixture still fails closed；the NRC1
 codec consumes exactly 1,000,000 generated commit entries with demand one, builds the exact 3,907-anchor sparse
 directory within the frozen object/directory/staging bounds, uploads and verifies the object, then reads its first、
-middle、last and out-of-range boundaries. Remaining M6 scale fixtures、52-scenario evidence and the aggregate Phase 4
-completion boundary remain pending.
+middle、last and out-of-range boundaries. Checkpoint BF adds an exact 1,000-reader/1,000-protection production-adapter
+inventory fixture：127-entry pages produce eight strict pages per reference kind, a fresh empty continuation reproduces
+the identical complete sorted inventory, and no duplicate/truncation is accepted. Checkpoint BG then reaches both task
+limits in one durable value—128 exact contiguous source ranges and 1,048,576 records—through planning、64 KiB envelope
+admission、exact source revalidation、Oxia create and exact round trip. The required compact task schema is explicit
+V2 with V1 dual-read compatibility and payload/envelope anti-alias checks；the locked broker generation lookup
+capability advances to version `2`, epoch `36151462167742895` and digest
+`80806f90349e89afb16f65d2e90f06339f48babe836f9954ad41fefc2869ab75`. Topic marker and durable activation-record
+protocols remain V1. Registry scale、two-broker/two-worker evidence、52-scenario mapping and aggregate gates remain
+pending.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -310,6 +318,7 @@ codec/
   GenerationIndexRecordCodecV1.java
   MaterializationStreamRegistrationRecordCodecV1.java
   MaterializationTaskRecordCodecV1.java
+  MaterializationTaskRecordCodecV2.java
   MaterializationCheckpointRecordCodecV1.java
   RangeRetentionStatsRecordCodecV1.java
   RecoveryCheckpointRootRecordCodecV1.java
@@ -1029,7 +1038,7 @@ PhysicalObjectGarbageCollectorModelTest
 PhysicalObjectGarbageCollectorFailureInjectionTest
 PhysicalGcConfigTest                                      implemented checkpoint H
 GcPlanTest                                                implemented checkpoint H
-F4MetadataCodecGoldenTest                                extended checkpoint S activation foundation (49 vectors)
+F4MetadataCodecGoldenTest                                activation plus task-V2 foundation (50 vectors)
 F4RecordValidationTest                                   extended checkpoint S activation contradictions
 GenerationProtocolActivationStoreContractTest            implemented checkpoint S exact-key/CAS contract
 GcRetirementJournalMetadataStoreContractTest             implemented checkpoint L durable-store parity
@@ -1807,16 +1816,20 @@ response-loss reload、final authority revalidation、open-return ordering and p
 does not modify the local Pulsar fork, advertise generation capability, activate a topic marker, enumerate cold
 topics, or publish a cluster backfill proof. The ordinary gate passed with `--rerun-tasks` on 2026-07-16.
 
-`phase4M5GenerationCapabilityCheck` is the checkpoint-Y precursor. It consumes the exact clean local fork
-`master@bce3422a94edf01c483c15063c6879254b3ff03f`, audits the capability/readiness/invalidation surface, publishes
-the existing Nereus F2 development composite, and runs broker spotless、checkstyle plus focused generation/cursor/
+`phase4M5GenerationCapabilityCheck` is the checkpoint-Y capability gate. It now consumes the exact clean current
+fork `master@5e5ca658ad278fd92151bd6707bee2dda3614b01`, audits the capability/readiness/invalidation surface, publishes
+the existing Nereus development composite, and runs broker spotless、checkstyle plus focused generation/cursor/
 binding suites. The readiness identity is domain-separated SHA-256 over sorted persistent broker registry keys、
-advertised broker ids、start timestamps and sorted required protocol pairs；the frozen two-broker fixture yields
-epoch `4351585672493013605` and digest
-`bc63f01d0aa01a65c7205625a2714f0246d8ba7e7b88b8a653137abbc719cc0d`. Registry notifications invalidate the
+advertised broker ids、start timestamps and sorted required protocol pairs. Checkpoint Y originally froze lookup
+version `1` at epoch `4351585672493013605` and digest
+`bc63f01d0aa01a65c7205625a2714f0246d8ba7e7b88b8a653137abbc719cc0d`；checkpoint BG advances the generation
+lookup property to `2` for task schema V2 and refreezes the same fixture at epoch `36151462167742895` and digest
+`80806f90349e89afb16f65d2e90f06339f48babe836f9954ad41fefc2869ab75`. Registry notifications invalidate the
 cache and a notification between equal snapshots fails closed. This gate does not enumerate cold topics、CAS the
-registration backfill proof、activate a topic marker or enable publication/deletion. It passed with `--rerun-tasks`
-on 2026-07-16.
+registration backfill proof、activate a topic marker or enable publication/deletion. Its first V1 run passed on
+2026-07-16；the V2 lock passed the complete `--rerun-tasks` gate on 2026-07-19 in 8m58s with 166/166 root tasks
+executed, including the retry-disabled real M4 multi-broker/Oxia/LocalStack final predecessor in 3m02s with 138/138
+tasks executed.
 
 `phase4M5RegistrationBackfillCheck` is the checkpoint-Z precursor. It consumes the current exact clean local fork
 `master@bce3422a94edf01c483c15063c6879254b3ff03f`, publishes the Nereus development composite, audits the product
@@ -1949,7 +1962,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BE are implemented and focused-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BG are implemented and focused-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -1966,7 +1979,13 @@ exist/pass and no completion claim is made here. Exact deterministic evidence is
 `cancellationWhileMergePinReturnsReleasesLateLeaseWithoutStaging`；the new scale evidence is
 `GenerationReadResolverTest.admitsExactlyFourThousandNinetySixGenerationCandidates`、
 `GenerationReadResolverTest.candidateOverflowFailsInsteadOfSilentlyIgnoringAHigherGeneration` and
-`RecoveryCheckpointMillionEntryScaleTest.streamsOneMillionEntriesAndReadsSparseDirectoryBoundaries`.
+`RecoveryCheckpointMillionEntryScaleTest.streamsOneMillionEntriesAndReadsSparseDirectoryBoundaries`. Checkpoint BF is
+`PhysicalObjectReferencePaginationScaleTest.scansOneThousandReaderLeasesAndProtectionsWithoutTruncationAndRestarts`.
+Checkpoint BG is
+`MaterializationPlannerScaleTest.plansAndDurablyRoundTripsOneTaskAtBothSourceAndRecordLimits` plus
+`F4MetadataCodecGoldenTest.taskEnvelopeAndPayloadSchemaVersionsCannotAlias` and the frozen `task-v2.planned` golden
+envelope. BG keeps V1 bytes unchanged, creates new tasks as schema/min-reader `2 / 2`, and requires generation lookup
+capability `2` before such roots may be admitted by the broker cluster.
 
 ### 8.1 Required scenarios
 

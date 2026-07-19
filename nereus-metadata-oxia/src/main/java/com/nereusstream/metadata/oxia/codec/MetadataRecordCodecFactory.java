@@ -9,8 +9,8 @@ public final class MetadataRecordCodecFactory {
 
     public static <T> byte[] encodeEnvelope(T record, Class<T> recordClass) {
         MetadataRecordCodec<T> codec = codecForClass(recordClass);
-        return MetadataRecordEnvelope.encode(codec.recordType(), codec.schemaVersion(),
-                codec.minReaderSchemaVersion(), MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
+        return MetadataRecordEnvelope.encode(codec.recordType(), codec.schemaVersion(record),
+                codec.minReaderSchemaVersion(record), MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
                 codec.encode(record));
     }
 
@@ -24,6 +24,12 @@ public final class MetadataRecordCodecFactory {
         }
         validateEnvelope(envelope, codec);
         T value = codec.decode(envelope.payload());
+        if (codec.schemaVersion(value) != envelope.schemaVersion()
+                || codec.minReaderSchemaVersion(value)
+                        != envelope.minReaderSchemaVersion()) {
+            throw new MetadataCodecException(
+                    "metadata payload schema does not match its envelope");
+        }
         if (!recordClass.isInstance(value)) {
             throw new MetadataCodecException("decoded metadata record has an unexpected Java type");
         }
@@ -79,8 +85,8 @@ public final class MetadataRecordCodecFactory {
     private static void validateEnvelope(
             MetadataRecordEnvelope.DecodedEnvelope envelope, MetadataRecordCodec<?> codec) {
         if (!MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())
-                || envelope.schemaVersion() != codec.schemaVersion()
-                || envelope.minReaderSchemaVersion() != codec.minReaderSchemaVersion()) {
+                || !codec.supportsEnvelopeSchema(
+                        envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
             throw new MetadataCodecException("unsupported metadata envelope for " + codec.recordType());
         }
     }

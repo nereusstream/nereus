@@ -504,6 +504,16 @@ encoded task root        <= 64 KiB
 
 Configuration may choose smaller values but cannot raise a durable hard limit without a format/capability review.
 
+The admitted corner is executable, not only a configuration inequality. A single planned task may contain exactly
+128 contiguous source ranges and exactly 1,048,576 coverage records (8,192 records per source in the scale fixture).
+Before the Oxia create, `MaterializationTaskStore` encodes the complete envelope and rejects values larger than
+64 KiB；it then reloads every exact source candidate by `(stream, view, endOffset, generation)` and verifies the full
+durable source identity before creating the task. `MaterializationTaskRecord` schema V2 dictionaries repeated source
+facts and target descriptors and stores SHA-256 fields as exact 32-byte values, so this maximum admitted task fits the
+same limit. The durable round-trip must reproduce all 128 source ranges and the one-task coverage exactly；splitting,
+truncating or silently dropping a source is not an accepted fallback. V1 task roots remain readable, but new task
+roots use schema/min-reader `2 / 2` and require broker generation lookup capability version `2`.
+
 `policyDigestSha256` is computed from every field above. A policy version change creates a new task identity；it does
 not mutate an existing task's meaning.
 

@@ -430,12 +430,14 @@ The local fork adds：
 ```java
 public final class NereusGenerationProtocolCapability {
     public static final String PROPERTY = "nereus.generation-protocol";
-    public static final String VERSION = "1";
+    public static final String VERSION = "2";
 }
 ```
 
 `NereusStorageBindingCapability.requireUnreserved` composes binding -> cursor -> generation reserved-property checks.
 `NereusBrokerCapabilityCoordinator.decorateLookupProperties` publishes all three after local runtime construction.
+Generation lookup version `2` means the broker can decode both durable task schemas and will write schema V2 tasks.
+It does not change the topic projection marker or activation-record format：those durable values remain protocol `1`.
 
 ### 4.2 Cluster barrier
 
@@ -483,6 +485,13 @@ property/value pairs. The bounded V1 `brokerReadinessEpoch` is the non-negative 
 lowercase digest and broker count remain available for exact comparison. The 63-bit value is an opaque identity token,
 not a monotonic sequence: protocol code may compare it only for equality/inequality and must never infer older/newer
 membership from its numeric ordering.
+
+Checkpoint BG advances only the generation lookup property from `1` to `2` when task schema V2 becomes writable.
+Binding and cursor lookup properties remain at their existing exact versions. For the frozen two-broker fixture the
+new exact readiness identity is epoch `36151462167742895` and digest
+`80806f90349e89afb16f65d2e90f06339f48babe836f9954ad41fefc2869ab75`. Any broker still advertising generation
+lookup version `1` invalidates the stable snapshot and blocks new Phase 4 mutation admission；it may not rely on the
+fact that V1 task roots are still readable to join a V2-writing cluster.
 
 The coordinator registers a broker-registry listener before readiness is used. Every notification increments a
 process-local revision and invalidates the cached identity；a revision change during two otherwise identical

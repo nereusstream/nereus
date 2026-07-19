@@ -121,6 +121,22 @@ final class F4Binary {
             return value;
         }
 
+        byte[] readFixedBytes(String name, int expectedLength) {
+            if (expectedLength < 0) {
+                throw new IllegalArgumentException(
+                        "expectedLength must be non-negative");
+            }
+            int length = readInt(name + "Length");
+            if (length != expectedLength) {
+                throw new MetadataCodecException(
+                        name + " must contain exactly " + expectedLength + " bytes");
+            }
+            requireRemaining(length, name);
+            byte[] value = new byte[length];
+            buffer.get(value);
+            return value;
+        }
+
         boolean readOptional(String name) {
             return switch (readUnsignedByte(name)) {
                 case 0 -> false;

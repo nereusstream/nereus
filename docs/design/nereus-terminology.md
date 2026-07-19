@@ -122,6 +122,7 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 | Cursor `TRIM_PENDING` | logical trim offset、attempt ID 与 exact composed L0 reason 已被冻结且必须恢复/验证完成的 retention 状态；不等于 physical GC completion |
 | Cursor protocol activation | topic projection 内部保留的 `nereus.cursor-protocol=1` minimum-reader fence；首个 durable cursor 前 CAS，用户 properties 不可见 |
 | Generation protocol activation | topic projection 内部单调 `nereus.generation-protocol=1` reader fence；先建立 matching stream registration，再执行首个 F4 publication/deletion，旧 broker 必须 fail closed |
+| Generation lookup capability | broker lookup 中 reserved 的 `nereus.generation-protocol=2` readiness value；`2` 表示可 dual-read task V1/V2 且 new-write V2，不会把上面的 durable topic marker/activation-record protocol 改成 2 |
 
 ### Kafka / KoP
 
@@ -249,6 +250,13 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   materialization、exact retention/backlog projection、bounded F3 logical trim 和 Pulsar admin routing 里程碑；已于
   2026-07-19 通过 ordinary 与 retry-disabled real two-broker final gate。Complete 不表示 BookKeeper primary WAL
   profile 已实现，也不替代 F4-M6 aggregate compatibility gate。
+- **F4-M6 checkpoint BD–BE**：32-reference NRC1 merge、4,096 admitted/4,097 rejected generation candidates 和
+  streaming one-million-entry recovery checkpoint 的首批 final-acceptance foundation。
+- **F4-M6 checkpoint BF**：生产 Oxia adapter 对 1,000 reader leases 与 1,000 source protections 分别执行八页
+  完整扫描，并从 empty continuation 重启得到相同 inventory 的 pagination scale checkpoint。
+- **F4-M6 checkpoint BG**：单 task 同时达到 128 exact source ranges 与 1,048,576 records，经过 64 KiB
+  admission、exact source revalidation、durable create/round trip；同时冻结 task schema V2 dual reader 与 broker
+  generation lookup capability V2 的 scale/schema checkpoint。
 - **Design gate**：进入实现规划前必须回答的问题。
 - **Implementation gate**：代码和测试必须通过的验收条件。
 

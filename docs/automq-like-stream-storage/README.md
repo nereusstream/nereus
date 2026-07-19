@@ -1,6 +1,6 @@
 # AutoMQ-like Async Materialization Profile
 
-> 状态：Implemented / F4-M1–M5 final-gated；F4-M6 aggregate compatibility pending；
+> 状态：Implemented / F4-M1–M5 final-gated；F4-M6 BD–BG focused-green，aggregate compatibility pending；
 > production Object-WAL resolver/read-repair/materialization runtime 与 Pulsar exact profile/config mapping 已装配
 > 前置：Future 1 stable append、Phase 1.5 generic read target/stable-commit split、Phase 3 retention；
 > 精确 target contract 见 `../phase-4-compaction-generation/`
@@ -370,11 +370,13 @@ acknowledged primary range merely because materialization lags。
 - all-shard registry/task-loss scanner and all partial-failure recovery paths；
 - primary-WAL retention/reference integration；
 - Pulsar monotonic `nereus.generation-protocol=1` activation and async-profile admission；
+- broker lookup `nereus.generation-protocol=2` readiness for dual-read/new-write task schema V2；
 - metrics/backpressure/close behavior；
 - F4-M5 ordinary/final gates and all predecessor regressions；
 - Phase 1/1.5/2/3 and overall docs updated in the same change。
 
-F4-M6 remains the Phase 4-wide scale/failure/compatibility and aggregate completion gate；it is not permission to
+F4-M6 BD–BG cover the current merge/candidate/checkpoint/reference/task limits；the remaining registry、two-worker/
+two-broker、scenario-mapping and aggregate gates are still the Phase 4-wide completion boundary. This is not permission to
 infer either BookKeeper primary profile from the implemented Object-WAL profile.
 
 BookKeeper async/sync profiles have an additional independent gate: a real BookKeeper writer/reader/location and
