@@ -11,7 +11,9 @@ enforces that contract against both clean source trees. A passing matrix check p
 the final aggregate still have to execute the tests and prove behavior.
 
 Checkpoint BK status：**52/52 scenarios traced** against Pulsar
-`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`；the complete final aggregate remains pending.
+`master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`. Checkpoints BM/BN make owning-gate execution deterministic by
+serializing Docker owners and, independently, every nested build of the single locked Pulsar checkout；the complete
+final aggregate remains pending.
 
 | ID | Required scenario | Executable evidence | Owning gate |
 | --- | --- | --- | --- |
@@ -72,5 +74,5 @@ Checkpoint BK status：**52/52 scenarios traced** against Pulsar
 
 `phase4M6Check` owns the ordinary 52-row traceability audit and all affected Nereus module checks.
 `phase4M6FinalCheck` adds every real-service M6 fixture. `phase4FinalCheck` composes the M1-M6 final gates and
-`phase3FinalCheck`; only that clean, rerun aggregate may change Phase 4 from `in progress` to `Implemented /
-final-gated`.
+`phase3FinalCheck`; both final tasks also audit Docker and locked-Pulsar checkout isolation. Only that clean, rerun
+aggregate may change Phase 4 from `in progress` to `Implemented / final-gated`.

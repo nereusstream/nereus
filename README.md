@@ -438,7 +438,7 @@ durable size backlog eviction、卸载后 exact ACTIVE-binding logical trim、tr
 logical trim 不删除 WAL bytes，stock BookKeeper control topic 始终可写可读。`phase4M5Check` 与
 `phase4M5FinalCheck` 是该里程碑的 ordinary/final completion boundary；F4-M6 和 Phase 4 aggregate final gate
 仍待完成。
-F4-M6 checkpoints BD–BM 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
+F4-M6 checkpoints BD–BN 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
 generation candidates、streaming 1,000,000-entry checkpoint、1,000 reader leases + 1,000 protections 的完整分页
 重扫、同时达到 128 sources / 1,048,576 records 的单 task durable round trip，以及每个 64 registry shards
 精确 257 条、page size 256 的 16,448-stream cold-restart 扫描。BI 又在真实 shared Oxia、LocalStack、BookKeeper
@@ -454,8 +454,10 @@ append-intent retirement；BK 增加 partitioned loaded/unloaded admin compatibi
 全部映射到 annotated tests 和 declared gates。BL 又阻止 Parquet/Hadoop 把 `slf4j-reload4j` backend 泄漏到
 broker-owned logging runtime，并重跑通过此前被 Oxia retry MDC NPE 阻断的真实 Phase 1 Oxia gate。M6/Phase 4
 BM 再用单一 Gradle shared service 串行十个本地 Docker gates 与六个 nested multi-broker Pulsar builds，保留
-普通任务并行度并消除 aggregate-only Oxia readiness 资源竞争。M6/Phase 4 aggregate tasks 已声明，但修复后的
-完整 rerun 尚未通过。
+普通任务并行度并消除 aggregate-only Oxia readiness 资源竞争。BN 进一步用独立 shared service 串行全部十七个
+locked-Pulsar nested Gradle builds，避免普通与 Docker-backed broker gates 同时改写同一 checkout 的 classes/
+test-results；真实 Phase 2 双 broker gate 与 M4 config gate 的 forced-parallel 回归按序通过 125/132 个内层任务。
+M6/Phase 4 aggregate tasks 已声明，但修复后的完整 rerun 尚未通过。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

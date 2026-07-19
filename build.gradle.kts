@@ -17,6 +17,8 @@ import org.gradle.api.services.BuildServiceParameters
 
 abstract class DockerIntegrationGateService : BuildService<BuildServiceParameters.None>
 
+abstract class PulsarCheckoutGateService : BuildService<BuildServiceParameters.None>
+
 plugins {
     `base`
     `maven-publish`
@@ -51,6 +53,12 @@ val dockerIntegrationGate = gradle.sharedServices.registerIfAbsent(
 ) {
     maxParallelUsages.set(1)
 }
+val pulsarCheckoutGate = gradle.sharedServices.registerIfAbsent(
+    "nereusPulsarCheckoutGate",
+    PulsarCheckoutGateService::class,
+) {
+    maxParallelUsages.set(1)
+}
 val dockerBackedSubprojectTasks = mapOf(
     ":nereus-core" to setOf("phase1IntegrationTest"),
     ":nereus-managed-ledger" to setOf("cursorS3IntegrationTest", "cursorM2IntegrationTest"),
@@ -71,9 +79,32 @@ val dockerBackedPulsarExecTasks = setOf(
     "phase4M5AsyncRetentionMultiBrokerPulsarCheck",
     "phase4M6TwoBrokerWorkerContentionPulsarCheck",
 )
+val pulsarCheckoutExecTasks = setOf(
+    "phase2PulsarCheck",
+    "phase2PulsarFinalCheck",
+    "phase3M4PulsarCheck",
+    "phase3M5PulsarFinalCheck",
+    "phase3M6PulsarFinalCheck",
+    "phase4M4PhysicalGcConfigPulsarCheck",
+    "phase4M4PhysicalDeletionActivationPulsarCheck",
+    "phase4M4ReadinessRolloverPulsarCheck",
+    "phase4M4PhysicalGcMultiBrokerPulsarCheck",
+    "phase4M5GenerationCapabilityPulsarCheck",
+    "phase4M5RegistrationBackfillPulsarCheck",
+    "phase4M5ActivationGuardPulsarCheck",
+    "phase4M5PublicationActivationPulsarCheck",
+    "phase4M5RetentionRuntimePulsarCheck",
+    "phase4M5RetentionPolicyAdminPulsarCheck",
+    "phase4M5AsyncRetentionMultiBrokerPulsarCheck",
+    "phase4M6TwoBrokerWorkerContentionPulsarCheck",
+)
 
 tasks.matching { it.name in dockerBackedPulsarExecTasks }.configureEach {
     usesService(dockerIntegrationGate)
+}
+
+tasks.matching { it.name in pulsarCheckoutExecTasks }.configureEach {
+    usesService(pulsarCheckoutGate)
 }
 
 subprojects {
@@ -2070,6 +2101,13 @@ tasks.register<Exec>("checkPhase4FinalDockerIsolation") {
     commandLine("bash", "scripts/check-phase4-final-docker-isolation.sh")
 }
 
+tasks.register<Exec>("checkPhase4FinalPulsarCheckoutIsolation") {
+    group = "verification"
+    description = "Verify every nested build of the locked Pulsar checkout shares one exclusive build service."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase4-final-pulsar-checkout-isolation.sh")
+}
+
 tasks.register("phase4M6Check") {
     group = "verification"
     description = "Run the complete ordinary F4-M6 gate and the executable 52-scenario evidence audit."
@@ -2098,6 +2136,7 @@ tasks.register("phase4M6FinalCheck") {
     dependsOn("phase4M5FinalCheck")
     dependsOn("phase3FinalCheck")
     dependsOn("checkPhase4FinalDockerIsolation")
+    dependsOn("checkPhase4FinalPulsarCheckoutIsolation")
 }
 
 tasks.register("phase4Check") {
@@ -2118,4 +2157,5 @@ tasks.register("phase4FinalCheck") {
     dependsOn("phase4M5FinalCheck")
     dependsOn("phase4M6FinalCheck")
     dependsOn("checkPhase4FinalDockerIsolation")
+    dependsOn("checkPhase4FinalPulsarCheckoutIsolation")
 }
