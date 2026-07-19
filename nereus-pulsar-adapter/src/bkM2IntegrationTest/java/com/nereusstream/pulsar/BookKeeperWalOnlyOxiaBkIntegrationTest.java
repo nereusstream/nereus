@@ -315,6 +315,74 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
+    void byteRangeAndAgeRolloverPreserveWholeBatchesAndDenseOffsets() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri)) {
+            assertRolloverBoundary(
+                    bookKeeperCluster,
+                    suffix,
+                    "bytes",
+                    configuration(100, 3, 100, Duration.ofHours(1)),
+                    new MutableClock(1_600_000),
+                    Duration.ZERO);
+            assertRolloverBoundary(
+                    bookKeeperCluster,
+                    suffix,
+                    "ranges",
+                    configuration(100, 1024 * 1024, 1, Duration.ofHours(1)),
+                    new MutableClock(1_700_000),
+                    Duration.ZERO);
+            assertRolloverBoundary(
+                    bookKeeperCluster,
+                    suffix,
+                    "age",
+                    configuration(100, 1024 * 1024, 100, Duration.ofSeconds(1)),
+                    new MutableClock(1_800_000),
+                    Duration.ofSeconds(1));
+        }
+    }
+
+    private static void assertRolloverBoundary(
+            BKCluster bookKeeperCluster,
+            String suffix,
+            String boundary,
+            BookKeeperWalConfiguration configuration,
+            MutableClock clock,
+            Duration advanceBeforeSecondAppend) throws Exception {
+        String cluster = "bk-m2-rollover-" + boundary + "-" + suffix;
+        String deployment = "deployment-" + boundary + "-" + suffix;
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        try (Process process = Process.open(
+                bookKeeperCluster,
+                cluster,
+                deployment,
+                "process-rollover-" + boundary,
+                configuration,
+                reservation,
+                clock)) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-rollover-" + boundary + "-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+
+            AppendResult first = process.append(stream, new byte[] {1, 2});
+            clock.advance(advanceBeforeSecondAppend);
+            AppendResult second = process.append(stream, new byte[] {3, 4});
+
+            assertThat(first.range().startOffset()).isZero();
+            assertThat(first.range().endOffset()).isOne();
+            assertThat(second.range().startOffset()).isOne();
+            assertThat(second.range().endOffset()).isEqualTo(2);
+            assertThat(target(second).ledgerId()).isNotEqualTo(target(first).ledgerId());
+            assertThat(target(second).firstEntryId()).isZero();
+            assertRead(process, stream, List.of(new byte[] {1, 2}, new byte[] {3, 4}));
+        }
+    }
+
+    @Test
     void firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
@@ -738,6 +806,14 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     private static BookKeeperWalConfiguration configuration(long maxEntriesPerLedger) {
+        return configuration(maxEntriesPerLedger, 1024 * 1024, 2, Duration.ofHours(1));
+    }
+
+    private static BookKeeperWalConfiguration configuration(
+            long maxEntriesPerLedger,
+            long maxBytesPerLedger,
+            int maxAppendRangesPerLedger,
+            Duration maxLedgerAge) {
         return new BookKeeperWalConfiguration(
                 "primary",
                 "11".repeat(32),
@@ -750,12 +826,12 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
                 BookKeeperDigestType.CRC32C,
                 new BookKeeperSecretRef("secret://bookkeeper/password", "v1"),
                 maxEntriesPerLedger,
-                1024 * 1024,
-                2,
+                maxBytesPerLedger,
+                maxAppendRangesPerLedger,
                 8,
                 32,
                 16,
-                Duration.ofHours(1),
+                maxLedgerAge,
                 1,
                 8,
                 8L * 1024 * 1024,

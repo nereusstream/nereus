@@ -93,6 +93,9 @@ require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (rea
 require_literal 'multiEntryAppendUsesOneExactConsecutiveBookKeeperRange' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'byteRangeAndAgeRolloverPreserveWholeBatchesAndDenseOffsets' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
 require_literal 'firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"

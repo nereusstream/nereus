@@ -529,7 +529,7 @@ public final class BookKeeperPrimaryWalAppender
                     || Math.addExact(writer.activePhysicalBytes(), prepared.physicalBytes())
                             > configuration.maxBytesPerLedger()
                     || Math.addExact(writer.activeAppendRangeCount(), 1) > configuration.maxAppendRangesPerLedger()
-                    || clock.instant().isAfter(InstantMath.add(
+                    || !clock.instant().isBefore(InstantMath.add(
                             active.root().value().createdAtMillis(), configuration.maxLedgerAge()));
         } catch (ArithmeticException overflow) {
             return true;

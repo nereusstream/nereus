@@ -252,6 +252,11 @@ before any create/open/write call。`DEFERRED_SYNC` is not a configuration value
 no write-flag field and `DefaultBookKeeperClientOperations` always passes `EnumSet.noneOf(WriteFlag.class)`；the public
 4.18 adapter contract test freezes both facts。
 
+The real-service gate also closes BK-30：entry-count、exact physical payload byte、append-range-count and
+`now >= createdAt + maxLedgerAge` boundaries are each evaluated before reservation；the triggering append remains one
+whole range on the replacement ledger at entry zero, while logical offsets and cold reads remain dense across the
+rollover。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session
