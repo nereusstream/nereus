@@ -100,6 +100,39 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
     }
 
     @Override
+    public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
+            StreamId streamId,
+            SourceGeneration source,
+            String referenceId) {
+        try {
+            String exactStream = Objects.requireNonNull(streamId, "streamId").value();
+            SourceGeneration exactSource = Objects.requireNonNull(source, "source");
+            BookKeeperEntryRangeReadTarget target = requireTarget(exactSource);
+            String exactReference = requireText(referenceId, "referenceId");
+            BookKeeperOperationDeadline deadline = deadline();
+            return loadRoot(target, deadline)
+                    .thenCompose(ignored -> scanProtections(
+                            target.ledgerId(), Optional.empty(), new ArrayList<>(), deadline))
+                    .thenApply(values -> {
+                        List<BookKeeperVersionedValue<BookKeeperLedgerProtectionRecord>> matches = values.stream()
+                                .filter(value -> value.value().protectionSlot() >= FIRST_DYNAMIC_SLOT)
+                                .filter(value -> sameLogicalReference(
+                                        value.value(), exactStream, exactSource, target, exactReference))
+                                .toList();
+                        if (matches.size() > 1) {
+                            throw invariant(
+                                    "BookKeeper materialization source protection is ambiguous");
+                        }
+                        return matches.isEmpty()
+                                ? Optional.empty()
+                                : Optional.of(wrap(matches.get(0)));
+                    });
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    @Override
     public CompletableFuture<MaterializationSourceProtection> revalidate(
             MaterializationSourceProtection protection,
             OwnerRevalidator ownerRevalidator) {
@@ -721,5 +754,9 @@ public final class BookKeeperMaterializationSourceProtectionAdapter
 
     private static NereusException condition(String message) {
         return new NereusException(ErrorCode.METADATA_CONDITION_FAILED, true, message);
+    }
+
+    private static NereusException invariant(String message) {
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
     }
 }

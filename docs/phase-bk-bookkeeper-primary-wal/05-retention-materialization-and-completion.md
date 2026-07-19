@@ -85,6 +85,20 @@ BookKeeper profile and `trimOffset >= range.endOffset`，and freezes canonical `
 pre/post-CAS revalidation。For RESERVED failed ranges it instead reloads the exact ABANDONED reservation key/version/
 stored SHA。The coordinator only consumes these facts；it never advances trim or deletes logical metadata。
 
+BK-M3 extends that bridge without changing the tombstone protocol。`CommittedObjectGenerationAuthority` scans a
+bounded COMMITTED-view candidate set and accepts only a canonical higher index whose Object target、ACTIVE physical
+root、exact index-owned `VISIBLE_GENERATION` protection and covering materialization checkpoint all agree。
+`BookKeeperAsyncObjectRetirementAuthority` binds that index key/version/stored SHA into
+`HEALTHY_HIGHER_GENERATION` evidence and reconstructs the complete F4 proof before and after each protection CAS。
+`REACHABLE_APPEND`/`APPEND_RECOVERY` rows whose own `commitVersion=0` obtain it only from the exact same-range slot-1
+generation-zero anchor；the anchor may be ACTIVE or the just-produced RETIRED tombstone。Dynamic
+`MATERIALIZATION_SOURCE` rows are deliberately excluded from tombstoning and are removed only by terminal task
+retirement, preventing permanent dynamic-slot leakage。
+
+This checkpoint is metadata-complete but is not the M3 final read gate：production wiring must additionally resolve and
+read the exact admitted Object generation under its normal pin/checksum path before enabling BK release。Until that
+proof and the real-service cuts pass, the production broker does not register this authority。
+
 ## 4. `BookKeeperWalRetentionGate`
 
 The gate evaluates one sealed root and produces a process-local candidate, never a durable second truth：
@@ -256,18 +270,27 @@ target; output remains one normal F4 Object generation.
 
 ### 7.3 Terminal/rollover flush
 
-Normal F4 policy requires `minMergeSourceRanges >= 2` as a planner trigger. A sealed stream or sealed BK ledger can end
-with one unmaterialized source forever unless there is an explicit flush trigger. Add
-`BookKeeperSealedLedgerMaterializationTrigger`：
+The code-level audit corrected an earlier assumption here。`DefaultMaterializationPlanner.eligible` applies
+`minMergeSourceRanges` only when every source is already a current-policy higher Object generation；a generation-zero
+source, including BK, is ordinary materialization input and is already eligible as a one-source deterministic task。
+Creating a BookKeeper-specific range scanner/grouper would therefore introduce a second planner and duplicate-task
+race。
 
-- it scans exact committed generation-zero sources in a sealed ledger；
-- groups them under existing max sources/records/bytes policy；
-- creates normal deterministic tasks；
-- permits a final one-source `MaterializationTask` when no merge partner exists；
-- uses the same task store/protection/worker and never publishes directly。
+`BookKeeperSealedLedgerMaterializationTrigger` instead performs only this bounded hint protocol：
 
-`MaterializationTask` already permits one nonempty source; `minMergeSourceRanges` remains ordinary planner admission,
-not a durable task-validity minimum. The same one-source trigger is used by sync completion.
+```text
+require exact SEALED root
+reload the same root key/version/digest
+invoke MaterializationStreamTrigger
+  -> existing DefaultMaterializationService.scanNow
+  -> existing 64-shard registration scan/planner/task store/worker
+reload the same SEALED root again
+```
+
+It never scans generation indexes、groups sources or creates/publishes tasks itself。
+`MaterializationPlannerTest.plansFinalSingleBookKeeperGenerationZeroThroughTheOrdinaryPlanner` freezes the one-source
+behavior with `minMergeSourceRanges=2`；the trigger test freezes exact pre/post root revalidation。Sync completion may
+request the same shared scanner, but does not get a second task-creation path。
 
 ### 7.4 Lag/backpressure
 

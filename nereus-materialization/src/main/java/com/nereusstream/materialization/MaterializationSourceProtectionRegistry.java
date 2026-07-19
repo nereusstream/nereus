@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Immutable exact-target registry for materialization source protection providers. */
@@ -46,6 +47,17 @@ public final class MaterializationSourceProtectionRegistry {
                 referenceId,
                 Objects.requireNonNull(owner, "owner"),
                 Objects.requireNonNull(ownerRevalidator, "ownerRevalidator"));
+    }
+
+    public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
+            StreamId streamId,
+            SourceGeneration source,
+            String referenceId) {
+        SourceGeneration exact = Objects.requireNonNull(source, "source");
+        return require(exact.readTarget()).findExisting(
+                Objects.requireNonNull(streamId, "streamId"),
+                exact,
+                Objects.requireNonNull(referenceId, "referenceId"));
     }
 
     public CompletableFuture<MaterializationSourceProtection> revalidate(

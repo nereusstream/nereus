@@ -5,10 +5,19 @@ import static com.nereusstream.materialization.GenerationPublicationTestSupport.
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.api.OffsetRange;
+import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadView;
+import com.nereusstream.api.StreamId;
+import com.nereusstream.api.target.BookKeeperEntryMapping;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.api.target.ReadTargetType;
+import com.nereusstream.core.physical.ObjectProtectionOwner;
 import com.nereusstream.core.physical.ObjectProtectionRequest;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
 import com.nereusstream.metadata.oxia.F4Keyspace;
@@ -20,6 +29,7 @@ import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.RangeRetentionStatsRecord;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
+import com.nereusstream.metadata.oxia.codec.ReadTargetCodecRegistry;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
@@ -231,6 +241,181 @@ class TerminalWorkflowMetadataRetirementTest {
                             context.task().streamId(), context.task().taskId()).join())
                     .isPresent();
         }
+    }
+
+    @Test
+    void retiresTerminalTaskWithProviderOwnedBookKeeperSourceProtection() {
+        try (GenerationPublicationTestSupport.Context context =
+                GenerationPublicationTestSupport.context()) {
+            BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
+                    1,
+                    "primary",
+                    71,
+                    3,
+                    2,
+                    BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                    sha('7'));
+            SourceGeneration source = new SourceGeneration(
+                    ReadView.COMMITTED,
+                    new OffsetRange(0, 2),
+                    0,
+                    11,
+                    "/indexes/bk-terminal-source",
+                    0,
+                    sha('8'),
+                    target,
+                    new Checksum(
+                            ChecksumType.SHA256,
+                            ReadTargetCodecRegistry.phase15()
+                                    .encode(target)
+                                    .identityChecksumValue()),
+                    Optional.empty(),
+                    PayloadFormat.OPAQUE_RECORD_BATCH,
+                    Optional.empty(),
+                    2,
+                    2,
+                    10,
+                    List.of(),
+                    0,
+                    10);
+            MaterializationTask task = MaterializationTask.create(
+                    GenerationPublicationTestSupport.STREAM,
+                    source.range(),
+                    List.of(source),
+                    context.task().policy());
+            var created = context.generations().createTask(
+                    CLUSTER, MaterializationRecordMapper.plannedTask(task, 100)).join();
+            var claimed = context.generations().compareAndSetTask(
+                    CLUSTER,
+                    MaterializationRecordMapper.claimed(
+                            created.value(), "q".repeat(26), "r".repeat(26), 500, 2_000),
+                    created.metadataVersion()).join();
+            var terminal = context.generations().compareAndSetTask(
+                    CLUSTER,
+                    MaterializationRecordMapper.failedClaim(
+                            claimed.value(),
+                            TaskLifecycle.TERMINAL_FAILED,
+                            TaskFailureClass.UNSUPPORTED_MAPPING,
+                            "terminal BK source",
+                            0,
+                            1_000),
+                    claimed.metadataVersion()).join();
+            String referenceId = MaterializationProtectionIdentities.sourceReferenceId(
+                    CLUSTER, task, source);
+            TrackingProviderProtectionAdapter adapter = new TrackingProviderProtectionAdapter(
+                    source,
+                    new MaterializationSourceProtection(
+                            ReadTargetType.BOOKKEEPER_ENTRY_RANGE,
+                            referenceId,
+                            MaterializationProtectionIdentities.taskOwner(terminal),
+                            4,
+                            "bk-provider-handle"));
+            DefaultTerminalWorkflowMetadataRetirer retirer = new DefaultTerminalWorkflowMetadataRetirer(
+                    CLUSTER,
+                    new MaterializationTaskStore(
+                            CLUSTER, context.generations(), GenerationPublicationTestSupport.CLOCK),
+                    context.generations(),
+                    context.physical(),
+                    new MaterializationSourceProtectionRegistry(List.of(adapter)),
+                    Duration.ofMillis(500),
+                    1,
+                    Duration.ofSeconds(10),
+                    context.scheduler(),
+                    RETIREMENT_CLOCK);
+
+            var result = retirer.retire(
+                            task.streamId(),
+                            task.policy(),
+                            0,
+                            MaterializationTaskMutationGuard.noOp())
+                    .join();
+
+            assertThat(result.tasksEligible()).isOne();
+            assertThat(result.tasksRetired()).isOne();
+            assertThat(result.protectionsReleased()).isOne();
+            assertThat(adapter.findCalls).hasValueGreaterThanOrEqualTo(3);
+            assertThat(adapter.releaseCalls).hasValue(1);
+            assertThat(adapter.current).isEmpty();
+            assertThat(context.generations().getTask(CLUSTER, task.streamId(), task.taskId()).join())
+                    .isEmpty();
+        }
+    }
+
+    private static final class TrackingProviderProtectionAdapter
+            implements MaterializationSourceProtectionAdapter<BookKeeperEntryRangeReadTarget> {
+        private final SourceGeneration expectedSource;
+        private final AtomicInteger findCalls = new AtomicInteger();
+        private final AtomicInteger releaseCalls = new AtomicInteger();
+        private Optional<MaterializationSourceProtection> current;
+
+        private TrackingProviderProtectionAdapter(
+                SourceGeneration expectedSource,
+                MaterializationSourceProtection current) {
+            this.expectedSource = expectedSource;
+            this.current = Optional.of(current);
+        }
+
+        @Override
+        public ReadTargetType targetType() {
+            return ReadTargetType.BOOKKEEPER_ENTRY_RANGE;
+        }
+
+        @Override
+        public Class<BookKeeperEntryRangeReadTarget> targetClass() {
+            return BookKeeperEntryRangeReadTarget.class;
+        }
+
+        @Override
+        public CompletableFuture<MaterializationSourceProtection> acquireOrTransfer(
+                StreamId streamId,
+                SourceGeneration source,
+                String referenceId,
+                ObjectProtectionOwner owner,
+                OwnerRevalidator ownerRevalidator) {
+            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+
+        @Override
+        public CompletableFuture<Optional<MaterializationSourceProtection>> findExisting(
+                StreamId streamId,
+                SourceGeneration source,
+                String referenceId) {
+            assertThat(streamId).isEqualTo(GenerationPublicationTestSupport.STREAM);
+            assertThat(source).isEqualTo(expectedSource);
+            current.ifPresent(value -> assertThat(value.referenceId()).isEqualTo(referenceId));
+            findCalls.incrementAndGet();
+            return CompletableFuture.completedFuture(current);
+        }
+
+        @Override
+        public CompletableFuture<MaterializationSourceProtection> revalidate(
+                MaterializationSourceProtection protection,
+                OwnerRevalidator ownerRevalidator) {
+            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+
+        @Override
+        public CompletableFuture<MaterializationSourceProtection> transfer(
+                MaterializationSourceProtection protection,
+                ObjectProtectionOwner newOwner,
+                OwnerRevalidator newOwnerRevalidator) {
+            return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+
+        @Override
+        public CompletableFuture<Void> release(
+                MaterializationSourceProtection protection,
+                RemovalAuthorizer removalAuthorizer) {
+            assertThat(current).contains(protection);
+            return removalAuthorizer.authorize(protection).thenRun(() -> {
+                current = Optional.empty();
+                releaseCalls.incrementAndGet();
+            });
+        }
+    }
+
+    private static Checksum sha(char value) {
+        return new Checksum(ChecksumType.SHA256, Character.toString(value).repeat(64));
     }
 
     private static void advanceCheckpoint(GenerationPublicationTestSupport.Context context) {

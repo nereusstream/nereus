@@ -362,6 +362,13 @@ final class MaterializationPlannerTestSupport {
     }
 
     static StreamMetadataSnapshot snapshot(long trimOffset, long committedEndOffset) {
+        return snapshot(trimOffset, committedEndOffset, StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+    }
+
+    static StreamMetadataSnapshot snapshot(
+            long trimOffset,
+            long committedEndOffset,
+            StorageProfile profile) {
         long metadataVersion = 5;
         long commitVersion = committedEndOffset == 0 ? 0 : committedEndOffset;
         return new StreamMetadataSnapshot(
@@ -370,7 +377,7 @@ final class MaterializationPlannerTestSupport {
                         "persistent://tenant/ns/topic",
                         "stream-name-hash",
                         StreamState.ACTIVE.name(),
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                        profile.canonical().name(),
                         Map.of(),
                         1,
                         1,

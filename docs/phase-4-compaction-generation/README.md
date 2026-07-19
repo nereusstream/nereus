@@ -310,7 +310,7 @@ disabled，直到 M4–M6 完成 recovery-root/anchor-aware reachability、physi
 这些后续门禁现已全部完成，Phase 4 为 `Implemented / final-gated`。`OBJECT_WAL_ASYNC_OBJECT` 已实现但受
 generation activation proof 约束；physical delete 已实现但只在 exact coverage/capability activation 下运行，
 safe broker defaults 仍为 `enabled=false, dryRun=true`。BookKeeper primary-WAL profiles 的 production rollout
-继续保留；后续 F1-BK BK-M3 已开始把 BK source/protection/profile/lag 接入这套共享 F4 truth。
+继续保留；后续 F1-BK BK-M3 已把 BK source/protection/profile/lag、retirement-metadata/sealed-trigger 接入这套共享 F4 truth。
 
 本目录是 Future 4 的代码级实现合同。Phase 4 把已经提交的 generation 0 物理布局转换为
 per-stream、read-optimized 的 higher generation，并补齐 reader pin、source retirement、recovery checkpoint、
@@ -2249,5 +2249,5 @@ Phase 4 is complete only when all of the following are executable evidence：
 Checkpoint BQ satisfies this definition. The clean source-locked `phase4FinalCheck --rerun-tasks --console=plain`
 run completed all 203 outer tasks in 21m47s and included the M1–M6、predecessor、52-scenario、real-service and
 artifact/isolation audits. The completion claim remains scoped to Object-WAL profiles；BookKeeper primary adapters are
-not inferred。The later F1-BK delivery owns those adapters and is currently at the BK-M3 source/protection/profile/lag
+not inferred。The later F1-BK delivery owns those adapters and is currently at the BK-M3 source/protection/profile/lag、retirement-metadata/sealed-trigger
 checkpoint，outside this F4 completion claim。

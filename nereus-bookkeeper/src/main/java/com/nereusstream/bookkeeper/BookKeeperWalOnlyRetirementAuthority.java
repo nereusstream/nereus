@@ -27,7 +27,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Production BK_ONLY bridge from monotonic L0 trim/abandoned-reservation facts to protection retirement. */
-public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperProtectionRetirementVerifier {
+public final class BookKeeperWalOnlyRetirementAuthority implements BookKeeperWalRetirementAuthority {
     private final String cluster;
     private final OxiaMetadataStore l0;
     private final BookKeeperWriterMetadataStore writerMetadata;

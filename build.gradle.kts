@@ -732,6 +732,35 @@ tasks.register("bookKeeperPrimaryWalM3LagCheck") {
     dependsOn(":nereus-materialization:test")
 }
 
+tasks.register("bookKeeperPrimaryWalM3SourceRetirementCheck") {
+    group = "verification"
+    description = "Verify healthy committed Object authority, terminal BK source release, and ledger-retention handoff."
+    dependsOn("bookKeeperPrimaryWalM3LagCheck")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-bookkeeper:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM3SealedLedgerCheck") {
+    group = "verification"
+    description = "Verify a sealed BK tail triggers the single F4 scanner and ordinary planner admits one gen0 source."
+    dependsOn("bookKeeperPrimaryWalM3SourceRetirementCheck")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-bookkeeper:test")
+    dependsOn(":nereus-pulsar-adapter:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM3Check") {
+    group = "verification"
+    description = "Run deterministic BK async Object source, protection, lag, retirement, and sealed-tail gates."
+    dependsOn("bookKeeperPrimaryWalM3SealedLedgerCheck")
+    dependsOn("checkBookKeeperModuleBoundaries")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-bookkeeper:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {
     group = "verification"
     description = "Verify the acyclic protocol-neutral F4 module dependency direction."

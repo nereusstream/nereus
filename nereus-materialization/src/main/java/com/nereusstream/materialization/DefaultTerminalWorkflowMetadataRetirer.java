@@ -60,6 +60,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
     private final MaterializationTaskStore tasks;
     private final GenerationMetadataStore generations;
     private final PhysicalObjectMetadataStore physical;
+    private final MaterializationSourceProtectionRegistry sourceProtections;
     private final long metadataAuditGraceMillis;
     private final int pageSize;
     private final Duration operationTimeout;
@@ -76,10 +77,35 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             Duration operationTimeout,
             ScheduledExecutorService scheduler,
             Clock clock) {
+        this(
+                cluster,
+                tasks,
+                generations,
+                physical,
+                new MaterializationSourceProtectionRegistry(List.of()),
+                metadataAuditGrace,
+                pageSize,
+                operationTimeout,
+                scheduler,
+                clock);
+    }
+
+    public DefaultTerminalWorkflowMetadataRetirer(
+            String cluster,
+            MaterializationTaskStore tasks,
+            GenerationMetadataStore generations,
+            PhysicalObjectMetadataStore physical,
+            MaterializationSourceProtectionRegistry sourceProtections,
+            Duration metadataAuditGrace,
+            int pageSize,
+            Duration operationTimeout,
+            ScheduledExecutorService scheduler,
+            Clock clock) {
         this.cluster = requireText(cluster, "cluster");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.physical = Objects.requireNonNull(physical, "physical");
+        this.sourceProtections = Objects.requireNonNull(sourceProtections, "sourceProtections");
         this.metadataAuditGraceMillis = requirePositiveMillis(
                 metadataAuditGrace, "metadataAuditGrace");
         if (pageSize <= 0 || pageSize > 1_000) {
@@ -619,21 +645,60 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                     }
                                     Map<ObjectKeyHash, VersionedPhysicalObjectRoot> roots =
                                             rootsOptional.orElseThrow();
-                                    if (actual.value().lifecycle() == TaskLifecycle.PUBLISHED) {
-                                        return provePublished(
-                                                actual,
-                                                task,
-                                                output.orElseThrow(),
-                                                roots,
-                                                requireNoTemporaryProtections);
-                                    }
-                                    return proveFailedTerminal(
-                                            actual,
-                                            task,
-                                            output,
-                                            roots,
-                                            requireNoTemporaryProtections);
+                                    return loadProviderSourceProtections(
+                                                    actual, task, 0, new ArrayList<>())
+                                            .thenCompose(providerProtections -> {
+                                                if (actual.value().lifecycle()
+                                                        == TaskLifecycle.PUBLISHED) {
+                                                    return provePublished(
+                                                            actual,
+                                                            task,
+                                                            output.orElseThrow(),
+                                                            roots,
+                                                            providerProtections,
+                                                            requireNoTemporaryProtections);
+                                                }
+                                                return proveFailedTerminal(
+                                                        actual,
+                                                        task,
+                                                        output,
+                                                        roots,
+                                                        providerProtections,
+                                                        requireNoTemporaryProtections);
+                                            });
                                 });
+                    });
+        }
+
+        private CompletableFuture<List<MaterializationSourceProtection>> loadProviderSourceProtections(
+                VersionedMaterializationTask durable,
+                MaterializationTask task,
+                int index,
+                List<MaterializationSourceProtection> values) {
+            if (index == task.sources().size()) {
+                return CompletableFuture.completedFuture(List.copyOf(values));
+            }
+            SourceGeneration source = task.sources().get(index);
+            if (source.readTarget() instanceof ObjectSliceReadTarget) {
+                return loadProviderSourceProtections(durable, task, index + 1, values);
+            }
+            String referenceId = MaterializationProtectionIdentities.sourceReferenceId(
+                    cluster, task, source);
+            return deadline.bound(
+                            () -> sourceProtections.findExisting(
+                                    task.streamId(), source, referenceId),
+                            "find terminal provider source protection")
+                    .thenCompose(optional -> {
+                        optional.ifPresent(protection -> {
+                            if (!protection.referenceId().equals(referenceId)
+                                    || !protection.owner().ownerKey().equals(durable.key())
+                                    || protection.owner().metadataVersion() > durable.metadataVersion()) {
+                                throw invariant(
+                                        "terminal provider source protection has an invalid owner", null);
+                            }
+                            values.add(protection);
+                        });
+                        return loadProviderSourceProtections(durable, task, index + 1, values);
                     });
         }
 
@@ -642,6 +707,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 MaterializationTask task,
                 MaterializationOutput output,
                 Map<ObjectKeyHash, VersionedPhysicalObjectRoot> roots,
+                List<MaterializationSourceProtection> providerProtections,
                 boolean requireNoTemporaryProtections) {
             long generation = durable.value().allocatedGeneration().orElseThrow();
             GenerationIndexIdentity identity = new GenerationIndexIdentity(
@@ -675,7 +741,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                         .thenApply(audit -> {
                             if (!audit.valid()
                                     || requireNoTemporaryProtections
-                                            && !audit.temporary().isEmpty()) {
+                                            && (!audit.temporary().isEmpty()
+                                                    || !providerProtections.isEmpty())) {
                                 return Optional.empty();
                             }
                             return Optional.of(new TaskProof(
@@ -683,7 +750,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                     Optional.of(index),
                                     Optional.of(checkpoint),
                                     roots,
-                                    audit.temporary()));
+                                    audit.temporary(),
+                                    providerProtections));
                         });
             });
         }
@@ -693,6 +761,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 MaterializationTask task,
                 Optional<MaterializationOutput> output,
                 Map<ObjectKeyHash, VersionedPhysicalObjectRoot> roots,
+                List<MaterializationSourceProtection> providerProtections,
                 boolean requireNoTemporaryProtections) {
             return scanTaskIndexes(task, Optional.empty(), new ArrayList<>())
                     .thenCompose(indexes -> {
@@ -709,7 +778,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                 .thenApply(audit -> {
                                     if (!audit.valid()
                                             || requireNoTemporaryProtections
-                                                    && !audit.temporary().isEmpty()) {
+                                                    && (!audit.temporary().isEmpty()
+                                                            || !providerProtections.isEmpty())) {
                                         return Optional.empty();
                                     }
                                     return Optional.of(new TaskProof(
@@ -717,7 +787,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                                             Optional.empty(),
                                             Optional.empty(),
                                             roots,
-                                            audit.temporary()));
+                                            audit.temporary(),
+                                            providerProtections));
                                 });
                     });
         }
@@ -851,13 +922,40 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         }
 
         private CompletableFuture<Integer> releaseAt(TaskProof proof, int index) {
-            if (index == proof.temporaryProtections().size()) {
+            int objectCount = proof.temporaryProtections().size();
+            int total = Math.addExact(objectCount, proof.providerSourceProtections().size());
+            if (index == total) {
                 return CompletableFuture.completedFuture(index);
             }
-            VersionedObjectProtection protection = proof.temporaryProtections().get(index);
-            return revalidateTaskAndRoot(proof.task(), proof.roots(), protection)
-                    .thenCompose(ignored -> deleteProtection(protection, 0))
+            if (index < objectCount) {
+                VersionedObjectProtection protection = proof.temporaryProtections().get(index);
+                return revalidateTaskAndRoot(proof.task(), proof.roots(), protection)
+                        .thenCompose(ignored -> deleteProtection(protection, 0))
+                        .thenCompose(ignored -> releaseAt(proof, index + 1));
+            }
+            MaterializationSourceProtection protection =
+                    proof.providerSourceProtections().get(index - objectCount);
+            return sourceProtections.release(
+                            protection,
+                            current -> authorizeProviderSourceRelease(proof, current))
                     .thenCompose(ignored -> releaseAt(proof, index + 1));
+        }
+
+        private CompletableFuture<Void> authorizeProviderSourceRelease(
+                TaskProof expected,
+                MaterializationSourceProtection current) {
+            return prove(expected.task(), false).thenAccept(optional -> {
+                TaskProof actual = optional.orElseThrow(() -> condition(
+                        "terminal task proof disappeared before provider protection release", null));
+                if (!sameRoots(expected.roots(), actual.roots())
+                        || !sameOptionalIndex(expected.index(), actual.index())
+                        || !sameOptionalCheckpoint(expected.checkpoint(), actual.checkpoint())
+                        || actual.providerSourceProtections().stream()
+                                .noneMatch(value -> sameProviderProtection(value, current))) {
+                    throw condition(
+                            "terminal provider source authority changed before release", null);
+                }
+            });
         }
 
         private CompletableFuture<Void> revalidateTaskAndRoot(
@@ -980,10 +1078,7 @@ public final class DefaultTerminalWorkflowMetadataRetirer
         List<ObjectExpectation> values = new ArrayList<>();
         for (SourceGeneration source : task.sources()) {
             if (!(source.readTarget() instanceof ObjectSliceReadTarget target)) {
-                throw new NereusException(
-                        ErrorCode.UNSUPPORTED_READ_TARGET,
-                        false,
-                        "terminal materialization source is not an object slice");
+                continue;
             }
             long requiredEnd;
             try {
@@ -1010,7 +1105,9 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             Optional<VersionedGenerationIndex> visibleIndex) {
         Map<ProtectionKey, ProtectionRole> result = new LinkedHashMap<>();
         for (SourceGeneration source : task.sources()) {
-            ObjectSliceReadTarget target = (ObjectSliceReadTarget) source.readTarget();
+            if (!(source.readTarget() instanceof ObjectSliceReadTarget target)) {
+                continue;
+            }
             putExpected(
                     result,
                     new ProtectionKey(
@@ -1197,6 +1294,41 @@ public final class DefaultTerminalWorkflowMetadataRetirer
                 && left.value().equals(right.value());
     }
 
+    private static boolean sameProviderProtection(
+            MaterializationSourceProtection left,
+            MaterializationSourceProtection right) {
+        return left.targetType() == right.targetType()
+                && left.referenceId().equals(right.referenceId())
+                && left.owner().equals(right.owner())
+                && left.metadataVersion() == right.metadataVersion()
+                && left.providerHandle().equals(right.providerHandle());
+    }
+
+    private static boolean sameOptionalIndex(
+            Optional<VersionedGenerationIndex> left,
+            Optional<VersionedGenerationIndex> right) {
+        return left.isEmpty() && right.isEmpty()
+                || left.isPresent() && right.isPresent()
+                        && sameIndex(left.orElseThrow(), right.orElseThrow());
+    }
+
+    private static boolean sameOptionalCheckpoint(
+            Optional<VersionedMaterializationCheckpoint> left,
+            Optional<VersionedMaterializationCheckpoint> right) {
+        return left.isEmpty() && right.isEmpty()
+                || left.isPresent() && right.isPresent()
+                        && sameCheckpoint(left.orElseThrow(), right.orElseThrow());
+    }
+
+    private static boolean sameIndex(
+            VersionedGenerationIndex left,
+            VersionedGenerationIndex right) {
+        return left.key().equals(right.key())
+                && left.metadataVersion() == right.metadataVersion()
+                && left.durableValueSha256().equals(right.durableValueSha256())
+                && left.value().equals(right.value());
+    }
+
     private static boolean sameStats(
             VersionedRangeRetentionStats left,
             VersionedRangeRetentionStats right) {
@@ -1317,7 +1449,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             Optional<VersionedGenerationIndex> index,
             Optional<VersionedMaterializationCheckpoint> checkpoint,
             Map<ObjectKeyHash, VersionedPhysicalObjectRoot> roots,
-            List<VersionedObjectProtection> temporaryProtections) {
+            List<VersionedObjectProtection> temporaryProtections,
+            List<MaterializationSourceProtection> providerSourceProtections) {
         private TaskProof {
             Objects.requireNonNull(task, "task");
             index = Objects.requireNonNull(index, "index");
@@ -1325,6 +1458,8 @@ public final class DefaultTerminalWorkflowMetadataRetirer
             roots = Map.copyOf(Objects.requireNonNull(roots, "roots"));
             temporaryProtections = List.copyOf(Objects.requireNonNull(
                     temporaryProtections, "temporaryProtections"));
+            providerSourceProtections = List.copyOf(Objects.requireNonNull(
+                    providerSourceProtections, "providerSourceProtections"));
         }
     }
 

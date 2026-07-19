@@ -134,7 +134,7 @@ must not create a second temporary L0 API。
 
 Phase 1.5 之后的 BookKeeper primary-WAL 实现合同已单独冻结为 F1-BK：
 `../phase-bk-bookkeeper-primary-wal/README.md`。它复用这里的 tagged target、registry、stable-head/gen0 split 和
-generic recovery。F1-BK 已实现 BK-M1、BK-M2 的 module-local runtime，并推进 BK-M3 source/protection/profile/lag
+generic recovery。F1-BK 已实现 BK-M1、BK-M2 的 module-local runtime，并推进 BK-M3 source/protection/profile/lag、retirement-metadata/sealed-trigger
 checkpoint；production rollout 仍未完成，不能把 reserved codec/registry seam 或 partial checkpoint 当成 broker
 profile support。
 

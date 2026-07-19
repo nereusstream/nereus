@@ -21,12 +21,21 @@
 > reads and source protection are provider-registered，BK `MATERIALIZATION_SOURCE` uses bounded durable dynamic slots
 > with restart-safe owner transfer，the shared F4 runtime accepts the matched BK reader/protection provider，the async
 > profile freezes `BOOKKEEPER_ENTRY_RANGE + ASYNCHRONOUS + STABLE_HEAD`，and the existing F4 lag authority admits the
-> BK async profile。These checkpoints are executable through `bookKeeperPrimaryWalM3ExactSourceCheck`、
+> BK async profile。The next checkpoint also provider-neutralizes terminal task cleanup，adds exact COMMITTED
+> index/Object-root/VISIBLE-protection/checkpoint authority for mandatory BK reference retirement，hands eligible
+> tombstones to the existing whole-ledger gate，and routes exact SEALED roots to the one registered-stream F4 scanner；
+> the ordinary planner is test-locked to admit a final single BK generation-zero source even when
+> `minMergeSourceRanges=2`。These checkpoints are executable through `bookKeeperPrimaryWalM3ExactSourceCheck`、
 > `bookKeeperPrimaryWalM3ProtectionCheck`、`bookKeeperPrimaryWalM3AsyncProfileCheck` and
-> `bookKeeperPrimaryWalM3LagCheck`。Source retirement、sealed-ledger final flush and real BK-to-Object publication/failure
-> cuts are still pending，so BK-M3 is not complete。The remaining M2 scenario/evidence rows and aggregate/final gate are not yet closed；
+> `bookKeeperPrimaryWalM3LagCheck`、`bookKeeperPrimaryWalM3SourceRetirementCheck`、
+> `bookKeeperPrimaryWalM3SealedLedgerCheck` and `bookKeeperPrimaryWalM3Check`。A live exact Object resolve/read proof、
+> real BK-to-Object publication and fresh-runtime failure cuts remain pending，so BK-M3 is not complete。The remaining
+> M2 scenario/evidence rows and aggregate/final gate are not yet closed；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
+
+> 2026-07-19：`bookKeeperPrimaryWalM3Check --rerun-tasks` passed 60/60 executable tasks for this deterministic
+> checkpoint；this is not `bookKeeperPrimaryWalM3FinalCheck` evidence。
 
 ## 1. Delivery identity
 

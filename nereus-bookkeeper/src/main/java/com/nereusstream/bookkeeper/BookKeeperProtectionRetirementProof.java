@@ -23,7 +23,7 @@ public record BookKeeperProtectionRetirementProof(
         protectionKey = text(protectionKey, "protectionKey");
         ownerKey = text(ownerKey, "ownerKey");
         authorityKey = text(authorityKey, "authorityKey");
-        if (protectionMetadataVersion < 0 || ownerMetadataVersion <= 0 || authorityMetadataVersion < 0) {
+        if (protectionMetadataVersion < 0 || ownerMetadataVersion < 0 || authorityMetadataVersion < 0) {
             throw new IllegalArgumentException("BookKeeper retirement proof versions are invalid");
         }
         protectionRecordSha256 = sha(protectionRecordSha256, "protectionRecordSha256");

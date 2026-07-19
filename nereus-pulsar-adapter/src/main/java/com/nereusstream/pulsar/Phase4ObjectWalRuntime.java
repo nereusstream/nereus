@@ -43,6 +43,7 @@ import com.nereusstream.materialization.MaterializationService;
 import com.nereusstream.materialization.MaterializationSourceProtectionAdapter;
 import com.nereusstream.materialization.MaterializationSourceProtectionRegistry;
 import com.nereusstream.materialization.MaterializationSourceProvider;
+import com.nereusstream.materialization.MaterializationStreamTrigger;
 import com.nereusstream.materialization.MaterializationSourceRepairer;
 import com.nereusstream.materialization.ObjectMaterializationSourceProtectionAdapter;
 import com.nereusstream.materialization.MaterializationTaskRecovery;
@@ -486,6 +487,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                                 tasks,
                                 exactGenerations,
                                 exactPhysical,
+                                sourceProtections,
                                 exactConfig.metadataAuditGrace(),
                                 exactConfig.taskScanPageSize(),
                                 exactConfig.operationTimeout(),
@@ -536,6 +538,17 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
 
     public MaterializationService materializationService() {
         return materializationService;
+    }
+
+    /** Sealed-primary-WAL hint routed through the one registered-stream scanner, never a second planner. */
+    public MaterializationStreamTrigger materializationStreamTrigger() {
+        if (closed.get()) {
+            throw new IllegalStateException("Phase 4 materialization runtime is closed");
+        }
+        return streamId -> {
+            Objects.requireNonNull(streamId, "streamId");
+            return materializationService.scanNow().thenApply(ignored -> null);
+        };
     }
 
     public void start() {

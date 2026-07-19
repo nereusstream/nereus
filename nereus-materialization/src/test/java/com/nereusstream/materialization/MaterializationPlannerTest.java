@@ -6,6 +6,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.ReadView;
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.target.BookKeeperEntryMapping;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import java.time.Clock;
@@ -14,6 +19,47 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class MaterializationPlannerTest {
+    @Test
+    void plansFinalSingleBookKeeperGenerationZeroThroughTheOrdinaryPlanner() {
+        BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
+                1,
+                "primary",
+                91,
+                0,
+                1,
+                BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                new Checksum(ChecksumType.SHA256, "7".repeat(64)));
+        List<VersionedGenerationCandidate> sources = List.of(
+                MaterializationPlannerTestSupport.zero(
+                        "/index/bk-final", 0, 1, 0, 100, 1, target));
+        GenerationMetadataStore store = MaterializationPlannerTestSupport.generationStore(
+                sources,
+                List.of(),
+                null,
+                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+        DefaultMaterializationPlanner planner = new DefaultMaterializationPlanner(
+                MaterializationPlannerTestSupport.CLUSTER,
+                MaterializationPlannerTestSupport.l0Store(
+                        MaterializationPlannerTestSupport.snapshot(
+                                0, 1, StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT)),
+                store,
+                1);
+
+        List<MaterializationTask> tasks = planner.plan(
+                STREAM,
+                new OffsetRange(0, 1),
+                MaterializationPlannerTestSupport.policy(),
+                1).join();
+
+        assertThat(tasks).singleElement().satisfies(task -> {
+            assertThat(task.sources()).singleElement().satisfies(source -> {
+                assertThat(source.generation()).isZero();
+                assertThat(source.readTarget()).isEqualTo(target);
+            });
+            assertThat(task.policy().minMergeSourceRanges()).isEqualTo(2);
+        });
+    }
+
     @Test
     void plansWholeGapFreeGenerationZeroEdgesAndDoesNotClipAStraddlingTrim() {
         List<VersionedGenerationCandidate> sources = List.of(

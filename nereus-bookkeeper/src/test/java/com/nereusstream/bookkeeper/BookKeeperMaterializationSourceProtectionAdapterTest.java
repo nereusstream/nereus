@@ -2,6 +2,7 @@
 package com.nereusstream.bookkeeper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.Checksum;
@@ -77,6 +78,18 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                     .isEqualTo(BookKeeperProtectionType.MATERIALIZATION_SOURCE);
             assertThat(durable.value().lifecycle()).isEqualTo(ProtectionLifecycle.ACTIVE);
             assertThat(durable.value().ownerMetadataVersion()).isZero();
+            assertThatCode(() -> new BookKeeperProtectionRetirementProof(
+                            durable.key(),
+                            durable.metadataVersion(),
+                            durable.durableValueSha256(),
+                            durable.value().ownerKey(),
+                            durable.value().ownerMetadataVersion(),
+                            sha('e'),
+                            "/authority/higher-generation",
+                            0,
+                            sha('f'),
+                            BookKeeperProtectionRetirementProof.Reason.HEALTHY_HIGHER_GENERATION))
+                    .doesNotThrowAnyException();
             assertThat(claimRevalidations).hasValueGreaterThanOrEqualTo(2);
 
             MaterializationSourceProtection replay = adapter.acquireOrTransfer(
@@ -88,6 +101,11 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                     .join();
             assertThat(replay.metadataVersion()).isEqualTo(acquired.metadataVersion());
             assertThat(replay.providerHandle()).isEqualTo(acquired.providerHandle());
+            assertThat(adapter.findExisting(
+                            BookKeeperPrimaryWalAppenderTest.STREAM,
+                            fixture.source(),
+                            acquired.referenceId())
+                    .join()).contains(replay);
 
             ObjectProtectionOwner outputReady = owner("/tasks/task-a", 2, 'f');
             MaterializationSourceProtection transferred = adapter.transfer(
@@ -119,6 +137,11 @@ class BookKeeperMaterializationSourceProtectionAdapterTest {
                             fixture.target().ledgerId(),
                             durable.value().ledgerRangeSlot(),
                             durable.value().protectionSlot())
+                    .join()).isEmpty();
+            assertThat(adapter.findExisting(
+                            BookKeeperPrimaryWalAppenderTest.STREAM,
+                            fixture.source(),
+                            acquired.referenceId())
                     .join()).isEmpty();
         }
     }

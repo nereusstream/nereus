@@ -10,6 +10,8 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
+import com.nereusstream.materialization.CommittedGenerationRetirementAuthority;
+import com.nereusstream.materialization.CommittedGenerationRetirementProof;
 import com.nereusstream.metadata.oxia.BookKeeperLedgerMetadataStore;
 import com.nereusstream.metadata.oxia.BookKeeperScanPage;
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
@@ -42,6 +44,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 
@@ -267,6 +270,130 @@ class BookKeeperWalRetentionGateTest {
                     ledger.target().ledgerId(), 0, 0, refreshed, TIMEOUT).join();
             assertThat(retired.value().lifecycle()).isEqualTo(ProtectionLifecycle.RETIRED);
         }
+    }
+
+    @Test
+    void healthyCommittedObjectGenerationRetiresOnlyMandatoryAsyncSourceReferences() {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+            StableLedger ledger = appendCommitAndSeal(runtime);
+            AtomicInteger proveCalls = new AtomicInteger();
+            AtomicInteger exactCalls = new AtomicInteger();
+            Checksum indexSha = sha('9');
+            CommittedGenerationRetirementAuthority replacements =
+                    new CommittedGenerationRetirementAuthority() {
+                        @Override
+                        public CompletableFuture<Optional<CommittedGenerationRetirementProof>> proveRetirement(
+                                com.nereusstream.api.StreamId streamId,
+                                OffsetRange sourceRange,
+                                long sourceCommitVersion) {
+                            proveCalls.incrementAndGet();
+                            return CompletableFuture.completedFuture(Optional.of(
+                                    replacementProof(
+                                            streamId, sourceRange, sourceCommitVersion, indexSha)));
+                        }
+
+                        @Override
+                        public CompletableFuture<Optional<CommittedGenerationRetirementProof>>
+                                proveExactRetirement(
+                                        com.nereusstream.api.StreamId streamId,
+                                        OffsetRange sourceRange,
+                                        long sourceCommitVersion,
+                                        String indexKey,
+                                        long indexMetadataVersion,
+                                        Checksum indexSha256) {
+                            exactCalls.incrementAndGet();
+                            CommittedGenerationRetirementProof proof = replacementProof(
+                                    streamId, sourceRange, sourceCommitVersion, indexSha);
+                            return CompletableFuture.completedFuture(
+                                    proof.indexKey().equals(indexKey)
+                                                    && proof.indexMetadataVersion() == indexMetadataVersion
+                                                    && proof.indexSha256().equals(indexSha256)
+                                            ? Optional.of(proof)
+                                            : Optional.empty());
+                        }
+
+                        @Override
+                        public CompletableFuture<Void> revalidateRetirement(
+                                CommittedGenerationRetirementProof expected) {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                    };
+            BookKeeperWalOnlyRetirementAuthority common = new BookKeeperWalOnlyRetirementAuthority(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    l0(new AtomicReference<>(snapshot(0, 7))),
+                    runtime.metadata);
+            BookKeeperAsyncObjectRetirementAuthority authority =
+                    new BookKeeperAsyncObjectRetirementAuthority(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration,
+                            common,
+                            replacements,
+                            runtime.metadata);
+            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+                    BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                    runtime.configuration,
+                    runtime.metadata,
+                    authority);
+            BookKeeperWalOnlyReferenceRetirementCoordinator coordinator =
+                    new BookKeeperWalOnlyReferenceRetirementCoordinator(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration,
+                            runtime.metadata,
+                            authority,
+                            references);
+
+            BookKeeperWalReferenceRetirementResult result = coordinator.retireEligible(
+                    ledger.sealedRoot(), TIMEOUT).join();
+
+            assertThat(result.scannedProtections()).isEqualTo(3);
+            assertThat(result.newlyRetiredProtections()).isEqualTo(3);
+            assertThat(result.fullyRetired()).isTrue();
+            assertThat(proveCalls).hasValue(3);
+            assertThat(exactCalls).hasValue(6);
+            assertThat(gate(runtime, activation(runtime)).evaluate(ledger.sealedRoot(), TIMEOUT)
+                            .join().blockers())
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    void sealedLedgerTriggerRevalidatesExactRootAndUsesTheSharedMaterializationScanner() {
+        try (BookKeeperPrimaryWalAppenderTest.Runtime runtime = new BookKeeperPrimaryWalAppenderTest.Runtime()) {
+            StableLedger ledger = appendCommitAndSeal(runtime);
+            AtomicReference<com.nereusstream.api.StreamId> triggered = new AtomicReference<>();
+            BookKeeperSealedLedgerMaterializationTrigger trigger =
+                    new BookKeeperSealedLedgerMaterializationTrigger(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration,
+                            runtime.metadata,
+                            streamId -> {
+                                triggered.set(streamId);
+                                return CompletableFuture.completedFuture(null);
+                            });
+
+            trigger.trigger(ledger.sealedRoot(), TIMEOUT).join();
+
+            assertThat(triggered).hasValue(BookKeeperPrimaryWalAppenderTest.STREAM);
+            assertThat(runtime.metadata.getRoot(
+                            BookKeeperPrimaryWalAppenderTest.CLUSTER,
+                            runtime.configuration.providerScopeSha256(),
+                            ledger.target().ledgerId()).join())
+                    .contains(ledger.sealedRoot());
+        }
+    }
+
+    private static CommittedGenerationRetirementProof replacementProof(
+            com.nereusstream.api.StreamId streamId,
+            OffsetRange sourceRange,
+            long sourceCommitVersion,
+            Checksum indexSha) {
+        return new CommittedGenerationRetirementProof(
+                streamId,
+                sourceRange,
+                sourceCommitVersion,
+                "/f4/committed-object-index",
+                0,
+                indexSha);
     }
 
     @Test

@@ -144,9 +144,9 @@ Evidence levels：
 | BK-62 | M3 | B/O/S | ordinary/batched Entry bytes and MessageIds equal before/after NCP1 | `BookKeeperAsyncObjectEntryIT.preservesPulsarProjection` |
 | BK-63 | M3 | D/O | lag records/bytes/age derive from coverage, not ledger/task count | D checkpoint: `DefaultMaterializationLagSnapshotReaderTest.measuresBookKeeperAsyncObjectWithTheSharedLagAuthority`; real-service O evidence remains open |
 | BK-64 | M3 | D/B | lag throttle remeasures; reject occurs before next BK IO | `BookKeeperAsyncAdmissionTest.throttlesAndRejectsBeforeWal` |
-| BK-65 | M3 | O/S | sealed ledger final single source creates normal deterministic task | `BookKeeperSealedLedgerFlushIT.materializesOneRemainingSource` |
-| BK-66 | M3 | O/B/S | healthy replacement retires BK source; broken/PREPARED output does not | `BookKeeperSourceRetirementIT.requiresReadableCommittedReplacement` |
-| BK-67 | M3 | O/B/S/C | generation/source/protection response-loss cuts precede whole-ledger delete | `BookKeeperSourceRetirementIT.recoversMetadataFirstCuts` |
+| BK-65 | M3 | D/O/S | sealed ledger final single source uses the one normal deterministic planner/task path | D checkpoint: `MaterializationPlannerTest.plansFinalSingleBookKeeperGenerationZeroThroughTheOrdinaryPlanner` + `BookKeeperWalRetentionGateTest.sealedLedgerTriggerRevalidatesExactRootAndUsesTheSharedMaterializationScanner`；real scanner/worker S remains open |
+| BK-66 | M3 | D/O/B/S | healthy replacement retires BK source; broken/PREPARED/missing-protection/checkpoint output does not | D metadata checkpoint: `CommittedObjectGenerationAuthorityTest.requiresExactCommittedIndexActiveRootVisibleProtectionAndCoveringCheckpoint` + `BookKeeperWalRetentionGateTest.healthyCommittedObjectGenerationRetiresOnlyMandatoryAsyncSourceReferences`；live exact-read and real-service evidence remain open |
+| BK-67 | M3 | D/O/B/S/C | generation/source/protection response-loss cuts precede whole-ledger delete | D terminal/provider release: `TerminalWorkflowMetadataRetirementTest.retiresTerminalTaskWithProviderOwnedBookKeeperSourceProtection`；real response-loss/process-cut evidence remains open |
 
 ## 8. Sync completion
 

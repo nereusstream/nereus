@@ -22,14 +22,14 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
     private final String cluster;
     private final BookKeeperWalConfiguration configuration;
     private final BookKeeperLedgerMetadataStore metadata;
-    private final BookKeeperWalOnlyRetirementAuthority authority;
+    private final BookKeeperWalRetirementAuthority authority;
     private final BookKeeperWalReferenceManager references;
 
     public BookKeeperWalOnlyReferenceRetirementCoordinator(
             String cluster,
             BookKeeperWalConfiguration configuration,
             BookKeeperLedgerMetadataStore metadata,
-            BookKeeperWalOnlyRetirementAuthority authority,
+            BookKeeperWalRetirementAuthority authority,
             BookKeeperWalReferenceManager references) {
         this.cluster = text(cluster, "cluster");
         this.configuration = Objects.requireNonNull(configuration, "configuration");
@@ -74,13 +74,21 @@ public final class BookKeeperWalOnlyReferenceRetirementCoordinator {
         if (protection.value().lifecycle() == ProtectionLifecycle.RETIRED) {
             return retire(protections, deadline, index + 1, newlyRetired);
         }
+        if (protection.value().protectionType()
+                == com.nereusstream.metadata.oxia.records.BookKeeperProtectionType.MATERIALIZATION_SOURCE) {
+            return retire(protections, deadline, index + 1, newlyRetired);
+        }
         CompletableFuture<Optional<BookKeeperProtectionRetirementProof>> proof =
                 authority.proveAbandonedAppend(protection, deadline.remaining()).thenCompose(abandoned -> {
                     if (abandoned.isPresent()
                             || protection.value().lifecycle() == ProtectionLifecycle.RESERVED) {
                         return CompletableFuture.completedFuture(abandoned);
                     }
-                    return authority.proveLogicalTrim(protection, deadline.remaining());
+                    return authority.proveLogicalTrim(protection, deadline.remaining())
+                            .thenCompose(trimmed -> trimmed.isPresent()
+                                    ? CompletableFuture.completedFuture(trimmed)
+                                    : authority.proveHealthyHigherGeneration(
+                                            protection, deadline.remaining()));
                 });
         return proof.thenCompose(optional -> {
             if (optional.isEmpty()) return retire(protections, deadline, index + 1, newlyRetired);
