@@ -380,10 +380,13 @@ public final class GenerationReadResolver {
             return CompletableFuture.failedFuture(unsupported);
         }
         if (!(candidate.resolvedRange().readTarget() instanceof ObjectSliceReadTarget objectTarget)) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.UNSUPPORTED_READ_TARGET,
-                    false,
-                    "M2 generation pinning requires an object-slice target"));
+            if (!candidate.generationZero()) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.UNSUPPORTED_READ_TARGET,
+                        false,
+                        "higher generations require an object-slice target"));
+            }
+            return CompletableFuture.completedFuture(Optional.of(new PinnedResolvedRange(candidate)));
         }
         return deadline.bound(
                         () -> identityResolver.resolve(objectTarget, view),
@@ -565,11 +568,11 @@ public final class GenerationReadResolver {
                     state == StreamState.CREATING,
                     "stream state does not admit generation reads");
         }
-        if (!profile.usesObjectWal()) {
+        if (!profile.objectMaterializationEnabled()) {
             throw new NereusException(
                     ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
                     false,
-                    "F4 generation reads require an Object-WAL profile");
+                    "generation-aware reads require an object-materializing profile");
         }
         if (offset < snapshot.trim().trimOffset()) {
             throw new NereusException(

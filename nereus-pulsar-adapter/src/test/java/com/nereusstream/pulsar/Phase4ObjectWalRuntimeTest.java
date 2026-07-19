@@ -110,6 +110,7 @@ class Phase4ObjectWalRuntimeTest {
             assertThat(runtime.appendRecoverySearcher()).isNotNull();
             assertThat(runtime.generationZeroRepairScanner()).isNotNull();
             assertThat(runtime.lagSnapshotReader()).isNotNull();
+            assertThat(runtime.committedGenerationRetirementAuthority()).isNotNull();
             assertThat(runtime.materializationService().isRunning())
                     .isFalse();
 

@@ -1890,7 +1890,8 @@ budget 内 best-effort 等待；未完成工作仍由 durable scanner 收敛。
 `VISIBLE_GENERATION` protection。它明确拒绝从 NRC1-covered offset 重建已退休 generation-zero target；
 `CheckpointDerivedIndexRepairer` 新增 injectable live repairer seam，production composition 可以用
 `ReadAfterStableCommitRepair` 处理 live tail，再保留既有 NRC1 higher-generation restore path。
-`GenerationReadResolver` 因此接受两个 Object-WAL profile，但 default `DefaultStreamStorage` 仍未切换到 F4
+`GenerationReadResolver` 因此接受所有启用 object materialization 的 profile；非 Object generation zero 由其
+provider reader 持有 durable read lease，positive generation 仍强制使用 Object pin。default `DefaultStreamStorage` 仍未切换到 F4
 generation resolver。
 
 聚焦测试覆盖 detached work 尚未开始即返回、strict protection wait、secondary protection failure 不撤销 ack、

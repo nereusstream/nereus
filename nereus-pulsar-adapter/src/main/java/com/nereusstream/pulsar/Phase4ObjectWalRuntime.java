@@ -24,6 +24,8 @@ import com.nereusstream.core.recovery.CheckpointAppendReplayReader;
 import com.nereusstream.core.recovery.CheckpointDerivedIndexRepairer;
 import com.nereusstream.core.recovery.GenerationZeroRepairScanner;
 import com.nereusstream.materialization.CompactedMaterializationFormatVerifier;
+import com.nereusstream.materialization.CommittedGenerationRetirementAuthority;
+import com.nereusstream.materialization.CommittedObjectGenerationAuthority;
 import com.nereusstream.materialization.DefaultExactSourceRangeReader;
 import com.nereusstream.materialization.DefaultGenerationCommitter;
 import com.nereusstream.materialization.DefaultMaterializationCheckpointReconciler;
@@ -48,6 +50,7 @@ import com.nereusstream.materialization.MaterializationSourceRepairer;
 import com.nereusstream.materialization.ObjectMaterializationSourceProtectionAdapter;
 import com.nereusstream.materialization.MaterializationTaskRecovery;
 import com.nereusstream.materialization.MaterializationTaskStore;
+import com.nereusstream.materialization.NormalPathCommittedObjectGenerationReadVerifier;
 import com.nereusstream.materialization.RegisteredMaterializationStreamScanner;
 import com.nereusstream.materialization.TaskRecoveryScanner;
 import com.nereusstream.materialization.recovery.MetadataRecoveryCheckpointVerifier;
@@ -94,6 +97,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
     private final AppendRecoverySearcher appendRecoverySearcher;
     private final GenerationZeroRepairScanner generationZeroRepairScanner;
     private final MaterializationLagSnapshotReader lagSnapshotReader;
+    private final CommittedGenerationRetirementAuthority committedGenerationRetirementAuthority;
     private final RecoveryCheckpointCodecV1 checkpointCodec;
     private final MaterializationService materializationService;
     private final StagingFileManager stagingFiles;
@@ -344,6 +348,20 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactGenerations,
                         exactPhysical,
                         exactClock));
+        this.committedGenerationRetirementAuthority =
+                new CommittedObjectGenerationAuthority(
+                        exactCluster,
+                        exactGenerations,
+                        exactPhysical,
+                        new NormalPathCommittedObjectGenerationReadVerifier(
+                                generationResolver,
+                                readers,
+                                exactConfig.sourceReadPageRecords(),
+                                Math.toIntExact(exactConfig.sourceReadPageBytes()),
+                                exactScheduler),
+                        exactConfig.plannerPageSize(),
+                        exactConfig.operationTimeout(),
+                        exactScheduler);
         this.lagSnapshotReader =
                 new DefaultMaterializationLagSnapshotReader(
                         exactCluster,
@@ -526,6 +544,14 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
     public MaterializationLagSnapshotReader
             lagSnapshotReader() {
         return lagSnapshotReader;
+    }
+
+    /** Live normal-read-path authority consumed by primary-WAL retention after higher-generation publication. */
+    public CommittedGenerationRetirementAuthority committedGenerationRetirementAuthority() {
+        if (closed.get()) {
+            throw new IllegalStateException("Phase 4 materialization runtime is closed");
+        }
+        return committedGenerationRetirementAuthority;
     }
 
     /** Borrowed by the physical-GC registration-retirement runtime and closed with this runtime's staging owner. */

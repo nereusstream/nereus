@@ -46,6 +46,7 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
     private final String cluster;
     private final GenerationMetadataStore generations;
     private final PhysicalObjectMetadataStore physical;
+    private final CommittedObjectGenerationReadVerifier readVerifier;
     private final int pageSize;
     private final Duration operationTimeout;
     private final ScheduledExecutorService scheduler;
@@ -55,12 +56,14 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
             String cluster,
             GenerationMetadataStore generations,
             PhysicalObjectMetadataStore physical,
+            CommittedObjectGenerationReadVerifier readVerifier,
             int pageSize,
             Duration operationTimeout,
             ScheduledExecutorService scheduler) {
         this.cluster = text(cluster, "cluster");
         this.generations = Objects.requireNonNull(generations, "generations");
         this.physical = Objects.requireNonNull(physical, "physical");
+        this.readVerifier = Objects.requireNonNull(readVerifier, "readVerifier");
         if (pageSize <= 0 || pageSize > 1_000) {
             throw new IllegalArgumentException("pageSize must be in [1, 1000]");
         }
@@ -114,13 +117,14 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
             CompletableFuture<Optional<VersionedObjectProtection>> protection = findVisibleProtection(
                     proof.index(), proof.root(), Optional.empty(), new ArrayList<>(), 0, deadline);
             CompletableFuture<Void> result = CompletableFuture.allOf(index, root, checkpoint, protection)
-                    .thenAccept(ignored -> {
+                    .thenCompose(ignored -> {
                         if (!index.join().equals(Optional.of(proof.index()))
                                 || !root.join().equals(Optional.of(proof.root()))
                                 || !checkpoint.join().equals(Optional.of(proof.checkpoint()))
                                 || !protection.join().equals(Optional.of(proof.visibleProtection()))) {
                             throw condition("committed Object replacement authority changed");
                         }
+                        return requireReadable(proof, deadline);
                     });
             result.whenComplete((ignored, failure) -> deadline.close());
             return result;
@@ -309,26 +313,54 @@ public final class CommittedObjectGenerationAuthority implements CommittedGenera
                                         new ArrayList<>(),
                                         0,
                                         deadline)
-                                .thenCompose(checkpoint -> checkpoint.isEmpty()
-                                        ? proveCandidate(
+                                .thenCompose(checkpoint -> {
+                                    if (checkpoint.isEmpty()) {
+                                        return proveCandidate(
                                                 stream,
                                                 range,
                                                 commitVersion,
                                                 candidates,
                                                 index + 1,
-                                                deadline)
-                                        : CompletableFuture.completedFuture(Optional.of(
-                                                new CommittedObjectGenerationProof(
-                                                        stream,
-                                                        range,
-                                                        commitVersion,
-                                                        candidate,
-                                                        target,
-                                                        exactRoot,
-                                                        protection.orElseThrow(),
-                                                        checkpoint.orElseThrow()))));
+                                                deadline);
+                                    }
+                                    CommittedObjectGenerationProof proof =
+                                            new CommittedObjectGenerationProof(
+                                                    stream,
+                                                    range,
+                                                    commitVersion,
+                                                    candidate,
+                                                    target,
+                                                    exactRoot,
+                                                    protection.orElseThrow(),
+                                                    checkpoint.orElseThrow());
+                                    return deadline.bound(
+                                                    () -> readVerifier.verify(proof, deadline.remaining()),
+                                                    "verify committed Object replacement through normal read path")
+                                            .thenCompose(readable -> readable
+                                                    ? CompletableFuture.completedFuture(Optional.of(proof))
+                                                    : proveCandidate(
+                                                            stream,
+                                                            range,
+                                                            commitVersion,
+                                                            candidates,
+                                                            index + 1,
+                                                            deadline));
+                                });
                     });
         });
+    }
+
+    private CompletableFuture<Void> requireReadable(
+            CommittedObjectGenerationProof proof,
+            MaterializationDeadline deadline) {
+        return deadline.bound(
+                        () -> readVerifier.verify(proof, deadline.remaining()),
+                        "revalidate committed Object replacement through normal read path")
+                .thenAccept(readable -> {
+                    if (!readable) {
+                        throw condition("committed Object replacement is not the exact normal read candidate");
+                    }
+                });
     }
 
     private Optional<ObjectSliceReadTarget> canonicalTarget(

@@ -261,7 +261,7 @@ public final class GenerationZeroRepairScanner {
                         "load stream snapshot for generation-zero repair")
                 .thenApply(snapshot -> {
                     requireSnapshotStream(streamId, snapshot);
-                    requireObjectWalReadable(snapshot);
+                    requireMaterializingProfileReadable(snapshot);
                     return snapshot;
                 });
     }
@@ -273,7 +273,7 @@ public final class GenerationZeroRepairScanner {
         }
     }
 
-    private static void requireObjectWalReadable(StreamMetadataSnapshot snapshot) {
+    private static void requireMaterializingProfileReadable(StreamMetadataSnapshot snapshot) {
         StreamState state;
         StorageProfile profile;
         try {
@@ -293,11 +293,11 @@ public final class GenerationZeroRepairScanner {
                     state == StreamState.CREATING,
                     "stream state does not admit generation-zero repair");
         }
-        if (!profile.usesObjectWal()) {
+        if (!profile.objectMaterializationEnabled()) {
             throw new NereusException(
                     ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
                     false,
-                    "generation-zero repair requires an Object-WAL profile");
+                    "generation-zero materialization repair requires an object-materializing profile");
         }
     }
 

@@ -15,6 +15,22 @@ public final class PinnedResolvedRange implements AutoCloseable {
     private final ObjectReadLease objectLease;
     private final AtomicReference<CompletableFuture<Void>> release = new AtomicReference<>();
 
+    /**
+     * Creates a provider-protected generation-zero range.
+     *
+     * <p>The physical reader must acquire and revalidate its own durable lease before returning bytes. Object
+     * generations cannot use this constructor because their protection is owned by the generation resolver.
+     */
+    public PinnedResolvedRange(GenerationReadCandidate candidate) {
+        this.candidate = Objects.requireNonNull(candidate, "candidate");
+        this.objectLease = null;
+        if (!candidate.generationZero()
+                || candidate.resolvedRange().readTarget() instanceof ObjectSliceReadTarget) {
+            throw new IllegalArgumentException(
+                    "only non-Object generation-zero ranges may use provider-owned read protection");
+        }
+    }
+
     public PinnedResolvedRange(
             GenerationReadCandidate candidate,
             ObjectReadLease objectLease) {
@@ -46,7 +62,10 @@ public final class PinnedResolvedRange implements AutoCloseable {
             return release.get();
         }
         try {
-            Objects.requireNonNull(objectLease.release(), "object lease release future")
+            CompletableFuture<Void> providerRelease = objectLease == null
+                    ? CompletableFuture.completedFuture(null)
+                    : Objects.requireNonNull(objectLease.release(), "object lease release future");
+            providerRelease
                     .whenComplete((ignored, failure) -> {
                         if (failure == null) {
                             completion.complete(null);
@@ -61,7 +80,7 @@ public final class PinnedResolvedRange implements AutoCloseable {
     }
 
     public boolean isReleased() {
-        return release.get() != null || objectLease.isReleased();
+        return release.get() != null || objectLease != null && objectLease.isReleased();
     }
 
     @Override

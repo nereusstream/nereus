@@ -740,10 +740,19 @@ tasks.register("bookKeeperPrimaryWalM3SourceRetirementCheck") {
     dependsOn(":nereus-bookkeeper:test")
 }
 
+tasks.register("bookKeeperPrimaryWalM3LiveReadCheck") {
+    group = "verification"
+    description = "Verify exact higher-generation retirement uses the normal resolver, durable Object pin, and full-range reader."
+    dependsOn("bookKeeperPrimaryWalM3SourceRetirementCheck")
+    dependsOn(":nereus-core:test")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-pulsar-adapter:test")
+}
+
 tasks.register("bookKeeperPrimaryWalM3SealedLedgerCheck") {
     group = "verification"
     description = "Verify a sealed BK tail triggers the single F4 scanner and ordinary planner admits one gen0 source."
-    dependsOn("bookKeeperPrimaryWalM3SourceRetirementCheck")
+    dependsOn("bookKeeperPrimaryWalM3LiveReadCheck")
     dependsOn(":nereus-materialization:test")
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-pulsar-adapter:test")

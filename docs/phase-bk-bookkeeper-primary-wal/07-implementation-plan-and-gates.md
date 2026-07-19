@@ -478,6 +478,13 @@ reconstruction before and after CAS。`DefaultTerminalWorkflowMetadataRetirer` n
 source protections through the same registry before deleting a task。`MATERIALIZATION_SOURCE` stays outside the
 permanent tombstone coordinator and therefore cannot consume fixed dynamic slots forever。
 
+The live-read checkpoint adds `NormalPathCommittedObjectGenerationReadVerifier` and installs it in
+`Phase4ObjectWalRuntime`。Retirement proof now pages the entire source interval through the normal fresh generation
+resolver、exact target reader and durable Object pin，requiring exact index/target/source identity and dense accounting
+before and during revalidation。The resolver also admits `BOOKKEEPER_WAL_ASYNC_OBJECT`：generation zero delegates its
+durable lease to the BK reader，while every positive generation remains Object-pin-owned。This is the same selection and
+fallback path used by client reads，not a second retirement-only Object reader。
+
 The sealed-tail audit found that the ordinary planner already admits a generation-zero single-source task regardless
 of the policy's higher-generation merge minimum。`BookKeeperSealedLedgerMaterializationTrigger` consequently only
 revalidates the exact SEALED root and hints `DefaultMaterializationService.scanNow` through
@@ -491,16 +498,18 @@ bookKeeperPrimaryWalM3ProtectionCheck
 bookKeeperPrimaryWalM3AsyncProfileCheck
 bookKeeperPrimaryWalM3LagCheck
 bookKeeperPrimaryWalM3SourceRetirementCheck
+bookKeeperPrimaryWalM3LiveReadCheck
 bookKeeperPrimaryWalM3SealedLedgerCheck
 bookKeeperPrimaryWalM3Check
 bookKeeperPrimaryWalM3FinalCheck             real Oxia + BK + Object store, fresh-runtime cuts
 ```
 
-The ordinary M3 gate now proves all deterministic source/protection/profile/lag/retirement-metadata/sealed-trigger
-contracts。Final gate still proves stable-head ack before object generation、BK reads during lag、task reconstruction、NCP1 exact bytes、
-higher-generation selection/fallback、source protection cuts、trim/replacement release and whole-ledger delete.
-`bookKeeperPrimaryWalM3Check --rerun-tasks` passed 60/60 tasks on 2026-07-19；the live-read and real-service final task
-remains intentionally unregistered。
+The ordinary M3 gate now proves all deterministic source/protection/profile/lag/retirement-metadata/live-read/
+sealed-trigger contracts。Final gate still proves stable-head ack before object generation、real BK reads during lag、
+task reconstruction、NCP1 exact bytes、higher-generation selection/fallback、source protection cuts、trim/replacement
+release and whole-ledger delete against real services and fresh runtimes。
+`bookKeeperPrimaryWalM3Check --rerun-tasks` passes 62/62 tasks for the live-read checkpoint on 2026-07-19；the
+real-service final task remains intentionally unregistered。
 
 ### 6.4 Mandatory review stop D
 

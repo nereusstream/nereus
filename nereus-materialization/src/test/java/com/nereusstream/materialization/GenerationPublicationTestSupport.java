@@ -661,6 +661,10 @@ final class GenerationPublicationTestSupport {
             return scheduler;
         }
 
+        OxiaMetadataStore l0Store() {
+            return l0Store;
+        }
+
         MaterializationTask task() {
             return task;
         }

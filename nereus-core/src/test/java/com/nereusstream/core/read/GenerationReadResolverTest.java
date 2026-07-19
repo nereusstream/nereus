@@ -17,6 +17,8 @@ import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.api.target.BookKeeperEntryMapping;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.ObjectReadLease;
 import com.nereusstream.core.physical.ObjectReadPinManager;
@@ -83,6 +85,45 @@ class GenerationReadResolverTest {
         assertThat(selected.candidate().publicationId()).isPresent();
         assertThat(pins.validations).hasValue(1);
         selected.release().join();
+    }
+
+    @Test
+    void bookKeeperAsyncFallsBackToProviderProtectedGenerationZeroWithoutObjectPin() {
+        BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
+                1,
+                "bk-cluster",
+                9,
+                11,
+                2,
+                BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                new Checksum(ChecksumType.SHA256, "b".repeat(64)));
+        VersionedGenerationZeroIndex zero = generationZero(1, target);
+        GenerationStoreState store = new GenerationStoreState(List.of(zero));
+        TestPinManager pins = new TestPinManager();
+        ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(List.of(
+                new NoopReader(ReadTargetReaderKey.from(target))));
+        GenerationReadResolver resolver = new GenerationReadResolver(
+                CLUSTER,
+                l0Store(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT),
+                store.proxy(),
+                GenerationIndexValidator.phase15Targets(),
+                readers,
+                GenerationReadResolverTest::identity,
+                pins,
+                1_000,
+                CLOCK,
+                Runnable::run);
+
+        PinnedResolvedRange selected = resolver.resolve(
+                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().readTarget()).isEqualTo(target);
+        assertThat(pins.validations).hasValue(0);
+        assertThat(selected.isReleased()).isFalse();
+        selected.release().join();
+        assertThat(selected.isReleased()).isTrue();
     }
 
     @Test
@@ -400,6 +441,12 @@ class GenerationReadResolverTest {
     private static VersionedGenerationZeroIndex generationZero(long version) {
         ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
                 ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        return generationZero(version, target);
+    }
+
+    private static VersionedGenerationZeroIndex generationZero(
+            long version,
+            com.nereusstream.api.target.ReadTarget target) {
         long offsetEnd = Math.addExact(version, 1);
         OffsetIndexEntry entry = new OffsetIndexEntry(
                 STREAM,

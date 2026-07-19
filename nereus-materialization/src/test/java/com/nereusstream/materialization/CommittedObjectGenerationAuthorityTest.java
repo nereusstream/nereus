@@ -12,6 +12,7 @@ import com.nereusstream.metadata.oxia.records.MaterializationCheckpointRecord;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class CommittedObjectGenerationAuthorityTest {
@@ -24,10 +25,12 @@ class CommittedObjectGenerationAuthorityTest {
                             GenerationPublicationTestSupport.successfulGuard())
                     .publish(context.task(), context.output())
                     .join();
+            AtomicBoolean readable = new AtomicBoolean(true);
             CommittedObjectGenerationAuthority authority = new CommittedObjectGenerationAuthority(
                     CLUSTER,
                     context.generations(),
                     context.physical(),
+                    (proof, timeout) -> java.util.concurrent.CompletableFuture.completedFuture(readable.get()),
                     1,
                     Duration.ofSeconds(10),
                     context.scheduler());
@@ -59,6 +62,12 @@ class CommittedObjectGenerationAuthorityTest {
                             0),
                     created.metadataVersion()).join();
 
+            readable.set(false);
+            assertThat(authority.prove(
+                            context.task().streamId(), new OffsetRange(0, 2), 1).join())
+                    .isEmpty();
+            readable.set(true);
+
             CommittedObjectGenerationProof proof = authority.prove(
                             context.task().streamId(), new OffsetRange(0, 2), 1)
                     .join().orElseThrow();
@@ -67,6 +76,11 @@ class CommittedObjectGenerationAuthorityTest {
             assertThat(proof.visibleProtection().value().protectionTypeId())
                     .isEqualTo(ObjectProtectionType.VISIBLE_GENERATION.wireId());
             authority.revalidate(proof).join();
+
+            readable.set(false);
+            assertThatThrownBy(() -> authority.revalidate(proof).join())
+                    .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class);
+            readable.set(true);
 
             ObjectSliceReadTarget target = proof.target();
             context.physical().deleteProtection(

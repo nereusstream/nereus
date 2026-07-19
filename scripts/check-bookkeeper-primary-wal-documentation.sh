@@ -84,6 +84,8 @@ require_literal 'BookKeeperSealedLedgerMaterializationTrigger' \
     "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
 require_literal 'bookKeeperPrimaryWalM3SourceRetirementCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM3LiveReadCheck' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3SealedLedgerCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'No online migration in BK-M0–M6' \
@@ -194,6 +196,7 @@ require_literal 'bookKeeperPrimaryWalM3ProtectionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3AsyncProfileCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3LagCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3SourceRetirementCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM3LiveReadCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3SealedLedgerCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3Check' "build.gradle.kts"
 require_literal 'readsBookKeeperSourceThroughRegisteredProviderWithoutObjectIdentityOrPin' \
@@ -204,6 +207,10 @@ require_literal 'measuresBookKeeperAsyncObjectWithTheSharedLagAuthority' \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/DefaultMaterializationLagSnapshotReaderTest.java"
 require_literal 'requiresExactCommittedIndexActiveRootVisibleProtectionAndCoveringCheckpoint' \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/CommittedObjectGenerationAuthorityTest.java"
+require_literal 'retirementProofAcquiresNormalPinsAndReadsTheExactGenerationEndToEnd' \
+    "nereus-materialization/src/test/java/com/nereusstream/materialization/NormalPathCommittedObjectGenerationReadVerifierTest.java"
+require_literal 'bookKeeperAsyncFallsBackToProviderProtectedGenerationZeroWithoutObjectPin' \
+    "nereus-core/src/test/java/com/nereusstream/core/read/GenerationReadResolverTest.java"
 require_literal 'retiresTerminalTaskWithProviderOwnedBookKeeperSourceProtection' \
     "nereus-materialization/src/test/java/com/nereusstream/materialization/TerminalWorkflowMetadataRetirementTest.java"
 require_literal 'plansFinalSingleBookKeeperGenerationZeroThroughTheOrdinaryPlanner' \
@@ -247,7 +254,7 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|SealedLedgerCheck|Check))|[4-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|Check))|[4-6])' \
     "$repo_root/build.gradle.kts"; then
     echo "unfinished BK-M2 final/profile, BK-M3 final, and BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1

@@ -1073,7 +1073,8 @@ Checkpoint AD implements the core boundary without prematurely enabling it in th
   NRC1-retired primary target；
 - `ReadAfterStableCommitRepair` is injectable as the live branch of `CheckpointDerivedIndexRepairer`, so a committed
   index gap receives physical protection before re-resolve；
-- both Object-WAL profiles are accepted by the F4 `GenerationReadResolver`.
+- every object-materializing profile is accepted by the shared `GenerationReadResolver`; a non-Object generation zero
+  delegates durable protection to its provider reader, while positive generations remain Object-pin-owned.
 
 Legacy `DefaultStreamStorage` constructors continue to install `Phase15StorageProfileResolver`. The new explicit
 resolver constructor is an integration seam, not a rollout switch. Checkpoint AE implements the exact

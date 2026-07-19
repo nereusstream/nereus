@@ -28,14 +28,16 @@
 > `minMergeSourceRanges=2`。These checkpoints are executable through `bookKeeperPrimaryWalM3ExactSourceCheck`、
 > `bookKeeperPrimaryWalM3ProtectionCheck`、`bookKeeperPrimaryWalM3AsyncProfileCheck` and
 > `bookKeeperPrimaryWalM3LagCheck`、`bookKeeperPrimaryWalM3SourceRetirementCheck`、
-> `bookKeeperPrimaryWalM3SealedLedgerCheck` and `bookKeeperPrimaryWalM3Check`。A live exact Object resolve/read proof、
-> real BK-to-Object publication and fresh-runtime failure cuts remain pending，so BK-M3 is not complete。The remaining
+> `bookKeeperPrimaryWalM3LiveReadCheck`、`bookKeeperPrimaryWalM3SealedLedgerCheck` and
+> `bookKeeperPrimaryWalM3Check`。The live checkpoint now fresh-resolves and reads the full exact higher generation under
+> normal durable Object pins before BK retirement，while generation-zero fallback delegates protection to the BK reader
+> lease。Real BK-to-Object publication and fresh-runtime failure cuts remain pending，so BK-M3 is not complete。The remaining
 > M2 scenario/evidence rows and aggregate/final gate are not yet closed；
 > production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
 > fail-closed, so the production broker still rejects the profile before primary IO。
 
-> 2026-07-19：`bookKeeperPrimaryWalM3Check --rerun-tasks` passed 60/60 executable tasks for this deterministic
-> checkpoint；this is not `bookKeeperPrimaryWalM3FinalCheck` evidence。
+> 2026-07-19：the live-read checkpoint `bookKeeperPrimaryWalM3Check --rerun-tasks` passes 62/62 executable tasks；
+> this is deterministic aggregate evidence，not `bookKeeperPrimaryWalM3FinalCheck` real-service evidence。
 
 ## 1. Delivery identity
 

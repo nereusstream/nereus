@@ -14,10 +14,10 @@ import java.util.List;
 import java.util.Map;
 
 /** Exact one-stat-per-resolved-target accounting validation shared by every physical reader. */
-final class ProviderNeutralReadAccounting {
+public final class ProviderNeutralReadAccounting {
     private ProviderNeutralReadAccounting() { }
 
-    static void validate(List<ResolvedRange> ranges, PhysicalReadResult result) {
+    public static void validate(List<ResolvedRange> ranges, PhysicalReadResult result) {
         Map<Checksum, Integer> expectedRanges = new HashMap<>();
         ranges.forEach(range -> expectedRanges.merge(
                 ReadTargetIdentities.sha256(range.readTarget()), 1, Math::addExact));

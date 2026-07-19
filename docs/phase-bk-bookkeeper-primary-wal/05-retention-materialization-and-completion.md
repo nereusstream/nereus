@@ -95,9 +95,21 @@ generation-zero anchor；the anchor may be ACTIVE or the just-produced RETIRED t
 `MATERIALIZATION_SOURCE` rows are deliberately excluded from tombstoning and are removed only by terminal task
 retirement, preventing permanent dynamic-slot leakage。
 
-This checkpoint is metadata-complete but is not the M3 final read gate：production wiring must additionally resolve and
-read the exact admitted Object generation under its normal pin/checksum path before enabling BK release。Until that
-proof and the real-service cuts pass, the production broker does not register this authority。
+The live-read checkpoint closes the remaining deterministic half of this authority。Metadata proof construction now
+calls `NormalPathCommittedObjectGenerationReadVerifier`，which repeatedly fresh-resolves the source interval through
+`GenerationReadResolver`，requires the exact index key/version/stored SHA、generation、commit version and target，acquires
+the normal durable Object pin，and reads every source record in bounded pages through the registered production target
+reader。Every page must preserve dense logical offsets、the exact `ReadSourceRef` and provider-neutral byte accounting；
+the compacted reader still owns physical format/slice checksum verification。Pin release is joined on success and
+failure。Metadata revalidation repeats this live proof，so a checkpoint or active root alone cannot authorize BK
+release。
+
+The shared resolver now admits every object-materializing profile。Before publication，a BK generation-zero candidate
+is returned without an Object lease only because `BookKeeperPrimaryWalReader` owns the durable ledger reader lease and
+final lease revalidation；positive generations remain Object-only and resolver-pin-owned。This preserves normal BK
+fallback during lag without weakening higher-generation GC safety。`Phase4ObjectWalRuntime` constructs and exports the
+live `CommittedGenerationRetirementAuthority` for BK composition。Real Oxia + BookKeeper + Object publication and
+fresh-runtime cuts remain required before the M3 final gate and broker registration。
 
 ## 4. `BookKeeperWalRetentionGate`
 
