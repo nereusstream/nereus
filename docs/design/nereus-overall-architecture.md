@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M6 complete/final-gated；F1-BK BookKeeper primary-WAL code-level target frozen, not implemented
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M6 complete/final-gated；F1-BK BK-M0 documentation-gated, BK-M1–M6 not implemented
 > 最近设计/实现同步：2026-07-19
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -286,6 +286,8 @@ separate `TOPIC_COMPACTED` view and can never outrank or backstop an ordinary co
 | State | Owner | Visibility meaning |
 | --- | --- | --- |
 | Primary WAL bytes | BookKeeper or object store | durable proof only |
+| BookKeeper ledger-id namespace | exact provider-scope digest + deployment-reserved positive-63-bit advanced-id prefix | prevents foreign create/delete ABA；required for every F1-BK profile |
+| BookKeeper uncertain-create slot | fixed Oxia slot + monotonic ledger-root hazard | bounds unknown creates cluster-wide and permanently vetoes automatic delete when provider completion was not durably observed |
 | Object manifest | Oxia | precondition/audit/format/reference information |
 | Object bytes | object store | immutable physical payload |
 | Generation index | Oxia | current physical read selection |
@@ -413,7 +415,8 @@ flowchart TB
 Phase 1.5 已实现 tagged `ReadTarget`、generic `AppendResult/ResolvedRange`、primary-WAL registry、
 generic durable target records、exact recovery 和 lifecycle。BookKeeper profile 在其真实 writer/reader 注册前
 仍被拒绝；不得用伪造 `ObjectKey` 表示 BK ledger range。F1-BK 的 provider-neutral read-result seam、exact-id
-ledger allocation、fencing/retention 和 completion policy 见 `../phase-bk-bookkeeper-primary-wal/README.md`。
+reserved-namespace ledger allocation、fencing/retention 和 completion policy 见
+`../phase-bk-bookkeeper-primary-wal/README.md`。
 
 ## 9. Metadata model
 

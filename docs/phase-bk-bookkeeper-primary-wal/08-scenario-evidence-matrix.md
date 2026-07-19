@@ -2,8 +2,9 @@
 
 ## 1. Status and evidence levels
 
-All rows below are required target evidence and are currently **not executed/not implemented**. During implementation,
-each row receives an exact test method、gate、source lock、date and result. No row may be marked covered by prose only.
+BK-01 (the documentation/source-lock gate) executed successfully on 2026-07-19. BK-02 through BK-96 are required
+target evidence and are currently **not executed/not implemented**. During implementation, each row receives an exact
+test method、gate、source lock、date and result. No implementation row may be marked covered by prose only.
 
 Evidence levels：
 
@@ -31,21 +32,21 @@ Evidence levels：
 | BK-07 | M1 | D | generic append commit/protection/gen0 accepts synthetic BK target without Object cast | `GenericPrimaryAppendContractTest.commitsTaggedBookKeeperTarget` |
 | BK-08 | M1 | D | Object append protocol bytes/result/error cuts remain unchanged | `ObjectPrimaryWalCompatibilityTest.preservesStableAppendContract` |
 | BK-09 | M1 | D | BookKeeper/ManagedLedger imports obey module DAG | `check-bookkeeper-module-boundaries.sh` |
-| BK-10 | M1 | D | config digest excludes secret bytes and changes for every semantic binding field | `BookKeeperWalConfigurationTest.bindsNonSecretSemantics` |
+| BK-10 | M1 | D/O | config excludes secrets, alias cannot drift provider scope, namespace store rejects conflict/revoke, candidates round-trip prefix | `BookKeeperWalConfigurationTest.bindsNonSecretSemantics` + `BookKeeperLedgerIdNamespaceReservationStoreContractTest` |
 
 ## 3. Allocation, metadata, and lifecycle
 
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
-| BK-11 | M2 | D/O | six V1 record codecs share production/fake round-trip/golden/truncation contracts | `BookKeeperMetadataCodecContractTest` + `BookKeeperMetadataStoreContractScenario` |
+| BK-11 | M2 | D/O | seven V1 writer/allocation/slot/root/reservation/protection/lease codecs share production/fake golden/failure contracts | `BookKeeperMetadataCodecContractTest` + `BookKeeperMetadataStoreContractScenario` |
 | BK-12 | M2 | D | key strict inverse rejects wrong cluster/shard/depth/noncanonical components | `BookKeeperKeyspaceTest.strictlyInvertsEveryWriterPrefix` |
-| BK-13 | M2 | O | exact allocation intent -> root -> active writer survives every Oxia CAS response loss | `BookKeeperAllocatorOxiaIT.convergesEveryAllocationCut` |
-| BK-14 | M2 | B/O | `CreateAdvBuilder.withLedgerId` response loss reconciles by exact metadata | `BookKeeperAllocatorIT.recoversExactCreateResponseLoss` |
+| BK-13 | M2 | O | intent -> durable slot CLAIMED/CREATE_STARTED -> root -> active writer survives every Oxia CAS response loss | `BookKeeperAllocatorOxiaIT.convergesEveryAllocationCut` |
+| BK-14 | M2 | B/O | exact create response loss persists slot + permanent hazard；matching metadata restores owned IO but never automatic delete | `BookKeeperAllocatorIT.recoversExactCreateResponseLoss` |
 | BK-15 | M2 | B/O | candidate already owned by stock/foreign ledger is never deleted and a new id wins | `BookKeeperAllocatorIT.doesNotDeleteForeignCollision` |
 | BK-16 | M2 | D/O | two streams choose the same candidate; global root admits one allocation | `BookKeeperAllocatorContentionIT.serializesGlobalLedgerIdentity` |
-| BK-17 | M2 | B/O/C | late create after first absence is detected/cleaned and restarts audit grace | `BookKeeperAllocationLateCreateIT.recoversLatePhysicalCreate` |
-| BK-18 | M2 | D/O | writer state never reuses segment sequence/entry ids after conflict/restart | `BookKeeperWriterStatePropertyTest.isMonotonicAcrossCasSchedules` |
-| BK-19 | M2 | O | all 256 root shards scan from empty opaque continuations without omission | `BookKeeperLedgerRootScannerOxiaIT.scansEveryShardFromEmptyContinuation` |
+| BK-17 | M2 | B/O/C | `CREATE_UNCERTAIN` stays slot-consuming；matching late create activates/stale-seals with permanent GC veto, foreign quarantines | `BookKeeperAllocationLateCreateIT.recoversLatePhysicalCreate` |
+| BK-18 | M2 | D/O | writer state never reuses segment/entry ids and physical-byte/range counters never move backward after conflict/restart | `BookKeeperWriterStatePropertyTest.isMonotonicAcrossCasSchedules` |
+| BK-19 | M2 | O | all 256 root + 16 fixed allocation-slot shards scan empty opaque continuations without omission | `BookKeeperLedgerRootScannerOxiaIT.scansEveryShardFromEmptyContinuation` |
 | BK-20 | M2 | D | invalid lifecycle fields/transitions and immutable identity drift fail closed | `BookKeeperLedgerTransitionsTest.rejectsIllegalTransitions` |
 
 ## 4. Append, recovery, and fencing
@@ -56,12 +57,12 @@ Evidence levels：
 | BK-22 | M2 | B/O | multi-entry append occupies exact consecutive ids and one target checksum | `BookKeeperWalOnlyIT.appendsOneContiguousRange` |
 | BK-23 | M2 | D/B | unsupported profile/durability/config/oversize batch performs zero BK calls | `BookKeeperAppendAdmissionTest.rejectsBeforePrimaryIo` |
 | BK-24 | M2 | D/B | first/middle/last write failure taints and seals ledger; no tail reuse | `BookKeeperPartialWriteIT.sealsEveryUncertainPrefix` |
-| BK-25 | M2 | B/O/C | crash after reservation CAS before write becomes known-not-committed | `BookKeeperAppendRecoveryIT.recoversReservedEmptyRange` |
+| BK-25 | M2 | B/O/C | crash after range + three mandatory RESERVED protection slots but before write becomes known-not-committed | `BookKeeperAppendRecoveryIT.recoversReservedEmptyRange` |
 | BK-26 | M2 | B/O/C | full writes before commit intent resume only under unchanged session | `BookKeeperAppendRecoveryIT.resumesDurableRangeForCurrentSession` |
 | BK-27 | M2 | B/O/C | new session abandons unreachable old-writer full range and uses new ledger | `BookKeeperAppendRecoveryIT.doesNotCommitFencedWriterRange` |
 | BK-28 | M2 | O/C | commit intent/protection/head response loss returns same committed target/result | `BookKeeperAppendRecoveryIT.recoversSameReachableCommit` |
 | BK-29 | M2 | O/C | head reachable/gen0 missing repairs same target without BK write | `BookKeeperGenerationZeroRepairIT.repairsFromReachableCommit` |
-| BK-30 | M2 | B/O | rollover occurs before batch, never splits it and keeps dense offsets | `BookKeeperRolloverIT.preservesBatchAndLogicalDensity` |
+| BK-30 | M2 | B/O | entry/physical-byte/append-range/age rollover occurs before batch, never splits it and keeps dense offsets | `BookKeeperRolloverIT.preservesBatchAndLogicalDensity` |
 | BK-31 | M2 | B/O/C | crash in ACTIVE->SEALING->SEALED converges exact closed LAC/length | `BookKeeperLedgerRecoveryIT.recoversEverySealCut` |
 | BK-32 | M2 | B/O | new owner recovery-open fences old handle; old owner cannot head-commit | `BookKeeperFencingIT.alignsBookKeeperAndOxiaFences` |
 | BK-33 | M2 | B/O | two recovery owners contend; one new active ledger wins | `BookKeeperFencingIT.serializesTwoRecoveryOwners` |
@@ -78,7 +79,7 @@ Evidence levels：
 | BK-39 | M2 | B/O | middle-offset clipped read verifies full target then returns dense suffix | `BookKeeperPrimaryWalReaderIT.verifiesBeforeClipping` |
 | BK-40 | M2 | B/O | checksum/count/id/config mismatch fails; no partial/empty result | `BookKeeperPrimaryWalReaderCorruptionIT.failsClosed` |
 | BK-41 | M2 | B/O/C | fresh process reads history with no cached handle | `BookKeeperPrimaryWalReaderIT.readsAfterColdRestart` |
-| BK-42 | M2 | B/O | reader lease blocks MARK/delete and final revalidation precedes return | `BookKeeperReaderLeaseIT.fencesPhysicalDeletion` |
+| BK-42 | M2 | B/O | fixed reader slots cap concurrent processes race-free；lease blocks MARK/delete and final revalidation precedes return | `BookKeeperReaderLeaseIT.fencesPhysicalDeletion` |
 | BK-43 | M2 | P | raw Pulsar Entry properties/payload round-trip through BK generation zero | `NereusBookKeeperEntryIntegrationTest.preservesOpaqueEntryBytes` |
 | BK-44 | M2 | P | ordinary and batched `MessageIdAdv` use virtual identity, not BK ledger id | `NereusBookKeeperEntryIntegrationTest.preservesVirtualMessageIds` |
 | BK-45 | M2 | P | seek/history after rollover/restart returns same MessageIds | `NereusBookKeeperEntryIntegrationTest.preservesSeekAcrossRollover` |
@@ -91,11 +92,11 @@ Evidence levels：
 | BK-47 | M2 | O/B | BK_ONLY trim below range end cannot retire/delete range | `BookKeeperWalOnlyRetentionIT.rejectsPartialRangeTrim` |
 | BK-48 | M2 | O/B | one ledger with trimmed + live ranges remains physical | `BookKeeperWalOnlyRetentionIT.keepsMixedLedger` |
 | BK-49 | M2 | O/B | all ranges durably trimmed retire owners/protections then whole ledger | `BookKeeperWalOnlyRetentionIT.deletesFullyTrimmedLedger` |
-| BK-50 | M2 | D/O | protection/authority scan overflow or instability vetoes collection | `BookKeeperWalRetentionGateTest.failsClosedOnIncompleteAuthority` |
+| BK-50 | M2 | D/O | fixed protection-slot contention never exceeds Cartesian bound；invalid/unstable inventory vetoes collection | `BookKeeperWalRetentionGateTest.failsClosedOnIncompleteAuthority` |
 | BK-51 | M2 | O/B | reader/task/repair/reservation/writer vetoes are each enforced | `BookKeeperWalRetentionGateTest.enforcesEveryVetoDomain` |
 | BK-52 | M2 | O/C | reference appears after MARKED; root unmarks to SEALED | `BookKeeperLedgerGcIT.unmarksOnReferenceDrift` |
 | BK-53 | M2 | B/O/C | delete response loss reloads metadata before same-intent retry | `BookKeeperLedgerGcIT.neverBlindRetriesDelete` |
-| BK-54 | M2 | B/O/C | foreign ledger at same id after response loss is quarantined, not deleted | `BookKeeperLedgerGcIT.protectsRecreatedForeignLedger` |
+| BK-54 | M2 | B/O/C | namespace drift or late-create hazard stops before delete；foreign/reappeared same-id ledger is quarantined across validate/delete cut | `BookKeeperLedgerGcIT.protectsRecreatedForeignLedger` |
 | BK-55 | M2 | B/O/C | two separated absence observations and root CAS loss converge DELETED | `BookKeeperLedgerGcIT.convergesDualAbsenceAcrossRestart` |
 | BK-56 | M2 | D/O | dry-run/default-off mode performs no root/provider mutation | `BookKeeperLedgerGcActivationTest.safeDefaultsDoNothing` |
 
@@ -134,7 +135,7 @@ Evidence levels：
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
 | BK-77 | M5 | D/P | borrowed client is closed zero times by Nereus and once by stock owner | `NereusBookKeeperBorrowedClientTest.closesOnlyAtStockOwner` |
-| BK-78 | M5 | P | missing/mismatched broker capability/config rejects first-create before IO | `NereusBookKeeperCapabilityTest.rejectsUnreadyCluster` |
+| BK-78 | M5 | P | missing/mismatched/revoked provisioned namespace or broker config/capability rejects first-create before IO；runtime never auto-creates reservation | `NereusBookKeeperCapabilityTest.rejectsUnreadyCluster` |
 | BK-79 | M5 | P | first-create persists exact profile; reopen ignores changed default | `NereusBookKeeperProfileAdmissionTest.keepsImmutableProfile` |
 | BK-80 | M5 | P | explicit existing-profile mutation/online migration is rejected | `NereusBookKeeperProfileAdmissionTest.rejectsProfileMutation` |
 | BK-81 | M5 | P | loaded/unloaded/partitioned routes use durable profile/readiness | `NereusBookKeeperAdminRoutingTest.routesExactDurableProfile` |
@@ -149,14 +150,14 @@ Evidence levels：
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
 | BK-87 | M6 | X/O | 1,001 roots in one shard + every other shard paginate from cold restart | `BookKeeperLedgerRootScaleIT.scansHotAndAllShards` |
-| BK-88 | M6 | X/O | maximum ranges/protections in one ledger scan without truncation | `BookKeeperLedgerProtectionScaleIT.scansMaximumLedgerInventory` |
-| BK-89 | M6 | X/O | 1,000 leases + 1,000 protections restart from empty tokens | `BookKeeperLedgerReferenceScaleIT.restartsCompleteInventory` |
+| BK-88 | M6 | X/O | exact max range x protection-slot Cartesian scan；next range/dynamic owner rejects or rolls before IO | `BookKeeperLedgerProtectionScaleIT.scansMaximumLedgerInventory` |
+| BK-89 | M6 | X/O | every fixed reader slot + mixed protection slots restart from empty tokens without scan-count races | `BookKeeperLedgerReferenceScaleIT.restartsCompleteInventory` |
 | BK-90 | M6 | X/O | 10,000 terminal roots use stack-bounded sequential visitation | `BookKeeperLedgerGcScaleIT.visitsTenThousandWithoutStackGrowth` |
 | BK-91 | M6 | X/O/S | 128 mixed BK/Object sources and 1,048,576 records task round-trips/runs | `BookKeeperMixedSourceTaskScaleIT.executesBothTaskLimits` |
 | BK-92 | M6 | X/O | 4,096 generation candidates resolve; 4,097 fails closed | `BookKeeperGenerationScaleIT.enforcesCandidateBoundary` |
 | BK-93 | M6 | C/B/O | independent processes recover every allocation/write/seal/head/delete cut | `BookKeeperPrimaryWalProcessCutIT` |
 | BK-94 | M6 | C/T/B/O/S | two brokers + workers contend on writer/task/GC without double head/delete | `NereusBookKeeperContentionMultiBrokerIT.convergesSharedAuthority` |
-| BK-95 | M6 | X/T | configured max concurrent topics/workers/deletes stay within shared budgets | `NereusBookKeeperLoadMultiBrokerIT.enforcesResourceBounds` |
+| BK-95 | M6 | X/T | configured topics/workers/deletes/hazard slots stay bounded；full hazard set rejects before next create and never clears for availability | `NereusBookKeeperLoadMultiBrokerIT.enforcesResourceBounds` |
 | BK-96 | M6 | T/B/O/S | full mixed-profile history, cursor, trim, GC and stock BK acceptance | `NereusBookKeeperAggregateMultiBrokerIT.finalAcceptance` |
 
 ## 11. Traceability requirements

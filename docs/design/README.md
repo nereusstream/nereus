@@ -9,6 +9,7 @@
 `docs/phase-bk-bookkeeper-primary-wal/` 共同构成仓库内设计基线。已实现合同由代码/
 测试优先；Phase 4 目录同时记录已通过 M0 的 target contract，以及已 final-gated 的 F4-M1–M6 实现和
 checkpoint-BQ aggregate evidence；F1-BK 目录是下一项底层交付的代码级 target，当前不表示实现。
+BK-M0 documentation gate passed on 2026-07-19；BK-M1–M6 remain not implemented。
 
 建议阅读顺序：
 

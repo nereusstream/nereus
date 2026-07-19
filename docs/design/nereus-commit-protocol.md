@@ -365,6 +365,14 @@ BookKeeper provides primary bytes durability only。The same head/commit-log pro
 offsets。The commit record/read target uses the existing tagged `BookKeeperEntryRangeReadTarget`；one Nereus offset
 maps to one exact BK entry, and the physical ledger id never becomes Pulsar `MessageId` identity：
 
+Exact ids are allocated only inside a deployment-reserved positive-63-bit advanced-ledger-id prefix bound into
+configuration/readiness/activation. BookKeeper delete is not metadata-version conditional；without that namespace
+exclusivity, validate-then-delete has a foreign-ledger ABA window and every BK profile must remain closed. A
+transmitted create with unknown outcome stays durable/scan-visible and id-consuming；absence plus elapsed grace cannot
+make it `ABORTED`。Its fixed allocation slot and monotonic `lateCreateHazard` remain a physical-delete veto even if
+matching bytes later appear；BK-M0–M6 do not invent a provider operation fence that BookKeeper's public client API does
+not expose.
+
 | Profile | Logical visibility | Producer completion | Read/source behavior |
 | --- | --- | --- | --- |
 | `BOOKKEEPER_WAL_ONLY` | reachable head commit | stable head by default；strict caller may also wait for gen0 | generation 0 remains the exact BK range；no object task |

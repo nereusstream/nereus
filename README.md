@@ -57,8 +57,9 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 Only `OBJECT_WAL_SYNC_OBJECT` is a Phase 1 execution target. BookKeeper and async
 materialization profiles are reserved design/API boundaries, not implemented support.
 
-The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. Its code-level
-target is frozen in [`docs/phase-bk-bookkeeper-primary-wal/`](docs/phase-bk-bookkeeper-primary-wal/README.md)：
+The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 is
+documentation-gated and its code-level target is frozen in
+[`docs/phase-bk-bookkeeper-primary-wal/`](docs/phase-bk-bookkeeper-primary-wal/README.md)：
 BK-M0–M6 cover provider-neutral append/read seams、exact ledger allocation/lifecycle/fencing、BK_ONLY retention、F4
 async/sync reuse and Pulsar rollout. This is design-only status；all three BookKeeper profiles remain rejected before
 primary IO until their executable gates pass.

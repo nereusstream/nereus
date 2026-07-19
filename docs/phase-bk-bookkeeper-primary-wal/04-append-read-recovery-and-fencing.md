@@ -24,11 +24,12 @@ F2 virtual positions、F3 cursor state or F4 generation selection.
 
 The serialized per-stream append lane performs, in order：
 
-1. resolve durable stream `StorageProfile` and configuration binding；
-2. require profile capability for the exact broker/readiness epoch；
+1. resolve durable stream `StorageProfile`、configuration and exclusive ledger-id namespace binding；
+2. require profile/namespace capability for the exact broker/readiness epoch；
 3. require current append session and expected start offset；
 4. run F4 lag admission for async/sync profiles；BK_ONLY has no materialization lag gate；
-5. validate record/entry/byte limits and that the entire batch fits one permitted ledger；
+5. compute exact payload physical bytes and validate record/entry/byte/append-range limits plus mandatory protection
+   capacity so the entire batch fits one permitted ledger；
 6. acquire global/per-stream memory + request permits；
 7. only then prepare/allocate/reserve/write BookKeeper。
 
@@ -40,6 +41,7 @@ is revalidated immediately before provider write and before head CAS; policy is 
 ```text
 A. prepare
    exact AppendEntry bytes -> retained buffers
+   checked sum exact physical bytes
    compute NBKR1 range checksum
    select current ACTIVE segment or run allocation protocol
    rollover first if full batch would cross configured boundary
@@ -47,6 +49,8 @@ A. prepare
 B. reserve
    create BookKeeperAppendReservation
    writer-state CAS reserves [firstEntryId, firstEntryId + entryCount)
+   and advances durable activePhysicalBytes/activeAppendRangeCount (old range count is ledgerRangeSlot)
+   create/reload fixed mandatory protection slots 0..2 as RESERVED before provider write
 
 C. persist
    WriteAdvHandle.writeAsync(firstEntryId + i, entry[i])
@@ -97,13 +101,15 @@ Before reservation, checked arithmetic evaluates：
 
 ```text
 nextEntryId + batch.entryCount > maxEntriesPerLedger
-currentLedgerLogicalBytes + batch.logicalBytes > maxBytesPerLedger
+activePhysicalBytes + sum(exact entry payload lengths) > maxBytesPerLedger
+activeAppendRangeCount + 1 > maxAppendRangesPerLedger
 now - openedAt >= maxLedgerAge
 BookKeeper/Nereus hard entry or ledger byte bound would be exceeded
 ```
 
 If any condition is true and the current ledger is nonempty, seal it before allocating the next. If the batch itself
-exceeds one configured ledger or entry bound, reject before IO; V1 does not split an append batch across ledgers.
+exceeds one configured ledger/entry/physical-byte bound, reject before IO; V1 does not split an append batch across
+ledgers. Logical/cumulative Pulsar size never substitutes for the physical-byte counter.
 
 ### 3.2 Rollover sequence
 
@@ -129,7 +135,7 @@ append. A crash is resumed from writer/root lifecycle; it never reopens a SEALIN
 ReadResolver
   -> exact COMMITTED generation index or reachable-commit repair
   -> ResolvedRange(logical range, generation=0, commitVersion, BK target)
-  -> acquire whole-ledger durable reader lease
+  -> claim one fixed whole-ledger reader slot below maxReaderLeasesPerLedger
   -> validate root identity/lifecycle/config binding
   -> open ledger withRecovery(false)
   -> readUnconfirmedAsync(firstEntryId, lastEntryIdInclusive)
@@ -205,8 +211,13 @@ a new BK write.
 
 ### 6.1 Before writer-state reservation CAS
 
-An immutable reservation row may exist, but no BK write was allowed. Exact writer-state/head/commit absence makes it
-terminal ABANDONED after grace. Outcome is `KNOWN_NOT_COMMITTED`.
+An immutable append reservation row may exist, but no BK entry write was allowed. Exact writer-state/head/commit
+absence makes it terminal ABANDONED after grace. An earlier transmitted ledger create with unknown outcome is handled
+separately as durable `CREATE_UNCERTAIN`：detach its writer allocation by CAS, consume the segment/id, admit a fresh
+candidate only below the shared fixed-slot bound, and fence/seal any matching late physical ledger. The allocation
+slot plus monotonic `lateCreateHazard` remain permanent and veto physical deletion in BK-M0–M6, even if matching bytes
+later appear. Both append branches are `KNOWN_NOT_COMMITTED`；neither converts provider absence into an `ABORTED`
+create proof.
 
 ### 6.2 After reservation CAS, before/among writes
 

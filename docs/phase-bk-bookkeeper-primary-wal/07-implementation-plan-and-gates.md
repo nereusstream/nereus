@@ -5,7 +5,7 @@
 This document is a code-level implementation plan, not implementation evidence. Current status：
 
 ```text
-BK-M0 design/source audit       in progress until the complete documentation gate passes
+BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 .. BK-M6                  not implemented
 all BookKeeper profiles         reserved / rejected before primary IO
 BookKeeper ledger deletion      absent / safe default closed
@@ -57,6 +57,8 @@ scripts/check-bookkeeper-primary-wal-documentation.sh
 The gate verifies all documents/links、Nereus audit lock
 `35c58c575c3da220633c53e48a581f16756ea047`、local Pulsar lock
 `eaf7b9a704890a9265c21f30d9f351e02d00c600`、BookKeeper `4.18.0`、profile naming and explicit not-implemented status.
+The exact command passed on 2026-07-19. It is BK-M0 design evidence only；the target implementation tasks below do
+not exist yet and may not be represented by empty Gradle tasks。
 
 ### 3.3 Mandatory review stop A
 
@@ -114,6 +116,9 @@ Implement without registering an executable profile：
 
 ```text
 BookKeeperWalConfiguration + binding digest
+BookKeeperLedgerGcConfiguration + activation/safe-default validation
+BookKeeperLedgerIdNamespace + candidate generator/round-trip validation
+BookKeeperLedgerIdNamespaceReservation value/codec/store + read-only runtime verifier
 BookKeeperRangeChecksums (NBKR1)
 BookKeeperPreparedPrimaryAppend
 BookKeeperPrimaryPhysicalIdentity
@@ -153,11 +158,12 @@ Implement document 03 exactly：
 
 ```text
 BookKeeperKeyspace + strict inverse
-six V1 record codecs + wrappers/pages
+seven V1 writer/allocation/slot/root/reservation/protection/lease record codecs + wrappers/pages
 BookKeeperWriterMetadataStore + production/fake adapters
 BookKeeperLedgerMetadataStore + production/fake adapters
 shared contract/failure-injection scenarios
 all-256-shard root scanner
+all-16-shard fixed allocation-slot scanner
 ```
 
 No generic unbounded list/delete primitive is added. Golden codec changes require protocol/version review.
@@ -166,12 +172,12 @@ No generic unbounded list/delete primitive is added. Golden codec changes requir
 
 Implement in this order：
 
-1. `BookKeeperLedgerAllocator` exact-id root reservation/create/reconcile；
+1. `BookKeeperLedgerAllocator` reserved-namespace exact-id intent/durable-slot/root reservation/create/reconcile；
 2. `BookKeeperWriterStateMachine` allocation/active/reservation/recovering CAS；
 3. `BookKeeperPrimaryWalAppender` explicit ordered writes and taint/seal；
 4. `BookKeeperLedgerRecovery` recovery-open/fence/seal and nonterminal scan；
 5. `BookKeeperPrimaryWalReader` lease/non-recovery exact read/checksum/accounting；
-6. `BookKeeperWalReferenceManager` range protection + reader lease；
+6. `BookKeeperWalReferenceManager` fixed range-protection + fixed reader-slot admission；
 7. generation-zero trim/commit/protection retirement adapters；
 8. `BookKeeperLedgerRetentionManager` dry-run, mark/drain/delete/dual-absence recovery；
 9. `BookKeeperWalRuntime` lifecycle/composition。
@@ -200,14 +206,17 @@ bookKeeperPrimaryWalM2Check                 ordinary aggregate, delete remains d
 bookKeeperPrimaryWalM2FinalCheck            real Oxia + real BK + restart/delete-response-loss
 ```
 
-Final evidence includes empty/nonempty rollover、partial/uncertain writes、head/gen0 cuts、logical trim with mixed live
-ranges、reader drain、foreign collision and exact dual-absence delete recovery.
+Final evidence includes empty/nonempty entry/physical-byte/append-range rollover、partial/uncertain writes、head/gen0
+cuts、logical trim with mixed live ranges、fixed-slot protection/reader contention、foreign collision、permanent
+late-create-hazard deletion veto and exact dual-absence delete recovery.
 
 ### 5.6 Mandatory review stop C
 
 Before enabling physical delete：review complete protection inventory、root/stream/reservation scan bounds、foreign
-custom-metadata check、delete response-loss ABA and safe defaults. BK_ONLY must demonstrate bounded reclaim; M3 cannot
-be used to hide a BK_ONLY leak.
+custom-metadata check、exclusive exact-id namespace proof、validate-to-delete ABA、`CREATE_UNCERTAIN` nonterminal
+handling、permanent `lateCreateHazard` veto and safe defaults. BK_ONLY must demonstrate bounded reclaim for normal
+terminal creates；hazardous ledgers are an explicit bounded fail-closed quarantine, not a reclaim success. M3 cannot be
+used to hide a BK_ONLY leak.
 
 ## 6. BK-M3 — `BOOKKEEPER_WAL_ASYNC_OBJECT`
 
@@ -311,6 +320,7 @@ NereusRuntimeConfiguration BookKeeperWalConfiguration
 DefaultNereusRuntimeProvider shared registry/runtime composition
 NereusManagedLedgerFactory profile-specific exact plan/admission
 capability/activation core provider and status values
+explicit namespace admin provisioning/revoke command and readiness/activation binding
 ```
 
 ### 8.2 Local Pulsar fork
@@ -354,13 +364,16 @@ exclusion、borrowed client close ownership and safe delete defaults. Online mig
 Required exact fixtures：
 
 - all 256 root shards from fresh empty continuations；
+- all 16 allocation-slot shards with CLAIMED/CREATE_STARTED/CREATE_UNCERTAIN and lost-release occupants；
 - 1,001 roots in one hot shard plus one in every other shard；
-- maximum configured ranges/protections in one ledger across bounded pages；
-- 1,000 reader leases + 1,000 source protections restart scan；
+- maximum configured range x protection-slot Cartesian inventory across bounded pages；
+- maximum fixed reader slots + occupied source-protection slots restart scan；
 - 10,000 sealed/deleted roots without recursion/unbounded retained futures；
 - 128-source/1,048,576-record F4 task with mixed BK/Object source targets；
 - 4,096 generation candidates and 4,097 fail-closed boundary；
 - configured concurrent streams/workers/deletes under one shared budget。
+- configured maximum uncertain/hazard allocation slots rejects the next create without retiring/reusing any id or
+  clearing any deletion veto。
 
 ### 9.2 Chaos/process cuts
 
@@ -426,6 +439,10 @@ Stop and return to design review if implementation discovers any need to：
 - ack after BK write but before reachable head；
 - treat gen0 BK index as sync Object completion；
 - delete a partially reclaimable ledger or a foreign custom-metadata identity；
+- run a BK profile without the exact advanced-ledger-id namespace reservation, or treat repeated absence as proof an
+  uncertain transmitted create can never appear；
+- clear `lateCreateHazard` after matching metadata appears, or release its fixed slot without a separately versioned
+  provider-operation fence；
 - rely on listing/process cache for correctness；
 - mutate profile in place or reinterpret pre-barrier commits。
 

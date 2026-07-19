@@ -56,7 +56,8 @@ BookKeeper 4.18.0 public client API locally verified from the pinned jar：
 - `WriteAdvHandle.writeAsync(long, ByteBuf)` and `ForceableHandle.force()`；
 - `OpenBuilder.withLedgerId(long).withRecovery(boolean)...execute()`；
 - `ReadHandle.readAsync`、`readUnconfirmedAsync` and LAC APIs；
-- `DeleteBuilder`、`getLedgerMetadata(long)` and bounded/listing APIs；
+- `DeleteBuilder.withLedgerId(long)` only (no expected metadata/version condition)、`getLedgerMetadata(long)` and
+  bounded/listing APIs；
 - `LedgerMetadata` closed/last-entry/length/quorum/digest/custom-metadata facts；
 - `WriteFlag.DEFERRED_SYNC` and typed `BKException` return codes。
 
@@ -254,6 +255,25 @@ No cross-system protocol can prove that an already transmitted stale write never
 correct guarantee is narrower and sufficient：a stale session cannot make those bytes reachable through the current
 head or receive success. Orphan/tainted entries are reclaimed only after the ledger is sealed and all reachable
 references are proven absent.
+
+### 4.5 Exact-id namespace and delete ABA
+
+BookKeeper `DeleteBuilder` deletes by ledger id and offers no conditional “delete only if this custom-metadata/version
+still matches” primitive. A metadata read followed by delete is therefore unsafe if an unrelated client may replace
+the ledger in between. F1-BK requires an explicit positive-63-bit advanced-ledger-id prefix reserved to one Nereus
+deployment and included in broker readiness/config/activation. Stock clients may continue using normal allocation but
+must not issue `CreateAdv` inside that prefix. Without this deployment invariant, all BK profiles remain unsupported；
+a configuration boolean alone is not deletion authority.
+
+The reservation identity is `(providerScopeSha256, prefixBits, prefixValue)`, not `(clusterAlias, prefix)`。The alias
+is a durable lookup name；the scope digest binds the canonical BookKeeper metadata-service/ledger-root identity so two
+physical clusters cannot accidentally share roots or deletion authority under the same alias.
+
+Likewise, a transmitted create whose result is unknown has no public provider proof that it can never appear later.
+Its exact Oxia root/id and one fixed allocation slot stay consumed and scan-visible. Matching metadata may recover
+owned bytes, but it does not prove an older create cannot execute after a later delete；therefore the monotonic
+`lateCreateHazard` permanently vetoes automatic deletion in BK-M0–M6. Elapsed grace and repeated absence are audit
+signals, not a correctness proof of non-creation.
 
 ## 5. Gap-to-milestone ownership
 

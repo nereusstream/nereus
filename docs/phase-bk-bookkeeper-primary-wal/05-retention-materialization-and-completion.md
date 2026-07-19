@@ -102,9 +102,14 @@ Candidate admission requires all of the following：
 5. writer state does not select the ledger and no allocation/append reservation may still write/recover it；
 6. every current commit/generation/task/recovery/repair domain is complete and agrees with the protection inventory；
 7. root's stream projection/profile remains a supported BookKeeper profile；
-8. exact cluster BK deletion activation/config binding/scope digest is current；
+8. exact cluster BK deletion activation/config/ledger-id-namespace binding/scope digest is current；
 9. candidate/reference count is within configured bounds; overflow is a veto；
 10. a second complete capture is byte-for-byte equal before `SEALED -> MARKED`。
+
+Any retained `CREATE_UNCERTAIN` allocation slot or root `lateCreateHazard=true` is a non-expiring veto. The hazard
+survives later matching activation/seal；repeated physical absence cannot retire it, authorize candidate reuse or
+permit whole-ledger delete. Because BookKeeper delete is not metadata-version conditional, loss of the exclusive
+advanced-ledger-id namespace proof also invalidates every in-flight MARK/DELETING mutation before the provider call.
 
 The reference digest includes key、record type、Oxia version、stored-value SHA and semantic identity for every row；it
 does not hash only counts.
@@ -183,7 +188,8 @@ source retirement removes owners/protections when eligible
 ```
 
 Generation-zero `VISIBLE_GENERATION` protection covers the brief task-created/source-protection-not-yet-created
-window. A task with an unprotected source is never runnable.
+window. Each task/reference claims its own fixed dynamic protection slot before source IO；a full per-range slot set
+rejects task/repair admission and remains a GC veto. A task with an unprotected source is never runnable.
 
 ### 6.4 Exact BK source read
 
@@ -384,6 +390,9 @@ never justified merely because an upload once succeeded.
 | all protections gone, reader lease exists | ledger remains SEALED/MARKED until lease drain and final revalidation |
 | BookKeeper DELETE response lost | reload exact metadata; never blind-delete foreign identity; dual absence proof |
 | matching ledger reappears during absence grace | validate allocation metadata, repeat delete under same intent, restart grace |
+| allocation create once entered unknown outcome | persist permanent slot + `lateCreateHazard`；matching activation may restore IO but automatic delete remains forbidden |
+| namespace readiness/reservation changes before delete | invalidate activation and stop before provider delete；never trust prior metadata check |
+| physical ledger appears for ABORTED/DELETED tombstone | conditional escalation to QUARANTINED；no automatic delete/reuse |
 | reference appears after MARKED | unmark to SEALED; no physical delete |
 
 ## 11. Metrics

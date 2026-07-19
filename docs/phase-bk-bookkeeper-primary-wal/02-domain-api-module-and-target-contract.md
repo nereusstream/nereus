@@ -40,10 +40,13 @@ Target package：`com.nereusstream.bookkeeper`。
 | Type | Responsibility | Must not own |
 | --- | --- | --- |
 | `BookKeeperWalConfiguration` | validated alias、quorums、digest/password reference、rollover/limits/timeouts | mutable policy lookup、secrets in logs/metadata |
+| `BookKeeperLedgerGcConfiguration` | deletion concurrency、clock/drain/audit windows and safe local switches | reference eligibility、activation authority |
+| `BookKeeperLedgerIdNamespace` | validate/probe reserved prefix and generate exact positive-63-bit candidates | self-authorizing namespace reservation |
+| `BookKeeperLedgerIdNamespaceReservationVerifier` | read exact provisioned reservation/version/digest and fail closed on revoke/drift | creating or renewing operator authority |
 | `BookKeeperWalRuntime` | appender/reader/allocator/recovery/retention lifecycle assembly | borrowed client close |
 | `BookKeeperPrimaryWalAppender` | prepare exact entries、persist one contiguous range、post-write validation | head CAS、offset allocation、MessageId |
 | `BookKeeperPrimaryWalReader` | exact non-recovery open/range read/checksum/provider-neutral result | generation choice、projection truth |
-| `BookKeeperLedgerAllocator` | allocation intent、exact-id create/reconcile、activate segment | random untracked create、listing correctness |
+| `BookKeeperLedgerAllocator` | allocation intent/durable slot、reserved exact-id create/reconcile、activate segment | random untracked create、listing correctness |
 | `BookKeeperLedgerRecovery` | fence/recovery-open old active ledger、seal/reconcile | ordinary reads |
 | `BookKeeperLedgerRetentionManager` | scan sealed candidates、whole-ledger proof/delete convergence | logical trim decision、Object output publication |
 | `BookKeeperLedgerHandleCache` | bounded non-authoritative read handles and close | durable ownership/fencing truth |
@@ -273,6 +276,23 @@ range checksum matches full exact entry sequence
 The target codec remains `BookKeeperEntryRangeReadTargetCodecV1`. Golden bytes, max encoded size, malformed UTF-8/
 enum/checksum/overflow rejection and decode-reencode equality are mandatory BK-M1 gates.
 
+### 6.1 Entry, ledger, and batch metadata placement
+
+V1 does not create a second per-entry Oxia index：
+
+| Fact | Durable location | Bound |
+| --- | --- | --- |
+| logical offset range -> physical range | existing generation-zero offset index containing one `BookKeeperEntryRangeReadTarget` per committed append range | at most `maxAppendRangesPerLedger` source ranges per ledger |
+| entry boundary/order | BookKeeper entry ids inside the target's consecutive `[firstEntryId, entryCount]` range | at most `maxEntriesPerLedger`；checked arithmetic |
+| ledger quorum/closed/LAC/length | BookKeeper `LedgerMetadata` | one provider record per ledger |
+| Nereus ledger owner/lifecycle/config | `BookKeeperLedgerRootRecord` + writer/allocation state | one root per exact id, one writer per stream |
+| source/reference inventory | fixed `(ledgerRangeSlot, protectionSlot)` rows under the ledger shard | at most checked `maxAppendRangesPerLedger * protectionSlotsPerRange`；invalid/out-of-range rows veto GC |
+| reader pins | fixed reader-slot rows under the ledger shard | at most `maxReaderLeasesPerLedger` process occupants；claim before provider IO |
+| Pulsar batch metadata/index | inside the exact opaque serialized Pulsar Entry bytes | batch index does not consume an L0 offset and is never copied into BK lifecycle metadata |
+
+F2 decodes batch information only when projecting the returned Entry. Physical BK entry id、ledger rollover and
+protection row identity never enter `MessageIdAdv` or become a second compatibility truth.
+
 ## 7. BookKeeper appender API behavior
 
 ### 7.1 Prepared value
@@ -283,13 +303,14 @@ record BookKeeperPreparedPrimaryAppend(
     List<ByteBuf> retainedEntries,
     Checksum rangeChecksum,
     int entryCount,
-    long logicalBytes) implements PreparedPrimaryAppend, AutoCloseable { }
+    long logicalBytes,
+    long physicalBytes) implements PreparedPrimaryAppend, AutoCloseable { }
 ```
 
 Implementation may use another reference-count-safe holder. Requirements：
 
 - preserve exact Pulsar Entry bytes and ordering；
-- compute/check bounds before BookKeeper IO；
+- compute/check exact payload physical bytes independently from logical/cumulative size before BookKeeper IO；
 - release each retained buffer exactly once on success/failure/cancel/close；
 - never log payload、password or digest secret；
 - one provider call owns the monotonic remaining deadline across allocation/write/validation。
@@ -302,6 +323,7 @@ if batch would violate entry/byte/age rollover threshold:
     seal current segment
     allocate next segment
 reserve contiguous explicit entry ids in writer state CAS
+reserve exact ledgerRangeSlot and mandatory protection slots 0..2
 writeAsync(firstEntryId + i, entry[i]) sequentially or with bounded pipeline
 await every write under one deadline
 on full success: return target + exact physical identity
@@ -328,7 +350,7 @@ Any drift prevents head publication. Bytes may remain orphaned but are never vis
 
 ```text
 validate target + logical range + configuration binding
-acquire durable whole-ledger reader lease
+claim durable fixed whole-ledger reader slot
 open ledger withRecovery(false)
 readUnconfirmedAsync(firstEntryId, lastEntryIdInclusive)
 require exactly entryCount entries with exact consecutive ids
@@ -352,6 +374,10 @@ nonterminal protection/root is a metadata invariant/physical-loss error, not an 
 ```java
 record BookKeeperWalConfiguration(
     String clusterAlias,
+    String providerScopeSha256,
+    int ledgerIdPrefixBits,
+    long ledgerIdPrefixValue,
+    String ledgerIdNamespaceReservationId,
     int ensembleSize,
     int writeQuorumSize,
     int ackQuorumSize,
@@ -359,6 +385,10 @@ record BookKeeperWalConfiguration(
     SecretRef passwordRef,
     long maxEntriesPerLedger,
     long maxBytesPerLedger,
+    int maxAppendRangesPerLedger,
+    int protectionSlotsPerRange,
+    int maxReaderLeasesPerLedger,
+    int maxUncertainAllocations,
     Duration maxLedgerAge,
     int maxWritesInFlight,
     int maxReadsInFlight,
@@ -368,14 +398,47 @@ record BookKeeperWalConfiguration(
     Duration sealTimeout,
     Duration deleteTimeout,
     Duration readerLeaseTtl,
+    Duration readerLeaseRenewInterval,
     Duration retentionScanInterval,
     int retentionPageSize) { }
+
+record BookKeeperLedgerGcConfiguration(
+    int maxConcurrentDeletes,
+    Duration maxClockSkew,
+    Duration drainGrace,
+    Duration lateCreateAuditGrace,
+    boolean enabled,
+    boolean dryRun) { }
 ```
 
 Validation includes `ensemble >= writeQuorum >= ackQuorum > 0`、all bounds positive/non-overflowing、timeouts below
-the broker close budget, and no `DEFERRED_SYNC` flag. The durable **configuration binding digest** includes alias、
-quorums、digest type and a non-secret password identity/version, never password bytes. A binding change cannot open an
-existing ledger under a silently different digest/password.
+the broker close budget, and no `DEFERRED_SYNC` flag. Prefix bits/value must encode a nonzero subset of the positive
+63-bit domain：`ledgerIdPrefixBits` is `[8,24]`、the prefix's highest bit must be one、and the random suffix is therefore
+at least 39 bits；every candidate must round-trip the namespace predicate. The
+nonblank reservation id names an externally enforced deployment allocation, not a trust-me toggle. The durable
+**configuration binding digest** includes alias、ledger-id namespace、quorums、digest type、range/size bounds and a
+non-secret password identity/version, never password bytes. A binding change cannot open an existing ledger under a
+silently different namespace/digest/password.
+
+`providerScopeSha256` is the lowercase SHA-256 of the canonical, non-secret BookKeeper metadata-service/ledger-root
+scope supplied and verified by the Pulsar composition boundary. `clusterAlias` is a durable lookup name, not enough
+to distinguish two physical provider scopes；one alias/config binding must resolve to exactly one scope digest.
+
+`maxUncertainAllocations` is `[1,65536]` and defines that many fixed durable allocation-slot identities across 16 shards.
+Every provider create must hold one；there is no scan-then-increment counter race.
+
+`protectionSlotsPerRange` is `[4,64]`。Slots `0..2` are reserved for append-owned
+`REACHABLE_APPEND`、`VISIBLE_GENERATION` and `APPEND_RECOVERY` transitions；slots
+`[3, protectionSlotsPerRange)` are fixed, race-free dynamic owner slots for materialization、repair and replacement
+contenders. Checked validation requires
+`maxAppendRangesPerLedger * protectionSlotsPerRange <= 65536`。The derived maximum, rather than a scan-then-increment
+counter, bounds every ledger protection scan；capacity for an admitted append cannot be stolen before its post-head
+generation-zero transition completes.
+
+`readerLeaseRenewInterval < readerLeaseTtl` and `drainGrace >= readerLeaseTtl + configuredClockSkew`。The WAL
+configuration digest binds every non-secret semantic/tuning field so all brokers open/recover with one exact plan.
+GC `enabled/dryRun` remain local rollout switches and are not authority；the activation/scope digest binds every other
+GC field plus WAL page/limit facts, and every delete additionally requires `enabled && !dryRun`.
 
 ## 10. Resource, deadline, and close rules
 

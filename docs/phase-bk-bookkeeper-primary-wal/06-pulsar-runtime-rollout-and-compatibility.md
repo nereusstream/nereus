@@ -73,6 +73,10 @@ Add checked one-time fields to `ServiceConfiguration` and map them in `NereusBro
 | --- | --- |
 | `nereusBookKeeperPrimaryWalEnabled` | `false`; gates registration/profile first-create |
 | `nereusBookKeeperClusterAlias` | nonblank durable alias |
+| `nereusBookKeeperProviderScopeId` | required canonical non-secret stock BK metadata-service/ledger-root identity；adapter derives/verifies SHA-256 |
+| `nereusBookKeeperLedgerIdPrefixBits` | required `[8,24]`；leaves at least 39 random bits inside positive 63-bit ids |
+| `nereusBookKeeperLedgerIdPrefixValue` | required canonical value with highest prefix bit one；all generated/existing ids must round-trip it |
+| `nereusBookKeeperLedgerIdNamespaceReservationId` | required deployment-owned reservation identity；immutable/digest-bound, not a Boolean override |
 | `nereusBookKeeperEnsembleSize` | positive; defaults to explicit stock BK configured value |
 | `nereusBookKeeperWriteQuorumSize` | `ensemble >= write >= ack` |
 | `nereusBookKeeperAckQuorumSize` | positive |
@@ -80,6 +84,10 @@ Add checked one-time fields to `ServiceConfiguration` and map them in `NereusBro
 | `nereusBookKeeperPasswordSecretRef` | secret reference only; empty password must be explicit/defaulted consistently |
 | `nereusBookKeeperMaxEntriesPerLedger` | positive and bounded |
 | `nereusBookKeeperMaxBytesPerLedger` | positive and bounded |
+| `nereusBookKeeperMaxAppendRangesPerLedger` | positive hard bound for protection/inventory pagination |
+| `nereusBookKeeperProtectionSlotsPerRange` | `[4,64]` fixed slots；checked product with max ranges is at most 65,536 |
+| `nereusBookKeeperMaxReaderLeasesPerLedger` | positive hard cap on process/ledger lease rows；overflow rejects read before provider IO |
+| `nereusBookKeeperMaxUncertainAllocations` | `[1,65536]` fixed durable slot count；exhaustion rejects before another provider create |
 | `nereusBookKeeperMaxLedgerAgeSeconds` | positive |
 | `nereusBookKeeperMaxWritesInFlight` | V1 default `1`; bounded |
 | `nereusBookKeeperMaxReadsInFlight` | positive |
@@ -93,16 +101,68 @@ Add checked one-time fields to `ServiceConfiguration` and map them in `NereusBro
 | `nereusBookKeeperRetentionScanIntervalSeconds` | positive |
 | `nereusBookKeeperRetentionScanPageSize` | `[1,1024]` |
 | `nereusBookKeeperMaxConcurrentDeletes` | positive bounded |
+| `nereusBookKeeperMaxClockSkewSeconds` | nonnegative deployment bound；part of lease/drain safety validation |
 | `nereusBookKeeperGcDrainGraceSeconds` | at least reader lease + clock skew |
-| `nereusBookKeeperLateCreateAuditGraceSeconds` | greater than max provider retry/operation/close uncertainty window |
+| `nereusBookKeeperLateCreateAuditGraceSeconds` | positive alert/recheck pacing only；never proves a transmitted create impossible |
 | `nereusBookKeeperGcEnabled` | `false` safe default |
 | `nereusBookKeeperGcDryRun` | `true` safe default |
+
+The provider/ledger/read/scan fields map to `BookKeeperWalConfiguration`; delete concurrency、clock/drain/audit and
+the two local switches map to `BookKeeperLedgerGcConfiguration`。No field is silently dropped or defaulted differently
+between brokers.
 
 `nereusDefaultStorageProfile` remains first-create-only. Merely selecting a BK enum while the feature/capability is
 disabled must fail broker config validation or topic first-create before any ledger allocation.
 
-Configuration binding SHA-256 includes cluster alias、quorums、digest、non-secret password identity/version and V1
-protocol semantics. Every broker advertises the same digest; secret bytes never enter lookup properties/Oxia/logs.
+Configuration binding SHA-256 includes cluster alias、provider-scope digest、exact ledger-id namespace/reservation、quorums、digest、range/
+size bounds、non-secret password identity/version and V1 protocol semantics. Every broker advertises the same digest;
+secret bytes never enter lookup properties/Oxia/logs.
+
+### 4.1 Namespace provisioning authority
+
+Runtime code must not turn a config string into its own exclusivity proof. A separate, explicit cluster provisioning
+operation creates one immutable/revocable record under the product capability keyspace：
+
+```text
+${globalNereusPrefix}/bookkeeper-provider-scopes/v1/${providerScopeSha256}/ledger-id-prefixes/${prefixBits:02d}/${prefixValue:06x}
+```
+
+Every Nereus deployment sharing that BookKeeper provider scope must use the same Oxia authority/global prefix；if it
+cannot, shared-scope BK profiles are unsupported. Components are canonical and strict-inverse parsed.
+`providerScopeSha256` is 64 lowercase hex、prefix bits are two decimal digits and prefix value is six lowercase hex
+digits with leading zeroes；decode/re-encode equality is mandatory.
+
+```java
+record BookKeeperLedgerIdNamespaceReservationRecord(
+    int schemaVersion,
+    String reservationId,
+    String nereusDeploymentId,
+    String clusterAlias,
+    String bookKeeperProviderScopeSha256,
+    int ledgerIdPrefixBits,
+    long ledgerIdPrefixValue,
+    Lifecycle lifecycle,                 // ACTIVE, REVOKED
+    long reservationEpoch,
+    long createdAtMillis,
+    long revokedAtMillis,
+    String operatorEvidenceSha256,
+    long metadataVersion) { }
+```
+
+Lifecycle wire ids are `ACTIVE=1` and `REVOKED=2`；ordinals are forbidden. `reservationEpoch` is one at creation and
+increments only for the terminal revoke CAS.
+
+`ledgerIdNamespaceSha256` uses the exact binary frame
+`SHA-256("NBLN1" || u32be(keyUtf8Length) || keyUtf8 || i64be(Oxia metadata version) ||
+decodeLowerHex32(storedValueSha256))`。That exact digest is written into broker readiness、stream config binding、ledger
+root/custom metadata and activation；a revoke or record replacement cannot retain the old capability identity.
+
+The admin operation verifies the BookKeeper scope and deployment policy, uses put-if-absent/CAS to prevent two Nereus
+deployments reserving the same `(providerScope,prefix)`, and records non-secret evidence digest only. Brokers may only
+read/verify this record；startup, first-create and activation never auto-create it. `REVOKED` is terminal and invalidates
+readiness immediately. This coordinates trusted Nereus deployments；a BookKeeper environment permitting untrusted
+external exact `CreateAdv` in the prefix is outside the supported profile, because the provider cannot enforce a
+conditional delete fence.
 
 ## 5. Cluster capability
 
@@ -111,17 +171,18 @@ Add reserved lookup properties：
 ```text
 nereus.bookkeeper-primary-wal-protocol = "1"
 nereus.bookkeeper-primary-wal-config   = <configuration binding SHA-256>
+nereus.bookkeeper-ledger-namespace     = <reserved-prefix + reservation binding SHA-256>
 ```
 
 `NereusBookKeeperPrimaryWalCapability.requireUnreserved` chains with existing storage-binding/cursor/generation
 reserved checks. `NereusBrokerCapabilityCoordinator.decorateLookupProperties` publishes them only after the borrowed
-client、module、codecs、writer/reader/recovery are initialized.
+client、module、codecs、writer/reader/recovery and exact deployment namespace reservation are initialized.
 
 Profile barriers use two stable all-persistent-broker snapshots：
 
 | Profile | Required capabilities |
 | --- | --- |
-| BK_ONLY | storage binding + cursor + BK protocol/config |
+| BK_ONLY | storage binding + cursor + BK protocol/config + exact ledger-id namespace |
 | BK_ASYNC_OBJECT | BK_ONLY set + generation protocol |
 | BK_SYNC_OBJECT | BK_ONLY set + generation protocol + required-object completion capability |
 
@@ -132,6 +193,10 @@ Readiness identity includes broker id、start timestamp、all required property 
 Registry changes invalidate cached readiness. A broker with missing/different config keeps new BK profile admission
 closed; existing topics may read only if the broker can satisfy their exact durable profile, otherwise ownership must
 not be assigned/opened there.
+
+Activation also requires `maxReaderLeasesPerLedger` to cover the stable persistent-broker set plus the configured
+rolling-restart overlap. A larger broker set invalidates readiness before those processes can become BK readers；the
+limit cannot be silently exceeded and later used as a truncated GC scan.
 
 ## 6. Durable activation and deletion gate
 
@@ -145,6 +210,7 @@ record BookKeeperProtocolActivationRecord(
     long brokerReadinessEpoch,
     String brokerReadinessSha256,
     String configurationBindingSha256,
+    String ledgerIdNamespaceSha256,
     boolean walOnlyPublicationEnabled,
     boolean asyncPublicationEnabled,
     boolean syncPublicationEnabled,
@@ -156,16 +222,29 @@ record BookKeeperProtocolActivationRecord(
     long metadataVersion) { }
 ```
 
+Activation lifecycle wire ids are `PREPARED=1` and `ACTIVE=2`；record identity fields and enabled bits are validated
+independently of enum ordinal.
+
 Publication bits advance monotonically only after their milestone gate. Ledger deletion additionally requires：
 
 - complete all-256-shard root/protection/lease scan；
 - complete registered BK stream/profile/reference-domain scan；
 - exact provider-scope create/write/read/fence/delete/response-loss canary；
+- exact exclusive advanced-ledger-id namespace reservation digest and no stock/foreign exact-create permission in
+  that prefix；
+- zero `lateCreateHazard` and no retained allocation slot for every candidate selected for physical deletion；
 - current stable broker readiness/config digest；
 - one CAS installing all three exact proof digests and deletion bit；
 - local `gcEnabled && !gcDryRun` plus exact active proof revalidation on every mutation。
 
-Configuration alone is never deletion authority. Safe defaults start no mutating ledger collector.
+Configuration alone is never deletion authority. Safe defaults start no mutating ledger collector. Namespace proof
+is an operational trust boundary backed by cluster provisioning/readiness；the canary demonstrates the configured
+scope but cannot manufacture exclusivity. If the reservation cannot be asserted, no BookKeeper profile may be
+first-created and an already loaded topic must fail ownership/write/delete closed.
+
+Likewise, an unknown create outcome is not repaired by an admin Boolean. Its fixed slot/hazard may exhaust new ledger
+allocation by design；BK-M0–M6 require fail-closed operational escalation or a new provider-scope/prefix deployment,
+and define no online hazard-clear operation.
 
 ## 7. First-create and reopen admission
 
@@ -176,7 +255,7 @@ resolve requested/default profile
 storage-class creation guard proves no stock BK/Nereus durable conflict
 require exact profile capability/readiness + activation publication bit
 create durable Nereus stream metadata with immutable profile
-store BK configuration binding for BK profiles
+store BK configuration + ledger-id namespace binding for BK profiles
 create F2 topic/virtual-ledger projection
 register generation/materialization stream if object-enabled
 finish storage-class binding ACTIVE
@@ -240,10 +319,13 @@ broker against shared F4 tasks; source protections and claims serialize physical
 Stock Pulsar topics and Nereus BK-profile topics may share the same client/BookKeeper cluster, but not metadata
 authority：
 
+- Nereus uses only its reserved positive-63-bit advanced-id prefix；stock clients use normal allocation and must not
+  call exact `CreateAdv` inside that prefix；
 - stock ManagedLedger metadata/ledgers are never inserted into Nereus root keyspace；
 - Nereus ledgers carry exact `NBKL1` custom metadata and global Oxia root/allocation identity；
 - Nereus reader/deleter requires both root and matching custom metadata；
-- a ledger-id collision with stock/foreign metadata is never deleted；a new random candidate is chosen；
+- a ledger-id collision with stock/foreign metadata is never deleted；a new random candidate inside the reserved
+  prefix is chosen and the collision invalidates deletion activation for audit；
 - Nereus does not invoke stock ManagedLedger trim/delete APIs for its physical ledgers；
 - stock control topic write/read/retention remains in every real two-broker gate。
 
@@ -252,8 +334,9 @@ authority：
 Recommended operational rollout mirrors implementation milestones：
 
 ```text
-1. deploy BK-capable readers/codecs/module with all publication/delete bits off
-2. establish stable cluster readiness/config digest
+1. reserve/provision the exact ledger-id namespace, then deploy BK-capable readers/codecs/module with all
+   publication/delete bits off
+2. establish stable cluster readiness/config/namespace digests
 3. enable BK_ONLY publication for canary first-create topics
 4. pass restart/unload/failover/rollover/logical-trim gates
 5. enable BK_ASYNC publication; keep ledger delete dry-run initially
