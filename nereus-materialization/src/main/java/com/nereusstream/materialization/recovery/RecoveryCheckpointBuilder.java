@@ -7,6 +7,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PublicationId;
+import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
@@ -591,10 +592,29 @@ public final class RecoveryCheckpointBuilder {
                         && profile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT)) {
             throw condition("stream is not eligible for Object-WAL recovery checkpointing");
         }
+        Optional<ProjectionRef> registeredProjection = decodeProjection(
+                registration.value().projectionRef(),
+                "recovery registration projection cannot be decoded");
+        if (registeredProjection.isEmpty()) {
+            throw invariant("recovery registration has no live projection identity");
+        }
         for (var commit : walk.commitsNewestFirst()) {
-            if (!commit.canonicalCommit().projectionRef().equals(registration.value().projectionRef())) {
+            Optional<ProjectionRef> sourceProjection = decodeProjection(
+                    commit.canonicalCommit().projectionRef(),
+                    "live commit projection cannot be decoded");
+            if (sourceProjection.isPresent()
+                    && !sourceProjection.equals(registeredProjection)) {
                 throw invariant("live commit projection differs from the recovery registration");
             }
+        }
+    }
+
+    private static Optional<ProjectionRef> decodeProjection(
+            String encoded, String failureMessage) {
+        try {
+            return ProjectionIdentity.decode(encoded);
+        } catch (RuntimeException failure) {
+            throw invariant(failureMessage, failure);
         }
     }
 

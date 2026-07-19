@@ -130,6 +130,53 @@ class Phase4PhysicalRootLifecycleRouterTest {
         assertThat(ownerless).hasValue(1);
     }
 
+    @Test
+    void referencedGenerationRootsRunBeforeOwnerlessFallbackForActiveAndMarked() {
+        CursorLedgerIdentity ledger = ledger();
+        AtomicInteger referencedActive = new AtomicInteger();
+        AtomicInteger referencedMarked = new AtomicInteger();
+        AtomicInteger ownerless = new AtomicInteger();
+        Phase4PhysicalRootLifecycleRouter router =
+                new Phase4PhysicalRootLifecycleRouter(
+                        CLUSTER,
+                        projections(ledger, true),
+                        ignored -> CompletableFuture.completedFuture(null),
+                        (ignored, root) -> CompletableFuture.completedFuture(null),
+                        root -> {
+                            referencedActive.incrementAndGet();
+                            return CompletableFuture.completedFuture(true);
+                        },
+                        root -> {
+                            referencedMarked.incrementAndGet();
+                            return CompletableFuture.completedFuture(true);
+                        },
+                        root -> {
+                            ownerless.incrementAndGet();
+                            return CompletableFuture.completedFuture(null);
+                        },
+                        root -> {
+                            ownerless.incrementAndGet();
+                            return CompletableFuture.completedFuture(null);
+                        },
+                        root -> CompletableFuture.completedFuture(null),
+                        root -> CompletableFuture.completedFuture(null));
+
+        router.visit(root(
+                        new ObjectKey("objects/referenced-active"),
+                        PhysicalObjectKind.OBJECT_WAL,
+                        PhysicalObjectLifecycle.ACTIVE))
+                .join();
+        router.visit(root(
+                        new ObjectKey("objects/referenced-marked"),
+                        PhysicalObjectKind.COMMITTED_COMPACTED,
+                        PhysicalObjectLifecycle.MARKED))
+                .join();
+
+        assertThat(referencedActive).hasValue(1);
+        assertThat(referencedMarked).hasValue(1);
+        assertThat(ownerless).hasValue(0);
+    }
+
     private static ManagedLedgerProjectionMetadataStore projections(
             CursorLedgerIdentity ledger, boolean bindingPresent) {
         return (ManagedLedgerProjectionMetadataStore) Proxy.newProxyInstance(

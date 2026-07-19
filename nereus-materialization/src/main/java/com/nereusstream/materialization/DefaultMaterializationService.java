@@ -33,6 +33,7 @@ public final class DefaultMaterializationService implements MaterializationServi
     private State state = State.NEW;
     private ScheduledFuture<?> scheduledScan;
     private CompletableFuture<RegisteredMaterializationScanResult> activeScan;
+    private CompletableFuture<RegisteredMaterializationScanResult> activeScanSource;
     private boolean rescanRequested;
     private CompletableFuture<Void> closeFuture;
     private ScheduledFuture<?> closeDeadline;
@@ -160,9 +161,7 @@ public final class DefaultMaterializationService implements MaterializationServi
             ScheduledFuture<?> deadline = scheduler.schedule(
                     () -> {
                         markCloseDeadlineForced();
-                        if (scan != null) {
-                            scan.cancel(true);
-                        }
+                        cancelActiveScan(scan);
                         completeClose(true);
                     },
                     timeoutNanos,
@@ -175,9 +174,7 @@ public final class DefaultMaterializationService implements MaterializationServi
             }
         } catch (ArithmeticException | RejectedExecutionException failure) {
             markCloseDeadlineForced();
-            if (scan != null) {
-                scan.cancel(true);
-            }
+            cancelActiveScan(scan);
             completeClose(true);
         }
         return result;
@@ -221,6 +218,13 @@ public final class DefaultMaterializationService implements MaterializationServi
             source = CompletableFuture.failedFuture(failure);
         }
         CompletableFuture<RegisteredMaterializationScanResult> admittedSource = source;
+        boolean admitted;
+        synchronized (monitor) {
+            admitted = activeScan == target && state != State.CLOSED;
+            if (admitted) {
+                activeScanSource = admittedSource;
+            }
+        }
         admittedSource.whenComplete((value, failure) -> executeCallback(
                 () -> finishScan(target, value, failure, started)));
         target.whenComplete((ignored, failure) -> {
@@ -228,6 +232,10 @@ public final class DefaultMaterializationService implements MaterializationServi
                 admittedSource.cancel(true);
             }
         });
+        if (!admitted) {
+            admittedSource.cancel(true);
+            target.cancel(true);
+        }
     }
 
     private void finishScan(
@@ -246,6 +254,7 @@ public final class DefaultMaterializationService implements MaterializationServi
         synchronized (monitor) {
             if (activeScan == target) {
                 activeScan = null;
+                activeScanSource = null;
             }
             if (state == State.RUNNING) {
                 Duration delay = rescanRequested
@@ -300,6 +309,7 @@ public final class DefaultMaterializationService implements MaterializationServi
             }
             state = State.CLOSED;
             activeScan = null;
+            activeScanSource = null;
             if (closeDeadline != null) {
                 closeDeadline.cancel(false);
                 closeDeadline = null;
@@ -310,6 +320,21 @@ public final class DefaultMaterializationService implements MaterializationServi
         }
         observe(() -> observer.closeCompleted(forced, elapsed));
         result.complete(null);
+    }
+
+    private void cancelActiveScan(
+            CompletableFuture<RegisteredMaterializationScanResult> scan) {
+        if (scan == null) {
+            return;
+        }
+        CompletableFuture<RegisteredMaterializationScanResult> source;
+        synchronized (monitor) {
+            source = activeScan == scan ? activeScanSource : null;
+        }
+        if (source != null) {
+            source.cancel(true);
+        }
+        scan.cancel(true);
     }
 
     private void markCloseDeadlineForced() {

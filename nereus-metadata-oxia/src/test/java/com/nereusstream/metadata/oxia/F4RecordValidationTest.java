@@ -172,7 +172,7 @@ class F4RecordValidationTest {
     }
 
     @Test
-    void rejectsActivationBackfillFactsFromAFutureReadinessEpoch() {
+    void rejectsActivationBackfillFactsFromAnotherOpaqueReadinessEpoch() {
         assertThatThrownBy(() -> new GenerationProtocolActivationRecord(
                         1,
                         1,
@@ -192,7 +192,7 @@ class F4RecordValidationTest {
                         150,
                         0))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("cannot be newer");
+                .hasMessageContaining("another broker readiness identity");
     }
 
     @Test

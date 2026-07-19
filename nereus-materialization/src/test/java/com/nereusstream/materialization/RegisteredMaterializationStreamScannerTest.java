@@ -97,6 +97,10 @@ class RegisteredMaterializationStreamScannerTest {
                 taskStore,
                 recovery,
                 recoveryScanner,
+                streamId -> CompletableFuture.completedFuture(
+                        com.nereusstream.materialization.recovery.RecoveryCheckpointRunResult.skipped(
+                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus
+                                        .NO_LIVE_TAIL)),
                 (streamId, exactPolicy, mutationGuard) -> mutationGuard.revalidate()
                         .thenCompose(ignored -> durable.getOrCreateMaterializationCheckpoint(
                                 CLUSTER,
@@ -212,6 +216,10 @@ class RegisteredMaterializationStreamScannerTest {
                 taskStore,
                 recovery,
                 new TaskRecoveryScanner(taskStore, recovery, 1),
+                streamId -> CompletableFuture.completedFuture(
+                        com.nereusstream.materialization.recovery.RecoveryCheckpointRunResult.skipped(
+                                com.nereusstream.materialization.recovery.RecoveryCheckpointBuildStatus
+                                        .NO_LIVE_TAIL)),
                 (streamId, exactPolicy, mutationGuard) -> mutationGuard.revalidate()
                         .thenCompose(ignored -> durable.getOrCreateMaterializationCheckpoint(
                                 CLUSTER,
@@ -319,6 +327,7 @@ class RegisteredMaterializationStreamScannerTest {
                     com.nereusstream.core.capability.GenerationActivationSubject subject,
                     boolean activateLiveProjectionIfAbsent) {
                 readinessChecks.incrementAndGet();
+                assertThat(activateLiveProjectionIfAbsent).isTrue();
                 return delegate.requireReady(operation, subject, activateLiveProjectionIfAbsent);
             }
 

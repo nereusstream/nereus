@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 class GenerationProtocolActivationStoreContractTest {
     @Test
-    void exactClusterAuthorityBootstrapsAndAdvancesMonotonicallyAcrossRuntimes() {
+    void exactClusterAuthorityBootstrapsAndAdvancesCapabilitiesAcrossRuntimes() {
         InMemoryPartitionedOxiaBackend backend = new InMemoryPartitionedOxiaBackend();
         Clock clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
         GenerationProtocolActivationStore first = store(
@@ -134,7 +134,7 @@ class GenerationProtocolActivationStoreContractTest {
                 true,
                 true,
                 true,
-                8,
+                6,
                 current.requiredReferenceDomains(),
                 complete(F4MetadataTestValues.ATTEMPT, F4MetadataTestValues.HASH_A, 1_200),
                 complete(F4MetadataTestValues.CLAIM, F4MetadataTestValues.HASH_B, 1_201),
@@ -149,7 +149,7 @@ class GenerationProtocolActivationStoreContractTest {
             String coverageSha256,
             long completedAtMillis) {
         return new GenerationBackfillProofRecord(
-                runId, 8, coverageSha256, true, completedAtMillis);
+                runId, 6, coverageSha256, true, completedAtMillis);
     }
 
     private static GenerationProtocolActivationRecord copy(

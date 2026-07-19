@@ -122,15 +122,10 @@ public record GenerationProtocolActivationRecord(
     private static void requireBackfillEpoch(
             GenerationBackfillProofRecord proof,
             long brokerCapabilityReadinessEpoch) {
-        if (proof.brokerReadinessEpoch() > brokerCapabilityReadinessEpoch) {
+        if (proof.brokerReadinessEpoch()
+                != brokerCapabilityReadinessEpoch) {
             throw new IllegalArgumentException(
-                    "backfill proof cannot be newer than the broker readiness epoch");
-        }
-        if (proof.complete()
-                && proof.brokerReadinessEpoch()
-                        != brokerCapabilityReadinessEpoch) {
-            throw new IllegalArgumentException(
-                    "complete backfill proof belongs to another broker readiness epoch");
+                    "backfill proof belongs to another broker readiness identity");
         }
     }
 }

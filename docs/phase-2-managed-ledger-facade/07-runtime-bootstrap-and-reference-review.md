@@ -236,8 +236,9 @@ No broker-private class enters L0 modules.
 
 `DefaultNereusRuntimeProvider` is the production implementation. During hybrid-storage initialization, before
 building `StreamStorageConfig`，the fork calls `NereusProcessIdentity.generate(new SecureRandom())` exactly once。
-The method fills 16 random bytes, Base64-URL encodes them without padding as `processRunId`，zeros the temporary byte
-array and returns `writerId="pulsar-f2/" + processRunId`。The broker configuration mapper injects both exact values
+The method fills 16 random bytes, domain-independently hashes and lowercase-base32 encodes them through
+`DeterministicIds.randomRunIdHash` as `processRunId`，zeros the temporary byte array and returns
+`writerId="pulsar-f2/" + processRunId`。The broker configuration mapper injects both exact values
 into `StreamStorageConfig` before `create` is called. The provider verifies that relationship and that the cluster
 equals the frozen broker cluster identity；it neither reads nor waits for `PulsarService.getBrokerId()`。Phase 1.5
 derives the durable writer-run hash and process-local `AppendAttemptId` namespace from the explicit process ID。
@@ -258,7 +259,8 @@ runtime without an untyped side channel. Construction validates cross-config sca
 before provider/client creation，loads the ObjectStore provider through the supplied classloader and assembles one
 shared Oxia runtime、L0 metadata adapter、projection adapter、Object WAL and `DefaultStreamStorage`。Partial failure
 closes every already-created owned resource while retaining close failures as suppressed exceptions。Unit gates lock
-128-bit URL-safe process identity/temporary-array zeroing、cross-config rejection and provider type/public-constructor
+128-bit-entropy lowercase-base32 process identity/temporary-array zeroing、cross-config rejection and provider
+type/public-constructor
 failure before client construction。Broker-private hybrid storage construction remains fork-owned and pending。
 
 ### 3.1 ObjectStore provider

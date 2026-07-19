@@ -157,10 +157,6 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
         GenerationProtocolActivationRecord value = current.value();
         requireDomainSet(value);
         long expectedEpoch = completion.readiness().brokerReadinessEpoch();
-        if (value.brokerCapabilityReadinessEpoch() > expectedEpoch) {
-            return CompletableFuture.failedFuture(notReady(
-                    "registration backfill readiness is older than durable activation"));
-        }
         GenerationBackfillProofRecord proof =
                 value.streamRegistrationBackfill();
         if (proof.complete()
@@ -183,8 +179,8 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
         }
 
         long completedAt = Math.max(1, clock.millis());
-        boolean newerEpoch =
-                expectedEpoch > value.brokerCapabilityReadinessEpoch();
+        boolean changedEpoch =
+                expectedEpoch != value.brokerCapabilityReadinessEpoch();
         GenerationBackfillProofRecord replacementProof =
                 new GenerationBackfillProofRecord(
                         completion.runId(),
@@ -203,15 +199,15 @@ public final class DefaultManagedLedgerGenerationRegistrationBackfillProofCoordi
                         expectedEpoch,
                         value.requiredReferenceDomains(),
                         replacementProof,
-                        newerEpoch
+                        changedEpoch
                                 ? GenerationBackfillProofRecord.incomplete(
                                         expectedEpoch)
                                 : value.physicalRootBackfill(),
-                        newerEpoch
+                        changedEpoch
                                 ? GenerationBackfillProofRecord.incomplete(
                                         expectedEpoch)
                                 : value.cursorSnapshotBackfill(),
-                        newerEpoch
+                        changedEpoch
                                 ? ""
                                 : value.objectStoreCapabilitySha256(),
                         value.activatingBrokerRunId(),

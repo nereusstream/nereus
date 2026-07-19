@@ -232,6 +232,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     streamConfig.processRunId(),
                     streamConfig,
                     configuration.materialization(),
+                    configuration.physicalGc().pendingProtectionDuration(),
                     l0MetadataStore,
                     generationMetadataStore,
                     physicalMetadataStore,

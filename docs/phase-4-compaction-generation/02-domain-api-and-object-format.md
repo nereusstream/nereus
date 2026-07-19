@@ -10,7 +10,7 @@ reconciliation、advisory checkpoint reconciler、bounded M3 service lifecycle a
 trip are also implemented. The protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity
 registry、COMMITTED-source planner bootstrap、collision-free tagged-v1 key namespace、checksum-verified sorted-spill
 two-pass engine、NTC1 worker/publication path and proof-driven terminal workflow-metadata retirement are implemented
-and covered by focused tests. The M3 ordinary/final gates passed on 2026-07-15. F4-M4 is now in progress：the NRC1
+and covered by focused tests. The M3 ordinary/final gates passed on 2026-07-15. F4-M4 is complete/final-gated：the NRC1
 domain values、private-staging streaming writer、strict header/footer/directory/range reader、attempt/key identity and
 authoritative F4 metadata-record verifier described in section 9 are implemented and focused-tested. The document 03
 §10 generation-zero protocol is also implemented for ordinary and recovery append paths：exact prepared intent、
@@ -32,9 +32,10 @@ lane、production managed-ledger/facade installation and exact Pulsar retention/
 admin admission. Checkpoints AJ–AN additionally implement cursor-snapshot discovery/execution、the current-writer
 known-prefix inventory and exact missing-root registration boundary、registration-last retirement and the strict
 metadata-first lifecycle. Checkpoint AO maps the exact bounded broker physical-GC configuration into that runtime；
-checkpoint AP now implements the configured-scope object-store PUT/HEAD/LIST/exact-DELETE capability proof without
-persisting or activating it. Product composition of coverage + capability proof、physical-delete activation and the
-remaining destructive runtime remain target work. Package、class and method names
+checkpoint AP implements the configured-scope object-store PUT/HEAD/LIST/exact-DELETE capability proof；checkpoints
+AQ–BC add atomic activation、runtime routing、restart/scale/failure cuts and deletion-active readiness rollover. The
+retry-disabled real two-broker gate proves exact source deletion、compacted reads、MessageId stability、unload/
+failover/restart and BookKeeper coexistence. Package、class and method names
 are normative unless a review replaces them together with
 every caller/test listed in document 07.
 

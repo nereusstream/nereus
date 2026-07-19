@@ -2,8 +2,8 @@
 
 > 状态：Current cross-track protocol
 > Append truth 已与 Phase 1 stream-head CAS 实现合同对齐；Phase 1.5 generic target/recovery/lifecycle 已实现并
-> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M3
-> 已 implementation/final-gated，F4-M4 through checkpoint BC 与 F4-M5 through checkpoint AI 正在实现；
+> final-gated；F3 cursor protocol 已完成 M0/M0R design gate 与 M1-M6 implementation/final gates；F4-M1–M4
+> 已 implementation/final-gated，F4-M5 through checkpoint AI 正在实现；
 > txn、catalog 仍为 target design。
 
 ## 1. Purpose

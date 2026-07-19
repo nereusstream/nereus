@@ -8,7 +8,7 @@
 > worker、protection/checkpoint reconciliation、bounded service lifecycle 与 Pulsar Entry/NCP1 byte round trip
 > checkpoints、topic-compaction neutral SPI/registry、COMMITTED-source bootstrap、tagged-v1 key encoding、
 > sorted-spill two-pass engine/worker 与 terminal workflow-metadata retirement 已实现；F4-M3 ordinary/real-service
-> final gates 已于 2026-07-15 通过；F4-M4 through checkpoint BC 已实现 opt-in physical-GC composition，并以
+> final gates 已于 2026-07-15 通过；F4-M4 已实现 opt-in physical-GC composition，并以
 > 真实 Oxia/LocalStack 验证 wrong-scope、empty-list/lost-response、post-DELETE/pre-root-CAS restart 与 applied-
 > DELETED-CAS response-loss exact-reload cuts、two-worker shared-intent/idempotent-delete convergence，以及
 > 1,001-root hot-shard + all-shard 1,256-root real-Oxia bounded pagination，以及 10,000 DELETED-root
@@ -16,6 +16,8 @@
 > deleted-cursor 的 exact classification/protection retirement/object delete，以及 Object-WAL first/retry guarded
 > transmission、tombstone audit cuts 和 post-root external reappearance 的 missing-root registration/full grace；
 > checkpoint BC 不改变 object bytes，新增 deletion-active epoch 的 non-publishing root scan 与 atomic proof rollover；
+> retry-disabled real two-broker final gate 又证明 source bytes 删除后 compacted reads、exact MessageIds、unload/
+> failover/restart/reverse takeover 和 stock BookKeeper coexistence；F4-M4 已 final-gated；
 > 其他 object families `Designed/Reserved`
 > Durable Object WAL bytes 以代码、Phase 1 code-level design 和 golden tests 为准。
 
@@ -281,8 +283,10 @@ implement BookKeeper IO。
 
 ## 10. F4 code-level object families
 
-> Status: In progress. NCP1/NTC1 are implemented and F4-M3 final-gated；the NRC1 object codec/strict reader is
-> implemented as F4-M4 checkpoint A. Recovery-root publication、retirement and GC remain unavailable.
+> Status: Implemented through F4-M4 and final-gated on 2026-07-19. NCP1/NTC1 and NRC1 codec/strict reader、
+> recovery-root publication、replay/index repair、source retirement and referenced/ownerless physical GC are wired
+> into the production runtime and covered by a retry-disabled real two-broker acceptance gate. Safe broker defaults
+> still schedule no physical deletion；F4-M5/M6 remain separate rollout/compatibility milestones.
 
 A read-optimized object is per-stream and covers a declared half-open offset range. Its durable header includes a
 closed read-view value (`COMMITTED` or `TOPIC_COMPACTED`); view-specific indexes and generation ordering never cross.

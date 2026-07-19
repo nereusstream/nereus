@@ -169,7 +169,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("725b2ad9e7f57135e18419589ff0a42b05fe58aa")
+    .orElse("5aeb199eadc2f5bcd2d618e1dbc42b810168de2d")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1463,6 +1463,55 @@ tasks.register("phase4M4ReadinessRolloverCheck") {
     dependsOn(":nereus-pulsar-adapter:check")
 }
 
+tasks.register("phase4M4Check") {
+    group = "verification"
+    description = "Run every ordinary and real-service Nereus F4-M4 product gate."
+    dependsOn("phase4M4ReadinessRolloverCheck")
+}
+
+tasks.register<Exec>("checkPhase4M4FinalContractSurface") {
+    group = "verification"
+    description = "Audit stable L0 authority and the real two-broker physical-GC acceptance fixture."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase4-m4-final-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("phase4M4PhysicalGcMultiBrokerPulsarCheck") {
+    group = "verification"
+    description = "Run the real two-broker Nereus physical-GC, MessageId, and BookKeeper coexistence gate."
+    dependsOn("checkPhase4PulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    mustRunAfter("phase4M4Check")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusPhysicalGcMultiBrokerIntegrationTest",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+        "-PtestRetryCount=0",
+    )
+}
+
+tasks.register("phase4M4FinalCheck") {
+    group = "verification"
+    description = "Run the complete F4-M4 release gate including real two-broker physical deletion and failover."
+    dependsOn("phase4M4Check")
+    dependsOn("checkPhase4M4FinalContractSurface")
+    dependsOn("phase4M4PhysicalGcMultiBrokerPulsarCheck")
+    dependsOn("checkPhase4Documentation")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPhase4PulsarSourceLock")
+}
+
 tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
     group = "verification"
     description = "Audit exact managed-ledger registration before every topic-open return."
@@ -1473,7 +1522,7 @@ tasks.register<Exec>("checkPhase4M5RegistrationFrontierContractSurface") {
 tasks.register("phase4M5RegistrationFrontierCheck") {
     group = "verification"
     description = "Verify the F4 registration new-write/open frontier and shared production wiring."
-    dependsOn("phase4M4ReadinessRolloverCheck")
+    dependsOn("phase4M4FinalCheck")
     dependsOn("checkPhase4M5RegistrationFrontierContractSurface")
     dependsOn("checkPhase4Documentation")
     dependsOn("checkPhase4ModuleBoundaries")

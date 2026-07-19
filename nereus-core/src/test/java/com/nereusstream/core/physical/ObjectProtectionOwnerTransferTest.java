@@ -16,12 +16,50 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedObjectProtection;
+import com.nereusstream.metadata.oxia.VersionedPhysicalObjectRoot;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionRecord;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
+import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class ObjectProtectionOwnerTransferTest {
+    @Test
+    void acquireOrTransferRebindsTheExactOwnerAfterAnActiveRootEpochAdvance() {
+        FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();
+        DefaultObjectProtectionManager manager = manager(
+                store, new ObjectProtectionTestSupport.MutableClock(NOW));
+        ObjectProtectionOwner exactOwner = owner("f", 41);
+        ObjectProtection original = manager.acquire(
+                permanent(exactOwner), ignored -> CompletableFuture.completedFuture(null)).join();
+        VersionedPhysicalObjectRoot active = store.getRoot(
+                CLUSTER, original.object().objectKeyHash()).join().orElseThrow();
+        VersionedPhysicalObjectRoot marked = store.compareAndSetRoot(
+                CLUSTER,
+                withLifecycle(active.value(), PhysicalObjectLifecycle.MARKED, 2),
+                active.metadataVersion()).join();
+        VersionedPhysicalObjectRoot reboundRoot = store.compareAndSetRoot(
+                CLUSTER,
+                withLifecycle(marked.value(), PhysicalObjectLifecycle.ACTIVE, 3),
+                marked.metadataVersion()).join();
+        AtomicInteger validations = new AtomicInteger();
+
+        ObjectProtection rebound = manager.acquireOrTransfer(
+                permanent(exactOwner), expected -> {
+                    assertThat(expected).isEqualTo(exactOwner);
+                    validations.incrementAndGet();
+                    return CompletableFuture.completedFuture(null);
+                }).join();
+
+        assertThat(rebound.identity()).isEqualTo(original.identity());
+        assertThat(rebound.owner()).isEqualTo(exactOwner);
+        assertThat(rebound.rootLifecycleEpoch())
+                .isEqualTo(reboundRoot.value().lifecycleEpoch());
+        assertThat(rebound.metadataVersion()).isGreaterThan(original.metadataVersion());
+        assertThat(validations).hasValue(2);
+    }
+
     @Test
     void acquireOrTransferConvergesOnlyAForwardVersionOfTheSameLogicalOwner() {
         FakePhysicalObjectMetadataStore store = new FakePhysicalObjectMetadataStore();
@@ -162,6 +200,38 @@ class ObjectProtectionOwnerTransferTest {
                 ignored -> CompletableFuture.completedFuture(null)).join();
         manager.release(
                 reconciled, ignored -> CompletableFuture.completedFuture(null)).join();
+    }
+
+    private static PhysicalObjectRootRecord withLifecycle(
+            PhysicalObjectRootRecord current,
+            PhysicalObjectLifecycle lifecycle,
+            long lifecycleEpoch) {
+        boolean marked = lifecycle == PhysicalObjectLifecycle.MARKED;
+        return new PhysicalObjectRootRecord(
+                current.schemaVersion(),
+                current.objectKeyHash(),
+                current.objectKey(),
+                current.objectId(),
+                current.objectKindId(),
+                current.objectLength(),
+                current.storageChecksumType(),
+                current.storageChecksumValue(),
+                current.contentSha256(),
+                current.etag(),
+                lifecycle,
+                lifecycleEpoch,
+                current.createdAtMillis(),
+                current.orphanNotBeforeMillis(),
+                marked ? "a".repeat(52) : "",
+                marked ? "a".repeat(64) : "",
+                marked ? NOW : 0,
+                marked ? NOW : 0,
+                0,
+                0,
+                0,
+                "",
+                "",
+                0);
     }
 
     private static final class LostTransferResponseStore

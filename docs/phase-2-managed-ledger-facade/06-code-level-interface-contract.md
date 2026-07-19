@@ -455,8 +455,9 @@ append and exact recovery before closing its callback domain. `maxEntryBytes` is
 persisted entry size and no larger than the L0/object limits.
 
 Runtime construction does not accept or wait for a Pulsar `brokerId`: the locked `PulsarService` startup sequence
-constructs managed-ledger storage before the final broker ID exists. It generates a fresh, URL-safe 128-bit-or-more
-`processRunId` with `SecureRandom` and freezes `writerId="pulsar-f2/" + processRunId`；both accessors return those
+constructs managed-ledger storage before the final broker ID exists. It generates 128 bits of fresh entropy with
+`SecureRandom`，hashes and lowercase-base32 encodes it as `processRunId`，and freezes
+`writerId="pulsar-f2/" + processRunId`；both accessors return those
 immutable values. They are diagnostic/session identities only, never durable topic identity. The fork publishes its
 broker capability later, after a broker ID exists and before load-manager advertisement, as specified in `07`.
 

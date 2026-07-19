@@ -78,6 +78,7 @@ class Phase4ObjectWalRuntimeTest {
                 streamConfig(),
                 MaterializationConfig.defaults(
                         root.resolve("staging").toAbsolutePath()),
+                Duration.ofMinutes(1),
                 l0,
                 generations,
                 l0,

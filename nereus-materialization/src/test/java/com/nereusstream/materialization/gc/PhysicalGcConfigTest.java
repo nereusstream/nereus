@@ -101,6 +101,27 @@ class PhysicalGcConfigTest {
     }
 
     @Test
+    void crossValidationRejectsReadDeadlineOutsideReaderLease(@TempDir Path stagingDirectory) {
+        PhysicalGcConfig shortReaderLease = config(
+                false,
+                true,
+                Duration.ofMinutes(1),
+                Duration.ofHours(25),
+                Duration.ofDays(7),
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(20),
+                Duration.ofSeconds(5),
+                Duration.ZERO);
+
+        assertThatThrownBy(() -> shortReaderLease.validateAgainst(
+                        StreamStorageConfig.defaults("cluster-a", "writer-a"),
+                        MaterializationConfig.defaults(stagingDirectory)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("readTimeout plus maximumClockSkew");
+    }
+
+    @Test
     void deadlineOverflowDisablesCandidateInsteadOfWrapping() {
         PhysicalGcConfig config = PhysicalGcConfig.defaults();
 

@@ -243,7 +243,9 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
             return failed(failure);
         }
         ObjectProtection existing = fromVersioned(request.object(), current);
-        if (existing.owner().equals(request.owner())) {
+        if (existing.owner().equals(request.owner())
+                && existing.rootLifecycleEpoch()
+                        == root.value().lifecycleEpoch()) {
             return postCheck(existing, root, ownerRevalidator);
         }
         return invokeOwnerRevalidator(ownerRevalidator, request.owner()).thenCompose(ignored -> {
@@ -505,9 +507,11 @@ public final class DefaultObjectProtectionManager implements ObjectProtectionMan
         if (!currentOwner.ownerKey().equals(request.owner().ownerKey())) {
             throw condition("existing protection belongs to a different logical owner");
         }
-        if (value.expiresAtMillis() != request.expiresAtMillis()
-                || value.rootLifecycleEpoch() != root.value().lifecycleEpoch()) {
-            throw condition("existing protection expiry/root cannot be reconciled");
+        if (value.expiresAtMillis() != request.expiresAtMillis()) {
+            throw condition("existing protection expiry cannot be reconciled");
+        }
+        if (value.rootLifecycleEpoch() > root.value().lifecycleEpoch()) {
+            throw invariant("object protection lifecycle epoch is ahead of its ACTIVE root");
         }
         if (request.owner().metadataVersion() < currentOwner.metadataVersion()) {
             throw condition("object protection owner reconciliation cannot roll back");

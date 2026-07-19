@@ -3,11 +3,13 @@ package com.nereusstream.pulsar;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.core.capability.GenerationCapabilityReadinessProvider;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.capability.GenerationRegistrationBackfillCompletion;
 import com.nereusstream.core.physical.GcGlobalReferenceScope;
 import com.nereusstream.core.physical.GcReferenceDomain;
+import com.nereusstream.core.physical.GcReferenceDomainConfig;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.managedledger.cursor.CursorStorageConfig;
 import com.nereusstream.managedledger.generation.ManagedLedgerGenerationProjectionAuthorityReader;
@@ -35,6 +37,7 @@ import com.nereusstream.materialization.gc.GenerationZeroCommitRetirementHandler
 import com.nereusstream.materialization.gc.GenerationZeroIndexRetirementHandler;
 import com.nereusstream.materialization.gc.GenerationZeroMarkerRetirementHandler;
 import com.nereusstream.materialization.gc.HigherGenerationIndexRetirementHandler;
+import com.nereusstream.materialization.gc.HigherGenerationPreDrainCoordinator;
 import com.nereusstream.materialization.gc.MaterializationReferenceDomain;
 import com.nereusstream.materialization.gc.ObjectInventoryScanner;
 import com.nereusstream.materialization.gc.OwnerlessObjectGcExecutor;
@@ -45,6 +48,7 @@ import com.nereusstream.materialization.gc.PhysicalObjectGarbageCollector;
 import com.nereusstream.materialization.gc.PhysicalObjectRootScanner;
 import com.nereusstream.materialization.gc.SecureGcIdGenerator;
 import com.nereusstream.materialization.gc.SourceRetirementCoordinator;
+import com.nereusstream.materialization.gc.SourceRetirementPlanBuilder;
 import com.nereusstream.materialization.gc.StreamRegistrationRetirementCoordinator;
 import com.nereusstream.materialization.gc.StreamRegistrationRetirementScanner;
 import com.nereusstream.metadata.oxia.CursorMetadataStore;
@@ -63,8 +67,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -92,6 +99,8 @@ public final class Phase4PhysicalGcRuntime
     private final Phase4PhysicalGcStartupGate startupGate;
     private final SourceRetirementMetadataStore sourceRetirementMetadata;
     private final ObjectAuditRetirementStore objectAuditRetirement;
+    private final ConcurrentMap<ObjectKeyHash, ReferencedObjectGcExecutor.ExecutionResult>
+            referencedGcResults = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public Phase4PhysicalGcRuntime(
@@ -174,6 +183,13 @@ public final class Phase4PhysicalGcRuntime
 
         List<GcReferenceDomainVersion> installedDomains =
                 NereusGenerationProtocolReferenceDomains.currentGcV1();
+        GcReferenceDomainConfig cursorReferenceDomainConfig =
+                new GcReferenceDomainConfig(
+                        Math.min(
+                                exactConfig.metadataScanPageSize(),
+                                exactCursorConfig.cursorScanPageSize()),
+                        exactConfig.maxAuthoritiesPerDomainSnapshot(),
+                        exactConfig.maxReferencesPerDomainSnapshot());
         List<GcReferenceDomain> domains = List.of(
                 new AppendRecoveryReferenceDomain(
                         exactCluster,
@@ -184,7 +200,7 @@ public final class Phase4PhysicalGcRuntime
                 new CursorSnapshotReferenceDomain(
                         exactCluster,
                         exactCursors,
-                        exactConfig.referenceDomainConfig(),
+                        cursorReferenceDomainConfig,
                         exactGlobalScope),
                 new FutureCatalogSentinelDomain(
                         exactCluster,
@@ -222,6 +238,9 @@ public final class Phase4PhysicalGcRuntime
                 new ManagedLedgerGenerationProjectionAuthorityReader(
                         exactCluster, exactProjections),
                 exactConfig.metadataScanPageSize(),
+                Math.min(
+                        exactConfig.metadataScanPageSize(),
+                        exactCursorConfig.cursorScanPageSize()),
                 exactObjectStoreRequestTimeout,
                 exactClock);
         this.deletionActivationCoordinator =
@@ -263,8 +282,31 @@ public final class Phase4PhysicalGcRuntime
                 exactScheduler);
         DefaultGcRetirementJournal journal = new DefaultGcRetirementJournal(
                 exactCluster, exactPhysical, exactConfig);
+        SourceRetirementPlanBuilder sourcePlans = new SourceRetirementPlanBuilder(
+                exactCluster,
+                exactL0,
+                exactGenerations,
+                exactPhysical,
+                exactSourceRetirement,
+                exactCheckpointCodec,
+                exactConfig);
+        HigherGenerationPreDrainCoordinator preDrain =
+                new HigherGenerationPreDrainCoordinator(
+                        exactCluster,
+                        exactL0,
+                        exactGenerations,
+                        exactPhysical,
+                        exactCheckpointCodec,
+                        exactConfig,
+                        exactClock,
+                        exactScheduler);
         GcPlanMetadataRevalidator metadataRevalidator = (candidate, expected) -> {
             var kind = candidate.referenceQuery().kind();
+            if (kind
+                    == com.nereusstream.core.physical.GcReferenceQueryKind
+                            .REFERENCED_OBJECT) {
+                return sourcePlans.reload(candidate, expected);
+            }
             if ((kind
                                     != com.nereusstream.core.physical.GcReferenceQueryKind
                                             .CURSOR_SNAPSHOT_CANDIDATE
@@ -312,6 +354,22 @@ public final class Phase4PhysicalGcRuntime
                 exactObjectStore,
                 exactClock,
                 exactScheduler);
+        ReferencedObjectGcExecutor referencedExecutor =
+                new ReferencedObjectGcExecutor(
+                        exactCluster,
+                        exactConfig,
+                        exactMaterializationConfig,
+                        exactPhysical,
+                        exactObjectProtection,
+                        preDrain,
+                        sourcePlans,
+                        registry,
+                        collector,
+                        retirement,
+                        journal,
+                        new SecureGcIdGenerator(),
+                        exactClock,
+                        exactScheduler);
         this.objectInventoryScanner = new ObjectInventoryScanner(
                 exactCluster,
                 exactConfig,
@@ -357,7 +415,7 @@ public final class Phase4PhysicalGcRuntime
                         new ManagedLedgerStreamRetirementAuthorityReader(
                                 exactCluster,
                                 exactCursors,
-                                exactConfig.referenceDomainConfig()),
+                                cursorReferenceDomainConfig),
                         exactCheckpointCodec,
                         exactConfig,
                         exactMaterializationConfig.metadataAuditGrace(),
@@ -373,13 +431,19 @@ public final class Phase4PhysicalGcRuntime
                 exactScheduler);
         PhysicalGcLifecyclePass lifecyclePass = new PhysicalGcLifecyclePass(
                 rootScanner,
-                () -> new Phase4PhysicalRootLifecycleRouter(
-                        exactCluster,
-                        exactProjections,
-                        cursorExecutor,
-                        ownerlessExecutor,
-                        retirement,
-                        tombstones),
+                () -> {
+                    referencedGcResults.clear();
+                    return new Phase4PhysicalRootLifecycleRouter(
+                            exactCluster,
+                            exactProjections,
+                            cursorExecutor,
+                            referencedExecutor,
+                            ownerlessExecutor,
+                            retirement,
+                            tombstones,
+                            result -> referencedGcResults.put(
+                                    result.object(), result));
+                },
                 registrationScanner,
                 objectInventoryScanner);
         this.lifecycleService = new DefaultPhysicalGcLifecycleService(
@@ -501,6 +565,15 @@ public final class Phase4PhysicalGcRuntime
             throw new IllegalStateException("Phase 4 physical GC runtime is closed");
         }
         return lifecycleService;
+    }
+
+    /** Last completed or in-flight root-pass outcome for every referenced root visited in this process. */
+    public Map<ObjectKeyHash, ReferencedObjectGcExecutor.ExecutionResult>
+            referencedGcResults() {
+        if (closed.get()) {
+            throw new IllegalStateException("Phase 4 physical GC runtime is closed");
+        }
+        return Map.copyOf(referencedGcResults);
     }
 
     @Override

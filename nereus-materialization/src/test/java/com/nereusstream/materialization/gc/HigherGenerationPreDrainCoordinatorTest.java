@@ -15,6 +15,8 @@ import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.PublicationId;
+import com.nereusstream.api.ProjectionRef;
+import com.nereusstream.api.ProjectionType;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
@@ -32,6 +34,7 @@ import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.RecoveryCheckpointRootDigests;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
@@ -83,6 +86,9 @@ import org.junit.jupiter.api.Test;
 class HigherGenerationPreDrainCoordinatorTest {
     private static final String CLUSTER = "cluster-pre-drain";
     private static final StreamId STREAM = new StreamId("tenant/ns/pre-drain");
+    private static final String PROJECTION_IDENTITY = ProjectionIdentity.encode(
+            Optional.of(new ProjectionRef(
+                    ProjectionType.VIRTUAL_LEDGER, "projection-pre-drain")));
 
     private final ScheduledExecutorService scheduler =
             Executors.newSingleThreadScheduledExecutor();
@@ -119,6 +125,39 @@ class HigherGenerationPreDrainCoordinatorTest {
     }
 
     @Test
+    void legacyEmptyNrc1ProjectionUsesTheHigherGenerationProjection() {
+        Fixture fixture = fixture(GenerationLifecycle.COMMITTED);
+        StoreState state = new StoreState(fixture);
+
+        HigherGenerationPreDrainResult result = coordinator(
+                        fixture, state, false, false)
+                .preDrain(fixture.candidate())
+                .join();
+
+        assertThat(fixture.source().value().projectionRef())
+                .isEqualTo(PROJECTION_IDENTITY);
+        assertThat(result.status())
+                .isEqualTo(HigherGenerationPreDrainStatus.DRAINING_READY);
+    }
+
+    @Test
+    void differentNonEmptyNrc1ProjectionVetoesBeforeTheSourceCas() {
+        Fixture base = fixture(GenerationLifecycle.COMMITTED);
+        String differentProjection = ProjectionIdentity.encode(Optional.of(
+                new ProjectionRef(ProjectionType.ENTRY_INDEX, "different")));
+        Fixture fixture = base.withEntry(entryWithProjection(
+                base.entry(), differentProjection));
+        StoreState state = new StoreState(fixture);
+
+        assertThatThrownBy(() -> coordinator(fixture, state, false, false)
+                        .preDrain(fixture.candidate())
+                        .join())
+                .hasRootCauseMessage(
+                        "higher-generation source is not an exact tiling of NRC1 commit entries: projection");
+        assertThat(state.casCalls).hasValue(0);
+    }
+
+    @Test
     void quarantinedSourceUsesTheSameCoverageProofBeforeDraining() {
         Fixture fixture = fixture(GenerationLifecycle.QUARANTINED);
         StoreState state = new StoreState(fixture);
@@ -146,6 +185,21 @@ class HigherGenerationPreDrainCoordinatorTest {
                 .hasRootCauseMessage(
                         "higher-generation source has no current healthy NRC1 replacement");
         assertThat(state.casCalls).hasValue(0);
+    }
+
+    @Test
+    void currentGenerationPublicationIsSkippedAsAReplacementCandidate() {
+        Fixture base = fixture(GenerationLifecycle.COMMITTED);
+        Fixture fixture = base.withPublication(publication(base.source().value()));
+        StoreState state = new StoreState(fixture);
+
+        assertThatThrownBy(() -> coordinator(fixture, state, false, false)
+                        .preDrain(fixture.candidate())
+                        .join())
+                .hasRootCauseMessage(
+                        "higher-generation source has no current healthy NRC1 replacement");
+        assertThat(state.casCalls).hasValue(0);
+        assertThat(state.replacementRootReads).hasValue(0);
     }
 
     @Test
@@ -447,15 +501,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 ByteBuffer.wrap(commitBytes),
                 sha256(commitBytes),
                 List.of(0));
-        GenerationIndexRecord embedded = replacement.value().withMetadataVersion(0);
-        byte[] publicationBytes = new GenerationIndexRecordCodecV1().encode(
-                embedded);
-        RecoveryCheckpointPublication publication = new RecoveryCheckpointPublication(
-                embedded.generation(),
-                new PublicationId(embedded.publicationId()),
-                new OffsetRange(embedded.offsetStart(), embedded.offsetEnd()),
-                ByteBuffer.wrap(publicationBytes),
-                GenerationIndexDigests.canonicalRecordSha256(embedded));
+        RecoveryCheckpointPublication publication = publication(replacement.value());
 
         RecoveryCheckpointWriteRequest header = new RecoveryCheckpointWriteRequest(
                 CLUSTER,
@@ -627,7 +673,7 @@ class HigherGenerationPreDrainCoordinatorTest {
                 1,
                 1,
                 List.of(),
-                CommitSliceRequest.emptyProjectionIdentity(),
+                PROJECTION_IDENTITY,
                 1,
                 committed ? 2 : 0,
                 reason,
@@ -641,6 +687,18 @@ class HigherGenerationPreDrainCoordinatorTest {
                 metadataVersion,
                 GenerationIndexDigests.durableValueSha256(
                         value.withMetadataVersion(0)));
+    }
+
+    private static RecoveryCheckpointPublication publication(
+            GenerationIndexRecord value) {
+        GenerationIndexRecord embedded = value.withMetadataVersion(0);
+        byte[] canonical = new GenerationIndexRecordCodecV1().encode(embedded);
+        return new RecoveryCheckpointPublication(
+                embedded.generation(),
+                new PublicationId(embedded.publicationId()),
+                new OffsetRange(embedded.offsetStart(), embedded.offsetEnd()),
+                ByteBuffer.wrap(canonical),
+                GenerationIndexDigests.canonicalRecordSha256(embedded));
     }
 
     private static VersionedGenerationIndex sourceWithEntryCount(
@@ -712,6 +770,55 @@ class HigherGenerationPreDrainCoordinatorTest {
                 0,
                 1,
                 0);
+    }
+
+    private static RecoveryCheckpointEntry entryWithProjection(
+            RecoveryCheckpointEntry entry, String projectionRef) {
+        StreamCommitTargetRecord value = MetadataRecordCodecFactory.decodeEnvelope(
+                bytes(entry.canonicalCommitRecord()),
+                StreamCommitTargetRecord.class);
+        StreamCommitTargetRecord changed = new StreamCommitTargetRecord(
+                value.streamId(),
+                value.commitId(),
+                value.previousCommitId(),
+                value.offsetStart(),
+                value.offsetEnd(),
+                value.generation(),
+                value.cumulativeSize(),
+                value.commitVersion(),
+                value.writerId(),
+                value.writerRunIdHash(),
+                value.writerEpoch(),
+                value.fencingTokenHash(),
+                value.readTarget(),
+                value.payloadFormat(),
+                value.recordCount(),
+                value.entryCount(),
+                value.logicalBytes(),
+                value.schemaRefs(),
+                projectionRef,
+                value.minEventTimeMillis(),
+                value.maxEventTimeMillis(),
+                value.preparedAtMillis(),
+                value.metadataVersion());
+        byte[] canonical = MetadataRecordCodecFactory.encodeEnvelope(
+                changed, StreamCommitTargetRecord.class);
+        return new RecoveryCheckpointEntry(
+                entry.commitVersion(),
+                entry.range(),
+                entry.cumulativeSizeAtEnd(),
+                entry.commitId(),
+                entry.previousCommitId(),
+                ByteBuffer.wrap(canonical),
+                sha256(canonical),
+                entry.coveringPublicationIndexes());
+    }
+
+    private static byte[] bytes(ByteBuffer value) {
+        ByteBuffer copy = value.asReadOnlyBuffer();
+        byte[] result = new byte[copy.remaining()];
+        copy.get(result);
+        return result;
     }
 
     private static ObjectSliceReadTarget target(
@@ -1149,6 +1256,33 @@ class HigherGenerationPreDrainCoordinatorTest {
                     checkpoint,
                     entry,
                     publication,
+                    candidateRoot,
+                    replacementRoot,
+                    candidate);
+        }
+
+        private Fixture withEntry(RecoveryCheckpointEntry replacementEntry) {
+            return new Fixture(
+                    source,
+                    replacement,
+                    recoveryRoot,
+                    checkpoint,
+                    replacementEntry,
+                    publication,
+                    candidateRoot,
+                    replacementRoot,
+                    candidate);
+        }
+
+        private Fixture withPublication(
+                RecoveryCheckpointPublication replacementPublication) {
+            return new Fixture(
+                    source,
+                    replacement,
+                    recoveryRoot,
+                    checkpoint,
+                    entry,
+                    replacementPublication,
                     candidateRoot,
                     replacementRoot,
                     candidate);

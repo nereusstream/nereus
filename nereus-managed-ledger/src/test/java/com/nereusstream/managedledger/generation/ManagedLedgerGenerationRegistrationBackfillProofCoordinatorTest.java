@@ -117,7 +117,7 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
     }
 
     @Test
-    void newerReadinessRefreshesProofAndInvalidatesOtherEpochFacts() {
+    void changedOpaqueReadinessRefreshesProofAndInvalidatesOtherEpochFacts() {
         MutableReadinessProvider readiness =
                 new MutableReadinessProvider(readiness(7, "77"));
         try (GenerationProtocolActivationStore store = activationStore()) {
@@ -125,7 +125,7 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
             coordinator.complete(completion(readiness.value(), COVERAGE, 0))
                     .join();
 
-            readiness.value = readiness(8, "88");
+            readiness.value = readiness(6, "88");
             Checksum nextCoverage = sha("99");
             coordinator.complete(new GenerationRegistrationBackfillCompletion(
                             "bcdefghijklmnopqrstuvwxyza",
@@ -136,15 +136,15 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
 
             GenerationProtocolActivationRecord current =
                     store.get(CLUSTER).join().orElseThrow().value();
-            assertThat(current.brokerCapabilityReadinessEpoch()).isEqualTo(8);
+            assertThat(current.brokerCapabilityReadinessEpoch()).isEqualTo(6);
             assertThat(current.streamRegistrationBackfill().coverageSha256())
                     .isEqualTo(nextCoverage.value());
             assertThat(current.physicalRootBackfill().complete()).isFalse();
             assertThat(current.physicalRootBackfill().brokerReadinessEpoch())
-                    .isEqualTo(8);
+                    .isEqualTo(6);
             assertThat(current.cursorSnapshotBackfill().complete()).isFalse();
             assertThat(current.cursorSnapshotBackfill().brokerReadinessEpoch())
-                    .isEqualTo(8);
+                    .isEqualTo(6);
             assertThat(current.objectStoreCapabilitySha256()).isEmpty();
         }
     }
@@ -196,9 +196,9 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
     }
 
     @Test
-    void deletionActiveEpochDelegatesOneBoundedAtomicRollover() {
+    void deletionActiveChangedOpaqueEpochDelegatesOneBoundedAtomicRollover() {
         MutableReadinessProvider readiness =
-                new MutableReadinessProvider(readiness(8, "cc"));
+                new MutableReadinessProvider(readiness(6, "cc"));
         try (GenerationProtocolActivationStore store = activationStore()) {
             VersionedGenerationProtocolActivation old = seedDeletion(store, 7);
             AtomicInteger concurrency = new AtomicInteger();
@@ -278,7 +278,7 @@ class ManagedLedgerGenerationRegistrationBackfillProofCoordinatorTest {
                     .join()
                     .orElseThrow()
                     .value();
-            assertThat(installed.brokerCapabilityReadinessEpoch()).isEqualTo(8);
+            assertThat(installed.brokerCapabilityReadinessEpoch()).isEqualTo(6);
             assertThat(installed.physicalDeleteEnabled()).isTrue();
             assertThat(installed.cursorSnapshotDeleteEnabled()).isTrue();
             assertThat(installed.streamRegistrationBackfill().coverageSha256())

@@ -585,9 +585,9 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
                     "active physical deletion authority belongs to another object-store scope");
         }
         long nextEpoch = registration.readiness().brokerReadinessEpoch();
-        if (nextEpoch <= value.brokerCapabilityReadinessEpoch()) {
+        if (nextEpoch == value.brokerCapabilityReadinessEpoch()) {
             throw notReady(
-                    "deletion-active readiness rollover requires a strictly newer epoch");
+                    "deletion-active readiness rollover requires a changed opaque epoch token");
         }
         requireCompleteProofForEpoch(
                 value.streamRegistrationBackfill(),
@@ -617,7 +617,8 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
         if (exact.failureCount() != 0
                 || !exact.boundedFailures().isEmpty()) {
             throw notReady(
-                    "physical-root/cursor-root readiness rollover contains failures");
+                    "physical-root/cursor-root readiness rollover contains failures: "
+                            + exact.boundedFailures());
         }
         return new Coverage(
                 exact.dataCoverageSha256().value(),
@@ -817,7 +818,8 @@ public final class DefaultPhase4PhysicalDeletionActivationCoordinator
         if (exact.failureCount() != 0
                 || !exact.boundedFailures().isEmpty()) {
             throw notReady(
-                    "physical-root/cursor-root backfill contains failures");
+                    "physical-root/cursor-root backfill contains failures: "
+                            + exact.boundedFailures());
         }
         return new Coverage(
                 exact.dataCoverageSha256().value(),

@@ -182,8 +182,8 @@ does not delete again. Checkpoint AV then proves two independent runtime workers
 root and converge through one durable DELETING intent plus idempotent exact deletes. Checkpoint AW adds fresh-process
 recovery of a mixed 128 MARKED / 128 DELETING population spanning all 256 root shards while every object LIST is
 empty. It also removes cross-page logical-key ordering as an inventory-progress assumption；only the exact prefix and
-changing opaque continuation are valid. The remaining two-broker/scale/failure final gate is still planned，and the
-safe-default production bridge still schedules no pass or deletion.
+changing opaque continuation are valid. Checkpoints AX–BC plus the final retry-disabled real two-broker gate now close
+the remaining scale/failure/ownership line；the safe-default production bridge still schedules no pass or deletion.
 
 `ObjectReadPinManager` is injected into both ordinary target readers and `DefaultCursorSnapshotStore`; no direct
 object read remains on a physically collectible key.
@@ -375,16 +375,21 @@ public interface PhysicalRootBackfillCoordinator {
 ```
 
 Run id/epoch/concurrency/timeout and bounded-failure rules match the registration backfill contract in document 06.
-Both coverage digests incrementally hash every registry/projection/head/cursor authority token and every classified
-object/root/protection outcome in canonical order. Counters cover the full traversal；failure details retain only the
-first 100 hashed resource identities. A zero-object traversal is valid only when the stable authority scan itself is
-non-empty/complete or independently proves there are no Nereus projections.
+Both coverage digests incrementally hash every registry/projection/stable-stream/cursor authority and every classified
+object/root/protection outcome in canonical order. `stream-authority-v1` includes immutable stream identity/name/hash、
+state/profile/attributes、created/policy version、committed offset/size/commit version and trim offset. It deliberately
+excludes the shared stream-head metadata version, append-session renewal state and hydrated trim reason/read time；
+those fields can change without changing GC truth. Append-head coverage similarly includes stream/commit/range facts
+but excludes the shared head metadata version. Counters cover the full traversal；failure details retain only the first
+100 hashed resource identities. A zero-object traversal is valid only when the stable authority scan itself is non-
+empty/complete or independently proves there are no Nereus projections.
 
 `PhysicalRootBackfillCoordinator` runs only after cold-topic stream registration coverage. It pages all 64 registered-
 stream shards, then for each still-live projection pages generation-zero indexes、reachable commits and F3 cursor
 snapshot inventory. It creates/verifies exact roots plus commit-owned `REACHABLE_APPEND`、generation-zero-index-owned
 `VISIBLE_GENERATION` and `CURSOR_SNAPSHOT_ROOT` protections,
-re-reads registration/projection/head/cursor versions and counts a stream covered only if they are unchanged. A full
+re-reads registration/projection/stable head/cursor authority and counts a stream covered only if those correctness
+facts are unchanged. A full
 pass with zero failures and the same broker/domain readiness epoch CASes the activation record's live-reference
 data/cursor backfill proofs from the two report digests. New append/snapshot publication creates root/protection before visibility once this epoch begins, so
 concurrent new objects are covered by their write hook. Object-store listing is not coverage evidence；unreferenced
@@ -392,7 +397,7 @@ or deleted-incarnation bytes enter the orphan/domain-proof path separately. Any 
 keeps deletion disabled.
 
 Checkpoint BC adds a second mode for a deletion-active readiness change. `runRollover` freezes the exact old
-activation wrapper and performs the same complete root/protection traversal for the strictly newer epoch, but does not
+activation wrapper and performs the same complete root/protection traversal for the changed opaque epoch token, but does not
 CAS either coverage proof. After exact old-wrapper revalidation, the activation coordinator combines the report with
 the new registration completion and a fresh object-store capability proof, then publishes all three proofs、the scope
 digest and the new epoch in one CAS while both delete bits stay true. This prevents a partial durable epoch from
@@ -414,7 +419,11 @@ Cursor inventory requires an ACTIVE same-projection retention root, scans every 
 NCS1 key/HEAD metadata and installs `CURSOR_SNAPSHOT_ROOT` with the exact cursor key/version/envelope SHA as owner.
 
 Before counting a stream covered, checkpoint W reloads the registration、full L0 snapshot、F2 authority、
-recovery-root/head and complete cursor-authority digest. Only a zero-failure run whose activation record still has
+recovery-root/head and complete cursor-authority digest. Snapshot/head comparison uses the stable semantic authority
+above：a commit、trim、policy/profile/lifecycle change fails closed, while append-session renewal and synthetic trim
+observation fields do not cause an endless rollover failure. Ordinary metadata scans and F3 cursor scans retain
+separate configured page bounds；the cursor request is capped by both its own store limit and the physical-GC bound.
+Only a zero-failure run whose activation record still has
 the same broker readiness epoch、domain set and registration proof may install the two coverage proofs. Lost
 activation-CAS responses converge only when a reload contains the exact desired data/cursor proofs. The report keeps
 the first 100 redacted failures while counters cover the entire attempted traversal；`dataObjectsScanned` and
@@ -558,12 +567,15 @@ requires `now + maximumClockSkew < expiresAt <= now + pendingProtectionDuration`
 requires `expiresAt <= createdAt + pendingProtectionDuration`. `close()` rejects acquire/revalidate/transfer but
 continues to admit authenticated release so shutdown cannot strand cleanup.
 
-`acquireOrTransfer` is the restart-recovery primitive for a workflow whose exact metadata record advanced before all
-of its protection-owner CASes. It accepts only the same complete protection identity, object/root epoch, expiry and
-`ownerKey`, requires a non-decreasing owner metadata version, rejects a same-version/different-digest contradiction,
-revalidates the requested owner before and after CAS, and resolves response loss only from the exact desired durable
-record. Arbitrary owner changes still require an explicit `transfer` handle；recovery cannot use this method to seize
-another logical owner's veto.
+`acquireOrTransfer` is the restart-recovery primitive for a workflow whose exact metadata record or physical-root
+lifecycle epoch advanced before all of its protection-owner CASes. It accepts only the same complete protection
+identity、expiry and logical `ownerKey`, requires a non-decreasing owner metadata version, and permits the stored
+protection epoch only when it is no newer than the current exact ACTIVE root. An older protection epoch and/or owner
+version is CAS-rebound to the requested owner and current ACTIVE epoch；an epoch ahead of the root is a metadata
+invariant violation. The method rejects a same-version/different-digest contradiction, revalidates the requested
+owner before and after CAS, and resolves response loss only from the exact desired durable record. Arbitrary owner or
+expiry changes still require an explicit `transfer` handle；recovery cannot use this method to seize another logical
+owner's veto.
 
 ## 4. Physical-object Store API
 
@@ -673,8 +685,17 @@ If any post-check fails, the manager conditionally deletes P only when the succe
 this invocation created that exact version. A recovered create after response loss never claims exclusive cleanup
 ownership；failure leaves the protection as a deletion veto for reconciliation. A concurrent GC that marks after the
 post-check waits the mark grace and rescans protections；it sees P and returns the root to ACTIVE before any
-index/object deletion. An exact duplicate with the same owner/expiry/root epoch is idempotent；a different owner or
-root epoch requires explicit transfer/reconciliation and is never overwritten by acquire.
+index/object deletion. An exact duplicate with the same owner/expiry/root epoch is idempotent；ordinary `acquire`
+never overwrites a different owner or root epoch.
+
+There is one explicit root-epoch reconciliation path. A complete GC drift may CAS `MARKED -> ACTIVE` with a fresh
+lifecycle epoch while the exact durable owner and protection identity remain unchanged. On a later referenced-object
+pass, `ReferencedObjectGcExecutor` first rebuilds and reloads the exact source-retirement removals, then calls
+`acquireOrTransfer` for each protection whose epoch is older than that ACTIVE root. The owner is revalidated both
+before and after the same-key CAS. If any protection is rebound, the current pass returns a handled `NOT_ELIGIBLE`
+result and retries from fresh discovery on a later pass；it does not mark using the stale candidate snapshot. A
+different logical owner、changed expiry、owner-version rollback、epoch ahead of the ACTIVE root or changed retirement
+plan fails closed.
 
 Removing a protection is also owner-checked. `release` first loads the exact handle version、calls the owner-specific
 `RemovalAuthorizer`、reloads the same version and only then conditionally deletes. A lost delete response succeeds
@@ -915,8 +936,10 @@ page size in `[1, 1000]` and authority/reference limits in `[1, 100000]`；`GcRe
 both lists, retains at most the configured values, reports the first overflow as count `max + 1`, and forces
 `complete=false/veto=true`. Checkpoint K's `unsupportedOwnerless` remains a compatibility helper；checkpoint T's
 default domain constructors instead inject `GcGlobalReferenceScope.unsupported()`, whose explicit incomplete snapshot
-flows through the same builder. `PhysicalGcConfig.referenceDomainConfig()` supplies the same limits to all
-implementations.
+flows through the same builder. `PhysicalGcConfig.referenceDomainConfig()` supplies the common limits；runtime
+composition lowers only cursor-backed domain page size to
+`min(physicalGc.metadataScanPageSize, cursorStorage.cursorScanPageSize)` while preserving the configured
+authority/reference totals.
 
 Checkpoint J's concrete rules are：
 
@@ -1711,18 +1734,29 @@ following total routing table:
 | root lifecycle | route |
 |---|---|
 | `ACTIVE`, canonical NCS1 cursor key with stable historical binding | one `CursorSnapshotGcScanner` evaluation per stream |
-| `ACTIVE`, every other exact identity or unresolved cursor binding | `OwnerlessObjectGcExecutor.executeActive` |
+| `ACTIVE`, every other exact identity or unresolved cursor binding | `ReferencedObjectGcExecutor.executeActive` first；fall through to `OwnerlessObjectGcExecutor.executeActive` only when no current visible-generation owner is discovered |
 | `MARKED`, recoverable cursor evidence | `CursorSnapshotGcExecutor.recoverMarked` |
-| `MARKED`, every other exact identity | `OwnerlessObjectGcExecutor.recoverMarked` |
+| `MARKED`, every other exact identity | `ReferencedObjectGcExecutor.recoverMarked` first；fall through to `OwnerlessObjectGcExecutor.recoverMarked` only when referenced discovery is empty |
 | `DELETING` | `SourceRetirementCoordinator.resume` |
 | `DELETED` | `DefaultPhysicalRootTombstoneRetirementCoordinator.retire` |
 | `QUARANTINED` | no mutation |
+
+Referenced discovery scans the complete bounded protection prefix and selects canonical streams only from exact
+`VISIBLE_GENERATION` owner keys. Any such owner makes the referenced executor responsible for that root, including a
+handled not-eligible outcome；ownerless GC cannot reinterpret the same facts. It reconstructs the exact
+`REFERENCED_OBJECT` query、higher-generation pre-drain proof and source-retirement plan, requires every durable
+protection to map to an exact planned owner removal, then uses the shared collector and retirement coordinator. Its
+ACTIVE pass records source-grace、pre-drain、plan、epoch-rebind、mark/advance/delete outcomes. Its MARKED pass reloads
+the sealed journal and accepts only the same query identity、metadata removals、protection removals and complete
+reference-domain snapshot；complete condition drift unmarks to a fresh ACTIVE epoch, while invariant or incomplete
+facts fail closed. `Phase4PhysicalGcRuntime` clears and repopulates one latest referenced result per object at the
+start of each root pass；that immutable snapshot is diagnostics only.
 
 The generic ownerless executor derives candidate evidence from the immutable physical identity SHA, constructs an
 `OWNERLESS_ORPHAN_CANDIDATE` query and delegates every destructive transition to the central collector. A durable
 protection precheck may conservatively skip work, but absence from that precheck never authorizes deletion: the full
 reader/protection/metadata/domain proof and activation fence still run inside the collector. Restart from MARKED
-reconstructs the exact plan; complete drift unmarks, while incomplete/limit failure leaves MARKED.
+reconstructs the exact plan；complete drift unmarks, while incomplete/limit failure leaves MARKED.
 
 `DefaultPhysicalGcLifecycleService` starts immediately only after explicit `start()`, permits at most one active pass,
 coalesces any number of hints during a pass into one immediate follow-up and otherwise schedules the next attempt at

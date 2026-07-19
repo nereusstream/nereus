@@ -123,7 +123,8 @@ require_literal 'revalidate(expected, "healthy NRC1 replacement")' "$replacement
 require_literal 'revalidate(expected, "healthy same-view replacement")' "$replacement_verifier"
 require_literal 'label + " index changed while source facts were frozen"' "$replacement_verifier"
 require_literal 'label + " root changed while source facts were frozen"' "$replacement_verifier"
-require_literal "record.generation() <= requirement.minimumGenerationExclusive()" "$replacement_verifier"
+require_literal "if (embedded.record().generation()" "$replacement_verifier"
+require_literal "<= requirement.minimumGenerationExclusive())" "$replacement_verifier"
 
 require_literal "TOPIC_COMPACTED higher-generation retirement requires a view-specific replacement proof" "$higher_coverage"
 require_literal "higher-generation source is not an exact tiling of NRC1 commit entries" "$higher_coverage"

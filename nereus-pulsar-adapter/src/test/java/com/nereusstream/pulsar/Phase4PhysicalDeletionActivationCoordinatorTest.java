@@ -153,7 +153,7 @@ class Phase4PhysicalDeletionActivationCoordinatorTest {
                     .orElseThrow();
             GenerationCapabilityReadiness nextReadiness =
                     new GenerationCapabilityReadiness(
-                            READINESS_EPOCH + 1,
+                            READINESS_EPOCH - 1,
                             sha256(F4MetadataTestValues.HASH_A),
                             2);
             MutableReadinessProvider readiness =
@@ -205,7 +205,7 @@ class Phase4PhysicalDeletionActivationCoordinatorTest {
             assertThat(calls).containsExactly("rollover-backfill", "probe");
             GenerationProtocolActivationRecord value = installed.value();
             assertThat(value.brokerCapabilityReadinessEpoch())
-                    .isEqualTo(READINESS_EPOCH + 1);
+                    .isEqualTo(nextReadiness.brokerReadinessEpoch());
             assertThat(value.physicalDeleteEnabled()).isTrue();
             assertThat(value.cursorSnapshotDeleteEnabled()).isTrue();
             assertThat(value.streamRegistrationBackfill().coverageSha256())
@@ -216,11 +216,11 @@ class Phase4PhysicalDeletionActivationCoordinatorTest {
                     .isEqualTo(CURSOR_COVERAGE);
             assertThat(value.streamRegistrationBackfill()
                             .brokerReadinessEpoch())
-                    .isEqualTo(READINESS_EPOCH + 1);
+                    .isEqualTo(nextReadiness.brokerReadinessEpoch());
             assertThat(value.physicalRootBackfill().brokerReadinessEpoch())
-                    .isEqualTo(READINESS_EPOCH + 1);
+                    .isEqualTo(nextReadiness.brokerReadinessEpoch());
             assertThat(value.cursorSnapshotBackfill().brokerReadinessEpoch())
-                    .isEqualTo(READINESS_EPOCH + 1);
+                    .isEqualTo(nextReadiness.brokerReadinessEpoch());
             assertThat(value.objectStoreCapabilitySha256())
                     .isEqualTo(CAPABILITY);
             assertThat(store.get(CLUSTER).join())

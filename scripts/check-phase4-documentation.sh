@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="725b2ad9e7f57135e18419589ff0a42b05fe58aa"
+current_pulsar_lock="5aeb199eadc2f5bcd2d618e1dbc42b810168de2d"
 
 require_literal() {
     local literal="$1"
@@ -248,16 +248,20 @@ require_literal "checkpoints AG–AI retention planner" \
     "docs/design/nereus-overall-architecture.md"
 require_literal "M5 through AI" \
     "docs/design/nereus-design-index.md"
-require_literal "M4 through BC" \
+require_literal "F4-M1–M4 final-gated" \
     "docs/design/nereus-design-index.md"
 require_literal "M5 through checkpoint AI" \
     "docs/design/nereus-future4-compaction-generation.md"
 require_literal "M5 through checkpoint AI" \
     "docs/automq-like-stream-storage/README.md"
-require_literal "M4 through checkpoint BC" \
+require_literal "F4-M4 final gate" \
     "docs/automq-like-stream-storage/README.md"
-require_literal "M4 through checkpoint BC" \
+require_literal "F4-M4 real two-broker" \
     "docs/design/nereus-future4-compaction-generation.md"
+require_literal "phase4M4FinalCheck" \
+    "docs/phase-4-compaction-generation/07-implementation-plan-and-gates.md"
+require_literal "phase4M4FinalCheck" \
+    "build.gradle.kts"
 require_literal "post-delete cut against real services" \
     "docs/design/nereus-commit-protocol.md"
 require_literal "uncertain metadata-commit cut" \
@@ -315,4 +319,4 @@ while IFS=: read -r source match; do
     fi
 done < <(rg --with-filename --no-heading -o --glob '*.md' '\]\(([^)]+)\)' "${link_docs[@]}")
 
-echo "Phase 4 M1-M3 final status plus M4 through BC and M5 through AI, source lock, gates, and local links verified."
+echo "Phase 4 M1-M4 final status plus M5 through AI, source lock, gates, and local links verified."

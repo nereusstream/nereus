@@ -115,6 +115,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
     private final GenerationProjectionAuthorityReader projectionAuthorities;
     private final PhysicalObjectIdentityResolver dataIdentityResolver;
     private final int metadataPageSize;
+    private final int cursorPageSize;
     private final Duration objectStoreRequestTimeout;
     private final Clock clock;
     private final LongSupplier nanoTime;
@@ -148,6 +149,39 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 objectStore,
                 projectionAuthorities,
                 metadataPageSize,
+                metadataPageSize,
+                objectStoreRequestTimeout,
+                clock);
+    }
+
+    public DefaultPhysicalRootBackfillCoordinator(
+            String cluster,
+            OxiaMetadataStore l0Metadata,
+            GenerationMetadataStore generations,
+            SourceRetirementMetadataStore sourceRetirement,
+            CursorMetadataStore cursors,
+            GenerationProtocolActivationStore activations,
+            PhysicalObjectMetadataStore physicalMetadata,
+            ObjectProtectionManager protections,
+            ObjectStore objectStore,
+            GenerationProjectionAuthorityReader projectionAuthorities,
+            int metadataPageSize,
+            int cursorPageSize,
+            Duration objectStoreRequestTimeout,
+            Clock clock) {
+        this(
+                cluster,
+                l0Metadata,
+                generations,
+                sourceRetirement,
+                cursors,
+                activations,
+                physicalMetadata,
+                protections,
+                objectStore,
+                projectionAuthorities,
+                metadataPageSize,
+                cursorPageSize,
                 objectStoreRequestTimeout,
                 clock,
                 System::nanoTime);
@@ -165,6 +199,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
             ObjectStore objectStore,
             GenerationProjectionAuthorityReader projectionAuthorities,
             int metadataPageSize,
+            int cursorPageSize,
             Duration objectStoreRequestTimeout,
             Clock clock,
             LongSupplier nanoTime) {
@@ -191,6 +226,11 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     "metadataPageSize must be in [1, 4096]");
         }
         this.metadataPageSize = metadataPageSize;
+        if (cursorPageSize <= 0 || cursorPageSize > 4_096) {
+            throw new IllegalArgumentException(
+                    "cursorPageSize must be in [1, 4096]");
+        }
+        this.cursorPageSize = cursorPageSize;
         this.objectStoreRequestTimeout = requirePositive(
                 objectStoreRequestTimeout, "objectStoreRequestTimeout");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -1149,7 +1189,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
                         cluster,
                         stream,
                         continuation,
-                        metadataPageSize))
+                        cursorPageSize))
                 .thenCompose(page -> {
                     if (previousKey != null
                             && !page.records().isEmpty()
@@ -1600,7 +1640,8 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 .thenCompose(ignored -> deadline.call(() ->
                         l0Metadata.getStreamSnapshot(cluster, stream)))
                 .thenAccept(current -> {
-                    if (!current.equals(capture.streamSnapshot())) {
+                    if (!sameStreamAuthority(
+                            current, capture.streamSnapshot())) {
                         throw invariant(
                                 "stream head/profile changed during backfill");
                     }
@@ -1628,7 +1669,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
                                 PhysicalRootBackfillStage
                                         .FINAL_REVALIDATION,
                                 accumulator.registration.key(),
-                                "AUTHORITY_CHANGED");
+                                finalRevalidationErrorCode(failure));
                         return accumulator.result(false);
                     }
                     accumulator.finalRevalidation();
@@ -1664,10 +1705,9 @@ public final class DefaultPhysicalRootBackfillCoordinator
                                     Optional.empty(),
                                     1)))
                     .thenAccept(page -> {
-                        if (!page.observedHead()
-                                .equals(
-                                        accumulator
-                                                .recoveryHead)) {
+                        if (!sameAppendRecoveryAuthority(
+                                page.observedHead(),
+                                accumulator.recoveryHead)) {
                             throw invariant(
                                     "append head changed during backfill");
                         }
@@ -1941,8 +1981,8 @@ public final class DefaultPhysicalRootBackfillCoordinator
                 || !value.cursorSnapshotDeleteEnabled()) {
             return "DELETION_AUTHORITY_INACTIVE";
         }
-        if (nextEpoch <= value.brokerCapabilityReadinessEpoch()) {
-            return "READINESS_EPOCH_NOT_NEWER";
+        if (nextEpoch == value.brokerCapabilityReadinessEpoch()) {
+            return "READINESS_EPOCH_UNCHANGED";
         }
         return null;
     }
@@ -2074,7 +2114,7 @@ public final class DefaultPhysicalRootBackfillCoordinator
             PhysicalRootBackfillStage stage,
             Throwable failure) {
         Throwable exact = unwrap(failure);
-        if (exact instanceof BackfillStepException step) {
+        while (exact instanceof BackfillStepException step) {
             exact = unwrap(step.getCause());
         }
         if (exact instanceof TimeoutException) {
@@ -2087,13 +2127,109 @@ public final class DefaultPhysicalRootBackfillCoordinator
             case GENERATION_ZERO_SCAN ->
                     "GENERATION_ZERO_SCAN_FAILED";
             case CURSOR_INVENTORY_SCAN ->
-                    "CURSOR_INVENTORY_SCAN_FAILED";
+                    cursorInventoryErrorCode(exact);
             case OBJECT_HEAD -> "OBJECT_HEAD_FAILED";
             case ROOT_WRITE -> "ROOT_WRITE_FAILED";
             case PROTECTION_WRITE -> "PROTECTION_WRITE_FAILED";
             case FINAL_REVALIDATION ->
                     "FINAL_REVALIDATION_FAILED";
         };
+    }
+
+    private static String cursorInventoryErrorCode(Throwable failure) {
+        String message = failure.getMessage();
+        if ("cursor retention is not ACTIVE for the live projection".equals(message)) {
+            return "CURSOR_RETENTION_NOT_ACTIVE";
+        }
+        if ("cursor roots exist without a retention authority".equals(message)) {
+            return "CURSOR_ROOTS_WITHOUT_RETENTION";
+        }
+        if ("cursor root belongs to another projection".equals(message)) {
+            return "CURSOR_PROJECTION_MISMATCH";
+        }
+        if ("cursor inventory scan did not advance".equals(message)) {
+            return "CURSOR_SCAN_DID_NOT_ADVANCE";
+        }
+        if (failure instanceof NereusException nereus) {
+            return "CURSOR_INVENTORY_" + nereus.code().name();
+        }
+        return "CURSOR_INVENTORY_SCAN_FAILED";
+    }
+
+    private static String finalRevalidationErrorCode(Throwable failure) {
+        Throwable exact = unwrap(failure);
+        while (exact instanceof BackfillStepException step) {
+            exact = unwrap(step.getCause());
+        }
+        String message = exact.getMessage();
+        if ("registration changed during backfill".equals(message)) {
+            return "REGISTRATION_AUTHORITY_CHANGED";
+        }
+        if ("stream head/profile changed during backfill".equals(message)) {
+            return "STREAM_AUTHORITY_CHANGED";
+        }
+        if ("projection authority changed during backfill".equals(message)) {
+            return "PROJECTION_AUTHORITY_CHANGED";
+        }
+        if ("recovery root changed during backfill".equals(message)) {
+            return "RECOVERY_ROOT_AUTHORITY_CHANGED";
+        }
+        if ("append head changed during backfill".equals(message)) {
+            return "APPEND_HEAD_AUTHORITY_CHANGED";
+        }
+        if ("cursor inventory changed during backfill".equals(message)) {
+            return "CURSOR_INVENTORY_AUTHORITY_CHANGED";
+        }
+        if (exact instanceof NereusException nereus) {
+            return "FINAL_REVALIDATION_" + nereus.code().name();
+        }
+        return "FINAL_REVALIDATION_FAILED";
+    }
+
+    static boolean sameStreamAuthority(
+            StreamMetadataSnapshot first,
+            StreamMetadataSnapshot second) {
+        Objects.requireNonNull(first, "first");
+        Objects.requireNonNull(second, "second");
+        return first.metadata().streamId().equals(
+                        second.metadata().streamId())
+                && first.metadata().streamName().equals(
+                        second.metadata().streamName())
+                && first.metadata().streamNameHash().equals(
+                        second.metadata().streamNameHash())
+                && first.metadata().state().equals(
+                        second.metadata().state())
+                && first.metadata().profile().equals(
+                        second.metadata().profile())
+                && first.metadata().attributes().equals(
+                        second.metadata().attributes())
+                && first.metadata().createdAtMillis()
+                        == second.metadata().createdAtMillis()
+                && first.metadata().policyVersion()
+                        == second.metadata().policyVersion()
+                && first.committedEnd().committedEndOffset()
+                        == second.committedEnd().committedEndOffset()
+                && first.committedEnd().cumulativeSize()
+                        == second.committedEnd().cumulativeSize()
+                && first.committedEnd().commitVersion()
+                        == second.committedEnd().commitVersion()
+                && first.trim().trimOffset()
+                        == second.trim().trimOffset();
+    }
+
+    static boolean sameAppendRecoveryAuthority(
+            AppendRecoveryHead first,
+            AppendRecoveryHead second) {
+        Objects.requireNonNull(first, "first");
+        Objects.requireNonNull(second, "second");
+        return first.streamId().equals(second.streamId())
+                && first.lastCommitId().equals(
+                        second.lastCommitId())
+                && first.offsetEnd() == second.offsetEnd()
+                && first.cumulativeSize()
+                        == second.cumulativeSize()
+                && first.commitVersion()
+                        == second.commitVersion();
     }
 
     private static Throwable unwrap(Throwable supplied) {
@@ -2236,8 +2372,8 @@ public final class DefaultPhysicalRootBackfillCoordinator
 
         private void streamSnapshot(
                 StreamMetadataSnapshot snapshot) {
-            writeStreamSnapshot(data, snapshot);
-            writeStreamSnapshot(cursor, snapshot);
+            writeStreamAuthority(data, snapshot);
+            writeStreamAuthority(cursor, snapshot);
         }
 
         private void projection(
@@ -2281,7 +2417,6 @@ public final class DefaultPhysicalRootBackfillCoordinator
             data.int64(head.offsetEnd());
             data.int64(head.cumulativeSize());
             data.int64(head.commitVersion());
-            data.int64(head.metadataVersion());
         }
 
         private void commitAuthority(
@@ -2404,10 +2539,10 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     cursor.finish());
         }
 
-        private static void writeStreamSnapshot(
+        private static void writeStreamAuthority(
                 PhysicalRootBackfillDigest writer,
                 StreamMetadataSnapshot snapshot) {
-            writer.text("stream-snapshot");
+            writer.text("stream-authority-v1");
             writer.text(snapshot.metadata().streamId());
             writer.text(snapshot.metadata().streamName());
             writer.text(snapshot.metadata().streamNameHash());
@@ -2415,7 +2550,6 @@ public final class DefaultPhysicalRootBackfillCoordinator
             writer.text(snapshot.metadata().profile());
             writer.int64(snapshot.metadata().createdAtMillis());
             writer.int64(snapshot.metadata().policyVersion());
-            writer.int64(snapshot.metadataVersion());
             writer.int64(
                     snapshot.committedEnd()
                             .committedEndOffset());
@@ -2426,9 +2560,6 @@ public final class DefaultPhysicalRootBackfillCoordinator
                     snapshot.committedEnd()
                             .commitVersion());
             writer.int64(snapshot.trim().trimOffset());
-            writer.text(snapshot.trim().reason());
-            writer.int64(
-                    snapshot.trim().updatedAtMillis());
             writer.int32(
                     snapshot.metadata()
                             .attributes()

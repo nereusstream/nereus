@@ -118,7 +118,7 @@ require_literal "default CompletableFuture<PhysicalRootBackfillReport> runRollov
 require_literal "public CompletableFuture<PhysicalRootBackfillReport> runRollover(" "$backfill"
 require_literal "revalidateRolloverBasis(" "$backfill"
 require_literal "ACTIVATION_AUTHORITY_CHANGED" "$backfill"
-require_literal "READINESS_EPOCH_NOT_NEWER" "$backfill"
+require_literal "READINESS_EPOCH_UNCHANGED" "$backfill"
 
 require_literal "ManagedLedgerGenerationReadinessRolloverCoordinator" "$activation"
 require_literal "backfill.runRollover(" "$activation"
@@ -137,7 +137,7 @@ require_literal ".rollover(" "$runtime"
 require_literal "startMutatingLifecycleIfAuthorized(true)" "$runtime"
 require_literal "physicalGcRuntime," "$provider"
 
-require_literal "deletionActiveEpochDelegatesOneBoundedAtomicRollover" "$proof_test"
+require_literal "deletionActiveChangedOpaqueEpochDelegatesOneBoundedAtomicRollover" "$proof_test"
 require_literal ".isLessThan(deadline)" "$proof_test"
 require_literal "deletionActiveRolloverScansWithoutPublishingPartialProofs" "$backfill_test"
 require_literal "deletionActiveReadinessRolloverReplacesEveryProofInOneCas" "$activation_test"

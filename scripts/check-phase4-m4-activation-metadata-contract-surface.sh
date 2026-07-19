@@ -65,14 +65,14 @@ require_literal "cursorSnapshotBackfill" "$record"
 require_literal "objectStoreCapabilitySha256" "$record"
 require_literal "physical deletion requires all backfills and object-store capability" "$record"
 require_literal "V1 physical and cursor-snapshot deletion must activate together" "$record"
-require_literal "backfill proof cannot be newer than the broker readiness epoch" "$record"
+require_literal "backfill proof belongs to another broker readiness identity" "$record"
 
 require_literal "GenerationProtocolActivationRecordCodecV1" "$codecs"
 require_literal "instanceof GenerationProtocolActivationRecord" "$support"
 require_literal "ACTIVE generation protocol cannot return to PREPARED" "$transitions"
 require_literal "generation activation capability bits are monotonic" "$transitions"
 require_literal "backfill changed after completion in one epoch" "$transitions"
-require_literal "object-store capability changed without a newer readiness epoch" "$transitions"
+require_literal "object-store capability changed without a readiness identity change" "$transitions"
 
 require_literal "getOrCreate" "$store"
 require_literal "GenerationProtocolActivationLifecycle.PREPARED" "$store"
@@ -88,9 +88,9 @@ if rg -Fq -- "=TODO" "$repo_root/$golden"; then
     exit 1
 fi
 
-require_literal "exactClusterAuthorityBootstrapsAndAdvancesMonotonicallyAcrossRuntimes" "$contract_test"
+require_literal "exactClusterAuthorityBootstrapsAndAdvancesCapabilitiesAcrossRuntimes" "$contract_test"
 require_literal "activeDomainSetCannotDriftInsideTheSameProtocolActivation" "$contract_test"
-require_literal "rejectsActivationBackfillFactsFromAFutureReadinessEpoch" \
+require_literal "rejectsActivationBackfillFactsFromAnotherOpaqueReadinessEpoch" \
     "nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/F4RecordValidationTest.java"
 require_literal "phase4M4ActivationMetadataCheck" "build.gradle.kts"
 require_literal "phase4M4ActivationMetadataCheck" \

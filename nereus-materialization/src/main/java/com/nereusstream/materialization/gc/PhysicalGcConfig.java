@@ -153,6 +153,12 @@ public record PhysicalGcConfig(
             MaterializationConfig materialization) {
         Objects.requireNonNull(storage, "storage");
         validateAgainst(materialization);
+        Duration readSafety = checkedPlus(
+                storage.readTimeout(), maximumClockSkew, "readTimeout plus maximumClockSkew");
+        if (readSafety.compareTo(readerLeaseDuration) >= 0) {
+            throw new IllegalArgumentException(
+                    "readTimeout plus maximumClockSkew must be shorter than readerLeaseDuration");
+        }
         requireTombstoneStrictlyExceeds(
                 "append/session/recovery lifetime",
                 storage.appendSessionTtl(),

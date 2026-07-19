@@ -45,6 +45,9 @@ import com.nereusstream.materialization.MaterializationTaskStore;
 import com.nereusstream.materialization.RegisteredMaterializationStreamScanner;
 import com.nereusstream.materialization.TaskRecoveryScanner;
 import com.nereusstream.materialization.recovery.MetadataRecoveryCheckpointVerifier;
+import com.nereusstream.materialization.recovery.RecoveryCheckpointBuilder;
+import com.nereusstream.materialization.recovery.RecoveryCheckpointCoordinator;
+import com.nereusstream.materialization.recovery.RecoveryCheckpointProtectionManager;
 import com.nereusstream.metadata.oxia.GenerationIndexValidator;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -96,6 +99,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
             String processRunId,
             StreamStorageConfig streamConfig,
             MaterializationConfig config,
+            Duration recoveryCheckpointPendingProtectionDuration,
             OxiaMetadataStore l0Metadata,
             GenerationMetadataStore generations,
             PhysicalObjectMetadataStore physicalMetadata,
@@ -116,6 +120,10 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                 Objects.requireNonNull(streamConfig, "streamConfig");
         MaterializationConfig exactConfig =
                 Objects.requireNonNull(config, "config");
+        Duration exactRecoveryCheckpointPendingProtectionDuration =
+                Objects.requireNonNull(
+                        recoveryCheckpointPendingProtectionDuration,
+                        "recoveryCheckpointPendingProtectionDuration");
         OxiaMetadataStore exactL0 =
                 Objects.requireNonNull(l0Metadata, "l0Metadata");
         GenerationMetadataStore exactGenerations =
@@ -187,6 +195,30 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         stagingFiles,
                         exactWorkerExecutor,
                         new MetadataRecoveryCheckpointVerifier());
+        RecoveryCheckpointCoordinator recoveryCheckpoints =
+                new RecoveryCheckpointCoordinator(
+                        exactCluster,
+                        exactGenerations,
+                        exactPhysical,
+                        exactObjectStore,
+                        this.checkpointCodec,
+                        new RecoveryCheckpointBuilder(
+                                exactCluster,
+                                exactL0,
+                                exactGenerations,
+                                walker,
+                                exactConfig,
+                                exactClock),
+                        new RecoveryCheckpointProtectionManager(
+                                exactCluster,
+                                exactGenerations,
+                                exactPhysical,
+                                exactProtections),
+                        exactActivation,
+                        exactConfig,
+                        exactRecoveryCheckpointPendingProtectionDuration,
+                        exactScheduler,
+                        exactClock);
         this.appendRecoverySearcher =
                 new CheckpointAppendReplayReader(
                         exactCluster,
@@ -371,6 +403,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                                 tasks,
                                 taskRecovery,
                                 exactConfig.taskScanPageSize()),
+                        recoveryCheckpoints,
                         new DefaultMaterializationCheckpointReconciler(
                                 exactCluster,
                                 exactL0,

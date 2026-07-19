@@ -4,7 +4,7 @@ package com.nereusstream.core.capability;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.core.physical.GcReferenceQuery;
 
-/** Exact broker-set capability identity shared with the product activation boundary. */
+/** Exact broker-set capability identity shared with the product activation boundary; its epoch is opaque. */
 public record GenerationCapabilityReadiness(
         long brokerReadinessEpoch,
         Checksum brokerSetSha256,

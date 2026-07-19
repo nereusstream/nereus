@@ -21,7 +21,7 @@ public interface ObjectProtectionManager extends AutoCloseable {
 
     /**
      * Acquires an absent protection or monotonically reconciles an existing protection owned by the same logical
-     * owner key to the requested durable owner version.
+     * owner key to the requested durable owner version and current ACTIVE root lifecycle epoch.
      */
     CompletableFuture<ObjectProtection> acquireOrTransfer(
             ObjectProtectionRequest request,

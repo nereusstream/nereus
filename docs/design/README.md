@@ -6,7 +6,7 @@
 `docs/phase-2-managed-ledger-facade/`、
 `docs/phase-3-cursor-subscription/` 与
 `docs/phase-4-compaction-generation/` 共同构成仓库内设计基线。前四者的已实现合同由代码/
-测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1–M3 实现和后续目标。
+测试优先；Phase 4 目录同时记录已通过 M0 的 target contract、已 final-gated 的 F4-M1–M4 实现和后续目标。
 
 建议阅读顺序：
 
@@ -53,10 +53,11 @@ checkpoints、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction neutral
 workflow-metadata retirement，以及 topic-compaction COMMITTED-source bootstrap、tagged-v1 key encoding、
 sorted-spill two-pass engine/worker/publication focused tests 已落地。`phase4M3Check` 与真实
 Oxia/LocalStack-backed `phase4M3FinalCheck --rerun-tasks` 已于 2026-07-15 通过；
-F4-M3 已 final-gated。M4/M5 正在实现：NRC1 recovery、retirement/GC fences、generation
+F4-M3 已 final-gated。F4-M4 也已于 2026-07-19 通过 retry-disabled 真实双 broker final gate：NRC1 recovery、
+retirement/GC fences、generation
 registration/readiness/activation、protected async Object-WAL acknowledgement、pre-I/O materialization-lag
-admission，以及 coupled production generation-aware read/repair/materialization runtime 已落地到 checkpoint
-AF；local Pulsar fork 也已映射 exact sync/async first-create profile 和 bounded materialization config。Sync
+admission，以及 coupled production generation-aware read/repair/materialization runtime 已落地；M5 正在实现，
+当前到 checkpoint AI。local Pulsar fork 也已映射 exact sync/async first-create profile 和 bounded materialization config。Sync
 仍是默认，async 仍受 durable activation proof 约束；retention/admin 与 cursor snapshot execution 已有实现
 slices，checkpoints AL–AM 已实现 current-writer object inventory/missing-root registration 与 registration-last
 retirement；checkpoint AN 已装配 metadata-first root/registration/inventory lifecycle 和恢复路由；checkpoint AO

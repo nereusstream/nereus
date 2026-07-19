@@ -23,11 +23,9 @@ final class GenerationProtocolActivationTransitions {
             throw invariant(
                     "generation activation CAS changed immutable protocol identity");
         }
-        if (replacement.updatedAtMillis() < current.updatedAtMillis()
-                || replacement.brokerCapabilityReadinessEpoch()
-                        < current.brokerCapabilityReadinessEpoch()) {
+        if (replacement.updatedAtMillis() < current.updatedAtMillis()) {
             throw invariant(
-                    "generation activation CAS moved time or readiness epoch backward");
+                    "generation activation CAS moved time backward");
         }
         if (current.lifecycle() == GenerationProtocolActivationLifecycle.ACTIVE
                 && replacement.lifecycle()
@@ -83,7 +81,7 @@ final class GenerationProtocolActivationTransitions {
                         replacement.objectStoreCapabilitySha256())
                 && replacementEpoch == currentEpoch) {
             throw invariant(
-                    "object-store capability changed without a newer readiness epoch");
+                    "object-store capability changed without a readiness identity change");
         }
     }
 
@@ -102,17 +100,11 @@ final class GenerationProtocolActivationTransitions {
                     && replacement.brokerReadinessEpoch() != replacementEpoch) {
                 throw invariant(name + " backfill completed for another readiness epoch");
             }
-            if (!current.complete()
-                    && !replacement.complete()
-                    && replacement.brokerReadinessEpoch()
-                            < current.brokerReadinessEpoch()) {
-                throw invariant(name + " backfill attempt epoch moved backward");
-            }
             return;
         }
         if (replacement.complete()
                 && replacement.brokerReadinessEpoch() != replacementEpoch) {
-            throw invariant(name + " backfill does not match the newer readiness epoch");
+            throw invariant(name + " backfill does not match the changed readiness identity");
         }
     }
 

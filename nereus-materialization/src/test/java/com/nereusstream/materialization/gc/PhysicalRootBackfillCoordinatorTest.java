@@ -101,6 +101,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class PhysicalRootBackfillCoordinatorTest {
@@ -267,12 +268,15 @@ class PhysicalRootBackfillCoordinatorTest {
     @Test
     void activeCursorSnapshotCreatesExactEtagRootAndPermanentOwnerProtection() {
         CursorFixture fixture = cursorFixture();
+        AtomicInteger observedCursorPageSize = new AtomicInteger();
         try (GenerationMetadataStore generations =
                         GenerationMetadataStoreTestFactory.inMemory(CLOCK);
                 GenerationProtocolActivationStore activations =
                         activationStore();
-                FakeCursorMetadataStore cursors =
-                        new FakeCursorMetadataStore()) {
+                CursorMetadataStore cursors = boundedCursorPages(
+                        new FakeCursorMetadataStore(),
+                        2,
+                        observedCursorPageSize)) {
             prepareRegistrationBackfill(activations);
             generations.createOrVerifyStreamRegistration(
                             CLUSTER, fixture.registration())
@@ -304,6 +308,7 @@ class PhysicalRootBackfillCoordinatorTest {
                                 objects,
                                 projectionReader(
                                         fixture.projectionIdentity()),
+                                1_000,
                                 2,
                                 Duration.ofSeconds(1),
                                 CLOCK);
@@ -320,6 +325,7 @@ class PhysicalRootBackfillCoordinatorTest {
                 assertThat(report.streamsScanned()).isOne();
                 assertThat(report.dataObjectsScanned()).isZero();
                 assertThat(report.cursorObjectsScanned()).isOne();
+                assertThat(observedCursorPageSize).hasValue(2);
                 ObjectKeyHash hash =
                         ObjectKeyHash.from(fixture.objectKey());
                 var root = physical.getRoot(CLUSTER, hash)
@@ -450,7 +456,7 @@ class PhysicalRootBackfillCoordinatorTest {
                 PhysicalRootBackfillReport report = coordinator.runRollover(
                                 new PhysicalRootBackfillRequest(
                                         RUN_ID,
-                                        READINESS_EPOCH + 1,
+                                        READINESS_EPOCH - 1,
                                         4,
                                         Duration.ofSeconds(5)),
                                 expected)
@@ -458,7 +464,7 @@ class PhysicalRootBackfillCoordinatorTest {
 
                 assertThat(report.failureCount()).isZero();
                 assertThat(report.brokerReadinessEpoch())
-                        .isEqualTo(READINESS_EPOCH + 1);
+                        .isEqualTo(READINESS_EPOCH - 1);
                 assertThat(activations.get(CLUSTER).join())
                         .contains(expected);
                 assertThat(expected.value().physicalRootBackfill()
@@ -471,11 +477,108 @@ class PhysicalRootBackfillCoordinatorTest {
         }
     }
 
+    @Test
+    void streamAuthorityIgnoresObservationChurnButDetectsDurableChanges() {
+        StreamMetadataSnapshot first =
+                streamFixture().streamSnapshot();
+        StreamMetadataSnapshot refreshed =
+                observedSnapshot(first, 99, "synthetic", 9_999);
+
+        assertThat(DefaultPhysicalRootBackfillCoordinator
+                        .sameStreamAuthority(first, refreshed))
+                .isTrue();
+
+        StreamMetadataSnapshot advancedCommit =
+                new StreamMetadataSnapshot(
+                        refreshed.metadata(),
+                        new CommittedEndOffsetRecord(
+                                refreshed.metadata().streamId(),
+                                2,
+                                16,
+                                2,
+                                refreshed.metadataVersion()),
+                        refreshed.trim());
+        StreamMetadataSnapshot advancedTrim =
+                new StreamMetadataSnapshot(
+                        refreshed.metadata(),
+                        refreshed.committedEnd(),
+                        new TrimRecord(
+                                refreshed.metadata().streamId(),
+                                1,
+                                "retention",
+                                10_000,
+                                refreshed.metadataVersion()));
+
+        assertThat(DefaultPhysicalRootBackfillCoordinator
+                        .sameStreamAuthority(first, advancedCommit))
+                .isFalse();
+        assertThat(DefaultPhysicalRootBackfillCoordinator
+                        .sameStreamAuthority(first, advancedTrim))
+                .isFalse();
+    }
+
+    @Test
+    void appendRecoveryAuthorityIgnoresHeadVersionButDetectsNewCommit() {
+        AppendRecoveryHead first =
+                streamFixture().tail().observedHead();
+        AppendRecoveryHead refreshed = new AppendRecoveryHead(
+                first.streamId(),
+                first.lastCommitId(),
+                first.offsetEnd(),
+                first.cumulativeSize(),
+                first.commitVersion(),
+                99);
+        AppendRecoveryHead advanced = new AppendRecoveryHead(
+                first.streamId(),
+                "next-commit",
+                first.offsetEnd() + 1,
+                first.cumulativeSize() + 8,
+                first.commitVersion() + 1,
+                100);
+
+        assertThat(DefaultPhysicalRootBackfillCoordinator
+                        .sameAppendRecoveryAuthority(first, refreshed))
+                .isTrue();
+        assertThat(DefaultPhysicalRootBackfillCoordinator
+                        .sameAppendRecoveryAuthority(first, advanced))
+                .isFalse();
+    }
+
     private static GenerationProtocolActivationStore activationStore() {
         return GenerationProtocolActivationStoreTestFactory.inMemory(
                 CLOCK,
                 F4MetadataTestValues.ATTEMPT,
                 F4MetadataTestValues.referenceDomains());
+    }
+
+    private static StreamMetadataSnapshot observedSnapshot(
+            StreamMetadataSnapshot source,
+            long metadataVersion,
+            String trimReason,
+            long trimUpdatedAtMillis) {
+        return new StreamMetadataSnapshot(
+                new StreamMetadataRecord(
+                        source.metadata().streamId(),
+                        source.metadata().streamName(),
+                        source.metadata().streamNameHash(),
+                        source.metadata().state(),
+                        source.metadata().profile(),
+                        source.metadata().attributes(),
+                        source.metadata().createdAtMillis(),
+                        source.metadata().policyVersion(),
+                        metadataVersion),
+                new CommittedEndOffsetRecord(
+                        source.committedEnd().streamId(),
+                        source.committedEnd().committedEndOffset(),
+                        source.committedEnd().cumulativeSize(),
+                        source.committedEnd().commitVersion(),
+                        metadataVersion),
+                new TrimRecord(
+                        source.trim().streamId(),
+                        source.trim().trimOffset(),
+                        trimReason,
+                        trimUpdatedAtMillis,
+                        metadataVersion));
     }
 
     private static void prepareRegistrationBackfill(
@@ -1257,6 +1360,25 @@ class PhysicalRootBackfillCoordinatorTest {
         } catch (InvocationTargetException failure) {
             throw failure.getCause();
         }
+    }
+
+    private static CursorMetadataStore boundedCursorPages(
+            CursorMetadataStore delegate,
+            int maximumPageSize,
+            AtomicInteger observedPageSize) {
+        return proxy(
+                CursorMetadataStore.class,
+                (method, arguments) -> {
+                    if (method.getName().equals("scanCursors")) {
+                        int pageSize = (int) arguments[3];
+                        observedPageSize.set(pageSize);
+                        if (pageSize > maximumPageSize) {
+                            throw new IllegalArgumentException(
+                                    "cursor page exceeds the test metadata-store limit");
+                        }
+                    }
+                    return invoke(delegate, method, arguments);
+                });
     }
 
     @SuppressWarnings("unchecked")

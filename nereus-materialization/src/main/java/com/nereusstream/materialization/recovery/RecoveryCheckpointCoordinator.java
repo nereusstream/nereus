@@ -52,7 +52,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 
 /** Publishes one bounded NRC1 prefix and converges every root-owned protection. */
-public final class RecoveryCheckpointCoordinator {
+public final class RecoveryCheckpointCoordinator implements RecoveryCheckpointPublisher {
     private final String cluster;
     private final GenerationMetadataStore generationStore;
     private final PhysicalObjectMetadataStore physicalStore;
@@ -137,6 +137,7 @@ public final class RecoveryCheckpointCoordinator {
                 this.scheduler);
     }
 
+    @Override
     public CompletableFuture<RecoveryCheckpointRunResult> checkpoint(StreamId streamId) {
         try {
             return new Operation(Objects.requireNonNull(streamId, "streamId")).run();

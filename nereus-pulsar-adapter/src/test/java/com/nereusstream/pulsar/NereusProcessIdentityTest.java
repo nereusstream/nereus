@@ -10,12 +10,12 @@ import org.junit.jupiter.api.Test;
 
 class NereusProcessIdentityTest {
     @Test
-    void generatesUrlSafeIdentityAndZerosTemporaryEntropy() {
+    void generatesLowercaseBase32IdentityAndZerosTemporaryEntropy() {
         CapturingSecureRandom random = new CapturingSecureRandom();
 
         NereusProcessIdentity identity = NereusProcessIdentity.generate(random);
 
-        assertThat(identity.processRunId()).hasSize(22).matches("[A-Za-z0-9_-]{22}");
+        assertThat(identity.processRunId()).hasSize(52).matches("[a-z2-7]{52}");
         assertThat(identity.writerId()).isEqualTo("pulsar-f2/" + identity.processRunId());
         assertThat(random.supplied).containsOnly((byte) 0);
     }
@@ -23,9 +23,17 @@ class NereusProcessIdentityTest {
     @Test
     void rejectsIdentityMismatch() {
         assertThatThrownBy(() -> new NereusProcessIdentity(
-                "AAAAAAAAAAAAAAAAAAAAAA", "pulsar-f2/different"))
+                "aaaaaaaaaaaaaaaaaaaaaaaaaa", "pulsar-f2/different"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("writerId");
+    }
+
+    @Test
+    void rejectsLegacyBase64UrlIdentity() {
+        assertThatThrownBy(() -> new NereusProcessIdentity(
+                "AAAAAAAAAAAAAAAAAAAAAA", "pulsar-f2/AAAAAAAAAAAAAAAAAAAAAA"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lowercase base32");
     }
 
     private static final class CapturingSecureRandom extends SecureRandom {

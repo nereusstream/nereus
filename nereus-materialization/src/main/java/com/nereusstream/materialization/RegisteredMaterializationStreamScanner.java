@@ -14,6 +14,7 @@ import com.nereusstream.core.capability.GenerationActivationProof;
 import com.nereusstream.core.capability.GenerationOperation;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.capability.LiveProjectionSubject;
+import com.nereusstream.materialization.recovery.RecoveryCheckpointPublisher;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.F4ScanToken;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
@@ -40,6 +41,7 @@ public final class RegisteredMaterializationStreamScanner {
     private final MaterializationTaskStore tasks;
     private final MaterializationTaskRecovery recovery;
     private final TaskRecoveryScanner recoveryScanner;
+    private final RecoveryCheckpointPublisher recoveryCheckpoints;
     private final MaterializationCheckpointReconciler checkpoints;
     private final TerminalWorkflowMetadataRetirer metadataRetirer;
     private final MaterializationPolicy policy;
@@ -56,6 +58,7 @@ public final class RegisteredMaterializationStreamScanner {
             MaterializationTaskStore tasks,
             MaterializationTaskRecovery recovery,
             TaskRecoveryScanner recoveryScanner,
+            RecoveryCheckpointPublisher recoveryCheckpoints,
             MaterializationCheckpointReconciler checkpoints,
             TerminalWorkflowMetadataRetirer metadataRetirer,
             MaterializationPolicy policy,
@@ -71,6 +74,7 @@ public final class RegisteredMaterializationStreamScanner {
                 tasks,
                 recovery,
                 recoveryScanner,
+                recoveryCheckpoints,
                 checkpoints,
                 metadataRetirer,
                 policy,
@@ -88,6 +92,7 @@ public final class RegisteredMaterializationStreamScanner {
             MaterializationTaskStore tasks,
             MaterializationTaskRecovery recovery,
             TaskRecoveryScanner recoveryScanner,
+            RecoveryCheckpointPublisher recoveryCheckpoints,
             MaterializationCheckpointReconciler checkpoints,
             TerminalWorkflowMetadataRetirer metadataRetirer,
             MaterializationPolicy policy,
@@ -103,6 +108,8 @@ public final class RegisteredMaterializationStreamScanner {
         this.tasks = Objects.requireNonNull(tasks, "tasks");
         this.recovery = Objects.requireNonNull(recovery, "recovery");
         this.recoveryScanner = Objects.requireNonNull(recoveryScanner, "recoveryScanner");
+        this.recoveryCheckpoints = Objects.requireNonNull(
+                recoveryCheckpoints, "recoveryCheckpoints");
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.metadataRetirer = Objects.requireNonNull(metadataRetirer, "metadataRetirer");
         this.policy = Objects.requireNonNull(policy, "policy");
@@ -184,7 +191,7 @@ public final class RegisteredMaterializationStreamScanner {
                                     ? GenerationOperation.TOPIC_COMPACTED_PUBLISH
                                     : GenerationOperation.GENERATION_PUBLISH,
                             subject.orElseThrow(),
-                            false)
+                            true)
                     .thenCompose(proof -> processAdmittedStream(
                             streamId, snapshot, proof, accumulator));
         });
@@ -251,7 +258,8 @@ public final class RegisteredMaterializationStreamScanner {
                         .thenCompose(tasks -> createAndRecover(
                                 tasks, 0, mutationGuard, accumulator));
             }
-            return planned.thenCompose(ignored -> checkpoints.reconcile(
+            return planned.thenCompose(ignored -> recoveryCheckpoints.checkpoint(streamId))
+                    .thenCompose(ignored -> checkpoints.reconcile(
                             streamId, policy, mutationGuard))
                     .thenCompose(ignored -> metadataRetirer.retire(
                             streamId, policy, trim, mutationGuard))

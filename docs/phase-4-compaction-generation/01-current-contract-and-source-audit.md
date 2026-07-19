@@ -6,9 +6,9 @@ This is the F4-M0 read-only audit. It records the exact current seams that Phase
 implementation from inventing a second append truth、cursor truth or broker policy path. No production source change
 is part of M0.
 
-> Post-audit status (2026-07-15)：F4-M4 checkpoint B has closed the generation-zero gap identified in §3.1 with
-> prepare/protect/head/materialize/protect sequencing. The hashes and call path below intentionally remain the M0
-> baseline；current implementation status is authoritative in this directory's README and documents 03/07.
+> Post-audit status (2026-07-19)：F4-M4 is final-gated. Checkpoint B closed the generation-zero gap identified in
+> §3.1；checkpoints C–BC and the real two-broker acceptance close recovery/retirement/physical+cursor GC. The Nereus
+> M0 rows remain historical baseline evidence；the local Pulsar lock/table below tracks the current final-gate source.
 
 ## 2. Source Locks
 
@@ -39,13 +39,15 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@725b2ad9e7f57135e18419589ff0a42b05fe58aa`。
+`master@5aeb199eadc2f5bcd2d618e1dbc42b810168de2d`。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
 | `pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java` | `0b76b1939603c7ba60ed1c4691287819421d3ed4` | two-stable-snapshot barrier plus product-neutral readiness provider |
-| `pulsar-broker/.../nereus/NereusGenerationCapabilityReadiness.java` | `782303d1442972a02a290955f920835971a8d8fe` | exact full readiness identity and core conversion |
-| `pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java` | `39e68dd8e9719bffe6dc21d037c485168417ca4e` | canonical traversal/report plus exact remaining-budget/concurrency proof handoff |
+| `pulsar-broker/.../nereus/NereusGenerationCapabilityReadiness.java` | `ae281faf2353c927de0f10685d0f1df63acd8f8a` | exact full readiness identity, opaque epoch contract and core conversion |
+| `pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java` | `97912566a045eddbb763e9b2bd7563a07d7abe69` | tenant-local namespace canonicalization plus exact remaining-budget/concurrency proof handoff |
+| `pulsar-broker/.../nereus/GenerationRegistrationBackfillReport.java` | `e84406c679f44f04e50ba943a1f97d92abf8f95a` | topic-outcome versus broader traversal-failure accounting |
+| `pulsar-broker/.../nereus/NereusPhysicalGcMultiBrokerIntegrationTest.java` | `86dbbb8797887e89ee78d03b3fe729db882b833f` | retry-disabled real source deletion、MessageId、unload/failover/restart and BookKeeper final gate |
 | `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `3ca141fcfd0f8f6049fd40725d0007789bf088f7` | bounded broker-to-product proof completion and publication-activation delegate |
 | `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `14916134ed514fc0d2c2e6628e7317463798bb89` | current retention/compaction/admin denylist |
 | `pulsar-broker/.../nereus/NereusAdminOperation.java` | `a99c967347ce7b9edc29b57892b220f42bedf8be` | closed loaded/unloaded admin operation set |
@@ -182,12 +184,14 @@ BookKeeper-ledger retention heuristic is meaningful for one immutable virtual le
 ## 4. M0 Gap Inventory and Required Owners
 
 The “current fact” column below is the frozen M0 input fact, not a claim about the latest checkpoint. Implemented
-closures are tracked in document 07；as of checkpoints AV/AI the generation/reader/task/publication/retention-rollout、
+closures are tracked in document 07；as of the F4-M4 final gate and F4-M5 checkpoint AI, the generation/reader/task/publication/retention-rollout、
 cursor/ownerless execution、current-writer inventory、registration retirement、metadata-first lifecycle、broker
 physical-GC mapping、coverage/delete activation and production composition rows have implementation slices. AS–AV
 prove exact-scope ownerless restart/delete-response-loss、post-DELETE/pre-root-CAS independent recovery and applied-
 DELETED-CAS response-loss exact reload without repeated DELETE plus two-worker shared-intent convergence against real
-Oxia/LocalStack；the full destructive/scale matrix and final M4–M6 composition remain open.
+Oxia/LocalStack. Checkpoints AW–BC and the retry-disabled real two-broker fixture subsequently closed the M4 all-shard/
+scale/late-PUT/source-protection/readiness-rollover/ownership-failover matrix；F4-M4 is complete, while M5/M6 and the
+aggregate Phase 4 composition remain open.
 
 | Gap | Current fact | Phase 4 owner |
 | --- | --- | --- |

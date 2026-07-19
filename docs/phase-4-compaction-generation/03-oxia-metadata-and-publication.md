@@ -118,7 +118,7 @@ the physical store/manager/publisher over its shared Oxia client and owns their 
 This checkpoint closes the new-write physical-reference gap only. Later checkpoints D–F implement recovery-root
 publication and anchor-aware replay/repair, and checkpoint I implements the recoverable root fence through DELETING
 intent. Source/index retirement、physical delete and runtime composition remain unimplemented, so deletion stays
-disabled and F4-M4 remains in progress.
+disabled and F4-M4 remained in progress at that checkpoint.
 
 ### 1.5 F4-M4 guarded recovery-root publication checkpoint
 

@@ -317,6 +317,11 @@ Activation is required before：
 - publishing a topic-compacted storage primitive。
 
 Activation itself changes no bytes、index、trim or task state.
+The registered-stream scanner is the first ordinary generation-publication admission point for sync topics that do
+not otherwise require an F4 policy. It therefore calls `requireReady(..., activateLiveProjectionIfAbsent=true)`：
+after cluster publication activation it may perform the registration-before-marker convergence, but it still creates
+no task or generation index until the returned proof is revalidated. Later commit/recovery/GC call sites pass
+`false` and require the marker established by admission.
 
 GC of an authoritatively deleted/unaddressable old incarnation or a proven ownerless orphan does not invent a topic
 marker after deletion. It instead requires cluster deletion activation plus the
@@ -369,10 +374,15 @@ Run id is random 128-bit lowercase base32；readiness epoch/counters are non-neg
 positive. `boundedFailures.size() == min(100, failureCount)` in canonical traversal order, identities are lowercase
 SHA-256 (never raw tenant/topic names) and error codes are stable bounded machine values. Report digest hashes every
 visited canonical resource identity、classification and registration result, not just the retained failures.
+`persistentTopicsScanned - nereusProjectionsRegistered - deletedOrNonNereusSkipped` is the exact topic-failure
+count and must be non-negative and no greater than total `failureCount`；the latter also counts tenant、namespace and
+topic-list traversal failures that occur before any individual topic outcome exists.
 
 The implementation uses the locked local-source methods `TenantResources.listTenantsAsync()`、
 `NamespaceResources.listNamespacesAsync(tenant)` and `TopicResources.listPersistentTopicsAsync(namespace)` in sorted
-order. It does not load/own topics. For every non-system persistent topic/partition, it linearly reads storage binding
+order. The namespace resource API returns bare local names，so the traversal rejects slash-bearing/non-canonical
+values and reconstructs each exact identity with `NamespaceName.get(tenant, localName)` before hashing or topic
+listing. It does not load/own topics. For every non-system persistent topic/partition, it linearly reads storage binding
 and the exact Nereus projection；a live Nereus incarnation is registered through the coordinator from 3.2, while
 deleted/non-Nereus topics are counted and skipped. Concurrency and one operation deadline are bounded；failure details
 are capped at 100 and the digest/counters cover the full canonical traversal. It processes one namespace result at a
@@ -389,7 +399,7 @@ Checkpoint AA adds `GenerationRegistrationBackfillCompletion` as the product bou
 comparison, only a zero-failure report is submitted, within the same whole-run deadline. The product coordinator
 reacquires exact readiness before CAS, compares epoch/full digest/broker count, and installs the proof through the
 shared-Oxia activation store. Same-epoch completed coverage is immutable；a rerun with another run id and the same
-coverage converges. Before deletion is active, a newer readiness epoch resets physical-root/cursor-snapshot proof
+coverage converges. Before deletion is active, a changed readiness identity resets physical-root/cursor-snapshot proof
 epochs to incomplete and clears the old object-store capability. Once deletion is active, a registration-only refresh
 remains forbidden；checkpoint BC instead runs physical/cursor coverage in non-publishing mode、repeats the configured-
 scope capability probe and atomically replaces the readiness epoch、all three proofs and capability digest while both
@@ -467,7 +477,9 @@ persistent-topic brokers, validates all three exact versions, and compares two f
 key sets. Its canonical SHA-256 input is domain-separated and length-prefixed；brokers are sorted by registry key and
 each contributes that key、the advertised `BrokerLookupData.brokerId`、`startTimestamp` and sorted required
 property/value pairs. The bounded V1 `brokerReadinessEpoch` is the non-negative first 63 digest bits；the complete
-lowercase digest and broker count remain available for exact comparison.
+lowercase digest and broker count remain available for exact comparison. The 63-bit value is an opaque identity token,
+not a monotonic sequence: protocol code may compare it only for equality/inequality and must never infer older/newer
+membership from its numeric ordering.
 
 The coordinator registers a broker-registry listener before readiness is used. Every notification increments a
 process-local revision and invalidates the cached identity；a revision change during two otherwise identical
@@ -560,12 +572,12 @@ change this rollout boundary or schedule production deletion.
 Schema/protocol are `1`. Domain pairs are canonical sorted/unique, non-empty and capped at 32. Run/broker ids are
 random 128-bit lowercase base32；coverage/capability digests are lowercase SHA-256. An incomplete backfill has empty
 run/digest、zero completion time but still records the readiness epoch being attempted；a complete proof has all
-fields present and its epoch equals the record's broker epoch. No proof may name an epoch newer than the record's
+fields present and its epoch equals the record's broker epoch. No proof may name an epoch different from the record's
 broker epoch. `metadataVersion` is zero on wire and hydrated from
 Oxia. The version wrapper follows document 03's exact key/version/durable-value-digest contract.
 
 Allowed durable changes are `PREPARED -> ACTIVE`, false-to-true capability bits, replacement of a backfill proof by a
-newer broker-readiness epoch and exact domain-set changes only under a separately reviewed capability transition.
+changed opaque broker-readiness identity and exact domain-set changes only under a separately reviewed capability transition.
 No true bit returns false. A membership/property change invalidates the process-local readiness epoch, so the guard
 blocks immediately even though durable bits are monotonic；the next stable capable epoch must refresh every required
 proof before operations resume. `ACTIVE` requires：
@@ -586,7 +598,8 @@ cursor/capability facts. A broker whose mutating GC lifecycle was deferred at st
 and exact startup-gate revalidation. The locked Pulsar adapter now forwards the request's exact concurrency and its
 actual remaining whole-run deadline through the storage/factory proof boundary. Broker and product code share the
 1,024 concurrency ceiling；the product starts no second full timeout and bounds readiness、activation、CAS/reloads and
-the final durable read under the same monotonic deadline. The real two-broker final gate remains outstanding.
+the final durable read under the same monotonic deadline. The real two-broker final gate described below now closes
+that rollover boundary.
 
 Checkpoint AC is the first production owner of the ACTIVE CAS, but only for publication. It proves the first two
 publication prerequisites above through exact broker readiness and the durable registration proof；the physical-root、
@@ -1010,6 +1023,21 @@ registration backfill it first waits for publication activation, then only under
 request with the same run id/concurrency/timeout and waits through lifecycle start. Failure reports、disabled generation
 publication and safe/default/dry-run physical config never call physical activation；either activation failure is
 propagated to the original backfill completion promise.
+
+The F4-M4 final bridge is
+`NereusPhysicalGcMultiBrokerIntegrationTest.deletesMaterializedWalSourcesAndPreservesMessageIdsAcrossOwnershipCuts`.
+It starts two brokers over shared real Oxia、pinned LocalStack and stock BookKeeper, activates the exact physical-GC
+scope, materializes ordinary plus compressed-batch Nereus entries and waits until every captured Object-WAL source
+key is absent while COMMITTED compacted keys remain. Reads before/after deletion and explicit unload compare the full
+payload/properties and all `MessageIdAdv` coordinates. The fixture then stops the owner、rolls deletion authority to
+the survivor、appends there、restarts the old broker、stops the survivor and performs reverse takeover. The same Nereus
+history remains readable and a separate BookKeeper topic continues to append/read.
+
+This gate runs with `testRetryCount=0`. The rollover helper allows 120 seconds for stable capability/backfill
+convergence and includes bounded report diagnostics；it does not silently retry the test class. Broker readiness epoch
+is an opaque equality token, not a numeric sequence. Product backfill revalidation compares stable stream/append
+authority rather than shared stream-head metadata versions changed by append-session renewal, and uses a separately
+bounded F3 cursor page size. The test passed on 2026-07-19 in 2m19s and is composed by `phase4M4FinalCheck`.
 
 ## 12. Operations and Status
 

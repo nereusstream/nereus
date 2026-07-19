@@ -3,8 +3,10 @@
 ## 1. Current Status
 
 F4-M0 is complete against Nereus `e330969cd5c2c11cd38d0bd7f687185171ae91e2` and current local Pulsar source lock
-`725b2ad9e7f57135e18419589ff0a42b05fe58aa`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
-final gates on 2026-07-15；the following foundation parts are implemented and covered by focused and real-service tests：
+`5aeb199eadc2f5bcd2d618e1dbc42b810168de2d`. F4-M1、F4-M2 and F4-M3 completed their ordinary and Docker-backed
+final gates on 2026-07-15；F4-M4 completed its focused、real Oxia/LocalStack、scale/failure and retry-disabled real
+two-broker final boundary on 2026-07-19. The following foundation parts are implemented and covered by focused and
+real-service tests：
 
 - F4 API identities、materialization module boundary、Oxia keyspace/records/codecs/store adapters and conditional
   delete surface；
@@ -144,8 +146,9 @@ registration traversal triggers a non-publishing physical/cursor root scan、fre
 that preserves both delete bits while replacing the epoch、all three proofs and capability digest. Runtime startup
 deferred by the old epoch resumes only after exact new authority is durable. Locked-Pulsar propagation of the exact
 remaining traversal deadline/concurrency is now implemented through the three-argument proof boundary, including the
-shared 1,024 concurrency ceiling and product-owned monotonic deadline. The actual two-broker ownership/unload/failover
-matrix remains pending.
+shared 1,024 concurrency ceiling and product-owned monotonic deadline. The final locked-Pulsar fixture now proves
+source-byte deletion、exact MessageId preservation、unload、owner failover、restart/reverse takeover and stock
+BookKeeper coexistence with test retry disabled；F4-M4 is complete/final-gated.
 Checkpoint X starts M5 by adding the exact durable
 registration create/refresh/final-revalidation coordinator、topic-open return barrier and shared generation-store
 production ownership. Checkpoint Y adds the locked Pulsar fork's reserved generation lookup property、exact
@@ -684,7 +687,7 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 
 ## 6. F4-M4 — Recovery Checkpoint, Retirement, and GC
 
-> Current status：in progress. Checkpoints A–R implement NRC1/protected append/recovery、checkpoint replay/index repair、
+> Current status：complete/final-gated on 2026-07-19. Checkpoints A–R implement NRC1/protected append/recovery、checkpoint replay/index repair、
 > retirement metadata、bounded GC plan/root/journal fencing、root-authenticated destructive recovery、typed source
 > retirement and all view/trim eligibility paths. Checkpoint S implements durable generation activation metadata；
 > checkpoint T implements the future sentinel、activation-gated full registration scope and affected/ownerless variants
@@ -714,11 +717,10 @@ with no durable task. F4-M3 is complete/final-gated；M4 is the next implementat
 > 10,000-cursor-root live/old/CAS-lost/deleted-cursor classification/deletion. The remaining destructive/failure
 > Checkpoint BA proves journaled source/protection post-delete recovery. Checkpoint BB proves guarded Object-WAL
 > first/retried transmissions、late exact PUT at both Phase 1 audit-removal cuts and real post-root external
-> reappearance through missing-root inventory. The actual two-broker ownership/unload/failover scenario and final M4
-> gate remain before F4-M4 can be called complete. Checkpoint BC adds product-owned atomic deletion-authority
+> reappearance through missing-root inventory. Checkpoint BC adds product-owned atomic deletion-authority
 > readiness rollover without a partial-proof durable state；the locked broker call now preserves the cold-topic
-> traversal's exact concurrency and remaining whole-run deadline through the product boundary. The two-broker final
-> fixture is the remaining destructive line.
+> traversal's exact concurrency and remaining whole-run deadline through the product boundary. The retry-disabled
+> real two-broker fixture now closes source deletion、MessageId、unload/failover/restart and BookKeeper coexistence.
 > Checkpoint X separately starts M5's rollout frontier：new/create/open/recreate topics cannot return before exact
 > durable registration. Checkpoint Y publishes/verifies the generation broker capability and stable readiness
 > identity. Checkpoint Z implements the cold-topic traversal/report, but no durable coverage proof、marker or product
@@ -1094,6 +1096,9 @@ retirement.
 ./gradlew phase4M4CursorGcScaleCheck
 ./gradlew phase4M4SourceProtectionCutCheck
 ./gradlew phase4M4LatePutTombstoneCheck
+./gradlew phase4M4ReadinessRolloverCheck
+./gradlew phase4M4Check
+./gradlew phase4M4PhysicalGcMultiBrokerPulsarCheck --rerun-tasks
 ./gradlew phase4M4FinalCheck --rerun-tasks
 ```
 
@@ -1591,9 +1596,27 @@ names. The locked Pulsar fork now calls the bounded storage/factory overload wit
 and remaining whole-run deadline；request/config validation freezes the shared 1,024 ceiling. The product proof
 coordinator starts one monotonic deadline before readiness admission, bounds activation/CAS/reload/final reads and
 hands only the remaining budget into rollover. `phase4M4ReadinessRolloverPulsarCheck` and the extended static audit
-freeze this cross-repository seam. This checkpoint is intentionally not the M4 final gate：the real two-broker unload/
-failover/restart fixture must still become authoritative. The locked-Pulsar sub-gate passed on 2026-07-19 under Java
-21 with 65 outer tasks and 141/141 nested tasks executed.
+freeze this cross-repository seam. BC by itself is not the M4 final gate；the locked-Pulsar sub-gate passed on
+2026-07-19 under Java 21 with 65 outer tasks and 141/141 nested tasks executed.
+
+`phase4M4PhysicalGcMultiBrokerPulsarCheck` is the final broker evidence. Its retry-disabled
+`NereusPhysicalGcMultiBrokerIntegrationTest`
+`deletesMaterializedWalSourcesAndPreservesMessageIdsAcrossOwnershipCuts` starts two real brokers with shared
+four-shard Oxia、pinned LocalStack and stock BookKeeper. It activates the production physical-delete path, writes
+ordinary and compressed batched entries, materializes COMMITTED compacted output and waits until every captured
+generation-zero Object-WAL key is absent while compacted keys remain. It compares payload、properties and all
+`MessageIdAdv` coordinates after source deletion and unload. It then stops the owner、rolls deletion authority to the
+survivor、reads/appends、restarts the old broker、stops the survivor and reverse-rolls authority；the restarted broker
+reads the exact history and the independent BookKeeper topic still appends/reads.
+
+The fixture exposed and froze three cross-layer bounds. Pulsar namespace listings are tenant-local names, and a
+namespace-list failure is not a topic outcome. Physical-root backfill uses a separately capped F3 cursor page size.
+Final L0/recovery revalidation compares stable semantic authority rather than the shared head metadata version changed
+by append-session renewal or synthetic trim observation time；commit、trim、policy/profile/lifecycle changes still
+fail closed. Focused tests cover those positive/negative comparisons. The locked-Pulsar method passed on 2026-07-19
+under Java 21 in 2m19s with `testRetryCount=0`. `phase4M4FinalCheck` composes the complete checkpoint-BC chain、the
+stable-authority/static contract audit and this broker gate. F4-M4 is complete/final-gated；F4-M5/M6 and the aggregate
+Phase 4 completion gate remain separate.
 
 ## 7. F4-M5 — Async Profile, Retention, and Pulsar Integration
 

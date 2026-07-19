@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /** Product router for one complete metadata-root pass; a fresh instance owns per-pass cursor deduplication. */
@@ -30,6 +31,8 @@ final class Phase4PhysicalRootLifecycleRouter
     private final Function<CursorLedgerIdentity, CompletableFuture<Void>> scanCursor;
     private final BiFunction<CursorLedgerIdentity, VersionedPhysicalObjectRoot,
             CompletableFuture<Void>> recoverCursor;
+    private final Function<VersionedPhysicalObjectRoot, CompletableFuture<Boolean>> executeReferenced;
+    private final Function<VersionedPhysicalObjectRoot, CompletableFuture<Boolean>> recoverReferenced;
     private final Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> executeOwnerless;
     private final Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> recoverOwnerless;
     private final Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> recoverDeleting;
@@ -40,27 +43,89 @@ final class Phase4PhysicalRootLifecycleRouter
             String cluster,
             ManagedLedgerProjectionMetadataStore projections,
             CursorSnapshotGcExecutor cursorGc,
+            ReferencedObjectGcExecutor referencedGc,
             OwnerlessObjectGcExecutor ownerlessGc,
             SourceRetirementCoordinator sourceRetirement,
             PhysicalRootTombstoneRetirementCoordinator tombstones) {
+        this(
+                cluster,
+                projections,
+                cursorGc,
+                referencedGc,
+                ownerlessGc,
+                sourceRetirement,
+                tombstones,
+                ignored -> { });
+    }
+
+    Phase4PhysicalRootLifecycleRouter(
+            String cluster,
+            ManagedLedgerProjectionMetadataStore projections,
+            CursorSnapshotGcExecutor cursorGc,
+            ReferencedObjectGcExecutor referencedGc,
+            OwnerlessObjectGcExecutor ownerlessGc,
+            SourceRetirementCoordinator sourceRetirement,
+            PhysicalRootTombstoneRetirementCoordinator tombstones,
+            Consumer<ReferencedObjectGcExecutor.ExecutionResult> referencedObserver) {
         this.cluster = requireText(cluster, "cluster");
         this.projections = Objects.requireNonNull(projections, "projections");
         CursorSnapshotGcExecutor exactCursor = Objects.requireNonNull(cursorGc, "cursorGc");
+        ReferencedObjectGcExecutor exactReferenced = Objects.requireNonNull(
+                referencedGc, "referencedGc");
         OwnerlessObjectGcExecutor exactOwnerless = Objects.requireNonNull(
                 ownerlessGc, "ownerlessGc");
         SourceRetirementCoordinator exactRetirement = Objects.requireNonNull(
                 sourceRetirement, "sourceRetirement");
         PhysicalRootTombstoneRetirementCoordinator exactTombstones = Objects.requireNonNull(
                 tombstones, "tombstones");
+        Consumer<ReferencedObjectGcExecutor.ExecutionResult> exactObserver =
+                Objects.requireNonNull(referencedObserver, "referencedObserver");
         this.scanCursor = ledger -> exactCursor.scan(ledger).thenApply(ignored -> null);
         this.recoverCursor = (ledger, root) -> exactCursor.recoverMarked(ledger, root)
                 .thenApply(ignored -> null);
+        this.executeReferenced = root -> exactReferenced.executeActive(root)
+                .thenApply(result -> observe(result, exactObserver));
+        this.recoverReferenced = root -> exactReferenced.recoverMarked(root)
+                .thenApply(result -> observe(result, exactObserver));
         this.executeOwnerless = root -> exactOwnerless.executeActive(root)
                 .thenApply(ignored -> null);
         this.recoverOwnerless = root -> exactOwnerless.recoverMarked(root)
                 .thenApply(ignored -> null);
         this.recoverDeleting = root -> exactRetirement.resume(root).thenApply(ignored -> null);
         this.retireTombstone = root -> exactTombstones.retire(root).thenApply(ignored -> null);
+    }
+
+    private static boolean observe(
+            Optional<ReferencedObjectGcExecutor.ExecutionResult> result,
+            Consumer<ReferencedObjectGcExecutor.ExecutionResult> observer) {
+        result.ifPresent(observer);
+        return result.isPresent();
+    }
+
+    Phase4PhysicalRootLifecycleRouter(
+            String cluster,
+            ManagedLedgerProjectionMetadataStore projections,
+            Function<CursorLedgerIdentity, CompletableFuture<Void>> scanCursor,
+            BiFunction<CursorLedgerIdentity, VersionedPhysicalObjectRoot,
+                    CompletableFuture<Void>> recoverCursor,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Boolean>> executeReferenced,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Boolean>> recoverReferenced,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> executeOwnerless,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> recoverOwnerless,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> recoverDeleting,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> retireTombstone) {
+        this.cluster = requireText(cluster, "cluster");
+        this.projections = Objects.requireNonNull(projections, "projections");
+        this.scanCursor = Objects.requireNonNull(scanCursor, "scanCursor");
+        this.recoverCursor = Objects.requireNonNull(recoverCursor, "recoverCursor");
+        this.executeReferenced = Objects.requireNonNull(
+                executeReferenced, "executeReferenced");
+        this.recoverReferenced = Objects.requireNonNull(
+                recoverReferenced, "recoverReferenced");
+        this.executeOwnerless = Objects.requireNonNull(executeOwnerless, "executeOwnerless");
+        this.recoverOwnerless = Objects.requireNonNull(recoverOwnerless, "recoverOwnerless");
+        this.recoverDeleting = Objects.requireNonNull(recoverDeleting, "recoverDeleting");
+        this.retireTombstone = Objects.requireNonNull(retireTombstone, "retireTombstone");
     }
 
     Phase4PhysicalRootLifecycleRouter(
@@ -73,14 +138,17 @@ final class Phase4PhysicalRootLifecycleRouter
             Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> recoverOwnerless,
             Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> recoverDeleting,
             Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> retireTombstone) {
-        this.cluster = requireText(cluster, "cluster");
-        this.projections = Objects.requireNonNull(projections, "projections");
-        this.scanCursor = Objects.requireNonNull(scanCursor, "scanCursor");
-        this.recoverCursor = Objects.requireNonNull(recoverCursor, "recoverCursor");
-        this.executeOwnerless = Objects.requireNonNull(executeOwnerless, "executeOwnerless");
-        this.recoverOwnerless = Objects.requireNonNull(recoverOwnerless, "recoverOwnerless");
-        this.recoverDeleting = Objects.requireNonNull(recoverDeleting, "recoverDeleting");
-        this.retireTombstone = Objects.requireNonNull(retireTombstone, "retireTombstone");
+        this(
+                cluster,
+                projections,
+                scanCursor,
+                recoverCursor,
+                ignored -> CompletableFuture.completedFuture(false),
+                ignored -> CompletableFuture.completedFuture(false),
+                executeOwnerless,
+                recoverOwnerless,
+                recoverDeleting,
+                retireTombstone);
     }
 
     @Override
@@ -98,7 +166,12 @@ final class Phase4PhysicalRootLifecycleRouter
     private CompletableFuture<Void> visitActive(VersionedPhysicalObjectRoot root) {
         return resolveCursorLedger(root).thenCompose(optional -> {
             if (optional.isEmpty()) {
-                return require(executeOwnerless, root, "ownerless ACTIVE execution");
+                return referencedOrOwnerless(
+                        root,
+                        executeReferenced,
+                        executeOwnerless,
+                        "referenced ACTIVE execution",
+                        "ownerless ACTIVE execution");
             }
             CursorLedgerIdentity ledger = optional.orElseThrow();
             StreamId stream = new StreamId(ledger.projection().streamId());
@@ -113,8 +186,24 @@ final class Phase4PhysicalRootLifecycleRouter
         return resolveCursorLedger(root).thenCompose(optional -> optional
                 .<CompletableFuture<Void>>map(ledger ->
                         require(recoverCursor, ledger, root, "cursor MARKED recovery"))
-                .orElseGet(() -> require(
-                        recoverOwnerless, root, "ownerless MARKED recovery")));
+                .orElseGet(() -> referencedOrOwnerless(
+                        root,
+                        recoverReferenced,
+                        recoverOwnerless,
+                        "referenced MARKED recovery",
+                        "ownerless MARKED recovery")));
+    }
+
+    private CompletableFuture<Void> referencedOrOwnerless(
+            VersionedPhysicalObjectRoot root,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Boolean>> referenced,
+            Function<VersionedPhysicalObjectRoot, CompletableFuture<Void>> ownerless,
+            String referencedStage,
+            String ownerlessStage) {
+        return requireBoolean(referenced, root, referencedStage)
+                .thenCompose(handled -> handled
+                        ? CompletableFuture.completedFuture(null)
+                        : require(ownerless, root, ownerlessStage));
     }
 
     private CompletableFuture<Optional<CursorLedgerIdentity>> resolveCursorLedger(
@@ -175,6 +264,20 @@ final class Phase4PhysicalRootLifecycleRouter
         try {
             return Objects.requireNonNull(
                     operation.apply(first, second), stage + " returned null");
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private static <T> CompletableFuture<Boolean> requireBoolean(
+            Function<T, CompletableFuture<Boolean>> operation,
+            T value,
+            String stage) {
+        try {
+            return Objects.requireNonNull(
+                            operation.apply(value), stage + " returned null")
+                    .thenApply(result -> Objects.requireNonNull(
+                            result, stage + " completed with null"));
         } catch (Throwable failure) {
             return CompletableFuture.failedFuture(failure);
         }

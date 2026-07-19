@@ -118,6 +118,16 @@ final class RecoveryReplacementVerifier {
                     }
                     EmbeddedReplacement embedded = decode(
                             stream, requirement, page.values().get(0));
+                    if (embedded.record().generation()
+                            <= requirement.minimumGenerationExclusive()) {
+                        return select(
+                                query,
+                                stream,
+                                checkpoint,
+                                entry,
+                                requirement,
+                                cursor + 1);
+                    }
                     return loadHealthy(query, embedded).thenCompose(optional ->
                             optional.<CompletableFuture<HealthyReplacement>>map(
                                             CompletableFuture::completedFuture)
@@ -150,7 +160,6 @@ final class RecoveryReplacementVerifier {
                 || record.readViewId() != ReadView.COMMITTED.wireId()
                 || !record.streamId().equals(stream.value())
                 || record.generation() != publication.generation()
-                || record.generation() <= requirement.minimumGenerationExclusive()
                 || !record.publicationId().equals(publication.publicationId().value())
                 || record.offsetStart() != publication.coverage().startOffset()
                 || record.offsetEnd() != publication.coverage().endOffset()

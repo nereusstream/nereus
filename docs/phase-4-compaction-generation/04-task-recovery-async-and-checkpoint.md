@@ -74,14 +74,35 @@ work. The dispatcher coalesces duplicate local task ids, enforces both global an
 saturated stream without blocking other streams and rejects/cancels queued work during close. The service runs
 non-overlapping 64-shard full passes, coalesces hints into one immediate following pass, keeps injected stores and
 executors borrowed, and drains or locally cancels admitted work by `closeTimeout`. Focused tests cover all of these
-cuts, including a hung scan、deadline-forced cancellation and borrowed-executor ownership.
+cuts, including a hung scan、deadline-forced cancellation and borrowed-executor ownership. The service retains the
+active scanner source separately from its exposed pass future；at the deadline it cancels the source first, so
+`closeAsync()` completion cannot overtake cancellation propagation to a hung scanner.
 
-This is still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip now passes. The
+At the F4-M3 boundary this was still not the production materialization gate. The Pulsar Entry/NCP1 opaque-byte round trip passes. The
 protocol-neutral topic-compaction decoder/strategy SPI、exact frozen-identity registry、COMMITTED-source bootstrap、
 shared-budget sorted-spill two-pass engine and NTC1 worker/publication path are implemented. The proof-driven terminal
 workflow-metadata retirer is also wired after checkpoint reconciliation. `phase4M3Check` and the real Oxia/LocalStack
-`phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15；higher-generation production activation remains disabled
-until the M4–M6 recovery/GC、async/Pulsar and compatibility gates complete.
+`phase4M3FinalCheck --rerun-tasks` passed on 2026-07-15；at that checkpoint, higher-generation production activation
+remained disabled pending the M4–M6 recovery/GC、async/Pulsar and compatibility gates.
+
+The current F4-M4 final composition has closed the recovery-checkpoint and physical-GC portion of that gap.
+`RecoveryCheckpointPublisher` is the process-shared functional boundary, implemented by
+`RecoveryCheckpointCoordinator`. `Phase4ObjectWalRuntime` constructs the coordinator from the shared L0/generation/
+physical/object-store runtimes、`RecoveryCheckpointBuilder`、`RecoveryCheckpointProtectionManager`、activation
+guard and the physical-GC pending-protection duration, then injects it into
+`RegisteredMaterializationStreamScanner`. For each admitted stream the scanner now executes source repair, durable
+task recovery/planning, `recoveryCheckpoints.checkpoint(streamId)`, materialization-checkpoint reconciliation and
+terminal metadata retirement in that order. Admission requests creation of an absent live-projection activation
+subject before any of those mutations；a checkpoint result is advisory progress, but a failed future stops the rest
+of that stream's pass.
+
+The builder's projection compatibility is deliberately asymmetric for pre-F2 data. The current stream registration
+must decode to a present projection identity. Each live commit projection must decode successfully；an empty legacy
+commit projection is accepted as “identity not encoded”, while every present projection must equal the registration.
+This compatibility exception does not allow a conflicting identity. During higher-generation replacement search,
+an otherwise valid NRC1 publication at the current or an older generation is skipped and the bounded candidate scan
+continues；only a strictly newer healthy replacement can authorize retirement. Malformed publication metadata still
+fails as an invariant instead of being hidden by the skip.
 
 F4-M4 checkpoint A now implements the NRC1 values、spill-backed one-at-a-time codec、strict bounded open/lookup path
 and `MetadataRecoveryCheckpointVerifier`. It proves canonical recovery bytes can be built and consumed without an

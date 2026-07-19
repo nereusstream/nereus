@@ -2,6 +2,7 @@
 package com.nereusstream.materialization.recovery;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -30,6 +31,7 @@ import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationScanPage;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
+import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
@@ -139,6 +141,84 @@ class RecoveryCheckpointBuilderTest {
         assertThat(result.plan()).isEmpty();
     }
 
+    @Test
+    void acceptsLegacyEmptyCommitProjectionUsingRegistrationAsEffectiveIdentity() {
+        VersionedRecoveryCheckpointRoot root = emptyRoot();
+        String absentProjection = ProjectionIdentity.encode(Optional.empty());
+        AppendRecoveryCommit first = commit(
+                "commit-1",
+                "",
+                0,
+                1,
+                10,
+                1,
+                absentProjection);
+        AppendRecoveryCommit second = commit(
+                "commit-2",
+                "commit-1",
+                1,
+                2,
+                20,
+                2,
+                absentProjection);
+        AppendRecoveryTailPage tail = new AppendRecoveryTailPage(
+                AppendRecoveryAnchor.genesis(STREAM),
+                new AppendRecoveryHead(STREAM, "commit-2", 2, 20, 2, 8),
+                List.of(second, first),
+                true,
+                Optional.empty());
+        GenerationMetadataStore generationStore = generationStore(root, List.of(generation()));
+        OxiaMetadataStore l0Store = l0Store(tail, snapshot());
+
+        RecoveryCheckpointBuildResult result = new RecoveryCheckpointBuilder(
+                CLUSTER,
+                l0Store,
+                generationStore,
+                new AnchorAwareCommitWalker(CLUSTER, l0Store, generationStore),
+                MaterializationConfig.defaults(staging),
+                CLOCK)
+                .build(STREAM, root, registration(), "d".repeat(26))
+                .join();
+
+        assertThat(result.status()).isEqualTo(RecoveryCheckpointBuildStatus.READY);
+    }
+
+    @Test
+    void refusesDifferentNonEmptyCommitProjection() {
+        VersionedRecoveryCheckpointRoot root = emptyRoot();
+        AppendRecoveryCommit commit = commit(
+                "commit-1",
+                "",
+                0,
+                1,
+                10,
+                1,
+                ProjectionIdentity.encode(Optional.of(new ProjectionRef(
+                        ProjectionType.VIRTUAL_LEDGER,
+                        "persistent://tenant/ns/recreated-topic"))));
+        AppendRecoveryTailPage tail = new AppendRecoveryTailPage(
+                AppendRecoveryAnchor.genesis(STREAM),
+                new AppendRecoveryHead(STREAM, "commit-1", 1, 10, 1, 8),
+                List.of(commit),
+                true,
+                Optional.empty());
+        GenerationMetadataStore generationStore = generationStore(root, List.of(generation()));
+        OxiaMetadataStore l0Store = l0Store(tail, snapshot(1, 10, 1));
+        RecoveryCheckpointBuilder builder = new RecoveryCheckpointBuilder(
+                CLUSTER,
+                l0Store,
+                generationStore,
+                new AnchorAwareCommitWalker(CLUSTER, l0Store, generationStore),
+                MaterializationConfig.defaults(staging),
+                CLOCK);
+
+        assertThatThrownBy(() -> builder
+                        .build(STREAM, root, registration(), "e".repeat(26))
+                        .join())
+                .hasRootCauseMessage(
+                        "live commit projection differs from the recovery registration");
+    }
+
     private static OxiaMetadataStore l0Store(
             AppendRecoveryTailPage tail,
             StreamMetadataSnapshot snapshot) {
@@ -230,6 +310,24 @@ class RecoveryCheckpointBuilderTest {
             long end,
             long cumulative,
             long version) {
+        return commit(
+                id,
+                previous,
+                start,
+                end,
+                cumulative,
+                version,
+                PROJECTION_IDENTITY);
+    }
+
+    private static AppendRecoveryCommit commit(
+            String id,
+            String previous,
+            long start,
+            long end,
+            long cumulative,
+            long version,
+            String projectionIdentity) {
         StreamCommitTargetRecord value = new StreamCommitTargetRecord(
                 STREAM.value(),
                 id,
@@ -249,7 +347,7 @@ class RecoveryCheckpointBuilderTest {
                 1,
                 10,
                 List.of(),
-                PROJECTION_IDENTITY,
+                projectionIdentity,
                 1,
                 1,
                 1,

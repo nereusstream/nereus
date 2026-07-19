@@ -7,6 +7,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.MetadataCanonicalizer;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StreamId;
@@ -14,6 +15,7 @@ import com.nereusstream.core.physical.GcReferenceQuery;
 import com.nereusstream.metadata.oxia.F4Keyspace;
 import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
+import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedRecoveryCheckpointRoot;
 import com.nereusstream.metadata.oxia.codec.MetadataRecordCodecFactory;
@@ -281,16 +283,55 @@ final class HigherGenerationRecoveryCoverageVerifier {
             StreamCommitTargetRecord commit) {
         long cumulativeStart = Math.subtractExact(
                 commit.cumulativeSize(), commit.logicalBytes());
-        if (entry.range().startOffset() != state.offset
-                || entry.range().endOffset() > source.offsetEnd()
-                || entry.commitVersion() != state.commitVersion
-                || cumulativeStart != state.cumulativeSize
-                || (!state.previousCommitId.isEmpty()
-                        && !entry.previousCommitId().equals(state.previousCommitId))
-                || !commit.payloadFormat().equals(source.payloadFormat())
-                || !commit.projectionRef().equals(source.projectionRef())) {
+        requireTiling(
+                entry.range().startOffset() == state.offset,
+                "offset start");
+        requireTiling(
+                entry.range().endOffset() <= source.offsetEnd(),
+                "offset end");
+        requireTiling(
+                entry.commitVersion() == state.commitVersion,
+                "commit version");
+        requireTiling(
+                cumulativeStart == state.cumulativeSize,
+                "cumulative size");
+        requireTiling(
+                state.previousCommitId.isEmpty()
+                        || entry.previousCommitId().equals(state.previousCommitId),
+                "previous commit");
+        requireTiling(
+                commit.payloadFormat().equals(source.payloadFormat()),
+                "payload format");
+        requireTiling(
+                compatibleProjection(source.projectionRef(), commit.projectionRef()),
+                "projection");
+    }
+
+    private static void requireTiling(boolean exact, String fact) {
+        if (!exact) {
             throw invariant(
-                    "higher-generation source is not an exact tiling of NRC1 commit entries");
+                    "higher-generation source is not an exact tiling of NRC1 commit entries: "
+                            + fact);
+        }
+    }
+
+    private static boolean compatibleProjection(
+            String sourceEncoded, String commitEncoded) {
+        Optional<ProjectionRef> source = decodeProjection(
+                sourceEncoded,
+                "higher-generation source projection cannot be decoded");
+        Optional<ProjectionRef> commit = decodeProjection(
+                commitEncoded,
+                "higher-generation NRC1 commit projection cannot be decoded");
+        return commit.isEmpty() || commit.equals(source);
+    }
+
+    private static Optional<ProjectionRef> decodeProjection(
+            String encoded, String failureMessage) {
+        try {
+            return ProjectionIdentity.decode(encoded);
+        } catch (RuntimeException failure) {
+            throw invariant(failureMessage);
         }
     }
 
