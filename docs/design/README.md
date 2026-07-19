@@ -10,7 +10,8 @@
 测试优先；Phase 4 目录同时记录已通过 M0 的 target contract，以及已 final-gated 的 F4-M1–M6 实现和
 checkpoint-BQ aggregate evidence；F1-BK 目录记录当前 BookKeeper primary-WAL 交付。
 BK-M0 documentation gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；BK-M2
-`BOOKKEEPER_WAL_ONLY` 是下一里程碑，BK-M2–M6 profile runtime 尚未实现。
+`BOOKKEEPER_WAL_ONLY` implementation 已开始并完成 keyspace/record/codec checkpoint，profile runtime 尚未实现；
+BK-M3–M6 未实现。
 
 建议阅读顺序：
 

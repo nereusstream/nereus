@@ -7,7 +7,8 @@ This document contains the frozen plan and explicit implementation evidence. Cur
 ```text
 BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
-BK-M2 .. BK-M6                  not implemented; BK-M2 is next
+BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress (metadata/keyspace/codec checkpoint)
+BK-M3 .. BK-M6                  not implemented
 all BookKeeper profiles         reserved / rejected before primary IO
 BookKeeper ledger deletion      absent / safe default closed
 ```
@@ -166,6 +167,18 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
+
+### 5.0 Current checkpoint evidence (2026-07-19)
+
+Implemented：`BookKeeperKeyspace` and strict root/protection/reader/allocation-slot inverse；all seven V1 records with
+explicit lifecycle wire ids、bounds and immutable metadata-version wrappers；seven binary-v1/envelope codecs and
+`MetadataRecordCodecFactory` dispatch；shared canonical samples；frozen envelope SHA-256、round-trip、truncation、
+trailing-byte、envelope-checksum、unknown-wire-id and key negative tests。The focused tests and the complete
+`:nereus-metadata-oxia:test` regression pass。
+
+Still required before BK-M2 is complete：production/fake store contracts and scanners；allocation/writer/lifecycle
+state machines；real BookKeeper writer/reader/fencing/restart tests；whole-ledger retention/GC；profile admission and
+local Pulsar gate。The profile remains rejected before primary IO。
 
 ### 5.1 Metadata/keyspace
 

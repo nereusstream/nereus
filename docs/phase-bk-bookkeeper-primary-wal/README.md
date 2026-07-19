@@ -2,8 +2,9 @@
 
 > 状态：BK-M0 design gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；
 > `bookKeeperPrimaryWalM1FinalCheck` 通过 199-task aggregate（包含 Phase 1.5、Phase 4 与 pinned local Pulsar
-> regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` 是下一里程碑；writer、reader、ledger lifecycle、retention
-> 尚未实现，因此三个 BookKeeper profile 继续在任何 BookKeeper IO 之前 fail closed。
+> regressions）。BK-M2 `BOOKKEEPER_WAL_ONLY` implementation is in progress：strict keyspace、7 类 V1 durable
+> records/codecs、factory dispatch 与 focused golden/negative tests 已实现；store、writer、reader、ledger
+> lifecycle、retention 尚未完成，因此三个 BookKeeper profile 继续在任何 BookKeeper IO 之前 fail closed。
 
 ## 1. Delivery identity
 
@@ -165,3 +166,8 @@ BK-M1 implements and final-gates：
 BK-M1 does not register `BookKeeperPrimaryWalAppender`/reader/lifecycle runtime. Production metadata admits only the
 fully validated Object reference proof until BK-M2 installs the exact BookKeeper proof adapter and lifecycle stores；
 unknown proof types fail closed。
+
+The first BK-M2 checkpoint implements `BookKeeperKeyspace` with strict root/protection/reader/allocation-slot inverse、
+all seven V1 record models and explicit enum wire ids、seven envelope codecs registered in
+`MetadataRecordCodecFactory`、frozen envelope SHA-256 vectors and malformed/truncated/trailing/checksum tests。This is
+metadata groundwork only；it does not make `BOOKKEEPER_WAL_ONLY` executable。

@@ -88,6 +88,8 @@ require_literal 'BK-M0 design/source audit       documentation-gated on 2026-07-
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       implementation in progress' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalDocumentationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM1Check' "build.gradle.kts"
 
