@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M5 complete/final-gated；F4-M4/M5 passed retry-disabled two-broker acceptance；F4-M6 BD–BK evidence and 52/52 traceability are green，aggregate M6 pending
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M5 complete/final-gated；F4-M4/M5 passed retry-disabled two-broker acceptance；F4-M6 BD–BL evidence and 52/52 traceability are green，aggregate M6 pending
 > 最近设计/实现同步：2026-07-19
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -177,11 +177,12 @@ admission。Cursor snapshot candidate/execution、current-writer object inventor
 metadata-first lifecycle now have checkpoints AJ–AO；coverage/capability proof、destructive activation and M4 final
 acceptance are complete。The M5 final gate additionally proves cold async registration、exact ordinary/batched
 MessageIds、durable backlog eviction、unloaded logical trim、post-trim IO、owner rejoin/failover and stock BookKeeper
-coexistence with retry disabled；M5 is complete/final-gated. M6 BD–BK now cover the bounded 32-ref merge、4,096/4,097
+coexistence with retry disabled；M5 is complete/final-gated. M6 BD–BL now cover the bounded 32-ref merge、4,096/4,097
 candidate edge、million-entry NRC1、1,000+1,000 reference pagination、128-source/1,048,576-record task schema-V2
 boundary、exact 16,448-stream/64-shard registry cold restart and real two-broker/two-worker compressed-read
 convergence with exact Pulsar MessageIds and BookKeeper coexistence、protected-intent retirement、partitioned admin
-routing and the executable 52/52 evidence matrix，while aggregate M6 remains the final target. Safe-default production
+routing、provider-neutral Hadoop/Oxia logging composition and the executable 52/52 evidence matrix，while aggregate
+M6 remains the final target. Safe-default production
 deletion 继续关闭。
 
 Phase 1 只交付 `OBJECT_WAL_SYNC_OBJECT` execution path。`OBJECT_WAL` 是该 profile 的 deprecated

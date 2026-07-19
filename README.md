@@ -438,7 +438,7 @@ durable size backlog eviction、卸载后 exact ACTIVE-binding logical trim、tr
 logical trim 不删除 WAL bytes，stock BookKeeper control topic 始终可写可读。`phase4M5Check` 与
 `phase4M5FinalCheck` 是该里程碑的 ordinary/final completion boundary；F4-M6 和 Phase 4 aggregate final gate
 仍待完成。
-F4-M6 checkpoints BD–BK 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
+F4-M6 checkpoints BD–BL 已完成 focused/evidence foundation：32-reference NRC1 merge、4,096 admitted/4,097 rejected
 generation candidates、streaming 1,000,000-entry checkpoint、1,000 reader leases + 1,000 protections 的完整分页
 重扫、同时达到 128 sources / 1,048,576 records 的单 task durable round trip，以及每个 64 registry shards
 精确 257 条、page size 256 的 16,448-stream cold-restart 扫描。BI 又在真实 shared Oxia、LocalStack、BookKeeper
@@ -451,7 +451,9 @@ broker lookup capability 提升为 `nereus.generation-protocol=2`。Topic projec
 record 仍为 V1。新 source lock 上的完整 `phase4M5GenerationCapabilityCheck --rerun-tasks` 已以 166/166 tasks
 通过，并重跑通过 retry-disabled 真实 M4 final predecessor。BJ 又关闭 protected-head ordering 与 abandoned
 append-intent retirement；BK 增加 partitioned loaded/unloaded admin compatibility，并把 52 个 required scenarios
-全部映射到 annotated tests 和 declared gates。M6/Phase 4 aggregate tasks 已声明，但完整 rerun 尚未通过。
+全部映射到 annotated tests 和 declared gates。BL 又阻止 Parquet/Hadoop 把 `slf4j-reload4j` backend 泄漏到
+broker-owned logging runtime，并重跑通过此前被 Oxia retry MDC NPE 阻断的真实 Phase 1 Oxia gate。M6/Phase 4
+aggregate tasks 已声明，但修复后的完整 rerun 尚未通过。
 Phase 4 只计划实现
 `OBJECT_WAL_ASYNC_OBJECT`，BookKeeper WAL/profiles 仍需独立 adapter 和 gate。
 

@@ -561,7 +561,9 @@ Implementation evidence（through 2026-07-13）：
   resolver-array zeroing and close/reopen restart readability。
 - the provider now uses pinned AWS SDK v2 `2.47.5` `S3AsyncClient` plus Netty NIO；unit gates additionally prove
   request cancellation/deadline linkage、closed HTTP error mapping、SDK throwable/raw-key/credential redaction、
-  canonical Base64URL keys and exact request headers/metadata。The runtime classpath contains no SDK-v1 artifact。
+  canonical Base64URL keys and exact request headers/metadata。The runtime classpath contains no SDK-v1 artifact；
+  after Phase 4 introduced Parquet/Hadoop, both direct Hadoop edges also exclude the transitive
+  `slf4j-reload4j` implementation so the embeddable library leaves broker logging-backend selection to its host。
 - `nereus-pulsar-adapter` now has typed runtime/context/provider/process-identity boundaries and production assembly
   for one ObjectStore、shared Oxia runtime、L0/projection adapters、Object WAL and owned executors；unit gates cover
   identity zeroing、cross-config invariants and reflection fail-fast behavior。

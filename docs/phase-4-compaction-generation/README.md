@@ -177,6 +177,12 @@
 > placeholders are not BookKeeper durable state；base-topic operations expand to every exact partition；only a local
 > loaded projection is consulted, while remote-owned or unloaded partitions are decided by the durable binding. The
 > focused binding test and retry-disabled two-broker compatibility method pass on the new source lock.
+> Checkpoint BL closes a production runtime dependency cut exposed by the first aggregate rerun. Parquet's Hadoop
+> dependencies no longer export `slf4j-reload4j` from the Nereus ObjectStore library into a broker-selected logging
+> environment. That binding rejects a nullable MDC value used by the Oxia 0.9.0 retry path and converted a recoverable
+> initial write-stream retry into an NPE. Both direct Hadoop edges now exclude the backend；a classpath isolation test、
+> the storage-isolation audit and the real Phase 1 Oxia restart gate pass. The complete aggregate is still pending a
+> fresh rerun.
 > These are focused
 > M6 foundations, not the aggregate completion claim.
 >
@@ -2072,6 +2078,21 @@ bindings without installing the policy. The focused binding suite、retry-disabl
 Spotless/Checkstyle checks pass on Pulsar
 `master@4d9d5bbd0230770cd2692088bf7d0644d4b46f94`.
 
+### 6.40 F4-M6 broker logging-backend isolation checkpoint
+
+Checkpoint BL fixes a process-composition failure found by the first `phase4FinalCheck --rerun-tasks` execution.
+`nereus-object-store` needs Parquet/Hadoop at runtime, but it is an embeddable broker library and therefore cannot
+select a process-wide SLF4J backend. Hadoop's transitive `org.slf4j:slf4j-reload4j` binding reached the combined
+ObjectStore + Oxia runtime. During Oxia write-stream initialization/recovery, slog 0.9.5 emits a nullable MDC value；
+reload4j rejects that value and masks the retry with `Hashtable.put` NPE.
+
+Both direct Hadoop dependency edges now exclude only the logging binding, leaving `slf4j-api` and all Hadoop/Parquet
+functionality available for the host's chosen backend. `RuntimeDependencyIsolationTest`
+`.objectStoreLibraryDoesNotSelectTheBrokerLoggingBackend` checks the resolved object-store test runtime rather than a
+source-only convention. `checkPhase2StorageIsolation` also freezes both exclusion edges and the executable regression.
+The formerly failing `Phase1FinalIntegrationTest` real four-shard Oxia restart/failure suite passes with tasks rerun；
+the Phase 4 aggregate must still be rerun from the beginning before completion can be claimed.
+
 ## 7. Milestones
 
 | Milestone | Deliverable | Current status |
@@ -2082,7 +2103,7 @@ Spotless/Checkstyle checks pass on Pulsar
 | F4-M3 | lossless/topic compacted format、planner/task/worker and sync-profile materialization | complete/final-gated on 2026-07-15；real Parquet/Oxia/LocalStack two-worker、restart、response-loss、full-byte and all-shard pagination/watch-loss evidence passed |
 | F4-M4 | recovery checkpoint、source/index retirement and physical/cursor-snapshot GC | complete/final-gated on 2026-07-19；checkpoint A–BC storage/runtime/scale/failure evidence is composed with a retry-disabled real two-broker Pulsar gate that deletes generation-zero source bytes, preserves compacted reads and exact ordinary/middle-batch MessageIds through unload、owner failover、restart and reverse takeover, and proves stock BookKeeper coexistence；safe broker defaults remain `enabled=false, dryRun=true` |
 | F4-M5 | Object-WAL async profile、Pulsar retention/admin/capability integration | complete/final-gated on 2026-07-19；checkpoint X–AI implement exact durable registration/readiness/activation、protected async Object-WAL acknowledgement/repair、pre-I/O lag admission、coupled production runtime/config、stable exact-evidence retention planning、bounded execution and exact Pulsar policy/admin admission；the retry-disabled real two-broker gate proves cold registration、ordinary/compressed-batch MessageIds、owner failover/rejoin、durable backlog eviction、unloaded logical trim、post-trim append/read、physical-byte retention and stock BookKeeper coexistence |
-| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BK focused/evidence-green、52/52 executable traceability complete、aggregate tasks declared；full rerun aggregate pending |
+| F4-M6 | scale、failure、two-broker/Oxia/S3 compatibility and aggregate final gate | in progress；BD–BL focused/evidence-green、52/52 executable traceability complete、aggregate tasks declared；full rerun aggregate pending |
 
 No later milestone may bypass an earlier correctness gate with a process-local mock. In particular：
 

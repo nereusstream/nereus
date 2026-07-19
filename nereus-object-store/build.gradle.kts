@@ -26,8 +26,14 @@ dependencies {
     implementation(libs.aws.sdk.v2.netty.client)
     implementation(libs.parquet.hadoop)
     implementation(libs.parquet.column)
-    implementation(libs.hadoop.common)
-    implementation(libs.hadoop.mapreduce.client.core)
+    implementation(libs.hadoop.common) {
+        // Nereus is embedded in broker processes that own their logging backend. Hadoop's
+        // reload4j binding also rejects the nullable MDC values emitted by the Oxia client.
+        exclude(group = "org.slf4j", module = "slf4j-reload4j")
+    }
+    implementation(libs.hadoop.mapreduce.client.core) {
+        exclude(group = "org.slf4j", module = "slf4j-reload4j")
+    }
     runtimeOnly(libs.zstd.jni)
 
     testImplementation(libs.junit.jupiter)

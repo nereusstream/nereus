@@ -210,6 +210,9 @@ entries per topic with unchanged properties/`MessageIdAdv` and a stock BookKeepe
 forced and fixed compressed-physical versus returned-logical byte accounting. Checkpoint BJ closes protected-head
 ordering and abandoned protected-intent retirement. Checkpoint BK supplies the executable 52/52 scenario mapping、
 partitioned loaded/unloaded admin evidence and aggregate task composition；the full rerun aggregate remains pending.
+Checkpoint BL removes Hadoop's transitive reload4j backend from the embeddable ObjectStore runtime after the first
+aggregate run exposed an Oxia retry-path MDC incompatibility；classpath isolation、the storage audit and the real
+Phase 1 Oxia restart suite now pass, while a fresh full aggregate rerun remains required.
 
 `phase4M4ProtectedAppendCheck` passed on 2026-07-15, including the inherited M1–M3/NRC1 chain、all affected Nereus
 checks/source-set compilation and the locked local Pulsar M4 check. This is checkpoint-B evidence, not a claim that
@@ -1970,7 +1973,7 @@ separate；BookKeeper primary-WAL profiles remain reserved.
 
 ## 8. F4-M6 — Final Acceptance
 
-Current implementation checkpoints (2026-07-19)：BD–BK are implemented and focused/evidence-green. The product-neutral NRC1 codec
+Current implementation checkpoints (2026-07-19)：BD–BL are implemented and focused/evidence-green. The product-neutral NRC1 codec
 can merge 32 ordered/gap-free source objects without materializing all entries；the materialization coordinator pins
 all current source objects, atomically replaces the root with one merged reference, converges a lost successful CAS,
 reconciles the new root's permanent protections, and releases source leases afterward. The resolver's admitted-edge
@@ -2040,6 +2043,16 @@ topic may supply projection facts；a remote-owned or unloaded child is validate
 is never loaded merely for admin admission. The focused placeholder test and retry-disabled two-broker compatibility
 method prove first Nereus open、loaded compaction rejection、full unload and unloaded shadow-policy rejection without
 policy installation. Spotless and both broker Checkstyle tasks pass.
+
+Checkpoint BL closes the production logging-backend isolation defect exposed by the first complete aggregate run.
+The ObjectStore module's Parquet implementation requires Hadoop, but an embeddable Nereus library must not install
+Hadoop's transitive `slf4j-reload4j` binding into the broker process. With that binding present, an ordinary Oxia 0.9.0
+write-stream initialization retry sent a nullable slog MDC value to reload4j and failed with `Hashtable.put` NPE.
+Both direct Hadoop edges now exclude the backend while retaining SLF4J API and host-owned logging selection.
+`RuntimeDependencyIsolationTest.objectStoreLibraryDoesNotSelectTheBrokerLoggingBackend` verifies the resolved runtime
+surface；`checkPhase2StorageIsolation` freezes the dependency declarations and test. The previously failing real
+four-shard `Phase1FinalIntegrationTest` passes with `--rerun-tasks`. This repairs a prerequisite gate but is not a
+substitute for rerunning `phase4FinalCheck`.
 
 ### 8.1 Required scenarios
 
@@ -2136,7 +2149,8 @@ truth, and all 16,448 stale-hint snapshots are safely skipped only after authori
 implements the final two-broker/two-worker row through broker-owned production runtimes and shared durable services.
 Checkpoint BJ closes scenario 51's protected-head ordering and abandoned-intent retirement path. Checkpoint BK maps
 every one of these facts into the executable 52-row audit；the map proves traceability, not that the owning gates have
-all run in the current aggregate.
+all run in the current aggregate. Checkpoint BL keeps that aggregate's combined Hadoop/Oxia broker runtime
+provider-neutral by rejecting a leaked logging implementation.
 
 ### 8.3 Gates
 
