@@ -9,12 +9,26 @@ import java.util.concurrent.CompletableFuture;
 public final class ResponseLossPartitionedOxiaBackend implements PartitionedOxiaClient.Backend {
     private final InMemoryPartitionedOxiaBackend delegate = new InMemoryPartitionedOxiaBackend();
     private Operation armed;
+    private int armedOccurrence;
+    private int lostResponses;
 
     public synchronized void loseNextResponse(Operation operation) {
+        loseResponse(operation, 1);
+    }
+
+    public synchronized void loseResponse(Operation operation, int occurrence) {
         if (armed != null) {
             throw new IllegalStateException("one response-loss injection is already armed");
         }
+        if (occurrence <= 0) {
+            throw new IllegalArgumentException("response-loss occurrence must be positive");
+        }
         armed = operation;
+        armedOccurrence = occurrence;
+    }
+
+    public synchronized boolean responseWasLost() {
+        return lostResponses > 0;
     }
 
     @Override
@@ -68,7 +82,11 @@ public final class ResponseLossPartitionedOxiaBackend implements PartitionedOxia
         if (armed != operation) {
             return applied;
         }
+        if (--armedOccurrence > 0) {
+            return applied;
+        }
         armed = null;
+        lostResponses++;
         return applied.thenCompose(ignored -> CompletableFuture.failedFuture(
                 new InjectedResponseLossException(operation + " response was lost after apply")));
     }

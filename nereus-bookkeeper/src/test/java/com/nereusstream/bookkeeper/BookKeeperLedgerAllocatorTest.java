@@ -13,6 +13,7 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.BookKeeperScanToken;
 import com.nereusstream.metadata.oxia.FakeBookKeeperMetadataStore;
+import com.nereusstream.metadata.oxia.ResponseLossPartitionedOxiaBackend;
 import com.nereusstream.metadata.oxia.records.AllocationSlotLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.bookkeeper.client.api.LedgerEntries;
 import org.apache.bookkeeper.client.api.LedgerMetadata;
 import org.apache.bookkeeper.client.api.ReadHandle;
@@ -67,6 +69,45 @@ class BookKeeperLedgerAllocatorTest {
                     .doesNotContainKey("password");
             assertThat(new String(operations.createdCustomMetadata.get("nereus.format"), StandardCharsets.UTF_8))
                     .isEqualTo(BookKeeperLedgerCustomMetadata.FORMAT);
+        }
+    }
+
+    @Test
+    void convergesEveryAppliedMetadataResponseLossInTheAllocationChain() {
+        BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
+        for (ResponseLossPartitionedOxiaBackend.Operation operation
+                : ResponseLossPartitionedOxiaBackend.Operation.values()) {
+            int injectedCuts = 0;
+            for (int occurrence = 1; occurrence <= 32; occurrence++) {
+                ResponseLossPartitionedOxiaBackend backend = new ResponseLossPartitionedOxiaBackend();
+                backend.loseResponse(operation, occurrence);
+                try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
+                        metadataConfig(configuration), CLOCK, backend)) {
+                    FakeOperations operations = new FakeOperations(false);
+                    BookKeeperLedgerAllocator allocator =
+                            allocator(configuration, metadata, operations, new Random(occurrence));
+
+                    AllocatedBookKeeperLedger allocated = allocator.allocate(
+                            new BookKeeperLedgerAllocationRequest(
+                                    STREAM, session(1, 1, "token-1"), Duration.ofSeconds(10)))
+                            .join();
+                    allocated.handle().closeAsync().join();
+                    if (!backend.responseWasLost()) {
+                        break;
+                    }
+                    injectedCuts++;
+                    assertThat(allocated.root().value().lifecycle())
+                            .isEqualTo(BookKeeperLedgerLifecycle.ACTIVE);
+                    assertThat(allocated.allocation().value().lifecycle())
+                            .isEqualTo(LedgerAllocationLifecycle.ACTIVATED);
+                    assertThat(allocated.writer().value().lifecycle())
+                            .isEqualTo(BookKeeperWriterLifecycle.ACTIVE);
+                    assertThat(metadata.getAllocationSlot(
+                            CLUSTER, allocated.root().value().allocationSlot()).join()).isEmpty();
+                    assertThat(operations.createCalls).isOne();
+                }
+            }
+            assertThat(injectedCuts).as("covered response-loss cuts for %s", operation).isPositive();
         }
     }
 
@@ -219,6 +260,125 @@ class BookKeeperLedgerAllocatorTest {
                     .extracting(root -> root.value().lifecycle())
                     .isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
             assertThat(operations.deleteCalls).isZero();
+        }
+    }
+
+    @Test
+    void foreignCreateCollisionIsQuarantinedAndTheNextCandidateWinsWithoutDelete() {
+        BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
+        try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
+                metadataConfig(configuration), CLOCK)) {
+            FakeOperations operations = new FakeOperations(true);
+            operations.revealForeignPhysicalLedger();
+            BookKeeperWriterStateMachine state = writerState(configuration, metadata);
+            AtomicInteger allocations = new AtomicInteger();
+            BookKeeperLedgerAllocator allocator = new BookKeeperLedgerAllocator(
+                    CLUSTER,
+                    configuration,
+                    metadata,
+                    metadata,
+                    namespaceVerifier(configuration),
+                    operations,
+                    ignored -> "secret".getBytes(StandardCharsets.UTF_8),
+                    state,
+                    CLOCK,
+                    new Random(21),
+                    () -> "allocation-" + allocations.incrementAndGet());
+            AppendSession session = session(1, 1, "token-1");
+
+            assertThatThrownBy(() -> allocator.allocate(new BookKeeperLedgerAllocationRequest(
+                            STREAM, session, Duration.ofSeconds(10))).join())
+                    .hasCauseInstanceOf(NereusException.class);
+            var foreign = metadata.scanAllocations(
+                            CLUSTER, STREAM, Optional.<BookKeeperScanToken>empty(), 10)
+                    .join()
+                    .values()
+                    .get(0);
+            assertThat(foreign.value().lifecycle()).isEqualTo(LedgerAllocationLifecycle.FOREIGN_COLLISION);
+            assertThat(metadata.getRoot(
+                            CLUSTER, configuration.providerScopeSha256(), foreign.value().candidateLedgerId())
+                    .join())
+                    .get()
+                    .extracting(root -> root.value().lifecycle())
+                    .isEqualTo(BookKeeperLedgerLifecycle.QUARANTINED);
+
+            AllocatedBookKeeperLedger replacement = allocator.allocate(
+                    new BookKeeperLedgerAllocationRequest(STREAM, session, Duration.ofSeconds(10))).join();
+            assertThat(replacement.root().value().ledgerId()).isNotEqualTo(foreign.value().candidateLedgerId());
+            assertThat(replacement.root().value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.ACTIVE);
+            assertThat(operations.createCalls).isEqualTo(2);
+            assertThat(operations.deleteCalls).isZero();
+            replacement.handle().closeAsync().join();
+        }
+    }
+
+    @Test
+    void globalRootSerializesTwoStreamsThatChooseTheSameCandidate() {
+        BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
+        try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
+                metadataConfig(configuration), CLOCK)) {
+            StreamId firstStream = new StreamId("stream-bk-contention-a");
+            StreamId secondStream = new StreamId("stream-bk-contention-b");
+            AppendSession firstSession = new AppendSession(
+                    firstStream, "writer-a", 1, "token-a", 1, 10_000);
+            AppendSession secondSession = new AppendSession(
+                    secondStream, "writer-b", 1, "token-b", 1, 10_000);
+            FakeOperations firstOperations = new FakeOperations(false);
+            FakeOperations secondOperations = new FakeOperations(false);
+            BookKeeperWriterStateMachine firstState = new BookKeeperWriterStateMachine(
+                    CLUSTER, configuration, metadata, CLOCK, "process-a");
+            BookKeeperWriterStateMachine secondState = new BookKeeperWriterStateMachine(
+                    CLUSTER, configuration, metadata, CLOCK, "process-b");
+            BookKeeperLedgerAllocator firstAllocator = new BookKeeperLedgerAllocator(
+                    CLUSTER,
+                    configuration,
+                    metadata,
+                    metadata,
+                    namespaceVerifier(configuration),
+                    firstOperations,
+                    ignored -> "secret".getBytes(StandardCharsets.UTF_8),
+                    firstState,
+                    CLOCK,
+                    new SequenceRandom(7),
+                    () -> "allocation-first");
+            AtomicInteger secondAllocations = new AtomicInteger();
+            BookKeeperLedgerAllocator secondAllocator = new BookKeeperLedgerAllocator(
+                    CLUSTER,
+                    configuration,
+                    metadata,
+                    metadata,
+                    namespaceVerifier(configuration),
+                    secondOperations,
+                    ignored -> "secret".getBytes(StandardCharsets.UTF_8),
+                    secondState,
+                    CLOCK,
+                    new SequenceRandom(7, 8),
+                    () -> "allocation-second-" + secondAllocations.incrementAndGet());
+
+            AllocatedBookKeeperLedger first = firstAllocator.allocate(
+                    new BookKeeperLedgerAllocationRequest(firstStream, firstSession, Duration.ofSeconds(10))).join();
+            AllocatedBookKeeperLedger second = secondAllocator.allocate(
+                    new BookKeeperLedgerAllocationRequest(secondStream, secondSession, Duration.ofSeconds(10))).join();
+
+            assertThat(first.root().value().ledgerId()).isNotEqualTo(second.root().value().ledgerId());
+            assertThat(firstOperations.createCalls).isOne();
+            assertThat(secondOperations.createCalls).isOne();
+            assertThat(metadata.scanAllocations(
+                            CLUSTER, secondStream, Optional.<BookKeeperScanToken>empty(), 10)
+                    .join()
+                    .values())
+                    .extracting(value -> value.value().lifecycle())
+                    .containsExactly(
+                            LedgerAllocationLifecycle.ABORTED,
+                            LedgerAllocationLifecycle.ACTIVATED);
+            assertThat(metadata.getRoot(
+                            CLUSTER, configuration.providerScopeSha256(), first.root().value().ledgerId())
+                    .join())
+                    .get()
+                    .extracting(root -> root.value().streamId())
+                    .isEqualTo(firstStream.value());
+            first.handle().closeAsync().join();
+            second.handle().closeAsync().join();
         }
     }
 
@@ -414,7 +574,7 @@ class BookKeeperLedgerAllocatorTest {
     }
 
     private static final class FakeOperations implements BookKeeperClientOperations {
-        private final boolean failCreate;
+        private boolean failCreate;
         private boolean physicalExistsAfterFailure;
         private boolean foreignPhysicalMetadata;
         private int createCalls;
@@ -454,6 +614,7 @@ class BookKeeperLedgerAllocatorTest {
                     java.util.stream.Collectors.toUnmodifiableMap(
                             Map.Entry::getKey, entry -> entry.getValue().clone()));
             if (failCreate) {
+                failCreate = false;
                 return CompletableFuture.failedFuture(new NereusException(
                         ErrorCode.TIMEOUT, true, "injected unknown create outcome"));
             }
@@ -506,6 +667,23 @@ class BookKeeperLedgerAllocatorTest {
         public CompletableFuture<Void> delete(long ledgerId, BookKeeperOperationDeadline deadline) {
             deleteCalls++;
             return CompletableFuture.failedFuture(new UnsupportedOperationException());
+        }
+    }
+
+    private static final class SequenceRandom extends Random {
+        private final long[] values;
+        private int index;
+
+        private SequenceRandom(long... values) {
+            this.values = values.clone();
+        }
+
+        @Override
+        public long nextLong() {
+            if (index >= values.length) {
+                throw new IllegalStateException("deterministic candidate sequence exhausted");
+            }
+            return values[index++];
         }
     }
 }

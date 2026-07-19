@@ -104,6 +104,13 @@ require_literal 'BookKeeperUncertainAllocationReconciler' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'class BookKeeperUncertainAllocationReconciler' \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperUncertainAllocationReconciler.java"
+require_literal 'BookKeeperWriterStatePropertyTest' "nereus-bookkeeper/build.gradle.kts"
+require_literal 'realOxiaColdScanCoversEveryRootAndAllocationSlotShard' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'void realOxiaColdScanCoversEveryRootAndAllocationSlotShard' \
+    "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'class BookKeeperLedgerTransitionsTest' \
+    "nereus-metadata-oxia/src/test/java/com/nereusstream/metadata/oxia/BookKeeperLedgerTransitionsTest.java"
 
 scenario_matrix="$design_dir/08-scenario-evidence-matrix.md"
 scenario_count="$(rg -c '^\| BK-[0-9]+ \|' "$scenario_matrix")"

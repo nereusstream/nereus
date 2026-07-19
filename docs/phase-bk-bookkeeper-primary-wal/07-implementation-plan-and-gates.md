@@ -232,6 +232,11 @@ bounded 16-shard `BookKeeperUncertainAllocationReconciler` exposed by `BookKeepe
 identity-check、recovery-seal and retain the late ledger；`BookKeeperUncertainAllocationRecoveryResult` reports the
 complete bounded pass without turning absence into release authority。The
 retention gate proves both `LATE_CREATE_HAZARD` and `ALLOCATION_SLOT_PRESENT` remain permanent vetoes。The same gate
+also cold-reopens the real Oxia metadata service and scans exactly one root in every 256 root shards plus one durable
+uncertainty slot in every 16 fixed allocation-slot shards。Focused deterministic allocation evidence now covers every
+applied put-if-absent / CAS / delete response-loss occurrence、foreign collision without provider delete、two-stream
+global candidate contention and randomized per-ledger entry/byte/range monotonicity；their matrix rows retain any
+still-missing real-service level explicitly。The same gate
 forces a two-range ledger rollover, closes and recreates both Oxia and BookKeeper clients, proves historical target and
 byte stability, recovery-seals the cold active writer before allocating a new ledger, retires a completely trimmed
 ledger, injects a successful provider delete with a lost response, then recreates the process again before the second

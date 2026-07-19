@@ -55,6 +55,7 @@ import com.nereusstream.core.append.AppendAdmissionGuard;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.recovery.MetadataAppendRecoverySearcher;
 import com.nereusstream.core.trim.TrimMetricsObserver;
+import com.nereusstream.metadata.oxia.BookKeeperKeyspace;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.BookKeeperScanToken;
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
@@ -63,10 +64,12 @@ import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.records.AllocationSlotLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationLifecycle;
+import com.nereusstream.metadata.oxia.testing.BookKeeperMetadataStoreContractScenario;
 import io.netty.buffer.ByteBuf;
 import io.oxia.testcontainers.OxiaContainer;
 import java.nio.charset.StandardCharsets;
@@ -74,6 +77,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -393,6 +397,60 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         }
     }
 
+    @Test
+    void realOxiaColdScanCoversEveryRootAndAllocationSlotShard() throws Exception {
+        String cluster = "bk-m2-shards-" + UUID.randomUUID().toString().replace("-", "");
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(3_000_000), ZoneId.of("UTC"));
+        OxiaClientConfiguration oxia = OxiaClientConfiguration.defaults(OXIA.getServiceAddress());
+        BookKeeperMetadataStoreConfig metadataConfiguration =
+                new BookKeeperMetadataStoreConfig(128, 4, 128, 256);
+        BookKeeperKeyspace keys = metadataConfiguration.keyspace(cluster);
+        Map<Integer, BookKeeperLedgerRootRecord> roots = oneRootPerShard(keys);
+
+        try (SharedOxiaClientRuntime firstRuntime = SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaBookKeeperMetadataStore first = OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
+                        oxia, firstRuntime, clock, metadataConfiguration)) {
+            roots.values().forEach(root -> first.createRoot(cluster, root).join());
+            for (int slot = 0; slot < BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS; slot++) {
+                long ledgerId = 100_000L + slot;
+                first.createAllocationSlot(cluster, new BookKeeperAllocationSlotRecord(
+                        1,
+                        slot,
+                        "allocation-slot-" + slot,
+                        BookKeeperMetadataStoreContractScenario.STREAM.value(),
+                        ledgerId,
+                        keys.ledgerIdentitySha256(
+                                BookKeeperMetadataStoreContractScenario.PROVIDER_SCOPE, ledgerId),
+                        BookKeeperMetadataStoreContractScenario.CONFIGURATION,
+                        AllocationSlotLifecycle.CREATE_UNCERTAIN,
+                        100,
+                        101,
+                        0)).join();
+            }
+        }
+
+        try (SharedOxiaClientRuntime restartedRuntime = SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaBookKeeperMetadataStore restarted = OxiaJavaBookKeeperMetadataStore.usingSharedRuntime(
+                        oxia, restartedRuntime, clock, metadataConfiguration)) {
+            for (int shard = 0; shard < BookKeeperKeyspace.LEDGER_SHARDS; shard++) {
+                var page = restarted.scanRoots(cluster, shard, Optional.empty(), 1).join();
+                assertThat(page.values())
+                        .singleElement()
+                        .extracting(value -> value.value().ledgerIdentitySha256())
+                        .isEqualTo(roots.get(shard).ledgerIdentitySha256());
+                assertThat(page.continuation()).isEmpty();
+            }
+            for (int shard = 0; shard < BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS; shard++) {
+                var page = restarted.scanAllocationSlots(cluster, shard, Optional.empty(), 1).join();
+                assertThat(page.values())
+                        .singleElement()
+                        .extracting(value -> value.value().slot())
+                        .isEqualTo(shard);
+                assertThat(page.continuation()).isEmpty();
+            }
+        }
+    }
+
     private static void assertRead(Process process, StreamId streamId, List<byte[]> payloads) {
         assertRead(process, streamId, payloads, 0);
     }
@@ -412,6 +470,23 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
 
     private static BookKeeperEntryRangeReadTarget target(AppendResult result) {
         return (BookKeeperEntryRangeReadTarget) result.readTarget();
+    }
+
+    private static Map<Integer, BookKeeperLedgerRootRecord> oneRootPerShard(BookKeeperKeyspace keys) {
+        Map<Integer, BookKeeperLedgerRootRecord> roots = new LinkedHashMap<>();
+        for (long ledgerId = 1;
+                ledgerId < 100_000 && roots.size() < BookKeeperKeyspace.LEDGER_SHARDS;
+                ledgerId++) {
+            String identity = keys.ledgerIdentitySha256(
+                    BookKeeperMetadataStoreContractScenario.PROVIDER_SCOPE, ledgerId);
+            int shard = keys.ledgerShard(identity);
+            roots.putIfAbsent(
+                    shard,
+                    BookKeeperMetadataStoreContractScenario.root(
+                            keys, ledgerId, BookKeeperLedgerLifecycle.ACTIVE, 2));
+        }
+        assertThat(roots).hasSize(BookKeeperKeyspace.LEDGER_SHARDS);
+        return roots;
     }
 
     private static BookKeeperWalConfiguration configuration() {

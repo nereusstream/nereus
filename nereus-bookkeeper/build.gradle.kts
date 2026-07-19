@@ -29,8 +29,9 @@ fun registerFocusedTest(name: String, descriptionText: String, vararg classes: S
 
 registerFocusedTest(
     "bkM2AllocatorTest",
-    "Run BK-M2 reserved-id allocation and provider identity tests.",
+    "Run BK-M2 reserved-id allocation, provider identity, and writer monotonicity tests.",
     "com.nereusstream.bookkeeper.BookKeeperLedgerAllocatorTest",
+    "com.nereusstream.bookkeeper.BookKeeperWriterStatePropertyTest",
 )
 
 registerFocusedTest(

@@ -91,7 +91,7 @@ dependencies {
 
 tasks.register<Test>("bkM2IntegrationTest") {
     group = "verification"
-    description = "Run BK-M2 restart, rollover, and retention recovery against real Oxia and BookKeeper."
+    description = "Run BK-M2 allocation, shard, restart, rollover, and retention recovery against real services."
     testClassesDirs = bkM2IntegrationTest.output.classesDirs
     classpath = bkM2IntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)

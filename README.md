@@ -70,7 +70,8 @@ BK-M0–M6 cover provider-neutral append/read seams、exact ledger allocation/li
 async/sync reuse and Pulsar rollout. The BK_ONLY production logical-trim/abandoned-owner retirement bridge is now part
 of the M2 retention checkpoint；the real Oxia + BookKeeper checkpoint now covers exact CreateAdv response loss、a
 delayed matching create recovered by the bounded fixed-slot scanner、permanent hazard/GC veto、rollover、fresh
-client/runtime cold restart、stable historical targets、trim、lost delete response and fresh-process dual absence。
+client/runtime cold restart、all-256-root/all-16-slot cold Oxia scans、stable historical targets、trim、lost delete
+response and fresh-process dual absence。
 Remaining M2 matrix and aggregate/final evidence is still incomplete。BK_ONLY is executable only through the explicit module-local runtime；
 the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
 

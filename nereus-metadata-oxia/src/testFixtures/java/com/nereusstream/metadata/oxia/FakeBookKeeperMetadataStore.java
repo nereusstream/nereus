@@ -27,8 +27,22 @@ public final class FakeBookKeeperMetadataStore
     }
 
     public FakeBookKeeperMetadataStore(BookKeeperMetadataStoreConfig configuration, Clock clock) {
+        this(configuration, clock, new InMemoryPartitionedOxiaBackend());
+    }
+
+    public FakeBookKeeperMetadataStore(
+            BookKeeperMetadataStoreConfig configuration,
+            Clock clock,
+            ResponseLossPartitionedOxiaBackend backend) {
+        this(configuration, clock, (PartitionedOxiaClient.Backend) backend);
+    }
+
+    private FakeBookKeeperMetadataStore(
+            BookKeeperMetadataStoreConfig configuration,
+            Clock clock,
+            PartitionedOxiaClient.Backend backend) {
         this.delegate = new OxiaJavaBookKeeperMetadataStore(
-                new PartitionedOxiaClient(new InMemoryPartitionedOxiaBackend()), clock, configuration);
+                new PartitionedOxiaClient(backend), clock, configuration);
     }
 
     @Override
