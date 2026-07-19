@@ -276,6 +276,11 @@ are entries one and two returned。Replaying the same real range with an incorre
 future with `PRIMARY_WAL_CHECKSUM_MISMATCH` and still performs no recovery-open；count/id/config real corruptions remain
 open separately。
 
+The real retention gate now freezes both negative deletion boundaries。A trim inside a three-entry logical range
+retires none of its fixed protections；a separate sealed ledger with one fully trimmed range and two live ranges retires
+only the first range's three slots。Both ledgers remain physically present in BookKeeper, and the mixed ledger's live
+suffix remains readable with dense logical offsets。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session

@@ -388,6 +388,86 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
     }
 
     @Test
+    void partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes() throws Exception {
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String cluster = "bk-m2-retain-live-" + suffix;
+        String deployment = "deployment-" + suffix;
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        BookKeeperWalConfiguration configuration =
+                configuration(100, 1024 * 1024, 3, Duration.ofHours(1));
+        BookKeeperLedgerIdNamespaceReservation reservation = reservation(configuration, deployment);
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(1_575_000), ZoneId.of("UTC"));
+
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        bookKeeperCluster,
+                        cluster,
+                        deployment,
+                        "process-retain-live",
+                        configuration,
+                        reservation,
+                        clock)) {
+            BookKeeperWalOnlyRetirementAuthority authority = new BookKeeperWalOnlyRetirementAuthority(
+                    cluster, process.l0, process.bookKeeperMetadata);
+            BookKeeperWalReferenceManager references = new BookKeeperWalReferenceManager(
+                    cluster, configuration, process.bookKeeperMetadata, authority);
+            BookKeeperWalOnlyReferenceRetirementCoordinator retirement =
+                    new BookKeeperWalOnlyReferenceRetirementCoordinator(
+                            cluster, configuration, process.bookKeeperMetadata, authority, references);
+
+            StreamId partialStream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-partial-trim-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            AppendResult partial = process.append(
+                    partialStream, new byte[] {1}, new byte[] {2}, new byte[] {3});
+            process.append(partialStream, new byte[] {4});
+            process.append(partialStream, new byte[] {5});
+            process.append(partialStream, new byte[] {6});
+            long partialLedger = target(partial).ledgerId();
+            var partialRoot = process.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), partialLedger)
+                    .join()
+                    .orElseThrow();
+            assertThat(partialRoot.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+            process.storage.trim(partialStream, 1, new TrimOptions(TIMEOUT, "partial range trim")).join();
+
+            var partialRetirement = retirement.retireEligible(partialRoot, TIMEOUT).join();
+            assertThat(partialRetirement.newlyRetiredProtections()).isZero();
+            assertThat(partialRetirement.fullyRetired()).isFalse();
+            assertThat(process.rawOperations.metadata(
+                            partialLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLastEntryId()).isEqualTo(4);
+
+            StreamId mixedStream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/bk-mixed-trim-" + suffix),
+                            new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
+                    .join()
+                    .streamId();
+            AppendResult mixedFirst = process.append(mixedStream, new byte[] {11});
+            process.append(mixedStream, new byte[] {12});
+            process.append(mixedStream, new byte[] {13});
+            process.append(mixedStream, new byte[] {14});
+            long mixedLedger = target(mixedFirst).ledgerId();
+            var mixedRoot = process.bookKeeperMetadata.getRoot(
+                            cluster, configuration.providerScopeSha256(), mixedLedger)
+                    .join()
+                    .orElseThrow();
+            assertThat(mixedRoot.value().lifecycle()).isEqualTo(BookKeeperLedgerLifecycle.SEALED);
+            process.storage.trim(mixedStream, 1, new TrimOptions(TIMEOUT, "mixed ledger trim")).join();
+
+            var mixedRetirement = retirement.retireEligible(mixedRoot, TIMEOUT).join();
+            assertThat(mixedRetirement.newlyRetiredProtections()).isEqualTo(3);
+            assertThat(mixedRetirement.fullyRetired()).isFalse();
+            assertThat(process.rawOperations.metadata(
+                            mixedLedger, new BookKeeperOperationDeadline(TIMEOUT))
+                    .join().getLastEntryId()).isEqualTo(2);
+            assertRead(process, mixedStream, List.of(new byte[] {12}, new byte[] {13}, new byte[] {14}), 1);
+        }
+    }
+
+    @Test
     void byteRangeAndAgeRolloverPreserveWholeBatchesAndDenseOffsets() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "");
         String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();

@@ -10,7 +10,7 @@ immutable-drift contract, and BK-19 additionally passes a cold real-Oxia all-256
 The 2026-07-19 `bookKeeperPrimaryWalM2RealServiceCheck` checkpoint adds real Oxia + BookKeeper evidence for BK-14、
 the matching-create/retention-veto portion of BK-17、BK-19、BK-21、BK-22、BK-24、BK-26、BK-27、BK-30、BK-32、BK-37、
 BK-38、BK-39、the checksum portion of BK-40、
-BK-41、BK-49、BK-53
+BK-41、BK-47、BK-48、BK-49、BK-53
 and BK-55, including
 a delayed physical create after an absent probe and a fresh process between the two delete-absence observations；it
 does not claim the remaining M2 rows。The focused allocator gate also adds D checkpoints for every applied metadata
@@ -120,8 +120,8 @@ Evidence levels：
 
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
-| BK-47 | M2 | O/B | BK_ONLY trim below range end cannot retire/delete range | `BookKeeperWalOnlyRetentionIT.rejectsPartialRangeTrim` |
-| BK-48 | M2 | O/B | one ledger with trimmed + live ranges remains physical | `BookKeeperWalOnlyRetentionIT.keepsMixedLedger` |
+| BK-47 | M2 | O/B | BK_ONLY trim below range end cannot retire/delete range | `BookKeeperWalOnlyOxiaBkIntegrationTest.partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes` |
+| BK-48 | M2 | O/B | one ledger with trimmed + live ranges remains physical | `BookKeeperWalOnlyOxiaBkIntegrationTest.partialRangeAndMixedLedgerTrimNeverDeleteLiveBookKeeperBytes` |
 | BK-49 | M2 | O/B | all ranges durably trimmed retire owners/protections then whole ledger | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
 | BK-50 | M2 | D/O | fixed protection-slot contention never exceeds Cartesian bound；invalid/unstable inventory vetoes collection | `BookKeeperWalRetentionGateTest.failsClosedOnIncompleteAuthority` |
 | BK-51 | M2 | O/B | reader/task/repair/reservation/writer vetoes are each enforced | `BookKeeperWalRetentionGateTest.enforcesEveryVetoDomain` |
