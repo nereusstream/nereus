@@ -92,8 +92,8 @@ Evidence levels：
 | BK-31 | M2 | B/O/C | crash in ACTIVE->SEALING->SEALED converges exact closed LAC/length | `BookKeeperLedgerRecoveryIT.recoversEverySealCut` |
 | BK-32 | M2 | B/O | new owner recovery-open fences old handle; old owner cannot head-commit | `BookKeeperFencingIT.alignsBookKeeperAndOxiaFences` |
 | BK-33 | M2 | B/O | two recovery owners contend; one new active ledger wins | `BookKeeperFencingIT.serializesTwoRecoveryOwners` |
-| BK-34 | M2 | D | buffer/permit counts return to zero on success/failure/timeout/cancel/close | `BookKeeperAppenderResourceTest.releasesEveryOwnedResource` |
-| BK-35 | M2 | D/B | one monotonic deadline spans allocation/write/commit and does not reset | `BookKeeperAppenderDeadlineTest.propagatesRemainingBudget` |
+| BK-34 | M2 | D | buffer/permit counts return to zero on success/failure/timeout/cancel/close | `BookKeeperAppenderResourceTest.releasesEveryOwnedResource` + `BookKeeperPreparedPrimaryAppendTest` + `BookKeeperClientApiContractTest` |
+| BK-35 | M2 | D/B | one monotonic deadline spans allocation/write/commit and does not reset | D checkpoint: `BookKeeperAppenderDeadlineTest.propagatesRemainingBudget`; real B deadline cut remains open |
 | BK-36 | M2 | D | typed configuration has no write-flag escape hatch and production create always passes an empty flag set, making `DEFERRED_SYNC` unrepresentable | `BookKeeperClientApiContractTest.defaultAdapterMakesDeferredSyncUnrepresentableAndAlwaysUsesEmptyWriteFlags` |
 
 ## 5. Read and Pulsar compatibility

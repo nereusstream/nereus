@@ -7,7 +7,9 @@ import com.nereusstream.api.NereusException;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** One monotonic budget shared by every nested BookKeeper operation in a caller workflow. */
 public final class BookKeeperOperationDeadline {
@@ -33,6 +35,15 @@ public final class BookKeeperOperationDeadline {
     public <T> CompletableFuture<T> bound(CompletableFuture<T> source) {
         Objects.requireNonNull(source, "source");
         Duration remaining = remaining();
-        return source.orTimeout(remaining.toNanos(), TimeUnit.NANOSECONDS);
+        return source.orTimeout(remaining.toNanos(), TimeUnit.NANOSECONDS).handle((value, failure) -> {
+            if (failure == null) return value;
+            Throwable cause = failure;
+            while (cause instanceof CompletionException && cause.getCause() != null) cause = cause.getCause();
+            if (cause instanceof TimeoutException) {
+                throw new NereusException(ErrorCode.TIMEOUT, true, "BookKeeper operation timed out", cause);
+            }
+            if (cause instanceof RuntimeException runtimeException) throw runtimeException;
+            throw new CompletionException(cause);
+        });
     }
 }

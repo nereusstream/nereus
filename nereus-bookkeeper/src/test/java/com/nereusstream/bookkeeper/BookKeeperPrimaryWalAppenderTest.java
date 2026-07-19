@@ -298,6 +298,8 @@ class BookKeeperPrimaryWalAppenderTest {
         int failWriteCall;
         int hangWriteCall;
         private CompletableFuture<Long> hungWrite;
+        long createDelayNanos;
+        final List<Long> observedDeadlineNanos = new ArrayList<>();
         boolean failDeleteAfterRemoval;
         int recoveryOpenCalls;
         int normalOpenCalls;
@@ -327,6 +329,8 @@ class BookKeeperPrimaryWalAppenderTest {
         public CompletableFuture<WriteAdvHandle> createAdvanced(
                 long ledgerId, BookKeeperWalConfiguration configuration, byte[] password,
                 Map<String, byte[]> customMetadata, BookKeeperOperationDeadline deadline) {
+            observedDeadlineNanos.add(deadline.remaining().toNanos());
+            if (createDelayNanos > 0) java.util.concurrent.locks.LockSupport.parkNanos(createDelayNanos);
             createCalls++;
             LedgerState state = new LedgerState(configuration, customMetadata);
             ledgers.put(ledgerId, state);
@@ -353,6 +357,7 @@ class BookKeeperPrimaryWalAppenderTest {
         @Override
         public CompletableFuture<Long> write(
                 WriteAdvHandle handle, long entryId, ByteBuf entry, BookKeeperOperationDeadline deadline) {
+            observedDeadlineNanos.add(deadline.remaining().toNanos());
             writeCalls++;
             if (writeCalls == failWriteCall) {
                 failWriteCall = 0;

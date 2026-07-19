@@ -257,6 +257,12 @@ The real-service gate also closes BK-30：entry-count、exact physical payload b
 whole range on the replacement ledger at entry zero, while logical offsets and cold reads remain dense across the
 rollover。
 
+The BK-M2 appender now enforces `maxWritesInFlight` before provider IO and binds decorated/fake provider writes to the
+same remaining monotonic budget passed through allocation。Caller cancellation does not free the permit while an
+ambiguous provider attempt is still running；the permit is released only after that pipeline succeeds or fails and its
+seal/recovery path converges。Focused tests cover success、provider failure、timeout、cancel、capacity rejection and
+runtime close；the existing prepared-buffer/client-adapter ref-count tests remain the byte-buffer ownership evidence。
+
 The next deterministic recovery checkpoint introduces `BookKeeperAppendReservationIds` and
 `BookKeeperAppendRecoveryCoordinator`。Reservation identity is now an O(1) function of stream + append attempt, not a
 hash that requires the unknown ledger/range to locate。Focused crash cuts cover WRITING -> sealed/abandoned、same-session

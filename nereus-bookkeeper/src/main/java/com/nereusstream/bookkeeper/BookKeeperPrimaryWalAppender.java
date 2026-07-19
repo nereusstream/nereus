@@ -50,6 +50,7 @@ public final class BookKeeperPrimaryWalAppender
     private final Clock clock;
     private final ConcurrentHashMap<StreamId, ActiveLedger> activeLedgers = new ConcurrentHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private int inFlightWrites;
 
     public BookKeeperPrimaryWalAppender(
             String cluster,
@@ -103,10 +104,24 @@ public final class BookKeeperPrimaryWalAppender
         BookKeeperPreparedPrimaryAppend exact = Objects.requireNonNull(prepared, "prepared");
         Duration budget = min(Objects.requireNonNull(timeout, "timeout"), configuration.operationTimeout());
         validateBatchBound(exact);
+        WritePermit permit = acquireWritePermit();
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(budget);
-        return ensureActive(exact.request(), deadline)
-                .thenCompose(active -> rolloverIfRequired(active, exact, deadline))
-                .thenCompose(active -> persistRange(active, exact, deadline));
+        CompletableFuture<DurablePrimaryAppend> pipeline;
+        try {
+            pipeline = ensureActive(exact.request(), deadline)
+                    .thenCompose(active -> rolloverIfRequired(active, exact, deadline))
+                    .thenCompose(active -> persistRange(active, exact, deadline));
+        } catch (Throwable failure) {
+            permit.close();
+            throw failure;
+        }
+        CompletableFuture<DurablePrimaryAppend> exposed = new CompletableFuture<>();
+        pipeline.whenComplete((durable, failure) -> {
+            permit.close();
+            if (failure == null) exposed.complete(durable);
+            else exposed.completeExceptionally(failure);
+        });
+        return exposed;
     }
 
     @Override
@@ -377,7 +392,7 @@ public final class BookKeeperPrimaryWalAppender
         long entryId = Math.addExact(firstEntryId, index);
         CompletableFuture<Long> write;
         try {
-            write = client.write(handle, entryId, entry, deadline);
+            write = deadline.bound(client.write(handle, entryId, entry, deadline));
         } catch (Throwable failure) {
             entry.release();
             return CompletableFuture.failedFuture(failure);
@@ -541,6 +556,34 @@ public final class BookKeeperPrimaryWalAppender
                 || prepared.physicalBytes() > configuration.maxBytesPerLedger()) {
             throw new NereusException(ErrorCode.INVALID_ARGUMENT, false,
                     "one append batch exceeds an empty BookKeeper ledger bound");
+        }
+    }
+
+    synchronized int inFlightWriteCount() {
+        return inFlightWrites;
+    }
+
+    private synchronized WritePermit acquireWritePermit() {
+        ensureOpen();
+        if (inFlightWrites >= configuration.maxWritesInFlight()) {
+            throw new NereusException(
+                    ErrorCode.BACKPRESSURE_REJECTED,
+                    true,
+                    "BookKeeper primary writer capacity is exhausted");
+        }
+        inFlightWrites++;
+        return new WritePermit();
+    }
+
+    private final class WritePermit implements AutoCloseable {
+        private final AtomicBoolean released = new AtomicBoolean();
+
+        @Override
+        public void close() {
+            if (!released.compareAndSet(false, true)) return;
+            synchronized (BookKeeperPrimaryWalAppender.this) {
+                inFlightWrites--;
+            }
         }
     }
 

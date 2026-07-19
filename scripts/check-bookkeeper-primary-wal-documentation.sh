@@ -96,6 +96,14 @@ require_literal 'multiEntryAppendUsesOneExactConsecutiveBookKeeperRange' \
 require_literal 'byteRangeAndAgeRolloverPreserveWholeBatchesAndDenseOffsets' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
+require_literal 'BookKeeperAppenderResourceTest.releasesEveryOwnedResource' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'void releasesEveryOwnedResource()' \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppenderResourceTest.java"
+require_literal 'BookKeeperAppenderDeadlineTest.propagatesRemainingBudget' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'void propagatesRemainingBudget()' \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppenderDeadlineTest.java"
 require_literal 'firstMiddleAndLastWriteFailureSealTheLedgerBeforeReuse' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-pulsar-adapter/src/bkM2IntegrationTest/java/com/nereusstream/pulsar/BookKeeperWalOnlyOxiaBkIntegrationTest.java"
