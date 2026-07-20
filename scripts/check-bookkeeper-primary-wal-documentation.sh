@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="acce4183f2fa00511ae2951f3ee5b1937c8426cc"
+pulsar_source_lock="cd2a6e309ab8a6ef6983cacfc112ce513832b838"
 
 require_literal() {
     local literal="$1"
@@ -74,6 +74,20 @@ require_literal '${readerSlot:05d}' \
     "docs/phase-bk-bookkeeper-primary-wal/03-oxia-metadata-ledger-lifecycle-and-codecs.md"
 require_literal 'BookKeeperLedgerIdNamespaceReservationRecord' \
     "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
+require_literal 'nereus.bookkeeper-primary-wal-activation' \
+    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md"
+require_literal 'BookKeeperLedgerIdNamespaceProvisioningCoordinator' \
+    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperLedgerIdNamespaceProvisioningCoordinator.java"
+require_literal 'BookKeeperProtocolActivationCoordinator' \
+    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperProtocolActivationCoordinator.java"
+require_literal 'NBKA1' \
+    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperProtocolActivationCodecV1.java"
+require_literal 'namespaceProvisionIsIdempotentAndRevokeIsTerminalVersionedCas' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperProtocolAdministrationTest.java"
 require_literal 'withRecovery(false)' \
     "docs/phase-bk-bookkeeper-primary-wal/04-append-read-recovery-and-fencing.md"
 require_literal 'REQUIRED_OBJECT_GENERATION' \
@@ -238,6 +252,10 @@ require_literal 'bookKeeperPrimaryWalM4KnownCommittedCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM4ReadAdmissionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM4Check' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM4FinalCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5ConfigurationCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5CapabilityCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5FirstCreateCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5BorrowedClientCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md" \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
@@ -339,11 +357,23 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM[5-6]' \
-    "$repo_root/build.gradle.kts"; then
-    echo "unfinished BK-M5-M6 tasks must not be registered before executable implementation exists" >&2
-    exit 1
-fi
+for unfinished_task in \
+    bookKeeperPrimaryWalM5AdminRoutingCheck \
+    bookKeeperPrimaryWalM5TwoBrokerCheck \
+    bookKeeperPrimaryWalM5Check \
+    bookKeeperPrimaryWalM5FinalCheck \
+    bookKeeperPrimaryWalM6ScenarioEvidenceCheck \
+    bookKeeperPrimaryWalM6ScaleCheck \
+    bookKeeperPrimaryWalM6ChaosCheck \
+    bookKeeperPrimaryWalM6CompatibilityCheck \
+    bookKeeperPrimaryWalM6Check \
+    bookKeeperPrimaryWalM6FinalCheck; do
+    if rg --pcre2 -n "tasks\\.register[^\\n]*\"${unfinished_task}\"" \
+        "$repo_root/build.gradle.kts"; then
+        echo "unfinished task $unfinished_task must not be registered before executable implementation exists" >&2
+        exit 1
+    fi
+done
 
 global_links=(
     README.md

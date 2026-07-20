@@ -15,6 +15,7 @@ import com.nereusstream.bookkeeper.BookKeeperPasswordProvider;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalAppender;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryWalReader;
+import com.nereusstream.bookkeeper.BookKeeperProtocolActivation;
 import com.nereusstream.bookkeeper.BookKeeperReaderLeaseManager;
 import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.bookkeeper.BookKeeperWalRuntime;
@@ -32,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.bookkeeper.client.api.BookKeeper;
 
@@ -43,7 +45,7 @@ final class ProductionBookKeeperPrimaryWalRuntime implements AutoCloseable {
     private final BookKeeperWalRuntime walRuntime;
     private final BookKeeperPrimaryPhysicalReferenceAdapter physicalReferences;
     private final BookKeeperMaterializationSourceProtectionAdapter sourceProtections;
-    private final BookKeeperPrimaryWalCapabilityBinding capabilityBinding;
+    private final Optional<BookKeeperPrimaryWalCapabilityBinding> capabilityBinding;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     static ProductionBookKeeperPrimaryWalRuntime create(
@@ -78,6 +80,10 @@ final class ProductionBookKeeperPrimaryWalRuntime implements AutoCloseable {
             BookKeeperLedgerIdNamespaceReservation namespace = namespaceVerifier
                     .requireActive(wal, wal.operationTimeout())
                     .join();
+            Optional<BookKeeperProtocolActivation> activation =
+                    new OxiaBookKeeperProtocolActivationStore(oxia, sharedOxia)
+                            .read(wal, namespace, wal.operationTimeout())
+                            .join();
             BookKeeperClientOperations operations = new DefaultBookKeeperClientOperations(
                     Objects.requireNonNull(borrowedClient, "borrowedClient"));
             BookKeeperWriterStateMachine writer = new BookKeeperWriterStateMachine(
@@ -145,11 +151,13 @@ final class ProductionBookKeeperPrimaryWalRuntime implements AutoCloseable {
                             wal,
                             metadata,
                             clock),
-                    new BookKeeperPrimaryWalCapabilityBinding(
-                            1,
-                            wal.configurationBindingSha256(),
-                            namespace.ledgerIdNamespaceSha256(),
-                            1));
+                    activation.filter(BookKeeperProtocolActivation::supportsAllPublications)
+                            .map(active -> new BookKeeperPrimaryWalCapabilityBinding(
+                                    1,
+                                    wal.configurationBindingSha256(),
+                                    namespace.ledgerIdNamespaceSha256(),
+                                    active.activationRecordSha256(),
+                                    1)));
         } catch (Throwable failure) {
             try {
                 metadata.close();
@@ -171,7 +179,7 @@ final class ProductionBookKeeperPrimaryWalRuntime implements AutoCloseable {
             BookKeeperWalRuntime walRuntime,
             BookKeeperPrimaryPhysicalReferenceAdapter physicalReferences,
             BookKeeperMaterializationSourceProtectionAdapter sourceProtections,
-            BookKeeperPrimaryWalCapabilityBinding capabilityBinding) {
+            Optional<BookKeeperPrimaryWalCapabilityBinding> capabilityBinding) {
         this.metadata = Objects.requireNonNull(metadata, "metadata");
         this.walRuntime = Objects.requireNonNull(walRuntime, "walRuntime");
         this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
@@ -194,7 +202,7 @@ final class ProductionBookKeeperPrimaryWalRuntime implements AutoCloseable {
         return walRuntime.materializationSourceProvider(sourceProtections);
     }
 
-    BookKeeperPrimaryWalCapabilityBinding capabilityBinding() {
+    Optional<BookKeeperPrimaryWalCapabilityBinding> capabilityBinding() {
         ensureOpen();
         return capabilityBinding;
     }

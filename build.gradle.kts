@@ -248,7 +248,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("acce4183f2fa00511ae2951f3ee5b1937c8426cc")
+    .orElse("cd2a6e309ab8a6ef6983cacfc112ce513832b838")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -898,6 +898,58 @@ tasks.register("bookKeeperPrimaryWalM4FinalCheck") {
     description = "Run BK-M4 ordinary and real Oxia/BookKeeper/Object sync acceptance over final-gated BK async."
     dependsOn("bookKeeperPrimaryWalM4Check")
     dependsOn("bookKeeperPrimaryWalM3FinalCheck")
+}
+
+tasks.register("bookKeeperPrimaryWalM5ConfigurationCheck") {
+    group = "verification"
+    description = "Verify typed BK rollout configuration, safe GC defaults, source lock, and current documentation."
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("bookKeeperPrimaryWalDocumentationCheck")
+    dependsOn(":nereus-pulsar-adapter:test")
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM5CapabilityCheck") {
+    group = "verification"
+    description = "Verify activation-bound BK reserved properties and stable profile-specific all-broker snapshots."
+    dependsOn("bookKeeperPrimaryWalM5ConfigurationCheck")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBookKeeperPrimaryWalCapabilityTest",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
+}
+
+tasks.register("bookKeeperPrimaryWalM5FirstCreateCheck") {
+    group = "verification"
+    description = "Verify BK first-create admission precedes every L0 mutation while existing projection open remains available."
+    dependsOn("bookKeeperPrimaryWalM5CapabilityCheck")
+    dependsOn(":nereus-managed-ledger:test")
+    dependsOn(":nereus-pulsar-adapter:test")
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM5BorrowedClientCheck") {
+    group = "verification"
+    description = "Verify the production BK rollout still borrows and never closes the stock broker client."
+    dependsOn("bookKeeperPrimaryWalM5FirstCreateCheck")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusManagedLedgerStorageBookKeeperClientTest",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+    )
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

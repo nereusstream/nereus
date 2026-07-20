@@ -10,7 +10,7 @@ BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20
 BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20
 BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20
-BK-M5 Pulsar rollout            in progress (configuration/composition/first-create capability checkpoints passed)
+BK-M5 Pulsar rollout            in progress (configuration/composition/activation-bound first-create checkpoints passed)
 BK-M6 aggregate final gate      not implemented
 all BK module-local profiles    executable against real Oxia + BookKeeper/Object and installed by production provider
 all broker BookKeeper profiles  first-create admitted only by exact two-stable-snapshot capability equality
@@ -187,7 +187,7 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
 The current local Pulsar integration/source lock is
-`master@acce4183f2fa00511ae2951f3ee5b1937c8426cc`；it retains the BK-M1 historical evidence above and adds the focused
+`master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`；it retains the BK-M1 historical evidence above and adds the focused
 BK-M2 borrowed-client boundary plus BK-M5 configuration and profile-specific capability rollout。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
@@ -698,7 +698,7 @@ Implementation checkpoint A (2026-07-20) is complete：
 - the existing F4 activation and lag gate is shared by both Object-WAL async and BookKeeper async profiles，with exact
   L0/topic-profile matching；there is no BookKeeper-specific second lag truth；
 - production `DefaultNereusRuntimeProvider` composition、BookKeeper configuration/capability publication and Pulsar
-  first-create routing are implemented by checkpoints B/C below。
+  first-create routing and durable activation binding are implemented by checkpoints B–D below。
 
 Implementation checkpoints B/C (2026-07-20) are complete at the focused-test level：
 
@@ -717,8 +717,25 @@ Implementation checkpoints B/C (2026-07-20) are complete at the focused-test lev
 - `NereusCreationPermit.validateStorageProfileBeforeCreate` runs before the first L0 stream mutation and is not called
   for an existing projection，so rollout admission does not become an availability dependency for historical reads。
 
-Still open after checkpoint C：durable activation/provision/revoke operations、production ledger-retention scanner and
-deletion activation、loaded/unloaded/partitioned routes、two-broker owner transfer and the named aggregate M5 gates。
+Implementation checkpoint D (2026-07-20) is complete at the focused-test level：
+
+- a public exact-key `CapabilityMetadataClient` exposes only get/put-if-absent/version-CAS from the shared Oxia
+  runtime；ordinary broker components still receive read-only namespace/activation verifiers；
+- `BookKeeperLedgerIdNamespaceProvisioningCoordinator` and the explicit
+  `BookKeeperPrimaryWalAdministration` surface implement idempotent ACTIVE provision plus terminal versioned revoke，
+  including exact applied-response-loss recovery；
+- deterministic `NBKA1` activation value/codec、binding-specific canonical key、materialized record digest、monotonic
+  transition coordinator and deletion verifier are implemented and tested；
+- a replacement configuration/namespace uses a new activation key，so an old ACTIVE authority cannot authorize new
+  physical targets and does not need an unsafe in-place reset；
+- production broker bootstrap keeps the BK reader/runtime installed when activation is absent/PREPARED but withholds
+  all BK lookup properties；only an ACTIVE record with all three publication bits produces a capability binding；
+- the local Pulsar capability now reserves and compares `nereus.bookkeeper-primary-wal-activation` in the same stable
+  all-broker snapshot，and focused tests prove activation digest drift blocks BK_ONLY first-create。
+
+Still open after checkpoint D：provider-scope/coverage proof producers and production ledger-retention scanner/deletion
+activation、the concrete Pulsar admin route around the implemented administration surface、loaded/unloaded/partitioned
+routes、two-broker owner transfer and the named aggregate M5 gates。
 
 ### 8.2 Local Pulsar fork
 
@@ -748,6 +765,17 @@ bookKeeperPrimaryWalM5TwoBrokerCheck
 bookKeeperPrimaryWalM5Check
 bookKeeperPrimaryWalM5FinalCheck             retry-disabled real two-broker acceptance
 ```
+
+Checkpoint D registers the first four names as real tasks：configuration runs the typed adapter tests plus source/doc
+locks；capability publishes exact development artifacts and runs the locked Pulsar capability test with fresh broker
+Checkstyle；first-create adds the ManagedLedger pre-L0 admission regression；borrowed-client reruns the stock-client
+identity/close-ownership test. `bookKeeperPrimaryWalM5AdminRoutingCheck`、`bookKeeperPrimaryWalM5TwoBrokerCheck` and
+the ordinary/final aggregates remain intentionally unregistered until their concrete routes/fixtures exist；they are
+not success-only placeholders。
+
+`bookKeeperPrimaryWalM5BorrowedClientCheck` passed on 2026-07-20，therefore executing the complete registered chain
+above. Its locked Pulsar capability/Checkstyle build passed 136 executable tasks and the outer Nereus chain passed 88
+tasks. This is checkpoint-D evidence only；it does not satisfy any of the intentionally unregistered M5 gates。
 
 ### 8.4 Mandatory review stop F
 

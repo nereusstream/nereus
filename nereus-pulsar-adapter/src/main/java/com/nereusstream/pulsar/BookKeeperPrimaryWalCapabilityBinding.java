@@ -10,6 +10,7 @@ public record BookKeeperPrimaryWalCapabilityBinding(
         int protocolVersion,
         Checksum configurationBindingSha256,
         Checksum ledgerIdNamespaceSha256,
+        Checksum activationRecordSha256,
         int requiredObjectGenerationCompletionVersion) {
     public BookKeeperPrimaryWalCapabilityBinding {
         if (protocolVersion != 1 || requiredObjectGenerationCompletionVersion != 1) {
@@ -19,6 +20,8 @@ public record BookKeeperPrimaryWalCapabilityBinding(
                 configurationBindingSha256, "configurationBindingSha256");
         ledgerIdNamespaceSha256 = sha256(
                 ledgerIdNamespaceSha256, "ledgerIdNamespaceSha256");
+        activationRecordSha256 = sha256(
+                activationRecordSha256, "activationRecordSha256");
     }
 
     private static Checksum sha256(Checksum value, String name) {

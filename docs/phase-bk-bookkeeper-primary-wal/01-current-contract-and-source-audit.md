@@ -44,7 +44,7 @@ All shortened paths are below `src/main/java/com/nereusstream/...`。
 ### 2.2 Local Pulsar and BookKeeper
 
 Local checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@acce4183f2fa00511ae2951f3ee5b1937c8426cc`。The original BK-M0 audit input was
+`master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`。The original BK-M0 audit input was
 `eaf7b9a704890a9265c21f30d9f351e02d00c600`；the current commits add the audited borrowed-client handoff、typed BK
 configuration and exact profile first-create capability barrier without changing the pinned BookKeeper version。The checkout pins
 `org.apache.bookkeeper:*` to **4.18.0** in `gradle/libs.versions.toml`; it is local master, not an `M1-SNAPSHOT`.
@@ -54,7 +54,7 @@ configuration and exact profile first-create capability barrier without changing
 | `pulsar-broker/.../ManagedLedgerClientFactory.java` | `3dece00e89a7f0d2f72bff71eabe9d2dff519d37` | owns stock BK client lifecycle |
 | `pulsar-broker/.../storage/BookkeeperManagedLedgerStorageClass.java` | `1f05cde72a5b52c2e868abcd38a8e3cabf09a403` | exposes concrete borrowed `BookKeeper` client |
 | `pulsar-broker/.../storage/nereus/NereusManagedLedgerStorage.java` | `3b657b67458b397300d0fd4a759671d49da7363d` | fail-closes on a non-BK/null stock class，passes the exact borrowed client and installs the verified BK capability sink |
-| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapability.java` | `8d17ad702408912f3c5d2ceb8409af183cd8900d` | freezes reserved config/namespace/sync properties and one-snapshot profile requirements |
+| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapability.java` | `60526aae3bf17357413e0852d24c32368ff8b8fe` | freezes reserved config/namespace/activation/sync properties and one-snapshot profile requirements |
 | `pulsar-broker/.../nereus/NereusManagedLedgerStorageBookKeeperClientTest.java` | `c88aaf3848b20b00a2b6694260d0d1f293c098b6` | freezes same-instance handoff and both fail-closed cases |
 
 BookKeeper 4.18.0 public client API locally verified from the pinned jar：
@@ -295,7 +295,7 @@ signals, not a correctness proof of non-creation.
 | no exact BK read/write/fencing/restart recovery | bookkeeper BK-M1/M2 |
 | no whole-ledger retention proof | metadata/bookkeeper/materialization BK-M2 |
 | Object-only exact-source/protection/retirement branches | materialization/core BK-M3 |
-| no required-higher-generation producer barrier | closed by core/materialization BK-M4；production activation remains BK-M5 |
+| no required-higher-generation producer barrier | closed by core/materialization BK-M4；publication activation control plane closed by BK-M5 checkpoint D，deletion proof production/scheduling remains M5 |
 | no broker client/capability/profile admission wiring | pulsar-adapter + local Pulsar BK-M5 |
 | no real multi-broker/scale/chaos evidence | BK-M5/M6 |
 

@@ -6,7 +6,7 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 `bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-M2 then completed on 2026-07-20 through the 107/107-task
 `bookKeeperPrimaryWalM2Check --rerun-tasks` and the 212-task `bookKeeperPrimaryWalM2FinalCheck` aggregate against
-current local Pulsar `master@acce4183f2fa00511ae2951f3ee5b1937c8426cc`。The final aggregate covers BK-11 through
+current local Pulsar `master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`。The final aggregate covers BK-11 through
 BK-56 at the milestone's declared D/O/B and focused local-Pulsar boundary：all codecs/keyspaces/shards、allocation and
 writer monotonicity、foreign and same-candidate authority、uncertain/late create、exact append/recovery/fencing/read、
 generation-zero repair、resource/deadline contracts、logical trim、complete protection inventory and dual-absence
@@ -180,7 +180,7 @@ Evidence levels：
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
 | BK-77 | M5 | D/P | borrowed client is closed zero times by Nereus and once by stock owner | `NereusBookKeeperBorrowedClientTest.closesOnlyAtStockOwner` |
-| BK-78 | M5 | P | missing/mismatched/revoked provisioned namespace or broker config/capability rejects first-create before IO；runtime never auto-creates reservation | `NereusBookKeeperCapabilityTest.rejectsUnreadyCluster` |
+| BK-78 | M5 | D/P | exact namespace provision/terminal revoke plus missing/mismatched activation/config capability reject first-create before IO；runtime never auto-creates authority | implemented `BookKeeperProtocolAdministrationTest.namespaceProvisionIsIdempotentAndRevokeIsTerminalVersionedCas`、`NereusBookKeeperPrimaryWalCapabilityTest.firstCreateRequiresTwoStableAllBrokerSnapshotsWithTheExactBinding`；full broker revoke route remains M5 |
 | BK-79 | M5 | P | first-create persists exact profile; reopen ignores changed default | `NereusBookKeeperProfileAdmissionTest.keepsImmutableProfile` |
 | BK-80 | M5 | P | explicit existing-profile mutation/online migration is rejected | `NereusBookKeeperProfileAdmissionTest.rejectsProfileMutation` |
 | BK-81 | M5 | P | loaded/unloaded/partitioned routes use durable profile/readiness | `NereusBookKeeperAdminRoutingTest.routesExactDurableProfile` |

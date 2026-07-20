@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@acce4183f2fa00511ae2951f3ee5b1937c8426cc
+master@cd2a6e309ab8a6ef6983cacfc112ce513832b838
 BookKeeper 4.18.0
 ```
 
@@ -41,10 +41,12 @@ Exact type/wrapper names may follow module conventions. Required ownership：
 `nereus-api`/`nereus-core` do not import Pulsar or ManagedLedger classes. `nereus-bookkeeper` depends on BookKeeper
 client API, while `nereus-pulsar-adapter` is the composition boundary.
 
-BK-M5 checkpoints B/C now consume `borrowedBookKeeperClient` through `DefaultBookKeeperClientOperations` and install
+BK-M5 checkpoints B–D now consume `borrowedBookKeeperClient` through `DefaultBookKeeperClientOperations` and install
 the completed M2-M4 runtime without ever closing the client。Before advertising capability，bootstrap performs a
 bounded read of the separately provisioned Oxia namespace record、validates its exact deployment/config binding and
-probes the password secret reference；partial initialization still closes only Nereus-owned adapters/metadata views。
+probes the password secret reference，then reads the binding-specific activation record。An absent/PREPARED activation
+keeps the runtime available for existing-target reads but publishes no BK first-create capability；partial
+initialization still closes only Nereus-owned adapters/metadata views。
 
 ## 3. Runtime composition
 
@@ -71,7 +73,8 @@ is bounded.
 Implemented checkpoint B/C composition uses one `PrimaryWalRegistry.combine(Object, BK)` and passes the BK physical
 reference adapter into generation-zero publication plus the BK materialization-source provider into the existing F4
 runtime。No second planner、worker pool or lag authority is created。BK ledger retention scheduling and deletion
-activation are intentionally not started by this checkpoint and remain fail closed under the safe GC defaults。
+activation are intentionally not started yet and remain fail closed under the safe GC defaults；checkpoint D adds the
+durable activation control plane and read-side admission without starting a deletion loop。
 
 ## 4. Broker configuration
 
@@ -172,6 +175,20 @@ readiness immediately. This coordinates trusted Nereus deployments；a BookKeepe
 external exact `CreateAdv` in the prefix is outside the supported profile, because the provider cannot enforce a
 conditional delete fence.
 
+BK-M5 checkpoint D implements this boundary as two deliberately different surfaces：
+
+- `BookKeeperLedgerIdNamespaceReservationStore` remains read-only and is the only interface received by broker WAL
+  bootstrap；
+- `BookKeeperLedgerIdNamespaceReservationAdminStore` adds exact put-if-absent/version-CAS only for
+  `BookKeeperLedgerIdNamespaceProvisioningCoordinator`；
+- `BookKeeperPrimaryWalAdministration.provisionNamespace/revokeNamespace` is the explicit embedding surface for a
+  broker/admin route；normal runtime never calls it；
+- provision is idempotent only for the same ACTIVE epoch-one identity and operator evidence digest；any foreign or
+  terminal record fails closed；revoke requires the observed Oxia version、increments the reservation epoch exactly
+  once and cannot be reversed；
+- both create and revoke recover an applied-but-response-lost write only when a reload contains the byte-identical
+  desired `NBLR1` value at a newer valid version。
+
 ## 5. Cluster capability
 
 Add reserved lookup properties：
@@ -180,6 +197,7 @@ Add reserved lookup properties：
 nereus.bookkeeper-primary-wal-protocol = "1"
 nereus.bookkeeper-primary-wal-config   = <configuration binding SHA-256>
 nereus.bookkeeper-ledger-namespace     = <reserved-prefix + reservation binding SHA-256>
+nereus.bookkeeper-primary-wal-activation = <exact activation-record binding SHA-256>
 nereus.bookkeeper-required-object-generation = "1"
 ```
 
@@ -211,13 +229,25 @@ limit cannot be silently exceeded and later used as a truncated GC scan.
 
 ## 6. Durable activation and deletion gate
 
-Add a product-owned `BookKeeperProtocolActivationRecord` under a fixed Oxia capability key：
+Add a product-owned `BookKeeperProtocolActivationRecord` under a binding-specific Oxia capability key：
+
+```text
+/nereus/bookkeeper-primary-wal/v1/clusters/{sha256(clusterAlias)}/bindings/
+  {configurationBindingSha256}/{ledgerIdNamespaceSha256}/activation
+```
+
+The activation key includes the physical configuration and the exact `NBLN1` namespace identity. A terminal namespace
+revoke therefore cannot be overwritten in place or accidentally authorize a replacement prefix；a new binding receives
+a new activation key while old streams keep their original target/reader contract. The partition identity is
+`bookkeeper-primary-wal-v1-{sha256(clusterAlias)}`。
 
 ```java
 record BookKeeperProtocolActivationRecord(
     int schemaVersion,
     Lifecycle lifecycle,                 // PREPARED, ACTIVE
     int protocolVersion,
+    String clusterAlias,
+    String providerScopeSha256,
     long brokerReadinessEpoch,
     String brokerReadinessSha256,
     String configurationBindingSha256,
@@ -256,6 +286,21 @@ first-created and an already loaded topic must fail ownership/write/delete close
 Likewise, an unknown create outcome is not repaired by an admin Boolean. Its fixed slot/hazard may exhaust new ledger
 allocation by design；BK-M0–M6 require fail-closed operational escalation or a new provider-scope/prefix deployment,
 and define no online hazard-clear operation.
+
+The implemented wire value is deterministic `NBKA1` and keeps Oxia `metadataVersion` outside the stored bytes. Its
+advertised binding is
+`SHA-256("NBKA1" || u32be(keyUtf8Length) || keyUtf8 || i64be(metadataVersion) || storedValueSha256Bytes)`。
+`PREPARED=1` and `ACTIVE=2` are explicit wire ids；PREPARED has zero publication bits/proofs，ACTIVE must at least
+publish WAL_ONLY，async requires WAL_ONLY，sync requires async，and deletion requires sync plus three individually
+nonzero proof digests. Readiness epoch cannot decrease or change digest at the same epoch；publication/deletion bits
+cannot clear；deletion proofs become immutable once enabled。
+
+`BookKeeperProtocolActivationCoordinator` and `BookKeeperPrimaryWalAdministration.prepareActivation/activate` now
+provide the explicit CAS control plane. Broker bootstrap performs an exact read only：it installs writer/reader support
+even when activation is absent or PREPARED so historical topics remain readable，but publishes no BK lookup capability
+until the same durable record is ACTIVE with WAL_ONLY、async and sync publication enabled. The broker property set
+includes the exact activation digest，so any old/missing/drifted activation fails the same stable two-snapshot
+first-create barrier. Ledger deletion is still not scheduled by this checkpoint。
 
 ## 7. First-create and reopen admission
 

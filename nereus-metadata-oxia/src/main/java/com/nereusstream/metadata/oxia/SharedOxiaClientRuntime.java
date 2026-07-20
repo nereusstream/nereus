@@ -128,14 +128,55 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
             OxiaClientConfiguration candidate,
             String key,
             String partitionKey) {
+        return capabilityMetadataClient(candidate).get(key, partitionKey);
+    }
+
+    /** Returns a borrowed exact-key CAS view for explicit operator-owned capability mutations. */
+    public CapabilityMetadataClient capabilityMetadataClient(
+            OxiaClientConfiguration candidate) {
         requireCompatible(candidate);
-        String exactKey = Objects.requireNonNull(key, "key");
-        if (exactKey.isBlank()) {
-            throw new IllegalArgumentException("capability key cannot be blank");
-        }
-        PartitionKey exactPartition = new PartitionKey(partitionKey);
-        return client.get(exactKey, exactPartition).thenApply(optional -> optional.map(value ->
-                new CapabilityMetadataValue(value.key(), value.value(), value.version())));
+        return new CapabilityMetadataClient() {
+            @Override
+            public CompletableFuture<Optional<CapabilityMetadataValue>> get(
+                    String key, String partitionKey) {
+                ensureOpen();
+                String exactKey = requireCapabilityKey(key);
+                PartitionKey exactPartition = new PartitionKey(partitionKey);
+                return client.get(exactKey, exactPartition).thenApply(optional -> optional.map(value ->
+                        new CapabilityMetadataValue(value.key(), value.value(), value.version())));
+            }
+
+            @Override
+            public CompletableFuture<CapabilityMetadataValue> putIfAbsent(
+                    String key, byte[] value, String partitionKey) {
+                ensureOpen();
+                String exactKey = requireCapabilityKey(key);
+                byte[] exactValue = requireCapabilityValue(value);
+                PartitionKey exactPartition = new PartitionKey(partitionKey);
+                return client.putIfAbsent(exactKey, exactValue, exactPartition)
+                        .thenApply(result -> new CapabilityMetadataValue(
+                                exactKey, exactValue, result.version()));
+            }
+
+            @Override
+            public CompletableFuture<CapabilityMetadataValue> putIfVersion(
+                    String key,
+                    byte[] value,
+                    long expectedVersion,
+                    String partitionKey) {
+                ensureOpen();
+                String exactKey = requireCapabilityKey(key);
+                byte[] exactValue = requireCapabilityValue(value);
+                PartitionKey exactPartition = new PartitionKey(partitionKey);
+                return client.putIfVersion(
+                                exactKey,
+                                exactValue,
+                                expectedVersion,
+                                exactPartition)
+                        .thenApply(result -> new CapabilityMetadataValue(
+                                exactKey, exactValue, result.version()));
+            }
+        };
     }
 
     @Override
@@ -156,6 +197,22 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
         if (closed.get()) {
             throw new NereusException(ErrorCode.STORAGE_CLOSED, false, "shared Oxia client runtime is closed");
         }
+    }
+
+    private static String requireCapabilityKey(String key) {
+        String exact = Objects.requireNonNull(key, "key");
+        if (exact.isBlank()) {
+            throw new IllegalArgumentException("capability key cannot be blank");
+        }
+        return exact;
+    }
+
+    private static byte[] requireCapabilityValue(byte[] value) {
+        byte[] exact = Objects.requireNonNull(value, "value").clone();
+        if (exact.length == 0) {
+            throw new IllegalArgumentException("capability value cannot be empty");
+        }
+        return exact;
     }
 
     private static ThreadFactory daemonFactory(String prefix) {

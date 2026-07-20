@@ -432,8 +432,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             physicalGcRuntime,
                             clock);
             if (bookKeeperRuntime != null) {
-                context.bookKeeperPrimaryWalCapabilitySink()
-                        .install(bookKeeperRuntime.capabilityBinding());
+                bookKeeperRuntime.capabilityBinding().ifPresent(binding ->
+                        context.bookKeeperPrimaryWalCapabilitySink().install(binding));
             }
             phase4Runtime.start();
             physicalGcRuntime.start();
