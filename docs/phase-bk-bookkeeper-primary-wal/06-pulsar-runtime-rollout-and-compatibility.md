@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@52825536806a02eeb2418c9f4a39b0802d33d849
+master@512f8c1aed056033eef1690216f7b6fe9fae8450
 BookKeeper 4.18.0
 ```
 
@@ -289,7 +289,8 @@ Publication bits advance monotonically only after their milestone gate. Ledger d
 Configuration alone is never deletion authority. Safe defaults start no mutating ledger collector. Namespace proof
 is an operational trust boundary backed by cluster provisioning/readiness；the canary demonstrates the configured
 scope but cannot manufacture exclusivity. If the reservation cannot be asserted, no BookKeeper profile may be
-first-created and an already loaded topic must fail ownership/write/delete closed.
+first-created and an already loaded topic must fail ownership/write/provider-delete closed；logical unload and delete
+remain available so an operator can shed ownership or retire the topic without requiring a healthy BK rollout。
 
 Likewise, an unknown create outcome is not repaired by an admin Boolean. Its fixed slot/hazard may exhaust new ledger
 allocation by design；BK-M0–M6 require fail-closed operational escalation or a new provider-scope/prefix deployment,
@@ -362,8 +363,35 @@ Checkpoint E.1 implements the three proof producers and the only deletion-activa
   active record is returned idempotently without rerunning provider IO；
 - the ordinary `BookKeeperPrimaryWalAdministration.activate` rejects every request that sets the deletion bit，so a
   caller cannot inject digests through the older publication API。Production composition publishes the proof-capable
-  administration object to the Pulsar storage plugin through a one-time sink；the concrete broker admin REST route is
-  deliberately still a later BK-M5 checkpoint。
+  administration object to the Pulsar storage plugin through a one-time sink。
+
+Checkpoint E.2 installs the authenticated broker REST and durable-profile routing boundary：
+
+| Method/path below `/admin/v2/brokers` | Request authority |
+| --- | --- |
+| `PUT /bookkeeper-primary-wal/namespace` | `{operatorEvidenceSha256, timeoutSeconds}` |
+| `POST /bookkeeper-primary-wal/namespace/revoke` | `{revocationEvidenceSha256, expectedMetadataVersion, timeoutSeconds}` |
+| `POST /bookkeeper-primary-wal/activation/prepare` | `{brokerReadinessEpoch, brokerReadinessSha256, timeoutSeconds}` |
+| `POST /bookkeeper-primary-wal/activation/publications` | readiness identity、async/sync bits、expected version、timeout；no deletion/proof fields |
+| `POST /bookkeeper-primary-wal/activation/deletion` | `{runId, expectedActivationMetadataVersion, timeoutSeconds}` only |
+| `GET /bookkeeper-primary-wal/activation?timeoutSeconds=...` | authoritative read；missing record is 404 |
+
+Every route completes `validateSuperUserAccessAsync()` before storage lookup or mutation，rejects a non-Nereus broker
+before IO and caps request timeouts at 86,400 seconds。REST models return non-secret identity/version/digest facts but
+omit internal canonical keys。Publication activation constructs
+`BookKeeperProtocolActivationUpdate.publications(...)`，which fixes deletion false and all three proofs to zero；the
+deletion route can only construct `BookKeeperDeletionActivationRequest`，so the producer-owned proof boundary survives
+JSON deserialization and route mapping。
+
+Loaded and unloaded topics now call the same `NereusManagedLedgerStorage.validateBoundAdminOperation` path。It reads
+the immutable storage-class binding，loads the exact F2/L0 snapshot，requires
+`projection.storageClassBindingGeneration == binding.bindingGeneration` and obtains the canonical profile from L0
+`StreamMetadata`；the namespace/current broker default is never consulted。A partitioned parent enumerates and checks
+every concrete partition independently。Supported operations that can read primary bytes or create storage-visible
+state (`TERMINATE_TOPIC`、backlog analyze/clear、skip/expire、cursor reset、trim) require the exact durable profile's
+current capability；trim first requires F4 generation readiness。Unload、logical delete and durable-subscription delete
+remain available during capability drift；unsupported compaction/offload/truncate/shadow/migration operations fail
+before any readiness lookup。
 
 The retained QUARANTINED canary roots are intentional bounded-per-activation audit evidence and permanent allocation
 vetoes；they are never reclaimed or reused by the ordinary allocator。Operators must therefore use a unique stable
@@ -403,7 +431,8 @@ install F3 cursor + F4 services as profile requires
 ```
 
 Loaded and unloaded admin paths use durable binding/profile facts. An unloaded topic is not interpreted from namespace
-default policy.
+default policy。Checkpoint E.2 implements this admin boundary；writable ownership/open admission and two-broker
+transfer remain the next BK-M5 checkpoint。
 
 ### 7.3 Profile mutation
 

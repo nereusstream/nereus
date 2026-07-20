@@ -64,8 +64,10 @@
 > Checkpoint E.1 now implements strict all-256-root/all-64-stream proofs，the real reserved-scope
 > create/write/read/fence/delete response-loss canary and a readiness-stable one-CAS deletion coordinator whose proof
 > digests cannot be supplied by an admin caller。Production hands that administration object to the Pulsar storage
-> plugin without closing/owning the borrowed BK client。The concrete authenticated broker admin route、ownership
-> routing and full rollout acceptance remain open。
+> plugin without closing/owning the borrowed BK client。Checkpoint E.2 adds the concrete superuser-only broker routes
+> for namespace/activation operations with proof-safe DTOs，and unifies loaded、unloaded and partitioned admin
+> admission on the exact durable binding/L0 profile。Writable ownership transfer and full rollout acceptance remain
+> open。
 
 > BK-M4 `BOOKKEEPER_WAL_SYNC_OBJECT` is complete/final-gated：`StorageExecutionPlan` resolves
 > `REQUIRED_OBJECT_GENERATION` independently from generation-zero durability；the append path publishes/protects gen0
@@ -100,12 +102,15 @@
 > reader fact，`NBKSTREAM1` from every BK registration plus exact L0/F2 truth，and `NBKSCOPE1` from a real advanced-id
 > provider canary under a permanent QUARANTINED audit reservation。The coordinator rechecks broker readiness between
 > producers and installs all three digests plus deletion in one CAS；idempotent retry does not repeat provider IO。
-> The concrete Pulsar admin route、loaded/unloaded ownership routing and two-broker acceptance remain the next M5
-> checkpoints。
+> The concrete Pulsar admin route and loaded/unloaded/partitioned durable-profile routing are now implemented and
+> source-locked；writable ownership admission and two-broker acceptance remain the next M5 checkpoints。
 > The latest `bookKeeperPrimaryWalM5RetentionCheck --rerun-tasks` passes 91/91 outer tasks in 2m13s on the current
 > source lock；its nested capability and borrowed-client builds each pass 136/136 executable tasks。
 > The subsequent fresh `bookKeeperPrimaryWalM5DeletionActivationCheck --rerun-tasks` passes 101/101 outer tasks in
 > 2m46s；the final locked Pulsar administration-handoff format/checkstyle/compile leg passes 66/66 tasks。
+> The fresh `bookKeeperPrimaryWalM5AdminRoutingCheck --rerun-tasks` passes 103/103 outer tasks in 3m32s；after all
+> inherited M5 checkpoints，its final locked Pulsar Spotless、main/test Checkstyle and three focused suites pass
+> 138/138 tasks。
 
 > 2026-07-20：`bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks；
 > `bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate in 21m40s，including the final-gated
@@ -270,7 +275,7 @@ second commit protocol and is forbidden.
 
 The design is based only on this repository and the local Pulsar checkout at
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`。No internet or non-existent `M1-SNAPSHOT` artifact is an input.
-The target Pulsar source lock is `master@52825536806a02eeb2418c9f4a39b0802d33d849`。The Nereus pre-design audit
+The target Pulsar source lock is `master@512f8c1aed056033eef1690216f7b6fe9fae8450`。The Nereus pre-design audit
 lock and BookKeeper client API surface are recorded in document 01；a changed lock requires re-audit, not silent
 compilation against a different checkout.
 

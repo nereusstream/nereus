@@ -85,6 +85,8 @@ val dockerBackedPulsarExecTasks = setOf(
     "phase4M5AsyncRetentionMultiBrokerPulsarCheck",
     "phase4M6TwoBrokerWorkerContentionPulsarCheck",
     "bookKeeperPrimaryWalM2PulsarCheck",
+    "checkBookKeeperPrimaryWalM5AdminRoutingContractSurface",
+    "bookKeeperPrimaryWalM5AdminRoutingCheck",
 )
 val pulsarCheckoutExecTasks = setOf(
     "phase2PulsarCheck",
@@ -248,7 +250,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("52825536806a02eeb2418c9f4a39b0802d33d849")
+    .orElse("512f8c1aed056033eef1690216f7b6fe9fae8450")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -975,6 +977,41 @@ tasks.register<Exec>("bookKeeperPrimaryWalM5DeletionActivationCheck") {
         ":pulsar-broker:compileJava",
         "--rerun-tasks",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+    )
+}
+
+tasks.register<Exec>("checkBookKeeperPrimaryWalM5AdminRoutingContractSurface") {
+    group = "verification"
+    description = "Audit proof-safe BK admin DTOs and one durable-profile route for loaded/unloaded/partitioned topics."
+    dependsOn("checkPulsarSourceLock")
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-bookkeeper-primary-wal-m5-admin-routing-contract-surface.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM5AdminRoutingCheck") {
+    group = "verification"
+    description = "Verify authenticated BK rollout administration and exact durable-profile admin routing."
+    dependsOn("bookKeeperPrimaryWalM5DeletionActivationCheck")
+    dependsOn("checkBookKeeperPrimaryWalM5AdminRoutingContractSurface")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.admin.impl.NereusBookKeeperPrimaryWalAdminTest",
+        "--tests", "org.apache.pulsar.broker.admin.impl.PersistentTopicsNereusDurableProfileRoutingTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusAdminOperationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
     )
 }
 

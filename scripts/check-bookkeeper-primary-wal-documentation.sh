@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="52825536806a02eeb2418c9f4a39b0802d33d849"
+pulsar_source_lock="512f8c1aed056033eef1690216f7b6fe9fae8450"
 
 require_literal() {
     local literal="$1"
@@ -278,6 +278,11 @@ require_literal 'bookKeeperPrimaryWalM5FirstCreateCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5BorrowedClientCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5RetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5DeletionActivationCheck' "build.gradle.kts"
+require_literal 'checkBookKeeperPrimaryWalM5AdminRoutingContractSurface' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5AdminRoutingCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5AdminRoutingCheck --rerun-tasks` passes 103/103 outer tasks in 3m32s' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md" \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md" \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
@@ -380,7 +385,6 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     exit 1
 fi
 for unfinished_task in \
-    bookKeeperPrimaryWalM5AdminRoutingCheck \
     bookKeeperPrimaryWalM5TwoBrokerCheck \
     bookKeeperPrimaryWalM5Check \
     bookKeeperPrimaryWalM5FinalCheck \
@@ -396,6 +400,11 @@ for unfinished_task in \
         exit 1
     fi
 done
+
+if [[ ! -x "$repo_root/scripts/check-bookkeeper-primary-wal-m5-admin-routing-contract-surface.sh" ]]; then
+    echo "BookKeeper M5 admin-routing contract gate is missing or not executable" >&2
+    exit 1
+fi
 
 global_links=(
     README.md

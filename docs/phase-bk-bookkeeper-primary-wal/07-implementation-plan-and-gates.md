@@ -187,7 +187,7 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
 The current local Pulsar integration/source lock is
-`master@52825536806a02eeb2418c9f4a39b0802d33d849`；it retains the BK-M1 historical evidence above and adds the focused
+`master@512f8c1aed056033eef1690216f7b6fe9fae8450`；it retains the BK-M1 historical evidence above and adds the focused
 BK-M2 borrowed-client boundary plus BK-M5 configuration and profile-specific capability rollout。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
@@ -772,13 +772,27 @@ Implementation checkpoint E.1 (2026-07-20) closes proof-owned physical-deletion 
   rerunning canary IO；
 - public publication activation now rejects caller-supplied deletion bits/proofs。Production runtime constructs the
   real three producers from its shared Oxia/L0/F2/F4/BK facts and transfers only the administration object through a
-  one-time runtime-context sink；the Pulsar storage plugin exposes that object/async operation but no external REST
-  endpoint has yet been declared；
+  one-time runtime-context sink；the Pulsar storage plugin exposes that object/async operation；
 - focused root/scope/stream/coordinator tests cover canonical full traversal、profile drift、create/delete response
   loss、foreign isolation、readiness drift、proof-binding drift、one-CAS idempotence and proof-injection rejection。
 
-Still open after checkpoint E.1：the concrete authenticated Pulsar admin route、loaded/unloaded/partitioned routes、
-two-broker owner transfer and the named aggregate M5 gates。
+Implementation checkpoint E.2 (2026-07-20) closes the management and durable-profile route：
+
+- six superuser-only `/admin/v2/brokers/bookkeeper-primary-wal/...` operations expose namespace provision/revoke、
+  activation prepare/publications/deletion and authoritative activation read；authorization completes before storage
+  lookup/mutation and a non-Nereus broker fails before IO；
+- REST request records are intentionally narrower than Nereus domain updates。Publication has no deletion/proof
+  fields and constructs only `BookKeeperProtocolActivationUpdate.publications(...)`；deletion accepts only run id、
+  observed activation version and bounded timeout，leaving all proof production inside the broker；
+- one storage path resolves binding -> exact F2/L0 snapshot -> matching binding generation -> canonical durable
+  profile，then applies profile readiness only to storage-dependent operations。Unload、logical delete and subscription
+  delete remain recoverable during capability drift；
+- loaded topics、unloaded bindings and every partition under a partitioned parent use that same path。Focused tests
+  cover auth-before-lookup、exact DTO/domain mapping、proof-field absence、durable-profile generation match、operation
+  matrix and all three routing shapes。
+
+Still open after checkpoint E.2：writable ownership admission、two-broker owner transfer and the named aggregate M5
+gates。
 
 ### 8.2 Local Pulsar fork
 
@@ -811,25 +825,28 @@ bookKeeperPrimaryWalM5Check
 bookKeeperPrimaryWalM5FinalCheck             retry-disabled real two-broker acceptance
 ```
 
-Checkpoints D/E/E.1 register the first six names as real tasks：configuration runs the typed adapter tests plus source/doc
+Checkpoints D/E/E.1/E.2 register the first seven names as real tasks：configuration runs the typed adapter tests plus source/doc
 locks；capability publishes exact development artifacts and runs the locked Pulsar capability test with fresh broker
 Checkstyle；first-create adds the ManagedLedger pre-L0 admission regression；borrowed-client reruns the stock-client
 identity/close-ownership test；retention runs the all-shard scanner/service and production composition checks。
 Deletion activation additionally runs the producer/coordinator suites and recompiles/formats the locked Pulsar broker
-handoff against freshly published Nereus development artifacts。`bookKeeperPrimaryWalM5AdminRoutingCheck`、
-`bookKeeperPrimaryWalM5TwoBrokerCheck` and
-the ordinary/final aggregates remain intentionally unregistered until their concrete routes/fixtures exist；they are
-not success-only placeholders。
+handoff against freshly published Nereus development artifacts。Admin routing statically audits the proof-safe REST and
+durable-profile contract，then freshly runs the three focused Pulsar suites plus main/test formatting and Checkstyle。
+`bookKeeperPrimaryWalM5TwoBrokerCheck` and the ordinary/final aggregates remain intentionally unregistered until their
+concrete ownership/fixtures exist；they are not success-only placeholders。
 
 The focused Pulsar capability/Checkstyle run on 2026-07-20 passed 136/136 fresh tasks at source lock
-`52825536806a02eeb2418c9f4a39b0802d33d849`，including stable publication identity、strongest-profile live deletion
+`512f8c1aed056033eef1690216f7b6fe9fae8450`，including stable publication identity、strongest-profile live deletion
 readiness and broker/property drift invalidation. This remains checkpoint-D/E evidence only and does not satisfy any
 of the intentionally unregistered M5 gates. The latest complete fresh
 `bookKeeperPrimaryWalM5RetentionCheck --rerun-tasks` then passed 91/91 outer tasks in 2m13s；its nested capability and
 borrowed-client builds each passed 136/136 executable tasks。
 The fresh `bookKeeperPrimaryWalM5DeletionActivationCheck --rerun-tasks` passes 101/101 outer tasks in 2m46s at
-`52825536806a02eeb2418c9f4a39b0802d33d849`；its two inherited focused broker builds each pass 136/136 tasks and its
+`512f8c1aed056033eef1690216f7b6fe9fae8450`；its two inherited focused broker builds each pass 136/136 tasks and its
 final locked Pulsar handoff format/checkstyle/compile build passes 66/66 tasks。
+The fresh `bookKeeperPrimaryWalM5AdminRoutingCheck --rerun-tasks` passes 103/103 outer tasks in 3m32s at the same
+source lock；after all inherited M5 gates，its final Pulsar Spotless、main/test Checkstyle and authenticated-admin、
+durable-profile routing、operation-matrix suites pass 138/138 tasks。
 
 ### 8.4 Mandatory review stop F
 

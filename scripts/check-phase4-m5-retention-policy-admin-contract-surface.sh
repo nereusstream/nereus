@@ -103,7 +103,9 @@ require_literal "snapshot.hasSamePolicyInputs(reloaded)" "$persistent_topic"
 require_literal "validateAdminOperation(operation, nereusFeatures)" "$persistent_topic"
 
 require_literal "capabilityCoordinator::requireGenerationReadiness" "$storage"
-require_literal "operation == NereusAdminOperation.TRIM_TOPIC && generationProtocolEnabled" "$storage"
+require_literal "validateBoundAdminOperation(" "$storage"
+require_literal "nereusFactory.inspectStorageState(persistenceName)" "$storage"
+require_literal "operation == NereusAdminOperation.TRIM_TOPIC" "$storage"
 require_literal "validateNereusAdminOperationForLoadedOrBoundTopic(" "$admin_route"
 require_literal "NereusAdminOperation.TRIM_TOPIC" "$admin_route"
 
