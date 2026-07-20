@@ -49,8 +49,7 @@ public final class ManagedLedgerAsyncAppendAdmissionGuard
         final AppendAdmissionRequest exact;
         try {
             exact = Objects.requireNonNull(request, "request");
-            if (exact.storageProfile()
-                    != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+            if (!exact.storageProfile().asyncObjectMaterialization()) {
                 return CompletableFuture.completedFuture(null);
             }
         } catch (Throwable failure) {
@@ -58,7 +57,9 @@ public final class ManagedLedgerAsyncAppendAdmissionGuard
         }
         return projections.getProjectionByStream(
                         cluster, exact.streamId())
-                .thenApply(ManagedLedgerAsyncAppendAdmissionGuard::subject)
+                .thenApply(projection -> subject(
+                        projection,
+                        exact.storageProfile()))
                 .thenCompose(subject -> activationGuard.requireReady(
                                 GenerationOperation.GENERATION_PUBLISH,
                                 subject,
@@ -76,7 +77,8 @@ public final class ManagedLedgerAsyncAppendAdmissionGuard
     }
 
     private static LiveProjectionSubject subject(
-            ManagedLedgerStreamProjection projection) {
+            ManagedLedgerStreamProjection projection,
+            StorageProfile expectedProfile) {
         VersionedVirtualLedgerProjection binding =
                 projection.streamBinding().orElseThrow(() ->
                         notReady(
@@ -111,9 +113,9 @@ public final class ManagedLedgerAsyncAppendAdmissionGuard
                     "topic projection has an unknown async storage profile",
                     failure);
         }
-        if (profile != StorageProfile.OBJECT_WAL_ASYNC_OBJECT) {
+        if (profile != expectedProfile || !profile.asyncObjectMaterialization()) {
             throw invariant(
-                    "async L0 stream is bound to a non-async topic projection");
+                    "async L0 stream and topic projection profiles disagree");
         }
         ManagedLedgerGenerationProjectionRefV1 reference =
                 new ManagedLedgerGenerationProjectionRefV1(

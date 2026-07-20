@@ -185,7 +185,11 @@ public final class PositionProjection {
                 && profile
                         != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
                 && profile
-                        != StorageProfile.BOOKKEEPER_WAL_ONLY) {
+                        != StorageProfile.BOOKKEEPER_WAL_ONLY
+                && profile
+                        != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                && profile
+                        != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
             throw new ProjectionValidationException(
                     "F2 has no executable mapping for the storage profile");
         }

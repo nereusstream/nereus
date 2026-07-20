@@ -69,6 +69,15 @@
 > BK during the wait。Post-head proof failure is `KNOWN_COMMITTED`；`recoverAppend` and restart recovery reuse the same
 > attempt、BK range、offset and deterministic task。Production broker installation still belongs to BK-M5。
 
+> BK-M5 checkpoint A is implemented：`StorageProfileResolverRegistry` now composes exact per-profile resolvers
+> without moving BookKeeper types into L0；the ManagedLedger projection record、create/open validation and Position
+> mapping admit all three BookKeeper profiles。`F2L0RequestFactory` maps BK_ONLY and BK_ASYNC to stable-head profile
+> completion，and maps BK_SYNC to generation-zero durability plus the independent
+> `REQUIRED_OBJECT_GENERATION` completion policy。The shared async generation/lag admission guard now applies equally
+> to Object-WAL async and BK async while requiring the durable topic projection profile to match the L0 request。
+> Production provider composition and broker capability publication remain fail-closed pending the next M5
+> checkpoints。
+
 > 2026-07-20：`bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks；
 > `bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate in 21m40s，including the final-gated
 > BK-M3 and Phase 1.5–4 predecessor chains。The aggregate also closed a pre-existing F4 independent-publisher race：
@@ -308,8 +317,10 @@ The production-adapter real-service test additionally covers graceful first-proc
 BK-26 and an expired-session owner replacement for BK-27；the current-session path performs zero writes in the new
 client and the fenced path moves the replacement to a new ledger。Abrupt kill remains an explicit C-level gap。
 
-The focused ManagedLedger checkpoint admits BK_ONLY in projection creation/open/Position mapping and maps append to
-`WAL_DURABLE` without exposing the physical BK ledger id。`NereusBookKeeperManagedLedgerIntegrationTest` drives exact
+The focused ManagedLedger checkpoint now admits BK_ONLY、BK_ASYNC and BK_SYNC in projection
+creation/open/Position mapping without exposing the physical BK ledger id。BK_ONLY/BK_ASYNC append at
+`WAL_DURABLE`；BK_SYNC requests `WAL_DURABLE_AND_INDEX_COMMITTED` together with the separate
+`REQUIRED_OBJECT_GENERATION` producer-completion predicate。`NereusBookKeeperManagedLedgerIntegrationTest` drives exact
 entry bytes through `NereusManagedLedger.addEntry/readEntry` over generation zero and proves the returned Position
 uses the virtual ledger。The pinned Pulsar fork now obtains the same stock
 `BookkeeperManagedLedgerStorageClass.getBookKeeperClient()` instance, passes it as an explicitly borrowed

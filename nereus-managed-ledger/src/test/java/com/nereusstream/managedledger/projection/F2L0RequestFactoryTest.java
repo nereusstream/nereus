@@ -17,6 +17,7 @@ package com.nereusstream.managedledger.projection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.StorageProfile;
@@ -64,7 +65,7 @@ class F2L0RequestFactoryTest {
     }
 
     @Test
-    void mapsBookKeeperWalOnlyToStableHeadDurability() {
+    void mapsEveryBookKeeperProfileToItsExactCompletionPredicate() {
         F2L0RequestFactory bookKeeper = new F2L0RequestFactory(
                 StorageProfile.BOOKKEEPER_WAL_ONLY);
         assertThat(bookKeeper.createOptions().profile())
@@ -74,11 +75,36 @@ class F2L0RequestFactoryTest {
                         Duration.ofSeconds(7))
                 .durabilityLevel())
                 .isEqualTo(DurabilityLevel.WAL_DURABLE);
-        assertThatThrownBy(() -> new F2L0RequestFactory(
-                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new F2L0RequestFactory(
-                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(bookKeeper.appendOptions(
+                        StorageProfile.BOOKKEEPER_WAL_ONLY,
+                        Duration.ofSeconds(7))
+                .completionPolicy())
+                .isEqualTo(AppendCompletionPolicy.PROFILE_DEFAULT);
+
+        F2L0RequestFactory async = new F2L0RequestFactory(
+                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+        assertThat(async.appendOptions(
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                        Duration.ofSeconds(7))
+                .durabilityLevel())
+                .isEqualTo(DurabilityLevel.WAL_DURABLE);
+        assertThat(async.appendOptions(
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                        Duration.ofSeconds(7))
+                .completionPolicy())
+                .isEqualTo(AppendCompletionPolicy.PROFILE_DEFAULT);
+
+        F2L0RequestFactory sync = new F2L0RequestFactory(
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
+        assertThat(sync.appendOptions(
+                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                        Duration.ofSeconds(7))
+                .durabilityLevel())
+                .isEqualTo(DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED);
+        assertThat(sync.appendOptions(
+                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                        Duration.ofSeconds(7))
+                .completionPolicy())
+                .isEqualTo(AppendCompletionPolicy.REQUIRED_OBJECT_GENERATION);
     }
 }

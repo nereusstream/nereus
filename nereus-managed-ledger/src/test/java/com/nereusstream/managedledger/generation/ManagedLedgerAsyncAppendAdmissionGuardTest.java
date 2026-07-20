@@ -38,13 +38,21 @@ class ManagedLedgerAsyncAppendAdmissionGuardTest {
 
     @Test
     void asyncAdmissionActivatesThenMeasuresAndRevalidates() {
+        assertAsyncAdmissionActivatesThenMeasuresAndRevalidates(
+                StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
+        assertAsyncAdmissionActivatesThenMeasuresAndRevalidates(
+                StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+    }
+
+    private static void assertAsyncAdmissionActivatesThenMeasuresAndRevalidates(
+            StorageProfile profile) {
         ScheduledExecutorService scheduler =
                 Executors.newSingleThreadScheduledExecutor();
         try (FakeManagedLedgerProjectionMetadataStore projections =
                 new FakeManagedLedgerProjectionMetadataStore()) {
             var topic = createProjection(
                     projections,
-                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
+                    profile);
             AtomicInteger activationCalls = new AtomicInteger();
             AtomicInteger revalidationCalls = new AtomicInteger();
             AtomicReference<GenerationActivationSubject> subject =
@@ -119,8 +127,7 @@ class ManagedLedgerAsyncAppendAdmissionGuardTest {
             guard.admit(new AppendAdmissionRequest(
                             new com.nereusstream.api.StreamId(
                                     topic.streamId()),
-                            StorageProfile
-                                    .OBJECT_WAL_ASYNC_OBJECT,
+                            profile,
                             DurabilityLevel.WAL_DURABLE,
                             Duration.ofSeconds(2)))
                     .join();

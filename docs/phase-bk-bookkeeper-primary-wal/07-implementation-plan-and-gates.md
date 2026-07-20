@@ -10,7 +10,8 @@ BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20
 BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20
 BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20
-BK-M5 .. BK-M6                  not implemented
+BK-M5 Pulsar rollout            in progress (profile composition/admission checkpoint started 2026-07-20)
+BK-M6 aggregate final gate      not implemented
 all BK module-local profiles    executable against real Oxia + BookKeeper/Object; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
 BookKeeper ledger deletion      implemented and real-service tested / production safe default closed
@@ -685,6 +686,19 @@ NereusManagedLedgerFactory profile-specific exact plan/admission
 capability/activation core provider and status values
 explicit namespace admin provisioning/revoke command and readiness/activation binding
 ```
+
+Implementation checkpoint A (2026-07-20) is complete：
+
+- `StorageProfileResolverRegistry` dispatches exact canonical profiles to the Object or BookKeeper resolver and fails
+  closed when a profile is not installed；
+- ManagedLedger projection creation、durable topic records、open validation and Position projection accept all three
+  BookKeeper profiles while retaining the immutable durable profile as truth；
+- BK_ONLY and BK_ASYNC retain stable-head completion；BK_SYNC explicitly requests
+  `REQUIRED_OBJECT_GENERATION` in addition to generation-zero durability；
+- the existing F4 activation and lag gate is shared by both Object-WAL async and BookKeeper async profiles，with exact
+  L0/topic-profile matching；there is no BookKeeper-specific second lag truth；
+- production `DefaultNereusRuntimeProvider` composition、BookKeeper configuration/capability publication and Pulsar
+  first-create routing remain closed for checkpoints B onward。
 
 ### 8.2 Local Pulsar fork
 

@@ -60,6 +60,10 @@ public record TopicProjectionRecord(
                                 != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
                         && parsedProfile
                                 != StorageProfile.BOOKKEEPER_WAL_ONLY
+                        && parsedProfile
+                                != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                        && parsedProfile
+                                != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
                 || virtualLedgerId < ManagedLedgerProjectionNames.MIN_VIRTUAL_LEDGER_ID
                 || virtualLedgerId >= Long.MAX_VALUE
                 || positionMappingVersion != ManagedLedgerProjectionNames.POSITION_MAPPING_VERSION

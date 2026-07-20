@@ -14,6 +14,7 @@
 
 package com.nereusstream.managedledger.projection;
 
+import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.DeleteOptions;
@@ -63,6 +64,9 @@ public final class F2L0RequestFactory {
         return new AppendOptions(
                 Optional.empty(),
                 exact.defaultDurabilityLevel(),
+                exact == StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT
+                        ? AppendCompletionPolicy.REQUIRED_OBJECT_GENERATION
+                        : AppendCompletionPolicy.PROFILE_DEFAULT,
                 timeout,
                 true,
                 Map.of());
@@ -93,7 +97,11 @@ public final class F2L0RequestFactory {
                 && exact
                         != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
                 && exact
-                        != StorageProfile.BOOKKEEPER_WAL_ONLY) {
+                        != StorageProfile.BOOKKEEPER_WAL_ONLY
+                && exact
+                        != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                && exact
+                        != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
             throw new IllegalArgumentException(
                     "managed-ledger facade has no executable profile mapping");
         }

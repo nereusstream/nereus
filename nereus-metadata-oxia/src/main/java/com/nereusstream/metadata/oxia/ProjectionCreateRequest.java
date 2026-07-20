@@ -37,7 +37,11 @@ public record ProjectionCreateRequest(
                         && emptyStream.profile()
                                 != StorageProfile.OBJECT_WAL_ASYNC_OBJECT
                         && emptyStream.profile()
-                                != StorageProfile.BOOKKEEPER_WAL_ONLY)
+                                != StorageProfile.BOOKKEEPER_WAL_ONLY
+                        && emptyStream.profile()
+                                != StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT
+                        && emptyStream.profile()
+                                != StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT)
                 || emptyStream.state() != StreamState.ACTIVE
                 || emptyStream.committedEndOffset() != 0
                 || emptyStream.cumulativeSize() != 0
