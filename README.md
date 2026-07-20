@@ -104,10 +104,17 @@ on 2026-07-20。BK-M4 is also complete/final-gated：sync append resolves an ind
 generation zero visible while the producer waits，and recovers post-head `KNOWN_COMMITTED` failures without another
 BK range or offset。BK-M5 checkpoints A–D now compose the production reader/runtime from the broker-borrowed
 BookKeeper client，verify an explicitly provisioned `NBLR1` namespace and publish first-create capability only for the
-exact ACTIVE `NBKA1` activation binding；without that binding historical target reads remain available while new
+exact ACTIVE stable `NBKAP1` publication binding while retaining per-CAS `NBKA1` deletion identity；without that
+binding historical target reads remain available while new
 BookKeeper-profile creation fails closed before L0 IO。The first four real M5 configuration/capability/first-create/
-borrowed-client gates pass on 2026-07-20。BK-M5/BK-M6 remain open for deletion proof production and scheduling、the
+borrowed-client gates pass on 2026-07-20。Checkpoint E now installs the all-256-shard non-overlapping production
+retention scheduler only for explicit enabled/non-dry-run GC and reuses the existing reference/gate/manager protocol；
+physical delete remains unavailable until its exact activation proofs exist and match a fresh strongest-profile
+two-snapshot broker readiness fact plus reader-lease capacity。BK-M5/BK-M6 remain open for deletion
+proof production/activation、the
 concrete Pulsar admin route、loaded/unloaded/partitioned routing、two-broker ownership transfer and aggregate gates。
+The latest fresh checkpoint-E aggregate passed 91/91 outer tasks in 2m13s；its locked Pulsar capability and
+borrowed-client builds each passed 136/136 executable tasks。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the
@@ -163,7 +170,7 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Pulsar
-maintenance/source lock 已推进到 `master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`。M6 增加
+maintenance/source lock 已推进到 `master@3d103e6a0e1607dfd95245994cea87375ca62c5c`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace/partitioned admin route

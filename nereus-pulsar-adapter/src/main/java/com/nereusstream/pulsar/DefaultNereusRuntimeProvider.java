@@ -4,6 +4,7 @@ package com.nereusstream.pulsar;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.bookkeeper.BookKeeperLedgerRetentionService;
 import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
@@ -127,6 +128,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         ExecutorService workerExecutor = null;
         Phase4ObjectWalRuntime phase4Runtime = null;
         ProductionBookKeeperPrimaryWalRuntime bookKeeperRuntime = null;
+        BookKeeperLedgerRetentionService bookKeeperRetentionService = null;
         CompositeOwnedRuntime ownedWalAndMaterializationRuntime = null;
         StreamStorage streamStorage = null;
         CursorSnapshotStore cursorSnapshotStore = null;
@@ -256,6 +258,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                         new OxiaBookKeeperLedgerIdNamespaceReservationStore(
                                 configuration.oxia(),
                                 sharedOxiaRuntime),
+                        context.bookKeeperBrokerReadinessProvider(),
                         context.secretResolver(),
                         clock);
             }
@@ -293,6 +296,15 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     workerExecutor,
                     callbackExecutor,
                     clock);
+            if (bookKeeperRuntime != null) {
+                bookKeeperRetentionService = bookKeeperRuntime.createRetentionService(
+                                l0MetadataStore,
+                                phase4Runtime.committedGenerationRetirementAuthority(),
+                                phase4Runtime.materializationStreamTrigger(),
+                                scheduler,
+                                callbackExecutor)
+                        .orElse(null);
+            }
             var lagConfig = configuration.materialization();
             MaterializationLagGate lagGate =
                     new MaterializationLagGate(
@@ -436,8 +448,12 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                         context.bookKeeperPrimaryWalCapabilitySink().install(binding));
             }
             phase4Runtime.start();
+            if (bookKeeperRetentionService != null) {
+                bookKeeperRetentionService.start().join();
+            }
             physicalGcRuntime.start();
             ownedWalAndMaterializationRuntime = new CompositeOwnedRuntime(
+                    bookKeeperRetentionService,
                     phase4Runtime,
                     bookKeeperRuntime);
             return new NereusManagedLedgerRuntime(
@@ -482,6 +498,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorSnapshotStore,
                     cursorMetadataStore,
                     ownedWalAndMaterializationRuntime,
+                    bookKeeperRetentionService,
                     phase4Runtime,
                     bookKeeperRuntime,
                     generationProtocolActivationStore,

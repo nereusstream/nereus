@@ -6,7 +6,7 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 `bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-M2 then completed on 2026-07-20 through the 107/107-task
 `bookKeeperPrimaryWalM2Check --rerun-tasks` and the 212-task `bookKeeperPrimaryWalM2FinalCheck` aggregate against
-current local Pulsar `master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`。The final aggregate covers BK-11 through
+current local Pulsar `master@3d103e6a0e1607dfd95245994cea87375ca62c5c`。The final aggregate covers BK-11 through
 BK-56 at the milestone's declared D/O/B and focused local-Pulsar boundary：all codecs/keyspaces/shards、allocation and
 writer monotonicity、foreign and same-candidate authority、uncertain/late create、exact append/recovery/fencing/read、
 generation-zero repair、resource/deadline contracts、logical trim、complete protection inventory and dual-absence
@@ -143,7 +143,7 @@ Evidence levels：
 | BK-53 | M2 | B/O/C | delete response loss reloads metadata before same-intent retry | `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover` |
 | BK-54 | M2 | B/O/C | namespace drift or late-create hazard stops before delete；foreign/reappeared same-id ledger is quarantined across validate/delete cut | B/O checkpoint: `BookKeeperWalOnlyOxiaBkIntegrationTest.foreignLedgerRecreationAndNamespaceDriftStopBeforePhysicalDelete`; independent-process C remains open |
 | BK-55 | M2 | D/B/O/C | two separated absence observations and root CAS loss converge DELETED | D every-root-CAS applied-response-loss: `BookKeeperWalRetentionGateTest.everyGcRootCasConvergesAfterAppliedResponseLoss`；fresh-process B/O dual absence: `BookKeeperWalOnlyOxiaBkIntegrationTest.restartPreservesExactTargetsAndLostDeleteResponseConvergesAfterRollover`；independent-process transport-loss C remains open |
-| BK-56 | M2 | D/O | dry-run/default-off mode performs no root/provider mutation | `BookKeeperWalRetentionGateTest.disabledAndDryRunGcNeverMutateRootOrProvider` + `BookKeeperWalOnlyOxiaBkIntegrationTest.referenceAfterMarkUnmarksAndSafeGcModesNeverDelete` |
+| BK-56 | M2/M5 | D/O | dry-run/default-off mode performs no root/provider mutation；enabled production pass scans all shards、routes only the exact binding and isolates one-root failure | `BookKeeperWalRetentionGateTest.disabledAndDryRunGcNeverMutateRootOrProvider` + `BookKeeperWalOnlyOxiaBkIntegrationTest.referenceAfterMarkUnmarksAndSafeGcModesNeverDelete` + `BookKeeperLedgerRetentionScannerTest.scansEveryShardAndRoutesOnlyTheExactBinding` + `oneRootFailureIsAccountedAndDoesNotStopLaterRootsOrShards` + `disabledAndDryRunModesNeverEvenScanTheDurableInventory` |
 
 ## 7. Async materialization
 
@@ -180,7 +180,7 @@ Evidence levels：
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
 | BK-77 | M5 | D/P | borrowed client is closed zero times by Nereus and once by stock owner | `NereusBookKeeperBorrowedClientTest.closesOnlyAtStockOwner` |
-| BK-78 | M5 | D/P | exact namespace provision/terminal revoke plus missing/mismatched activation/config capability reject first-create before IO；runtime never auto-creates authority | implemented `BookKeeperProtocolAdministrationTest.namespaceProvisionIsIdempotentAndRevokeIsTerminalVersionedCas`、`NereusBookKeeperPrimaryWalCapabilityTest.firstCreateRequiresTwoStableAllBrokerSnapshotsWithTheExactBinding`；full broker revoke route remains M5 |
+| BK-78 | M5 | D/P | exact namespace provision/terminal revoke plus missing/mismatched activation/config capability reject first-create before IO；runtime never auto-creates authority；exact deletion readiness must equal the live strongest-profile broker set | implemented `BookKeeperProtocolAdministrationTest.namespaceProvisionIsIdempotentAndRevokeIsTerminalVersionedCas`、`activationKeepsPublicationIdentityStableButRebindsEveryDeletionRecord`、`NereusBookKeeperPrimaryWalCapabilityTest.firstCreateRequiresTwoStableAllBrokerSnapshotsWithTheExactBinding`、`deletionReadinessUsesTheStablePublicationBindingAndInvalidatesOnDrift`；full broker revoke route remains M5 |
 | BK-79 | M5 | P | first-create persists exact profile; reopen ignores changed default | `NereusBookKeeperProfileAdmissionTest.keepsImmutableProfile` |
 | BK-80 | M5 | P | explicit existing-profile mutation/online migration is rejected | `NereusBookKeeperProfileAdmissionTest.rejectsProfileMutation` |
 | BK-81 | M5 | P | loaded/unloaded/partitioned routes use durable profile/readiness | `NereusBookKeeperAdminRoutingTest.routesExactDurableProfile` |

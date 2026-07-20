@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-current_pulsar_lock="cd2a6e309ab8a6ef6983cacfc112ce513832b838"
+current_pulsar_lock="3d103e6a0e1607dfd95245994cea87375ca62c5c"
 phase4_acceptance_nereus_lock="fa533a934c33f5bcc4fda328c4df64cb96c6b485"
 
 require_literal() {

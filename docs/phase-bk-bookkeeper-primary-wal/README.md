@@ -58,8 +58,10 @@
 > BK range。BK-M3 implementation evidence and its BK-M2 predecessor are now final-gated。Abrupt-process/chaos evidence
 > remains assigned to BK-M6 rather than retroactively blocking the BK-M2 storage milestone；
 > production provider composition、durable activation-bound first-create admission and explicit namespace/activation
-> administration are now implemented by BK-M5 checkpoints B–D；broker admin routing、ownership routing、retention
-> scheduling/deletion activation and full rollout acceptance remain open。
+> administration are now implemented by BK-M5 checkpoints B–D；checkpoint E installs the production all-256-shard
+> non-overlapping retention service，routes one sealed-ledger hint through the shared F4 scanner，retires exact
+> trim/abandoned/healthy-Object references and only then invokes the existing activation-guarded whole-ledger protocol。
+> Deletion-proof production/activation、broker admin routing、ownership routing and full rollout acceptance remain open。
 
 > BK-M4 `BOOKKEEPER_WAL_SYNC_OBJECT` is complete/final-gated：`StorageExecutionPlan` resolves
 > `REQUIRED_OBJECT_GENERATION` independently from generation-zero durability；the append path publishes/protects gen0
@@ -80,14 +82,21 @@
 > owning it，composes Object and BK primary registries plus the shared F4 source/runtime，and verifies the provisioned
 > `NBLR1` Oxia namespace record before publishing an exact config/namespace capability binding。Checkpoint D adds the
 > explicit namespace provision/terminal revoke surface、deterministic `NBKA1` PREPARED/ACTIVE CAS authority and exact
-> activation-record binding。The Pulsar fork maps the typed BK/GC configuration with deletion disabled+dry-run by
+> activation-record deletion binding plus stable `NBKAP1` publication binding。The Pulsar fork maps the typed BK/GC
+> configuration with deletion disabled+dry-run by
 > default，protects five reserved lookup properties，and
 > permits BK first-create only after two stable all-persistent-broker snapshots match the exact binding；BK_SYNC
 > independently requires the required-Object-generation completion property。The profile check occurs before any L0
 > stream mutation；existing projections do not depend on this first-create rollout barrier。Without an ACTIVE record
 > carrying all three publication bits the runtime remains read-capable but advertises no BK first-create capability。
-> Retention scheduling/deletion proof activation、the concrete Pulsar admin route、loaded/unloaded ownership routing and
-> two-broker acceptance remain the next M5 checkpoints。
+> The production retention scheduler is now installed only for `gcEnabled && !gcDryRun` and remains unable to delete
+> without the exact durable activation proof and matching live strongest-profile broker readiness reloaded by every
+> gate/provider mutation。Broker-set/property drift invalidates readiness，and the stored activation epoch cannot become
+> its own correctness authority。Deletion-proof production and
+> activation、the concrete Pulsar admin route、loaded/unloaded ownership routing and two-broker acceptance remain the
+> next M5 checkpoints。
+> The latest `bookKeeperPrimaryWalM5RetentionCheck --rerun-tasks` passes 91/91 outer tasks in 2m13s on the current
+> source lock；its nested capability and borrowed-client builds each pass 136/136 executable tasks。
 
 > 2026-07-20：`bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks；
 > `bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate in 21m40s，including the final-gated
@@ -252,7 +261,7 @@ second commit protocol and is forbidden.
 
 The design is based only on this repository and the local Pulsar checkout at
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`。No internet or non-existent `M1-SNAPSHOT` artifact is an input.
-The target Pulsar source lock is `master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`。The Nereus pre-design audit
+The target Pulsar source lock is `master@3d103e6a0e1607dfd95245994cea87375ca62c5c`。The Nereus pre-design audit
 lock and BookKeeper client API surface are recorded in document 01；a changed lock requires re-audit, not silent
 compilation against a different checkout.
 
@@ -296,6 +305,12 @@ abandoned-reservation authority without choosing the trim offset，then performs
 exact rollout/namespace/provider
 validation、double-capture mark、reader drain、unmark-on-drift、provider delete response-loss recovery and delayed dual
 absence before `DELETED`；GC remains disabled/dry-run by default and local config is never deletion authority。
+BK-M5 checkpoint E now composes these previously module-local components into
+`BookKeeperLedgerRetentionScanner`/`BookKeeperLedgerRetentionService`。A pass starts from an empty continuation for
+all 256 root shards，filters the exact configuration/namespace binding，uses at most one shared F4 materialization
+trigger，retires owner-authorized references，and advances SEALED/MARKED/DELETING roots sequentially。The service owns
+neither scheduler nor BookKeeper client，coalesces overlapping hints and closes before the shared F4/BK runtimes；safe
+default and dry-run configurations do not even start a mutating inventory pass。
 Tests cover normal allocation、
 uncertain create、stale-session pre-IO rejection、ownership-transfer sealing、contiguous/reused ranges、partial write
 seal/no-tail-reuse、commit/gen0 protection owners、non-recovery reads、checksum failure、retirement-authority failure、

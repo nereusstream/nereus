@@ -187,7 +187,7 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
 The current local Pulsar integration/source lock is
-`master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`；it retains the BK-M1 historical evidence above and adds the focused
+`master@3d103e6a0e1607dfd95245994cea87375ca62c5c`；it retains the BK-M1 historical evidence above and adds the focused
 BK-M2 borrowed-client boundary plus BK-M5 configuration and profile-specific capability rollout。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
@@ -725,17 +725,38 @@ Implementation checkpoint D (2026-07-20) is complete at the focused-test level�
   `BookKeeperPrimaryWalAdministration` surface implement idempotent ACTIVE provision plus terminal versioned revoke，
   including exact applied-response-loss recovery；
 - deterministic `NBKA1` activation value/codec、binding-specific canonical key、materialized record digest、monotonic
-  transition coordinator and deletion verifier are implemented and tested；
+  transition coordinator and deletion verifier are implemented and tested；exact NBKA1 deletion identity is distinct
+  from the stable `NBKAP1` publication identity，so deletion CAS cannot self-invalidate broker readiness；
 - a replacement configuration/namespace uses a new activation key，so an old ACTIVE authority cannot authorize new
   physical targets and does not need an unsafe in-place reset；
 - production broker bootstrap keeps the BK reader/runtime installed when activation is absent/PREPARED but withholds
   all BK lookup properties；only an ACTIVE record with all three publication bits produces a capability binding；
-- the local Pulsar capability now reserves and compares `nereus.bookkeeper-primary-wal-activation` in the same stable
-  all-broker snapshot，and focused tests prove activation digest drift blocks BK_ONLY first-create。
+- the local Pulsar capability now reserves and compares the stable NBKAP1 value in
+  `nereus.bookkeeper-primary-wal-activation` in the same all-broker snapshot，and focused tests prove publication
+  digest drift blocks BK_ONLY first-create；
+- a separate `BookKeeperBrokerReadinessProvider` uses the strongest BK profile and a dedicated two-stable-snapshot
+  digest domain；the deletion verifier requires the stored epoch/SHA to equal that live fact and requires reader-lease
+  capacity for all persistent brokers plus one restart overlap. Broker-set/property drift clears readiness and an
+  arbitrary admin-supplied epoch cannot authorize deletion。
 
-Still open after checkpoint D：provider-scope/coverage proof producers and production ledger-retention scanner/deletion
-activation、the concrete Pulsar admin route around the implemented administration surface、loaded/unloaded/partitioned
-routes、two-broker owner transfer and the named aggregate M5 gates。
+Implementation checkpoint E (2026-07-20) installs the production retention path：
+
+- `BookKeeperLedgerRetentionScanner` starts every one of the 256 root shards from an empty continuation，filters the
+  exact config/namespace binding and processes roots sequentially with bounded operations；one root failure is counted
+  without stopping later roots/shards，while a page-scan failure retries the pass from a fresh continuation；
+- one pass requests at most one sealed-ledger materialization hint from the shared F4 service，then runs the existing
+  owner-specific protection retirement before whole-ledger eligibility；
+- SEALED roots enter the existing double-capture mark path，while MARKED/DELETING roots advance exactly one
+  drain/delete/absence step；exact activation、namespace and live BK broker readiness are still reloaded/revalidated by
+  every deletion mutation；
+- `BookKeeperLedgerRetentionService` is non-overlapping、coalesces hints、owns no injected executor/client and closes
+  before Phase 4 and BookKeeper runtimes；production creates it only for `gcEnabled && !gcDryRun`；
+- `bookKeeperPrimaryWalM5RetentionCheck` is a real gate over the scanner/service/runtime composition and the preceding
+  M5 rollout chain。
+
+Still open after checkpoint E：provider-scope/root/stream coverage proof producers and deletion activation、the
+concrete Pulsar admin route around the implemented administration surface、loaded/unloaded/partitioned routes、
+two-broker owner transfer and the named aggregate M5 gates。
 
 ### 8.2 Local Pulsar fork
 
@@ -760,22 +781,27 @@ bookKeeperPrimaryWalM5ConfigurationCheck
 bookKeeperPrimaryWalM5CapabilityCheck
 bookKeeperPrimaryWalM5FirstCreateCheck
 bookKeeperPrimaryWalM5BorrowedClientCheck
+bookKeeperPrimaryWalM5RetentionCheck
 bookKeeperPrimaryWalM5AdminRoutingCheck
 bookKeeperPrimaryWalM5TwoBrokerCheck
 bookKeeperPrimaryWalM5Check
 bookKeeperPrimaryWalM5FinalCheck             retry-disabled real two-broker acceptance
 ```
 
-Checkpoint D registers the first four names as real tasks：configuration runs the typed adapter tests plus source/doc
+Checkpoints D/E register the first five names as real tasks：configuration runs the typed adapter tests plus source/doc
 locks；capability publishes exact development artifacts and runs the locked Pulsar capability test with fresh broker
 Checkstyle；first-create adds the ManagedLedger pre-L0 admission regression；borrowed-client reruns the stock-client
-identity/close-ownership test. `bookKeeperPrimaryWalM5AdminRoutingCheck`、`bookKeeperPrimaryWalM5TwoBrokerCheck` and
+identity/close-ownership test；retention runs the all-shard scanner/service and production composition checks。
+`bookKeeperPrimaryWalM5AdminRoutingCheck`、`bookKeeperPrimaryWalM5TwoBrokerCheck` and
 the ordinary/final aggregates remain intentionally unregistered until their concrete routes/fixtures exist；they are
 not success-only placeholders。
 
-`bookKeeperPrimaryWalM5BorrowedClientCheck` passed on 2026-07-20，therefore executing the complete registered chain
-above. Its locked Pulsar capability/Checkstyle build passed 136 executable tasks and the outer Nereus chain passed 88
-tasks. This is checkpoint-D evidence only；it does not satisfy any of the intentionally unregistered M5 gates。
+The focused Pulsar capability/Checkstyle run on 2026-07-20 passed 136/136 fresh tasks at source lock
+`3d103e6a0e1607dfd95245994cea87375ca62c5c`，including stable publication identity、strongest-profile live deletion
+readiness and broker/property drift invalidation. This remains checkpoint-D/E evidence only and does not satisfy any
+of the intentionally unregistered M5 gates. The latest complete fresh
+`bookKeeperPrimaryWalM5RetentionCheck --rerun-tasks` then passed 91/91 outer tasks in 2m13s；its nested capability and
+borrowed-client builds each passed 136/136 executable tasks。
 
 ### 8.4 Mandatory review stop F
 

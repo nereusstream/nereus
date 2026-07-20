@@ -30,7 +30,7 @@ public record BookKeeperProtocolActivation(
                 value.ledgerIdNamespaceSha256());
     }
 
-    /** Exact NBKA1 binding advertised by every broker; any CAS creates a new identity. */
+    /** Exact NBKA1 record identity used by deletion proofs; any CAS creates a new identity. */
     public Checksum activationRecordSha256() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -40,6 +40,40 @@ public record BookKeeperProtocolActivation(
             digest.update(key);
             digest.update(ByteBuffer.allocate(Long.BYTES).putLong(metadataVersion).array());
             digest.update(HexFormat.of().parseHex(storedValueSha256.value()));
+            return new Checksum(
+                    ChecksumType.SHA256,
+                    HexFormat.of().formatHex(digest.digest()));
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException("SHA-256 is unavailable", failure);
+        }
+    }
+
+    /**
+     * Stable NBKAP1 publication identity advertised by brokers.
+     *
+     * <p>The identity intentionally excludes broker readiness, deletion proofs, metadata version,
+     * timestamps, and stored bytes. Those fields may advance after publication is enabled and are
+     * revalidated independently before every physical deletion.
+     */
+    public Checksum publicationActivationSha256() {
+        if (!supportsAllPublications()) {
+            throw new IllegalStateException(
+                    "all BookKeeper primary-WAL publications are not active");
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            frame(digest, "NBKAP1");
+            frame(digest, canonicalKey);
+            frame(digest, Integer.toString(value.protocolVersion()));
+            frame(digest, Integer.toString(value.schemaVersion()));
+            frame(digest, value.clusterAlias());
+            frame(digest, value.providerScopeSha256());
+            frame(digest, value.configurationBindingSha256());
+            frame(digest, value.ledgerIdNamespaceSha256());
+            frame(digest, Integer.toString(value.lifecycle().wireId()));
+            frame(digest, Boolean.toString(value.walOnlyPublicationEnabled()));
+            frame(digest, Boolean.toString(value.asyncPublicationEnabled()));
+            frame(digest, Boolean.toString(value.syncPublicationEnabled()));
             return new Checksum(
                     ChecksumType.SHA256,
                     HexFormat.of().formatHex(digest.digest()));
@@ -86,5 +120,11 @@ public record BookKeeperProtocolActivation(
             throw new IllegalArgumentException(name + " must use SHA256");
         }
         return exact;
+    }
+
+    private static void frame(MessageDigest digest, String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+        digest.update(bytes);
     }
 }

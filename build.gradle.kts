@@ -248,7 +248,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("cd2a6e309ab8a6ef6983cacfc112ce513832b838")
+    .orElse("3d103e6a0e1607dfd95245994cea87375ca62c5c")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -950,6 +950,15 @@ tasks.register<Exec>("bookKeeperPrimaryWalM5BorrowedClientCheck") {
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
     )
+}
+
+tasks.register("bookKeeperPrimaryWalM5RetentionCheck") {
+    group = "verification"
+    description = "Verify production all-shard BK reference retirement and activation-guarded ledger GC scheduling."
+    dependsOn("bookKeeperPrimaryWalM5BorrowedClientCheck")
+    dependsOn("checkBookKeeperModuleBoundaries")
+    dependsOn(":nereus-bookkeeper:check")
+    dependsOn(":nereus-pulsar-adapter:check")
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

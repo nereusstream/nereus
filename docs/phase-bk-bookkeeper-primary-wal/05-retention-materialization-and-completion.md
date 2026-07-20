@@ -174,6 +174,35 @@ so `SEALED -> MARKED -> DELETING` and later appends on a different ledger cannot
 still reloads the exact observed root version/digest and rechecks the writer predicate；the digest never hashes only
 counts。
 
+### 4.1 Production scanner and scheduler
+
+BK-M5 checkpoint E installs the existing retirement/gate/manager chain in the broker runtime instead of creating a
+second physical-deletion truth：
+
+```text
+fixed-delay non-overlapping pass
+  -> scan root shards 000..255 from empty continuations
+  -> filter exact configurationBindingSha256 + ledgerIdNamespaceSha256
+  -> at most one sealed-ledger hint to the shared F4 registered-stream scanner
+  -> owner-specific trim/abandoned/healthy-Object protection retirement
+  -> SEALED: complete gate capture then manager.mark
+  -> MARKED/DELETING: manager.converge one durable/provider step
+  -> schedule the next pass only after completion
+```
+
+`BookKeeperLedgerRetentionScanner` is sequential and stack-bounded by asynchronous page/root continuation；each store、
+authority and provider operation retains the configured operation deadline。`BookKeeperLedgerRetentionService`
+coalesces concurrent hints、never overlaps full passes and owns neither the shared scheduler nor the borrowed
+BookKeeper client。Production creates/starts it only when `gcEnabled && !gcDryRun`；disabled and dry-run modes perform
+no root scan or reference mutation。A materialization hint failure is accounting only and cannot become deletion
+authority；reference retirement and the whole-ledger gate still independently prove their facts。Missing、PREPARED or
+drifted deletion activation，or live broker epoch/property/capacity drift，causes the gate/provider mutation to fail
+closed and later fixed-delay passes may retry after authority is re-established. The exact NBKA1 record identity
+protects each candidate；the stable NBKAP1 publication property avoids a self-referential readiness digest when
+deletion activation itself advances。
+One root's authority/provider failure is counted and isolated so later roots and shards remain discoverable；a root-page
+scan failure fails that pass and is retried from an empty shard continuation on the next fixed-delay pass。
+
 ## 5. Whole-ledger behavior by profile
 
 ### 5.1 `BOOKKEEPER_WAL_ONLY`

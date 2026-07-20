@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@cd2a6e309ab8a6ef6983cacfc112ce513832b838
+master@3d103e6a0e1607dfd95245994cea87375ca62c5c
 BookKeeper 4.18.0
 ```
 
@@ -25,7 +25,11 @@ BookkeeperManagedLedgerStorageClass stock =
 org.apache.bookkeeper.client.api.BookKeeper borrowed =
     stock.getBookKeeperClient();
 
-NereusRuntimeContext context = new NereusRuntimeContext(..., Optional.of(borrowed));
+NereusRuntimeContext context = new NereusRuntimeContext(
+    ...,
+    Optional.of(borrowed),
+    capabilityCoordinator, // BookKeeperBrokerReadinessProvider
+    capabilityCoordinator::installBookKeeperPrimaryWalCapability);
 ```
 
 Exact type/wrapper names may follow module conventions. Required ownership：
@@ -35,6 +39,8 @@ Exact type/wrapper names may follow module conventions. Required ownership：
 - Nereus never calls `BookKeeper.close()` and never closes broker event loops；
 - partial Nereus runtime initialization closes only Nereus-owned resources, then the existing storage error path closes
   the stock factory once；
+- the same broker capability coordinator receives the stable publication binding before storage initialization and
+  provides live two-snapshot BK deletion readiness after registry attachment；it never transfers client ownership；
 - `NereusManagedLedgerStorageBookKeeperClientTest` freezes exact instance identity plus non-BK/null rejection；the
   normal/partial-close ownership counts remain required through the production BK runtime rollout。
 
@@ -72,9 +78,10 @@ is bounded.
 
 Implemented checkpoint B/C composition uses one `PrimaryWalRegistry.combine(Object, BK)` and passes the BK physical
 reference adapter into generation-zero publication plus the BK materialization-source provider into the existing F4
-runtime。No second planner、worker pool or lag authority is created。BK ledger retention scheduling and deletion
-activation are intentionally not started yet and remain fail closed under the safe GC defaults；checkpoint D adds the
-durable activation control plane and read-side admission without starting a deletion loop。
+runtime。No second planner、worker pool or lag authority is created。Checkpoint D adds the durable activation control
+plane and read-side admission；checkpoint E adds the one binding-filtered all-shard retention loop under explicit
+non-dry-run configuration。Deletion remains fail closed until the separate coverage/scope proof producers activate its
+durable authority。
 
 ## 4. Broker configuration
 
@@ -197,7 +204,7 @@ Add reserved lookup properties：
 nereus.bookkeeper-primary-wal-protocol = "1"
 nereus.bookkeeper-primary-wal-config   = <configuration binding SHA-256>
 nereus.bookkeeper-ledger-namespace     = <reserved-prefix + reservation binding SHA-256>
-nereus.bookkeeper-primary-wal-activation = <exact activation-record binding SHA-256>
+nereus.bookkeeper-primary-wal-activation = <stable NBKAP1 publication binding SHA-256>
 nereus.bookkeeper-required-object-generation = "1"
 ```
 
@@ -223,9 +230,10 @@ Registry changes invalidate cached readiness. A broker with missing/different co
 closed; existing topics may read only if the broker can satisfy their exact durable profile, otherwise ownership must
 not be assigned/opened there.
 
-Activation also requires `maxReaderLeasesPerLedger` to cover the stable persistent-broker set plus the configured
-rolling-restart overlap. A larger broker set invalidates readiness before those processes can become BK readers；the
-limit cannot be silently exceeded and later used as a truncated GC scan.
+Deletion activation also requires `maxReaderLeasesPerLedger` to cover the stable persistent-broker set plus one
+conservative rolling-restart overlap slot in V1. A larger broker set invalidates deletion readiness；the limit cannot
+be silently exceeded and later used as a truncated GC scan. This capacity check is performed again from live broker
+readiness on every physical-deletion gate, not trusted from operator-supplied activation bytes.
 
 ## 6. Durable activation and deletion gate
 
@@ -287,9 +295,21 @@ Likewise, an unknown create outcome is not repaired by an admin Boolean. Its fix
 allocation by design；BK-M0–M6 require fail-closed operational escalation or a new provider-scope/prefix deployment,
 and define no online hazard-clear operation.
 
-The implemented wire value is deterministic `NBKA1` and keeps Oxia `metadataVersion` outside the stored bytes. Its
-advertised binding is
-`SHA-256("NBKA1" || u32be(keyUtf8Length) || keyUtf8 || i64be(metadataVersion) || storedValueSha256Bytes)`。
+The implemented wire value is deterministic `NBKA1` and keeps Oxia `metadataVersion` outside the stored bytes. Two
+different identities are intentionally derived from it：
+
+- exact `activationRecordSha256 = SHA-256("NBKA1" || u32be(keyUtf8Length) || keyUtf8 ||
+  i64be(metadataVersion) || storedValueSha256Bytes)` binds every deletion candidate/proof；any activation CAS changes
+  it and invalidates in-flight destructive work；
+- stable `publicationActivationSha256 = SHA-256` over the `NBKAP1` domain、canonical key、protocol/schema、cluster、
+  provider/config/namespace and the ACTIVE all-three-publication facts. It excludes broker readiness、deletion bit/
+  proofs、timestamps、Oxia version and stored-value digest，and is the only activation identity advertised in broker
+  lookup properties.
+
+This split prevents deletion activation or readiness rollover from changing the property that is itself an input to
+broker readiness；`NBKA1` remains the destructive-operation identity and `NBKAP1` remains the first-create publication
+identity. They are not interchangeable.
+
 `PREPARED=1` and `ACTIVE=2` are explicit wire ids；PREPARED has zero publication bits/proofs，ACTIVE must at least
 publish WAL_ONLY，async requires WAL_ONLY，sync requires async，and deletion requires sync plus three individually
 nonzero proof digests. Readiness epoch cannot decrease or change digest at the same epoch；publication/deletion bits
@@ -299,8 +319,25 @@ cannot clear；deletion proofs become immutable once enabled。
 provide the explicit CAS control plane. Broker bootstrap performs an exact read only：it installs writer/reader support
 even when activation is absent or PREPARED so historical topics remain readable，but publishes no BK lookup capability
 until the same durable record is ACTIVE with WAL_ONLY、async and sync publication enabled. The broker property set
-includes the exact activation digest，so any old/missing/drifted activation fails the same stable two-snapshot
-first-create barrier. Ledger deletion is still not scheduled by this checkpoint。
+includes the stable `NBKAP1` digest，so any old/missing/drifted publication binding fails the same stable two-snapshot
+first-create barrier. Enabling publication after broker bootstrap requires the normal broker rollout/restart so every
+broker advertises the newly verified stable binding；the runtime never hot-patches lookup identity from an admin CAS。
+
+Physical deletion has a separate live barrier. `BookKeeperBrokerReadinessProvider` obtains two stable snapshots of the
+strongest `BOOKKEEPER_WAL_SYNC_OBJECT` property set under the
+`nereus-bookkeeper-primary-wal-broker-readiness-v1` digest domain. `DefaultBookKeeperProtocolActivationVerifier`
+reloads the exact NBKA1 record，derives its deletion proof，then requires the live epoch/SHA to equal the record and
+checks broker-count-plus-one against reader-lease capacity. Registry events、broker restart/set drift or property drift
+clear the cache and fail closed. Thus an admin caller cannot authorize deletion by storing an arbitrary readiness
+epoch/digest even if every other activation field is syntactically valid。
+
+Checkpoint E installs a production `BookKeeperLedgerRetentionService` only for explicit
+`gcEnabled && !gcDryRun`。It scans every root shard、retires exact owner-authorized protections and drives the existing
+mark/drain/delete/dual-absence manager one step per pass。This does not make local configuration deletion authority：
+the current activation record、namespace and live strongest-profile broker readiness are reloaded/revalidated by the
+gate and again before each provider-facing mutation。
+Until the three proof producers below install `ledgerDeletionEnabled=true`，the service can make safe logical reference
+progress but physical ledger deletion remains fail closed。
 
 ## 7. First-create and reopen admission
 

@@ -44,17 +44,20 @@ All shortened paths are below `src/main/java/com/nereusstream/...`。
 ### 2.2 Local Pulsar and BookKeeper
 
 Local checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@cd2a6e309ab8a6ef6983cacfc112ce513832b838`。The original BK-M0 audit input was
+`master@3d103e6a0e1607dfd95245994cea87375ca62c5c`。The original BK-M0 audit input was
 `eaf7b9a704890a9265c21f30d9f351e02d00c600`；the current commits add the audited borrowed-client handoff、typed BK
-configuration and exact profile first-create capability barrier without changing the pinned BookKeeper version。The checkout pins
+configuration、exact profile first-create capability barrier and independent live BK deletion-readiness snapshot
+without changing the pinned BookKeeper version。The checkout pins
 `org.apache.bookkeeper:*` to **4.18.0** in `gradle/libs.versions.toml`; it is local master, not an `M1-SNAPSHOT`.
 
 | Source | Git blob | Audit result |
 | --- | --- | --- |
 | `pulsar-broker/.../ManagedLedgerClientFactory.java` | `3dece00e89a7f0d2f72bff71eabe9d2dff519d37` | owns stock BK client lifecycle |
 | `pulsar-broker/.../storage/BookkeeperManagedLedgerStorageClass.java` | `1f05cde72a5b52c2e868abcd38a8e3cabf09a403` | exposes concrete borrowed `BookKeeper` client |
-| `pulsar-broker/.../storage/nereus/NereusManagedLedgerStorage.java` | `3b657b67458b397300d0fd4a759671d49da7363d` | fail-closes on a non-BK/null stock class，passes the exact borrowed client and installs the verified BK capability sink |
-| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapability.java` | `60526aae3bf17357413e0852d24c32368ff8b8fe` | freezes reserved config/namespace/activation/sync properties and one-snapshot profile requirements |
+| `pulsar-broker/.../storage/nereus/NereusManagedLedgerStorage.java` | `0e4b37de74eb49e65be9b2e1157194502b3a9393` | fail-closes on a non-BK/null stock class，passes the exact borrowed client plus live BK readiness provider and installs the verified BK capability sink |
+| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapability.java` | `3642d44786341be191c58c80abcb64700ac49882` | freezes reserved config/namespace/stable-publication/sync properties and profile requirements |
+| `pulsar-broker/.../storage/nereus/NereusBrokerCapabilityCoordinator.java` | `4dacbfd0dd1ffc83941d80fdd7d39ec259a16f67` | computes independent two-snapshot generation and BK deletion readiness domains and invalidates both on broker-registry drift |
+| `pulsar-broker/.../storage/nereus/NereusBookKeeperPrimaryWalCapabilityTest.java` | `127709efc15ee9bb076a76cde0d945b2700dcf90` | freezes stable publication binding、strongest-profile deletion readiness and broker/property drift rejection |
 | `pulsar-broker/.../nereus/NereusManagedLedgerStorageBookKeeperClientTest.java` | `c88aaf3848b20b00a2b6694260d0d1f293c098b6` | freezes same-instance handoff and both fail-closed cases |
 
 BookKeeper 4.18.0 public client API locally verified from the pinned jar：

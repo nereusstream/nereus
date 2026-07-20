@@ -52,7 +52,7 @@ class BookKeeperProtocolAdministrationTest {
     }
 
     @Test
-    void activationAdvancesPublicationsThenDeletionWithoutChangingIdentity() {
+    void activationKeepsPublicationIdentityStableButRebindsEveryDeletionRecord() {
         BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
         BookKeeperLedgerIdNamespaceReservation namespace =
                 BookKeeperProtocolActivationCodecV1Test.namespace(configuration);
@@ -99,11 +99,37 @@ class BookKeeperProtocolAdministrationTest {
                         "99".repeat(32),
                         allProfiles.metadataVersion()),
                 TIMEOUT).join();
+        assertThat(deletion.publicationActivationSha256())
+                .isEqualTo(allProfiles.publicationActivationSha256());
+        assertThat(deletion.activationRecordSha256())
+                .isNotEqualTo(allProfiles.activationRecordSha256());
         assertThat(deletion.deletionProof().activationRecordSha256())
                 .isEqualTo(deletion.activationRecordSha256());
         assertThat(new DefaultBookKeeperProtocolActivationVerifier(
-                        store, configuration, namespace).requireActive(TIMEOUT).join())
+                        store,
+                        configuration,
+                        namespace,
+                        readiness(8, "66".repeat(32), 2))
+                .requireActive(TIMEOUT).join())
                 .isEqualTo(deletion.deletionProof());
+        assertThatThrownBy(() -> new DefaultBookKeeperProtocolActivationVerifier(
+                        store,
+                        configuration,
+                        namespace,
+                        readiness(9, "aa".repeat(32), 2))
+                .requireActive(TIMEOUT).join())
+                .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class)
+                .hasRootCauseMessage("BookKeeper deletion activation broker readiness is stale");
+        assertThatThrownBy(() -> new DefaultBookKeeperProtocolActivationVerifier(
+                        store,
+                        configuration,
+                        namespace,
+                        readiness(8, "66".repeat(32), 64))
+                .requireActive(TIMEOUT).join())
+                .hasRootCauseInstanceOf(com.nereusstream.api.NereusException.class)
+                .hasRootCauseMessage(
+                        "BookKeeper reader lease capacity cannot cover the broker set "
+                                + "plus one rolling-restart overlap");
 
         assertThatThrownBy(() -> coordinator.activate(
                         configuration,
@@ -117,6 +143,27 @@ class BookKeeperProtocolAdministrationTest {
                         TIMEOUT).join())
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .hasRootCauseMessage("BookKeeper activation bits are monotonic");
+    }
+
+    private static BookKeeperBrokerReadinessProvider readiness(
+            long epoch, String sha256, int brokerCount) {
+        BookKeeperBrokerReadiness readiness = new BookKeeperBrokerReadiness(
+                epoch,
+                new Checksum(ChecksumType.SHA256, sha256),
+                brokerCount);
+        return new BookKeeperBrokerReadinessProvider() {
+            @Override
+            public CompletableFuture<BookKeeperBrokerReadiness>
+                    requireBookKeeperPrimaryWalReadiness() {
+                return CompletableFuture.completedFuture(readiness);
+            }
+
+            @Override
+            public Optional<BookKeeperBrokerReadiness>
+                    currentBookKeeperPrimaryWalReadiness() {
+                return Optional.of(readiness);
+            }
+        };
     }
 
     private static final class NamespaceStore

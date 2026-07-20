@@ -260,8 +260,13 @@ public final class BookKeeperLedgerRetentionManager {
     private CompletableFuture<Void> requireDeletionAuthority(
             BookKeeperVersionedValue<BookKeeperLedgerRootRecord> root,
             Duration timeout) {
-        var namespace = namespaceVerifier.requireActive(configuration, timeout);
-        var activation = activationVerifier.requireActive(timeout);
+        BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(min(
+                Objects.requireNonNull(timeout, "timeout"),
+                configuration.operationTimeout()));
+        var namespace = deadline.bound(
+                namespaceVerifier.requireActive(configuration, deadline.remaining()));
+        var activation = deadline.bound(
+                activationVerifier.requireActive(deadline.remaining()));
         return CompletableFuture.allOf(namespace, activation).thenApply(ignored -> {
             activation.join().requireExact(configuration, namespace.join());
             if (!namespace.join().ledgerIdNamespaceSha256().value()

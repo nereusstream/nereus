@@ -101,8 +101,10 @@ public final class BookKeeperWalRetentionGate {
         var readersFuture = scanReaders(expected.value().ledgerId(), deadline, Optional.empty(), new ArrayList<>());
         var slotFuture = deadline.bound(writerMetadata.getAllocationSlot(
                 cluster, expected.value().allocationSlot()));
-        var namespaceFuture = namespaceVerifier.requireActive(configuration, deadline.remaining());
-        var activationFuture = activationVerifier.requireActive(deadline.remaining());
+        var namespaceFuture = deadline.bound(
+                namespaceVerifier.requireActive(configuration, deadline.remaining()));
+        var activationFuture = deadline.bound(
+                activationVerifier.requireActive(deadline.remaining()));
         var providerFuture = deadline.bound(client.metadata(expected.value().ledgerId(), deadline));
         return CompletableFuture.allOf(
                         rootFuture,

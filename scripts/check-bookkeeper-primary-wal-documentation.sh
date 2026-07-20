@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="cd2a6e309ab8a6ef6983cacfc112ce513832b838"
+pulsar_source_lock="3d103e6a0e1607dfd95245994cea87375ca62c5c"
 
 require_literal() {
     local literal="$1"
@@ -85,6 +85,17 @@ require_literal 'BookKeeperProtocolActivationCoordinator' \
 require_literal 'NBKA1' \
     "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
     "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperProtocolActivationCodecV1.java"
+require_literal 'NBKAP1' \
+    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperProtocolActivation.java"
+require_literal 'BookKeeperBrokerReadinessProvider' \
+    "docs/phase-bk-bookkeeper-primary-wal/06-pulsar-runtime-rollout-and-compatibility.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperBrokerReadinessProvider.java"
+require_literal 'activationKeepsPublicationIdentityStableButRebindsEveryDeletionRecord' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperProtocolAdministrationTest.java"
+require_literal 'deletionReadinessUsesTheStablePublicationBindingAndInvalidatesOnDrift' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'namespaceProvisionIsIdempotentAndRevokeIsTerminalVersionedCas' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperProtocolAdministrationTest.java"
@@ -96,6 +107,15 @@ require_literal 'CommittedObjectGenerationAuthority' \
     "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
 require_literal 'BookKeeperSealedLedgerMaterializationTrigger' \
     "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md"
+require_literal 'BookKeeperLedgerRetentionService' \
+    "docs/phase-bk-bookkeeper-primary-wal/05-retention-materialization-and-completion.md" \
+    "nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperLedgerRetentionService.java"
+require_literal 'scansEveryShardAndRoutesOnlyTheExactBinding' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperLedgerRetentionScannerTest.java"
+require_literal 'oneRootFailureIsAccountedAndDoesNotStopLaterRootsOrShards' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperLedgerRetentionScannerTest.java"
 require_literal 'bookKeeperPrimaryWalM3SourceRetirementCheck' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3LiveReadCheck' \
@@ -256,6 +276,7 @@ require_literal 'bookKeeperPrimaryWalM5ConfigurationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5CapabilityCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5FirstCreateCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5BorrowedClientCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5RetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md" \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
