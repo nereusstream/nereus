@@ -6,11 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendBatch;
+import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.DurabilityLevel;
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StorageProfile;
@@ -20,6 +23,8 @@ import com.nereusstream.api.StreamName;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.core.wal.DurablePrimaryAppend;
 import com.nereusstream.core.wal.PrimaryAppendRequest;
+import com.nereusstream.core.append.RequiredObjectGenerationProof;
+import com.nereusstream.core.append.RequiredObjectGenerationRequest;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.testing.FakeOxiaMetadataStore;
 import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
@@ -37,6 +42,49 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 class BookKeeperAppendRecoveryCoordinatorTest {
+    @Test
+    void syncRestartWaitsForExactObjectProofWithoutAnotherBookKeeperWrite() {
+        try (Fixture fixture = new Fixture("sync-current-session")) {
+            AppendAttemptId attempt = new AppendAttemptId("attempt-sync-current");
+            DurablePrimaryAppend durable = fixture.persist(
+                    attempt, fixture.session, new byte[] {1}, new byte[] {2});
+            int writesBeforeRecovery = fixture.runtime.operations.writeCalls();
+            CompletableFuture<RequiredObjectGenerationRequest> observed = new CompletableFuture<>();
+            CompletableFuture<RequiredObjectGenerationProof> objectProof = new CompletableFuture<>();
+
+            CompletableFuture<com.nereusstream.api.AppendResult> recovery =
+                    fixture.coordinator(fixture.runtime.recovery).recoverAfterRestart(
+                            fixture.session,
+                            attempt,
+                            DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                            AppendCompletionPolicy.REQUIRED_OBJECT_GENERATION,
+                            (request, timeout) -> {
+                                observed.complete(request);
+                                return objectProof;
+                            },
+                            Duration.ofSeconds(10));
+
+            RequiredObjectGenerationRequest request = observed.join();
+            assertThat(request.streamId()).isEqualTo(fixture.stream);
+            assertThat(request.sourceRange()).isEqualTo(new com.nereusstream.api.OffsetRange(0, 2));
+            assertThat(recovery).isNotDone();
+            assertThat(fixture.runtime.operations.writeCalls()).isEqualTo(writesBeforeRecovery);
+            Checksum sha = new Checksum(ChecksumType.SHA256, "a".repeat(64));
+            objectProof.complete(new RequiredObjectGenerationProof(
+                    request,
+                    "sync-task",
+                    1,
+                    "/generation/sync/1",
+                    1,
+                    sha,
+                    sha));
+
+            assertThat(recovery.join().readTarget()).isEqualTo(durable.readTarget());
+            assertThat(fixture.runtime.operations.writeCalls()).isEqualTo(writesBeforeRecovery);
+            fixture.assertReservation(attempt, AppendReservationLifecycle.HEAD_COMMITTED);
+        }
+    }
+
     @Test
     void currentSessionCommitsTheSameDurableRangeWithoutAnotherBookKeeperWrite() {
         try (Fixture fixture = new Fixture("current-session")) {

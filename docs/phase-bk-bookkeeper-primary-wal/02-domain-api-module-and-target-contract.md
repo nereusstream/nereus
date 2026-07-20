@@ -465,5 +465,5 @@ BK-M1 is complete only when：
 3. generic stable append/protection/gen0 paths accept a typed BK target without casts；
 4. the new module compiles against the local Pulsar-pinned BookKeeper 4.18.0 API；
 5. BK codec/config/entry mapping/checksum/resource/deadline tests pass；
-6. runtime registration remains opt-in and every BookKeeper profile is still pre-IO rejected until BK-M2/M3/M4
-   activates its exact capability。
+6. runtime registration remains opt-in；BK-M2/M3/M4 activate the exact module-local profile capabilities，while the
+   production broker still rejects every BookKeeper profile before IO until BK-M5 rollout。

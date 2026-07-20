@@ -28,7 +28,7 @@ nereus/
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
-  docs/phase-bk-bookkeeper-primary-wal/  F1-BK code-level target and BK-M1/M2 implementation evidence
+  docs/phase-bk-bookkeeper-primary-wal/  F1-BK code-level target and BK-M1–M4 implementation evidence
   docs/automq-like-stream-storage/       async materialization profile design
 ```
 
@@ -55,8 +55,8 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 - ordinary and Docker-backed final acceptance gates。
 
 Only `OBJECT_WAL_SYNC_OBJECT` is currently installed as a Phase 1 production-broker execution target. The
-BookKeeper profiles remain rollout-disabled before BK-M5, although BK_ONLY is executable through the explicit
-module-local runtime and its current BK-M2 gates.
+BookKeeper profiles remain rollout-disabled before BK-M5, although all three are executable through the explicit
+module-local runtime and their BK-M2–M4 gates.
 
 The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 through BK-M2
 are complete/final-gated；BK-M2 has its keyspace/seven codecs、focused production/fake metadata stores、exact
@@ -99,9 +99,11 @@ fresh-runtime response-loss extension converges applied task create、source pro
 CAS without rewriting BK or allocating another task/generation。The focused lag/failure checkpoint now rejects a real
 backlog before BK mutation、re-admits after Object coverage and keeps all BK references/bytes on a physically missing
 COMMITTED Object while normal reads fall back to BK。`bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate
-on 2026-07-20；BK-M4 sync completion and later rollout gates remain open，so
-`BOOKKEEPER_WAL_ASYNC_OBJECT` is not yet production-enabled。
-the production broker provider still rejects all BookKeeper profiles before primary IO until its BK-M5 rollout gates pass。
+on 2026-07-20。BK-M4 is also complete/final-gated：sync append resolves an independent
+`REQUIRED_OBJECT_GENERATION` boundary，reuses the one F4 planner/task/worker/publication/read-proof path，keeps BK
+generation zero visible while the producer waits，and recovers post-head `KNOWN_COMMITTED` failures without another
+BK range or offset。BK-M5/BK-M6 remain open，so the production broker provider still rejects all BookKeeper profiles
+before primary IO until its BK-M5 rollout gates pass。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the

@@ -6,8 +6,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.nereusstream.api.AppendBatch;
+import com.nereusstream.api.AppendAttemptId;
+import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
+import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
@@ -60,6 +64,7 @@ import com.nereusstream.bookkeeper.DefaultBookKeeperClientOperations;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.AppendAdmissionGuard;
+import com.nereusstream.core.append.RequiredObjectGenerationRequest;
 import com.nereusstream.core.backpressure.MaterializationLagGate;
 import com.nereusstream.core.backpressure.MaterializationLagThresholds;
 import com.nereusstream.core.capability.GenerationActivationProof;
@@ -163,7 +168,7 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 /** BK-M3 end-to-end acceptance over real Oxia, BookKeeper, and S3-compatible Object storage. */
 @Testcontainers
 class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration TIMEOUT = Duration.ofSeconds(90);
     private static final DockerImageName OXIA_IMAGE = DockerImageName.parse("oxia/oxia:0.16.3");
     private static final DockerImageName LOCALSTACK_IMAGE =
             DockerImageName.parse("localstack/localstack:4.14.0");
@@ -177,6 +182,203 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
 
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void syncObjectAcknowledgesOnlyAfterExactObjectGenerationIsNormallyReadable() throws Exception {
+        Fixture fixture = Fixture.create();
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        fixture,
+                        bookKeeperCluster,
+                        "sync-success",
+                        temporaryDirectory.resolve("sync-success"))) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/sync-" + fixture.suffix),
+                            new StreamCreateOptions(
+                                    StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                                    Map.of()))
+                    .join()
+                    .streamId();
+            process.register(stream, 0, StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
+            process.phase4.start();
+
+            AppendResult result = process.appendSync(
+                    stream, List.of(new byte[] {9, 8, 7}, new byte[] {6, 5}));
+
+            assertThat(result.readTarget()).isInstanceOf(BookKeeperEntryRangeReadTarget.class);
+            assertThat(process.committedHigherGenerations(stream)).hasSize(1);
+            assertThat(process.phase4.committedGenerationRetirementAuthority()
+                            .proveRetirement(stream, result.range(), result.commitVersion())
+                            .join())
+                    .isPresent();
+            assertExactRead(
+                    process.storage,
+                    stream,
+                    List.of(new byte[] {9, 8, 7}, new byte[] {6, 5}),
+                    ObjectSliceReadTarget.class);
+            var durableTasks = process.generations.scanTasks(
+                            fixture.cluster, stream, Optional.empty(), 100)
+                    .join()
+                    .values();
+            assertThat(durableTasks).hasSize(1);
+            assertThat(durableTasks.getFirst().value().offsetStart())
+                    .isEqualTo(result.range().startOffset());
+            assertThat(durableTasks.getFirst().value().offsetEnd())
+                    .isEqualTo(result.range().endOffset());
+            assertThat(durableTasks.getFirst().value().sources()).hasSize(1);
+
+            var repeatedProof = process.phase4.requiredObjectGenerationCompletion()
+                    .complete(
+                            new RequiredObjectGenerationRequest(
+                                    stream, result.range(), result.commitVersion()),
+                            TIMEOUT)
+                    .join();
+            assertThat(repeatedProof.generation()).isGreaterThan(0);
+            assertThat(process.generations.scanTasks(
+                                    fixture.cluster, stream, Optional.empty(), 100)
+                            .join()
+                            .values())
+                    .hasSize(1);
+            assertThat(process.committedHigherGenerations(stream)).hasSize(1);
+        }
+    }
+
+    @Test
+    void syncObjectUnreadablePublicationIsKnownCommittedAndRecoveryReusesBkRange() throws Exception {
+        Fixture fixture = Fixture.create();
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        ResponseLossPlan loss = ResponseLossPlan.blockingCompactedReads();
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        fixture,
+                        bookKeeperCluster,
+                        "sync-recovery",
+                        temporaryDirectory.resolve("sync-recovery"),
+                        loss)) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/sync-recovery-" + fixture.suffix),
+                            new StreamCreateOptions(
+                                    StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                                    Map.of()))
+                    .join()
+                    .streamId();
+            process.register(stream, 0, StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
+            process.phase4.start();
+
+            Throwable appendFailure = catchThrowable(() -> process.appendSync(
+                    stream, List.of(new byte[] {4, 3, 2, 1})));
+            NereusException knownCommitted = requireNereus(appendFailure);
+            assertThat(knownCommitted.appendOutcome()).contains(AppendOutcome.KNOWN_COMMITTED);
+            AppendAttemptId attemptId = knownCommitted.appendAttemptId().orElseThrow();
+            assertThat(process.bookKeeperMetadata.scanReservations(
+                            fixture.cluster, stream, Optional.empty(), 100)
+                    .join()
+                    .values())
+                    .hasSize(1);
+            loss.allowCompactedReads();
+            fixture.clock.advance(process.materializationConfig.retryMinBackoff().plusMillis(1));
+
+            AppendResult recovered = process.storage.recoverAppend(
+                            stream, attemptId, new AppendRecoveryOptions(TIMEOUT))
+                    .join();
+
+            assertThat(recovered.range()).isEqualTo(new OffsetRange(0, 1));
+            assertThat(recovered.readTarget()).isInstanceOf(BookKeeperEntryRangeReadTarget.class);
+            assertThat(process.bookKeeperMetadata.scanReservations(
+                            fixture.cluster, stream, Optional.empty(), 100)
+                    .join()
+                    .values())
+                    .hasSize(1);
+            assertThat(process.committedHigherGenerations(stream)).hasSize(1);
+            assertExactRead(
+                    process.storage,
+                    stream,
+                    List.of(new byte[] {4, 3, 2, 1}),
+                    ObjectSliceReadTarget.class);
+        }
+    }
+
+    @Test
+    void syncObjectKeepsBkVisibleWhileProducerWaitsForObjectPublication() throws Exception {
+        Fixture fixture = Fixture.create();
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        ResponseLossPlan pause = ResponseLossPlan.pausingCompactedPut();
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        fixture,
+                        bookKeeperCluster,
+                        "sync-wait",
+                        temporaryDirectory.resolve("sync-wait"),
+                        pause)) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/sync-wait-" + fixture.suffix),
+                            new StreamCreateOptions(
+                                    StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                                    Map.of()))
+                    .join()
+                    .streamId();
+            process.register(stream, 0, StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
+            process.phase4.start();
+            List<byte[]> payloads = List.of(new byte[] {1, 3, 5});
+
+            CompletableFuture<AppendResult> pending = CompletableFuture.supplyAsync(
+                    () -> process.appendSync(stream, payloads));
+            pause.compactedPutObserved().join();
+
+            assertThat(process.l0.getCommittedEndOffset(fixture.cluster, stream)
+                            .join()
+                            .committedEndOffset())
+                    .isOne();
+            assertThat(pending).isNotDone();
+            assertExactRead(process.storage, stream, payloads, BookKeeperEntryRangeReadTarget.class);
+
+            pause.allowCompactedPut();
+            AppendResult acknowledged = pending.join();
+            assertThat(acknowledged.range()).isEqualTo(new OffsetRange(0, 1));
+            assertExactRead(process.storage, stream, payloads, ObjectSliceReadTarget.class);
+        }
+    }
+
+    @Test
+    void syncObjectSequentialAppendsKeepOneDeterministicTaskPerBkRange() throws Exception {
+        Fixture fixture = Fixture.create();
+        String metadataServiceUri = "oxia://" + OXIA.getServiceAddress();
+        try (BKCluster bookKeeperCluster = startBookKeeper(metadataServiceUri);
+                Process process = Process.open(
+                        fixture,
+                        bookKeeperCluster,
+                        "sync-sequential",
+                        temporaryDirectory.resolve("sync-sequential"))) {
+            StreamId stream = process.storage.createOrGetStream(
+                            new StreamName("persistent://tenant/namespace/sync-sequential-" + fixture.suffix),
+                            new StreamCreateOptions(
+                                    StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                                    Map.of()))
+                    .join()
+                    .streamId();
+            process.register(stream, 0, StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
+            process.phase4.start();
+
+            AppendResult first = process.appendSync(stream, List.of(new byte[] {1}));
+            AppendResult second = process.appendSync(stream, List.of(new byte[] {2}));
+
+            assertThat(first.range()).isEqualTo(new OffsetRange(0, 1));
+            assertThat(second.range()).isEqualTo(new OffsetRange(1, 2));
+            var durableTasks = process.generations.scanTasks(
+                            fixture.cluster, stream, Optional.empty(), 100)
+                    .join()
+                    .values();
+            assertThat(durableTasks).hasSize(2);
+            assertThat(durableTasks)
+                    .allSatisfy(task -> assertThat(task.value().sources()).hasSize(1));
+            assertThat(durableTasks)
+                    .extracting(task -> new OffsetRange(
+                            task.value().offsetStart(), task.value().offsetEnd()))
+                    .containsExactlyInAnyOrder(first.range(), second.range());
+            assertThat(process.committedHigherGenerations(stream)).hasSize(2);
+        }
+    }
 
     @Test
     void stableHeadFallsBackToBookKeeperThenFreshRuntimePublishesAndReadsExactObject() throws Exception {
@@ -247,7 +449,9 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                 fixture.clock.advance(restarted.materializationConfig.metadataAuditGrace().plusMillis(1));
                 var retirementScan = restarted.phase4.materializationService().scanNow().join();
                 assertThat(retirementScan.registrationsAdmitted()).isOne();
-                assertThat(retirementScan.workflowMetadataRetired()).isPositive();
+                await(TIMEOUT, () -> restarted.bookKeeperProtections(retiredLedgerId).stream()
+                        .noneMatch(value -> value.value().protectionType()
+                                == BookKeeperProtectionType.MATERIALIZATION_SOURCE));
                 assertThat(restarted.bookKeeperProtections(retiredLedgerId))
                         .extracting(value -> value.value().protectionType())
                         .doesNotContain(BookKeeperProtectionType.MATERIALIZATION_SOURCE);
@@ -930,6 +1134,7 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                     l0,
                     new MetadataAppendRecoverySearcher(fixture.cluster, l0),
                     appendAdmissionGuard,
+                    phase4.requiredObjectGenerationCompletion(),
                     phase4.readComponents(),
                     fixture.clock,
                     callbacks,
@@ -959,6 +1164,26 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
         }
 
         private AppendResult append(StreamId stream, List<byte[]> payloads) {
+            return append(
+                    stream,
+                    payloads,
+                    DurabilityLevel.WAL_DURABLE,
+                    AppendCompletionPolicy.PROFILE_DEFAULT);
+        }
+
+        private AppendResult appendSync(StreamId stream, List<byte[]> payloads) {
+            return append(
+                    stream,
+                    payloads,
+                    DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                    AppendCompletionPolicy.REQUIRED_OBJECT_GENERATION);
+        }
+
+        private AppendResult append(
+                StreamId stream,
+                List<byte[]> payloads,
+                DurabilityLevel durability,
+                AppendCompletionPolicy completionPolicy) {
             List<AppendEntry> entries = java.util.stream.IntStream.range(0, payloads.size())
                     .mapToObj(index -> new AppendEntry(payloads.get(index), 1, index + 1L, Map.of()))
                     .toList();
@@ -977,7 +1202,8 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                             batch,
                             new AppendOptions(
                                     Optional.empty(),
-                                    DurabilityLevel.WAL_DURABLE,
+                                    durability,
+                                    completionPolicy,
                                     TIMEOUT,
                                     true,
                                     Map.of()))
@@ -985,6 +1211,13 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
         }
 
         private void register(StreamId stream, long commitVersion) {
+            register(stream, commitVersion, StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+        }
+
+        private void register(
+                StreamId stream,
+                long commitVersion,
+                StorageProfile profile) {
             String projectionIdentity = ProjectionIdentity.encode(Optional.of(fixture.projection));
             long now = fixture.clock.millis();
             generations.createOrVerifyStreamRegistration(
@@ -994,7 +1227,7 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                                     stream.value(),
                                     projectionIdentity,
                                     sha256(projectionIdentity.getBytes(StandardCharsets.UTF_8)).value(),
-                                    StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT.name(),
+                                    profile.name(),
                                     now,
                                     commitVersion,
                                     now,
@@ -1189,6 +1422,17 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
         }
     }
 
+    private static NereusException requireNereus(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof java.util.concurrent.CompletionException
+                        || current instanceof java.util.concurrent.ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        assertThat(current).isInstanceOf(NereusException.class);
+        return (NereusException) current;
+    }
+
     private static BKCluster startBookKeeper(String metadataServiceUri) throws Exception {
         ServerConfiguration configuration = new ServerConfiguration();
         configuration.setProperty("dbStorage_writeCacheMaxSizeMb", 32);
@@ -1308,10 +1552,28 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
 
     private static final class ResponseLossPlan {
         private final EnumMap<ResponseCut, AtomicBoolean> pending;
+        private final AtomicBoolean blockCompactedReads;
+        private final CompletableFuture<Void> compactedPutGate;
+        private final CompletableFuture<Void> compactedPutObserved = new CompletableFuture<>();
 
         private ResponseLossPlan(EnumSet<ResponseCut> cuts) {
+            this(cuts, false);
+        }
+
+        private ResponseLossPlan(
+                EnumSet<ResponseCut> cuts,
+                boolean blockCompactedReads) {
+            this(cuts, blockCompactedReads, null);
+        }
+
+        private ResponseLossPlan(
+                EnumSet<ResponseCut> cuts,
+                boolean blockCompactedReads,
+                CompletableFuture<Void> compactedPutGate) {
             pending = new EnumMap<>(ResponseCut.class);
             cuts.forEach(cut -> pending.put(cut, new AtomicBoolean(true)));
+            this.blockCompactedReads = new AtomicBoolean(blockCompactedReads);
+            this.compactedPutGate = compactedPutGate;
         }
 
         private static ResponseLossPlan none() {
@@ -1322,6 +1584,31 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
             EnumSet<ResponseCut> values = EnumSet.noneOf(ResponseCut.class);
             values.addAll(Arrays.asList(cuts));
             return new ResponseLossPlan(values);
+        }
+
+        private static ResponseLossPlan blockingCompactedReads() {
+            return new ResponseLossPlan(EnumSet.noneOf(ResponseCut.class), true);
+        }
+
+        private static ResponseLossPlan pausingCompactedPut() {
+            return new ResponseLossPlan(
+                    EnumSet.noneOf(ResponseCut.class),
+                    false,
+                    new CompletableFuture<>());
+        }
+
+        private void allowCompactedReads() {
+            blockCompactedReads.set(false);
+        }
+
+        private CompletableFuture<Void> compactedPutObserved() {
+            return compactedPutObserved;
+        }
+
+        private void allowCompactedPut() {
+            if (compactedPutGate != null) {
+                compactedPutGate.complete(null);
+            }
         }
 
         private boolean inject(ResponseCut cut) {
@@ -1444,11 +1731,16 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                         ReplayableObjectUpload source,
                         PutObjectOptions options,
                         PutObjectAttemptGuard attemptGuard) {
+                    if (!key.value().contains("/compacted/v1/")) {
+                        return delegate.putObject(key, source, options, attemptGuard);
+                    }
+                    if (compactedPutGate != null) {
+                        compactedPutObserved.complete(null);
+                        return compactedPutGate.thenCompose(ignored ->
+                                delegate.putObject(key, source, options, attemptGuard));
+                    }
                     CompletableFuture<PutObjectResult> applied =
                             delegate.putObject(key, source, options, attemptGuard);
-                    if (!key.value().contains("/compacted/v1/")) {
-                        return applied;
-                    }
                     return applied.thenCompose(value -> inject(ResponseCut.OBJECT_PUT)
                             ? CompletableFuture.failedFuture(new NereusException(
                                     ErrorCode.OBJECT_UPLOAD_FAILED,
@@ -1463,6 +1755,13 @@ class BookKeeperAsyncObjectOxiaBkS3IntegrationTest {
                         long offset,
                         long length,
                         RangeReadOptions options) {
+                    if (key.value().contains("/compacted/v1/")
+                            && blockCompactedReads.get()) {
+                        return CompletableFuture.failedFuture(new NereusException(
+                                ErrorCode.OBJECT_READ_FAILED,
+                                true,
+                                "injected compacted-object read-admission failure"));
+                    }
                     return delegate.readRange(key, offset, length, options);
                 }
 

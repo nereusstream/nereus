@@ -81,10 +81,12 @@ require_literal "appendCompletionCoordinator.completeAfterStableCommit" \
 completion_calls="$(rg -F "appendCompletionCoordinator.completeAfterStableCommit" \
     "$repo_root/nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java" \
     | wc -l | tr -d ' ')"
-if [[ "$completion_calls" != "2" ]]; then
-    echo "ordinary append and append recovery must both enter the protected generation-zero completion boundary" >&2
+if [[ "$completion_calls" != "3" ]]; then
+    echo "ordinary append, protected recovery, and checkpoint recovery must all enter the plan-based completion boundary" >&2
     exit 1
 fi
+require_literal "attempt.executionPlan()" \
+    "nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java"
 
 require_literal "prepareStableAppend" \
     "nereus-metadata-oxia/src/main/java/com/nereusstream/metadata/oxia/OxiaMetadataStore.java"

@@ -5,6 +5,7 @@ import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.AppendAdmissionGuard;
+import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.Phase4ReadComponents;
 import com.nereusstream.core.recovery.AppendRecoverySearcher;
@@ -110,6 +111,35 @@ public final class BookKeeperWalRuntime implements AutoCloseable {
                 recoverySearcher,
                 profileResolver,
                 appendAdmissionGuard,
+                readComponents,
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    /** Composes BK generation zero with F4 reads and the exact BK-sync producer completion barrier. */
+    public DefaultStreamStorage newGenerationAwareStorage(
+            StreamStorageConfig configuration,
+            OxiaMetadataStore metadata,
+            AppendRecoverySearcher recoverySearcher,
+            AppendAdmissionGuard appendAdmissionGuard,
+            RequiredObjectGenerationCompletion requiredObjectGeneration,
+            Phase4ReadComponents readComponents,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
+        ensureOpen();
+        return new DefaultStreamStorage(
+                configuration,
+                metadata,
+                registry,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                Objects.requireNonNull(requiredObjectGeneration, "requiredObjectGeneration"),
                 readComponents,
                 clock,
                 callbackExecutor,

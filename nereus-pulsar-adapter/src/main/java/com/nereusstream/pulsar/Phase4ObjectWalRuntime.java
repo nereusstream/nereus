@@ -3,6 +3,7 @@ package com.nereusstream.pulsar;
 
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
 import com.nereusstream.core.backpressure.MaterializationLagSnapshotReader;
 import com.nereusstream.core.capability.GenerationProtocolActivationGuard;
 import com.nereusstream.core.physical.ObjectProtectionManager;
@@ -52,6 +53,7 @@ import com.nereusstream.materialization.MaterializationTaskRecovery;
 import com.nereusstream.materialization.MaterializationTaskStore;
 import com.nereusstream.materialization.NormalPathCommittedObjectGenerationReadVerifier;
 import com.nereusstream.materialization.RegisteredMaterializationStreamScanner;
+import com.nereusstream.materialization.RequiredObjectGenerationCoordinator;
 import com.nereusstream.materialization.TaskRecoveryScanner;
 import com.nereusstream.materialization.recovery.MetadataRecoveryCheckpointVerifier;
 import com.nereusstream.materialization.recovery.RecoveryCheckpointBuilder;
@@ -98,6 +100,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
     private final GenerationZeroRepairScanner generationZeroRepairScanner;
     private final MaterializationLagSnapshotReader lagSnapshotReader;
     private final CommittedGenerationRetirementAuthority committedGenerationRetirementAuthority;
+    private final RequiredObjectGenerationCompletion requiredObjectGenerationCompletion;
     private final RecoveryCheckpointCodecV1 checkpointCodec;
     private final MaterializationService materializationService;
     private final StagingFileManager stagingFiles;
@@ -348,7 +351,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactGenerations,
                         exactPhysical,
                         exactClock));
-        this.committedGenerationRetirementAuthority =
+        CommittedObjectGenerationAuthority committedObjectAuthority =
                 new CommittedObjectGenerationAuthority(
                         exactCluster,
                         exactGenerations,
@@ -362,6 +365,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactConfig.plannerPageSize(),
                         exactConfig.operationTimeout(),
                         exactScheduler);
+        this.committedGenerationRetirementAuthority = committedObjectAuthority;
         this.lagSnapshotReader =
                 new DefaultMaterializationLagSnapshotReader(
                         exactCluster,
@@ -473,6 +477,12 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                                 streamId,
                                 exactConfig.operationTimeout())
                         .thenApply(ignored -> null);
+        DefaultMaterializationPlanner planner =
+                new DefaultMaterializationPlanner(
+                        exactCluster,
+                        exactL0,
+                        exactGenerations,
+                        exactConfig.plannerPageSize());
         RegisteredMaterializationStreamScanner scanner =
                 new RegisteredMaterializationStreamScanner(
                         exactCluster,
@@ -480,11 +490,7 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactGenerations,
                         exactActivation,
                         sourceRepairer,
-                        new DefaultMaterializationPlanner(
-                                exactCluster,
-                                exactL0,
-                                exactGenerations,
-                                exactConfig.plannerPageSize()),
+                        planner,
                         tasks,
                         taskRecovery,
                         new TaskRecoveryScanner(
@@ -522,6 +528,20 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
                         exactScheduler,
                         exactCallbackExecutor,
                         MaterializationMetricsObserver.noop());
+        this.requiredObjectGenerationCompletion =
+                new RequiredObjectGenerationCoordinator(
+                        exactCluster,
+                        exactL0,
+                        exactGenerations,
+                        exactActivation,
+                        planner,
+                        tasks,
+                        taskRecovery,
+                        materializationService,
+                        committedObjectAuthority,
+                        exactConfig.committedPolicy(),
+                        exactConfig.taskScanPageSize(),
+                        exactScheduler);
     }
 
     public StorageProfileResolver profileResolver() {
@@ -564,6 +584,14 @@ public final class Phase4ObjectWalRuntime implements AutoCloseable {
 
     public MaterializationService materializationService() {
         return materializationService;
+    }
+
+    /** Exact BK-sync producer barrier backed by this runtime's one F4 task/worker/publication pipeline. */
+    public RequiredObjectGenerationCompletion requiredObjectGenerationCompletion() {
+        if (closed.get()) {
+            throw new IllegalStateException("Phase 4 materialization runtime is closed");
+        }
+        return requiredObjectGenerationCompletion;
     }
 
     /** Sealed-primary-WAL hint routed through the one registered-stream scanner, never a second planner. */

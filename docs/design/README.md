@@ -16,8 +16,9 @@ delete checkpoints and cold all-shard Oxia coverage；remaining matrix/aggregate
 属于 BK-M5。BK-M3 已实现 provider-neutral exact-source、durable source protection、async profile/runtime
 composition、shared lag、retirement-metadata authority、sealed shared-scanner and first real Oxia/BK/Object
 publication/read/retirement、physical ledger deletion and fresh-runtime task/source/output/publication response-loss
-plus real-load lag/physically-missing-Object fail-closed checkpoints；BK-M2/M3 aggregate final gates 和 BK-M4–M6
-未实现。
+plus real-load lag/physically-missing-Object fail-closed checkpoints；BK-M2/M3 aggregate final gates 已通过。
+BK-M4 也已实现独立 sync completion policy、exact single-source task reuse、normal-read proof 和
+`KNOWN_COMMITTED` restart recovery，并通过普通/final gate；BK-M5–M6 尚未实现。
 
 建议阅读顺序：
 
@@ -74,7 +75,8 @@ BK-M2 已实现 metadata/store、真实 allocator/writer/recovery/reader、fixed
 whole-ledger retention checkpoints；真实 multi-entry 和 first/middle/last partial-write sealing/no-tail-reuse 也已
 落证；crash-cut abandoned/durable reservation point recovery 的确定性层也已实现。真实 process/two-client cut、
 production profile admission 与 Pulsar rollout
-尚未完成，三个 BookKeeper profiles 继续在 IO 前拒绝。
+尚未完成，production broker 的三个 BookKeeper profiles 继续在 IO 前拒绝；module-local runtime 已执行并
+final-gate BK_ONLY、async Object 与 sync Object 三种 profile。
 Legacy L0 合同以
 `../phase-1-core-stream-storage/README.md` 为准；implemented L0 evolution
 以 `../phase-1.5-core-storage-foundation/README.md` 为准；F2 合同、里程碑和 gate 以

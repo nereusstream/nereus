@@ -70,7 +70,12 @@ val dockerBackedSubprojectTasks = mapOf(
         "f4OxiaIntegrationTest",
     ),
     ":nereus-object-store" to setOf("s3IntegrationTest"),
-    ":nereus-pulsar-adapter" to setOf("f4M4IntegrationTest", "bkM2IntegrationTest", "bkM3IntegrationTest"),
+    ":nereus-pulsar-adapter" to setOf(
+        "f4M4IntegrationTest",
+        "bkM2IntegrationTest",
+        "bkM3IntegrationTest",
+        "bkM4IntegrationTest",
+    ),
 )
 val dockerBackedPulsarExecTasks = setOf(
     "phase2PulsarFinalCheck",
@@ -842,6 +847,57 @@ tasks.register("bookKeeperPrimaryWalM3FinalCheck") {
     description = "Run BK-M3 ordinary and real Oxia/BookKeeper/Object acceptance over the final-gated BK_ONLY predecessor."
     dependsOn("bookKeeperPrimaryWalM3LagFailureCheck")
     dependsOn("bookKeeperPrimaryWalM2FinalCheck")
+}
+
+tasks.register("bookKeeperPrimaryWalM4CompletionPolicyCheck") {
+    group = "verification"
+    description = "Verify BK sync resolves REQUIRED_OBJECT_GENERATION and rejects weaker or uninstalled policies before IO."
+    dependsOn("bookKeeperPrimaryWalDocumentationCheck")
+    dependsOn(":nereus-core:test")
+    dependsOn(":nereus-bookkeeper:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM4TaskReuseCheck") {
+    group = "verification"
+    description = "Verify exact single-source task creation uses the shared F4 worker and cannot race the background planner."
+    dependsOn("bookKeeperPrimaryWalM4CompletionPolicyCheck")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-pulsar-adapter:bkM4IntegrationTest")
+}
+
+tasks.register("bookKeeperPrimaryWalM4KnownCommittedCheck") {
+    group = "verification"
+    description = "Verify post-head Object failure returns KNOWN_COMMITTED and recovery reuses one BK reservation and offset."
+    dependsOn("bookKeeperPrimaryWalM4TaskReuseCheck")
+    dependsOn(":nereus-bookkeeper:test")
+    dependsOn(":nereus-pulsar-adapter:bkM4IntegrationTest")
+}
+
+tasks.register("bookKeeperPrimaryWalM4ReadAdmissionCheck") {
+    group = "verification"
+    description = "Verify producer success waits for exact COMMITTED higher-generation normal-read admission."
+    dependsOn("bookKeeperPrimaryWalM4KnownCommittedCheck")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-pulsar-adapter:bkM4IntegrationTest")
+}
+
+tasks.register("bookKeeperPrimaryWalM4Check") {
+    group = "verification"
+    description = "Run BK sync completion policy, deterministic task, recovery, and read-admission gates."
+    dependsOn("bookKeeperPrimaryWalM4ReadAdmissionCheck")
+    dependsOn("checkBookKeeperModuleBoundaries")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-bookkeeper:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register("bookKeeperPrimaryWalM4FinalCheck") {
+    group = "verification"
+    description = "Run BK-M4 ordinary and real Oxia/BookKeeper/Object sync acceptance over final-gated BK async."
+    dependsOn("bookKeeperPrimaryWalM4Check")
+    dependsOn("bookKeeperPrimaryWalM3FinalCheck")
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

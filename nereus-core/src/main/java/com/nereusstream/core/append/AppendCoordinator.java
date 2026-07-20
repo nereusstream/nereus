@@ -197,6 +197,7 @@ public final class AppendCoordinator implements AutoCloseable {
                 recoverySearcher,
                 profileResolver,
                 appendAdmissionGuard,
+                null,
                 clock,
                 callbackExecutor);
     }
@@ -211,6 +212,33 @@ public final class AppendCoordinator implements AutoCloseable {
             AppendRecoverySearcher recoverySearcher,
             StorageProfileResolver profileResolver,
             AppendAdmissionGuard appendAdmissionGuard,
+            Clock clock,
+            Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                primaryWalRegistry,
+                sessionManager,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                null,
+                clock,
+                callbackExecutor);
+    }
+
+    /** Provider-neutral composition with an optional F4 higher-generation producer completion seam. */
+    public AppendCoordinator(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            PrimaryWalRegistry primaryWalRegistry,
+            AppendSessionManager sessionManager,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            RequiredObjectGenerationCompletion requiredObjectGeneration,
             Clock clock,
             Executor callbackExecutor) {
         this.config = Objects.requireNonNull(config, "config");
@@ -234,7 +262,8 @@ public final class AppendCoordinator implements AutoCloseable {
                 indexMaterializer,
                 physicalReferences,
                 config.appendRecoveryAttemptTimeout(),
-                callbackExecutor);
+                callbackExecutor,
+                requiredObjectGeneration);
         this.recoveryScheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "nereus-append-recovery");
             thread.setDaemon(true);
@@ -506,8 +535,13 @@ public final class AppendCoordinator implements AutoCloseable {
                         if (search.evidenceSource().orElseThrow()
                                 == AppendReplayEvidenceSource.RECOVERY_CHECKPOINT) {
                             attempt.markHeadKnownCommitted();
-                            yield CompletableFuture.completedFuture(
-                                    search.committedAppend().orElseThrow().committedAppend());
+                            var reachable = search.committedAppend().orElseThrow();
+                            yield attempt.executionPlan().ackBoundary()
+                                            == com.nereusstream.core.profile.AppendAckBoundary
+                                                    .REQUIRED_OBJECT_GENERATION
+                                    ? completeRecoveredReachable(attempt, reachable)
+                                    : CompletableFuture.completedFuture(
+                                            reachable.committedAppend());
                         }
                         yield recoverProtectedAppend(attempt);
                     }
@@ -550,11 +584,24 @@ public final class AppendCoordinator implements AutoCloseable {
                     return deadline.bound(
                             () -> appendCompletionCoordinator.completeAfterStableCommit(
                                     stable,
-                                    attempt.options().durabilityLevel(),
+                                    attempt.executionPlan(),
                                     deadline.remaining()),
                             AppendOutcome.KNOWN_COMMITTED,
                             "complete recovered append durability boundary");
                 });
+    }
+
+    private CompletableFuture<CommittedAppend> completeRecoveredReachable(
+            Attempt attempt,
+            com.nereusstream.metadata.oxia.ReachableCommittedAppend reachable) {
+        AppendDeadline deadline = new AppendDeadline(config.appendRecoveryAttemptTimeout());
+        return deadline.bound(
+                () -> appendCompletionCoordinator.completeAfterStableCommit(
+                        new StableAppendResult(reachable, false),
+                        attempt.executionPlan(),
+                        deadline.remaining()),
+                AppendOutcome.KNOWN_COMMITTED,
+                "complete checkpoint-recovered append success predicate");
     }
 
     private AppendResult finishRecovery(Attempt attempt, AppendResult result, Throwable error) {
@@ -924,7 +971,7 @@ public final class AppendCoordinator implements AutoCloseable {
                     return attempt.deadline().bound(
                             () -> appendCompletionCoordinator.completeAfterStableCommit(
                                     stable,
-                                    attempt.options().durabilityLevel(),
+                                    attempt.executionPlan(),
                                     attempt.deadline().remaining()),
                             AppendOutcome.KNOWN_COMMITTED,
                             "complete append durability boundary");
@@ -983,12 +1030,15 @@ public final class AppendCoordinator implements AutoCloseable {
         StorageExecutionPlan candidate = profileResolver.requireExecutable(
                 profile,
                 options.durabilityLevel(),
+                options.completionPolicy(),
                 primaryWalRegistry.hasAppender(
                         profile.usesObjectWal()
                                 ? com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE
                                 : com.nereusstream.api.target.ReadTargetType.BOOKKEEPER_ENTRY_RANGE),
                 profile.usesObjectWal() || primaryWalRegistry.hasReader(
-                        com.nereusstream.api.target.ReadTargetType.BOOKKEEPER_ENTRY_RANGE));
+                        com.nereusstream.api.target.ReadTargetType.BOOKKEEPER_ENTRY_RANGE),
+                appendCompletionCoordinator.supports(
+                        com.nereusstream.core.profile.AppendAckBoundary.REQUIRED_OBJECT_GENERATION));
         if (!primaryWalRegistry.hasAppender(candidate.primaryTargetType())) {
             throw new NereusException(
                     ErrorCode.UNSUPPORTED_STORAGE_PROFILE,

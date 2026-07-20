@@ -18,6 +18,8 @@ import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.core.profile.AppendAckBoundary;
+import com.nereusstream.core.profile.StorageExecutionPlan;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ReachableCommittedAppend;
@@ -46,6 +48,7 @@ public final class AsyncObjectWalAppendCoordinator {
     private final GenerationZeroPhysicalReferencePublisher physicalReferences;
     private final Duration backgroundRepairTimeout;
     private final Executor backgroundExecutor;
+    private final RequiredObjectGenerationCompletion requiredObjectGeneration;
     private final ConcurrentMap<String, CompletableFuture<CommittedAppend>> backgroundRepairs =
             new ConcurrentHashMap<>();
     private final AtomicBoolean backgroundAdmissionClosed = new AtomicBoolean();
@@ -56,11 +59,42 @@ public final class AsyncObjectWalAppendCoordinator {
             GenerationZeroPhysicalReferencePublisher physicalReferences,
             Duration backgroundRepairTimeout,
             Executor backgroundExecutor) {
+        this(materializer, physicalReferences, backgroundRepairTimeout, backgroundExecutor, null);
+    }
+
+    public AsyncObjectWalAppendCoordinator(
+            GenerationZeroIndexMaterializer materializer,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Duration backgroundRepairTimeout,
+            Executor backgroundExecutor,
+            RequiredObjectGenerationCompletion requiredObjectGeneration) {
         this.materializer = Objects.requireNonNull(materializer, "materializer");
         this.physicalReferences = Objects.requireNonNull(physicalReferences, "physicalReferences");
         this.backgroundRepairTimeout = requirePositive(
                 backgroundRepairTimeout, "backgroundRepairTimeout");
         this.backgroundExecutor = Objects.requireNonNull(backgroundExecutor, "backgroundExecutor");
+        this.requiredObjectGeneration = requiredObjectGeneration;
+    }
+
+    public boolean supports(AppendAckBoundary boundary) {
+        Objects.requireNonNull(boundary, "boundary");
+        return boundary != AppendAckBoundary.REQUIRED_OBJECT_GENERATION
+                || requiredObjectGeneration != null;
+    }
+
+    public CompletableFuture<CommittedAppend> completeAfterStableCommit(
+            StableAppendResult stable,
+            StorageExecutionPlan plan,
+            Duration timeout) {
+        StorageExecutionPlan exactPlan = Objects.requireNonNull(plan, "plan");
+        return switch (exactPlan.ackBoundary()) {
+            case STABLE_HEAD -> completeAfterStableCommit(
+                    stable, DurabilityLevel.WAL_DURABLE, timeout);
+            case GENERATION_ZERO_VISIBLE -> completeAfterStableCommit(
+                    stable, DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED, timeout);
+            case REQUIRED_OBJECT_GENERATION -> completeRequiredObjectGeneration(
+                    Objects.requireNonNull(stable, "stable"), timeout);
+        };
     }
 
     public CompletableFuture<CommittedAppend> completeAfterStableCommit(
@@ -84,6 +118,44 @@ public final class AsyncObjectWalAppendCoordinator {
                 false,
                 "unknown Object-WAL durability boundary",
                 AppendOutcome.KNOWN_COMMITTED));
+    }
+
+    private CompletableFuture<CommittedAppend> completeRequiredObjectGeneration(
+            StableAppendResult stable,
+            Duration timeout) {
+        if (requiredObjectGeneration == null) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                    false,
+                    "required Object-generation completion is not installed",
+                    AppendOutcome.KNOWN_COMMITTED));
+        }
+        Duration exactTimeout = requirePositive(timeout, "timeout");
+        ReachableCommittedAppend reachable = stable.reachableAppend();
+        CommittedAppend committed = reachable.committedAppend();
+        AppendDeadline deadline = new AppendDeadline(exactTimeout);
+        return repairAndProtect(reachable, deadline.remaining())
+                .thenCompose(ignored -> deadline.bound(
+                        () -> requiredObjectGeneration.complete(
+                                new RequiredObjectGenerationRequest(
+                                        committed.streamId(),
+                                        committed.range(),
+                                        committed.commitVersion()),
+                                deadline.remaining()),
+                        AppendOutcome.KNOWN_COMMITTED,
+                        "publish required Object generation"))
+                .thenApply(proof -> {
+                    RequiredObjectGenerationRequest expected = new RequiredObjectGenerationRequest(
+                            committed.streamId(), committed.range(), committed.commitVersion());
+                    if (!proof.request().equals(expected)) {
+                        throw new NereusException(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                false,
+                                "required Object-generation completion returned another append",
+                                AppendOutcome.KNOWN_COMMITTED);
+                    }
+                    return committed;
+                });
     }
 
     private void startBackgroundRepair(ReachableCommittedAppend append) {

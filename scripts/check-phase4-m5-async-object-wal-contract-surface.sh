@@ -68,7 +68,7 @@ require_literal "backgroundRepairTimeout" "$async_append"
 require_literal "backgroundRepairFailures.incrementAndGet()" "$async_append"
 
 require_literal "appendCompletionCoordinator.completeAfterStableCommit" "$append_coordinator"
-require_literal "attempt.options().durabilityLevel()" "$append_coordinator"
+require_literal "attempt.executionPlan()" "$append_coordinator"
 require_literal "new Phase15StorageProfileResolver()" "$append_coordinator"
 require_literal "StorageProfileResolver profileResolver" "$storage"
 require_literal "new Phase15StorageProfileResolver()" "$storage"

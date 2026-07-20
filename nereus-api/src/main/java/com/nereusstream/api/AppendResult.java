@@ -23,8 +23,10 @@ import java.util.Optional;
  * Result returned after a batch is durable and has a stable logical commit.
  *
  * <p>The requested {@link DurabilityLevel} determines whether generation-zero read-index confirmation is also
- * required. Phase 1 executes only {@link DurabilityLevel#WAL_DURABLE_AND_INDEX_COMMITTED} on the Object WAL
- * profile. Physical selection is represented by a protocol-neutral target.
+ * required. {@link AppendCompletionPolicy} independently selects the producer-completion predicate required by the
+ * stream's storage profile. In particular, a BookKeeper synchronous-Object append still returns its immutable
+ * generation-zero BookKeeper target here, even though producer completion also waits for an exact readable higher
+ * Object generation. Physical selection is represented by a protocol-neutral target.
  *
  * <p>{@code cumulativeSize} is the exact lifetime logical byte total at this commit. It is provider-neutral and is
  * neither physical storage size nor a post-trim estimate.

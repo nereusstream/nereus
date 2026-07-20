@@ -10,7 +10,8 @@
 > BK-M2 与 BK-M3 已完成并通过 ordinary/final aggregate；BK-M3 covers provider-neutral exact-source、durable source
 > protection、async profile/runtime composition、shared lag、retirement-metadata authority、sealed shared-scanner、
 > real Oxia/BK/Object publication/read/physical release、fresh-runtime response-loss and unreadable-output fail-closed
-> evidence。BK-M4–M6 尚未完成。Production broker 的三个 BookKeeper profile
+> evidence。BK-M4 sync completion 也已完成/final-gated，覆盖独立 required-Object policy、exact task reuse、
+> BK-visible producer wait、normal-read proof 和 post-head recovery；BK-M5–M6 尚未完成。Production broker 的三个 BookKeeper profile
 > 仍为 pre-IO rejected；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 
@@ -96,8 +97,8 @@ and Future 4 workers remain deferred beyond it。
 F4 随后 final-gated `OBJECT_WAL_ASYNC_OBJECT`；BookKeeper primary-WAL 的真实 writer/reader、exact ledger
 lifecycle/fencing、whole-ledger retention 和 BK_ONLY/async/sync profile 则由 F1 的后续扩展 F1-BK 定义。代码级
 合同见 `../phase-bk-bookkeeper-primary-wal/README.md`。当前独立 BookKeeper 4.18 adapter/config/namespace/NBKR1
-foundation、writer/reader/lifecycle 与 safe-default retention convergence 已存在，但 profile/Pulsar runtime 尚未
-注册，三个 BookKeeper profiles 仍在 primary IO 前拒绝。
+foundation、writer/reader/lifecycle、safe-default retention convergence 和三个 module-local profile execution
+plan 已存在，但 production Pulsar runtime 尚未注册，三个 BookKeeper profiles 仍在 broker primary IO 前拒绝。
 
 ## 4. Layer and module boundary
 

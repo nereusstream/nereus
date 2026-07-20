@@ -188,8 +188,9 @@ Profile barriers use two stable all-persistent-broker snapshots：
 | BK_ASYNC_OBJECT | BK_ONLY set + generation protocol |
 | BK_SYNC_OBJECT | BK_ONLY set + generation protocol + required-object completion capability |
 
-The sync completion capability may share BK protocol V1 only if every V1 broker implements it; during staged
-development it remains a separate reserved property until BK-M4 final-gates it.
+The sync completion capability may share BK protocol V1 only if every V1 broker implements it。BK-M4 has final-gated
+the module-local completion path；during staged production rollout it remains a separate reserved property until
+BK-M5 proves all-broker readiness and ownership routing。
 
 Readiness identity includes broker id、start timestamp、all required property key/values and configuration digest.
 Registry changes invalidate cached readiness. A broker with missing/different config keeps new BK profile admission

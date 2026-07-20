@@ -2,6 +2,7 @@
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.AppendAttemptId;
+import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
@@ -14,6 +15,8 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.BookKeeperEntryMapping;
 import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
+import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
+import com.nereusstream.core.append.RequiredObjectGenerationRequest;
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
 import com.nereusstream.metadata.oxia.BookKeeperWriterMetadataStore;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
@@ -60,9 +63,27 @@ public final class BookKeeperAppendRecoveryCoordinator {
             AppendAttemptId attemptId,
             DurabilityLevel durability,
             Duration timeout) {
+        return recoverAfterRestart(
+                currentSession,
+                attemptId,
+                durability,
+                AppendCompletionPolicy.PROFILE_DEFAULT,
+                null,
+                timeout);
+    }
+
+    /** Resumes BK-sync producer completion from the durable reservation without another provider append. */
+    public CompletableFuture<AppendResult> recoverAfterRestart(
+            AppendSession currentSession,
+            AppendAttemptId attemptId,
+            DurabilityLevel durability,
+            AppendCompletionPolicy completionPolicy,
+            RequiredObjectGenerationCompletion requiredObjectGeneration,
+            Duration timeout) {
         AppendSession session = Objects.requireNonNull(currentSession, "currentSession");
         AppendAttemptId attempt = Objects.requireNonNull(attemptId, "attemptId");
         Objects.requireNonNull(durability, "durability");
+        Objects.requireNonNull(completionPolicy, "completionPolicy");
         BookKeeperOperationDeadline deadline = new BookKeeperOperationDeadline(
                 Objects.requireNonNull(timeout, "timeout"));
         String reservationId = BookKeeperAppendReservationIds.forAttempt(session.streamId(), attempt);
@@ -73,6 +94,8 @@ public final class BookKeeperAppendRecoveryCoordinator {
                         session,
                         attempt,
                         durability,
+                        completionPolicy,
+                        requiredObjectGeneration,
                         optional.orElseThrow(() -> failure(
                                 ErrorCode.METADATA_CONDITION_FAILED,
                                 false,
@@ -85,6 +108,8 @@ public final class BookKeeperAppendRecoveryCoordinator {
             AppendSession session,
             AppendAttemptId attempt,
             DurabilityLevel durability,
+            AppendCompletionPolicy completionPolicy,
+            RequiredObjectGenerationCompletion requiredObjectGeneration,
             BookKeeperVersionedValue<BookKeeperAppendReservationRecord> reservation,
             BookKeeperOperationDeadline deadline) {
         BookKeeperAppendReservationRecord value = reservation.value();
@@ -111,7 +136,13 @@ public final class BookKeeperAppendRecoveryCoordinator {
                             AppendOutcome.KNOWN_NOT_COMMITTED,
                             "BookKeeper append did not reach durable range completion")));
         }
-        return resumeDurable(session, value, durability, deadline)
+        return resumeDurable(
+                        session,
+                        value,
+                        durability,
+                        completionPolicy,
+                        requiredObjectGeneration,
+                        deadline)
                 .thenCompose(committed -> sealSelectedWriter(
                                 session, deadline, "seal recovered BookKeeper writer after restart")
                         .thenApply(ignored -> toResult(committed)));
@@ -144,6 +175,8 @@ public final class BookKeeperAppendRecoveryCoordinator {
             AppendSession session,
             BookKeeperAppendReservationRecord reservation,
             DurabilityLevel durability,
+            AppendCompletionPolicy completionPolicy,
+            RequiredObjectGenerationCompletion requiredObjectGeneration,
             BookKeeperOperationDeadline deadline) {
         if (durability != DurabilityLevel.WAL_DURABLE
                 && durability != DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED) {
@@ -171,7 +204,49 @@ public final class BookKeeperAppendRecoveryCoordinator {
                         materialized,
                         (BookKeeperEntryRangeReadTarget) request.readTarget(),
                         deadline.remaining())))
-                .thenApply(protectedIndex -> protectedIndex.materialized().committedAppend());
+                .thenApply(protectedIndex -> protectedIndex.materialized().committedAppend())
+                .thenCompose(committed -> completeProducerPolicy(
+                        committed,
+                        completionPolicy,
+                        requiredObjectGeneration,
+                        deadline));
+    }
+
+    private CompletableFuture<CommittedAppend> completeProducerPolicy(
+            CommittedAppend committed,
+            AppendCompletionPolicy completionPolicy,
+            RequiredObjectGenerationCompletion requiredObjectGeneration,
+            BookKeeperOperationDeadline deadline) {
+        if (completionPolicy == AppendCompletionPolicy.PROFILE_DEFAULT
+                || completionPolicy == AppendCompletionPolicy.STABLE_HEAD
+                || completionPolicy == AppendCompletionPolicy.GENERATION_ZERO_INDEX) {
+            return CompletableFuture.completedFuture(committed);
+        }
+        if (requiredObjectGeneration == null) {
+            return CompletableFuture.failedFuture(failure(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                    false,
+                    AppendOutcome.KNOWN_COMMITTED,
+                    "required Object-generation restart completion is not installed"));
+        }
+        return deadline.bound(requiredObjectGeneration.complete(
+                        new RequiredObjectGenerationRequest(
+                                committed.streamId(),
+                                committed.range(),
+                                committed.commitVersion()),
+                        deadline.remaining()))
+                .thenApply(proof -> {
+                    RequiredObjectGenerationRequest expected = new RequiredObjectGenerationRequest(
+                            committed.streamId(), committed.range(), committed.commitVersion());
+                    if (!proof.request().equals(expected)) {
+                        throw failure(
+                                ErrorCode.METADATA_INVARIANT_VIOLATION,
+                                false,
+                                AppendOutcome.KNOWN_COMMITTED,
+                                "required Object-generation restart proof belongs to another append");
+                    }
+                    return committed;
+                });
     }
 
     private CompletableFuture<Void> sealSelectedWriter(

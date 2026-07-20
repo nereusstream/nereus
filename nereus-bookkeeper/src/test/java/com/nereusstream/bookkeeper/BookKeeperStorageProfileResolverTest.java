@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.DurabilityLevel;
+import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StorageProfile;
@@ -54,6 +55,44 @@ class BookKeeperStorageProfileResolverTest {
     }
 
     @Test
+    void admitsSyncObjectOnlyWithExactCompletionBarrierAndStrongPublicPolicy() {
+        var plan = resolver.requireExecutable(
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                AppendCompletionPolicy.PROFILE_DEFAULT,
+                true,
+                true,
+                true);
+        assertThat(plan.primaryTargetType()).isEqualTo(ReadTargetType.BOOKKEEPER_ENTRY_RANGE);
+        assertThat(plan.publicationMode()).isEqualTo(ObjectPublicationMode.SYNCHRONOUS);
+        assertThat(plan.ackBoundary()).isEqualTo(AppendAckBoundary.REQUIRED_OBJECT_GENERATION);
+
+        for (AppendCompletionPolicy weak : new AppendCompletionPolicy[] {
+                AppendCompletionPolicy.STABLE_HEAD,
+                AppendCompletionPolicy.GENERATION_ZERO_INDEX
+        }) {
+            assertThatThrownBy(() -> resolver.requireExecutable(
+                            StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                            DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                            weak,
+                            true,
+                            true,
+                            true))
+                    .isInstanceOfSatisfying(
+                            NereusException.class,
+                            failure -> assertThat(failure.code())
+                                    .isEqualTo(ErrorCode.UNSUPPORTED_DURABILITY_LEVEL));
+        }
+        assertUnsupported(() -> resolver.requireExecutable(
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                AppendCompletionPolicy.REQUIRED_OBJECT_GENERATION,
+                true,
+                true,
+                false));
+    }
+
+    @Test
     void rejectsObjectFutureBkProfilesAndMissingAdaptersBeforeIo() {
         for (StorageProfile profile : StorageProfile.values()) {
             if (profile.canonical() == StorageProfile.BOOKKEEPER_WAL_ONLY
@@ -80,6 +119,10 @@ class BookKeeperStorageProfileResolverTest {
                 type -> false));
         assertThat(resolver.requireReadable(
                 StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                type -> type == ReadTargetType.BOOKKEEPER_ENTRY_RANGE))
+                .isEqualTo(ReadTargetType.BOOKKEEPER_ENTRY_RANGE);
+        assertThat(resolver.requireReadable(
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
                 type -> type == ReadTargetType.BOOKKEEPER_ENTRY_RANGE))
                 .isEqualTo(ReadTargetType.BOOKKEEPER_ENTRY_RANGE);
     }

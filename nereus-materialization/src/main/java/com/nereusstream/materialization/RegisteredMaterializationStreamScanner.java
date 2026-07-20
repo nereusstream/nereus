@@ -247,6 +247,12 @@ public final class RegisteredMaterializationStreamScanner {
             CompletableFuture<Void> planned;
             if (trim >= head) {
                 planned = CompletableFuture.completedFuture(null);
+            } else if (StorageProfile.valueOf(snapshot.metadata().profile()).canonical()
+                    == StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT) {
+                // BK sync owns exact single-append task creation on the producer completion path. This scanner still
+                // recovers those durable tasks and reconciles checkpoint/retirement state, but must not race them with
+                // a wider trim..head plan.
+                planned = CompletableFuture.completedFuture(null);
             } else {
                 // The advisory checkpoint is intentionally not a skip boundary. Scanning authoritative trim..head
                 // keeps a stale/ahead checkpoint incapable of hiding a missing task or committed index.

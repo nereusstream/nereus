@@ -42,6 +42,7 @@ import com.nereusstream.core.append.AppendCoordinator;
 import com.nereusstream.core.append.AppendSessionManager;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.lifecycle.StreamLifecycleCoordinator;
 import com.nereusstream.core.profile.Phase15StorageProfileResolver;
@@ -148,6 +149,37 @@ public final class DefaultStreamStorage implements StreamStorage {
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver,
             TrimMetricsObserver trimMetricsObserver) {
+        this(
+                config,
+                metadataStore,
+                primaryWalRegistry,
+                physicalReferences,
+                recoverySearcher,
+                profileResolver,
+                appendAdmissionGuard,
+                null,
+                readComponents,
+                clock,
+                callbackExecutor,
+                readMetricsObserver,
+                trimMetricsObserver);
+    }
+
+    /** Generation-aware composition whose producer may wait for an exact higher Object generation. */
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            PrimaryWalRegistry primaryWalRegistry,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            AppendRecoverySearcher recoverySearcher,
+            StorageProfileResolver profileResolver,
+            AppendAdmissionGuard appendAdmissionGuard,
+            RequiredObjectGenerationCompletion requiredObjectGeneration,
+            Phase4ReadComponents readComponents,
+            Clock clock,
+            Executor callbackExecutor,
+            ReadMetricsObserver readMetricsObserver,
+            TrimMetricsObserver trimMetricsObserver) {
         this.config = Objects.requireNonNull(config, "config");
         this.metadataStore = Objects.requireNonNull(metadataStore, "metadataStore");
         PrimaryWalRegistry registry = Objects.requireNonNull(primaryWalRegistry, "primaryWalRegistry");
@@ -170,6 +202,7 @@ public final class DefaultStreamStorage implements StreamStorage {
                 recoverySearcher,
                 profileResolver,
                 appendAdmissionGuard,
+                requiredObjectGeneration,
                 clock,
                 callbackExecutor);
         ReadResolver readResolver = new ReadResolver(

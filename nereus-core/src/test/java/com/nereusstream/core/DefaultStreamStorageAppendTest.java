@@ -192,9 +192,11 @@ class DefaultStreamStorageAppendTest {
     }
 
     @Test
-    void unconfirmedCommitResponseIsMayHaveCommittedAndSuspendsLane() {
+    void unconfirmedCommitResponseIsMayHaveCommittedAndSuspendsLane() throws Exception {
         FakeOxiaMetadataStore fake = new FakeOxiaMetadataStore(CLOCK::millis);
-        OxiaMetadataStore delayedCommit = delayMethod(fake, "commitPreparedStableAppend");
+        CountDownLatch commitStarted = new CountDownLatch(1);
+        OxiaMetadataStore delayedCommit = delayMethod(
+                fake, "commitPreparedStableAppend", commitStarted::countDown);
         LocalFileObjectStore objectStore = new LocalFileObjectStore(root);
         try (TestContext context = context(
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
@@ -204,8 +206,10 @@ class DefaultStreamStorageAppendTest {
                 delayedCommit,
                 objectStore)) {
             StreamId streamId = context.createStream("uncertain").streamId();
-            NereusException failure = appendFailure(context.storage.append(
-                    streamId, batch("a"), appendOptions(Duration.ofMillis(40))));
+            CompletableFuture<AppendResult> append = context.storage.append(
+                    streamId, batch("a"), appendOptions(Duration.ofSeconds(1)));
+            assertThat(commitStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            NereusException failure = appendFailure(append);
             assertThat(failure.code()).isEqualTo(ErrorCode.TIMEOUT);
             assertThat(failure.appendOutcome()).contains(AppendOutcome.MAY_HAVE_COMMITTED);
 
@@ -678,12 +682,16 @@ class DefaultStreamStorageAppendTest {
                 .count();
     }
 
-    private static OxiaMetadataStore delayMethod(OxiaMetadataStore delegate, String methodName) {
+    private static OxiaMetadataStore delayMethod(
+            OxiaMetadataStore delegate,
+            String methodName,
+            Runnable onDelayedInvocation) {
         return (OxiaMetadataStore) Proxy.newProxyInstance(
                 OxiaMetadataStore.class.getClassLoader(),
                 new Class<?>[] {OxiaMetadataStore.class},
                 (proxy, method, args) -> {
                     if (method.getName().equals(methodName)) {
+                        onDelayedInvocation.run();
                         return new CompletableFuture<>();
                     }
                     try {

@@ -165,15 +165,15 @@ Evidence levels：
 
 | ID | Milestone | Level | Scenario | Target evidence |
 | --- | --- | --- | --- | --- |
-| BK-68 | M4 | D | BK sync maps to REQUIRED_OBJECT_GENERATION, not gen0 durability | `BookKeeperCompletionPolicyTest.separatesDurabilityAndCompletion` |
-| BK-69 | M4 | D | weaker explicit policy for sync stream is rejected before IO | `BookKeeperCompletionPolicyTest.rejectsWeakerSyncBoundary` |
-| BK-70 | M4 | B/O/S | no producer ack until exact COMMITTED Object generation reads successfully | `BookKeeperSyncObjectIT.acksOnlyAfterExactObjectRead` |
-| BK-71 | M4 | B/O/S | consumer reads committed BK bytes while producer waits for Object | `BookKeeperSyncObjectIT.keepsHeadAsVisibilityPoint` |
-| BK-72 | M4 | O/S/C | crash at task create/claim/upload/publish/read/ack reuses same task/range | `BookKeeperSyncObjectRecoveryIT.recoversEveryCompletionCut` |
-| BK-73 | M4 | D/O | already committed current-policy coverage satisfies request after exact proof | `RequiredObjectGenerationCoordinatorTest.reusesExistingCoverage` |
-| BK-74 | M4 | D/O | one-source task id is deterministic and races converge | `RequiredObjectGenerationCoordinatorTest.convergesTaskCreation` |
-| BK-75 | M4 | B/O/S | object failure/timeout after head exposes KNOWN_COMMITTED + same attempt | `BookKeeperSyncObjectIT.exposesKnownCommittedFailure` |
-| BK-76 | M4 | B/O/S | recoverAppend returns original stable result and never writes another BK range | `BookKeeperSyncObjectRecoveryIT.neverDuplicatesPrimaryAppend` |
+| BK-68 | M4 | D | BK sync maps to REQUIRED_OBJECT_GENERATION, not gen0 durability | `BookKeeperStorageProfileResolverTest.admitsSyncObjectOnlyWithExactCompletionBarrierAndStrongPublicPolicy` + `AsyncObjectWalAppendCoordinatorTest.requiredObjectPolicyWaitsForGenerationZeroThenExactHigherGenerationProof` |
+| BK-69 | M4 | D | weaker explicit policy or missing completion seam is rejected before IO | `BookKeeperStorageProfileResolverTest.admitsSyncObjectOnlyWithExactCompletionBarrierAndStrongPublicPolicy` |
+| BK-70 | M4 | B/O/S | no producer ack until exact COMMITTED Object generation reads successfully | `BookKeeperAsyncObjectOxiaBkS3IntegrationTest.syncObjectAcknowledgesOnlyAfterExactObjectGenerationIsNormallyReadable` |
+| BK-71 | M4 | B/O/S | consumer reads committed BK bytes while producer waits for Object | `BookKeeperAsyncObjectOxiaBkS3IntegrationTest.syncObjectKeepsBkVisibleWhileProducerWaitsForObjectPublication` |
+| BK-72 | M4 | D/O/S | task recovery、publication/read failure and producer retry reuse the same committed task/range；abrupt-process exhaustive cuts remain M6 | M3 final-gated task/source/output/publication response-loss matrix + `syncObjectUnreadablePublicationIsKnownCommittedAndRecoveryReusesBkRange` |
+| BK-73 | M4 | O/S | already committed current-policy coverage satisfies a repeated request after exact proof | second completion in `syncObjectAcknowledgesOnlyAfterExactObjectGenerationIsNormallyReadable` preserves one task/generation |
+| BK-74 | M4 | O/S | exact one-source task identity is deterministic for each sequential BK range and does not race the broad scanner | `BookKeeperAsyncObjectOxiaBkS3IntegrationTest.syncObjectSequentialAppendsKeepOneDeterministicTaskPerBkRange` |
+| BK-75 | M4 | B/O/S | Object normal-read failure after head exposes KNOWN_COMMITTED + same attempt | `BookKeeperAsyncObjectOxiaBkS3IntegrationTest.syncObjectUnreadablePublicationIsKnownCommittedAndRecoveryReusesBkRange` |
+| BK-76 | M4 | D/B/O/S | recoverAppend/restart returns original stable result and never writes another BK range | real `syncObjectUnreadablePublicationIsKnownCommittedAndRecoveryReusesBkRange` + deterministic `BookKeeperAppendRecoveryCoordinatorTest.syncRestartWaitsForExactObjectProofWithoutAnotherBookKeeperWrite` |
 
 ## 9. Pulsar rollout and aggregate compatibility
 

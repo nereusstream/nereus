@@ -129,4 +129,19 @@ tasks.register<Test>("bkM3IntegrationTest") {
     classpath = bkM3IntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
+    filter {
+        excludeTestsMatching("*.syncObject*")
+    }
+}
+
+tasks.register<Test>("bkM4IntegrationTest") {
+    group = "verification"
+    description = "Run BK sync completion, normal Object-read admission, and KNOWN_COMMITTED recovery cuts."
+    testClassesDirs = bkM3IntegrationTest.output.classesDirs
+    classpath = bkM3IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("*.syncObject*")
+    }
 }

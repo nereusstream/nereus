@@ -122,6 +122,8 @@ require_literal 'BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate' \
@@ -230,6 +232,18 @@ require_literal 'bookKeeperPrimaryWalM3PhysicalRetirementCheck' "build.gradle.kt
 require_literal 'bookKeeperPrimaryWalM3ResponseLossCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3LagFailureCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM3FinalCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM4CompletionPolicyCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM4TaskReuseCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM4KnownCommittedCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM4ReadAdmissionCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM4Check' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM4FinalCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md" \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md" \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM2StableRecoveryCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2IsolationRetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM2AllocationAuthorityCheck' "build.gradle.kts"
@@ -253,6 +267,21 @@ require_literal 'sharedRealLagAdmissionRejectsBeforeBookKeeperIoAndRecoversAfter
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
 require_literal 'missingCommittedObjectVetoesBookKeeperRetirementAndFallsBackToExactRange' \
     "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'syncObjectAcknowledgesOnlyAfterExactObjectGenerationIsNormallyReadable' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'syncObjectUnreadablePublicationIsKnownCommittedAndRecoveryReusesBkRange' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'syncObjectKeepsBkVisibleWhileProducerWaitsForObjectPublication' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'syncObjectSequentialAppendsKeepOneDeterministicTaskPerBkRange' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-pulsar-adapter/src/bkM3IntegrationTest/java/com/nereusstream/pulsar/BookKeeperAsyncObjectOxiaBkS3IntegrationTest.java"
+require_literal 'syncRestartWaitsForExactObjectProofWithoutAnotherBookKeeperWrite' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md" \
+    "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAppendRecoveryCoordinatorTest.java"
 require_literal 'void throttlesAndRejectsBeforeWal' \
     "nereus-bookkeeper/src/test/java/com/nereusstream/bookkeeper/BookKeeperAsyncAdmissionTest.java"
 require_literal 'readsBookKeeperSourceThroughRegisteredProviderWithoutObjectIdentityOrPin' \
@@ -310,9 +339,9 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM(2(?!(MetadataCheck|AllocatorCheck|AppendReadCheck|RecoveryFencingCheck|RuntimeCheck|RetentionCheck|PulsarCheck|RealServiceCheck|StableRecoveryCheck|IsolationRetentionCheck|AllocationAuthorityCheck|Check|FinalCheck))|3(?!(ExactSourceCheck|ProtectionCheck|AsyncProfileCheck|LagCheck|SourceRetirementCheck|LiveReadCheck|SealedLedgerCheck|RealServiceCheck|PhysicalRetirementCheck|ResponseLossCheck|LagFailureCheck|Check|FinalCheck))|[4-6])' \
+if rg --pcre2 -n 'tasks\.register[^\n]*bookKeeperPrimaryWalM[5-6]' \
     "$repo_root/build.gradle.kts"; then
-    echo "unfinished BK-M4-M6 tasks must not be registered before executable implementation exists" >&2
+    echo "unfinished BK-M5-M6 tasks must not be registered before executable implementation exists" >&2
     exit 1
 fi
 
@@ -333,9 +362,9 @@ for path in "${global_links[@]}"; do
 done
 
 if rg -n --glob '*.md' \
-    'BK-M[4-6][[:space:]:=-]+(complete|final-gated)|BookKeeper primary WAL[[:space:]:=-]+Implemented|Implemented[[:space:]:=-]+BookKeeper primary WAL' \
+    'BK-M[5-6][[:space:]:=-]+(complete|final-gated)|BookKeeper primary WAL[[:space:]:=-]+Implemented|Implemented[[:space:]:=-]+BookKeeper primary WAL' \
     "$design_dir"; then
-    echo "BookKeeper primary-WAL design incorrectly claims BK-M4-M6 or whole-delivery completion" >&2
+    echo "BookKeeper primary-WAL design incorrectly claims BK-M5-M6 or whole-delivery completion" >&2
     exit 1
 fi
 

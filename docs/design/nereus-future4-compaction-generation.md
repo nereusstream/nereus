@@ -410,6 +410,11 @@ OUTPUT_READY
 都不可见且不是 correctness owner。该 CAS 只是 physical-target switch，不是新的
 logical append commit。
 
+两个独立 publisher 在 COMMITTED 后收敛时，可能跨越 task-owned protection 到 committed-index-owned
+protection 的 CAS handoff。`DefaultGenerationCommitter` 对“按 index owner acquire / 按 task owner reload 并
+transfer”执行 bounded、deadline-aware 重试，并在每次成功前重证 exact committed index owner；未知 owner、
+owner key 或 root epoch 不会被重试解释为成功。
+
 ### 9.5 GC readiness
 
 ```text
@@ -644,7 +649,8 @@ sites 和 topic marker 尚未接入。
 M5 checkpoints AD–AF 已继续实现 protected Object-WAL `WAL_DURABLE` acknowledgement、generation-zero
 restart/read repair、per-stream pre-I/O activation/lag admission，以及把 resolver/read-repair/materialization
 lifecycle 与 exact Pulsar profile/config mapping 作为一个 production unit 装配。Sync 仍为默认，async 仍要求
-durable generation activation proof；BookKeeper primary path 未实现。
+durable generation activation proof。F1-BK 后续已通过 BK-M1–M4 实现/final-gate module-local BookKeeper
+primary paths；production broker composition 仍由 BK-M5 负责。
 
 M5 checkpoint AG 已实现 product-neutral exact retention policy/config/evidence values、source-index-verified
 stable candidate planning 和 ownership/activation/final-authority gated F3 logical-trim delegation。它不会直接
@@ -661,7 +667,8 @@ disabled 通过。`OBJECT_WAL_ASYNC_OBJECT` topic 经 cold registration、ordina
 owner stop/rejoin、durable size-backlog eviction、unload 后 ACTIVE-binding logical trim、trim 后 append/read 和再次
 ownership cut 保持一致；logical trim 只消费 publication/live-projection authority，物理 WAL bytes 不随 admin
 promise 删除。`StreamMetadataSnapshot` 的 versioned comparator 还明确排除 hydrated trim observation fields，
-同时保留 head version/commit/trim/policy truth。F4-M5 已 final-gated；BookKeeper primary-WAL profiles 仍为 reserved。
+同时保留 head version/commit/trim/policy truth。F4-M5 已 final-gated；BookKeeper primary-WAL profiles 已在
+F1-BK BK-M2–M4 module-local final-gated，但 production broker 中仍为 reserved，等待 BK-M5 rollout。
 
 Checkpoint AP 已实现 configured-scope guarded PUT/exact HEAD/complete LIST/exact DELETE canary 和 deterministic
 non-secret capability digest。Checkpoint AQ 已实现 product-owned bounded coordinator：冻结 exact

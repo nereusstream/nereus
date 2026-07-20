@@ -6,12 +6,17 @@ This is the read-only BK-M0 audit. It answers whether the final-gated Phase 1.5/
 BookKeeper primary WAL without changing their logical compatibility model, and identifies every Object-specific seam
 that must be generalized first.
 
-Audit conclusion：**the compatibility model is reusable, but the current runtime is not BookKeeper-ready**。The
+Audit-time conclusion：**the compatibility model is reusable, but the audited runtime was not BookKeeper-ready**。The
 tagged target、stable-head commit、generic recovery、F2 logical projection and F4 generation/task protocols point in
-the right direction. Production append/read/protection/accounting paths still contain Object-specific types and all
-three BookKeeper profiles must remain rejected before IO until BK-M1/M2 close them.
+the right direction. At that lock, production append/read/protection/accounting paths still contained Object-specific
+types and all three BookKeeper profiles had to remain rejected before IO until BK-M1/M2 closed them.
 
 No production code is changed by BK-M0.
+
+Current implementation note：BK-M1–M4 have since closed the provider-neutral seams、BK writer/reader/lifecycle/
+retention、async F4 source path and required-higher-generation producer barrier through the module-local runtime。
+The audit hashes below remain the frozen M0 input；BK-M5 production broker wiring and BK-M6 aggregate evidence remain
+open。
 
 ## 2. Source locks
 
@@ -289,7 +294,7 @@ signals, not a correctness proof of non-creation.
 | no exact BK read/write/fencing/restart recovery | bookkeeper BK-M1/M2 |
 | no whole-ledger retention proof | metadata/bookkeeper/materialization BK-M2 |
 | Object-only exact-source/protection/retirement branches | materialization/core BK-M3 |
-| no required-higher-generation producer barrier | core/materialization BK-M4 |
+| no required-higher-generation producer barrier | closed by core/materialization BK-M4；production activation remains BK-M5 |
 | no broker client/capability/profile admission wiring | pulsar-adapter + local Pulsar BK-M5 |
 | no real multi-broker/scale/chaos evidence | BK-M5/M6 |
 

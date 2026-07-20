@@ -9,8 +9,9 @@ BK-M0 design/source audit       documentation-gated on 2026-07-19
 BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20
 BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20
-BK-M4 .. BK-M6                  not implemented
-BK_ONLY module-local runtime    executable against real Oxia + BookKeeper; not registered by production broker
+BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20
+BK-M5 .. BK-M6                  not implemented
+all BK module-local profiles    executable against real Oxia + BookKeeper/Object; not registered by production broker
 all broker BookKeeper profiles  reserved / rejected before primary IO
 BookKeeper ledger deletion      implemented and real-service tested / production safe default closed
 ```
@@ -29,8 +30,11 @@ module/unit/Oxia/BookKeeper/predecessor dependencies。The focused `bookKeeperPr
 `bookKeeperPrimaryWalM3SealedLedgerCheck` / `bookKeeperPrimaryWalM3Check` /
 `bookKeeperPrimaryWalM3RealServiceCheck` / `bookKeeperPrimaryWalM3PhysicalRetirementCheck` /
 `bookKeeperPrimaryWalM3ResponseLossCheck` / `bookKeeperPrimaryWalM3LagFailureCheck` are also executable。The
-The M2 and M3 ordinary/final gates are complete over their real focused chains。M4–M6 names
-remain frozen target names and must not be registered as empty/success-only Gradle tasks. A milestone becomes complete
+`bookKeeperPrimaryWalM4CompletionPolicyCheck` / `bookKeeperPrimaryWalM4TaskReuseCheck` /
+`bookKeeperPrimaryWalM4KnownCommittedCheck` / `bookKeeperPrimaryWalM4ReadAdmissionCheck` /
+`bookKeeperPrimaryWalM4Check` / `bookKeeperPrimaryWalM4FinalCheck` are executable over the same real F4 chain。The
+M2、M3 and M4 ordinary/final gates are complete over their real focused chains。M5–M6 names remain frozen target names
+and must not be registered as empty/success-only Gradle tasks. A milestone becomes complete
 only when its ordinary and final tasks execute their documented tests against the exact source locks.
 
 ## 2. Delivery dependency graph
@@ -627,13 +631,44 @@ bookKeeperPrimaryWalM4TaskReuseCheck
 bookKeeperPrimaryWalM4KnownCommittedCheck
 bookKeeperPrimaryWalM4ReadAdmissionCheck
 bookKeeperPrimaryWalM4Check
-bookKeeperPrimaryWalM4FinalCheck             process cuts around every task/publication/read/ack stage
+bookKeeperPrimaryWalM4FinalCheck             real sync acceptance plus final-gated M3 and predecessor chain
 ```
 
 Final gate proves no ack before exact Object read, logical visibility from BK while producer waits, timeout after head
 returns KNOWN_COMMITTED, and recovery never allocates another BK range/offset.
 
-### 7.3 Mandatory review stop E
+### 7.3 Completed evidence (2026-07-20)
+
+Implemented：public `AppendCompletionPolicy`/internal `AppendAckBoundary` resolution without changing
+`DurabilityLevel`；core `RequiredObjectGenerationRequest` / `Proof` / `Completion` seams；generation-aware
+`DefaultStreamStorage` and `BookKeeperWalRuntime` composition；sync profile pre-IO capability/policy admission；shared
+F4 `RequiredObjectGenerationCoordinator`；exact current-policy coverage proof；one-source task create/reuse/recovery；
+ordinary worker/publication/checkpoint/read authority；and restart recovery without provider rewrite。
+
+`RegisteredMaterializationStreamScanner` deliberately does not create a competing broad plan for sync streams；it
+continues to recover durable tasks and reconcile checkpoint/retirement。The real Oxia + BookKeeper + S3-compatible
+fixture is shared with M3 for infrastructure economy but is selected by a separate `bkM4IntegrationTest` task。It
+proves：
+
+- exact normally readable higher generation before producer success and idempotent existing-coverage proof；
+- stable-head BK visibility while compacted Object PUT is paused；
+- one deterministic single-source task per sequential append range；
+- unreadable higher generation after head returns `KNOWN_COMMITTED`，then `recoverAppend` reuses one reservation、
+  range、offset and task with no additional BK write。
+
+The M4-specific completion cuts are closed here；the exhaustive abrupt-process/chaos matrix remains explicitly owned
+by BK-M6 and is not misreported as M4 evidence。
+
+`bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks。
+`bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate in 21m40s，including final-gated BK-M3
+and every Phase 1.5–4 predecessor chain。During the aggregate run，the existing F4 independent-publisher test exposed
+the task-owner -> committed-index protection handoff window；`DefaultGenerationCommitter` now retries the exact
+index-owner acquire/task-owner repair sequence under the original bounded recovery count and operation deadline。
+Unknown owner/root identity still fails closed。The BK-M3 real-service fixture also treats terminal source-protection
+cleanup as asynchronous service state：it waits within the same bounded deadline for the durable protection absence，
+instead of requiring the caller's `scanNow()` invocation to win against the background scanner。
+
+### 7.4 Mandatory review stop E
 
 Review public completion semantics and all error cuts. `WAL_DURABLE_AND_INDEX_COMMITTED` must still mean generation
 zero; no code/test may equate it with Object publication for BK.

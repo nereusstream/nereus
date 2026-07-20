@@ -673,12 +673,31 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
             ObjectProtectionOwner owner = indexOwner(committed);
             if (taskProtection.isPresent()) {
                 return deadline.bound(
-                        () -> protectionManager.transfer(
-                                taskProtection.orElseThrow(),
-                                owner,
-                                expected -> revalidateIndexOwner(committed, expected)),
-                        "transfer visible-generation protection to committed index");
+                                () -> protectionManager.transfer(
+                                        taskProtection.orElseThrow(),
+                                        owner,
+                                        expected -> revalidateIndexOwner(committed, expected)),
+                                "transfer visible-generation protection to committed index")
+                        .exceptionallyCompose(transferFailure -> reconcileIndexProtection(
+                                publishingTask, committed, 0, unwrap(transferFailure)));
             }
+            return reconcileIndexProtection(publishingTask, committed, 0, null);
+        }
+
+        private CompletableFuture<ObjectProtection> reconcileIndexProtection(
+                VersionedMaterializationTask publishingTask,
+                VersionedGenerationIndex committed,
+                int attempt,
+                Throwable previousFailure) {
+            if (attempt >= MAX_RECOVERY_ATTEMPTS) {
+                Throwable exhausted = recoveryExhaustedFailure(
+                        "reconcile visible-generation protection owner");
+                if (previousFailure != null) {
+                    exhausted.addSuppressed(previousFailure);
+                }
+                return CompletableFuture.failedFuture(exhausted);
+            }
+            ObjectProtectionOwner owner = indexOwner(committed);
             ObjectProtectionRequest indexRequest = protectionRequest(publishingTask, owner);
             return deadline.bound(
                             () -> protectionManager.acquire(
@@ -695,7 +714,11 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                             .exceptionallyCompose(repairFailure -> {
                                 Throwable exact = unwrap(indexAcquireFailure);
                                 exact.addSuppressed(unwrap(repairFailure));
-                                return CompletableFuture.failedFuture(exact);
+                                if (previousFailure != null) {
+                                    exact.addSuppressed(previousFailure);
+                                }
+                                return reconcileIndexProtection(
+                                        publishingTask, committed, attempt + 1, exact);
                             }));
         }
 
@@ -1125,10 +1148,14 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
         }
 
         private <T> CompletableFuture<T> recoveryExhausted(String stage) {
-            return CompletableFuture.failedFuture(new NereusException(
+            return CompletableFuture.failedFuture(recoveryExhaustedFailure(stage));
+        }
+
+        private NereusException recoveryExhaustedFailure(String stage) {
+            return new NereusException(
                     ErrorCode.METADATA_CONDITION_FAILED,
                     true,
-                    stage + " exhausted bounded CAS recovery"));
+                    stage + " exhausted bounded CAS recovery");
         }
     }
 

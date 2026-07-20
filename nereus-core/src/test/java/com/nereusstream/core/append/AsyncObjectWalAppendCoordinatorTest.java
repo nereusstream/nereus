@@ -28,9 +28,14 @@ import com.nereusstream.api.ObjectKeyHash;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.physical.PhysicalObjectIdentity;
+import com.nereusstream.core.profile.AppendAckBoundary;
+import com.nereusstream.core.profile.ObjectPublicationMode;
+import com.nereusstream.core.profile.StorageExecutionPlan;
+import com.nereusstream.api.target.ReadTargetType;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.MaterializedGenerationZero;
 import com.nereusstream.metadata.oxia.ObjectProtectionIdentity;
@@ -46,6 +51,7 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class AsyncObjectWalAppendCoordinatorTest {
@@ -116,6 +122,55 @@ class AsyncObjectWalAppendCoordinatorTest {
         assertThat(publisher.visibleCalls).hasValue(1);
         publisher.visible.complete(protectedGeneration(materialized));
         assertThat(strict).isCompletedWithValue(
+                stable.reachableAppend().committedAppend());
+    }
+
+    @Test
+    void requiredObjectPolicyWaitsForGenerationZeroThenExactHigherGenerationProof() {
+        StableAppendResult stable = stable();
+        MaterializedGenerationZero materialized =
+                materialized(stable.reachableAppend().committedAppend());
+        ControlledPublisher publisher = new ControlledPublisher();
+        AtomicReference<RequiredObjectGenerationRequest> observed = new AtomicReference<>();
+        CompletableFuture<RequiredObjectGenerationProof> required = new CompletableFuture<>();
+        AsyncObjectWalAppendCoordinator coordinator = new AsyncObjectWalAppendCoordinator(
+                append -> CompletableFuture.completedFuture(materialized),
+                publisher,
+                TIMEOUT,
+                Runnable::run,
+                (request, timeout) -> {
+                    observed.set(request);
+                    return required;
+                });
+        StorageExecutionPlan plan = new StorageExecutionPlan(
+                StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                ReadTargetType.BOOKKEEPER_ENTRY_RANGE,
+                ObjectPublicationMode.SYNCHRONOUS,
+                DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
+                AppendAckBoundary.REQUIRED_OBJECT_GENERATION);
+
+        CompletableFuture<CommittedAppend> acknowledged =
+                coordinator.completeAfterStableCommit(stable, plan, TIMEOUT);
+
+        assertThat(acknowledged).isNotDone();
+        assertThat(observed).hasValue(null);
+        publisher.visible.complete(protectedGeneration(materialized));
+        RequiredObjectGenerationRequest request = new RequiredObjectGenerationRequest(
+                stable.reachableAppend().committedAppend().streamId(),
+                stable.reachableAppend().committedAppend().range(),
+                stable.reachableAppend().committedAppend().commitVersion());
+        assertThat(observed).hasValue(request);
+        assertThat(acknowledged).isNotDone();
+
+        required.complete(new RequiredObjectGenerationProof(
+                request,
+                "task-1",
+                1,
+                "/generation/1",
+                3,
+                sha(),
+                sha()));
+        assertThat(acknowledged).isCompletedWithValue(
                 stable.reachableAppend().committedAppend());
     }
 

@@ -196,6 +196,10 @@ while publication is absent/failed/uncertain.
 The same physical release rules apply. Producer sync completion does not itself delete the BK source；normal source
 retirement/ledger collector runs independently and respects reader/cursor/recovery references.
 
+BK-M4 implements this boundary with `RequiredObjectGenerationCompletion` and the existing F4 retirement authority；
+completion proof is never a deletion proof。The BK source remains governed by the same mandatory references and
+whole-ledger gate as the async profile。
+
 ## 6. Reusing F4 materialization
 
 ### 6.1 Existing identity is sufficient
@@ -377,26 +381,25 @@ After head/gen0, construct：
 record RequiredObjectGenerationRequest(
     StreamId streamId,
     OffsetRange range,
-    long sourceCommitVersion,
-    Checksum sourceIndexSha256,
-    Checksum sourceTargetIdentitySha256,
-    Checksum materializationPolicySha256,
-    Duration remainingTimeout) { }
+    long sourceCommitVersion) { }
 ```
 
-Identity is source/policy based. It does **not** reserve a generation number; the existing generation allocator owns
-that sequence.
+The request names the immutable committed append only。The coordinator reloads generation-zero index/target identity
+and current materialization policy from durable authority；callers cannot inject those facts。It does **not** reserve a
+generation number；the existing generation allocator owns that sequence。
 
 ### 8.3 Completion sequence
 
 ```text
-reload exact SourceGeneration(gen0 BK)
 search for already-COMMITTED current-policy Object coverage
 if absent:
+  reload/admit exact sync stream registration + generation activation
+  reload exact SourceGeneration(gen0 BK)
   MaterializationTask.create(exact one source, existing lossless policy)
   create/reconcile task and BK source protection
   dispatch through shared bounded F4 worker
 wait/recover task under append's monotonic remaining deadline
+run the shared scanner for checkpoint/recovery/retirement convergence
 reload exact COMMITTED generation produced by task or equivalent exact coverage
 require Object target + ACTIVE root + visible protection
 resolve/pin that exact generation
@@ -419,14 +422,13 @@ record RequiredObjectGenerationProof(
     String generationIndexKey,
     long generationIndexMetadataVersion,
     Checksum generationIndexSha256,
-    Checksum objectTargetIdentitySha256,
-    long objectRootMetadataVersion,
-    Checksum objectRootSha256,
-    long verifiedAtMillis) { }
+    Checksum objectTargetIdentitySha256) { }
 ```
 
 The proof is a checked process value returned to the coordinator, not a second durable commit. Recovery reconstructs
-it from source/task/generation/root facts.
+it from source/task/generation/root facts。Object-root、visible-protection、pin/read and covering-checkpoint facts are
+validated inside `CommittedObjectGenerationAuthority` and are intentionally not copied into another durable/public
+truth。
 
 ### 8.5 Failure after head
 
@@ -442,6 +444,15 @@ If Object upload/publication/read verification times out or fails after head：
 
 Current `AppendAttemptId` is process-scoped and is not stored in `StreamCommitTargetRecord`. This design does not claim
 cross-process producer dedup/exactly-once for a completely new attempt; that remains an advanced Pulsar/F8 concern.
+
+### 8.6 Implemented ownership split
+
+BK-M4 uses one task-creation owner for new sync appends：`RequiredObjectGenerationCoordinator` creates or reloads the
+exact single-source task。`RegisteredMaterializationStreamScanner` still recovers durable tasks、reconciles checkpoints
+and performs retirement，but skips broad `trim..head` planning for `BOOKKEEPER_WAL_SYNC_OBJECT`。This prevents a
+concurrent wider task from becoming a second producer-completion identity while retaining the shared F4 worker and
+recovery path。A repeated completion first proves existing current-policy coverage and returns without creating a
+second task or generation。
 
 ## 9. Read selection and source release
 
