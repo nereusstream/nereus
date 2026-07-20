@@ -42,24 +42,25 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@41d1cddb9d29451884002b96de2bc52367cbb8ca`。Phase 4 的 BQ historical acceptance lock 仍是
-`eaf7b9a704890a9265c21f30d9f351e02d00c600`；当前 commit 只在其上增加 F1-BK borrowed-client integration。
+`master@acce4183f2fa00511ae2951f3ee5b1937c8426cc`。Phase 4 的 BQ historical acceptance lock 仍是
+`eaf7b9a704890a9265c21f30d9f351e02d00c600`；当前 commits 在其上增加 F1-BK borrowed-client、runtime
+configuration 与 profile-specific first-create capability integration。
 
 | Source | Git blob | F4 relevance |
 | --- | --- | --- |
-| `pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java` | `0b76b1939603c7ba60ed1c4691287819421d3ed4` | two-stable-snapshot barrier plus product-neutral readiness provider |
+| `pulsar-broker/.../nereus/NereusBrokerCapabilityCoordinator.java` | `0bdaeb4951419f08dc3fd9033eec201f917a1c3b` | two-stable-snapshot barrier plus product-neutral readiness provider and exact BK profile rollout binding |
 | `pulsar-broker/.../nereus/NereusGenerationCapabilityReadiness.java` | `ae281faf2353c927de0f10685d0f1df63acd8f8a` | exact full readiness identity, opaque epoch contract and core conversion |
 | `pulsar-broker/.../nereus/DefaultNereusGenerationRegistrationBackfill.java` | `97912566a045eddbb763e9b2bd7563a07d7abe69` | tenant-local namespace canonicalization plus exact remaining-budget/concurrency proof handoff |
 | `pulsar-broker/.../nereus/GenerationRegistrationBackfillReport.java` | `e84406c679f44f04e50ba943a1f97d92abf8f95a` | topic-outcome versus broader traversal-failure accounting |
 | `pulsar-broker/.../nereus/NereusPhysicalGcMultiBrokerIntegrationTest.java` | `86dbbb8797887e89ee78d03b3fe729db882b833f` | retry-disabled real source deletion、MessageId、unload/failover/restart and BookKeeper final gate |
 | `pulsar-broker/.../nereus/NereusMaterializationContentionMultiBrokerIntegrationTest.java` | `b76bde8f98207655d74ef907c95e999bf53bda7b` | retry-disabled two-broker/two-worker shared-registry contention、compressed exact-read and BookKeeper coexistence gate |
-| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `ae81739e1dc6e512b8f758b21fec441b80a9b6c9` | bounded broker-to-product proof completion/publication activation plus fail-closed borrowed stock BookKeeper client handoff |
+| `pulsar-broker/.../nereus/NereusManagedLedgerStorage.java` | `3b657b67458b397300d0fd4a759671d49da7363d` | bounded broker-to-product activation plus borrowed stock BookKeeper client and exact BK capability sink handoff |
 | `pulsar-broker/.../nereus/NereusTopicFeatureValidator.java` | `14916134ed514fc0d2c2e6628e7317463798bb89` | current retention/compaction/admin denylist |
 | `pulsar-broker/.../nereus/NereusAdminOperation.java` | `a99c967347ce7b9edc29b57892b220f42bedf8be` | closed loaded/unloaded admin operation set |
 | `pulsar-broker/.../service/BacklogQuotaManager.java` | `686e2244b560a16c69303e854719016d610fb305` | cursor skip/mark-delete backlog eviction call path |
 | `managed-ledger/.../impl/ManagedLedgerImpl.java` | `26fdb458a21b2edfcdbaed049681e69fd4b99077` | exact time/size OR retention and conservative whole-ledger size-boundary rule |
 | `pulsar-broker/.../admin/impl/PersistentTopicsBase.java` | `70db01aca57920dfc864292fdc976bb19061df5d` | base-topic partition expansion；loaded-local projection or durable unloaded binding validates the same closed admin matrix |
-| `pulsar-broker/.../nereus/NereusStorageClassBindingStore.java` | `70b2b604acb033c4e75d6986cbea226e0d9d4cac` | distinguishes zero-byte partition catalog placeholders from non-empty BookKeeper durable metadata before storage-class claim |
+| `pulsar-broker/.../nereus/NereusStorageClassBindingStore.java` | `2d9d79f9841321080f6da47bfb1670604b721973` | distinguishes zero-byte catalog placeholders and invokes the profile-specific readiness hook before first L0 mutation |
 | `pulsar-broker/.../nereus/NereusCursorMultiBrokerIntegrationTest.java` | `7470d8a3ca75a052deb00c3c69626f70de417210` | real loaded/unloaded partitioned admin routing、Nereus first open and two-broker ownership evidence |
 | `pulsar-broker/.../admin/impl/NamespacesBase.java` | `a30d50a1ae8ec8c2492df7026e1c5deab6e711f6` | bounded topic-list memory limiter/size-cache pattern reused by backfill |
 | `managed-ledger/.../ManagedLedger.java` | `0455f0efa8bb6d0ef248b870b1a68166cdcef2c8` | `trimConsumedLedgersInBackground(CompletableFuture<?>)` contract |

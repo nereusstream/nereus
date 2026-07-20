@@ -11,6 +11,8 @@ import io.oxia.client.api.SyncOxiaClient;
 import io.oxia.client.api.exceptions.OxiaException;
 import java.time.Clock;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -119,6 +121,21 @@ public final class SharedOxiaClientRuntime implements AutoCloseable {
                 return client.deleteIfVersion(key.key(), expectedVersion, key.partitionKey());
             }
         };
+    }
+
+    /** Returns a borrowed exact-key read-only view for separately provisioned cluster capabilities. */
+    public CompletableFuture<Optional<CapabilityMetadataValue>> readCapability(
+            OxiaClientConfiguration candidate,
+            String key,
+            String partitionKey) {
+        requireCompatible(candidate);
+        String exactKey = Objects.requireNonNull(key, "key");
+        if (exactKey.isBlank()) {
+            throw new IllegalArgumentException("capability key cannot be blank");
+        }
+        PartitionKey exactPartition = new PartitionKey(partitionKey);
+        return client.get(exactKey, exactPartition).thenApply(optional -> optional.map(value ->
+                new CapabilityMetadataValue(value.key(), value.value(), value.version())));
     }
 
     @Override

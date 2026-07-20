@@ -2,8 +2,8 @@
 package com.nereusstream.pulsar;
 
 import com.nereusstream.core.capability.GenerationCapabilityReadinessProvider;
-import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
+import com.nereusstream.managedledger.integration.NereusCreationGuard;
 import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import io.netty.channel.EventLoopGroup;
 import io.opentelemetry.api.OpenTelemetry;
@@ -21,7 +21,31 @@ public record NereusRuntimeContext(
         boolean generationProtocolActivationEnabled,
         ObjectStoreSecretResolver secretResolver,
         ClassLoader pluginClassLoader,
-        Optional<BookKeeper> borrowedBookKeeperClient) {
+        Optional<BookKeeper> borrowedBookKeeperClient,
+        BookKeeperPrimaryWalCapabilitySink bookKeeperPrimaryWalCapabilitySink) {
+    public NereusRuntimeContext(
+            EventLoopGroup eventLoopGroup,
+            OpenTelemetry openTelemetry,
+            NereusCreationGuard creationGuard,
+            CursorProtocolActivationGuard cursorProtocolActivationGuard,
+            GenerationCapabilityReadinessProvider generationCapabilityReadinessProvider,
+            boolean generationProtocolActivationEnabled,
+            ObjectStoreSecretResolver secretResolver,
+            ClassLoader pluginClassLoader,
+            Optional<BookKeeper> borrowedBookKeeperClient) {
+        this(
+                eventLoopGroup,
+                openTelemetry,
+                creationGuard,
+                cursorProtocolActivationGuard,
+                generationCapabilityReadinessProvider,
+                generationProtocolActivationEnabled,
+                secretResolver,
+                pluginClassLoader,
+                borrowedBookKeeperClient,
+                BookKeeperPrimaryWalCapabilitySink.unavailable());
+    }
+
     public NereusRuntimeContext(
             EventLoopGroup eventLoopGroup,
             OpenTelemetry openTelemetry,
@@ -40,7 +64,8 @@ public record NereusRuntimeContext(
                 generationProtocolActivationEnabled,
                 secretResolver,
                 pluginClassLoader,
-                Optional.empty());
+                Optional.empty(),
+                BookKeeperPrimaryWalCapabilitySink.unavailable());
     }
 
     public NereusRuntimeContext(
@@ -60,7 +85,8 @@ public record NereusRuntimeContext(
                 false,
                 secretResolver,
                 pluginClassLoader,
-                Optional.empty());
+                Optional.empty(),
+                BookKeeperPrimaryWalCapabilitySink.unavailable());
     }
 
     public NereusRuntimeContext(
@@ -79,7 +105,8 @@ public record NereusRuntimeContext(
                 false,
                 secretResolver,
                 pluginClassLoader,
-                Optional.empty());
+                Optional.empty(),
+                BookKeeperPrimaryWalCapabilitySink.unavailable());
     }
 
     public NereusRuntimeContext(
@@ -97,7 +124,8 @@ public record NereusRuntimeContext(
                 false,
                 secretResolver,
                 pluginClassLoader,
-                Optional.empty());
+                Optional.empty(),
+                BookKeeperPrimaryWalCapabilitySink.unavailable());
     }
 
     public NereusRuntimeContext {
@@ -112,5 +140,8 @@ public record NereusRuntimeContext(
         Objects.requireNonNull(pluginClassLoader, "pluginClassLoader");
         borrowedBookKeeperClient = Objects.requireNonNull(
                 borrowedBookKeeperClient, "borrowedBookKeeperClient");
+        Objects.requireNonNull(
+                bookKeeperPrimaryWalCapabilitySink,
+                "bookKeeperPrimaryWalCapabilitySink");
     }
 }

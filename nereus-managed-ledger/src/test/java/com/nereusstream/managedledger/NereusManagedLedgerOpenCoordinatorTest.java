@@ -193,6 +193,56 @@ class NereusManagedLedgerOpenCoordinatorTest {
     }
 
     @Test
+    void firstCreateRequiresProfileCapabilityBeforeAnyL0MutationButExistingOpenDoesNot() {
+        FakeStreamStorage streamStorage = new FakeStreamStorage();
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        MutableGuard admitting = new MutableGuard(3);
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
+            NereusCreationGuard blocking = name -> CompletableFuture.completedFuture(
+                    new NereusCreationPermit() {
+                        @Override
+                        public String persistenceName() {
+                            return name;
+                        }
+
+                        @Override
+                        public long bindingGeneration() {
+                            return 3;
+                        }
+
+                        @Override
+                        public CompletableFuture<Void> validateStorageProfileBeforeCreate(
+                                StorageProfile profile) {
+                            return CompletableFuture.failedFuture(
+                                    new IllegalStateException("profile capability sentinel"));
+                        }
+
+                        @Override
+                        public CompletableFuture<Void> validateBeforeProjectionPublish() {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                    });
+            NereusManagedLedgerOpenCoordinator blocked =
+                    new NereusManagedLedgerOpenCoordinator(runtime, blocking);
+
+            assertThatThrownBy(() -> blocked.open(NAME, openConfig(true)).join())
+                    .hasRootCauseMessage("profile capability sentinel");
+            assertThat(streamStorage.createCalls).hasValue(0);
+            assertThat(projections.getProjection(CLUSTER, NAME).join()).isEmpty();
+
+            NereusManagedLedgerOpenCoordinator creator =
+                    new NereusManagedLedgerOpenCoordinator(runtime, admitting);
+            NereusLedgerOpenResult created = creator.open(NAME, openConfig(true)).join();
+            NereusLedgerOpenResult reopened = blocked.open(NAME, openConfig(true)).join();
+
+            assertThat(reopened).isEqualTo(created);
+            assertThat(streamStorage.createCalls).hasValue(1);
+        }
+    }
+
+    @Test
     void bindingMismatchFailsBeforeL0ReadAndMissingPublishedHeadIsCorruption() {
         FakeStreamStorage streamStorage = new FakeStreamStorage();
         FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();

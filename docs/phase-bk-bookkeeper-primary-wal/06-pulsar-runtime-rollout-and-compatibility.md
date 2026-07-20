@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@41d1cddb9d29451884002b96de2bc52367cbb8ca
+master@acce4183f2fa00511ae2951f3ee5b1937c8426cc
 BookKeeper 4.18.0
 ```
 
@@ -36,14 +36,15 @@ Exact type/wrapper names may follow module conventions. Required ownership：
 - partial Nereus runtime initialization closes only Nereus-owned resources, then the existing storage error path closes
   the stock factory once；
 - `NereusManagedLedgerStorageBookKeeperClientTest` freezes exact instance identity plus non-BK/null rejection；the
-  normal/partial-close ownership counts remain required before production BK runtime composition。
+  normal/partial-close ownership counts remain required through the production BK runtime rollout。
 
 `nereus-api`/`nereus-core` do not import Pulsar or ManagedLedger classes. `nereus-bookkeeper` depends on BookKeeper
 client API, while `nereus-pulsar-adapter` is the composition boundary.
 
-This is a resource-boundary checkpoint only。`DefaultNereusRuntimeProvider` still assembles the Object-WAL runtime and
-does not consume `borrowedBookKeeperClient`；BK profile configuration/first-create therefore remains fail closed until
-the M5 rollout work installs the completed M2-M4 runtime and capabilities。
+BK-M5 checkpoints B/C now consume `borrowedBookKeeperClient` through `DefaultBookKeeperClientOperations` and install
+the completed M2-M4 runtime without ever closing the client。Before advertising capability，bootstrap performs a
+bounded read of the separately provisioned Oxia namespace record、validates its exact deployment/config binding and
+probes the password secret reference；partial initialization still closes only Nereus-owned adapters/metadata views。
 
 ## 3. Runtime composition
 
@@ -66,6 +67,11 @@ streams and dispatches each source target through the generic registry.
 Runtime startup order：metadata/object provider -> BK borrowed adapter/config validation -> registries -> append/read
 core -> managed-ledger factory -> recovery scanners -> optional workers -> optional safe GC. Close runs in reverse and
 is bounded.
+
+Implemented checkpoint B/C composition uses one `PrimaryWalRegistry.combine(Object, BK)` and passes the BK physical
+reference adapter into generation-zero publication plus the BK materialization-source provider into the existing F4
+runtime。No second planner、worker pool or lag authority is created。BK ledger retention scheduling and deletion
+activation are intentionally not started by this checkpoint and remain fail closed under the safe GC defaults。
 
 ## 4. Broker configuration
 
@@ -174,6 +180,7 @@ Add reserved lookup properties：
 nereus.bookkeeper-primary-wal-protocol = "1"
 nereus.bookkeeper-primary-wal-config   = <configuration binding SHA-256>
 nereus.bookkeeper-ledger-namespace     = <reserved-prefix + reservation binding SHA-256>
+nereus.bookkeeper-required-object-generation = "1"
 ```
 
 `NereusBookKeeperPrimaryWalCapability.requireUnreserved` chains with existing storage-binding/cursor/generation
@@ -186,11 +193,12 @@ Profile barriers use two stable all-persistent-broker snapshots：
 | --- | --- |
 | BK_ONLY | storage binding + cursor + BK protocol/config + exact ledger-id namespace |
 | BK_ASYNC_OBJECT | BK_ONLY set + generation protocol |
-| BK_SYNC_OBJECT | BK_ONLY set + generation protocol + required-object completion capability |
+| BK_SYNC_OBJECT | BK_ONLY set + generation protocol + independent required-object completion property |
 
-The sync completion capability may share BK protocol V1 only if every V1 broker implements it。BK-M4 has final-gated
-the module-local completion path；during staged production rollout it remains a separate reserved property until
-BK-M5 proves all-broker readiness and ownership routing。
+BK-M4 has final-gated the module-local completion path；the production rollout nevertheless keeps sync completion as a
+separate reserved property so a broker cannot infer Object publication support from generation-zero durability。The
+implemented first-create barrier verifies the complete profile-specific property set in one stable two-snapshot fact，
+not by composing independent readiness checks from different broker epochs。
 
 Readiness identity includes broker id、start timestamp、all required property key/values and configuration digest.
 Registry changes invalidate cached readiness. A broker with missing/different config keeps new BK profile admission

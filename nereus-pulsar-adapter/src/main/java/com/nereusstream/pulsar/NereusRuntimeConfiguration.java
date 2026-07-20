@@ -13,6 +13,7 @@ import com.nereusstream.metadata.oxia.ProjectionMetadataStoreConfig;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Fully typed configuration mapped by the broker before any runtime resource is created. */
 public record NereusRuntimeConfiguration(
@@ -25,7 +26,8 @@ public record NereusRuntimeConfiguration(
         CursorStorageConfig cursorStorage,
         MaterializationConfig materialization,
         NereusRetentionConfig retention,
-        PhysicalGcConfig physicalGc) {
+        PhysicalGcConfig physicalGc,
+        Optional<NereusBookKeeperRuntimeConfiguration> bookKeeper) {
     public NereusRuntimeConfiguration(
             OxiaClientConfiguration oxia,
             ObjectStoreConfiguration objectStore,
@@ -42,7 +44,8 @@ public record NereusRuntimeConfiguration(
                 CursorStorageConfig.defaults(),
                 defaultMaterialization(streamStorage),
                 NereusRetentionConfig.defaults(),
-                PhysicalGcConfig.defaults());
+                PhysicalGcConfig.defaults(),
+                Optional.empty());
     }
 
     public NereusRuntimeConfiguration(
@@ -63,7 +66,8 @@ public record NereusRuntimeConfiguration(
                 cursorStorage,
                 defaultMaterialization(streamStorage),
                 NereusRetentionConfig.defaults(),
-                PhysicalGcConfig.defaults());
+                PhysicalGcConfig.defaults(),
+                Optional.empty());
     }
 
     public NereusRuntimeConfiguration(
@@ -85,7 +89,8 @@ public record NereusRuntimeConfiguration(
                 cursorStorage,
                 materialization,
                 NereusRetentionConfig.defaults(),
-                PhysicalGcConfig.defaults());
+                PhysicalGcConfig.defaults(),
+                Optional.empty());
     }
 
     /** Compatibility constructor retained while broker-side physical-GC config mapping remains default-off. */
@@ -109,7 +114,34 @@ public record NereusRuntimeConfiguration(
                 cursorStorage,
                 materialization,
                 retention,
-                PhysicalGcConfig.defaults());
+                PhysicalGcConfig.defaults(),
+                Optional.empty());
+    }
+
+    /** Compatibility constructor for the Object-WAL-only production mapping. */
+    public NereusRuntimeConfiguration(
+            OxiaClientConfiguration oxia,
+            ObjectStoreConfiguration objectStore,
+            StreamStorageConfig streamStorage,
+            NereusManagedLedgerFactoryConfig managedLedger,
+            ProjectionMetadataStoreConfig projectionMetadata,
+            CursorMetadataStoreConfig cursorMetadata,
+            CursorStorageConfig cursorStorage,
+            MaterializationConfig materialization,
+            NereusRetentionConfig retention,
+            PhysicalGcConfig physicalGc) {
+        this(
+                oxia,
+                objectStore,
+                streamStorage,
+                managedLedger,
+                projectionMetadata,
+                cursorMetadata,
+                cursorStorage,
+                materialization,
+                retention,
+                physicalGc,
+                Optional.empty());
     }
 
     public NereusRuntimeConfiguration {
@@ -123,6 +155,15 @@ public record NereusRuntimeConfiguration(
         Objects.requireNonNull(materialization, "materialization");
         Objects.requireNonNull(retention, "retention");
         Objects.requireNonNull(physicalGc, "physicalGc");
+        bookKeeper = Objects.requireNonNull(bookKeeper, "bookKeeper");
+        if (managedLedger.defaultStorageProfile().usesBookKeeperWal() && bookKeeper.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "BookKeeper default storage profile requires BookKeeper runtime configuration");
+        }
+        bookKeeper.ifPresent(configuration -> validateBookKeeper(
+                configuration,
+                streamStorage,
+                managedLedger));
         if (oxia.maxCommitChainScan() != streamStorage.maxCommitChainScan()) {
             throw new IllegalArgumentException("Oxia and StreamStorage maxCommitChainScan must match");
         }
@@ -244,5 +285,38 @@ public record NereusRuntimeConfiguration(
                 .toAbsolutePath()
                 .normalize();
         return MaterializationConfig.defaults(staging);
+    }
+
+    private static void validateBookKeeper(
+            NereusBookKeeperRuntimeConfiguration bookKeeper,
+            StreamStorageConfig streamStorage,
+            NereusManagedLedgerFactoryConfig managedLedger) {
+        var wal = bookKeeper.wal();
+        if (!wal.clusterAlias().equals(streamStorage.cluster())) {
+            throw new IllegalArgumentException(
+                    "BookKeeper clusterAlias must equal the Nereus stream cluster");
+        }
+        if (wal.operationTimeout().compareTo(streamStorage.appendTimeout()) > 0
+                || wal.operationTimeout().compareTo(streamStorage.readTimeout()) > 0
+                || wal.operationTimeout().compareTo(managedLedger.closeTimeout()) > 0) {
+            throw new IllegalArgumentException(
+                    "BookKeeper operation timeout must fit append, read, and close deadlines");
+        }
+        if (wal.allocationTimeout().compareTo(streamStorage.appendTimeout()) > 0
+                || wal.sealTimeout().compareTo(managedLedger.closeTimeout()) > 0
+                || wal.deleteTimeout().compareTo(managedLedger.closeTimeout()) > 0) {
+            throw new IllegalArgumentException(
+                    "BookKeeper allocation/seal/delete timeout exceeds its outer deadline");
+        }
+        if (wal.maxWritesInFlight() > streamStorage.maxInFlightAppends()) {
+            throw new IllegalArgumentException(
+                    "BookKeeper write concurrency exceeds core append concurrency");
+        }
+        if (wal.maxReadsInFlight() > streamStorage.maxConcurrentObjectReads()
+                || wal.maxReadBytesInFlight() > streamStorage.maxReadBufferBytes()) {
+            throw new IllegalArgumentException(
+                    "BookKeeper read limits exceed core read resources");
+        }
+        bookKeeper.metadataStore();
     }
 }

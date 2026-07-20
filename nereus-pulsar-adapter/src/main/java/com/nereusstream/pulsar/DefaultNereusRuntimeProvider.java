@@ -1,10 +1,13 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.pulsar;
 
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.keys.DeterministicIds;
+import com.nereusstream.bookkeeper.BookKeeperPrimaryPhysicalReferenceAdapter;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.core.append.AppendCoordinator;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.backpressure.MaterializationLagGate;
@@ -15,7 +18,10 @@ import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.read.ReadMetricsObserver;
+import com.nereusstream.core.profile.StorageProfileResolver;
+import com.nereusstream.core.profile.StorageProfileResolverRegistry;
 import com.nereusstream.core.trim.TrimMetricsObserver;
+import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.managedledger.NereusManagedLedgerRuntime;
 import com.nereusstream.managedledger.cursor.CursorProtocolActivationGuard;
 import com.nereusstream.managedledger.cursor.CursorRetentionCoordinator;
@@ -51,8 +57,8 @@ import com.nereusstream.metadata.oxia.retirement.ObjectAuditRetirementStore;
 import com.nereusstream.metadata.oxia.retirement.OxiaJavaObjectAuditRetirementStore;
 import com.nereusstream.metadata.oxia.retirement.OxiaJavaSourceRetirementMetadataStore;
 import com.nereusstream.metadata.oxia.retirement.SourceRetirementMetadataStore;
-import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.DefaultObjectStoreDeleteCapabilityProbe;
+import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreDeleteCapabilityProbe;
 import com.nereusstream.objectstore.ObjectStoreProvider;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
@@ -61,8 +67,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -82,6 +90,14 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         StreamStorageConfig streamConfig = configuration.streamStorage();
         var physicalGcConfig = configuration.physicalGc();
         requireIdentity(streamConfig);
+        Optional<NereusBookKeeperRuntimeConfiguration> bookKeeperConfiguration =
+                configuration.bookKeeper();
+        if (bookKeeperConfiguration.isPresent()) {
+            if (context.borrowedBookKeeperClient().isEmpty()) {
+                throw new IllegalArgumentException(
+                        "BookKeeper primary-WAL configuration requires the borrowed broker BookKeeper client");
+            }
+        }
 
         ObjectStoreProvider objectStoreProvider = null;
         ObjectStore objectStore = null;
@@ -110,6 +126,8 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
         ExecutorService callbackExecutor = null;
         ExecutorService workerExecutor = null;
         Phase4ObjectWalRuntime phase4Runtime = null;
+        ProductionBookKeeperPrimaryWalRuntime bookKeeperRuntime = null;
+        CompositeOwnedRuntime ownedWalAndMaterializationRuntime = null;
         StreamStorage streamStorage = null;
         CursorSnapshotStore cursorSnapshotStore = null;
         CursorRetentionCoordinator cursorRetentionCoordinator = null;
@@ -125,8 +143,14 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     new DefaultObjectStoreDeleteCapabilityProbe(
                             objectStore, configuration.objectStore(), clock);
             sharedOxiaRuntime = SharedOxiaClientRuntime.connect(configuration.oxia(), clock);
-            l0MetadataStore = OxiaJavaClientMetadataStore.usingSharedRuntime(
-                    configuration.oxia(), sharedOxiaRuntime, clock);
+            l0MetadataStore = bookKeeperConfiguration.isPresent()
+                    ? OxiaJavaClientMetadataStore.usingSharedRuntime(
+                            configuration.oxia(),
+                            sharedOxiaRuntime,
+                            clock,
+                            bookKeeperConfiguration.orElseThrow().metadataStore())
+                    : OxiaJavaClientMetadataStore.usingSharedRuntime(
+                            configuration.oxia(), sharedOxiaRuntime, clock);
             physicalMetadataStore = OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
                     configuration.oxia(), sharedOxiaRuntime, clock);
             sourceRetirementMetadataStore =
@@ -221,12 +245,34 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     daemonFactory("nereus-f4-worker"));
             DefaultWalObjectReader walObjectReader =
                     new DefaultWalObjectReader(objectStore);
+            if (bookKeeperConfiguration.isPresent()) {
+                bookKeeperRuntime = ProductionBookKeeperPrimaryWalRuntime.create(
+                        bookKeeperConfiguration.orElseThrow(),
+                        streamConfig.cluster(),
+                        streamConfig.processRunId(),
+                        configuration.oxia(),
+                        sharedOxiaRuntime,
+                        context.borrowedBookKeeperClient().orElseThrow(),
+                        new OxiaBookKeeperLedgerIdNamespaceReservationStore(
+                                configuration.oxia(),
+                                sharedOxiaRuntime),
+                        context.secretResolver(),
+                        clock);
+            }
+            List<BookKeeperPrimaryPhysicalReferenceAdapter> additionalPhysicalReferences =
+                    bookKeeperRuntime == null
+                            ? List.of()
+                            : List.of(bookKeeperRuntime.physicalReferences());
             GenerationZeroPhysicalReferencePublisher physicalReferences =
                     new DefaultGenerationZeroPhysicalReferencePublisher(
                             streamConfig.cluster(),
                             l0MetadataStore,
                             physicalMetadataStore,
-                            objectProtectionManager);
+                            objectProtectionManager,
+                            additionalPhysicalReferences);
+            var additionalMaterializationSources = bookKeeperRuntime == null
+                    ? List.<com.nereusstream.materialization.MaterializationSourceProvider>of()
+                    : List.of(bookKeeperRuntime.materializationSourceProvider());
             phase4Runtime = new Phase4ObjectWalRuntime(
                     streamConfig.cluster(),
                     streamConfig.processRunId(),
@@ -242,6 +288,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     objectProtectionManager,
                     objectReadPinManager,
                     generationProtocolActivationGuard,
+                    additionalMaterializationSources,
                     scheduler,
                     workerExecutor,
                     callbackExecutor,
@@ -264,15 +311,38 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                             projectionStore,
                             generationProtocolActivationGuard,
                             lagGate);
-            streamStorage = new DefaultStreamStorage(
+            PrimaryWalRegistry objectWalRegistry = AppendCoordinator.productionObjectWalRegistry(
                     streamConfig,
                     l0MetadataStore,
                     new DefaultWalObjectWriter(objectStore, WRITER_VERSION, clock),
                     walObjectReader,
                     physicalReferences,
+                    clock);
+            List<PrimaryWalRegistry> primaryWalRegistries = new ArrayList<>();
+            primaryWalRegistries.add(objectWalRegistry);
+            if (bookKeeperRuntime != null) {
+                primaryWalRegistries.add(bookKeeperRuntime.walRuntime().primaryWalRegistry());
+            }
+            PrimaryWalRegistry primaryWalRegistry = PrimaryWalRegistry.combine(primaryWalRegistries);
+            EnumMap<StorageProfile, StorageProfileResolver> profileResolvers =
+                    new EnumMap<>(StorageProfile.class);
+            profileResolvers.put(StorageProfile.OBJECT_WAL_SYNC_OBJECT, phase4Runtime.profileResolver());
+            profileResolvers.put(StorageProfile.OBJECT_WAL_ASYNC_OBJECT, phase4Runtime.profileResolver());
+            if (bookKeeperRuntime != null) {
+                StorageProfileResolver bookKeeperProfiles = bookKeeperRuntime.walRuntime().profileResolver();
+                profileResolvers.put(StorageProfile.BOOKKEEPER_WAL_ONLY, bookKeeperProfiles);
+                profileResolvers.put(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT, bookKeeperProfiles);
+                profileResolvers.put(StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT, bookKeeperProfiles);
+            }
+            streamStorage = new DefaultStreamStorage(
+                    streamConfig,
+                    l0MetadataStore,
+                    primaryWalRegistry,
+                    physicalReferences,
                     phase4Runtime.appendRecoverySearcher(),
-                    phase4Runtime.profileResolver(),
+                    new StorageProfileResolverRegistry(profileResolvers),
                     appendAdmissionGuard,
+                    phase4Runtime.requiredObjectGenerationCompletion(),
                     phase4Runtime.readComponents(),
                     clock,
                     callbackExecutor,
@@ -361,8 +431,15 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                                     .currentV1(),
                             physicalGcRuntime,
                             clock);
+            if (bookKeeperRuntime != null) {
+                context.bookKeeperPrimaryWalCapabilitySink()
+                        .install(bookKeeperRuntime.capabilityBinding());
+            }
             phase4Runtime.start();
             physicalGcRuntime.start();
+            ownedWalAndMaterializationRuntime = new CompositeOwnedRuntime(
+                    phase4Runtime,
+                    bookKeeperRuntime);
             return new NereusManagedLedgerRuntime(
                     streamStorage,
                     projectionStore,
@@ -378,7 +455,7 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     generationRegistrationBackfillProofCoordinator,
                     generationProtocolActivationCoordinator,
                     generationProtocolActivationGuard,
-                    phase4Runtime,
+                    ownedWalAndMaterializationRuntime,
                     retentionRuntime,
                     physicalGcRuntime,
                     physicalGcRuntime,
@@ -404,7 +481,9 @@ public final class DefaultNereusRuntimeProvider implements NereusRuntimeProvider
                     cursorRetentionCoordinator,
                     cursorSnapshotStore,
                     cursorMetadataStore,
+                    ownedWalAndMaterializationRuntime,
                     phase4Runtime,
+                    bookKeeperRuntime,
                     generationProtocolActivationStore,
                     generationMetadataStore,
                     projectionStore,

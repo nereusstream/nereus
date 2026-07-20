@@ -46,6 +46,7 @@ import com.nereusstream.core.wal.PrimaryAppendRequest;
 import com.nereusstream.core.wal.PrimaryWalAppender;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import com.nereusstream.core.wal.object.ObjectWalAppenderAdapter;
+import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
 import com.nereusstream.metadata.oxia.CommitAppendRequest;
 import com.nereusstream.metadata.oxia.CommittedAppend;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -57,6 +58,7 @@ import com.nereusstream.metadata.oxia.records.StreamSliceManifestRecord;
 import com.nereusstream.objectstore.wal.CompressionType;
 import com.nereusstream.objectstore.wal.PreparedWalObject;
 import com.nereusstream.objectstore.wal.WalObjectWriter;
+import com.nereusstream.objectstore.wal.WalObjectReader;
 import com.nereusstream.objectstore.wal.WalStreamSliceInput;
 import com.nereusstream.objectstore.wal.WalWriteOptions;
 import com.nereusstream.objectstore.wal.WalWriteRequest;
@@ -277,6 +279,41 @@ public final class AppendCoordinator implements AutoCloseable {
             WalObjectWriter walObjectWriter,
             GenerationZeroPhysicalReferencePublisher physicalReferences,
             Clock clock) {
+        return new PrimaryWalRegistry(
+                List.of(objectWalAppender(
+                        config,
+                        metadataStore,
+                        walObjectWriter,
+                        physicalReferences,
+                        clock)),
+                List.of());
+    }
+
+    /** Production Object-WAL registry with the exact existing guarded upload/manifest contract. */
+    public static PrimaryWalRegistry productionObjectWalRegistry(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Clock clock) {
+        Objects.requireNonNull(walObjectReader, "walObjectReader");
+        return new PrimaryWalRegistry(
+                List.of(objectWalAppender(
+                        config,
+                        metadataStore,
+                        walObjectWriter,
+                        physicalReferences,
+                        clock)),
+                List.of(new ObjectWalReaderAdapter(walObjectReader)));
+    }
+
+    private static ObjectWalAppenderAdapter objectWalAppender(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Clock clock) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(metadataStore, "metadataStore");
         Objects.requireNonNull(walObjectWriter, "walObjectWriter");
@@ -303,7 +340,7 @@ public final class AppendCoordinator implements AutoCloseable {
                 (result, session, timeout) -> metadataStore.putObjectManifest(
                         config.cluster(),
                         toManifest(config, writerRunIdHash, clock, result, session)));
-        return new PrimaryWalRegistry(List.of(objectAppender), List.of());
+        return objectAppender;
     }
 
     public CompletableFuture<AppendResult> append(

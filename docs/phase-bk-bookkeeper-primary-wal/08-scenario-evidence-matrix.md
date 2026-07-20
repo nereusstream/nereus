@@ -6,7 +6,7 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 `bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-M2 then completed on 2026-07-20 through the 107/107-task
 `bookKeeperPrimaryWalM2Check --rerun-tasks` and the 212-task `bookKeeperPrimaryWalM2FinalCheck` aggregate against
-current local Pulsar `master@41d1cddb9d29451884002b96de2bc52367cbb8ca`。The final aggregate covers BK-11 through
+current local Pulsar `master@acce4183f2fa00511ae2951f3ee5b1937c8426cc`。The final aggregate covers BK-11 through
 BK-56 at the milestone's declared D/O/B and focused local-Pulsar boundary：all codecs/keyspaces/shards、allocation and
 writer monotonicity、foreign and same-candidate authority、uncertain/late create、exact append/recovery/fencing/read、
 generation-zero repair、resource/deadline contracts、logical trim、complete protection inventory and dual-absence

@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="41d1cddb9d29451884002b96de2bc52367cbb8ca"
+pulsar_source_lock="acce4183f2fa00511ae2951f3ee5b1937c8426cc"
 
 require_literal() {
     local literal="$1"

@@ -248,7 +248,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("41d1cddb9d29451884002b96de2bc52367cbb8ca")
+    .orElse("acce4183f2fa00511ae2951f3ee5b1937c8426cc")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"

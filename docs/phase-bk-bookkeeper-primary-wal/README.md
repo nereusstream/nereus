@@ -57,8 +57,8 @@
 > every fixed BK reference remains ACTIVE、the ledger remains present and normal reads quarantine/fall back to the exact
 > BK range。BK-M3 implementation evidence and its BK-M2 predecessor are now final-gated。Abrupt-process/chaos evidence
 > remains assigned to BK-M6 rather than retroactively blocking the BK-M2 storage milestone；
-> production provider composition、first-create admission and broker ownership rollout belong to BK-M5 and remain
-> fail-closed, so the production broker still rejects the profile before primary IO。
+> production provider composition and profile-specific first-create admission are now implemented by BK-M5
+> checkpoints B/C；broker ownership routing、retention scheduling/activation and full rollout acceptance remain open。
 
 > BK-M4 `BOOKKEEPER_WAL_SYNC_OBJECT` is complete/final-gated：`StorageExecutionPlan` resolves
 > `REQUIRED_OBJECT_GENERATION` independently from generation-zero durability；the append path publishes/protects gen0
@@ -75,8 +75,15 @@
 > completion，and maps BK_SYNC to generation-zero durability plus the independent
 > `REQUIRED_OBJECT_GENERATION` completion policy。The shared async generation/lag admission guard now applies equally
 > to Object-WAL async and BK async while requiring the durable topic projection profile to match the L0 request。
-> Production provider composition and broker capability publication remain fail-closed pending the next M5
-> checkpoints。
+> Checkpoints B/C are also implemented：the production provider consumes the borrowed stock BookKeeper client without
+> owning it，composes Object and BK primary registries plus the shared F4 source/runtime，and verifies the provisioned
+> `NBLR1` Oxia namespace record before publishing an exact config/namespace capability binding。The Pulsar fork maps
+> the typed BK/GC configuration with deletion disabled+dry-run by default，protects four reserved lookup properties，and
+> permits BK first-create only after two stable all-persistent-broker snapshots match the exact binding；BK_SYNC
+> independently requires the required-Object-generation completion property。The profile check occurs before any L0
+> stream mutation；existing projections do not depend on this first-create rollout barrier。Retention scheduling and
+> deletion activation、explicit namespace provisioning operations、loaded/unloaded ownership routing and two-broker
+> acceptance remain the next M5 checkpoints。
 
 > 2026-07-20：`bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks；
 > `bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate in 21m40s，including the final-gated
@@ -241,7 +248,7 @@ second commit protocol and is forbidden.
 
 The design is based only on this repository and the local Pulsar checkout at
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`。No internet or non-existent `M1-SNAPSHOT` artifact is an input.
-The target Pulsar source lock is `master@41d1cddb9d29451884002b96de2bc52367cbb8ca`。The Nereus pre-design audit
+The target Pulsar source lock is `master@acce4183f2fa00511ae2951f3ee5b1937c8426cc`。The Nereus pre-design audit
 lock and BookKeeper client API surface are recorded in document 01；a changed lock requires re-audit, not silent
 compilation against a different checkout.
 
@@ -325,9 +332,11 @@ entry bytes through `NereusManagedLedger.addEntry/readEntry` over generation zer
 uses the virtual ledger。The pinned Pulsar fork now obtains the same stock
 `BookkeeperManagedLedgerStorageClass.getBookKeeperClient()` instance, passes it as an explicitly borrowed
 `NereusRuntimeContext` resource, rejects non-BK/null providers, and passes broker main/test Checkstyle plus its focused
-test。`DefaultNereusRuntimeProvider` does not yet compose that client into the production BK runtime；that BK-M5 rollout
-boundary does not weaken the now-real BK-M2 storage evidence, but it still prevents first-create and a production broker
-BK_ONLY data path。
+test。`DefaultNereusRuntimeProvider` now composes that client into a production BK runtime while retaining ownership in
+the stock factory。It verifies the separately provisioned namespace record、installs Object+BK primary adapters and the
+shared F4 source path，then hands an exact config/namespace binding to the broker capability coordinator。New BK topics
+remain gated by all-broker binding equality；the remaining M5 work is retention/activation scheduling、admin and
+ownership-route acceptance rather than primary writer/reader installation。
 
 BK-M4 adds `RequiredObjectGenerationRequest` / `RequiredObjectGenerationProof` /
 `RequiredObjectGenerationCompletion` in core and implements the seam with

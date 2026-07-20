@@ -232,9 +232,11 @@ public final class NereusManagedLedgerOpenCoordinator {
         if (!config.createIfMissing()) {
             return failed(ErrorCode.STREAM_NOT_FOUND, false, "managed ledger does not exist");
         }
-        return runtime.streamStorage().createOrGetStream(
+        StorageProfile profile = runtime.config().defaultStorageProfile();
+        return permit.validateStorageProfileBeforeCreate(profile)
+                .thenCompose(ignored -> runtime.streamStorage().createOrGetStream(
                         ManagedLedgerProjectionNames.streamName(managedLedgerName, 1),
-                        requests.createOptions())
+                        requests.createOptions()))
                 .thenCompose(candidate -> publishFirstOrFollowWinner(
                         managedLedgerName, permit, config, candidate));
     }
@@ -280,9 +282,11 @@ public final class NereusManagedLedgerOpenCoordinator {
                     "recreation permit binding generation did not advance");
         }
         long incarnation = nextIncarnation;
-        return runtime.streamStorage().createOrGetStream(
+        StorageProfile profile = runtime.config().defaultStorageProfile();
+        return permit.validateStorageProfileBeforeCreate(profile)
+                .thenCompose(ignored -> runtime.streamStorage().createOrGetStream(
                         ManagedLedgerProjectionNames.streamName(deleted.managedLedgerName(), incarnation),
-                        requests.createOptions())
+                        requests.createOptions()))
                 .thenCompose(candidate -> {
                     ProjectionCreateRequest request;
                     try {

@@ -10,10 +10,10 @@ BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20
 BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20
 BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20
-BK-M5 Pulsar rollout            in progress (profile composition/admission checkpoint started 2026-07-20)
+BK-M5 Pulsar rollout            in progress (configuration/composition/first-create capability checkpoints passed)
 BK-M6 aggregate final gate      not implemented
-all BK module-local profiles    executable against real Oxia + BookKeeper/Object; not registered by production broker
-all broker BookKeeper profiles  reserved / rejected before primary IO
+all BK module-local profiles    executable against real Oxia + BookKeeper/Object and installed by production provider
+all broker BookKeeper profiles  first-create admitted only by exact two-stable-snapshot capability equality
 BookKeeper ledger deletion      implemented and real-service tested / production safe default closed
 ```
 
@@ -187,8 +187,8 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
 The current local Pulsar integration/source lock is
-`master@41d1cddb9d29451884002b96de2bc52367cbb8ca`；it retains the BK-M1 historical evidence above and adds only the
-focused BK-M2 borrowed-client boundary。
+`master@acce4183f2fa00511ae2951f3ee5b1937c8426cc`；it retains the BK-M1 historical evidence above and adds the focused
+BK-M2 borrowed-client boundary plus BK-M5 configuration and profile-specific capability rollout。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
 
@@ -698,7 +698,27 @@ Implementation checkpoint A (2026-07-20) is complete：
 - the existing F4 activation and lag gate is shared by both Object-WAL async and BookKeeper async profiles，with exact
   L0/topic-profile matching；there is no BookKeeper-specific second lag truth；
 - production `DefaultNereusRuntimeProvider` composition、BookKeeper configuration/capability publication and Pulsar
-  first-create routing remain closed for checkpoints B onward。
+  first-create routing are implemented by checkpoints B/C below。
+
+Implementation checkpoints B/C (2026-07-20) are complete at the focused-test level：
+
+- `NereusRuntimeConfiguration` carries one optional typed BK/GC binding；the local Pulsar `ServiceConfiguration` maps
+  every bounded field，requires an explicit enable switch and keeps ledger deletion disabled+dry-run by default；
+- `DefaultNereusRuntimeProvider` requires the borrowed broker client before provider IO，builds the real
+  allocator/recovery/appender/reader adapters，combines Object+BK registries and registers the BK physical reference and
+  materialization source in the one shared F4 runtime；close never owns the borrowed client；
+- runtime reads the canonical `NBLR1` reservation from the global Oxia keyspace through a read-only adapter，checks
+  deployment/scope/prefix/reservation identity and binds the exact stored bytes+metadata version as `NBLN1`；it never
+  auto-creates or repairs the authority；
+- the broker publishes reserved protocol、configuration、namespace and required-Object-completion properties only
+  after local verification；two stable all-persistent-broker snapshots must match before first-create；
+- BK_ONLY/BK_ASYNC require the protocol/config/namespace tuple，while BK_SYNC additionally requires the independent
+  required-Object-generation property；Object profiles are unaffected；
+- `NereusCreationPermit.validateStorageProfileBeforeCreate` runs before the first L0 stream mutation and is not called
+  for an existing projection，so rollout admission does not become an availability dependency for historical reads。
+
+Still open after checkpoint C：durable activation/provision/revoke operations、production ledger-retention scanner and
+deletion activation、loaded/unloaded/partitioned routes、two-broker owner transfer and the named aggregate M5 gates。
 
 ### 8.2 Local Pulsar fork
 
