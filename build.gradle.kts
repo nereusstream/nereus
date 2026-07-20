@@ -248,7 +248,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("3d103e6a0e1607dfd95245994cea87375ca62c5c")
+    .orElse("52825536806a02eeb2418c9f4a39b0802d33d849")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -959,6 +959,23 @@ tasks.register("bookKeeperPrimaryWalM5RetentionCheck") {
     dependsOn("checkBookKeeperModuleBoundaries")
     dependsOn(":nereus-bookkeeper:check")
     dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM5DeletionActivationCheck") {
+    group = "verification"
+    description = "Verify producer-owned BK deletion proofs, one-CAS activation, and the locked broker handoff surface."
+    dependsOn("bookKeeperPrimaryWalM5RetentionCheck")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:compileJava",
+        "--rerun-tasks",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+    )
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

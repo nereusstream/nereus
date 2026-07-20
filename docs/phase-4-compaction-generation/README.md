@@ -223,7 +223,7 @@
 > Pulsar 输入基线：本地 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`
 > `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`
 >
-> 当前 post-BQ maintenance/source lock：`master@3d103e6a0e1607dfd95245994cea87375ca62c5c`；上面的 BQ
+> 当前 post-BQ maintenance/source lock：`master@52825536806a02eeb2418c9f4a39b0802d33d849`；上面的 BQ
 > acceptance lock 仍是历史验收事实，不因后续 F1-BK focused integration 改写。
 
 > 实现状态日期：2026-07-19

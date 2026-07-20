@@ -22,7 +22,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-/** Read-only broker adapter over the separately provisioned global Oxia namespace authority. */
+/** Shared Oxia adapter; brokers consume its read view while explicit administration owns mutations. */
 final class OxiaBookKeeperLedgerIdNamespaceReservationStore
         implements BookKeeperLedgerIdNamespaceReservationAdminStore {
     private final CapabilityMetadataClient client;

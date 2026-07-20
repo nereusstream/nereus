@@ -315,7 +315,7 @@ decision behind items 14 and 16-18。
 1. `nereus-future3-cursor-subscription.md`；
 2. `../phase-3-cursor-subscription/README.md`；
 3. 依次评审该目录的 `01` 到 `06` code-level documents；
-4. F3-M6 历史验收使用本地 Pulsar `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 maintenance/source lock 已推进到 `master@3d103e6a0e1607dfd95245994cea87375ca62c5c`。Phase 4 BQ historical acceptance lock 仍是 `eaf7b9a704890a9265c21f30d9f351e02d00c600`；M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
+4. F3-M6 历史验收使用本地 Pulsar `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 maintenance/source lock 已推进到 `master@52825536806a02eeb2418c9f4a39b0802d33d849`。Phase 4 BQ historical acceptance lock 仍是 `eaf7b9a704890a9265c21f30d9f351e02d00c600`；M0 历史 API/blob audit 仍固定在 `7efae25af39a15407c1397d9e1f4ac4658d09daa`，M4 历史证据固定在 `12edc9381c147ceec8bedd530acb5be7db339707`，M5 历史证据固定在 `a2bad4cfa260cc4575ae759f8a345ce969c8ec3a`；
 5. 执行 `phase3Check` 和 `phase3FinalCheck --rerun-tasks`；
 6. 后续 F4/F5/F8 必须消费 F3 已冻结的 cursor/reference/MessageId contract，不得另建 correctness owner。
 
@@ -327,7 +327,7 @@ decision behind items 14 and 16-18。
 3. 以 `../phase-4-compaction-generation/README.md` 为入口，依次评审 `01` 到 `08` 代码级文档；
 4. 实现必须按 `07-implementation-plan-and-gates.md` 的 M1–M6 顺序和 mandatory review stops 推进；
 5. 重新审计时使用本地 Pulsar
-   `master@3d103e6a0e1607dfd95245994cea87375ca62c5c`，不把未发布的 Maven snapshot 当作权威源；checkpoint BQ
+   `master@52825536806a02eeb2418c9f4a39b0802d33d849`，不把未发布的 Maven snapshot 当作权威源；checkpoint BQ
    的 Nereus acceptance code lock 是 `main@fa533a934c33f5bcc4fda328c4df64cb96c6b485`；
 6. F4-M6/BQ 之前不得将 broker destructive-GC activation 或最终兼容路径写成 Implemented；BQ 之后可以
    声明 Phase 4 final-gated，但仍必须写明 safe delete defaults 和 BookKeeper primary profiles 的保留边界。

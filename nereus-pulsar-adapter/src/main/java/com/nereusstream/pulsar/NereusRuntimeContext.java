@@ -24,7 +24,8 @@ public record NereusRuntimeContext(
         ClassLoader pluginClassLoader,
         Optional<BookKeeper> borrowedBookKeeperClient,
         BookKeeperBrokerReadinessProvider bookKeeperBrokerReadinessProvider,
-        BookKeeperPrimaryWalCapabilitySink bookKeeperPrimaryWalCapabilitySink) {
+        BookKeeperPrimaryWalCapabilitySink bookKeeperPrimaryWalCapabilitySink,
+        BookKeeperPrimaryWalAdministrationSink bookKeeperPrimaryWalAdministrationSink) {
     public NereusRuntimeContext(
             EventLoopGroup eventLoopGroup,
             OpenTelemetry openTelemetry,
@@ -46,7 +47,8 @@ public record NereusRuntimeContext(
                 pluginClassLoader,
                 borrowedBookKeeperClient,
                 BookKeeperBrokerReadinessProvider.unavailable(),
-                BookKeeperPrimaryWalCapabilitySink.unavailable());
+                BookKeeperPrimaryWalCapabilitySink.unavailable(),
+                BookKeeperPrimaryWalAdministrationSink.unavailable());
     }
 
     public NereusRuntimeContext(
@@ -69,7 +71,8 @@ public record NereusRuntimeContext(
                 pluginClassLoader,
                 Optional.empty(),
                 BookKeeperBrokerReadinessProvider.unavailable(),
-                BookKeeperPrimaryWalCapabilitySink.unavailable());
+                BookKeeperPrimaryWalCapabilitySink.unavailable(),
+                BookKeeperPrimaryWalAdministrationSink.unavailable());
     }
 
     public NereusRuntimeContext(
@@ -91,7 +94,8 @@ public record NereusRuntimeContext(
                 pluginClassLoader,
                 Optional.empty(),
                 BookKeeperBrokerReadinessProvider.unavailable(),
-                BookKeeperPrimaryWalCapabilitySink.unavailable());
+                BookKeeperPrimaryWalCapabilitySink.unavailable(),
+                BookKeeperPrimaryWalAdministrationSink.unavailable());
     }
 
     public NereusRuntimeContext(
@@ -112,7 +116,8 @@ public record NereusRuntimeContext(
                 pluginClassLoader,
                 Optional.empty(),
                 BookKeeperBrokerReadinessProvider.unavailable(),
-                BookKeeperPrimaryWalCapabilitySink.unavailable());
+                BookKeeperPrimaryWalCapabilitySink.unavailable(),
+                BookKeeperPrimaryWalAdministrationSink.unavailable());
     }
 
     public NereusRuntimeContext(
@@ -132,7 +137,8 @@ public record NereusRuntimeContext(
                 pluginClassLoader,
                 Optional.empty(),
                 BookKeeperBrokerReadinessProvider.unavailable(),
-                BookKeeperPrimaryWalCapabilitySink.unavailable());
+                BookKeeperPrimaryWalCapabilitySink.unavailable(),
+                BookKeeperPrimaryWalAdministrationSink.unavailable());
     }
 
     public NereusRuntimeContext {
@@ -153,5 +159,8 @@ public record NereusRuntimeContext(
         Objects.requireNonNull(
                 bookKeeperPrimaryWalCapabilitySink,
                 "bookKeeperPrimaryWalCapabilitySink");
+        Objects.requireNonNull(
+                bookKeeperPrimaryWalAdministrationSink,
+                "bookKeeperPrimaryWalAdministrationSink");
     }
 }

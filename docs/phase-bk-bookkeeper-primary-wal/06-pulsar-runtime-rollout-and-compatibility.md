@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@3d103e6a0e1607dfd95245994cea87375ca62c5c
+master@52825536806a02eeb2418c9f4a39b0802d33d849
 BookKeeper 4.18.0
 ```
 
@@ -80,8 +80,8 @@ Implemented checkpoint B/C composition uses one `PrimaryWalRegistry.combine(Obje
 reference adapter into generation-zero publication plus the BK materialization-source provider into the existing F4
 runtime。No second planner、worker pool or lag authority is created。Checkpoint D adds the durable activation control
 plane and read-side admission；checkpoint E adds the one binding-filtered all-shard retention loop under explicit
-non-dry-run configuration。Deletion remains fail closed until the separate coverage/scope proof producers activate its
-durable authority。
+non-dry-run configuration。Checkpoint E.1 adds the producer-owned root/stream/provider-scope proofs and one-CAS
+deletion activation described in §6；physical deletion remains fail closed until that exact activation succeeds。
 
 ## 4. Broker configuration
 
@@ -336,8 +336,39 @@ Checkpoint E installs a production `BookKeeperLedgerRetentionService` only for e
 mark/drain/delete/dual-absence manager one step per pass。This does not make local configuration deletion authority：
 the current activation record、namespace and live strongest-profile broker readiness are reloaded/revalidated by the
 gate and again before each provider-facing mutation。
-Until the three proof producers below install `ledgerDeletionEnabled=true`，the service can make safe logical reference
-progress but physical ledger deletion remains fail closed。
+
+Checkpoint E.1 implements the three proof producers and the only deletion-activation path：
+
+- `BookKeeperRootCoverageProofProducer` starts with an empty continuation in every one of the 256 root shards，requires
+  strict ordered/unique pages，reconstructs the exact root provider identity/custom metadata and traverses every
+  protection and reader-lease page for roots matching the configuration/namespace binding。`NBKROOT1` hashes the
+  canonical key、metadata version and durable stored-value digest for each matching fact plus the one broker-readiness
+  identity；a partial or malformed traversal returns no proof；
+- `BookKeeperStreamCoverageProofProducer` starts with an empty continuation in all 64 F4 registration shards。For every
+  BK profile registration it requires the exact canonical registry key/version，ACTIVE/SEALED L0 stream/profile，F2
+  virtual-ledger binding/current topic and `NPR1` projection reference/digest to agree。`NBKSTREAM1` binds those durable
+  records and their current L0 semantic frontier to the same readiness；
+- `BookKeeperScopeCapabilityProbe` first creates a permanent `QUARANTINED` Oxia audit root inside the reserved prefix，
+  then uses exact `CreateAdv` + `NBKL1` metadata to write entry 0、read it without recovery、reopen with recovery to
+  prove fencing/closed metadata、delete and observe absence twice。Applied create/delete response loss converges only
+  after exact provider metadata/absence；foreign metadata is never fenced or deleted。An indeterminate create leaves
+  the audit root quarantined and fails closed instead of guessing；
+- `BookKeeperDeletionActivationCoordinator` accepts only `{runId, expectedActivationMetadataVersion, timeout}`。It
+  requires non-dry-run GC、all three publication bits、live strongest-profile readiness and lease capacity，then runs
+  scope canary -> readiness recheck -> root -> readiness recheck -> stream -> readiness recheck -> namespace recheck。
+  Running the mutating canary first ensures its permanent audit root is included in the subsequent root coverage。All
+  proof records must bind the same epoch/SHA；one activation CAS installs the three producer-owned digests and
+  `ledgerDeletionEnabled=true`。A lost CAS response reloads and accepts only the exact installed proof tuple；an already
+  active record is returned idempotently without rerunning provider IO；
+- the ordinary `BookKeeperPrimaryWalAdministration.activate` rejects every request that sets the deletion bit，so a
+  caller cannot inject digests through the older publication API。Production composition publishes the proof-capable
+  administration object to the Pulsar storage plugin through a one-time sink；the concrete broker admin REST route is
+  deliberately still a later BK-M5 checkpoint。
+
+The retained QUARANTINED canary roots are intentional bounded-per-activation audit evidence and permanent allocation
+vetoes；they are never reclaimed or reused by the ordinary allocator。Operators must therefore use a unique stable
+run id per reviewed activation attempt and treat repeated failed canaries as a scope-health incident，not as garbage
+eligible for automatic cleanup。
 
 ## 7. First-create and reopen admission
 

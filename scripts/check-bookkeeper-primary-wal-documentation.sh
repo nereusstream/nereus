@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="3d103e6a0e1607dfd95245994cea87375ca62c5c"
+pulsar_source_lock="52825536806a02eeb2418c9f4a39b0802d33d849"
 
 require_literal() {
     local literal="$1"
@@ -277,6 +277,7 @@ require_literal 'bookKeeperPrimaryWalM5CapabilityCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5FirstCreateCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5BorrowedClientCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5RetentionCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5DeletionActivationCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md" \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"

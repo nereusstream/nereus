@@ -10,7 +10,7 @@ Docker-backed final gates on 2026-07-15；F4-M4 completed its focused、real Oxi
 retry-disabled real two-broker final boundary on 2026-07-19；F4-M5 completed its ordinary and retry-disabled real
 two-broker async/retention boundary on 2026-07-19；F4-M6 and the aggregate Phase 4 boundary completed on 2026-07-19
 through checkpoint BQ. The current post-BQ Pulsar maintenance/source lock is
-`master@3d103e6a0e1607dfd95245994cea87375ca62c5c`；the newer commits add the F1-BK borrowed-client、runtime configuration
+`master@52825536806a02eeb2418c9f4a39b0802d33d849`；the newer commits add the F1-BK borrowed-client、runtime configuration
 and profile-specific first-create capability boundaries and
 does not rewrite the historical BQ acceptance claim. The following foundation parts are implemented and covered by
 focused and real-service tests：
