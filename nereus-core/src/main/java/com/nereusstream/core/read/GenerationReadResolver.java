@@ -146,7 +146,7 @@ public final class GenerationReadResolver {
                     ErrorCode.INVALID_ARGUMENT, false, "read offset must be non-negative");
         }
         return loadSnapshot(streamId, deadline).thenComposeAsync(snapshot -> {
-            validateReadable(streamId, offset, snapshot);
+            StorageProfile profile = validateReadable(streamId, offset, snapshot);
             if (offset >= snapshot.committedEnd().committedEndOffset()) {
                 return CompletableFuture.completedFuture(Optional.empty());
             }
@@ -162,7 +162,12 @@ public final class GenerationReadResolver {
                             new ArrayList<>(),
                             deadline)
                     .thenCompose(wrappers -> candidates(
-                            streamId, offset, view, snapshot, wrappers))
+                            streamId,
+                            offset,
+                            view,
+                            snapshot,
+                            wrappers,
+                            profile.objectMaterializationEnabled()))
                     .thenCompose(candidates -> {
                         List<GenerationReadCandidate> admitted = candidates.stream()
                                 .filter(candidate -> !exclusions.contains(candidate))
@@ -302,11 +307,17 @@ public final class GenerationReadResolver {
             long offset,
             ReadView view,
             StreamMetadataSnapshot snapshot,
-            List<VersionedGenerationCandidate> wrappers) {
+            List<VersionedGenerationCandidate> wrappers,
+            boolean higherGenerationsAllowed) {
         Map<Long, String> positiveGenerationKeys = new HashMap<>();
         List<GenerationReadCandidate> result = new ArrayList<>();
         for (VersionedGenerationCandidate wrapper : wrappers) {
             if (wrapper instanceof VersionedGenerationIndex higher) {
+                if (!higherGenerationsAllowed) {
+                    return CompletableFuture.failedFuture(invariant(
+                            "a primary-WAL-only profile contains a higher generation",
+                            null));
+                }
                 String previous = positiveGenerationKeys.putIfAbsent(
                         higher.value().generation(), higher.key());
                 if (previous != null && !previous.equals(higher.key())) {
@@ -547,7 +558,7 @@ public final class GenerationReadResolver {
         return entry.offsetStart() <= offset && offset < entry.offsetEnd();
     }
 
-    private static void validateReadable(
+    private static StorageProfile validateReadable(
             StreamId streamId,
             long offset,
             StreamMetadataSnapshot snapshot) {
@@ -568,18 +579,13 @@ public final class GenerationReadResolver {
                     state == StreamState.CREATING,
                     "stream state does not admit generation reads");
         }
-        if (!profile.objectMaterializationEnabled()) {
-            throw new NereusException(
-                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
-                    false,
-                    "generation-aware reads require an object-materializing profile");
-        }
         if (offset < snapshot.trim().trimOffset()) {
             throw new NereusException(
                     ErrorCode.OFFSET_TRIMMED,
                     false,
                     "requested offset is below the stream trim offset");
         }
+        return profile;
     }
 
     private long maximumReadDeadlineMillis(ReadOperationDeadline deadline) {

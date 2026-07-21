@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@512f8c1aed056033eef1690216f7b6fe9fae8450
+master@a8eef5eb3906b6005006627506b3516ff2349fa7
 BookKeeper 4.18.0
 ```
 
@@ -227,8 +227,10 @@ not by composing independent readiness checks from different broker epochs。
 
 Readiness identity includes broker id、start timestamp、all required property key/values and configuration digest.
 Registry changes invalidate cached readiness. A broker with missing/different config keeps new BK profile admission
-closed; existing topics may read only if the broker can satisfy their exact durable profile, otherwise ownership must
-not be assigned/opened there.
+closed. First-create uses the all-broker stable-snapshot fact；an existing topic's writable open instead requires the
+persisted profile's exact immutable local BK capability after storage initialization and broker registration。This
+allows a capable owner to continue during a rolling old-broker window without weakening local admission。Read-only
+historical open does not require writable capability；an incapable broker must not publish the topic writable。
 
 Deletion activation also requires `maxReaderLeasesPerLedger` to cover the stable persistent-broker set plus one
 conservative rolling-restart overlap slot in V1. A larger broker set invalidates deletion readiness；the limit cannot
@@ -425,14 +427,16 @@ default and chooses another profile.
 load durable binding + stream metadata + projection
 ignore current default profile
 require local adapter/config matches stored profile/binding
-require current cluster readiness for ownership/writes
+require exact local capability for ownership/writes
 recover writer/ledger state before writable publication
 install F3 cursor + F4 services as profile requires
 ```
 
 Loaded and unloaded admin paths use durable binding/profile facts. An unloaded topic is not interpreted from namespace
-default policy。Checkpoint E.2 implements this admin boundary；writable ownership/open admission and two-broker
-transfer remain the next BK-M5 checkpoint。
+default policy。Checkpoint E.2 implements this admin boundary。Checkpoint E.3 calls
+`NereusCreationPermit.validateStorageProfileBeforeWritableOpen` only after reloading the existing projection/L0 profile
+and before writable cursor/runtime hydration。Read-only open skips that check；trusted logical-delete open has a
+separate explicit bypass so capability drift cannot make deletion impossible。
 
 ### 7.3 Profile mutation
 
@@ -467,6 +471,28 @@ New owner follows document 04 fencing sequence, allocates a new ledger and prese
 contend on recovery, but only the writer-state/session/root CAS winner becomes writable. Workers may run on either
 broker against shared F4 tasks; source protections and claims serialize physical work independently of topic owner.
 
+### 8.4 Implemented checkpoint E.3
+
+`NereusBrokerCapabilityCoordinator.requireLocalStorageProfileReady` is intentionally different from
+`requireStorageProfileReady`：
+
+- first-create still requires two identical all-persistent-broker snapshots for the exact profile；
+- existing writable open requires storage initialized、the local broker registry started/registered and the immutable
+  local `BookKeeperPrimaryWalCapabilityBinding` installed；
+- an old/incapable remote broker therefore blocks new BK first-create but does not stop an already capable owner；
+- a locally incapable broker fails writable open before facade hydration；historical read-only open and trusted logical
+  delete remain available；
+- generation-aware L0 reads admit generation zero for BK_ONLY and reject any positive generation as an invariant
+  violation；Reader seek reconnect returns the cached open non-durable cursor, matching stock ManagedLedger behavior。
+
+The real `NereusBookKeeperMultiBrokerIntegrationTest`
+`preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers` provisions the real Oxia namespace/activation，runs
+two Pulsar brokers against the borrowed real BookKeeper client and LocalStack-backed runtime，then proves unload、owner
+stop、survivor takeover、old-owner restart/rejoin、survivor stop and reverse takeover。It compares ledger/entry/partition/
+batch fields of every `MessageIdAdv` for ordinary and LZ4-compressed batches，checks both exclusive and inclusive seek，
+directly reads the provider-neutral generation-zero path and keeps a stock BookKeeper topic readable/writable across
+both takeovers。This is BK-82/BK-84 evidence；it does not close BK-83、BK-85 or BK-86。
+
 ## 9. Stock BookKeeper isolation
 
 Stock Pulsar topics and Nereus BK-profile topics may share the same client/BookKeeper cluster, but not metadata
@@ -498,9 +524,10 @@ Recommended operational rollout mirrors implementation milestones：
 8. expand profile policy only after BK-M6 aggregate gate
 ```
 
-Removing capability from one broker prevents new BK topic creates and ownership/writes there. Rollback must keep at
-least read/recovery support for already-created BK targets; downgrading to a build that cannot decode/read durable BK
-targets is prohibited.
+Removing capability from one broker prevents new BK topic creates cluster-wide and writable ownership on that broker；
+an already capable owner uses local admission and may continue serving existing topics。Rollback must keep at least
+read/recovery support for already-created BK targets；downgrading to a build that cannot decode/read durable BK targets
+is prohibited。
 
 ## 11. No online migration in BK-M0–M6
 
@@ -567,3 +594,7 @@ only after：
 - borrowed client closes exactly once by its stock owner；
 - safe defaults schedule no BookKeeper delete；
 - an explicitly activated canary scope proves response-loss-safe deletion without touching foreign/stock ledgers。
+
+Checkpoint E.3 satisfies the BK_ONLY ownership/MessageId/seek and stock-control subset above。BK-M5 remains in progress
+until mixed BK async/sync/Object profiles、old/noncapable broker ownership exclusion、capability-epoch recovery and the
+named ordinary/final aggregates are executable and green。

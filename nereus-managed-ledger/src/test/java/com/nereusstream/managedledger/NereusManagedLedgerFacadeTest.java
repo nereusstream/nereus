@@ -370,6 +370,10 @@ class NereusManagedLedgerFacadeTest {
             assertCursorBoundary(navigation, 0, -1);
             navigation.resetCursor(PositionFactory.LATEST);
             assertCursorBoundary(navigation, 3, 2);
+            ManagedCursor reusedAfterReset = ledger.newNonDurableCursor(
+                    PositionFactory.EARLIEST, "navigation");
+            assertThat(reusedAfterReset).isSameAs(navigation);
+            assertCursorBoundary(reusedAfterReset, 3, 2);
             assertThat(resetCursorAsync(navigation, first, true).join()).isEqualTo(first);
             assertCursorBoundary(navigation, 0, -1);
             assertThat(resetCursorAsync(

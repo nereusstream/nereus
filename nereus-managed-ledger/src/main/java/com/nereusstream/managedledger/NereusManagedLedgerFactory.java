@@ -483,7 +483,7 @@ public final class NereusManagedLedgerFactory implements ManagedLedgerFactory {
                 captured.operationView(), false, Map.of());
         NereusManagedLedgerOwnershipGuard ownershipGuard =
                 NereusManagedLedgerOwnershipGuard.trustedDirect(runtime.config().metadataTimeout());
-        return openCoordinator.openWritable(name, noCreate, ownershipGuard).thenCompose(opened -> {
+        return openCoordinator.openForLogicalDelete(name, noCreate, ownershipGuard).thenCompose(opened -> {
             CompletableFuture<Void> result = new CompletableFuture<>();
             NereusManagedLedger ephemeral = new NereusManagedLedger(
                     runtime, opened, ownershipGuard, config, () -> { });

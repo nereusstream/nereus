@@ -61,6 +61,13 @@ public final class NereusManagedLedgerOpenCoordinator {
     public CompletableFuture<NereusLedgerOpenResult> open(
             String managedLedgerName,
             ManagedLedgerOpenConfigView config) {
+        return open(managedLedgerName, config, false);
+    }
+
+    private CompletableFuture<NereusLedgerOpenResult> open(
+            String managedLedgerName,
+            ManagedLedgerOpenConfigView config,
+            boolean requireWritableProfileAdmission) {
         String exactName = ManagedLedgerProjectionNames.requireManagedLedgerName(managedLedgerName);
         Objects.requireNonNull(config, "config");
         return creationGuard.acquire(exactName)
@@ -69,7 +76,12 @@ public final class NereusManagedLedgerOpenCoordinator {
                     return runtime.projectionStore().getProjection(runtime.cluster(), exactName)
                             .thenCompose(existing -> existing
                                     .map(topic -> openExisting(topic, permit, config))
-                                    .orElseGet(() -> createFirst(exactName, permit, config)));
+                                    .orElseGet(() -> createFirst(exactName, permit, config)))
+                            .thenCompose(opened -> requireWritableProfileAdmission
+                                    ? permit.validateStorageProfileBeforeWritableOpen(
+                                                    opened.streamMetadata().profile())
+                                            .thenApply(ignored -> opened)
+                                    : CompletableFuture.completedFuture(opened));
                 })
                 .thenCompose(this::registerBeforeReturn);
     }
@@ -89,7 +101,21 @@ public final class NereusManagedLedgerOpenCoordinator {
             NereusManagedLedgerOwnershipGuard ownershipGuard) {
         Objects.requireNonNull(ownershipGuard, "ownershipGuard");
         return ownershipGuard.requireOwned("writable open before cursor claim")
-                .thenCompose(ignored -> open(managedLedgerName, config))
+                .thenCompose(ignored -> open(managedLedgerName, config, true))
+                .thenCompose(ledger -> hydrateWritable(ledger, ownershipGuard));
+    }
+
+    CompletableFuture<NereusWritableLedgerOpenResult> openForLogicalDelete(
+            String managedLedgerName,
+            ManagedLedgerOpenConfigView config,
+            NereusManagedLedgerOwnershipGuard ownershipGuard) {
+        Objects.requireNonNull(ownershipGuard, "ownershipGuard");
+        if (!ownershipGuard.isTrustedDirect()) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "logical-delete open requires trusted direct ownership"));
+        }
+        return ownershipGuard.requireOwned("logical-delete open before cursor claim")
+                .thenCompose(ignored -> open(managedLedgerName, config, false))
                 .thenCompose(ledger -> hydrateWritable(ledger, ownershipGuard));
     }
 

@@ -42,7 +42,7 @@ All paths above are under `src/main/java/com/nereusstream/...`; shortened prefix
 ### 2.2 Local Pulsar master
 
 Checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@512f8c1aed056033eef1690216f7b6fe9fae8450`。Phase 4 的 BQ historical acceptance lock 仍是
+`master@a8eef5eb3906b6005006627506b3516ff2349fa7`。Phase 4 的 BQ historical acceptance lock 仍是
 `eaf7b9a704890a9265c21f30d9f351e02d00c600`；当前 commits 在其上增加 F1-BK borrowed-client、runtime
 configuration 与 profile-specific first-create capability integration。
 

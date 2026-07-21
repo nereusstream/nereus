@@ -243,6 +243,72 @@ class NereusManagedLedgerOpenCoordinatorTest {
     }
 
     @Test
+    void existingReadOnlyOpenSkipsLocalProfileAdmissionButWritableOpenRequiresIt() {
+        FakeStreamStorage streamStorage = new FakeStreamStorage();
+        FakeManagedLedgerProjectionMetadataStore projections =
+                new FakeManagedLedgerProjectionMetadataStore();
+        MutableGuard creatorGuard = new MutableGuard(3);
+        AtomicInteger writableValidations = new AtomicInteger();
+        AtomicReference<StorageProfile> observedProfile = new AtomicReference<>();
+        try (NereusManagedLedgerRuntime runtime =
+                ManagedLedgerRuntimeTestSupport.runtime(streamStorage, projections)) {
+            NereusManagedLedgerOpenCoordinator creator =
+                    new NereusManagedLedgerOpenCoordinator(runtime, creatorGuard);
+            NereusLedgerOpenResult created = creator.open(NAME, openConfig(true)).join();
+            NereusCreationGuard blocking = name -> CompletableFuture.completedFuture(
+                    new NereusCreationPermit() {
+                        @Override
+                        public String persistenceName() {
+                            return name;
+                        }
+
+                        @Override
+                        public long bindingGeneration() {
+                            return 3;
+                        }
+
+                        @Override
+                        public CompletableFuture<Void> validateStorageProfileBeforeWritableOpen(
+                                StorageProfile profile) {
+                            writableValidations.incrementAndGet();
+                            observedProfile.set(profile);
+                            return CompletableFuture.failedFuture(
+                                    new IllegalStateException("local profile capability sentinel"));
+                        }
+
+                        @Override
+                        public CompletableFuture<Void> validateBeforeProjectionPublish() {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                    });
+            NereusManagedLedgerOpenCoordinator blocked =
+                    new NereusManagedLedgerOpenCoordinator(runtime, blocking);
+
+            assertThat(blocked.open(NAME, openConfig(false)).join()).isEqualTo(created);
+            assertThat(writableValidations).hasValue(0);
+
+            NereusManagedLedgerOwnershipGuard owned =
+                    NereusManagedLedgerOwnershipGuard.checked(
+                            () -> CompletableFuture.completedFuture(true),
+                            java.time.Duration.ofSeconds(1));
+            assertThatThrownBy(() -> blocked
+                            .openWritable(NAME, openConfig(false), owned)
+                            .join())
+                    .hasRootCauseMessage("local profile capability sentinel");
+            assertThat(writableValidations).hasValue(1);
+            assertThat(observedProfile).hasValue(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
+
+            blocked.openForLogicalDelete(
+                            NAME,
+                            openConfig(false),
+                            NereusManagedLedgerOwnershipGuard.trustedDirect(
+                                    java.time.Duration.ofSeconds(1)))
+                    .join();
+            assertThat(writableValidations).hasValue(1);
+        }
+    }
+
+    @Test
     void bindingMismatchFailsBeforeL0ReadAndMissingPublishedHeadIsCorruption() {
         FakeStreamStorage streamStorage = new FakeStreamStorage();
         FakeManagedLedgerProjectionMetadataStore projections = new FakeManagedLedgerProjectionMetadataStore();

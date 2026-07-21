@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="512f8c1aed056033eef1690216f7b6fe9fae8450"
+pulsar_source_lock="a8eef5eb3906b6005006627506b3516ff2349fa7"
 
 require_literal() {
     local literal="$1"
@@ -280,8 +280,21 @@ require_literal 'bookKeeperPrimaryWalM5RetentionCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5DeletionActivationCheck' "build.gradle.kts"
 require_literal 'checkBookKeeperPrimaryWalM5AdminRoutingContractSurface' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5AdminRoutingCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5TwoBrokerCheck' "build.gradle.kts"
+require_literal 'NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'bookKeeperWalOnlyResolvesGenerationZeroWithoutAdmittingHigherGenerations' \
+    "nereus-core/src/test/java/com/nereusstream/core/read/GenerationReadResolverTest.java"
+require_literal 'assertThat(reusedAfterReset).isSameAs(navigation)' \
+    "nereus-managed-ledger/src/test/java/com/nereusstream/managedledger/NereusManagedLedgerFacadeTest.java"
 require_literal 'bookKeeperPrimaryWalM5AdminRoutingCheck --rerun-tasks` passes 103/103 outer tasks in 3m32s' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md" \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM5TwoBrokerCheck --rerun-tasks` passes 104/104 outer tasks in 4m59s' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+require_literal 'bookKeeperPrimaryWalM5TwoBrokerCheck --rerun-tasks` passes 104/104 outer tasks in 4m59s' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md" \
@@ -385,7 +398,6 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     exit 1
 fi
 for unfinished_task in \
-    bookKeeperPrimaryWalM5TwoBrokerCheck \
     bookKeeperPrimaryWalM5Check \
     bookKeeperPrimaryWalM5FinalCheck \
     bookKeeperPrimaryWalM6ScenarioEvidenceCheck \

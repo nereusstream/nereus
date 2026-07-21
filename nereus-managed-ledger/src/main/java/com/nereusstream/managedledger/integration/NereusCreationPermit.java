@@ -15,5 +15,11 @@ public interface NereusCreationPermit {
         return CompletableFuture.completedFuture(null);
     }
 
+    /** Local broker admission for an existing durable profile before writable hydration. */
+    default CompletableFuture<Void> validateStorageProfileBeforeWritableOpen(StorageProfile profile) {
+        java.util.Objects.requireNonNull(profile, "profile");
+        return CompletableFuture.completedFuture(null);
+    }
+
     CompletableFuture<Void> validateBeforeProjectionPublish();
 }

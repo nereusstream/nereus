@@ -18,7 +18,9 @@ composition、shared lag、retirement-metadata authority、sealed shared-scanner
 publication/read/retirement、physical ledger deletion and fresh-runtime task/source/output/publication response-loss
 plus real-load lag/physically-missing-Object fail-closed checkpoints；BK-M2/M3 aggregate final gates 已通过。
 BK-M4 也已实现独立 sync completion policy、exact single-source task reuse、normal-read proof 和
-`KNOWN_COMMITTED` restart recovery，并通过普通/final gate；BK-M5–M6 尚未实现。
+`KNOWN_COMMITTED` restart recovery，并通过普通/final gate；BK-M5 checkpoints A–E.3 已实现 production rollout、
+admin/retention activation 与首个 retry-disabled BK_ONLY 双 broker ownership/MessageId/seek/stock-BK 门禁；
+BK-83/BK-85/BK-86、M5 aggregate 与 BK-M6 仍未实现。
 
 建议阅读顺序：
 

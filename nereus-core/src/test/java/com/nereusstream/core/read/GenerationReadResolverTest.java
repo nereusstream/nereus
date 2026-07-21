@@ -127,6 +127,63 @@ class GenerationReadResolverTest {
     }
 
     @Test
+    void bookKeeperWalOnlyResolvesGenerationZeroWithoutAdmittingHigherGenerations() {
+        BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
+                1,
+                "bk-cluster",
+                9,
+                11,
+                2,
+                BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                new Checksum(ChecksumType.SHA256, "b".repeat(64)));
+        ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(List.of(
+                new NoopReader(ReadTargetReaderKey.from(target))));
+        GenerationStoreState zeroOnly = new GenerationStoreState(List.of(generationZero(1, target)));
+        GenerationReadResolver resolver = new GenerationReadResolver(
+                CLUSTER,
+                l0Store(StorageProfile.BOOKKEEPER_WAL_ONLY),
+                zeroOnly.proxy(),
+                GenerationIndexValidator.phase15Targets(),
+                readers,
+                GenerationReadResolverTest::identity,
+                new TestPinManager(),
+                1_000,
+                CLOCK,
+                Runnable::run);
+
+        PinnedResolvedRange selected = resolver.resolve(
+                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().generation()).isZero();
+        assertThat(selected.resolvedRange().readTarget()).isEqualTo(target);
+        selected.release().join();
+
+        GenerationStoreState invalidHigher = new GenerationStoreState(List.of(
+                generationZero(1, target),
+                higher(2, GenerationLifecycle.COMMITTED, "NEREUS_COMPACTED_PARQUET_V1", ReadView.COMMITTED)));
+        GenerationReadResolver invalidResolver = new GenerationReadResolver(
+                CLUSTER,
+                l0Store(StorageProfile.BOOKKEEPER_WAL_ONLY),
+                invalidHigher.proxy(),
+                GenerationIndexValidator.phase15Targets(),
+                readers(true),
+                GenerationReadResolverTest::identity,
+                new TestPinManager(),
+                1_000,
+                CLOCK,
+                Runnable::run);
+        assertThatThrownBy(() -> invalidResolver.resolve(
+                        STREAM, 0, ReadView.COMMITTED, Duration.ofSeconds(5))
+                .join())
+                .satisfies(error -> assertThat(unwrap(error))
+                        .isInstanceOfSatisfying(NereusException.class,
+                                nereus -> assertThat(nereus.code())
+                                        .isEqualTo(ErrorCode.METADATA_INVARIANT_VIOLATION)));
+    }
+
+    @Test
     void staleHigherCandidateAtPinTimeFallsBackOnlyWithinCommittedView() {
         VersionedGenerationCandidate zero = generationZero(1);
         VersionedGenerationCandidate higher = higher(

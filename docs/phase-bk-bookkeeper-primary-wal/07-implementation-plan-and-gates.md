@@ -187,7 +187,7 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
 The current local Pulsar integration/source lock is
-`master@512f8c1aed056033eef1690216f7b6fe9fae8450`；it retains the BK-M1 historical evidence above and adds the focused
+`master@a8eef5eb3906b6005006627506b3516ff2349fa7`；it retains the BK-M1 historical evidence above and adds the focused
 BK-M2 borrowed-client boundary plus BK-M5 configuration and profile-specific capability rollout。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
@@ -791,8 +791,24 @@ Implementation checkpoint E.2 (2026-07-20) closes the management and durable-pro
   cover auth-before-lookup、exact DTO/domain mapping、proof-field absence、durable-profile generation match、operation
   matrix and all three routing shapes。
 
-Still open after checkpoint E.2：writable ownership admission、two-broker owner transfer and the named aggregate M5
-gates。
+Implementation checkpoint E.3 (2026-07-22) closes the first writable ownership slice：
+
+- existing writable open reloads the persisted L0 profile and calls the new
+  `NereusCreationPermit.validateStorageProfileBeforeWritableOpen` before writable hydration；
+- local BK admission requires initialized storage、a registered local broker and the immutable verified capability
+  binding，while first-create deliberately retains the two-stable-all-broker-snapshot barrier；
+- read-only history and trusted logical-delete opens bypass only writable capability admission，not durable projection/
+  L0 validation or ownership fencing；
+- BK_ONLY generation-zero is now legal in the shared `GenerationReadResolver`，while a positive generation under
+  BK_ONLY fails as a metadata invariant；
+- reconnect after Reader seek reuses the existing open non-durable cursor，matching stock ManagedLedger's exact-name
+  behavior without permitting a durable/closing cursor collision；
+- `NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers`
+  proves real unload、failover、restart/rejoin、reverse takeover、ordinary/LZ4-batch exact MessageIds、exclusive/
+  inclusive seek、direct generation-zero read and stock BookKeeper coexistence with retry disabled。
+
+Still open after checkpoint E.3：mixed BK async/sync/Object profile coexistence、old/noncapable broker selection/
+exclusion、capability-epoch recovery and the named M5 ordinary/final aggregates。
 
 ### 8.2 Local Pulsar fork
 
@@ -825,28 +841,33 @@ bookKeeperPrimaryWalM5Check
 bookKeeperPrimaryWalM5FinalCheck             retry-disabled real two-broker acceptance
 ```
 
-Checkpoints D/E/E.1/E.2 register the first seven names as real tasks：configuration runs the typed adapter tests plus source/doc
+Checkpoints D/E/E.1/E.2/E.3 register the first eight names as real tasks：configuration runs the typed adapter tests plus source/doc
 locks；capability publishes exact development artifacts and runs the locked Pulsar capability test with fresh broker
 Checkstyle；first-create adds the ManagedLedger pre-L0 admission regression；borrowed-client reruns the stock-client
 identity/close-ownership test；retention runs the all-shard scanner/service and production composition checks。
 Deletion activation additionally runs the producer/coordinator suites and recompiles/formats the locked Pulsar broker
 handoff against freshly published Nereus development artifacts。Admin routing statically audits the proof-safe REST and
 durable-profile contract，then freshly runs the three focused Pulsar suites plus main/test formatting and Checkstyle。
-`bookKeeperPrimaryWalM5TwoBrokerCheck` and the ordinary/final aggregates remain intentionally unregistered until their
-concrete ownership/fixtures exist；they are not success-only placeholders。
+`bookKeeperPrimaryWalM5TwoBrokerCheck` publishes current development artifacts and runs Pulsar Spotless、main/test
+Checkstyle plus the retry-disabled exact E.3 real fixture；the ordinary/final aggregates remain intentionally
+unregistered until BK-83/BK-85/BK-86 have concrete implementations。
 
 The focused Pulsar capability/Checkstyle run on 2026-07-20 passed 136/136 fresh tasks at source lock
-`512f8c1aed056033eef1690216f7b6fe9fae8450`，including stable publication identity、strongest-profile live deletion
+`a8eef5eb3906b6005006627506b3516ff2349fa7`，including stable publication identity、strongest-profile live deletion
 readiness and broker/property drift invalidation. This remains checkpoint-D/E evidence only and does not satisfy any
 of the intentionally unregistered M5 gates. The latest complete fresh
 `bookKeeperPrimaryWalM5RetentionCheck --rerun-tasks` then passed 91/91 outer tasks in 2m13s；its nested capability and
 borrowed-client builds each passed 136/136 executable tasks。
 The fresh `bookKeeperPrimaryWalM5DeletionActivationCheck --rerun-tasks` passes 101/101 outer tasks in 2m46s at
-`512f8c1aed056033eef1690216f7b6fe9fae8450`；its two inherited focused broker builds each pass 136/136 tasks and its
+`a8eef5eb3906b6005006627506b3516ff2349fa7`；its two inherited focused broker builds each pass 136/136 tasks and its
 final locked Pulsar handoff format/checkstyle/compile build passes 66/66 tasks。
 The fresh `bookKeeperPrimaryWalM5AdminRoutingCheck --rerun-tasks` passes 103/103 outer tasks in 3m32s at the same
 source lock；after all inherited M5 gates，its final Pulsar Spotless、main/test Checkstyle and authenticated-admin、
 durable-profile routing、operation-matrix suites pass 138/138 tasks。
+The fresh `bookKeeperPrimaryWalM5TwoBrokerCheck --rerun-tasks` passes 104/104 outer tasks in 4m59s at
+`a8eef5eb3906b6005006627506b3516ff2349fa7`；its final retry-disabled Pulsar Spotless、main/test Checkstyle and exact
+`NereusBookKeeperMultiBrokerIntegrationTest` leg pass 138/138 tasks。The generated XML contains one executed test and
+zero failures/errors。
 
 ### 8.4 Mandatory review stop F
 

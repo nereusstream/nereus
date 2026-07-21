@@ -1827,8 +1827,11 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
             NereusManagedCursor existing = cursors.putIfAbsent(exactName, cursor);
             if (existing != null) {
                 cursor.closeDetached();
+                if (!existing.isDurable() && existing.isOpenForRegistry()) {
+                    return existing;
+                }
                 throw new ManagedLedgerException(
-                        "a cursor already uses the exact name: " + exactName);
+                        "a durable or closing cursor already uses the exact name: " + exactName);
             }
         }
         return cursor;

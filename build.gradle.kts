@@ -250,7 +250,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("512f8c1aed056033eef1690216f7b6fe9fae8450")
+    .orElse("a8eef5eb3906b6005006627506b3516ff2349fa7")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1012,6 +1012,28 @@ tasks.register<Exec>("bookKeeperPrimaryWalM5AdminRoutingCheck") {
         "-PexcludedTestGroups=quarantine,flaky,broker-isolated",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",
+    )
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM5TwoBrokerCheck") {
+    group = "verification"
+    description = "Run the retry-disabled real two-broker BK_ONLY ownership, MessageId, seek, and stock-BK gate."
+    dependsOn("bookKeeperPrimaryWalM5AdminRoutingCheck")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBookKeeperMultiBrokerIntegrationTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+        "-PtestRetryCount=0",
     )
 }
 
