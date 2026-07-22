@@ -37,6 +37,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 final class BookKeeperDeletionActivationCoordinatorTest {
@@ -74,6 +75,55 @@ final class BookKeeperDeletionActivationCoordinatorTest {
         assertThat(fixture.rootCalls).hasValue(1);
         assertThat(fixture.streamCalls).hasValue(1);
         assertThat(fixture.scopeCalls).hasValue(1);
+    }
+
+    @Test
+    void rebindsAllDeletionProofsWhenTheReadinessIdentityChanges() {
+        AtomicReference<BookKeeperBrokerReadiness> readiness =
+                new AtomicReference<>(READY);
+        Fixture fixture = new Fixture(new BookKeeperBrokerReadinessProvider() {
+            @Override
+            public CompletableFuture<BookKeeperBrokerReadiness>
+                    requireBookKeeperPrimaryWalReadiness() {
+                return CompletableFuture.completedFuture(readiness.get());
+            }
+
+            @Override
+            public Optional<BookKeeperBrokerReadiness>
+                    currentBookKeeperPrimaryWalReadiness() {
+                return Optional.of(readiness.get());
+            }
+        });
+
+        BookKeeperDeletionActivationResult first = fixture.coordinator()
+                .activate(new BookKeeperDeletionActivationRequest(
+                        "rollout-epoch-1", 7, Duration.ofSeconds(10)))
+                .join();
+        BookKeeperBrokerReadiness replacement = new BookKeeperBrokerReadiness(
+                3, sha('9'), 1);
+        readiness.set(replacement);
+        fixture.scopeReadiness = replacement;
+
+        BookKeeperDeletionActivationResult rebound = fixture.coordinator()
+                .activate(new BookKeeperDeletionActivationRequest(
+                        "rollout-epoch-2",
+                        first.activation().metadataVersion(),
+                        Duration.ofSeconds(10)))
+                .join();
+
+        assertThat(rebound.newlyActivated()).isTrue();
+        assertThat(rebound.activation().metadataVersion())
+                .isEqualTo(first.activation().metadataVersion() + 1);
+        assertThat(rebound.activation().value().brokerReadinessEpoch())
+                .isEqualTo(replacement.brokerReadinessEpoch());
+        assertThat(rebound.activation().value().brokerReadinessSha256())
+                .isEqualTo(replacement.brokerSetSha256().value());
+        assertThat(rebound.activation().publicationActivationSha256())
+                .isEqualTo(first.activation().publicationActivationSha256());
+        assertThat(fixture.store.compareAndSetCalls).isEqualTo(2);
+        assertThat(fixture.rootCalls).hasValue(2);
+        assertThat(fixture.streamCalls).hasValue(2);
+        assertThat(fixture.scopeCalls).hasValue(2);
     }
 
     @Test

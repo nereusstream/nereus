@@ -10,7 +10,7 @@ BK-M1 provider-neutral foundation complete/final-gated on 2026-07-19
 BK-M2 BOOKKEEPER_WAL_ONLY       complete/final-gated on 2026-07-20
 BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-07-20
 BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20
-BK-M5 Pulsar rollout            in progress (configuration/composition/activation-bound first-create checkpoints passed)
+BK-M5 Pulsar rollout            complete/final-gated on 2026-07-22
 BK-M6 aggregate final gate      not implemented
 all BK module-local profiles    executable against real Oxia + BookKeeper/Object and installed by production provider
 all broker BookKeeper profiles  first-create admitted only by exact two-stable-snapshot capability equality
@@ -187,7 +187,7 @@ provider-neutral read accounting；Object compatibility bridges；module-boundar
 executable until BK-M2/M3/M4 installs and gates its exact writer、reader、lifecycle、retention and completion runtime。
 
 The current local Pulsar integration/source lock is
-`master@a8eef5eb3906b6005006627506b3516ff2349fa7`；it retains the BK-M1 historical evidence above and adds the focused
+`master@dfbcc8e11422c965957e3e1fcf809485e437d842`；it retains the BK-M1 historical evidence above and adds the focused
 BK-M2 borrowed-client boundary plus BK-M5 configuration and profile-specific capability rollout。
 
 ## 5. BK-M2 — `BOOKKEEPER_WAL_ONLY`
@@ -382,9 +382,9 @@ levels；the broader independent-process transport matrix remains BK-M6。
 
 The remaining M2 row suffixes are explicitly assigned to BK-M5 Pulsar rollout and BK-M6 independent-process/chaos
 evidence rather than hidden M2 prerequisites。The ordinary and aggregate final tasks passed against the current source
-locks。Production provider composition、first-create admission and
-loaded/unloaded/two-broker ownership rollout are BK-M5 responsibilities, not hidden BK-M2 completion criteria；until
-BK-M5, the broker profile remains rejected before primary IO。
+locks。Production provider composition、first-create admission and loaded/unloaded/two-broker ownership rollout were
+BK-M5 responsibilities, not hidden BK-M2 completion criteria；BK-M5 has since final-gated those routes behind exact
+activation/capability admission。
 `bookKeeperPrimaryWalM2Check --rerun-tasks` passed 107/107 executable tasks on 2026-07-20；
 `bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate on the same date。
 
@@ -807,8 +807,11 @@ Implementation checkpoint E.3 (2026-07-22) closes the first writable ownership s
   proves real unload、failover、restart/rejoin、reverse takeover、ordinary/LZ4-batch exact MessageIds、exclusive/
   inclusive seek、direct generation-zero read and stock BookKeeper coexistence with retry disabled。
 
-Still open after checkpoint E.3：mixed BK async/sync/Object profile coexistence、old/noncapable broker selection/
-exclusion、capability-epoch recovery and the named M5 ordinary/final aggregates。
+Checkpoint E.4 closes the remaining M5 surface：namespace-level durable-profile ownership filtering removes
+incapable candidates and fails closed on conflicting exact signatures；an old broker redirects to a capable owner but
+cannot publish writable ownership；readiness-set changes regenerate and CAS-rebind every deletion proof without
+changing publication identity；and the mixed-profile two-broker fixture preserves immutable BK_SYNC、BK_ASYNC and
+Object-WAL topic profiles、history and MessageIds across cold load and both ownership takeovers。
 
 ### 8.2 Local Pulsar fork
 
@@ -849,13 +852,13 @@ Deletion activation additionally runs the producer/coordinator suites and recomp
 handoff against freshly published Nereus development artifacts。Admin routing statically audits the proof-safe REST and
 durable-profile contract，then freshly runs the three focused Pulsar suites plus main/test formatting and Checkstyle。
 `bookKeeperPrimaryWalM5TwoBrokerCheck` publishes current development artifacts and runs Pulsar Spotless、main/test
-Checkstyle plus the retry-disabled exact E.3 real fixture；the ordinary/final aggregates remain intentionally
-unregistered until BK-83/BK-85/BK-86 have concrete implementations。
+Checkstyle plus the retry-disabled exact E.3 real fixture。Checkpoint E.4 registers `bookKeeperPrimaryWalM5Check`
+over ownership-filter、capability-rollover and mixed-profile suites，and registers `bookKeeperPrimaryWalM5FinalCheck`
+over that ordinary gate plus the complete BK-M4 final predecessor chain。
 
 The focused Pulsar capability/Checkstyle run on 2026-07-20 passed 136/136 fresh tasks at source lock
 `a8eef5eb3906b6005006627506b3516ff2349fa7`，including stable publication identity、strongest-profile live deletion
-readiness and broker/property drift invalidation. This remains checkpoint-D/E evidence only and does not satisfy any
-of the intentionally unregistered M5 gates. The latest complete fresh
+readiness and broker/property drift invalidation. This remains checkpoint-D/E historical evidence. The latest complete fresh
 `bookKeeperPrimaryWalM5RetentionCheck --rerun-tasks` then passed 91/91 outer tasks in 2m13s；its nested capability and
 borrowed-client builds each passed 136/136 executable tasks。
 The fresh `bookKeeperPrimaryWalM5DeletionActivationCheck --rerun-tasks` passes 101/101 outer tasks in 2m46s at
@@ -868,6 +871,12 @@ The fresh `bookKeeperPrimaryWalM5TwoBrokerCheck --rerun-tasks` passes 104/104 ou
 `a8eef5eb3906b6005006627506b3516ff2349fa7`；its final retry-disabled Pulsar Spotless、main/test Checkstyle and exact
 `NereusBookKeeperMultiBrokerIntegrationTest` leg pass 138/138 tasks。The generated XML contains one executed test and
 zero failures/errors。
+
+The checkpoint-E.4 `bookKeeperPrimaryWalM5Check --rerun-tasks` passes 105/105 outer tasks in 6m47s；its final locked
+Pulsar leg passes 138/138 fresh tasks with retry count zero。`bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` then
+passes 231/231 fresh tasks in 27m42s at
+`master@dfbcc8e11422c965957e3e1fcf809485e437d842`，including Phase 1.5、Phase 2/3/4 final and BK-M1–M4 final
+predecessors。BK-M5 is complete/final-gated；BK-M6 is the only remaining F1-BK milestone。
 
 ### 8.4 Mandatory review stop F
 

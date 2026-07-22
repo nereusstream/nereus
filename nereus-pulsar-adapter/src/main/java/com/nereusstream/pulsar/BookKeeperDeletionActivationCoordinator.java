@@ -135,17 +135,21 @@ public final class BookKeeperDeletionActivationCoordinator {
                     BookKeeperProtocolActivation current = optional.orElseThrow(() -> notReady(
                             "BookKeeper publication activation is absent"));
                     requirePublication(current);
-                    if (current.value().ledgerDeletionEnabled()) {
-                        return currentResult(current, deadline);
-                    }
-                    if (current.metadataVersion()
-                            != exact.expectedActivationMetadataVersion()) {
-                        return CompletableFuture.failedFuture(notReady(
-                                "BookKeeper activation metadata version changed before deletion proof production"));
-                    }
                     return readinessProvider.requireBookKeeperPrimaryWalReadiness()
-                            .thenCompose(readiness -> produceAndInstall(
-                                    exact, current, readiness, deadline));
+                            .thenCompose(readiness -> {
+                                requireCapacity(readiness);
+                                if (current.value().ledgerDeletionEnabled()
+                                        && matchesReadiness(current, readiness)) {
+                                    return currentResult(current, readiness, deadline);
+                                }
+                                if (current.metadataVersion()
+                                        != exact.expectedActivationMetadataVersion()) {
+                                    return CompletableFuture.failedFuture(notReady(
+                                            "BookKeeper activation metadata version changed before deletion proof production"));
+                                }
+                                return produceAndInstall(
+                                        exact, current, readiness, deadline);
+                            });
                 });
     }
 
@@ -231,16 +235,14 @@ public final class BookKeeperDeletionActivationCoordinator {
 
     private CompletableFuture<BookKeeperDeletionActivationResult> currentResult(
             BookKeeperProtocolActivation current,
+            BookKeeperBrokerReadiness readiness,
             BookKeeperOperationDeadline deadline) {
-        return readinessProvider.requireBookKeeperPrimaryWalReadiness()
-                .thenCompose(readiness -> {
-                    requireCapacity(readiness);
-                    requireReadiness(current, readiness);
-                    return namespaceVerifier
-                            .requireActive(configuration, deadline.remaining())
-                            .thenApply(this::requireNamespace)
-                            .thenApply(ignored -> result(current, false));
-                })
+        requireReadiness(current, readiness);
+        return requireCurrent(readiness, deadline)
+                .thenCompose(ignored -> namespaceVerifier
+                        .requireActive(configuration, deadline.remaining()))
+                .thenApply(this::requireNamespace)
+                .thenApply(ignored -> result(current, false))
                 .thenCompose(result -> activationStore
                         .read(configuration, namespace, deadline.remaining())
                         .thenApply(reloaded -> {
@@ -301,12 +303,19 @@ public final class BookKeeperDeletionActivationCoordinator {
     private static void requireReadiness(
             BookKeeperProtocolActivation activation,
             BookKeeperBrokerReadiness readiness) {
-        if (activation.value().brokerReadinessEpoch() != readiness.brokerReadinessEpoch()
-                || !activation.value().brokerReadinessSha256()
-                        .equals(readiness.brokerSetSha256().value())) {
+        if (!matchesReadiness(activation, readiness)) {
             throw notReady(
                     "BookKeeper deletion activation does not match live broker readiness");
         }
+    }
+
+    private static boolean matchesReadiness(
+            BookKeeperProtocolActivation activation,
+            BookKeeperBrokerReadiness readiness) {
+        return activation.value().brokerReadinessEpoch()
+                        == readiness.brokerReadinessEpoch()
+                && activation.value().brokerReadinessSha256()
+                        .equals(readiness.brokerSetSha256().value());
     }
 
     private static BookKeeperScopeCapabilityProof requireScopeBinding(

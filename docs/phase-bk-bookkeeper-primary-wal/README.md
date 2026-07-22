@@ -70,8 +70,14 @@
 > against the exact immutable local BK capability while keeping first-create on the all-broker stable-snapshot barrier；
 > read-only historical open and trusted logical-delete open remain available during rollout drift。A retry-disabled real
 > two-broker BK_ONLY fixture now proves unload、owner loss、restart/rejoin、reverse takeover、generation-zero reads、
-> ordinary and LZ4-batch exact MessageIds、exclusive/inclusive seek and stock-BookKeeper coexistence。Mixed-profile
-> rollout、old-broker ownership exclusion/capability-epoch recovery and the M5/M6 aggregates remain open。
+> ordinary and LZ4-batch exact MessageIds、exclusive/inclusive seek and stock-BookKeeper coexistence。Checkpoint E.4
+> installs namespace-level durable-profile ownership filtering：BK ownership candidates must publish one exact
+> immutable capability signature，incapable candidates are removed，conflicting complete signatures fail closed，and
+> an old broker may redirect without becoming writable owner。Capability/readiness-set changes rebind every
+> producer-owned deletion proof while keeping the publication identity stable。The mixed-profile fixture creates
+> BK_SYNC、BK_ASYNC and Object-WAL topics under successive broker defaults，then proves stored-profile immutability、
+> cold load、both single-broker ownership takeovers and exact ordinary/batched MessageIds。BK-M5 is now
+> complete/final-gated；only BK-M6 aggregate compatibility/scale/chaos remains open。
 
 > BK-M4 `BOOKKEEPER_WAL_SYNC_OBJECT` is complete/final-gated：`StorageExecutionPlan` resolves
 > `REQUIRED_OBJECT_GENERATION` independently from generation-zero durability；the append path publishes/protects gen0
@@ -80,7 +86,8 @@
 > scanner recovers/checkpoints/retires sync tasks but does not create a competing wider task。Producer completion waits
 > for exact current-policy higher-generation read proof，while logical visibility remains the stable head and reads use
 > BK during the wait。Post-head proof failure is `KNOWN_COMMITTED`；`recoverAppend` and restart recovery reuse the same
-> attempt、BK range、offset and deterministic task。Production broker installation still belongs to BK-M5。
+> attempt、BK range、offset and deterministic task。Production broker installation and rollout are final-gated by
+> BK-M5。
 
 > BK-M5 checkpoint A is implemented：`StorageProfileResolverRegistry` now composes exact per-profile resolvers
 > without moving BookKeeper types into L0；the ManagedLedger projection record、create/open validation and Position
@@ -120,6 +127,11 @@
 > The fresh `bookKeeperPrimaryWalM5TwoBrokerCheck --rerun-tasks` passes 104/104 outer tasks in 4m59s at
 > `master@a8eef5eb3906b6005006627506b3516ff2349fa7`；the final retry-disabled locked Pulsar E.3 leg passes 138/138
 > tasks and its XML records one test、zero failures/errors for the exact ownership fixture。
+> Checkpoint E.4's ordinary `bookKeeperPrimaryWalM5Check --rerun-tasks` passes 105/105 outer tasks in 6m47s；the
+> locked Pulsar leg passes 138/138 fresh tasks across ownership filtering、capability/deletion-proof rollover and
+> mixed BK_SYNC/BK_ASYNC/Object-WAL rollout。The final `bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` then passes
+> 231/231 fresh tasks in 27m42s at `master@dfbcc8e11422c965957e3e1fcf809485e437d842`，including Phase 1.5、Phase
+> 2/3/4 final gates and BK-M1–M4 final predecessors。
 
 > 2026-07-20：`bookKeeperPrimaryWalM4Check --rerun-tasks` passes 62/62 executable tasks；
 > `bookKeeperPrimaryWalM4FinalCheck --rerun-tasks` passes its 215-task aggregate in 21m40s，including the final-gated
@@ -284,7 +296,7 @@ second commit protocol and is forbidden.
 
 The design is based only on this repository and the local Pulsar checkout at
 `/Users/liusinan/apps/ideaproject/nereusstream/pulsar`。No internet or non-existent `M1-SNAPSHOT` artifact is an input.
-The target Pulsar source lock is `master@a8eef5eb3906b6005006627506b3516ff2349fa7`。The Nereus pre-design audit
+The target Pulsar source lock is `master@dfbcc8e11422c965957e3e1fcf809485e437d842`。The Nereus pre-design audit
 lock and BookKeeper client API surface are recorded in document 01；a changed lock requires re-audit, not silent
 compilation against a different checkout.
 
@@ -342,8 +354,9 @@ through the second-absence `DELETED` transition also has deterministic applied-r
 production Oxia metadata adapter；the independent-process transport-loss cut remains open。The Docker-backed
 `BookKeeperWalOnlyOxiaBkIntegrationTest` now repeats rollover、cold history read、writer recovery、trim、delete response
 loss and dual absence against production Oxia adapters plus a real BookKeeper 4.18 cluster, including a fresh process
-after the first absence。Profile registration and production Pulsar routing remain deliberately absent for BK-M5。The module-local
-`BookKeeperStorageProfileResolver`、`BookKeeperWalRuntime` and generic `DefaultStreamStorage` composition now admit
+after the first absence。BK-M5 now installs profile registration and production Pulsar routing behind exact
+activation/capability admission。The module-local
+`BookKeeperStorageProfileResolver`、`BookKeeperWalRuntime` and generic `DefaultStreamStorage` composition admit
 BK_ONLY only when the exact appender/reader are installed；strict append waits for generation zero and cold read
 resolves the same `BookKeeperEntryRangeReadTarget`。Production and fake L0 stores share
 `BookKeeperStableAppendProtectionValidator`，so this integration still reloads the exact root/protection proof before

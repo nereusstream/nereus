@@ -1,6 +1,6 @@
 # Nereus 总体架构设计
 
-> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M6 complete/final-gated；F1-BK BK-M0–BK-M4 complete/final-gated，BK-M5–M6 not implemented
+> 状态：North-star design；Future 1 / Phase 1 + Phase 1.5、Future 2、Future 3 与 Future 4 F4-M1–M6 complete/final-gated；F1-BK BK-M0–BK-M5 complete/final-gated，BK-M6 not implemented
 > 最近设计/实现同步：2026-07-19
 > 当前代码只实现本文的一部分；精确状态见 `nereus-design-index.md`
 
@@ -299,9 +299,9 @@ Profile 由两个决策组成：primary WAL 和 object publication mode。
 
 | Profile | Primary WAL | Producer success boundary | Secondary publication | Current status |
 | --- | --- | --- | --- | --- |
-| `BOOKKEEPER_WAL_ONLY` | BookKeeper | WAL durable + stable head commit | disabled | BK-M2 module/facade runtime and real Oxia/BookKeeper restart/delete evidence complete/final-gated；production broker pre-IO rejected until BK-M5 |
-| `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | stable head + gen0 BK index + `REQUIRED_OBJECT_GENERATION` COMMITTED/read proof | synchronous via shared F4 task/path | BK-M4 module-local profile complete/final-gated；production broker pre-IO rejected until BK-M5 |
-| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | WAL durable + stable head commit after lag admission | background via shared F4 task/path | BK-M3 source/protection/profile/lag、retirement、real publication/read/physical-delete/response-loss and unreadable-output fail-closed evidence complete/final-gated；production profile reserved until BK-M5 |
+| `BOOKKEEPER_WAL_ONLY` | BookKeeper | WAL durable + stable head commit | disabled | BK-M2 module/facade runtime and real Oxia/BookKeeper restart/delete evidence complete/final-gated；BK-M5 production rollout final-gated behind exact activation/capability admission |
+| `BOOKKEEPER_WAL_SYNC_OBJECT` | BookKeeper | stable head + gen0 BK index + `REQUIRED_OBJECT_GENERATION` COMMITTED/read proof | synchronous via shared F4 task/path | BK-M4 module-local profile and BK-M5 production mixed-profile rollout complete/final-gated |
+| `BOOKKEEPER_WAL_ASYNC_OBJECT` | BookKeeper | WAL durable + stable head commit after lag admission | background via shared F4 task/path | BK-M3 source/protection/profile/lag、retirement、real publication/read/physical-delete/response-loss and unreadable-output fail-closed evidence complete/final-gated；BK-M5 production rollout final-gated |
 | `OBJECT_WAL_SYNC_OBJECT` | object store | object WAL durable + stable head + generation-0 indexes | generation 0 on append path | Phase 1 target |
 | `OBJECT_WAL_ASYNC_OBJECT` | object store | object WAL durable + stable head commit | read-optimized generation background | Implemented/final-gated in Phase 4；activation-proof gated |
 

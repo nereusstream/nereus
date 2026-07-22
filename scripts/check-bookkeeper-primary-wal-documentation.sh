@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="a8eef5eb3906b6005006627506b3516ff2349fa7"
+pulsar_source_lock="dfbcc8e11422c965957e3e1fcf809485e437d842"
 
 require_literal() {
     local literal="$1"
@@ -158,6 +158,14 @@ require_literal 'BK-M3 BOOKKEEPER_WAL_ASYNC_OBJECT complete/final-gated on 2026-
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-07-20' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'BK-M5 Pulsar rollout            complete/final-gated on 2026-07-22' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM5Check --rerun-tasks` passes 105/105 outer tasks in 6m47s' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+require_literal 'bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` then passes' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+require_literal '231/231 fresh tasks in 27m42s' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate' \
@@ -281,9 +289,17 @@ require_literal 'bookKeeperPrimaryWalM5DeletionActivationCheck' "build.gradle.kt
 require_literal 'checkBookKeeperPrimaryWalM5AdminRoutingContractSurface' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5AdminRoutingCheck' "build.gradle.kts"
 require_literal 'bookKeeperPrimaryWalM5TwoBrokerCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5Check' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalM5FinalCheck' "build.gradle.kts"
 require_literal 'NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'NereusMixedPrimaryProfilesMultiBrokerTest.coexistsAcrossProfiles' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'NereusBookKeeperCapabilityRolloverTest.excludesOldBroker' \
+    "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
+require_literal 'NereusBookKeeperCapabilityRolloverTest.reestablishesExactAuthority' \
     "docs/phase-bk-bookkeeper-primary-wal/08-scenario-evidence-matrix.md"
 require_literal 'bookKeeperWalOnlyResolvesGenerationZeroWithoutAdmittingHigherGenerations' \
     "nereus-core/src/test/java/com/nereusstream/core/read/GenerationReadResolverTest.java"
@@ -398,8 +414,6 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     exit 1
 fi
 for unfinished_task in \
-    bookKeeperPrimaryWalM5Check \
-    bookKeeperPrimaryWalM5FinalCheck \
     bookKeeperPrimaryWalM6ScenarioEvidenceCheck \
     bookKeeperPrimaryWalM6ScaleCheck \
     bookKeeperPrimaryWalM6ChaosCheck \
@@ -435,9 +449,9 @@ for path in "${global_links[@]}"; do
 done
 
 if rg -n --glob '*.md' \
-    'BK-M[5-6][[:space:]:=-]+(complete|final-gated)|BookKeeper primary WAL[[:space:]:=-]+Implemented|Implemented[[:space:]:=-]+BookKeeper primary WAL' \
+    'BK-M6[[:space:]:=-]+(complete|final-gated)|BookKeeper primary WAL[[:space:]:=-]+Implemented|Implemented[[:space:]:=-]+BookKeeper primary WAL' \
     "$design_dir"; then
-    echo "BookKeeper primary-WAL design incorrectly claims BK-M5-M6 or whole-delivery completion" >&2
+    echo "BookKeeper primary-WAL design incorrectly claims BK-M6 or whole-delivery completion" >&2
     exit 1
 fi
 

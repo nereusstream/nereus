@@ -359,8 +359,8 @@ recovery protocol and a new API contract。It is explicitly outside the current 
 
 ## 10. BookKeeper primary WAL
 
-> Status: F1-BK BK-M1–M4 module-local writer/reader/ledger lifecycle/retention/profile execution
-> complete/final-gated；production broker rollout remains BK-M5
+> Status: F1-BK BK-M1–M4 module-local writer/reader/ledger lifecycle/retention/profile execution and BK-M5
+> production broker rollout complete/final-gated；BK-M6 aggregate evidence remains open
 
 BookKeeper provides primary bytes durability only。The same head/commit-log protocol assigns logical
 offsets。The commit record/read target uses the existing tagged `BookKeeperEntryRangeReadTarget`；one Nereus offset
@@ -388,8 +388,8 @@ does not prove an Object generation. F1-BK therefore keeps `DurabilityLevel` mea
 
 Exact allocation、fencing、read checksum、retention、F4 reuse and rollout state machines are frozen in
 `../phase-bk-bookkeeper-primary-wal/README.md`。BK-M1–M4 are complete/final-gated through the module-local runtime；
-until the BK-M5 production rollout gates pass, all three profiles fail before
-BookKeeper IO。
+BK-M5 now registers all three profiles in production only after exact activation/capability admission and immutable
+first-create binding，and its ordinary/final aggregates are green。
 
 ## 11. Generation publish protocol
 

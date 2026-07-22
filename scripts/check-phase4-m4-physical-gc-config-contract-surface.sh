@@ -107,7 +107,8 @@ for getter in \
     require_literal "$getter" "$pulsar_mapper"
 done
 require_literal "retention," "$pulsar_mapper"
-require_literal "physicalGc);" "$pulsar_mapper"
+require_literal "physicalGc," "$pulsar_mapper"
+require_literal "bookKeeper);" "$pulsar_mapper"
 
 require_literal "runtime.physicalGc().enabled()).isFalse()" "$pulsar_test"
 require_literal "runtime.physicalGc().dryRun()).isTrue()" "$pulsar_test"

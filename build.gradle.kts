@@ -87,6 +87,8 @@ val dockerBackedPulsarExecTasks = setOf(
     "bookKeeperPrimaryWalM2PulsarCheck",
     "checkBookKeeperPrimaryWalM5AdminRoutingContractSurface",
     "bookKeeperPrimaryWalM5AdminRoutingCheck",
+    "bookKeeperPrimaryWalM5TwoBrokerCheck",
+    "bookKeeperPrimaryWalM5Check",
 )
 val pulsarCheckoutExecTasks = setOf(
     "phase2PulsarCheck",
@@ -107,6 +109,12 @@ val pulsarCheckoutExecTasks = setOf(
     "phase4M5AsyncRetentionMultiBrokerPulsarCheck",
     "phase4M6TwoBrokerWorkerContentionPulsarCheck",
     "bookKeeperPrimaryWalM2PulsarCheck",
+    "bookKeeperPrimaryWalM5CapabilityCheck",
+    "bookKeeperPrimaryWalM5BorrowedClientCheck",
+    "bookKeeperPrimaryWalM5DeletionActivationCheck",
+    "bookKeeperPrimaryWalM5AdminRoutingCheck",
+    "bookKeeperPrimaryWalM5TwoBrokerCheck",
+    "bookKeeperPrimaryWalM5Check",
 )
 
 tasks.matching { it.name in dockerBackedPulsarExecTasks }.configureEach {
@@ -250,7 +258,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("a8eef5eb3906b6005006627506b3516ff2349fa7")
+    .orElse("dfbcc8e11422c965957e3e1fcf809485e437d842")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1035,6 +1043,37 @@ tasks.register<Exec>("bookKeeperPrimaryWalM5TwoBrokerCheck") {
         "-PtestFailFast=true",
         "-PtestRetryCount=0",
     )
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM5Check") {
+    group = "verification"
+    description = "Run the retry-disabled BK ownership exclusion, authority rollover, and mixed-profile aggregate."
+    dependsOn("bookKeeperPrimaryWalM5TwoBrokerCheck")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("publishPhase2DevelopmentArtifacts")
+    workingDir = file(pulsarCheckoutPath.get())
+    commandLine(
+        pulsarGradleWrapper,
+        ":pulsar-broker:spotlessJavaCheck",
+        ":pulsar-broker:checkstyleMain",
+        ":pulsar-broker:checkstyleTest",
+        ":pulsar-broker:test",
+        "--tests", "org.apache.pulsar.broker.loadbalance.extensions.filter.NereusBookKeeperOwnershipFilterTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusBookKeeperCapabilityRolloverTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusMixedPrimaryProfilesMultiBrokerTest",
+        "--rerun-tasks",
+        "-PexcludedTestGroups=quarantine,flaky",
+        "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
+        "-PtestFailFast=true",
+        "-PtestRetryCount=0",
+    )
+}
+
+tasks.register("bookKeeperPrimaryWalM5FinalCheck") {
+    group = "verification"
+    description = "Final-gate BK-M5 rollout over the retry-disabled aggregate and final-gated BK-M4 chain."
+    dependsOn("bookKeeperPrimaryWalM5Check")
+    dependsOn("bookKeeperPrimaryWalM4FinalCheck")
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

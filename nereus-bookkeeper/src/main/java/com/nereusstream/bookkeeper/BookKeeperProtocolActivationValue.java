@@ -138,11 +138,13 @@ public record BookKeeperProtocolActivationValue(
                         replacement.ledgerIdNamespaceSha256)) {
             throw new IllegalArgumentException("BookKeeper activation identity is immutable");
         }
-        if (replacement.brokerReadinessEpoch < current.brokerReadinessEpoch
-                || (replacement.brokerReadinessEpoch == current.brokerReadinessEpoch
-                        && !replacement.brokerReadinessSha256.equals(
-                                current.brokerReadinessSha256))) {
-            throw new IllegalArgumentException("BookKeeper readiness proof cannot regress or drift");
+        boolean readinessEpochChanged = replacement.brokerReadinessEpoch
+                != current.brokerReadinessEpoch;
+        boolean readinessDigestChanged = !replacement.brokerReadinessSha256.equals(
+                current.brokerReadinessSha256);
+        if (readinessEpochChanged != readinessDigestChanged) {
+            throw new IllegalArgumentException(
+                    "BookKeeper readiness epoch and digest must change atomically");
         }
         if ((current.walOnlyPublicationEnabled && !replacement.walOnlyPublicationEnabled)
                 || (current.asyncPublicationEnabled && !replacement.asyncPublicationEnabled)
@@ -154,13 +156,18 @@ public record BookKeeperProtocolActivationValue(
                 && replacement.lifecycle != BookKeeperProtocolActivationLifecycle.ACTIVE) {
             throw new IllegalArgumentException("BookKeeper activation lifecycle cannot regress");
         }
+        boolean deletionProofChanged = !current.rootCoverageProofSha256.equals(
+                        replacement.rootCoverageProofSha256)
+                || !current.streamCoverageProofSha256.equals(
+                        replacement.streamCoverageProofSha256)
+                || !current.bookKeeperScopeProofSha256.equals(
+                        replacement.bookKeeperScopeProofSha256);
         if (current.ledgerDeletionEnabled
-                && (!current.rootCoverageProofSha256.equals(replacement.rootCoverageProofSha256)
-                        || !current.streamCoverageProofSha256.equals(
-                                replacement.streamCoverageProofSha256)
-                        || !current.bookKeeperScopeProofSha256.equals(
-                                replacement.bookKeeperScopeProofSha256))) {
-            throw new IllegalArgumentException("BookKeeper deletion proofs are immutable once active");
+                && replacement.ledgerDeletionEnabled
+                && !readinessEpochChanged
+                && deletionProofChanged) {
+            throw new IllegalArgumentException(
+                    "BookKeeper deletion proofs require a new readiness identity");
         }
         if (replacement.activatedAtMillis < current.activatedAtMillis) {
             throw new IllegalArgumentException("BookKeeper activation timestamp cannot regress");

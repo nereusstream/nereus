@@ -79,7 +79,7 @@ require_literal "physicalReferences.protectVisibleIndex" "$scanner"
 require_literal "repair target belongs to recovery-checkpoint evidence" "$scanner"
 require_literal "implements GenerationIndexRepairer" "$read_repair"
 require_literal "GenerationIndexRepairer liveRepairer" "$checkpoint_repair"
-require_literal "if (!profile.objectMaterializationEnabled())" "$generation_resolver"
+require_literal "profile.objectMaterializationEnabled()))" "$generation_resolver"
 
 require_literal "walDurableReturnsBeforeDetachedGenerationZeroWorkStarts" "$async_test"
 require_literal "strictDurabilityWaitsForExactVisibleGenerationProtection" "$async_test"
@@ -87,6 +87,7 @@ require_literal "fullAppendReturnsAtProtectedHeadAndDetachedRepairPublishesProte
 require_literal "repairsAndProtectsEveryUntrimmedLiveCommitFromStableHeadEvidence" "$scanner_test"
 require_literal "committedIndexGapIsRepairedWithVisibleGenerationProtection" "$read_test"
 require_literal "asyncObjectWalProfileUsesTheSameCommittedGenerationResolver" "$resolver_test"
+require_literal "bookKeeperWalOnlyResolvesGenerationZeroWithoutAdmittingHigherGenerations" "$resolver_test"
 
 require_literal "phase4M5AsyncObjectWalCheck" "$repo_root/build.gradle.kts"
 require_literal "Checkpoint AD" "$repo_root/docs/phase-4-compaction-generation/README.md"

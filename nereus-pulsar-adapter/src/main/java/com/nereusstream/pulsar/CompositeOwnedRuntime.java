@@ -6,10 +6,11 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Idempotent close owner for runtime components that must remain distinct from borrowed broker resources. */
-final class CompositeOwnedRuntime implements AutoCloseable {
+final class CompositeOwnedRuntime implements OwnedRuntimeComponents {
     private final List<AutoCloseable> resources;
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -23,6 +24,15 @@ final class CompositeOwnedRuntime implements AutoCloseable {
             }
         }
         this.resources = List.copyOf(values);
+    }
+
+    @Override
+    public <T extends AutoCloseable> Optional<T> component(Class<T> componentType) {
+        Objects.requireNonNull(componentType, "componentType");
+        return resources.stream()
+                .filter(componentType::isInstance)
+                .findFirst()
+                .map(componentType::cast);
     }
 
     @Override

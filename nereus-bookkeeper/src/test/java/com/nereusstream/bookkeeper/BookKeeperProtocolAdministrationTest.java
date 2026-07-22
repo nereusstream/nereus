@@ -131,6 +131,32 @@ class BookKeeperProtocolAdministrationTest {
                         "BookKeeper reader lease capacity cannot cover the broker set "
                                 + "plus one rolling-restart overlap");
 
+        BookKeeperProtocolActivation rebound = coordinator.activate(
+                configuration,
+                namespace,
+                new BookKeeperProtocolActivationUpdate(
+                        3,
+                        "aa".repeat(32),
+                        true,
+                        true,
+                        true,
+                        "ab".repeat(32),
+                        "bc".repeat(32),
+                        "cd".repeat(32),
+                        deletion.metadataVersion()),
+                TIMEOUT).join();
+        assertThat(rebound.publicationActivationSha256())
+                .isEqualTo(deletion.publicationActivationSha256());
+        assertThat(rebound.activationRecordSha256())
+                .isNotEqualTo(deletion.activationRecordSha256());
+        assertThat(new DefaultBookKeeperProtocolActivationVerifier(
+                        store,
+                        configuration,
+                        namespace,
+                        readiness(3, "aa".repeat(32), 2))
+                .requireActive(TIMEOUT).join())
+                .isEqualTo(rebound.deletionProof());
+
         assertThatThrownBy(() -> coordinator.activate(
                         configuration,
                         namespace,
@@ -139,7 +165,7 @@ class BookKeeperProtocolAdministrationTest {
                                 "66".repeat(32),
                                 true,
                                 true,
-                                deletion.metadataVersion()),
+                                rebound.metadataVersion()),
                         TIMEOUT).join())
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .hasRootCauseMessage("BookKeeper activation bits are monotonic");

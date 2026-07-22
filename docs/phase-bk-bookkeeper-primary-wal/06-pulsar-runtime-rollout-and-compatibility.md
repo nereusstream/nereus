@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@a8eef5eb3906b6005006627506b3516ff2349fa7
+master@dfbcc8e11422c965957e3e1fcf809485e437d842
 BookKeeper 4.18.0
 ```
 
@@ -491,7 +491,32 @@ two Pulsar brokers against the borrowed real BookKeeper client and LocalStack-ba
 stop、survivor takeover、old-owner restart/rejoin、survivor stop and reverse takeover。It compares ledger/entry/partition/
 batch fields of every `MessageIdAdv` for ordinary and LZ4-compressed batches，checks both exclusive and inclusive seek，
 directly reads the provider-neutral generation-zero path and keeps a stock BookKeeper topic readable/writable across
-both takeovers。This is BK-82/BK-84 evidence；it does not close BK-83、BK-85 or BK-86。
+both takeovers。This is BK-82/BK-84 evidence。
+
+### 8.5 Implemented checkpoint E.4
+
+`NereusBookKeeperOwnershipFilter` runs in the extensible load-manager ownership pipeline for the Nereus storage
+class。For every namespace with active Nereus bindings it reloads the exact durable L0 profile through
+`NereusManagedLedgerStorage.requiredBookKeeperOwnershipProfile` and applies these rules before owner selection：
+
+- no BK profile leaves candidates unchanged；
+- any BK profile requires one complete exact reserved-property signature for that immutable strongest profile；
+- candidates without the signature are removed；two different complete signatures or a scan/reload failure clear all
+  candidates rather than guessing；
+- a noncapable broker may receive the client's initial lookup and redirect it，but cannot win writable ownership；
+- existing topic profile truth always comes from durable binding/L0 metadata，never the broker's current default。
+
+The deletion coordinator treats the readiness epoch as an opaque identity derived from the live exact broker set，not
+as a numeric monotonic counter。If the live identity changes，it regenerates and CAS-rebinds all root、stream and scope
+proofs under the same stable publication identity，then revalidates live readiness before returning；an unchanged
+identity is idempotent。
+
+`NereusBookKeeperCapabilityRolloverTest` proves old-broker exclusion、redirect to the capable owner、pre-binding
+first-create rejection and two deletion-proof rebindings as the broker set leaves and rejoins。
+`NereusMixedPrimaryProfilesMultiBrokerTest` changes only the broker default between first creates，persists
+BK_SYNC -> BK_ASYNC -> Object-WAL topics，then proves old topics retain their exact profiles across cold load，both
+single-broker takeovers read every history entry，and all MessageId ledger/entry/partition/batch fields remain exact。
+Together with E.3 this closes BK-83、BK-85 and BK-86；online profile migration remains absent by design。
 
 ## 9. Stock BookKeeper isolation
 
@@ -521,7 +546,7 @@ Recommended operational rollout mirrors implementation milestones：
 5. enable BK_ASYNC publication; keep ledger delete dry-run initially
 6. verify lag/object publication/source-retirement; activate scoped ledger deletion
 7. enable BK_SYNC publication and completion SLOs
-8. expand profile policy only after BK-M6 aggregate gate
+8. keep broad production expansion guarded until the BK-M6 aggregate gate
 ```
 
 Removing capability from one broker prevents new BK topic creates cluster-wide and writable ownership on that broker；
@@ -595,6 +620,6 @@ only after：
 - safe defaults schedule no BookKeeper delete；
 - an explicitly activated canary scope proves response-loss-safe deletion without touching foreign/stock ledgers。
 
-Checkpoint E.3 satisfies the BK_ONLY ownership/MessageId/seek and stock-control subset above。BK-M5 remains in progress
-until mixed BK async/sync/Object profiles、old/noncapable broker ownership exclusion、capability-epoch recovery and the
-named ordinary/final aggregates are executable and green。
+Checkpoint E.4 completes the remaining surface：mixed BK async/sync/Object profiles、old/noncapable broker ownership
+exclusion、opaque readiness-identity proof rebinding and the named ordinary/final aggregates are executable and green。
+BK-M5 is complete/final-gated；BK-M6 owns the remaining aggregate scenario/scale/chaos/compatibility evidence。

@@ -54,16 +54,16 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 - append, resolve/read, trim/recovery, restart, and post-head repair state machines；
 - ordinary and Docker-backed final acceptance gates。
 
-Only `OBJECT_WAL_SYNC_OBJECT` is currently installed as a Phase 1 production-broker execution target. The
-BookKeeper profiles remain rollout-disabled before BK-M5, although all three are executable through the explicit
-module-local runtime and their BK-M2–M4 gates.
+The production broker now installs the Object-WAL sync/async profiles and all three BookKeeper primary-WAL profiles。
+BookKeeper first-create and writable ownership remain guarded by exact durable activation、profile and live broker
+capability facts；broad rollout still waits for the BK-M6 aggregate gate。
 
 The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 through BK-M2
 are complete/final-gated；BK-M2 has its keyspace/seven codecs、focused production/fake metadata stores、exact
 response-loss recovery、bounded shard scanners、exact allocator/writer/recovery/reader runtime and whole-ledger
 retention convergence implemented under the M2 metadata/runtime/retention checks。An explicit `BookKeeperWalRuntime`
 now admits `BOOKKEEPER_WAL_ONLY` and proves strict append plus cold generation-zero read through the provider-neutral
-`DefaultStreamStorage` pipeline；it is not yet installed by the production Pulsar runtime。Its
+`DefaultStreamStorage` pipeline；BK-M5 subsequently installs it in the production Pulsar runtime。Its
 code-level target is frozen in
 [`docs/phase-bk-bookkeeper-primary-wal/`](docs/phase-bk-bookkeeper-primary-wal/README.md)：
 BK-M0–M6 cover provider-neutral append/read seams、exact ledger allocation/lifecycle/fencing、BK_ONLY retention、F4
@@ -102,19 +102,17 @@ COMMITTED Object while normal reads fall back to BK。`bookKeeperPrimaryWalM3Fin
 on 2026-07-20。BK-M4 is also complete/final-gated：sync append resolves an independent
 `REQUIRED_OBJECT_GENERATION` boundary，reuses the one F4 planner/task/worker/publication/read-proof path，keeps BK
 generation zero visible while the producer waits，and recovers post-head `KNOWN_COMMITTED` failures without another
-BK range or offset。BK-M5 checkpoints A–D now compose the production reader/runtime from the broker-borrowed
-BookKeeper client，verify an explicitly provisioned `NBLR1` namespace and publish first-create capability only for the
-exact ACTIVE stable `NBKAP1` publication binding while retaining per-CAS `NBKA1` deletion identity；without that
-binding historical target reads remain available while new
-BookKeeper-profile creation fails closed before L0 IO。The first four real M5 configuration/capability/first-create/
-borrowed-client gates pass on 2026-07-20。Checkpoint E now installs the all-256-shard non-overlapping production
-retention scheduler only for explicit enabled/non-dry-run GC and reuses the existing reference/gate/manager protocol；
-physical delete remains unavailable until its exact activation proofs exist and match a fresh strongest-profile
-two-snapshot broker readiness fact plus reader-lease capacity。BK-M5/BK-M6 remain open for deletion
-proof production/activation、the
-concrete Pulsar admin route、loaded/unloaded/partitioned routing、two-broker ownership transfer and aggregate gates。
-The latest fresh checkpoint-E aggregate passed 91/91 outer tasks in 2m13s；its locked Pulsar capability and
-borrowed-client builds each passed 136/136 executable tasks。
+BK range or offset。BK-M5 is complete/final-gated：production composes the reader/runtime from the broker-borrowed
+BookKeeper client，requires the explicitly provisioned `NBLR1` namespace and exact ACTIVE `NBKAP1` publication
+binding，keeps per-CAS `NBKA1` deletion identity，installs the all-shard retention/admin/proof path and admits writable
+ownership only on brokers with the exact immutable profile capability。Namespace-level ownership filtering excludes
+old/noncapable brokers and fails closed on conflicting signatures；readiness-set changes rebind all deletion proofs
+without changing publication identity。The mixed two-broker gate preserves BK_SYNC、BK_ASYNC and Object-WAL stored
+profiles、history and exact MessageIds across cold load and both takeovers。On 2026-07-22，
+`bookKeeperPrimaryWalM5Check --rerun-tasks` passed 105/105 tasks and
+`bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` passed 231/231 fresh tasks in 27m42s against
+`master@dfbcc8e11422c965957e3e1fcf809485e437d842`。Only BK-M6 scale/chaos/aggregate remains open；online profile
+migration remains unsupported。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the
@@ -170,7 +168,7 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Pulsar
-maintenance/source lock 已推进到 `master@a8eef5eb3906b6005006627506b3516ff2349fa7`。M6 增加
+maintenance/source lock 已推进到 `master@dfbcc8e11422c965957e3e1fcf809485e437d842`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace/partitioned admin route

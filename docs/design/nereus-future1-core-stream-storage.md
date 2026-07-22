@@ -11,8 +11,9 @@
 > protection、async profile/runtime composition、shared lag、retirement-metadata authority、sealed shared-scanner、
 > real Oxia/BK/Object publication/read/physical release、fresh-runtime response-loss and unreadable-output fail-closed
 > evidence。BK-M4 sync completion 也已完成/final-gated，覆盖独立 required-Object policy、exact task reuse、
-> BK-visible producer wait、normal-read proof 和 post-head recovery；BK-M5–M6 尚未完成。Production broker 的三个 BookKeeper profile
-> 仍为 pre-IO rejected；
+> BK-visible producer wait、normal-read proof 和 post-head recovery；BK-M5 production rollout 也已完成/final-gated，
+> 覆盖 exact ownership capability filter、readiness-proof rollover、双 broker takeover 和 BK sync/async/Object
+> mixed-profile compatibility。仅 BK-M6 aggregate scenario/scale/chaos/compatibility 尚未完成；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、

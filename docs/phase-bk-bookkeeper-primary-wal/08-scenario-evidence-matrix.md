@@ -6,7 +6,7 @@ BK-01 through BK-10 executed successfully on 2026-07-19 through `bookKeeperPrima
 `bookKeeperPrimaryWalM1FinalCheck` aggregate against local Pulsar
 `master@eaf7b9a704890a9265c21f30d9f351e02d00c600`。BK-M2 then completed on 2026-07-20 through the 107/107-task
 `bookKeeperPrimaryWalM2Check --rerun-tasks` and the 212-task `bookKeeperPrimaryWalM2FinalCheck` aggregate against
-current local Pulsar `master@a8eef5eb3906b6005006627506b3516ff2349fa7`。The final aggregate covers BK-11 through
+current local Pulsar `master@dfbcc8e11422c965957e3e1fcf809485e437d842`。The final aggregate covers BK-11 through
 BK-56 at the milestone's declared D/O/B and focused local-Pulsar boundary：all codecs/keyspaces/shards、allocation and
 writer monotonicity、foreign and same-candidate authority、uncertain/late create、exact append/recovery/fencing/read、
 generation-zero repair、resource/deadline contracts、logical trim、complete protection inventory and dual-absence
@@ -38,6 +38,14 @@ the later chaos aggregate rather than this focused M3 checkpoint。
 The 2026-07-20 `bookKeeperPrimaryWalM3FinalCheck` passed its 223-task aggregate over the final-gated BK-M2 predecessor
 and every focused M3 chain。BK-57 through BK-67 are therefore complete at their declared M3 D/O/B/S levels；row suffixes
 that explicitly require production broker rollout or abrupt-process C remain assigned to BK-M5/BK-M6。
+
+BK-M4 subsequently final-gated BK-68 through BK-76 at their declared D/O/B/S boundaries。On 2026-07-22，
+`bookKeeperPrimaryWalM5Check --rerun-tasks` passed 105/105 tasks and
+`bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` passed 231/231 fresh tasks in 27m42s against
+`master@dfbcc8e11422c965957e3e1fcf809485e437d842`。The final gate executed BK-77 through BK-86 across exact
+borrowed-client ownership、first-create/profile immutability、admin routing、BK_ONLY takeover、mixed BK_SYNC/BK_ASYNC/
+Object-WAL coexistence、old-broker exclusion and deletion-proof readiness rollover。BK-87 through BK-96 remain the
+explicit BK-M6 scale/chaos/aggregate boundary。
 
 The same deterministic recovery gate now converges applied-response-loss for every writer/root CAS from ACTIVE through
 IDLE (BK-31 D) and serializes two process-run recovery contenders onto one replacement ledger (BK-33 D)。Their remaining
@@ -185,10 +193,10 @@ Evidence levels：
 | BK-80 | M5 | P | explicit existing-profile mutation/online migration is rejected | `NereusBookKeeperProfileAdmissionTest.rejectsProfileMutation` |
 | BK-81 | M5 | P | loaded/unloaded/partitioned routes use the exact binding-generation/L0 durable profile；storage-dependent operations fail closed while unload/logical delete remain recoverable | `PersistentTopicsNereusDurableProfileRoutingTest.loadedNereusTopicUsesTheSameDurableStorageRoute/unloadedNereusBindingUsesTheDurableStorageRoute/partitionedParentValidatesEveryConcretePartition` + `NereusAdminOperationTest.durableProfileReadinessIsAppliedOnlyToStorageDependentOperations/durableProfileComesFromExactBindingGenerationAndL0Metadata` |
 | BK-82 | M5 | T/B/O | unload/failover/restart/rejoin/reverse takeover preserves history/MessageIds | implemented E.3: `NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers` |
-| BK-83 | M5 | T/B/O/S | async/sync topics and Object-WAL topics coexist on both brokers | `NereusMixedPrimaryProfilesMultiBrokerIT.coexistsAcrossProfiles` |
+| BK-83 | M5 | T/B/O/S | async/sync topics and Object-WAL topics coexist on both brokers | `NereusMixedPrimaryProfilesMultiBrokerTest.coexistsAcrossProfiles` |
 | BK-84 | M5 | T/B | stock BookKeeper control topic remains writable/readable through Nereus GC | implemented E.3 ownership/control-path evidence: `NereusBookKeeperMultiBrokerIntegrationTest.preservesOwnershipProjectionAndStockIsolationAcrossBothTakeovers`; destructive-GC coexistence remains covered separately by the activated retention gates |
-| BK-85 | M5 | T | old/noncapable broker is excluded from ownership; reads/writes fail closed | `NereusBookKeeperCapabilityRolloverIT.excludesOldBroker` |
-| BK-86 | M5 | T/C | capability epoch changes invalidate activation and safely resume after proof | `NereusBookKeeperCapabilityRolloverIT.reestablishesExactAuthority` |
+| BK-85 | M5 | T | old/noncapable broker is excluded from ownership; reads/writes fail closed | `NereusBookKeeperCapabilityRolloverTest.excludesOldBroker` |
+| BK-86 | M5 | T/C | capability epoch changes invalidate activation and safely resume after proof | `NereusBookKeeperCapabilityRolloverTest.reestablishesExactAuthority` |
 
 ## 10. Scale and chaos
 

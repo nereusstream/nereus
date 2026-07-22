@@ -36,6 +36,12 @@ pulsar_tasks=(
     phase4M5AsyncRetentionMultiBrokerPulsarCheck
     phase4M6TwoBrokerWorkerContentionPulsarCheck
     bookKeeperPrimaryWalM2PulsarCheck
+    bookKeeperPrimaryWalM5CapabilityCheck
+    bookKeeperPrimaryWalM5BorrowedClientCheck
+    bookKeeperPrimaryWalM5DeletionActivationCheck
+    bookKeeperPrimaryWalM5AdminRoutingCheck
+    bookKeeperPrimaryWalM5TwoBrokerCheck
+    bookKeeperPrimaryWalM5Check
 )
 
 for task in "${pulsar_tasks[@]}"; do
