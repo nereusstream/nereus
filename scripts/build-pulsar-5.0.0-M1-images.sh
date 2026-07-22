@@ -260,7 +260,8 @@ ensure_worktree "${pulsar_repo}" "${nereus_pulsar_worktree}" "${NEREUS_PULSAR_SH
 echo "publishing Nereus ${NEREUS_DEVELOPMENT_VERSION} artifacts from frozen source ${NEREUS_SOURCE_SHA}"
 (
     cd "${nereus_repo}"
-    ./gradlew publishPhase2DevelopmentArtifacts --rerun-tasks --no-daemon
+    ./gradlew publishPhase2DevelopmentArtifacts --rerun-tasks --no-daemon \
+        "-PpulsarCheckout=${nereus_pulsar_worktree}"
 )
 
 nereus_maven_repository="${nereus_repo}/build/development-repository"
