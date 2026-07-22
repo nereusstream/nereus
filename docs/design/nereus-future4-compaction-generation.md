@@ -667,8 +667,9 @@ disabled 通过。`OBJECT_WAL_ASYNC_OBJECT` topic 经 cold registration、ordina
 owner stop/rejoin、durable size-backlog eviction、unload 后 ACTIVE-binding logical trim、trim 后 append/read 和再次
 ownership cut 保持一致；logical trim 只消费 publication/live-projection authority，物理 WAL bytes 不随 admin
 promise 删除。`StreamMetadataSnapshot` 的 versioned comparator 还明确排除 hydrated trim observation fields，
-同时保留 head version/commit/trim/policy truth。F4-M5 已 final-gated；BookKeeper primary-WAL profiles 已在
-F1-BK BK-M2–M4 module-local final-gated，但 production broker 中仍为 reserved，等待 BK-M5 rollout。
+同时保留 head version/commit/trim/policy truth。F4-M5 已 final-gated；BookKeeper primary-WAL profiles 也已在
+F1-BK BK-M0–M6 complete/final-gated（见 [BookKeeper Primary WAL Delivery](../phase-bk-bookkeeper-primary-wal/README.md)）：BK-M5 完成 production broker admission、runtime、ownership transfer 和
+retention rollout，BK-M6 完成 aggregate scale/chaos/compatibility gate。Online WAL-profile migration 仍是独立后续交付。
 
 Checkpoint AP 已实现 configured-scope guarded PUT/exact HEAD/complete LIST/exact DELETE canary 和 deterministic
 non-secret capability digest。Checkpoint AQ 已实现 product-owned bounded coordinator：冻结 exact

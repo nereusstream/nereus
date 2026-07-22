@@ -458,6 +458,7 @@ global_links=(
     docs/design/nereus-design-index.md
     docs/design/nereus-futures.md
     docs/design/nereus-future1-core-stream-storage.md
+    docs/design/nereus-future4-compaction-generation.md
     docs/design/nereus-commit-protocol.md
     docs/design/nereus-overall-architecture.md
     docs/design/nereus-terminology.md
@@ -467,6 +468,14 @@ global_links=(
 for path in "${global_links[@]}"; do
     require_literal "phase-bk-bookkeeper-primary-wal" "$path"
 done
+require_literal 'F1-BK BK-M0–M6 complete/final-gated' \
+    "docs/design/nereus-future4-compaction-generation.md"
+
+if rg -Fq -- 'production broker 中仍为 reserved，等待 BK-M5 rollout' \
+    "$repo_root/docs/design/nereus-future4-compaction-generation.md"; then
+    echo "Future 4 design regressed to the pre-BK-M5 BookKeeper rollout status" >&2
+    exit 1
+fi
 
 while IFS=: read -r source match; do
     target="${match#*](}"
