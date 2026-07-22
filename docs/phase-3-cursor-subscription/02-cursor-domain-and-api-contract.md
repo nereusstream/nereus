@@ -989,7 +989,7 @@ The less visible `ManagedCursor` methods are still part of the locked API and ar
 | Method | Exact F3 behavior |
 | --- | --- |
 | `getNumberOfEntries()` | count offsets in `[localReadOffset, committedEndOffset)` excluding whole-ack ranges；partial Entry counts as one |
-| `hasBacklog()` / `hasBacklog(precise)` | `getNumberOfEntriesInBacklog(precise) > 0`；both are exact at F3 scale |
+| `getNumberOfEntriesInBacklog(precise)` | exact backlog count at F3 scale；the post-M1 `hasBacklog` convenience API is not part of the v5.0.0-M1 surface |
 | `getNumberOfEntriesSinceFirstNotAckedMessage()` | `max(0, min(localReadOffset,end)-firstUnacked)` in the dense one-Entry/one-offset coordinate |
 | `getTotalNonContiguousDeletedMessagesRange()` | effective normalized whole-ack range count；partials are not reported as whole ranges |
 | `getNonContiguousDeletedMessagesRangeSerializedSize()` | exact `16 * wholeRangeCount` V1 range-payload bytes，checked before narrowing to `int` |
