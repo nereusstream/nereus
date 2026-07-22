@@ -3,6 +3,9 @@
 This document freezes the source boundaries and comparison order for the first Nereus performance run. It does not
 claim that evidence collected from a later Pulsar `master` applies to this backport.
 
+Image identities and containerd delivery instructions are recorded in
+[`pulsar-5.0.0-M1-images.md`](pulsar-5.0.0-M1-images.md).
+
 ## 1. Source baselines
 
 | Role | Repository / branch | Source anchor | Version |
