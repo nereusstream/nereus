@@ -28,7 +28,7 @@ protocol/table state = projection
 
 | Track | Delivery mapping | Status | Next gate |
 | --- | --- | --- | --- |
-| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 + F1-BK BK-M0-M6 | Phase 1/1.5 and F1-BK BK-M0–BK-M5 implemented/final-gated；BK-M6 not implemented | implement BK-M6 aggregate scenario/scale/chaos/compatibility |
+| F1 Core Stream Storage | Phase 1 M0-M8 + Phase 1.5 P15-M0-M6 + F1-BK BK-M0-M6 | Implemented/final-gated；F1-BK BK-M0–M6 complete | F5/F6/F7/F8 may consume the stable lower-storage contracts；online WAL-profile migration remains separate |
 | F2 ManagedLedger Facade | Phase 2 F2-M0-M6 | Implemented/final-gated（M0/M0R/M0R2 + P15-M6 + F2-M1-M6 complete） | F3/F4 consume the locked facade/storage boundary |
 | F3 Cursor/Subscription | Phase 3 F3-M0-M6 | Implemented/final-gated | F4/F5/F8 consume stable cursor/reference semantics |
 | F4 Materialization/Compaction | Phase 4 F4-M0-M6 | Implemented/final-gated；M4 implements recovery/retirement/physical+cursor GC、activation/global domains、restart/scale/late-PUT cuts、atomic readiness rollover and retry-disabled real source deletion；M5 implements durable registration/readiness/activation、protected async Object-WAL、pre-I/O lag admission、coupled production materialization、versioned exact-evidence retention/F3 trim、durable backlog eviction and exact Pulsar policy/admin routing，then final-gates MessageIds、unload/failover/rejoin/post-trim IO and BookKeeper coexistence；M6 BD–BQ close scale/failure/compatibility and the clean 203/203-task aggregate；safe defaults keep production deletion disabled | F5/F6/F8 may consume the final-gated F4 contracts |
@@ -123,14 +123,15 @@ P15-M0-M6 before F2-M1：
 Phase 1.5 P15-M0-M6 still supports only strict Object WAL。BookKeeper IO、`WAL_DURABLE` success、async
 workers and higher generations remain outside this delivery。
 
-### F1-BK delivery extension (BK-M0–M5 implemented/final-gated)
+### F1-BK delivery extension (BK-M0–M6 implemented/final-gated)
 
 Code-level target：`../phase-bk-bookkeeper-primary-wal/README.md`。It consumes Phase 1.5 generic target/head/recovery,
 F2/F3 logical projection/cursor and final-gated F4 task/generation/retention contracts. BK-M0–M6 implement, in order,
 provider-neutral seams、BK_ONLY、BK_ASYNC_OBJECT、BK_SYNC_OBJECT、Pulsar rollout and aggregate compatibility.
-BK-M1–M4 now execute the three profiles through the module-local runtime；BK-M5 production rollout is final-gated
-with exact capability/readiness admission、ownership transfer and mixed-profile compatibility。BK-M6 aggregate
-evidence remains open，and no online profile migration exists。
+BK-M1–M4 execute the three profiles through the module-local runtime；BK-M5 production rollout is final-gated with
+exact capability/readiness admission、ownership transfer and mixed-profile compatibility。BK-M6 closes bounded scale、
+fresh-runtime response-loss recovery、two-broker/two-worker contention and the complete predecessor aggregate。
+No online profile migration exists。
 
 ## 5. F2 — ManagedLedger Facade
 

@@ -160,7 +160,8 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
   通过，BK-M1 foundation、BK-M2 BK_ONLY 与 BK-M3 async Object 已 complete/final-gated；BK-M3 includes
   source/protection/profile/lag、retirement-metadata/sealed-trigger、real Oxia/BK/Object publication/read/physical-delete、
   fresh-runtime response-loss、real lag and unreadable-output fail-closed evidence；BK-M4 sync completion is also
-  complete/final-gated；BK-M5 production rollout is also complete/final-gated；BK-M6 remains open。
+  complete/final-gated；BK-M5 production rollout and BK-M6 aggregate scale/chaos/compatibility are also
+  complete/final-gated。Online profile migration remains outside BK-M0–M6。
 - **P15-M6**：F2-M0R2 新发现的窄结果交接；把 internal committed truth 已有的 cumulative logical size
   加入 generic `AppendResult`，不改变 durable format/profile/commit boundary；已于 2026-07-12 final-gated。
 - **M0-M8**：Phase 1 内部里程碑；M7 是 production Oxia adapter gate，M8 是最终端到端验收/冻结。

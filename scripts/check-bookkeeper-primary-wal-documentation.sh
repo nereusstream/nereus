@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 design_dir="$repo_root/docs/phase-bk-bookkeeper-primary-wal"
 nereus_audit_lock="35c58c575c3da220633c53e48a581f16756ea047"
-pulsar_source_lock="dfbcc8e11422c965957e3e1fcf809485e437d842"
+pulsar_source_lock="2f9c1eb93be96e2036fbdc8c5e39545f21fa6200"
 
 require_literal() {
     local literal="$1"
@@ -25,6 +25,7 @@ required_docs=(
     06-pulsar-runtime-rollout-and-compatibility.md
     07-implementation-plan-and-gates.md
     08-scenario-evidence-matrix.md
+    09-m6-executable-evidence-matrix.md
 )
 
 for name in "${required_docs[@]}"; do
@@ -160,6 +161,18 @@ require_literal 'BK-M4 BOOKKEEPER_WAL_SYNC_OBJECT complete/final-gated on 2026-0
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
 require_literal 'BK-M5 Pulsar rollout            complete/final-gated on 2026-07-22' \
     "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'BK-M6 aggregate final gate      complete/final-gated on 2026-07-22' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalM6Check --rerun-tasks`：123/123 outer tasks in 10m22s' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'bookKeeperPrimaryWalFinalCheck --rerun-tasks`：236/236 outer tasks in 30m57s' \
+    "docs/phase-bk-bookkeeper-primary-wal/07-implementation-plan-and-gates.md"
+require_literal 'BookKeeper Primary WAL Delivery is complete/final-gated' \
+    "docs/phase-bk-bookkeeper-primary-wal/README.md"
+require_literal 'BK-M6 and the complete F1-BK / BookKeeper Primary WAL Delivery are complete/final-gated' \
+    "docs/phase-bk-bookkeeper-primary-wal/09-m6-executable-evidence-matrix.md"
+require_literal "$pulsar_source_lock" \
+    "docs/phase-bk-bookkeeper-primary-wal/09-m6-executable-evidence-matrix.md"
 require_literal 'bookKeeperPrimaryWalM5Check --rerun-tasks` passes 105/105 outer tasks in 6m47s' \
     "docs/phase-bk-bookkeeper-primary-wal/README.md"
 require_literal 'bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` then passes' \
@@ -413,19 +426,26 @@ if [[ ! -x "$repo_root/scripts/check-bookkeeper-module-boundaries.sh" ]]; then
     echo "BookKeeper module-boundary gate is missing or not executable" >&2
     exit 1
 fi
-for unfinished_task in \
+for implemented_task in \
     bookKeeperPrimaryWalM6ScenarioEvidenceCheck \
     bookKeeperPrimaryWalM6ScaleCheck \
     bookKeeperPrimaryWalM6ChaosCheck \
     bookKeeperPrimaryWalM6CompatibilityCheck \
     bookKeeperPrimaryWalM6Check \
     bookKeeperPrimaryWalM6FinalCheck; do
-    if rg --pcre2 -n "tasks\\.register[^\\n]*\"${unfinished_task}\"" \
+    if ! rg --pcre2 -q "tasks\\.register[^\\n]*\"${implemented_task}\"" \
         "$repo_root/build.gradle.kts"; then
-        echo "unfinished task $unfinished_task must not be registered before executable implementation exists" >&2
+        echo "implemented task $implemented_task is not registered" >&2
         exit 1
     fi
 done
+require_literal 'bookKeeperPrimaryWalCheck' "build.gradle.kts"
+require_literal 'bookKeeperPrimaryWalFinalCheck' "build.gradle.kts"
+
+if [[ ! -x "$repo_root/scripts/check-bookkeeper-primary-wal-m6-scenario-evidence.sh" ]]; then
+    echo "BookKeeper M6 executable scenario-evidence gate is missing or not executable" >&2
+    exit 1
+fi
 
 if [[ ! -x "$repo_root/scripts/check-bookkeeper-primary-wal-m5-admin-routing-contract-surface.sh" ]]; then
     echo "BookKeeper M5 admin-routing contract gate is missing or not executable" >&2
@@ -447,13 +467,6 @@ global_links=(
 for path in "${global_links[@]}"; do
     require_literal "phase-bk-bookkeeper-primary-wal" "$path"
 done
-
-if rg -n --glob '*.md' \
-    'BK-M6[[:space:]:=-]+(complete|final-gated)|BookKeeper primary WAL[[:space:]:=-]+Implemented|Implemented[[:space:]:=-]+BookKeeper primary WAL' \
-    "$design_dir"; then
-    echo "BookKeeper primary-WAL design incorrectly claims BK-M6 or whole-delivery completion" >&2
-    exit 1
-fi
 
 while IFS=: read -r source match; do
     target="${match#*](}"

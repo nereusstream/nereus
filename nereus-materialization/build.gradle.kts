@@ -84,3 +84,14 @@ tasks.register<Test>("f4M3IntegrationTest") {
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
 }
+
+tasks.register<Test>("bkM6MixedSourceScaleTest") {
+    group = "verification"
+    description = "Run the BK-M6 mixed BK/Object 128-source and 1,048,576-record task boundary."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.materialization.BookKeeperMixedSourceTaskScaleTest")
+    }
+}

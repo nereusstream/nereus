@@ -28,7 +28,7 @@ nereus/
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
-  docs/phase-bk-bookkeeper-primary-wal/  F1-BK code-level target and BK-M1–M4 implementation evidence
+  docs/phase-bk-bookkeeper-primary-wal/  final-gated F1-BK BK-M0–M6 contract and executable evidence
   docs/automq-like-stream-storage/       async materialization profile design
 ```
 
@@ -56,7 +56,7 @@ Future 1 / Phase 1 Core StreamStorage M0-M8 is complete:
 
 The production broker now installs the Object-WAL sync/async profiles and all three BookKeeper primary-WAL profiles。
 BookKeeper first-create and writable ownership remain guarded by exact durable activation、profile and live broker
-capability facts；broad rollout still waits for the BK-M6 aggregate gate。
+capability facts；the BK-M6 aggregate rollout gate is now complete/final-gated。
 
 The next lower-storage delivery is **F1-BK / BookKeeper Primary WAL Delivery** rather than Future 5. BK-M0 through BK-M2
 are complete/final-gated；BK-M2 has its keyspace/seven codecs、focused production/fake metadata stores、exact
@@ -82,10 +82,11 @@ The allocation-authority fixture additionally loses real Oxia mutation responses
 forces two streams onto one candidate id，proving exact reload and one global owner without provider deletion。
 The following deterministic restart-recovery checkpoint adds O(1) stream/attempt reservation identity、same-session
 durable range replay with zero BK rewrite、new-session abandon/seal/retire、intent/head response-loss convergence and
-generation-zero repair after the source ledger is already sealed；the corresponding abrupt-process cuts remain assigned
-to the BK-M6 chaos matrix。
+generation-zero repair after the source ledger is already sealed；BK-M6 closes the corresponding process-loss boundary
+with durable cut injection followed by fresh-runtime recovery。
 The same checkpoint now has production Oxia + BookKeeper B/O evidence across a fresh runtime for same-session durable
-replay and expired-session fencing/new-ledger retry；only the abrupt-kill C variants remain open for those rows。
+replay and expired-session fencing/new-ledger retry；BK-M6 composes those cuts with retry-disabled real two-broker
+ownership and two-worker contention evidence。
 `bookKeeperPrimaryWalM2Check --rerun-tasks` passed 107/107 executable tasks and
 `bookKeeperPrimaryWalM2FinalCheck` passed its 212-task aggregate on 2026-07-20。BK_ONLY is final-gated but remains
 executable only through the explicit module-local runtime；
@@ -111,8 +112,11 @@ without changing publication identity。The mixed two-broker gate preserves BK_S
 profiles、history and exact MessageIds across cold load and both takeovers。On 2026-07-22，
 `bookKeeperPrimaryWalM5Check --rerun-tasks` passed 105/105 tasks and
 `bookKeeperPrimaryWalM5FinalCheck --rerun-tasks` passed 231/231 fresh tasks in 27m42s against
-`master@dfbcc8e11422c965957e3e1fcf809485e437d842`。Only BK-M6 scale/chaos/aggregate remains open；online profile
-migration remains unsupported。
+`master@2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`。BK-M6 then adds all-shard/hot-shard pagination、maximum
+range/protection/hazard/task/generation bounds、fresh-runtime response-loss recovery、mixed-profile compatibility and
+retry-disabled two-broker/two-worker contention。`bookKeeperPrimaryWalM6Check --rerun-tasks` passes 123/123 tasks in
+10m22s，and `bookKeeperPrimaryWalFinalCheck --rerun-tasks` passes 236/236 tasks in 30m57s。F1-BK is
+complete/final-gated；online profile migration remains unsupported。
 
 Future 2 F2-M0/M0R/M0R2 design and Phase 1.5 prerequisites are complete. P15-M0-M6 and F2-M1-M6 are implemented/final-gated。
 `nereus-managed-ledger` now provides the
@@ -168,7 +172,7 @@ storage-class coexistence。M5 同时修复了 10k hydration 递归栈溢出、S
 以及首次 policy-system-topic 初始化时的 namespace lock 递归。
 
 F3-M6 的历史验收基线是 `master@ff6e4fdfc03ffd8535ab2ece58d247dd1c64e8b4`；当前 Pulsar
-maintenance/source lock 已推进到 `master@dfbcc8e11422c965957e3e1fcf809485e437d842`。M6 增加
+maintenance/source lock 已推进到 `master@2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`。M6 增加
 普通与 batch-index MessageId 在 history/seek/unload/failover/restart 后的逐字段恒等验证、cursor internal
 property 跨 owner/restart 保留、trim/future reset 边界、root/snapshot hard-limit、activation-marker rollout、
 F4 snapshot inventory、同名 topic 新 incarnation 隔离，以及 loaded/unloaded/namespace/partitioned admin route

@@ -44,11 +44,12 @@ class BookKeeperAppenderResourceTest {
             assertThatThrownBy(() -> {
                 try (var prepared = runtime.appender.prepare(BookKeeperPrimaryWalAppenderTest.request(
                         BookKeeperPrimaryWalAppenderTest.session(), "resource-timeout", 0, new byte[] {1}))) {
-                    runtime.appender.persist(prepared, Duration.ofMillis(25)).join();
+                    runtime.appender.persist(prepared, Duration.ofMillis(250)).join();
                 }
             }).hasCauseInstanceOf(NereusException.class)
                     .satisfies(error -> assertThat(((NereusException) error.getCause()).code())
                             .isEqualTo(ErrorCode.TIMEOUT));
+            assertThat(runtime.operations.writeCalls()).isOne();
             assertThat(runtime.appender.inFlightWriteCount()).isZero();
         }
     }

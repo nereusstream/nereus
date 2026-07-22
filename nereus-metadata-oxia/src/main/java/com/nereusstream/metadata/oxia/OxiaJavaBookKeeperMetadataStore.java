@@ -538,12 +538,13 @@ public final class OxiaJavaBookKeeperMetadataStore
             Class<T> type,
             BiConsumer<String, T> keyValidator) {
         requirePageLimit(limit);
-        String prefix = F4MetadataStoreSupport.fixedDepthStart(basePrefix, descendantSegments);
+        String prefix = basePrefix + "/";
+        String rangeStart = F4MetadataStoreSupport.fixedDepthStart(basePrefix, descendantSegments);
         String end = F4MetadataStoreSupport.fixedDepthEnd(basePrefix, descendantSegments);
         String scopeSha256 = support.scopeSha256(kind.name() + "\0" + canonicalScope + "\0" + basePrefix);
         BookKeeperScanToken token = validateToken(
                 continuation, cluster, kind, scopeSha256, prefix, limit);
-        String start = token == null ? prefix : token.resumeFromInclusive();
+        String start = token == null ? rangeStart : token.resumeFromInclusive();
         return support.client().rangeScan(start, end, limit + 1, partition).thenApply(rows -> {
             boolean hasMore = rows.size() > limit;
             List<BookKeeperVersionedValue<T>> values = rows.stream().limit(limit).map(row -> {

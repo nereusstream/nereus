@@ -13,10 +13,11 @@ types and all three BookKeeper profiles had to remain rejected before IO until B
 
 No production code is changed by BK-M0.
 
-Current implementation note：BK-M1–M4 have since closed the provider-neutral seams、BK writer/reader/lifecycle/
-retention、async F4 source path and required-higher-generation producer barrier through the module-local runtime；
-BK-M5 production broker wiring、activation/capability ownership filter and mixed-profile rollout are final-gated。
-The audit hashes below remain the frozen M0 input；only BK-M6 aggregate evidence remains open。
+Current implementation note：BK-M1–M6 have since closed the provider-neutral seams、BK writer/reader/lifecycle/
+retention、async F4 source path、required-higher-generation producer barrier、production broker wiring、activation/
+capability ownership filter、mixed-profile rollout and aggregate scale/chaos/compatibility gates。The audit hashes below
+remain the frozen M0 input；the complete F1-BK delivery is final-gated at the current local Pulsar source lock
+`2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`。
 
 ## 2. Source locks
 
@@ -44,7 +45,7 @@ All shortened paths are below `src/main/java/com/nereusstream/...`。
 ### 2.2 Local Pulsar and BookKeeper
 
 Local checkout：`/Users/liusinan/apps/ideaproject/nereusstream/pulsar`，clean
-`master@dfbcc8e11422c965957e3e1fcf809485e437d842`。The original BK-M0 audit input was
+`master@2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`。The original BK-M0 audit input was
 `eaf7b9a704890a9265c21f30d9f351e02d00c600`；the current commits add the audited borrowed-client handoff、typed BK
 configuration、exact profile first-create capability barrier and independent live BK deletion-readiness snapshot
 without changing the pinned BookKeeper version。The checkout pins

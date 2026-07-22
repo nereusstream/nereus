@@ -117,7 +117,13 @@ val pulsarCheckoutExecTasks = setOf(
     "bookKeeperPrimaryWalM5Check",
 )
 
-tasks.matching { it.name in dockerBackedPulsarExecTasks }.configureEach {
+// A nested Pulsar Gradle invocation can saturate the same local CPU, ports, and Docker
+// forwarding path used while a Nereus Testcontainers fixture is establishing its first
+// Oxia/BookKeeper connection. Keep every checkout invocation behind the real-service gate,
+// even when the particular Pulsar test does not itself start a container.
+tasks.matching {
+    it.name in dockerBackedPulsarExecTasks || it.name in pulsarCheckoutExecTasks
+}.configureEach {
     usesService(dockerIntegrationGate)
 }
 
@@ -258,7 +264,7 @@ val pulsarCheckoutPath = providers.gradleProperty("pulsarCheckout")
     .orElse(providers.environmentVariable("NEREUS_PULSAR_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../../nereusstream/pulsar").asFile.absolutePath)
 val pulsarExpectedHead = providers.gradleProperty("pulsarExpectedHead")
-    .orElse("dfbcc8e11422c965957e3e1fcf809485e437d842")
+    .orElse("2f9c1eb93be96e2036fbdc8c5e39545f21fa6200")
 
 tasks.register<Exec>("checkPulsarSourceLock") {
     group = "verification"
@@ -1074,6 +1080,94 @@ tasks.register("bookKeeperPrimaryWalM5FinalCheck") {
     description = "Final-gate BK-M5 rollout over the retry-disabled aggregate and final-gated BK-M4 chain."
     dependsOn("bookKeeperPrimaryWalM5Check")
     dependsOn("bookKeeperPrimaryWalM4FinalCheck")
+}
+
+tasks.register<Exec>("bookKeeperPrimaryWalM6ScenarioEvidenceCheck") {
+    group = "verification"
+    description = "Trace BK-87 through BK-96 to annotated tests and their executable owning gates."
+    dependsOn("checkPulsarSourceLock")
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-bookkeeper-primary-wal-m6-scenario-evidence.sh",
+        pulsarCheckoutPath.get(),
+    )
+}
+
+tasks.register("bookKeeperPrimaryWalM6ScaleCheck") {
+    group = "verification"
+    description = "Verify BK root/inventory/hazard bounds and shared F4 task/generation scale boundaries."
+    dependsOn("bookKeeperPrimaryWalM6ScenarioEvidenceCheck")
+    dependsOn(":nereus-bookkeeper:bkM6ScaleTest")
+    dependsOn(":nereus-materialization:bkM6MixedSourceScaleTest")
+    dependsOn(":nereus-core:bkM6GenerationScaleTest")
+    dependsOn(":nereus-metadata-oxia:test")
+}
+
+tasks.register("bookKeeperPrimaryWalM6ChaosCheck") {
+    group = "verification"
+    description = "Verify allocation/write/seal/head/task/publication/delete response-loss recovery across fresh runtimes."
+    dependsOn("bookKeeperPrimaryWalM6ScaleCheck")
+    dependsOn(":nereus-bookkeeper:bkM6ChaosTest")
+    dependsOn("bookKeeperPrimaryWalM2AllocationAuthorityCheck")
+    dependsOn("bookKeeperPrimaryWalM3ResponseLossCheck")
+}
+
+tasks.register("bookKeeperPrimaryWalM6CompatibilityCheck") {
+    group = "verification"
+    description = "Run mixed BK/Object rollout with retry-disabled two-broker worker contention and async trim/GC."
+    dependsOn("bookKeeperPrimaryWalM6ChaosCheck")
+    dependsOn("bookKeeperPrimaryWalM5Check")
+    dependsOn("phase4M6TwoBrokerWorkerContentionPulsarCheck")
+    dependsOn("phase4M5AsyncRetentionMultiBrokerPulsarCheck")
+}
+
+tasks.register("bookKeeperPrimaryWalM6Check") {
+    group = "verification"
+    description = "Run the complete ordinary BK-M6 scenario, scale, chaos, and compatibility gate."
+    dependsOn("bookKeeperPrimaryWalM6CompatibilityCheck")
+    dependsOn("bookKeeperPrimaryWalDocumentationCheck")
+    dependsOn("checkBookKeeperModuleBoundaries")
+    dependsOn("checkPhase4ModuleBoundaries")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn(":nereus-api:check")
+    dependsOn(":nereus-core:check")
+    dependsOn(":nereus-managed-ledger:check")
+    dependsOn(":nereus-materialization:check")
+    dependsOn(":nereus-metadata-oxia:check")
+    dependsOn(":nereus-object-store:check")
+    dependsOn(":nereus-bookkeeper:check")
+    dependsOn(":nereus-pulsar-adapter:check")
+}
+
+tasks.register("bookKeeperPrimaryWalM6FinalCheck") {
+    group = "verification"
+    description = "Run BK-M6 over every F1-BK milestone and all Phase 1 through Phase 4 final predecessors."
+    dependsOn("bookKeeperPrimaryWalM6Check")
+    dependsOn("bookKeeperPrimaryWalM1FinalCheck")
+    dependsOn("bookKeeperPrimaryWalM2FinalCheck")
+    dependsOn("bookKeeperPrimaryWalM3FinalCheck")
+    dependsOn("bookKeeperPrimaryWalM4FinalCheck")
+    dependsOn("bookKeeperPrimaryWalM5FinalCheck")
+    dependsOn("phase15FinalCheck")
+    dependsOn("phase2FinalCheck")
+    dependsOn("phase3FinalCheck")
+    dependsOn("phase4FinalCheck")
+    dependsOn("checkPhase4FinalDockerIsolation")
+    dependsOn("checkPhase4FinalPulsarCheckoutIsolation")
+}
+
+tasks.register("bookKeeperPrimaryWalCheck") {
+    group = "verification"
+    description = "Run every ordinary BookKeeper primary-WAL delivery gate."
+    dependsOn("bookKeeperPrimaryWalM6Check")
+}
+
+tasks.register("bookKeeperPrimaryWalFinalCheck") {
+    group = "verification"
+    description = "Run the complete BookKeeper primary-WAL release gate; this is the only delivery completion claim."
+    dependsOn("bookKeeperPrimaryWalCheck")
+    dependsOn("bookKeeperPrimaryWalM6FinalCheck")
 }
 
 tasks.register<Exec>("checkPhase4ModuleBoundaries") {

@@ -55,3 +55,14 @@ tasks.register<Test>("phase1IntegrationTest") {
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
 }
+
+tasks.register<Test>("bkM6GenerationScaleTest") {
+    group = "verification"
+    description = "Run the BK-M6 generation-zero and exact 4,096/4,097 candidate resolution boundaries."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.core.read.GenerationReadResolverTest")
+    }
+}

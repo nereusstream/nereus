@@ -2108,7 +2108,7 @@ class BookKeeperWalOnlyOxiaBkIntegrationTest {
         return BKCluster.builder()
                 .baseServerConfiguration(configuration)
                 .metadataServiceUri(metadataServiceUri)
-                .numBookies(1)
+                .numBookies(2)
                 .clearOldData(true)
                 .build();
     }

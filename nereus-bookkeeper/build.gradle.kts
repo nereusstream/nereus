@@ -58,3 +58,19 @@ registerFocusedTest(
     "com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinatorTest",
     "com.nereusstream.bookkeeper.BookKeeperWalRetentionGateTest",
 )
+
+registerFocusedTest(
+    "bkM6ScaleTest",
+    "Run BK-M6 root, protection, reader, hazard-slot, and stack-bounded scale boundaries.",
+    "com.nereusstream.bookkeeper.BookKeeperPrimaryWalScaleTest",
+    "com.nereusstream.bookkeeper.BookKeeperLedgerAllocatorTest",
+)
+
+registerFocusedTest(
+    "bkM6ChaosTest",
+    "Run BK-M6 allocation, seal, append/head, and deletion response-loss recovery matrix.",
+    "com.nereusstream.bookkeeper.BookKeeperLedgerAllocatorTest",
+    "com.nereusstream.bookkeeper.BookKeeperLedgerRecoveryTest",
+    "com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinatorTest",
+    "com.nereusstream.bookkeeper.BookKeeperWalRetentionGateTest",
+)

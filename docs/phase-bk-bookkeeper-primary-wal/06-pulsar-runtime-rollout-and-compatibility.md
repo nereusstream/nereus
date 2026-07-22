@@ -6,7 +6,7 @@ The integration target is the local Pulsar checkout only：
 
 ```text
 /Users/liusinan/apps/ideaproject/nereusstream/pulsar
-master@dfbcc8e11422c965957e3e1fcf809485e437d842
+master@2f9c1eb93be96e2036fbdc8c5e39545f21fa6200
 BookKeeper 4.18.0
 ```
 
@@ -546,7 +546,7 @@ Recommended operational rollout mirrors implementation milestones：
 5. enable BK_ASYNC publication; keep ledger delete dry-run initially
 6. verify lag/object publication/source-retirement; activate scoped ledger deletion
 7. enable BK_SYNC publication and completion SLOs
-8. keep broad production expansion guarded until the BK-M6 aggregate gate
+8. require the now-passed BK-M6 aggregate gate before broad production expansion
 ```
 
 Removing capability from one broker prevents new BK topic creates cluster-wide and writable ownership on that broker；
@@ -622,4 +622,7 @@ only after：
 
 Checkpoint E.4 completes the remaining surface：mixed BK async/sync/Object profiles、old/noncapable broker ownership
 exclusion、opaque readiness-identity proof rebinding and the named ordinary/final aggregates are executable and green。
-BK-M5 is complete/final-gated；BK-M6 owns the remaining aggregate scenario/scale/chaos/compatibility evidence。
+BK-M5 is complete/final-gated。BK-M6 subsequently closes the aggregate scenario/scale/chaos/compatibility evidence，
+including mixed profiles、fresh-runtime response-loss recovery、two-broker/two-worker contention and bounded scale；
+the whole F1-BK delivery is final-gated at
+`master@2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`。Online migration remains excluded。

@@ -15,6 +15,7 @@ import com.nereusstream.metadata.oxia.BookKeeperScanToken;
 import com.nereusstream.metadata.oxia.FakeBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.ResponseLossPartitionedOxiaBackend;
 import com.nereusstream.metadata.oxia.records.AllocationSlotLifecycle;
+import com.nereusstream.metadata.oxia.records.BookKeeperAllocationSlotRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperWriterLifecycle;
 import com.nereusstream.metadata.oxia.records.LedgerAllocationLifecycle;
@@ -383,6 +384,55 @@ class BookKeeperLedgerAllocatorTest {
     }
 
     @Test
+    void fullHazardSetRejectsBeforeProviderIoWithoutClearingAnySlot() {
+        BookKeeperWalConfiguration configuration = withMaxUncertainAllocations(
+                BookKeeperTestConfigurations.valid(), 32);
+        BookKeeperMetadataStoreConfig metadataConfiguration = metadataConfig(configuration);
+        var keys = metadataConfiguration.keyspace(CLUSTER);
+        try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
+                metadataConfiguration, CLOCK)) {
+            for (int slot = 0; slot < configuration.maxUncertainAllocations(); slot++) {
+                long ledgerId = 1_000L + slot;
+                metadata.createAllocationSlot(CLUSTER, new BookKeeperAllocationSlotRecord(
+                                1,
+                                slot,
+                                "hazard-allocation-" + slot,
+                                "hazard-stream-" + slot,
+                                ledgerId,
+                                keys.ledgerIdentitySha256(
+                                        configuration.providerScopeSha256(), ledgerId),
+                                configuration.configurationBindingSha256().value(),
+                                AllocationSlotLifecycle.CREATE_UNCERTAIN,
+                                1_000,
+                                1_000,
+                                0))
+                        .join();
+            }
+            FakeOperations operations = new FakeOperations(false);
+            BookKeeperLedgerAllocator allocator = allocator(
+                    configuration, metadata, operations, new Random(31));
+
+            assertThatThrownBy(() -> allocator.allocate(new BookKeeperLedgerAllocationRequest(
+                            STREAM,
+                            session(1, 1, "token-1"),
+                            Duration.ofSeconds(10)))
+                    .join())
+                    .cause()
+                    .isInstanceOf(NereusException.class)
+                    .extracting(error -> ((NereusException) error).code())
+                    .isEqualTo(ErrorCode.METADATA_LIMIT_EXCEEDED);
+
+            assertThat(operations.createCalls).isZero();
+            for (int slot = 0; slot < configuration.maxUncertainAllocations(); slot++) {
+                assertThat(metadata.getAllocationSlot(CLUSTER, slot).join())
+                        .get()
+                        .extracting(value -> value.value().lifecycle())
+                        .isEqualTo(AllocationSlotLifecycle.CREATE_UNCERTAIN);
+            }
+        }
+    }
+
+    @Test
     void writerStateRejectsStaleSessionBeforeAnyProviderCreate() {
         BookKeeperWalConfiguration configuration = BookKeeperTestConfigurations.valid();
         try (FakeBookKeeperMetadataStore metadata = new FakeBookKeeperMetadataStore(
@@ -493,6 +543,20 @@ class BookKeeperLedgerAllocatorTest {
         return new BookKeeperMetadataStoreConfig(configuration.maxAppendRangesPerLedger(),
                 configuration.protectionSlotsPerRange(), configuration.maxReaderLeasesPerLedger(),
                 configuration.maxUncertainAllocations());
+    }
+
+    private static BookKeeperWalConfiguration withMaxUncertainAllocations(
+            BookKeeperWalConfiguration value, int maximum) {
+        return new BookKeeperWalConfiguration(
+                value.clusterAlias(), value.providerScopeSha256(), value.ledgerIdPrefixBits(),
+                value.ledgerIdPrefixValue(), value.ledgerIdNamespaceReservationId(), value.ensembleSize(),
+                value.writeQuorumSize(), value.ackQuorumSize(), value.digestType(), value.passwordRef(),
+                value.maxEntriesPerLedger(), value.maxBytesPerLedger(), value.maxAppendRangesPerLedger(),
+                value.protectionSlotsPerRange(), value.maxReaderLeasesPerLedger(), maximum,
+                value.maxLedgerAge(), value.maxWritesInFlight(), value.maxReadsInFlight(),
+                value.maxReadBytesInFlight(), value.operationTimeout(), value.allocationTimeout(),
+                value.sealTimeout(), value.deleteTimeout(), value.readerLeaseTtl(),
+                value.readerLeaseRenewInterval(), value.retentionScanInterval(), value.retentionPageSize());
     }
 
     private static AppendSession session(long epoch, long leaseVersion, String token) {

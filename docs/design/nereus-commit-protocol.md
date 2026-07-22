@@ -359,8 +359,8 @@ recovery protocol and a new API contract。It is explicitly outside the current 
 
 ## 10. BookKeeper primary WAL
 
-> Status: F1-BK BK-M1–M4 module-local writer/reader/ledger lifecycle/retention/profile execution and BK-M5
-> production broker rollout complete/final-gated；BK-M6 aggregate evidence remains open
+> Status: F1-BK BK-M0–M6 module-local profiles、production broker rollout and aggregate evidence
+> complete/final-gated；online profile migration remains outside this delivery
 
 BookKeeper provides primary bytes durability only。The same head/commit-log protocol assigns logical
 offsets。The commit record/read target uses the existing tagged `BookKeeperEntryRangeReadTarget`；one Nereus offset

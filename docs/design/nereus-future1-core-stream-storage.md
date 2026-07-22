@@ -13,7 +13,8 @@
 > evidence。BK-M4 sync completion 也已完成/final-gated，覆盖独立 required-Object policy、exact task reuse、
 > BK-visible producer wait、normal-read proof 和 post-head recovery；BK-M5 production rollout 也已完成/final-gated，
 > 覆盖 exact ownership capability filter、readiness-proof rollover、双 broker takeover 和 BK sync/async/Object
-> mixed-profile compatibility。仅 BK-M6 aggregate scenario/scale/chaos/compatibility 尚未完成；
+> mixed-profile compatibility。BK-M6 aggregate scenario/scale/chaos/compatibility and the complete 236-task delivery
+> final gate are also complete；
 > `docs/phase-bk-bookkeeper-primary-wal/`
 
 本文定义 L0 目标边界，并把总体架构映射到当前 Phase 1。精确 Java records、binary layout、

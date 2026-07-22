@@ -100,22 +100,36 @@ class BookKeeperMetadataStoreContractTest {
     void scansEveryFixedAllocationSlotShardWithStableOrdering() {
         try (OxiaJavaBookKeeperMetadataStore store = productionStore()) {
             BookKeeperKeyspace keys = CONFIG.keyspace(CLUSTER);
-            for (int slot = 0; slot < BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS; slot++) {
-                long ledgerId = 1_000L + slot;
-                store.createAllocationSlot(CLUSTER, new BookKeeperAllocationSlotRecord(
-                        1, slot, "allocation-slot-" + slot, STREAM.value(), ledgerId,
-                        keys.ledgerIdentitySha256(PROVIDER_SCOPE, ledgerId), CONFIGURATION,
-                        AllocationSlotLifecycle.CLAIMED, 100, 100, 0)).join();
+            AllocationSlotLifecycle[] lifecycles = AllocationSlotLifecycle.values();
+            for (int shard = 0; shard < BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS; shard++) {
+                for (int lifecycle = 0; lifecycle < lifecycles.length; lifecycle++) {
+                    int slot = shard + lifecycle * BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS;
+                    long ledgerId = 1_000L + slot;
+                    store.createAllocationSlot(CLUSTER, new BookKeeperAllocationSlotRecord(
+                            1, slot, "allocation-slot-" + slot, STREAM.value(), ledgerId,
+                            keys.ledgerIdentitySha256(PROVIDER_SCOPE, ledgerId), CONFIGURATION,
+                            lifecycles[lifecycle], 100, 100 + lifecycle, 0)).join();
+                }
             }
 
             for (int shard = 0; shard < BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS; shard++) {
-                BookKeeperScanPage<BookKeeperVersionedValue<BookKeeperAllocationSlotRecord>> page =
+                BookKeeperScanPage<BookKeeperVersionedValue<BookKeeperAllocationSlotRecord>> first =
                         store.scanAllocationSlots(CLUSTER, shard, Optional.empty(), 2).join();
-                assertThat(page.values())
-                        .singleElement()
-                        .extracting(value -> value.value().slot())
-                        .isEqualTo(shard);
-                assertThat(page.continuation()).isEmpty();
+                BookKeeperScanPage<BookKeeperVersionedValue<BookKeeperAllocationSlotRecord>> second =
+                        store.scanAllocationSlots(
+                                CLUSTER, shard, first.continuation(), 2).join();
+                assertThat(first.values()).hasSize(2);
+                assertThat(second.values()).hasSize(1);
+                assertThat(first.values().stream().map(value -> value.value().slot()).toList())
+                        .containsExactly(shard, shard + BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS);
+                assertThat(second.values().get(0).value().slot())
+                        .isEqualTo(shard + 2 * BookKeeperKeyspace.ALLOCATION_SLOT_SHARDS);
+                assertThat(java.util.stream.Stream.concat(
+                                first.values().stream(), second.values().stream())
+                        .map(value -> value.value().lifecycle())
+                        .toList())
+                        .containsExactly(lifecycles);
+                assertThat(second.continuation()).isEmpty();
             }
         }
     }
