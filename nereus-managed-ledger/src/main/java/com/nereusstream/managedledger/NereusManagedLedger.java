@@ -1234,7 +1234,6 @@ public final class NereusManagedLedger extends AbstractNereusManagedLedger
                 case PERMANENTLY_FENCED -> "Fenced";
             };
         }
-        internal.properties = new java.util.HashMap<>(getProperties());
         ManagedLedgerInternalStats.LedgerInfo ledger = new ManagedLedgerInternalStats.LedgerInfo();
         ledger.ledgerId = projection.virtualLedgerId();
         ledger.entries = metadata.committedEndOffset();
