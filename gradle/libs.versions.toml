@@ -20,6 +20,8 @@ parquet = "1.15.2"
 hadoop = "3.4.1"
 zstd-jni = "1.5.7-3"
 bookkeeper = "4.18.0"
+# Test-only Kafka oracle aligned with the locked AutoMQ 3.9.0 reference baseline.
+kafka = "3.9.0"
 
 [libraries]
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
@@ -53,5 +55,6 @@ hadoop-common = { module = "org.apache.hadoop:hadoop-common", version.ref = "had
 hadoop-mapreduce-client-core = { module = "org.apache.hadoop:hadoop-mapreduce-client-core", version.ref = "hadoop" }
 zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstd-jni" }
 bookkeeper-server = { module = "org.apache.bookkeeper:bookkeeper-server", version.ref = "bookkeeper" }
+kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka" }
 
 [plugins]

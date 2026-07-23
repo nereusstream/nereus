@@ -2,7 +2,8 @@
 
 Nereus is a protocol-neutral shared-storage streaming engine currently delivered through its Pulsar-native
 integration. Native KRaft Kafka Future 9 has completed the F9-M1 foundation and F9-M2 metadata/checkpoint
-implementation；no native Kafka broker capability is available yet. Nereus is built around an Oxia
+implementation；the Nereus-side F9-M3 byte-exact RecordBatch/Fetch codec slice is in progress，but no native Kafka
+broker capability is available yet. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a
 single logical `streamId + offset` coordinate.
@@ -24,14 +25,14 @@ nereus/
   nereus-managed-ledger/                ManagedLedger facade implementation boundary
   nereus-pulsar-adapter/                Pulsar broker integration boundary
   nereus-kop-adapter/                   KoP/Kafka projection boundary
-  nereus-kafka-adapter/                 F9 native Kafka-owned metadata/checkpoint/recovery boundary
+  nereus-kafka-adapter/                 F9 Kafka metadata/checkpoint/recovery and byte-exact batch boundary
   docs/design/                          north-star and capability-track designs
   docs/phase-1-core-stream-storage/     implemented Phase 1 contracts and milestones
   docs/phase-1.5-core-storage-foundation/ implemented L0 evolution and gates
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
-  docs/phase-9-kafka-native-storage/     F9 native Kafka code-level target and M1/M2 evidence
+  docs/phase-9-kafka-native-storage/     F9 native Kafka code-level target and M1/M2/partial-M3 evidence
   docs/phase-bk-bookkeeper-primary-wal/  final-gated F1-BK BK-M0–M6 contract and executable evidence
   docs/automq-like-stream-storage/       async materialization profile design
 ```
@@ -48,9 +49,10 @@ github.com/nereusstream/kafka   -> planned fork of apache/kafka for F9 native in
 
 The main Nereus repository holds product-owned modules and authoritative design documents.
 Forks hold changes that must land inside upstream Pulsar, KoP, or Kafka trees. The `nereus-kafka-adapter` now owns the
-F9-M2 config-free binding/checkpoint/recovery boundary；its code-level target and locked AutoMQ reference audit live in
-[`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). Native Produce/Fetch and the Kafka
-fork remain future work，so this is not a current broker-runtime claim.
+F9-M2 binding/checkpoint/recovery boundary and the first M3 raw Kafka batch encode/Fetch assembly slice；its code-level
+target and locked AutoMQ reference audit live in
+[`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). Kafka fork wiring and end-to-end
+native Produce/Fetch remain future work，so this is not a current broker-runtime claim.
 
 ## Current Phase
 

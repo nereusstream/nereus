@@ -9,6 +9,7 @@ dependencies {
 
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testImplementation(testFixtures(project(":nereus-object-store")))
+    testImplementation(libs.kafka.clients)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -31,5 +32,16 @@ tasks.register<Test>("f9M2IntegrationTest") {
     useJUnitPlatform()
     filter {
         includeTestsMatching("com.nereusstream.kafka.*IntegrationTest")
+    }
+}
+
+tasks.register<Test>("f9M3CodecTest") {
+    group = "verification"
+    description = "Run F9-M3 byte-exact Kafka record-batch encode and Fetch assembly contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.codec.*")
     }
 }

@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Designed target；F9-M3/F9-M6
+> 状态：Implementation in progress；Nereus-side M3 codec slice implemented；Kafka fork/runtime remains designed target
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -289,6 +289,28 @@ abortedTransactions
 
 start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 requested offset 过滤。storage trim/logStart
 已屏蔽不可见前缀，assembler 不返回完全位于 logStart 之前的 batch。
+
+### 5.3 Current Nereus-side implementation（2026-07-23）
+
+当前 `nereus-kafka-adapter` 已实现且由 `f9M3CodecTest` 验证：
+
+- `KafkaRecordBatchCodec`：从调用者 `ByteBuffer.position..limit` 解析一个或多个 magic-v2 batch，保持调用者
+  position/limit/order 不变；逐 batch 拷贝 exact owned bytes；严格校验 61-byte minimum、declared length、CRC32C、
+  base/last offset、compression id、physical record count、timestamp 和 producer-field coherence；
+- `KafkaRecordBatch`：只暴露校验后的 header/range/producer facts，所有 byte array/buffer accessor 都是 defensive
+  owned/read-only view；
+- `KafkaAppendBatchEncoder`：要求 dense first-base/next-base chain，每个 Kafka batch 对应一个
+  `AppendEntry`，保留 exact bytes，event hint 取 normalized max timestamp，生成 concatenated CRC32C；M3 明确拒绝
+  idempotent/transaction/control batches，它们必须等 M4 producer-state/transaction owner 落地后再启用；
+- `KafkaAppendResultValidator`：逐项验证 stream/range/end/format/record count/entry count/logical bytes 和空
+  schema/projection；
+- `KafkaFetchAssembler`：只接受 range 与 raw batch header 完全一致的 Kafka payload；COMMITTED 要求 dense，
+  TOPIC_COMPACTED 允许 non-overlapping sparse；按 hard byte limit 分配 exact owned output，同时返回 actual first base、
+  logical cursor、coverage、first-overflow、virtual position 和 aborted-transaction facts。
+
+测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
+format 对齐；该依赖不进入 production/runtime classpath。此切片尚未满足 M3 entry 中的组织 Kafka fork source lock，
+也不构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading
 

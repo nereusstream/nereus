@@ -1,17 +1,18 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1 ranged foundation and F9-M2 metadata/checkpoint/recovery implementation complete；ordinary and direct real-service M2 gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka runtime
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch/Fetch codec slice in progress；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> F9 implementation base：`main@112c459`
+> F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
 gate 是实现约束。F9-M1 已落地 conditional append、Object/BookKeeper ranged readers、semantic views、
 NCP2/NTC2、exact format dispatch/capability 和真实 S3 round trip；F9-M2 已落地 binary-safe authority API、
 authority-bound head CAS、V1/V2 dual codec、Kafka partition binding 的显式 codec、真实 Oxia store、
 deterministic create/delete、64-shard hint scanner、NKC1、受保护 publication/fallback 和 fresh-state replay
-状态机。若以后
+状态机；F9-M3 已开始落地 raw magic-v2 RecordBatch 严格校验、exact per-batch append encoding 和 Fetch owned-byte
+assembly。Kafka fork/runtime/acks/async Fetch 尚未实现。若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 
 ## 1. 设计文档

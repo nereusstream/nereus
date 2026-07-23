@@ -2,7 +2,7 @@
 
 > 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
-> 当前 F9-M1 implementation、deterministic gate 与真实 LocalStack NCP2/NTC2 已通过；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 M1 rows 暂不升级为 `PASSED_CURRENT_SOURCE`
+> 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec rows have deterministic partial evidence；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
 
 ## 1. Evidence tiers
 
@@ -37,6 +37,10 @@ method uniqueness：
   "status": "PLANNED"
 }
 ```
+
+当前 `f9M3CodecTest` 为 KF-APP-002、KF-FET-001/KF-FET-002 的 deterministic adapter-level evidence，并覆盖
+KF-APP-003 的 pre-storage exact-byte/CRC invariant。它不替代这些 row 要求的 Kafka fork/real-service evidence，
+因此 row 状态仍不标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。

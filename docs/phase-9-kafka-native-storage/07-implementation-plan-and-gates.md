@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1 and F9-M2 implementation slices complete；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec slice in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -337,6 +337,18 @@ Final uses real KRaft broker process + real Oxia + selected primary WAL/Object p
 
 M3 supports non-transactional `delete`-policy user topics for the gate。It is not a full Kafka compatibility claim；internal
 coordinator/transaction/compaction remain M4/M5。
+
+### 7.1 Current partial implementation evidence（2026-07-23）
+
+- implemented the Nereus-side `KafkaRecordBatchCodec`、`KafkaAppendBatchEncoder`、exact append-result validator and
+  `KafkaFetchAssembler` with owned byte arrays/read-only buffers；
+- `:nereus-kafka-adapter:f9M3CodecTest --rerun-tasks` passes against test-only Kafka 3.9.0-generated batches，covering
+  uncompressed/GZIP、multi-batch、producer facts、CRC/length/magic/compression corruption、offset gaps、containing-entry
+  Fetch and sparse compacted coverage；
+- M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
+- this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
+  an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、
+  broker runtime tasks and real KRaft final gate remain open。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics
 
