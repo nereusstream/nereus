@@ -59,12 +59,12 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
     private volatile CompletableFuture<T> inFlightFuture;
     private AutoCloseable subscription;
     private boolean controlScheduled;
-    private boolean inFlight;
+    private volatile boolean inFlight;
     private boolean dirty;
     private boolean deadlineExpired;
     private boolean deadlineReadStarted;
     private int eventRereads;
-    private int readAttempts;
+    private volatile int readAttempts;
 
     public KafkaFetchWaveOperation(
             KafkaFetchWaveSource<T> source,
@@ -231,10 +231,9 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
             completeFailure(failure, KafkaFetchOperationState.COMPLETE);
             return;
         }
-        if (kind == ReadKind.DEADLINE
-                || maxWait.isZero()
-                || exactBytes >= minBytes
-                || mustComplete) {
+        if (mustComplete
+                || kind == ReadKind.DEADLINE
+                || maxWait.isZero()) {
             completeSuccess(new KafkaFetchWaveResult<>(
                     exactResult,
                     exactBytes,
@@ -244,6 +243,12 @@ public final class KafkaFetchWaveOperation<T> implements AutoCloseable {
         }
         if (deadlineExpired) {
             beginDeadlineRead();
+        } else if (exactBytes >= minBytes) {
+            completeSuccess(new KafkaFetchWaveResult<>(
+                    exactResult,
+                    exactBytes,
+                    false,
+                    readAttempts));
         } else if (dirty) {
             beginEventReadIfAllowed();
         } else {

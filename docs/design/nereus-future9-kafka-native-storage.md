@@ -1,6 +1,6 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
-> 状态：In progress；F9-M1/M2 implemented；F9-M3 append/fetch/ListOffsets/metadata-lifecycle plus checkpoint-pinned paged recovery and stock-RecordBatch-derived Partition state slices implemented；F9-M6 config/runtime-lifecycle slices implemented；native broker log selection/data plane pending
+> 状态：In progress；F9-M1/M2 implemented；F9-M3 append/fetch/ListOffsets/metadata-lifecycle、checkpoint-pinned paged recovery、stock-RecordBatch-derived Partition state、authoritative log shell，以及 bounded Produce / whole-request async Fetch broker handoff slices implemented；F9-M6 config/runtime-lifecycle slices implemented；CLI/KafkaRaftServer production selection and real native KRaft process gate pending
 > 代码级合同：`../phase-9-kafka-native-storage/README.md`
 > 参考源码：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`，`3.9.0-SNAPSHOT`
 > 设计基线日期：2026-07-23
@@ -201,6 +201,12 @@ Fetch isolation：
 - `READ_UNCOMMITTED` 上界是 HW；
 - `READ_COMMITTED` 上界是 LSO，并使用 stock aborted-transaction filtering；
 - 超出 Nereus stable end 的本地 cache 值不能作为 fetch 上界。
+
+当前 fork 的 request path 以 optional stock-owned executor seam 保留整次 `ReplicaManager.readFromLog` 为 opaque
+wave：initial、stable-event 与 deadline reread 均在 bounded worker 执行，stock 继续拥有 request-wide byte
+budget、partition order、divergence/preferred-replica/error 语义；actual response bytes 决定 `minBytes`。listener、
+timer、logical operation permit 和独立 callback executor 由 runtime drain/close 统一收敛。disabled mode 仍走原
+`DelayedFetch` purgatory。
 
 ## 11. Checkpoint、恢复与虚拟 segment
 

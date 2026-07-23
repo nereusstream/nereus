@@ -2,7 +2,7 @@
 
 > 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
-> 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec rows have deterministic partial evidence；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
+> 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch request-path rows have deterministic partial evidence；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
 
 ## 1. Evidence tiers
 
@@ -50,7 +50,13 @@ Kafka fork/real-service evidence。`KafkaFetchOperationTest` 还为 KF-FET-004/0
 event coalescing、deadline、one-in-flight-read、listener/read cleanup 和 callback-once 的 deterministic partial
 evidence；`KafkaFetchWaveOperationTest` additionally covers the stock-compatible whole-request source boundary、
 subscribe-before-read、event coalescing、deadline-final-read independent of the event safety budget and caller-cancel
-isolation；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local higher-term takeover、late-open fencing 和
+isolation，including the deadline/enough-in-flight race；local fork `NereusBrokerStorageFetchExecutorTest` proves bounded
+worker event reread、listener cleanup、whole-lifetime logical-cap rejection and accepted deadline completion，while stock
+two-partition `ReplicaManagerTest` proves the optional path defers response、preserves order/per-partition errors and drains
+the action queue。These are request-path partial evidence for KF-FET-004/005/016，but do not replace their real KRaft/process
+tiers。The exact-head aggregate also proves simultaneous wakeups retain all admitted operations under the logical cap and
+passes 80/80 outer、92/92 stock and 95/95 artifact-enabled tasks；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供
+process-local higher-term takeover、late-open fencing 和
 stale-resign isolation 的 deterministic partial evidence，但不替代 durable authority/real process cut；
 `KafkaListOffsetsResolverTest` 为 KF-FET-009 提供 stable-snapshot earliest/latest、compressed exact-record
 timestamp/max-timestamp、跨页硬预算、inspector invariant 与 mid-scan leadership fencing 的 deterministic partial
@@ -62,7 +68,7 @@ time-index recovery/real KRaft baseline；local fork `NereusTopicDeltaLifecycleT
 activation、per-partition failure/offline policy 及 real KRaft process/chaos evidence 仍未实现，所以该 row 保持
 `PLANNED`；fork
 `NereusBrokerStorageRuntimeTest` further proves exact one-ReplicaManager binding、construction of that same
-ListOffsets/topic-delta chain、disabled/optional append-executor selection and combined append/product drain；
+ListOffsets/topic-delta chain、disabled/optional append/fetch-executor selection and combined append/fetch/product drain；
 `KafkaStorageAdmissionTest` 为 KF-OPS-014/017 提供 readiness recovery、stable pre-I/O rejection、one-winner concurrent
 drain 和 irreversible drain/close 的 deterministic partial evidence；`DefaultNereusKafkaRuntimeTest` 与
 `KafkaRuntimeResourcesTest` 进一步为 KF-OPS-012/014 提供 protected/deduplicated startup、timeout-view isolation、

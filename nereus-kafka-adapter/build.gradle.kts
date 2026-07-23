@@ -75,6 +75,7 @@ tasks.register<Test>("f9M3CodecTest") {
         includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeConfigurationTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeFactoryTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaFetchOperationTest")
+        includeTestsMatching("com.nereusstream.kafka.fetch.KafkaFetchWaveOperationTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaPartitionLeaderManagerTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaStorageProfilePolicyTest")
         includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManagerTest")

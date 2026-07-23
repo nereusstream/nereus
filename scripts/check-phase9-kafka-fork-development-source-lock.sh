@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "17" ]] \
-    || fail "expected seventeen reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "19" ]] \
+    || fail "expected nineteen reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -87,9 +87,11 @@ core/src/main/scala/kafka/server/ReplicaManager.scala
 core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
 core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageAppendExecutor.scala
+core/src/main/scala/kafka/server/nereus/NereusBrokerStorageFetchExecutor.scala
 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntime.scala
 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntimeFactory.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageAppendExecutor.scala
+core/src/main/scala/kafka/server/storage/BrokerStorageFetchExecutor.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageDrainReason.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageRuntime.scala
 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeContext.scala
@@ -112,6 +114,7 @@ core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageAppendExecutorTest.scala
+core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageFetchExecutorTest.scala
 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
 core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
 server-common/src/main/java/org/apache/kafka/server/util/KafkaScheduler.java
@@ -126,7 +129,7 @@ storage/src/main/java/org/apache/kafka/storage/internals/log/RequiredAcksAwareAp
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed seventy-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition slice"
+    || fail "fork change set differs from the reviewed seventy-three-file log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -145,7 +148,7 @@ b6513029a84c01b75095d93c8103ce97b6f3c533 core/src/main/java/kafka/log/nereus/Ner
 aadcc658a9e74de9798b06d674ecb784947c8762 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
 f4f5b14e85a1f278653ce0e1d9f1c7ca2517500b core/src/main/java/kafka/log/nereus/NereusUnifiedLog.java
 df74856a75146e0e35aaf5431b1ecb35531ec054 core/src/main/java/kafka/server/builders/LogManagerBuilder.java
-402d4dea5db44e022519ed76ff02becb8e077247 core/src/main/java/kafka/server/builders/ReplicaManagerBuilder.java
+0984006b925982dea46544d6459a5b5510e2a634 core/src/main/java/kafka/server/builders/ReplicaManagerBuilder.java
 5e2061bbb1655ab63a2796a3c0f12d34d7346ea7 core/src/main/java/kafka/server/nereus/NereusKafkaClock.java
 22da430c45f92afcce47208f42c8ac1346ae6e1e core/src/main/java/kafka/server/nereus/NereusKafkaDeferredRuntime.java
 93d44199a1e982d5a1f939d70f215154fa77e3f1 core/src/main/java/kafka/server/nereus/NereusKafkaMappedRuntimeConfiguration.java
@@ -160,21 +163,23 @@ d1e0f2999d6a9c7cd3ad8fc69002220f9c524545 core/src/main/scala/kafka/log/LogManage
 5d48cd669ee816cd3215f93a4db0c9fc8b4e9a2f core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
 21441c7e0e06556ff072f38b5c58e90514176748 core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
 f487465399bcde389cc5209e88bc5b946184217d core/src/main/scala/kafka/log/nereus/NereusUnifiedLogFactory.scala
-dc11fe51171c9844e12e320fa37af6d29dd8cff5 core/src/main/scala/kafka/server/BrokerServer.scala
+241bf8dc000e47c8cf8303062b558a4705baa5fa core/src/main/scala/kafka/server/BrokerServer.scala
 457e08ad6714dd972abdb92d9f7471bb258469b7 core/src/main/scala/kafka/server/KafkaConfig.scala
 1bb02848026399255535c83f667daa1d1777ad59 core/src/main/scala/kafka/server/KafkaRaftServer.scala
 1526e85d891d075c173fd50c22dc017219d8aa73 core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
-8bc994d2f60eac1a10be96a4f2461d641544403e core/src/main/scala/kafka/server/ReplicaManager.scala
+d763e9a0631c3bfe7d7c7ad367d220b3975d5d66 core/src/main/scala/kafka/server/ReplicaManager.scala
 7a3674d0cb71daa8830ea1ef89273181733ba661 core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
 7c4da64c61aff4cefe9769764a9ff05306e5de73 core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
 6c24857341618113e7c7d3e1646112b3c469b75f core/src/main/scala/kafka/server/nereus/NereusBrokerStorageAppendExecutor.scala
-e1fd35664fca2b6b1aa95249b21ffa84117ee3c2 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntime.scala
+b5d51ebc62ffa3e99cccff99030060fb8c59e262 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageFetchExecutor.scala
+058ddfd0e131722496ae4d8764983a03aa31f893 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntime.scala
 85051ba5ee6594bfee7032c3d4e4735a1b2f0c61 core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntimeFactory.scala
 315a6959c87bc2f86466148ffb9630ab9eeedbeb core/src/main/scala/kafka/server/storage/BrokerStorageAppendExecutor.scala
+1b2984caa4062c995c10ffcc91710c3b9b4ea42c core/src/main/scala/kafka/server/storage/BrokerStorageFetchExecutor.scala
 876bde2298de1e772d6bcd4eee2e38bb0817bbde core/src/main/scala/kafka/server/storage/BrokerStorageDrainReason.scala
-5621fb4bb2c7f4685380ce737f70c53f528bb311 core/src/main/scala/kafka/server/storage/BrokerStorageRuntime.scala
+f798e41b5dd028eb6880aedad7dd427690ebae64 core/src/main/scala/kafka/server/storage/BrokerStorageRuntime.scala
 b2d6eccbc8169932d4104c6f494d945476becfd1 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeContext.scala
-48b9255fe51a6483117128d949ee877d01295775 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeFactory.scala
+ce68275cd8367da3cbb3a8d043ac6234163dd032 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeFactory.scala
 f81ec4137daa9e9fff7b7262733ded7998c86eba core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 759b84a731942ff991f415c2e87be001fbd961a7 core/src/test/java/kafka/log/nereus/NereusKafkaRecoveryStateCodecTest.java
 c2bd8e03152a23547044a42f439b33698ace4251 core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
@@ -190,10 +195,11 @@ c28a29d488b51c0630cb1197b95b30bc6bf43a68 core/src/test/scala/unit/kafka/log/nere
 a5db519a38aa2db0af1d0eda710890af0b9bd260 core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
 14358b2d91ae9a25ea683946509cd3fd1657b6ca core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
 7bd6e2c1512fbc2e0879d4c9df3f3e8f8d40a7e2 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
-0f9a226b84072513dd7981719a1184055294f3c0 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
+eff5ffbc55787e2f96e4aacf03cbd7b0e8e167b3 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 b69cb745a04454dc890429498d44ce61c6b4a70a core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
 7e992aacc46a0dccfa2ca0941e5c3946c034ad7b core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageAppendExecutorTest.scala
-6c4b963d71e5cc4f7a08e0ba7c389211df200c04 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
+3c9281f1c48872b3645de485aaa98bcc2ac431ae core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageFetchExecutorTest.scala
+49c96ae84cb30876cfd79afd39e93ad52aa92618 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
 733c4d4815cbec6a7335f9a337053e980e87883d core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
 1fbf9180a68bca9a5d45e38f9862841ea486f739 server-common/src/main/java/org/apache/kafka/server/util/KafkaScheduler.java
 3036df4e77ad23fabb6533d1dc173458356ea6b3 server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java
@@ -353,6 +359,12 @@ grep -F -q 'RequestLocal.noCaching' "$replica_manager" \
     || fail "ReplicaManager resumed borrowing request-thread state on append workers"
 grep -F -q 'defaultActionQueue.tryCompleteActions()' "$replica_manager" \
     || fail "ReplicaManager lost post-worker delayed-action completion"
+grep -F -q 'storageFetchExecutor match {' "$replica_manager" \
+    || fail "ReplicaManager lost optional whole-request Fetch handoff routing"
+grep -F -q 'readFromPurgatory = !initialWave' "$replica_manager" \
+    || fail "ReplicaManager lost initial-versus-delayed Fetch wave semantics"
+grep -F -q 'completeStorageFetch(params, fetchInfos, responseCallback, exactResults)' "$replica_manager" \
+    || fail "ReplicaManager lost callback-once storage Fetch completion"
 
 append_executor_seam="$kafka_checkout/core/src/main/scala/kafka/server/storage/BrokerStorageAppendExecutor.scala"
 grep -F -q 'trait BrokerStorageAppendExecutor extends AutoCloseable' "$append_executor_seam" \
@@ -361,6 +373,14 @@ grep -F -q 'def validateRequest(entries: Iterable[MemoryRecords]): Unit' "$appen
     || fail "bounded append seam lost request-wide prevalidation"
 grep -F -q 'def drained: CompletionStage[Void]' "$append_executor_seam" \
     || fail "bounded append seam lost drain completion"
+
+fetch_executor_seam="$kafka_checkout/core/src/main/scala/kafka/server/storage/BrokerStorageFetchExecutor.scala"
+grep -F -q 'trait BrokerStorageFetchExecutor extends AutoCloseable' "$fetch_executor_seam" \
+    || fail "stock-compatible whole-request Fetch executor seam is missing"
+grep -F -q 'read: Boolean => Seq[(TopicIdPartition, LogReadResult)]' "$fetch_executor_seam" \
+    || fail "whole-request Fetch seam lost stock read-wave ownership"
+grep -F -q 'def drained: CompletionStage[Void]' "$fetch_executor_seam" \
+    || fail "whole-request Fetch seam lost drain completion"
 
 list_offsets_lifecycle="$kafka_checkout/core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala"
 grep -F -q 'storageManager.openLeader(request)' "$list_offsets_lifecycle" \
@@ -445,6 +465,10 @@ grep -F -q 'storageAppendExecutor.close()' "$adapter_runtime" \
     || fail "adapter-backed broker runtime lost synchronous Produce admission drain"
 grep -F -q 'storageAppendExecutor.drained.toCompletableFuture' "$adapter_runtime" \
     || fail "adapter-backed broker runtime no longer waits for admitted Produce work"
+grep -F -q 'storageFetchExecutor.close()' "$adapter_runtime" \
+    || fail "adapter-backed broker runtime lost synchronous Fetch admission drain"
+grep -F -q 'storageFetchExecutor.drained.toCompletableFuture' "$adapter_runtime" \
+    || fail "adapter-backed broker runtime no longer waits for admitted Fetch work"
 
 adapter_append_executor="$kafka_checkout/core/src/main/scala/kafka/server/nereus/NereusBrokerStorageAppendExecutor.scala"
 grep -F -q 'new KafkaBoundedAppendExecutor(' "$adapter_append_executor" \
@@ -453,6 +477,18 @@ grep -F -q 'records.buffer().duplicate()' "$adapter_append_executor" \
     || fail "adapter-backed append handoff lost exact Produce buffer capture"
 grep -F -q 'NereusKafkaExceptionMapper.map(failure)' "$adapter_append_executor" \
     || fail "adapter-backed append handoff lost Kafka error mapping"
+
+adapter_fetch_executor="$kafka_checkout/core/src/main/scala/kafka/server/nereus/NereusBrokerStorageFetchExecutor.scala"
+grep -F -q 'new KafkaFetchWaveOperation' "$adapter_fetch_executor" \
+    || fail "adapter-backed Fetch handoff lost the product wave operation"
+grep -F -q 'operations.size >= maxOutstanding' "$adapter_fetch_executor" \
+    || fail "adapter-backed Fetch handoff lost logical operation capacity"
+grep -F -q 'config.executorThreads(),' "$adapter_fetch_executor" \
+    || fail "adapter-backed Fetch handoff lost bounded worker sizing"
+grep -F -q 'maxOutstanding,' "$adapter_fetch_executor" \
+    || fail "adapter-backed Fetch handoff can reject wakeups for admitted logical operations"
+grep -F -q 'storageManager.current(identity).ifPresent' "$adapter_fetch_executor" \
+    || fail "adapter-backed Fetch handoff lost exact current-storage event subscription"
 
 adapter_factory="$kafka_checkout/core/src/main/scala/kafka/server/nereus/NereusBrokerStorageRuntimeFactory.scala"
 grep -F -q 'runtimeCreator: Function[BrokerStorageRuntimeContext, NereusKafkaRuntime]' "$adapter_factory" \
@@ -468,6 +504,8 @@ grep -F -q 'brokerStorageRuntime.asyncTopicDeltaLifecycle' "$broker_server" \
     || fail "BrokerServer lost storage metadata lifecycle composition"
 grep -F -q 'storageAppendExecutor = brokerStorageRuntime.appendExecutor' "$broker_server" \
     || fail "BrokerServer lost exact bounded append executor injection"
+grep -F -q 'storageFetchExecutor = brokerStorageRuntime.fetchExecutor' "$broker_server" \
+    || fail "BrokerServer lost exact whole-request Fetch executor injection"
 grep -F -q '"the broker storage runtime to become ready"' "$broker_server" \
     || fail "BrokerServer lost pre-unfence storage readiness"
 grep -F -q 'brokerStorageRuntime.beginDrain(brokerStorageDrainReason)' "$broker_server" \
@@ -566,4 +604,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; seventeen commits, seventy log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition blobs and markers match"
+echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; nineteen commits, seventy-three log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition blobs and markers match"

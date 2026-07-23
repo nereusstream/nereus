@@ -116,6 +116,33 @@ class KafkaFetchWaveOperationTest {
     }
 
     @Test
+    void deadlineRacingWithEnoughInFlightWaveStillPerformsFinalRead() throws Exception {
+        try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor()) {
+            NamedExecutor readExecutor = new NamedExecutor("fetch-read");
+            NamedExecutor callbackExecutor = new NamedExecutor("fetch-callback");
+            TestSource source = new TestSource();
+            CompletableFuture<Integer> initial = new CompletableFuture<>();
+            source.results.add(initial);
+            source.results.add(CompletableFuture.completedFuture(2));
+            KafkaFetchWaveOperation<Integer> operation = operation(
+                    source, 10, Duration.ofMillis(50), 2, readExecutor, callbackExecutor, scheduler);
+
+            CompletableFuture<KafkaFetchWaveResult<Integer>> completion = operation.start();
+            await(() -> operation.state() == KafkaFetchOperationState.TIMED_READING);
+            initial.complete(10);
+
+            KafkaFetchWaveResult<Integer> result = completion.get(5, TimeUnit.SECONDS);
+
+            assertThat(result.response()).isEqualTo(2);
+            assertThat(result.timedOut()).isTrue();
+            assertThat(result.readAttempts()).isEqualTo(2);
+            assertThat(source.initialFlags).containsExactly(true, false);
+            readExecutor.close();
+            callbackExecutor.close();
+        }
+    }
+
+    @Test
     void executorRejectionFailsBeforeReadAndCleansSubscription() {
         try (ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor()) {
             TestSource source = new TestSource();

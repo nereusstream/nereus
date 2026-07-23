@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec/partition IO/checkpoint-pinned paged recovery/fork-derived-state/log-shell-factory/bounded Produce handoff slices in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec/partition IO/checkpoint-pinned paged recovery/fork-derived-state/log-shell-factory/bounded Produce and whole-request async Fetch handoff slices in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -367,7 +367,8 @@ coordinator/transaction/compaction remain M4/M5。
   state and that listener failure cannot reclassify append I/O；
 - `KafkaFetchWaveOperationTest` further proves an opaque stock-compatible whole-request wave registers signals before the
   initial read、coalesces events with one wave in flight、always performs one deadline final read after the event-reread
-  safety budget、rejects before source I/O、isolates caller cancellation and cleans the subscription before callback；
+  safety budget（including a deadline race with an enough in-flight wave）、rejects before source I/O、isolates caller
+  cancellation and cleans the subscription before callback；
 - `KafkaPartitionLeaderManagerTest` proves exact-open deduplication、higher leader-term and same-owner broker-epoch takeover、
   conflicting/stale authority rejection、late-old-open fencing、stale-resign isolation、shutdown fencing and strict
   opener-result identity/epoch/state validation；durable authority acquire/recovery remains the opener responsibility；
@@ -436,6 +437,15 @@ coordinator/transaction/compaction remain M4/M5。
   and response until executor completion；runtime tests prove disabled `None`、enabled `Some` and combined append/product
   drain。Focused stock/artifact-enabled tests and core format/static gates pass；fresh exact-head aggregate evidence is
   recorded below；
+- at `bba3ef0121`，stock `BrokerStorageFetchExecutor` preserves the disabled purgatory branch and submits one ordered
+  whole-request read closure in enabled mode。`NereusBrokerStorageFetchExecutorTest` proves subscribe-before-read event
+  reread/listener cleanup、logical-cap rejection before a third storage wave and accepted deadline completion；
+  `ReplicaManagerTest` uses two partitions to prove deferred response、order/cardinality、per-partition error and worker-side
+  action-queue drain。Runtime tests prove disabled `None`、enabled `Some` and append/fetch/product combined drain；
+- at `47d36a1d9f`，the internal read-control queue retains one runner for every logically admitted Fetch operation，
+  preventing a simultaneous stable-event burst from rejecting accepted work while preserving the
+  `threads + queueCapacity` logical cap。The deterministic capacity test holds two admitted requests，rejects the third
+  before read，wakes both exact listeners and requires all four waves plus drain；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
   cleaner/AutoMQ/request-limit/directory validation。Six snapshot tests、four validator tests and the complete stock
@@ -444,16 +454,16 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@ee608625e4` contains seventeen reviewed commits and the seventy-file
+  `nereus/future9-native-kafka-storage@47d36a1d9f` contains nineteen reviewed commits and the seventy-three-file
   log-IO/bridge/request/recovery/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
-  read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Produce now hands off exact owned bytes
-  to a bounded per-partition FIFO executor before invoking the synchronous `UnifiedLog` bridge；multi-partition async Fetch、
-  Broker runtime selection and the real KRaft final gate remain open；
+  read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Produce hands off exact owned bytes
+  to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
+  wave executor。CLI/KafkaRaftServer production runtime selection and the real KRaft final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/seventeen-commit count/remotes/seventy log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition
+  fork branch/head/base ancestry/nineteen-commit count/remotes/seventy-three log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition
   blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、five stock Partition seam tests、two
@@ -479,6 +489,10 @@ coordinator/transaction/compaction remain M4/M5。
   stock optional seam、Kafka wrapper、ReplicaManager handoff and combined runtime drain are included in a fresh successful
   exact-head aggregate with the same 80/80 outer、92/92 stock and 95/95 artifact-enabled actionable task counts，including
   146/146 scenarios、real provider recovery、stock KRaft restart、Checkstyle、SpotBugs and Spotless。
+  At `47d36a1d9f`，after the first Fetch aggregate exposed and fixed the admitted simultaneous-wakeup queue race，a fresh
+  exact-head rerun passes 80/80 outer、92/92 stock-without-artifacts and 95/95 artifact-enabled actionable tasks，including
+  the deterministic capacity/wakeup regression、146/146 scenarios、real provider recovery、stock KRaft restart and all
+  format/static gates。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics
 

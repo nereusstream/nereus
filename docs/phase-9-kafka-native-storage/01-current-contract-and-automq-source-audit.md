@@ -406,10 +406,12 @@ baseline-only completion evidence。
 `cfcdd55fbc571bc7187379d65504caa4fe23586e`，第十五个 stock-file inject-marker alignment commit 是
 `7739351b7cccd1fa388ad151bfb3e2cc78d7a8a4`，第十六个 stable UnifiedLog append/read correctness bridge commit 是
 `dc8c66388a8b093f219d314d97188feb8fd93f92`，第十七个 bounded Produce request-path handoff commit 是
-`ee608625e4dde95089b25765e874d50edec044d4`。
+`ee608625e4dde95089b25765e874d50edec044d4`，第十八个 whole-request async Fetch handoff commit 是
+`bba3ef01217a9f6728104e45f1b7d0e867e02459`，第十九个 admitted-Fetch wakeup capacity fix 是
+`47d36a1d9fd3ae670e6b799b90df42fb86502e41`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/seventeen-commit count/version、Apache 与组织 remote
-identity、cached organization trunk ancestry、七十文件 exact change set/blob、成对 inject marker、adapter/async bridge/
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/nineteen-commit count/version、Apache 与组织 remote
+identity、cached organization trunk ancestry、七十三文件 exact change set/blob、成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding，以及 package-wide
 no-reflection/no-service-loader 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
@@ -420,7 +422,9 @@ post-registration broker epoch、per-operation admission recheck、one-time reco
 和 `RequiredAcksAwareAppend` exact routing、stable append-before-LEO、post-stable fencing、bounded adapter read 与
 `MemoryRecords` Fetch assembly signatures，以及 request-wide Produce validation、stock optional append executor、
 owned buffer capture、`RequestLocal.noCaching` worker、per-partition FIFO、公平 reschedule、post-worker action-queue
-completion 和 runtime drain signatures。
+completion，以及 stock optional fetch executor、whole-request `readFromLog` routing、initial/event
+`readFromPurgatory` mode、response completion、bounded worker/callback pools、logical operation admission、
+exact partition subscription 和 combined runtime drain signatures。
 `publishPhase9DevelopmentArtifacts` 只把 `0.1.0-f9-dev` 发布到 Nereus build 目录的隔离 Maven repository；
 fork build 必须显式同时传入 repository 与 version，缺任一参数即 configuration failure，不读取 Maven local。
 `phase9M3KafkaForkStockCheck` 不传参数从头验证 stock server/core compile/static analysis、完整 `KafkaConfigTest`、
@@ -502,6 +506,31 @@ Spotless/Checkstyle/SpotBugs pass。Against exact product source and this fork h
 builds pass 92/92 and 95/95 actionable tasks，including 146/146 scenario synchronization、real provider recovery、stock
 KRaft restart and all format/static gates。Fetch still lacks the ReplicaManager-level async handoff，so this is a bounded
 Produce slice rather than M3 completion。
+
+At local head `bba3ef0121`，`BrokerStorageRuntime.fetchExecutor` is the second optional stock-owned seam。Disabled mode
+returns `None` and executes the original `DelayedFetch` purgatory branch unchanged；enabled mode submits the complete ordered
+request to `NereusBrokerStorageFetchExecutor`，whose source closure invokes stock `ReplicaManager.readFromLog` for every wave。
+The initial wave uses normal read side effects；event/deadline waves use `readFromPurgatory=true`，so partition order、
+request-wide byte budget、first-entry overflow、leader-epoch divergence、preferred-replica、remote-fetch and per-partition
+error semantics remain stock-owned。The product `KafkaFetchWaveOperation` subscribes before initial read，coalesces events
+behind one in-flight wave，applies `minBytes` to actual returned record bytes，limits event rereads without suppressing one
+deadline-final read，and cleans listeners/timer/read before completing on a separate bounded callback executor。Logical
+admission is capped at `threads + queueCapacity` for the whole wait lifetime；missing current storage is not converted into
+request-wide failure，so the stock wave still returns the exact partition error。Every worker wave drains
+`defaultActionQueue` because the KafkaApis epilogue has returned；final completion validates order/cardinality，marks fetch
+metrics once and invokes the original response callback once。Runtime start/drain/close now owns both append and fetch
+executors。Focused product state-machine、stock two-partition ReplicaManager、artifact executor saturation/event/deadline and
+runtime drain tests pass with core Spotless/Checkstyle/SpotBugs。
+The first fresh aggregate exposed a race in the capacity test and a corresponding executor defect：a burst of wakeups for
+already-admitted operations could momentarily fill the configured excess queue before an idle worker dequeued the first
+control task。`47d36a1d9f` retains the same `threads + queueCapacity` logical admission cap but provisions that many internal
+control queue slots，so at most one runner for every admitted operation can always be retained without caller-thread fallback
+or unbounded growth。The deterministic test now holds two accepted requests below a long deadline，proves a third submit is
+rejected before read，then wakes both listeners and requires four exact waves plus drain。The focused executor rerun passes。
+Against exact product source and local head `47d36a1d9f`，the fresh
+`phase9M3KafkaForkCheck --rerun-tasks` passes 80/80 outer tasks；nested stock-without-artifacts and artifact-enabled Kafka
+builds pass 92/92 and 95/95 actionable tasks，including 146/146 scenario synchronization、real provider recovery、stock
+KRaft restart、the simultaneous-wakeup regression and all Checkstyle/SpotBugs/Spotless gates。
 
 当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
 development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求
