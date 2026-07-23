@@ -47,5 +47,6 @@ tasks.register<Test>("f9M3CodecTest") {
         includeTestsMatching("com.nereusstream.kafka.runtime.KafkaBoundedAppendExecutorTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.KafkaAppendFailureClassifierTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaFetchOperationTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.KafkaPartitionLeaderManagerTest")
     }
 }

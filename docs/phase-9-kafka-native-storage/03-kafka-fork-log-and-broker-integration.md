@@ -427,6 +427,24 @@ logStartOffset <= LSO <= HW <= stableEndOffset == LEO
 LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，recovery 从 checkpoint + committed replay
 重建。`read_committed` upper bound 是 min(HW,LSO)。
 
+### 7.1 Current process-local leader arbitration（2026-07-23）
+
+`KafkaLeaderAuthority` 精确映射文档 04 的 external authority tuple：`leaderEpoch` 是 authority epoch，decimal
+`leaderId` 是 owner ID，KRaft broker registration epoch 是 owner epoch。`KafkaPartitionLeaderManager` 在
+`KafkaPartitionOpener`（authority acquire + recovery + storage construction owner）之外再提供 process-local publish gate：
+
+- exact authority 的并发 open 共享一个 operation-owned future；外部 cancel/complete/obtrude 不能改变 open；
+- higher leader epoch 立即 supersede；同 leader/leader epoch 只有 higher broker epoch 能 supersede；lower term、同
+  leader epoch 的 conflicting owner 和 non-dominating broker term 都 fail closed 为 `FENCED_APPEND`；
+- supersede 立即从 `current` 移除并 resign 旧实例；多个 authority open 可以在底层并发，但只有仍等于 desired term 的
+  future 能安装；迟到 storage 会被 resign 并以 fenced 完成，绝不重新成为 current；
+- opener result 必须 identity、leader epoch、`LEADER_WRITABLE` 全部吻合，否则作为 metadata invariant 拒绝并关闭；
+- stale resign notification 是 no-op，不能关闭新 term；shutdown 停止新 open、resign 已安装实例，并让迟到 open
+  走 superseded close path。
+
+该 manager 不替代 durable Oxia/head authority CAS；`KafkaPartitionOpener` 必须先完成文档 04 的 session acquisition
+和 fresh recovery。Kafka fork metadata callback wiring 尚未实现。
+
 ## 8. Fetch execution
 
 ### 8.1 Async read path
@@ -536,6 +554,11 @@ cumulativeLogicalBytesAtEntryStart
 
 timestamp lookup若 checkpoint index没有候选，bounded scan committed entries；scan 预算/timeout 超限映射 storage error，
 不能返回一个未经证明的 nearby offset。
+
+当前 adapter 的 batch codec 只拥有 Kafka batch header，不拥有 stock Kafka record iterator。因而 earliest/latest 可由
+`KafkaStableSnapshot` 精确给出，但 timestamp lookup 仍保留为 fork `MemoryRecords` iterator + adapter candidate/read
+组合；在该 wiring 落地前不会把 batch base 伪装成 first-record timestamp result。`KafkaVirtualPositionIndex`、
+`NereusTimeIndex` section codec 和 fork ListOffsets tests 仍为 open M3/M4 work。
 
 ## 10. Error and outcome mapping
 

@@ -45,7 +45,9 @@ KF-APP-013 和 KF-FET-003 的 adapter state-machine evidence；`KafkaBoundedAppe
 evidence，`KafkaAppendFailureClassifierTest` 固化 fail-closed outcome/action mapping。它们不替代这些 row 要求的
 Kafka fork/real-service evidence。`KafkaFetchOperationTest` 还为 KF-FET-004/005/016 提供 actual-byte minBytes、
 event coalescing、deadline、one-in-flight-read、listener/read cleanup 和 callback-once 的 deterministic partial
-evidence；这些 row 状态仍不标记为完整通过。
+evidence；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local higher-term takeover、late-open fencing 和
+stale-resign isolation 的 deterministic partial evidence，但不替代 durable authority/real process cut。各 row 状态仍不
+标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。
