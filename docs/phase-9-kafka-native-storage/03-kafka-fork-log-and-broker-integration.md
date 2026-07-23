@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup lifecycle、optional async metadata-publisher seam、M6 typed config validation and stock-compatible BrokerServer runtime lifecycle injection implemented；concrete Nereus runtime/log composition remains open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection and adapter-backed typed runtime bridge implemented；provider/log composition remains open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -43,7 +43,8 @@ Kafka stock protocol/controller/coordinators
 | `kafka.server.nereus.NereusProduceBufferSnapshot` | owned request bytes | buffer lifetime across async handoff |
 | `kafka.server.nereus.NereusFetchOperation` | async state machine | minBytes/maxWait/event/re-read/callback-once |
 | `kafka.log.nereus.NereusKafkaExceptionMapper` | mapper | Nereus error/outcome → Kafka exception |
-| `kafka.server.nereus.NereusBrokerLifecycle` | runtime bridge | boot/readiness/drain/shutdown ordering |
+| `kafka.server.nereus.NereusBrokerStorageRuntime` | runtime bridge | exact ReplicaManager binding、boot/readiness/drain/shutdown delegation |
+| `kafka.server.nereus.NereusBrokerStorageRuntimeFactory` | typed factory | disabled isolation、explicit runtime/scan-limit creators、failure rollback |
 
 Adapter-side counterpart：
 
@@ -88,7 +89,8 @@ Adapter-side counterpart：
 
 禁止把 field type 写死为 `NereusReplicaManager`；对外仍暴露 `ReplicaManager`，避免 disabled mode cast。
 
-`46e67037615a60a39320836cc5f34ddaf4a9b347` 已实现 generic lifecycle seam：
+`46e67037615a60a39320836cc5f34ddaf4a9b347` 已实现 generic lifecycle seam；`617451957c886d4247f6d2f1a88e44a35edfbba7`
+增加 adapter-backed bridge：
 
 - `KafkaRaftServer`/`BrokerServer` 通过显式 constructor 参数接收 `BrokerStorageRuntimeFactory`，默认 factory 仅允许
   disabled mode 并返回 no-op；enabled 且未安装 concrete factory 在 LogManager 创建前抛 `ConfigException`；
@@ -96,12 +98,18 @@ Adapter-side counterpart：
   不使用 reflection、service loader 或 process-global singleton；
 - runtime create 位于 LogManager 前；`start` 在 lifecycle manager 启动后异步发起，initial metadata publish 后、broker
   unfence/request processing 前等待 ready future；
-- runtime 的 `Option[AsyncTopicDeltaLifecycle]` 传入 `BrokerMetadataPublisher`；disabled branch 精确保持 `None`；
+- runtime 在 exact `ReplicaManager` 创建后才构造/缓存 `Option[AsyncTopicDeltaLifecycle]` 并传入
+  `BrokerMetadataPublisher`；disabled branch 精确保持 `None`，同一 runtime 不能绑定第二个 manager；
 - shutdown 在停止 socket requests 后同步开始 admission drain，在 ReplicaManager 前 bounded `awaitDrained`，在 LogManager
   后 close；earlier stock shutdown failure 仍执行 best-effort idempotent close；
+- `NereusBrokerStorageRuntimeFactory` 只接受两个 typed `Function` creators，不使用 reflection/service loader/global
+  registry；disabled mode 不调用 creator，runtime 已创建后的 scan-config/wrapper failure 会 close 并保留 suppressed failure；
+- `NereusBrokerStorageRuntime` 把四种 drain reason 显式映射到 adapter enum，以同一
+  `KafkaPartitionStorageManager` 构造 lookup/topic-delta lifecycle，并在 delegate drain 的同步边界撤销全部 lookup；
+  `NereusListOffsetsLifecycle.beginDrain` 只负责 admission/revocation，standalone `shutdown` 仍 deduplicate manager shutdown；
 - stock/no-artifact factory tests 和 single-node KRaft start→shutdown→restart 已通过。
 
-尚未实现 concrete Nereus factory/resource composition、enabled `NereusReplicaManager`/log selection、activation/capability
+尚未实现 provider client/resource creator、enabled `NereusReplicaManager`/log selection、activation/capability
 advertisement 和 native-storage KRaft process test，所以这是可执行 lifecycle seam，不是可启用 broker runtime。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
@@ -417,7 +425,7 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
-消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `46e6703761` 落地
+消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `617451957c` 落地
 `NereusRecordTimestampInspector`、`NereusListOffsetsBridge`、`NereusListOffsetsScanConfig` 和
 `NereusKafkaExceptionMapper`，并通过 Kafka-only `LeaderEpochAwareOffsetLookup` 接入 stock `Partition`/
 `ReplicaManager` request path。`NereusListOffsetsLifecycle` 包装 product-owned manager，在 manager 返回 fully recovered
@@ -425,7 +433,9 @@ writable storage 后构造 resolver/bridge 并安装到相同 leader epoch；它
 authority/recovery。第五个 commit 另加入 `AsyncTopicDeltaLifecycle`、`NereusTopicDeltaLifecycle` 和 optional
 `BrokerMetadataPublisher` routing；第六个 commit 注册 58-key config surface、immutable typed snapshot 和 enabled-only
 cross-Kafka validator；第七个 commit 增加 explicit stock-compatible runtime factory、publisher lifecycle injection、
-pre-unfence ready wait 和 ordered drain/close，但 concrete Nereus factory 尚未实现。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
+pre-unfence ready wait 和 ordered drain/close；第八个 commit 增加 adapter-backed runtime、typed creator factory、
+exact ReplicaManager metadata lifecycle binding 和 lookup-only drain。Provider composition 尚未实现。当前 commit
+尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading

@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + default process lifecycle/resource ownership and generic BrokerServer lifecycle seam implemented；provider composition/activation/observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + default process lifecycle/resource ownership、generic BrokerServer seam and adapter-backed typed bridge implemented；provider composition/activation/observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -35,9 +35,12 @@ those later steps rather than hidden reflection or a global singleton。
 broker epoch supplier、KRaft metadata-view supplier、Kafka `Time`、metrics registry and scheduler。No static singleton；tests can
 run independent runtimes in one JVM。
 
-Kafka fork commit `46e6703761` now supplies the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
+Kafka fork commits `46e6703761..617451957c` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
 create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
-enabled mode before LogManager construction。A concrete adapter-backed factory and owned provider resources remain open。
+enabled mode before LogManager construction。`NereusBrokerStorageRuntimeFactory` is the concrete adapter bridge：typed creators
+return the product runtime and exact scan limits；it does not evaluate them while disabled and closes a created runtime if later
+assembly fails。`NereusBrokerStorageRuntime` binds the runtime's single manager to the exact BrokerServer `ReplicaManager` and
+constructs the ListOffsets/topic-delta lifecycle only at that point。Owned provider client creation remains open。
 
 ### 1.2 Resource ownership
 

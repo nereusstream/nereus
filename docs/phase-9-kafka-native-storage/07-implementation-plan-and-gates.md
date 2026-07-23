@@ -390,7 +390,7 @@ coordinator/transaction/compaction remain M4/M5。
   `BrokerMetadataPublisher` routing。`NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` and
   `BrokerMetadataPublisherTest` prove stock-state-first preparation、old/new image identity selection、delete-before-recreate、
   callback-after-success、coordinator-election-after-recovery and `firstPublishFuture` non-readiness semantics。Time-index
-  checkpoint candidate、concrete BrokerServer runtime composition and real native-storage KRaft baseline remain open；
+  checkpoint candidate、provider-backed BrokerServer activation and real native-storage KRaft baseline remain open；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
   cleaner/AutoMQ/request-limit/directory validation。Six snapshot tests、four validator tests and the complete stock
@@ -399,7 +399,7 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@46e6703761` contains seven reviewed commits and the thirty-six-file
+  `nereus/future9-native-kafka-storage@617451957c` contains eight reviewed commits and the thirty-nine-file
   bridge/request/metadata-lifecycle/configuration/runtime seam，but the current GitHub credential has
   read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
   final gate remain open；
@@ -407,12 +407,14 @@ coordinator/transaction/compaction remain M4/M5。
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/seven-commit count/remotes/thirty-six bridge/metadata-lifecycle/configuration/runtime blobs/markers；`phase9M3KafkaForkCheck` publishes exact
+  fork branch/head/base ancestry/eight-commit count/remotes/thirty-nine bridge/metadata-lifecycle/configuration/runtime blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、four stock Partition seam tests、one
   ReplicaManager publication test、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
-  complete `KafkaConfigTest`、three runtime-factory tests、stock single-node KRaft restart and server/core/storage format/static-analysis
-  gates。Because the exact
+  complete `KafkaConfigTest`、three stock runtime-factory tests、four adapter-backed runtime tests、stock single-node KRaft
+  restart and server/core/storage format/static-analysis
+  gates。At `617451957c` the aggregate rerun passed 78/78 outer tasks；nested stock/artifact-enabled Kafka builds completed
+  92/92 and 95/95 actionable tasks。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics
@@ -493,8 +495,10 @@ recovery before drain、stable pre-I/O rejection、one-winner concurrent drain a
 callbacks。`DefaultNereusKafkaRuntime` and `KafkaRuntimeResources` now make start/drain operation ownership、timeout-view
 isolation、late-start fencing、manager-first close、exact OWNED/BORROWED identity、reverse-order close and attempt-all failure
 aggregation executable。The local Kafka fork also has an explicitly injected generic `BrokerStorageRuntimeFactory` with
-stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。This is deterministic partial evidence
-for KF-OPS-012/014/017；provider construction/activation、adapter-backed Kafka factory、priority budgets and real
+stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。`NereusBrokerStorageRuntimeFactory`
+and `NereusBrokerStorageRuntime` now add typed runtime/scan-limit creators、failure rollback、one exact ReplicaManager binding、
+drain-reason mapping and synchronous lookup revocation without a duplicate manager owner。This is deterministic partial evidence
+for KF-OPS-012/014/017；provider client construction/activation、priority budgets and real
 native-storage shutdown/process cuts remain open。
 
 ### Tasks

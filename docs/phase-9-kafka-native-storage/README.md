@@ -4,7 +4,7 @@
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development lock：local `nereus/future9-native-kafka-storage@46e67037615a60a39320836cc5f34ddaf4a9b347` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
+> Kafka fork development lock：local `nereus/future9-native-kafka-storage@617451957c886d4247f6d2f1a88e44a35edfbba7` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -37,7 +37,7 @@ adapter 已新增 exact `NereusKafkaRuntime`、drain reason、immutable health s
 drain/close 终态不能被 late readiness callback 重新打开；`DefaultNereusKafkaRuntime` 进一步提供 operation-owned
 start/drain、non-destructive timeout view、partition-manager shutdown 和 idempotent close，`KafkaRuntimeResources` 明确
 OWNED/BORROWED 身份、拒绝同一实例的重复/混合所有权，并按构造逆序 attempt-all close。concrete provider
-composition/activation factory、adapter-backed Kafka factory、`UnifiedLog`/factory、
+composition/activation creator、`UnifiedLog`/factory、
 checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock
@@ -49,7 +49,12 @@ deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/auth
 并支持 genesis commitVersion `0`。Exact commit-ancestor reachability、source validator 与 concrete
 session/head/recovery opener 已组装；public binary-safe session renewal 与 partition-owned periodic renewal 已落地，
 renew failure/invalid token 会立即 write-fence 且阻止 queued append dispatch。Kafka fork generic BrokerServer lifecycle
-wiring 已落地并通过 stock KRaft restart；concrete Nereus runtime/log wiring 和真实 native-storage KRaft gate 尚未闭合。
+wiring 已落地并通过 stock KRaft restart；provider-backed runtime activation、log wiring 和真实 native-storage KRaft
+gate 尚未闭合。
+fork `617451957c` 已把该 generic seam 接到 adapter contract：显式 typed creators 交付 runtime 与 ListOffsets limits，
+同一 product manager 只绑定一个 exact `ReplicaManager`，构造 `NereusListOffsetsLifecycle`/`NereusTopicDeltaLifecycle`，
+并在 runtime drain 时同步撤销 lookup admission；disabled build 排除全部 adapter-backed sources。provider clients、
+activation/capability 与 log factory 仍未组装。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 
