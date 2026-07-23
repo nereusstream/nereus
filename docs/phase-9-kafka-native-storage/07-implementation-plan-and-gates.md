@@ -420,9 +420,11 @@ coordinator/transaction/compaction remain M4/M5。
 - fork `NereusUnifiedLogFactoryTest` proves the per-broker factory selects only the dedicated
   `${cacheDir}/{brokerId}/partition-logs` root、ignores stale cache logs、does not use `log.dirs`、requires non-zero topic ID
   and creates an exact identity shell。An actual empty recovered state plus exact manager storage publication makes the shell
-  report writable；exact instance removal revokes it。Produce fails before recovery and still fails with a data-plane-pending
-  storage error after publication，so no call can fall back to the ephemeral local segment。Stock-without-artifacts
-  `LogManagerTest` and `BrokerStorageRuntimeFactoryTest` preserve local factory behavior；
+  report writable；exact instance removal revokes it。At `dc8c66388a`，stock validation/offset assignment precedes stable
+  adapter append，LEO advances only after exact result validation，Fetch returns exact adapter bytes as `MemoryRecords`，and
+  synthetic local size stays zero。Fault injection proves invalid stable result and post-stable failure resign/fence；
+  required-acks routing has a stock `Partition` regression test。Stock-without-artifacts `LogManagerTest`、
+  `PartitionTest` and `BrokerStorageRuntimeFactoryTest` preserve local behavior；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
   cleaner/AutoMQ/request-limit/directory validation。Six snapshot tests、four validator tests and the complete stock
@@ -431,18 +433,19 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@7739351b7c` contains fifteen reviewed commits and the sixty-five-file
-  log-shell/bridge/request/recovery/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
-  read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
-  final gate remain open；
+  `nereus/future9-native-kafka-storage@dc8c66388a` contains sixteen reviewed commits and the sixty-six-file
+  log-IO/bridge/request/recovery/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
+  read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。The bridge still blocks its
+  `UnifiedLog` caller；bounded append handoff、multi-partition async Fetch、Broker runtime selection and the real KRaft final
+  gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/fifteen-commit count/remotes/sixty-five log-shell/bridge/recovery/metadata-lifecycle/configuration/runtime-composition
+  fork branch/head/base ancestry/sixteen-commit count/remotes/sixty-six log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition
   blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
-  seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、four stock Partition seam tests、one
+  seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、five stock Partition seam tests、one
   ReplicaManager publication test、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
   four product-runtime mapper tests、three KRaft context adapters、four deferred-runtime tests、two recovery-state bridge tests、
   three recovery codec tests、two exact Partition recovery-state factory tests、authoritative log-shell/factory tests、
@@ -457,6 +460,10 @@ coordinator/transaction/compaction remain M4/M5。
   artifact-enabled Kafka builds pass 92/92 and 95/95 actionable tasks，including the authoritative log-shell/factory test、
   146/146 scenario synchronization、real provider recovery、stock KRaft restart、Checkstyle、SpotBugs and Spotless。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
+  At `dc8c66388a`，the updated source lock、product adapter error mapping、artifact-enabled append/fetch/fencing tests and
+  exact required-acks Partition test are included in another successful exact-head aggregate：80/80 outer tasks，nested
+  stock-without-artifacts 92/92 and artifact-enabled 95/95 actionable tasks，including 146/146 scenarios、real provider
+  recovery、stock KRaft restart、Checkstyle、SpotBugs and Spotless。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics
 

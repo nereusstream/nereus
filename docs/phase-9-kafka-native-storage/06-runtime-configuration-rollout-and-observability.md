@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition and runtime-owned authoritative log-shell factory implemented；Kafka controller scheduling、CLI/KafkaRaftServer production selection、UnifiedLog adapter Produce/Fetch、BookKeeper/async providers and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory and synchronous correctness-only UnifiedLog append/read bridge implemented；Kafka controller scheduling、CLI/KafkaRaftServer production selection、bounded request-path IO、BookKeeper/async providers and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -249,7 +249,8 @@ scope and both unsupported-profile/provider pre-I/O failures。
 
 ### 2.8 Executable Kafka context-to-provider lifecycle
 
-Local fork `c27305a7ad..7739351b7c` consumes the mapper and log factory through the following exact call path：
+Local fork `c27305a7ad..dc8c66388a` consumes the mapper、log factory and first stable I/O bridge through the following exact
+call path：
 
 ```text
 NereusBrokerStorageRuntimeFactory.production(recoveryStateFactoryCreator)
@@ -269,6 +270,9 @@ NereusBrokerStorageRuntimeFactory.production(recoveryStateFactoryCreator)
   -> product start publishes capability and waits ACTIVE/readiness
   -> first asyncTopicDeltaLifecycle(exactReplicaManager)
        -> bind NereusKafkaRecoveryStateFactory through one-time bridge
+  -> recovered state + manager storage publish to exact NereusUnifiedLog
+  -> Partition required-acks seam -> stock validation -> stable adapter append -> shell LEO/HW
+  -> NereusUnifiedLog bounded read -> adapter Fetch assembly -> MemoryRecords
 ```
 
 The broker-epoch wait deadline is the typed rollout readiness timeout。The exact epoch is captured once and passed unchanged into
@@ -301,6 +305,11 @@ all steps succeed；failed open cleanup calls `cancelLeaderEpochAwareOffsetLooku
 which clear lookup admission、storage and provisional state without touching a newer epoch。Idempotent、
 transaction/control and NKC1-derived sections remain M4 fail-closed boundaries。`Partition` accepts only the stock
 `LeaderEpochAwareRecoveryState` interface；the artifact-only implementation remains excluded from disabled builds。
+
+`dc8c66388a` 的 append/read bridge 使用 typed append/fetch timeout 与 fetch hard-response limit；required acks 不改变
+profile completion policy。timeout/interrupt、stable-result mismatch 或 stable commit 后 stock state failure 都会
+resign 当前 storage。当前 future wait 仍发生在 `UnifiedLog` caller 上；配置中的 bounded append/fetch executor 已由
+product 实现，但 fork request-path handoff 尚未接入，所以该路径不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
 `${cacheDir}/{brokerId}/partition-logs`，sets `loadExistingLogs=false` and `scheduleLocalMaintenance=false`，and rejects local

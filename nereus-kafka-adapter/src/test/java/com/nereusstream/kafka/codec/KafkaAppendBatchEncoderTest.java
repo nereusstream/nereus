@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.AppendResult;
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StreamId;
@@ -65,6 +67,8 @@ class KafkaAppendBatchEncoderTest {
                 new SimpleRecord(1_000, "v".getBytes()));
         assertThatThrownBy(() -> encoder.encode(
                         ByteBuffer.wrap(KafkaRecordBatchTestSupport.bytes(idempotent)), 10))
+                .isInstanceOfSatisfying(NereusException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ErrorCode.UNSUPPORTED_FORMAT))
                 .hasMessageContaining("F9-M3")
                 .hasMessageContaining("non-idempotent");
     }
