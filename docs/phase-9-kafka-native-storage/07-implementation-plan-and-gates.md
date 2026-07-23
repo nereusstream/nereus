@@ -378,20 +378,22 @@ coordinator/transaction/compaction remain M4/M5。
 - `KafkaListOffsetsResolverTest` proves stable-snapshot earliest/latest、compressed exact-record timestamp lookup、
   bounded cross-page scan、max-timestamp lowest-offset tie-break、budget exhaustion without approximate answers、invalid
   inspector result rejection and leadership loss during inspection。This is deterministic Nereus-side partial evidence for
-  KF-FET-009；local fork `NereusRecordTimestampInspectorTest` now proves the stock 4.3 compressed `MemoryRecords` exact
-  iterator、minimum-offset filtering、buffer-state preservation and max-timestamp tie-break。Time-index checkpoint
-  candidate、handler mapping、restart and real KRaft baseline remain open；
+  KF-FET-009；local fork tests now prove the stock 4.3 compressed `MemoryRecords` exact iterator、minimum-offset filtering、
+  buffer-state preservation、max-timestamp tie-break、Kafka sentinel/request projection、immediate/async
+  `OffsetResultHolder` conversion、cancellation propagation、delayed-operation wakeup-once and exhaustive adapter error
+  mapping。Time-index checkpoint candidate、stock handler injection、restart and real KRaft baseline remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@2379c63933` contains the first four-file bridge，but the current GitHub credential has
+  `nereus/future9-native-kafka-storage@c2b1b4b3a0` contains two reviewed commits and the nine-file bridge，but the current GitHub credential has
   read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
   final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/parent/remotes/four bridge blobs/markers；`phase9M3KafkaForkCheck` publishes exact `0.1.0-f9-dev` artifacts，
-  verifies stock-without-artifacts compilation and runs the fork bridge test/format/static-analysis gate。Because the exact
+  fork branch/head/base ancestry/two-commit count/remotes/nine bridge blobs/markers；`phase9M3KafkaForkCheck` publishes exact
+  `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
+  format/static-analysis gates。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics

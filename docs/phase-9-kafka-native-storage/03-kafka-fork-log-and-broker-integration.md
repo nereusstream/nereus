@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec slice implemented；Kafka fork/runtime remains designed target
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets slices and Kafka-fork record/async-result bridges implemented；stock broker runtime injection remains open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -364,8 +364,9 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
-消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork commit `2379c63933` 落地
-`NereusRecordTimestampInspector`。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
+消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `c2b1b4b3a0` 落地
+`NereusRecordTimestampInspector`、`NereusListOffsetsBridge`、`NereusListOffsetsScanConfig` 和
+`NereusKafkaExceptionMapper`。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading
@@ -615,8 +616,12 @@ error，不能返回一个未经证明的 nearby offset。
 `NereusTimeIndex` verified checkpoint candidate 尚未接入，因此当前 resolver 从冻结 log start 扫描，属于正确但受硬
 预算限制的 fallback。local Kafka fork 的 `NereusRecordTimestampInspector` 已用锁定 4.3 stock
 `MemoryRecords.readableRecords(...).batches()` 实现 exact record iteration，保持 caller buffer state，不跳过
-minimum offset，并对 max timestamp 做 lowest-offset tie-break。该 bridge 的 compressed-record tests、checkstyle、
-SpotBugs、Spotless 与无 Nereus 参数的 stock compile/checkstyle 均通过。fork ListOffsets handler/exception mapping、
+minimum offset，并对 max timestamp 做 lowest-offset tie-break。`NereusListOffsetsBridge` 把 `-2/-1/-3` 与非负
+timestamp 映射成 adapter query，复用 Kafka 已有 `AsyncOffsetReadFutureHolder` / delayed-operation wakeup contract，
+把取消传回 resolver future，并把所有 terminal path 收口为 Kafka result/error；`-4/-5/-6` 明确拒绝。
+`NereusKafkaExceptionMapper` 对当前 `ErrorCode` 做 exhaustive switch，保持 fencing、trim、checksum、backpressure 和
+timeout 的 Kafka protocol 语义。三个 bridge test classes 共 12 tests、checkstyle、SpotBugs、Spotless 与无 Nereus
+参数的 stock compile/checkstyle 均通过。fork stock handler injection、
 leader-epoch cache、`KafkaVirtualPositionIndex`、`NereusTimeIndex` section codec、restart recovery、remote branch push 与
 真实 KRaft baseline integration tests 仍为 open M3/M4 work。
 
@@ -631,7 +636,7 @@ leader-epoch cache、`KafkaVirtualPositionIndex`、`NereusTimeIndex` section cod
 | `OFFSET_CONFLICT` | `KafkaStorageException` | write-fence，full reopen/replay |
 | `FENCED_APPEND` / `APPEND_SESSION_EXPIRED` | `FencedLeaderEpochException` or `NotLeaderOrFollowerException` | fence/close current instance |
 | `BACKPRESSURE_REJECTED` before IO | `ThrottlingQuotaExceededException` | remain writable |
-| timeout + `KNOWN_NOT_COMMITTED` | `RequestTimedOutException` | remain/retry only after lane confirms no attempt |
+| timeout + `KNOWN_NOT_COMMITTED` | `TimeoutException` / `REQUEST_TIMED_OUT` | remain/retry only after lane confirms no attempt |
 | any `MAY_HAVE_COMMITTED` | `KafkaStorageException` response | `WRITE_FENCED_RECOVERY_REQUIRED` |
 | `KNOWN_COMMITTED` response lost | `KafkaStorageException` until recovery publishes | fence then exact recover/replay |
 | object/primary checksum mismatch | `CorruptRecordException`/`KafkaStorageException` | offline partition，repair/fallback audit |

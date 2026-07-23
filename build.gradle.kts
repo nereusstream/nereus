@@ -2818,14 +2818,14 @@ tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
 
 tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
     group = "verification"
-    description = "Verify the local organization-fork F9 branch, exact bridge commit, markers, and source blobs."
+    description = "Verify the local organization-fork F9 branch, exact bridge commits, markers, and source blobs."
     usesService(kafkaCheckoutGate)
     workingDir = layout.projectDirectory.asFile
     commandLine(
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "2379c63933dd0a155d5a5bf90fca85c7b24db58b",
+        "c2b1b4b3a00fb7cfa222a3e6df659011795f3b3e",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2866,7 +2866,7 @@ tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
 
 tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
     group = "verification"
-    description = "Run the Kafka fork exact-record timestamp bridge test against isolated Nereus F9 artifacts."
+    description = "Run the Kafka fork record-inspector and async ListOffsets bridge tests against isolated F9 artifacts."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     dependsOn("publishPhase9DevelopmentArtifacts")
     usesService(kafkaCheckoutGate)
@@ -2874,9 +2874,12 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
     commandLine(
         kafkaForkGradleWrapper,
         ":core:spotlessCheck",
+        ":core:checkstyleMain",
+        ":core:checkstyleTest",
+        ":core:spotbugsMain",
         ":core:test",
         "--tests",
-        "kafka.log.nereus.NereusRecordTimestampInspectorTest",
+        "kafka.log.nereus.*Test",
         "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
         "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
     )

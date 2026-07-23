@@ -24,9 +24,11 @@ actual_branch="$(git -C "$kafka_checkout" branch --show-current)"
 actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 [[ "$actual_head" == "$expected_head" ]] \
     || fail "fork HEAD drifted: expected $expected_head, got $actual_head"
-actual_parent="$(git -C "$kafka_checkout" rev-parse HEAD^)"
-[[ "$actual_parent" == "$expected_base" ]] \
-    || fail "fork parent drifted: expected $expected_base, got $actual_parent"
+git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
+    || fail "locked Apache base is not an ancestor of fork HEAD"
+actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
+[[ "$actual_commit_count" == "2" ]] \
+    || fail "expected two reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -53,12 +55,17 @@ actual_changes="$(git -C "$kafka_checkout" diff --name-only "$expected_base"..HE
 expected_changes="$(LC_ALL=C sort <<'FILES'
 build.gradle
 checkstyle/import-control-core.xml
+core/src/main/java/kafka/log/nereus/NereusKafkaExceptionMapper.java
+core/src/main/java/kafka/log/nereus/NereusListOffsetsBridge.java
+core/src/main/java/kafka/log/nereus/NereusListOffsetsScanConfig.java
 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
+core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
+core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed four-file bridge"
+    || fail "fork change set differs from the reviewed nine-file bridge"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -67,8 +74,13 @@ while read -r expected path; do
         || fail "fork source drifted: $path expected $expected, got $actual"
 done <<'LOCKS'
 f564fde6c76eef4913b2b82fa96e952d68293bf8 build.gradle
-7055b5d6449a0737f995a73e6f1fe789b618b2b5 checkstyle/import-control-core.xml
+5fa025b8a70a52364d5a9bfdbff092f63ae7563d checkstyle/import-control-core.xml
+60dbfb45a00f3c007c624ea31c1aca32ea49a8b2 core/src/main/java/kafka/log/nereus/NereusKafkaExceptionMapper.java
+c3ada67468f626cbab04d08b9981eafb52fcdd03 core/src/main/java/kafka/log/nereus/NereusListOffsetsBridge.java
+6f1e5f76fb4ed51f786e7f07a22c3fc3f46cf9ae core/src/main/java/kafka/log/nereus/NereusListOffsetsScanConfig.java
 aadcc658a9e74de9798b06d674ecb784947c8762 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
+f81ec4137daa9e9fff7b7262733ded7998c86eba core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
+c2bd8e03152a23547044a42f439b33698ace4251 core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 205989c5d3adf68127d71be28c6ff9f521abcbf1 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 LOCKS
 
@@ -92,4 +104,25 @@ if grep -E -q 'Class\.forName|MethodHandles|setAccessible' "$bridge"; then
     fail "timestamp bridge uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; four bridge blobs and markers match"
+list_offsets_bridge="$kafka_checkout/core/src/main/java/kafka/log/nereus/NereusListOffsetsBridge.java"
+grep -F -q 'public OffsetResultHolder fetchOffsetByTimestamp(' "$list_offsets_bridge" \
+    || fail "ListOffsets bridge lost the Kafka result-holder entry point"
+grep -F -q 'KafkaListOffsetsResolver resolver' "$list_offsets_bridge" \
+    || fail "ListOffsets bridge lost the adapter resolver dependency"
+grep -F -q 'result.whenComplete(' "$list_offsets_bridge" \
+    || fail "ListOffsets bridge lost asynchronous terminal mapping"
+grep -F -q 'result.cancel(false)' "$list_offsets_bridge" \
+    || fail "ListOffsets bridge lost cancellation propagation"
+
+exception_mapper="$kafka_checkout/core/src/main/java/kafka/log/nereus/NereusKafkaExceptionMapper.java"
+grep -F -q 'public static ApiException map(Throwable failure)' "$exception_mapper" \
+    || fail "Kafka exception mapper lost its public boundary"
+grep -F -q 'switch (code)' "$exception_mapper" \
+    || fail "Kafka exception mapper lost exhaustive ErrorCode mapping"
+
+if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
+        "$kafka_checkout/core/src/main/java/kafka/log/nereus"; then
+    fail "Kafka bridge package uses a forbidden reflection bypass"
+fi
+
+echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; two commits, nine bridge blobs and markers match"

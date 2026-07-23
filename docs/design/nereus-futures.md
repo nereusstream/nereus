@@ -342,8 +342,9 @@ Detailed design: `nereus-future9-kafka-native-storage.md`
 Code-level target contract: `../phase-9-kafka-native-storage/README.md`
 
 F9-M0 source/design review completed on 2026-07-23；the dated evidence is
-`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`. This closes only the documentation gate；F9 has
-no production module、Kafka fork or executable capability yet.
+`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`. F9-M1/M2 and Nereus-side partial M3 are now
+implemented；the local Kafka fork has exact-record and async ListOffsets result bridges，while stock broker injection、
+remote fork publication and native Kafka end-to-end capability remain open.
 
 F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
 a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives

@@ -137,7 +137,7 @@ Ursa-like 和 AutoMQ-like 在 Nereus 中描述 publication policy，不是两套
 | --- | --- |
 | Kafka offset | 在明确的 Kafka mapping version 中等于 Nereus logical record offset；不能直接套用到 `PULSAR_ENTRY_V1` batch entry。F5 和 F9 使用不同 mapping/version authority |
 | F5 KoP projection | `Kafka client -> KoP -> Pulsar facade -> Nereus`；其 payload、coordinator 和 retention contract 由 Future 5 单独定义 |
-| F9 native Kafka projection | `Kafka client -> KRaft Kafka fork -> nereus-kafka-adapter -> Nereus`；planned module/fork，当前仅 Designed |
+| F9 native Kafka projection | `Kafka client -> KRaft Kafka fork -> nereus-kafka-adapter -> Nereus`；F9-M1/M2 and partial M3 implemented，native broker runtime not yet available |
 | Kafka partition binding | F9 Oxia record keyed by Kafka cluster id、topic UUID and partition；binds exactly one incarnation to one Nereus stream and never uses topic name as identity |
 | Log end/high watermark | F5 由其 mapping 派生；F9 首版只在 stable Nereus append 后推进 native LEO/HW，不由本地文件或 checkpoint 单独推进 |
 | Fetch target | offset resolver 选择的 current physical generation |
