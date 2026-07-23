@@ -518,8 +518,11 @@ for KF-OPS-012/014/017。`KafkaStorageProtocolActivationRecord`、`KafkaBrokerCa
 readiness epoch/metadata-offset monotonicity and applied-but-response-lost recovery。Deterministic contracts and a real-Oxia
 close/reconnect gate pass。`KafkaBrokerCapabilitySpecification`/`Publisher`、the frozen canonical compatibility digest and
 `KafkaStorageActivationVerifier` now cover broker-epoch publication/renewal and exact KRaft↔ACTIVE↔readiness↔all-capability
-admission；heartbeat owns only its scheduled future and a failed CAS permanently invokes the fencing callback。Typed
-Kafka-config-to-provider construction、the controller-owned first-activation coordinator、runtime startup composition、priority budgets
+admission；heartbeat owns only its scheduled future and a failed CAS permanently invokes the fencing callback。
+`KafkaStorageFirstActivationCoordinator` now executes empty-image proof → capability aggregation → readiness → PREPARED → second
+empty-image/capability proof → ACTIVE，resumes PREPARED without mutation，recovers a compatible concurrent winner and treats ACTIVE
+as idempotent without reapplying the first-activation emptiness rule。Typed Kafka-config-to-provider construction、Kafka controller
+snapshot/scheduling integration、runtime startup composition、priority budgets
 and real native-storage shutdown/process cuts remain open。
 
 ### Tasks

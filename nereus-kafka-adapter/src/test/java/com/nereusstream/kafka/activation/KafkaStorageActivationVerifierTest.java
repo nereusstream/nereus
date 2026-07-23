@@ -86,6 +86,46 @@ class KafkaStorageActivationVerifierTest {
     }
 
     @Test
+    void admitsANewerReadinessEpochForACompatibleRollingRestart() {
+        KafkaBrokerCapabilitySpecification original = KafkaActivationTestSupport.specification(3);
+        InMemoryKafkaStorageActivationStore store = activeStore(original, NOW + 30_000);
+        KafkaBrokerIdentity restartedIdentity = new KafkaBrokerIdentity(1, 12);
+        KafkaBrokerCapabilitySpecification restarted = KafkaActivationTestSupport.specification(
+                restartedIdentity, "runtime-2", 3);
+        KafkaBrokerCapabilityRecord restartedCapability = restarted.initialRecord(NOW - 50);
+        store.createCapability(restartedCapability).join();
+        var previous = store.getReadiness().join().orElseThrow();
+        List<KafkaBrokerIdentity> currentBrokers = List.of(restartedIdentity);
+        store.compareAndSetReadiness(previous, new KafkaStorageReadinessRecord(
+                KafkaStorageReadinessRecord.RECORD_VERSION,
+                KafkaActivationTestSupport.CLUSTER,
+                previous.value().readinessEpoch() + 1,
+                110,
+                currentBrokers,
+                KafkaStorageReadinessRecord.brokerSetSha256(currentBrokers),
+                KafkaStorageCapabilityDigests.compatibilitySha256(restartedCapability),
+                restarted.providerScopeSha256(),
+                NOW - 25,
+                NOW + 30_000,
+                0)).join();
+        KafkaStorageClusterSnapshot snapshot = new KafkaStorageClusterSnapshot(
+                KafkaActivationTestSupport.CLUSTER,
+                111,
+                KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
+                currentBrokers,
+                true,
+                false,
+                true);
+
+        VerifiedKafkaStorageActivation verified = verifier(
+                store, restarted, snapshot).verifyCurrent().toCompletableFuture().join();
+
+        assertThat(verified.readiness().value().readinessEpoch())
+                .isGreaterThan(verified.activation().value().activationEpoch());
+        assertThat(verified.capabilities().get(0).value().identity()).isEqualTo(restartedIdentity);
+    }
+
+    @Test
     void freezesTheCanonicalCompatibilityDigest() {
         byte[] digest = KafkaStorageCapabilityDigests.compatibilitySha256(
                 KafkaActivationTestSupport.specification(3).initialRecord(NOW));

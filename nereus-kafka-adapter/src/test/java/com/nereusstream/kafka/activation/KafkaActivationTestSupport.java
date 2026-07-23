@@ -13,10 +13,15 @@ final class KafkaActivationTestSupport {
     private KafkaActivationTestSupport() { }
 
     static KafkaBrokerCapabilitySpecification specification(int providerSeed) {
+        return specification(BROKER, "runtime-1", providerSeed);
+    }
+
+    static KafkaBrokerCapabilitySpecification specification(
+            KafkaBrokerIdentity identity, String runtimeInstanceId, int providerSeed) {
         return new KafkaBrokerCapabilitySpecification(
                 CLUSTER,
-                BROKER,
-                "runtime-1",
+                identity,
+                runtimeInstanceId,
                 "4.3.0",
                 "nereus-test",
                 "21",

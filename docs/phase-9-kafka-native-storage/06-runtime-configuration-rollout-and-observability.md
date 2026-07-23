@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + strict Object-WAL provider lifecycle、activation/capability/readiness durable records and Oxia CAS store、generic BrokerServer seam and adapter-backed typed bridge implemented；activation coordinator、BookKeeper/async providers and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + strict Object-WAL provider lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam and adapter-backed typed bridge implemented；Kafka controller/runtime composition、BookKeeper/async providers and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -334,6 +334,10 @@ metadataVersion:long
 `brokerSetSha256` 必须等于列表按顺序拼接 big-endian `int brokerId || long brokerEpoch` 的 SHA-256；constructor 会重算
 并拒绝不匹配。Readiness CAS 必须严格增加 readiness epoch/created time，且不得倒退 KRaft metadata offset。它是
 admission proof，不是 leadership truth；membership change invalidates cached readiness，new leader open reloads proof。
+首次激活令 `activationEpoch == readinessEpoch`，此时 ACTIVE 的 `requiredBrokerSetSha256` 必须与 readiness 精确相等。
+ACTIVE 后的兼容滚动重启发布更高 `readinessEpoch` 和新的 broker epoch set；ACTIVE 中的 broker-set digest 保留为首次
+激活审计证据，不再要求等于较新 readiness。较新 readiness 仍必须匹配当前 KRaft broker set，且 capability digest、
+provider scope、profile/default 和 protocol tuple 不得改变；readiness epoch 小于 activation epoch 永远拒绝。
 
 三类 record 已注册进 `KafkaMetadataCodecs`，array accessors defensive-copy，metadata version 只由 store hydrate。
 `KafkaStorageActivationMetadataStore`/`OxiaJavaKafkaStorageActivationMetadataStore` 将 activation、capability、readiness
@@ -346,8 +350,18 @@ aggregate/provider scope 与 PREPARED/ACTIVE digest 交叉验证。
 Broker-side `KafkaStorageActivationVerifier` already implements the read-only half：it consumes a Kafka-type-free
 `KafkaStorageClusterSnapshot`，requires the local broker ID+epoch in the exact sorted current set，loads ACTIVE/readiness and every
 current capability，then rejects absent/expired authorities、older source offsets、feature/profile/default/provider mismatch、or any
-digest divergence before partition IO。Absence/expiry/image lag are retriable `METADATA_UNAVAILABLE`；durable contradictions are
-non-retriable `METADATA_INVARIANT_VIOLATION`。The controller-owned empty-cluster PREPARED→ACTIVE writer remains open。
+digest divergence before partition IO。At the activation epoch it also requires the historical ACTIVE broker-set digest；at a higher
+readiness epoch it admits a changed broker epoch set only when that set exactly matches current KRaft and all compatibility facts stay
+unchanged。Absence/expiry/image lag are retriable `METADATA_UNAVAILABLE`；durable contradictions are
+non-retriable `METADATA_INVARIANT_VIOLATION`。
+
+Controller-side `KafkaStorageFirstActivationCoordinator` implements the write half behind the same snapshot seam。With no activation
+it requires an empty first image，loads every exact broker epoch capability，derives one common capability/provider proof，creates or
+CAS-refreshes readiness，and creates PREPARED from that exact readiness。It then reads a second empty image，requires non-regressing
+metadata offset and an unchanged broker set，reloads all capabilities and only then CASes ACTIVE。With PREPARED it never rewrites
+readiness or immutable activation facts；it only resumes verification and the final CAS。Condition losers reload and accept only a
+compatible winner，including a winner already at ACTIVE。With ACTIVE it performs an idempotent policy/image check without requiring
+the now-running cluster to remain empty。The Kafka controller still has to supply the snapshot and schedule this coordinator。
 
 ## 5. First activation workflow
 

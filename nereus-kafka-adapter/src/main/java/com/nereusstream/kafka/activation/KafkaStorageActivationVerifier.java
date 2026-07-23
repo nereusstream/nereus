@@ -96,8 +96,12 @@ public final class KafkaStorageActivationVerifier {
                 "KRaft image precedes the readiness source offset", true);
         require(ready.brokers().equals(snapshot.brokers()),
                 "readiness broker set does not match KRaft", true);
-        require(Arrays.equals(active.requiredBrokerSetSha256(), ready.brokerSetSha256()),
-                "ACTIVE and readiness broker-set digests differ", false);
+        require(ready.readinessEpoch() >= active.activationEpoch(),
+                "readiness epoch predates ACTIVE", false);
+        if (ready.readinessEpoch() == active.activationEpoch()) {
+            require(Arrays.equals(active.requiredBrokerSetSha256(), ready.brokerSetSha256()),
+                    "activation-epoch readiness changed its broker set", false);
+        }
         require(Arrays.equals(active.requiredCapabilitySha256(), ready.capabilitySha256()),
                 "ACTIVE and readiness capability digests differ", false);
         require(Arrays.equals(ready.providerScopeSha256(), localSpecification.providerScopeSha256()),

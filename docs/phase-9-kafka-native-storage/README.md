@@ -50,8 +50,10 @@ closed codecs；同一 deterministic Oxia partition 上的 create/exact-version 
 one-way ACTIVE、heartbeat/readiness monotonicity，并恢复 applied-but-response-lost。broker 侧 capability publisher 已按固定周期
 续租并在首次失败后停止，ACTIVE verifier 会把当前 KRaft cluster/feature/broker epoch set 与 activation、readiness、逐 broker
 capability、profile 和 provider scope 一次性交叉校验后才允许启动继续；兼容能力摘要已冻结为 domain-separated canonical bytes。
-deterministic 与 real-Oxia reconnect gates 已通过。BookKeeper/async-object creator、controller-owned first-activation coordinator、
-Object-WAL startup-action composition、fork config mapper、`UnifiedLog`/factory、
+`KafkaStorageFirstActivationCoordinator` 已实现 controller 侧的 empty-cluster 双重快照证明、全 broker capability 聚合、
+readiness create/CAS、PREPARED create/resume、ACTIVE one-way CAS 与并发 controller 胜者恢复；ACTIVE 幂等重试不再错误要求
+集群持续为空。deterministic 与 real-Oxia reconnect gates 已通过。BookKeeper/async-object creator、Kafka controller seam
+integration、Object-WAL startup-action composition、fork config mapper、`UnifiedLog`/factory、
 checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock
