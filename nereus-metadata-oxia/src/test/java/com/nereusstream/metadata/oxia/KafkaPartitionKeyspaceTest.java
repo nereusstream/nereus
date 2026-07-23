@@ -14,11 +14,16 @@ public class KafkaPartitionKeyspaceTest {
     void canonicalBindingAndRegistryKeysRoundTrip() {
         KafkaPartitionKeyspace keys = new KafkaPartitionKeyspace("nereus/cluster", "kraft-cluster");
         KafkaPartitionId id = new KafkaPartitionId("kraft-cluster", topicId(17), 3);
+        KafkaBrokerIdentity broker = new KafkaBrokerIdentity(12, 34);
 
         assertThat(keys.parseBindingRootKey(keys.bindingRootKey(id))).isEqualTo(id);
         assertThat(keys.parseRegistryKey(keys.registryShard(id), keys.registryKey(id))).isEqualTo(id);
+        assertThat(keys.parseCapabilityKey(
+                keys.capabilityKey(broker.brokerId(), broker.brokerEpoch()))).isEqualTo(broker);
         assertThat(keys.bindingRootKey(id)).contains("/0000000003/root");
         assertThat(keys.identitySha256(id)).hasSize(64);
+        assertThat(keys.activationPartitionKey().value()).isEqualTo(
+                "kafka-activation-v1-178580dc89c7d27312ce0a99659a5ce6a8d0069a51e0b7c199f4ae8846e5a636");
     }
 
     @Test
@@ -32,6 +37,11 @@ public class KafkaPartitionKeyspaceTest {
         assertThatThrownBy(() -> keys.parseBindingRootKey(canonical + "/extra"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> keys.parseBindingRootKey(canonical.replace("0000000012", "12")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.parseCapabilityKey(keys.capabilityKey(1, 2) + "/extra"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.parseCapabilityKey(keys.capabilityKey(1, 2)
+                .replace("0000000001", "1")))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new KafkaPartitionId("kraft-a", "AAAAAAAAAAAAAAAAAAAAAA", 0))
                 .isInstanceOf(IllegalArgumentException.class);

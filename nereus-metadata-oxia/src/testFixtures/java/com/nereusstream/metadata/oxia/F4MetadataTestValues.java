@@ -543,7 +543,8 @@ public final class F4MetadataTestValues {
 
     public static ObjectProtectionRecord protection(ObjectProtectionType type) {
         boolean pending = type == ObjectProtectionType.CURSOR_SNAPSHOT_PENDING
-                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING;
+                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING
+                || type == ObjectProtectionType.KAFKA_CHECKPOINT_PENDING;
         return new ObjectProtectionRecord(
                 1,
                 physicalRoot(PhysicalObjectLifecycle.ACTIVE).objectKeyHash(),

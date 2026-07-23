@@ -66,7 +66,11 @@ aggregation evidence；`NereusKafkaRuntimeFactoryTest` additionally proves immut
 startup deduplication、owned reverse close、borrowed dependency preservation and duplicate-identity rejection-before-transfer。
 `NereusKafkaObjectWalRuntimeConfigurationTest` and the real-Oxia `NereusKafkaObjectWalRuntimeIntegrationTest` further prove the
 strict Object-WAL executable-profile fence、no legacy auto-session fallback、provider graph ownership、authority leader open and
-stable Produce/Fetch。BookKeeper/async-object provider construction、activation、priority budgets and native-storage process cuts
+stable Produce/Fetch。`KafkaActivationMetadataCodecTest` freezes activation/capability/readiness V1 bytes and rejects unknown or
+non-canonical facts；`KafkaStorageActivationMetadataStoreContractTest` proves exact-key CAS、one-way ACTIVE、immutable heartbeat、
+readiness monotonicity、stale-version rejection and applied-but-response-lost recovery；
+`KafkaStorageActivationMetadataOxiaIntegrationTest` proves all three authorities survive real Oxia client close/reconnect。
+The KRaft-aware activation coordinator、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
 仍未实现，
 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及

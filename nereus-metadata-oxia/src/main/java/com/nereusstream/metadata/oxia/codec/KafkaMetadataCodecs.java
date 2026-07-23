@@ -1,15 +1,23 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.metadata.oxia.codec;
 
+import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionRegistryRecord;
+import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
+import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
 import java.util.List;
 
 /** Closed F9 native-Kafka metadata codec family. */
 public final class KafkaMetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
             registered(KafkaPartitionBindingRecord.class, new KafkaPartitionBindingRecordCodecV1()),
-            registered(KafkaPartitionRegistryRecord.class, new KafkaPartitionRegistryRecordCodecV1())));
+            registered(KafkaPartitionRegistryRecord.class, new KafkaPartitionRegistryRecordCodecV1()),
+            registered(
+                    KafkaStorageProtocolActivationRecord.class,
+                    new KafkaStorageProtocolActivationRecordCodecV1()),
+            registered(KafkaBrokerCapabilityRecord.class, new KafkaBrokerCapabilityRecordCodecV1()),
+            registered(KafkaStorageReadinessRecord.class, new KafkaStorageReadinessRecordCodecV1())));
 
     private KafkaMetadataCodecs() { }
 

@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + strict Object-WAL provider runtime + local Kafka-fork record-inspector/async-result/metadata-lifecycle slices in progress；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 activation-backed native Kafka broker runtime
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + strict Object-WAL provider runtime + local Kafka-fork record-inspector/async-result/metadata-lifecycle slices in progress；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation/capability/readiness durable CAS foundation + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 activation-backed native Kafka broker runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -45,7 +45,10 @@ server 类型；runtime configuration 同时冻结 executable profile set，mana
 `ObjectStore`、shared Oxia、L0/physical/binding stores、protection manager、callback executor 和 strict generation-zero
 `DefaultStreamStorage` 被组装为仅支持 `OBJECT_WAL_SYNC_OBJECT` 的 runtime，legacy auto-session 被强制关闭，失败切点
 逆序回收。real-Oxia + local-file provider gate 已通过 leader open、authority recovery、stable Produce/Fetch 与 close。
-BookKeeper/async-object creator、activation/capability startup action、fork config mapper、`UnifiedLog`/factory、
+activation control plane 已新增 V1 protocol activation、epoch-scoped broker capability、exact broker-set readiness records 与
+closed codecs；同一 deterministic Oxia partition 上的 create/exact-version CAS 会校验 key/value identity、不可变 tuple、
+one-way ACTIVE、heartbeat/readiness monotonicity，并恢复 applied-but-response-lost。deterministic 与 real-Oxia reconnect gates
+已通过。BookKeeper/async-object creator、KRaft-aware activation coordinator/startup action、fork config mapper、`UnifiedLog`/factory、
 checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock

@@ -91,6 +91,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "oxiaCapabilitySpike",
         "oxiaIntegrationTest",
         "f4OxiaIntegrationTest",
+        "f9ActivationOxiaIntegrationTest",
         "f9OxiaIntegrationTest",
     ),
     ":nereus-object-store" to setOf(
@@ -3005,4 +3006,11 @@ tasks.register("phase9M3ProviderCheck") {
     description = "Run the partial F9-M3 provider-backed Object-WAL gate against real Oxia."
     dependsOn("phase9M3CodecCheck")
     dependsOn(":nereus-kafka-adapter:f9M3ProviderIntegrationTest")
+}
+
+tasks.register("phase9M6ActivationMetadataCheck") {
+    group = "verification"
+    description = "Run the partial F9-M6 activation metadata codec, CAS, response-loss, and real-Oxia gates."
+    dependsOn("phase9M2Check")
+    dependsOn(":nereus-metadata-oxia:f9ActivationOxiaIntegrationTest")
 }

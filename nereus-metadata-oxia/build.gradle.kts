@@ -119,6 +119,20 @@ tasks.register<Test>("f9OxiaIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9ActivationOxiaIntegrationTest") {
+    group = "verification"
+    description = "Run the F9-M6 Kafka activation/capability/readiness CAS gate against real Oxia."
+    testClassesDirs = oxiaIntegrationTest.output.classesDirs
+    classpath = oxiaIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9MetadataTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataOxiaIntegrationTest",
+        )
+    }
+}
+
 val oxiaCapabilitySpikeReportDir = layout.buildDirectory.dir("reports/oxia-capability-spike")
 
 tasks.register<Test>("oxiaCapabilitySpike") {

@@ -43,6 +43,9 @@ activation       = sha256(kafkaClusterId || 0x00 || "activation")
 
 binding 与其 registry hint 使用相同 Oxia partition key where provider permits，但实现不能依赖 multi-key
 transaction。stream head 使用既有 `streamPartitionKey(streamId)`，通常与 binding 不同 shard。
+V1 activation、capability 与 readiness 三类 control-plane key 均使用 `activation` partition key；这是 deterministic
+routing，不是 multi-key transaction 承诺。`KafkaPartitionKeyspace` 已实现 capability key strict round-trip parser，拒绝
+alternate decimal、wrong depth 与 wrong cluster。
 
 `partition` key component 是 fixed-width non-negative integer；parser 必须 round-trip canonical full path，拒绝
 额外 slash、alternate decimal、wrong cluster 和 unknown depth。

@@ -512,14 +512,20 @@ has an explicitly injected generic `BrokerStorageRuntimeFactory` with
 stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。`NereusBrokerStorageRuntimeFactory`
 and `NereusBrokerStorageRuntime` now add typed runtime/scan-limit creators、failure rollback、one exact ReplicaManager binding、
 drain-reason mapping and synchronous lookup revocation without a duplicate manager owner。This is deterministic partial evidence
-for KF-OPS-012/014/017；typed Kafka-config-to-provider construction、activation、priority budgets and real
-native-storage shutdown/process cuts remain open。
+for KF-OPS-012/014/017。`KafkaStorageProtocolActivationRecord`、`KafkaBrokerCapabilityRecord`、
+`KafkaStorageReadinessRecord` and their closed codecs now freeze the V1 protocol tuple/profile sets/digests/broker identities；
+`KafkaStorageActivationMetadataStore` supplies exact-key create/CAS、ACTIVE monotonicity、immutable capability heartbeat、
+readiness epoch/metadata-offset monotonicity and applied-but-response-lost recovery。Deterministic contracts and a real-Oxia
+close/reconnect gate pass。Typed Kafka-config-to-provider construction、the KRaft-aware activation coordinator、priority budgets
+and real native-storage shutdown/process cuts remain open。
 
 ### Tasks
 
 ```text
 :nereus-kafka-adapter:f9ConfigTest
 :nereus-kafka-adapter:f9ActivationOxiaIntegrationTest
+:nereus-metadata-oxia:f9ActivationOxiaIntegrationTest
+phase9M6ActivationMetadataCheck
 Kafka fork: nereusF9ControllerTest
 Kafka fork: nereusF9BrokerLifecycleTest
 Kafka fork: nereusF9MetadataPublisherTest

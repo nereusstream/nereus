@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + strict Object-WAL provider lifecycle、generic BrokerServer seam and adapter-backed typed bridge implemented；BookKeeper/async providers、activation/observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + strict Object-WAL provider lifecycle、activation/capability/readiness durable records and Oxia CAS store、generic BrokerServer seam and adapter-backed typed bridge implemented；activation coordinator、BookKeeper/async providers and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -253,6 +253,11 @@ activatedAtMillis:long             0 while PREPARED
 metadataVersion:long               hydrated
 ```
 
+以上 field order 已由 `KafkaStorageProtocolActivationRecordCodecV1` 封闭并以 golden SHA-256 固定。V1 的所有 version
+field 是精确值，不解释为范围；allowed profile 是 1..5 个 canonical、strictly sorted、unique 名称，legacy
+`OBJECT_WAL` alias 被拒绝，default 必须属于 allowed set。PREPARED 只允许以同一不可变 tuple CAS 到 ACTIVE；ACTIVE
+不能回退或在同一 activation epoch 原地修改任一 digest/profile/version/source metadata offset。
+
 ACTIVE is one-way at a protocol version；cannot return to PREPARED or change digest/profile/version in place。Future protocol
 upgrade uses a new preparation/activation epoch and explicit dual-read/write gates。
 
@@ -261,30 +266,73 @@ upgrade uses a new preparation/activation epoch and explicit dual-read/write gat
 Key includes broker ID + KRaft broker epoch，so restart cannot inherit stale readiness。Record：
 
 ```text
+recordVersion:int=1
+kafkaClusterId:string
 brokerId:int
 brokerEpoch:long
 runtimeInstanceId:string
 kafkaVersion:string
 nereusBuild:string
 javaVersion:string
-supported version/range fields matching activation
+protocolVersion:int
+apiVersion:int
+streamHeadSessionVersion:int
+bindingVersion:int
+payloadMappingId:int
+objectWalEntryIndexVersion:int
+ncpVersion:int
+ntcVersion:int
+checkpointVersion:int
+compactionStrategyVersion:int
+kafkaFeatureLevel:int
 supportedStorageProfiles:sorted list
 configCompatibilitySha256[32]
 codeCapabilitySha256[32]
+providerScopeSha256[32]
 startedAtMillis:long
 heartbeatAtMillis:long
 expiresAtMillis:long
 metadataVersion:long
 ```
 
+V1 将 supported fields 实现为与 activation 完全同构的 11-field exact tuple：`protocolVersion`、
+`apiVersion`、`streamHeadSessionVersion`、`bindingVersion`、`payloadMappingId`、`objectWalEntryIndexVersion`、
+`ncpVersion`、`ntcVersion`、`checkpointVersion`、`compactionStrategyVersion`、`kafkaFeatureLevel`；不声称尚未实现的
+range negotiation。record 还持久化 `kafkaClusterId` 和 `providerScopeSha256[32]`，使 key/value scope 与 readiness
+provider proof 都可独立验证。Heartbeat CAS 只能严格增加 `heartbeatAtMillis` 和 `expiresAtMillis`，其他字段不可变。
+
 Digest uses canonical field encoding，not JSON/property iteration order。Heartbeat only extends expiry if immutable capability
 facts match；changed facts require new broker epoch/runtime record。
 
 ### 4.3 Readiness snapshot
 
-`KafkaStorageReadinessRecord` contains readiness epoch、KRaft metadata offset、exact unfenced broker IDs/epochs、broker-set
-digest、capability digest、provider-scope digest、created/expiry and metadata version。It is an admission proof，not leadership
-truth。Membership change invalidates cached readiness；new leader open reloads proof。
+`KafkaStorageReadinessRecord` closed field order：
+
+```text
+recordVersion:int=1
+kafkaClusterId:string
+readinessEpoch:long
+kraftMetadataOffset:long
+brokers:list<(brokerId:int,brokerEpoch:long)> strictly sorted/unique, 1..16384
+brokerSetSha256:32 bytes
+capabilitySha256:32 bytes
+providerScopeSha256:32 bytes
+createdAtMillis:long
+expiresAtMillis:long
+metadataVersion:long
+```
+
+`brokerSetSha256` 必须等于列表按顺序拼接 big-endian `int brokerId || long brokerEpoch` 的 SHA-256；constructor 会重算
+并拒绝不匹配。Readiness CAS 必须严格增加 readiness epoch/created time，且不得倒退 KRaft metadata offset。它是
+admission proof，不是 leadership truth；membership change invalidates cached readiness，new leader open reloads proof。
+
+三类 record 已注册进 `KafkaMetadataCodecs`，array accessors defensive-copy，metadata version 只由 store hydrate。
+`KafkaStorageActivationMetadataStore`/`OxiaJavaKafkaStorageActivationMetadataStore` 将 activation、capability、readiness
+路由到同一 deterministic activation partition，提供 create/exact-version CAS；key/value identity、cluster scope、closed
+codec、monotonic transition 都在 write/read 边界 fail closed。若 Oxia 已应用 mutation 但响应丢失，store reload exact
+key，仅当 durable value 等于 intended value 且 version 已前进时恢复成功；否则保留 condition/availability failure。
+deterministic backend 与 real Oxia restart gates 已通过。Coordinator 仍需负责把当前 KRaft broker set、capability
+aggregate/provider scope 与 PREPARED/ACTIVE digest 交叉验证。
 
 ## 5. First activation workflow
 

@@ -187,6 +187,7 @@ final class F4MetadataStoreSupport {
                 || cause instanceof F4MetadataConditionFailedException
                 || cause instanceof BookKeeperMetadataConditionFailedException
                 || cause instanceof CursorMetadataConditionFailedException
+                || cause instanceof KafkaMetadataConditionFailedException
                 || cause instanceof ProjectionMetadataConditionFailedException;
     }
 

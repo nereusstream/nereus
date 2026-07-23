@@ -31,12 +31,36 @@ public final class KafkaPartitionKeyspace {
     public String activationKey() { return prefix + "/activation"; }
     public String readinessKey() { return prefix + "/readiness"; }
 
+    public PartitionKey activationPartitionKey() {
+        MessageDigest digest = sha256();
+        digest.update(kafkaClusterId.getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+        digest.update("activation".getBytes(StandardCharsets.US_ASCII));
+        return new PartitionKey("kafka-activation-v1-" + HexFormat.of().formatHex(digest.digest()));
+    }
+
+    public String capabilityPrefix() { return prefix + "/capabilities"; }
+
     public String capabilityKey(int brokerId, long brokerEpoch) {
-        if (brokerId < 0 || brokerEpoch < 0) {
-            throw new IllegalArgumentException("broker identity must be non-negative");
+        KafkaBrokerIdentity identity = new KafkaBrokerIdentity(brokerId, brokerEpoch);
+        return capabilityPrefix() + "/" + partitionDigits(identity.brokerId()) + "/"
+                + KeyComponentCodec.encodeNonNegativeLong(identity.brokerEpoch());
+    }
+
+    public KafkaBrokerIdentity parseCapabilityKey(String key) {
+        String family = capabilityPrefix() + "/";
+        String supplied = scoped(key, family, "capability");
+        String[] components = supplied.substring(family.length()).split("/", -1);
+        if (components.length != 2) {
+            throw new IllegalArgumentException("capability key has an unknown depth");
         }
-        return prefix + "/capabilities/" + partitionDigits(brokerId) + "/"
-                + KeyComponentCodec.encodeNonNegativeLong(brokerEpoch);
+        KafkaBrokerIdentity identity = new KafkaBrokerIdentity(
+                parsePartition(components[0]),
+                KeyComponentCodec.decodeNonNegativeLong(components[1]));
+        if (!capabilityKey(identity.brokerId(), identity.brokerEpoch()).equals(supplied)) {
+            throw new IllegalArgumentException("capability key is not canonical");
+        }
+        return identity;
     }
 
     public String bindingRootKey(KafkaPartitionId id) {
