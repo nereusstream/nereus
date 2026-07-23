@@ -101,6 +101,24 @@ class DefaultKafkaPartitionStorageManagerTest {
     }
 
     @Test
+    void rejectsProfileThatTheConcreteRuntimeCannotExecuteBeforeBinding() {
+        FakeLifecycle lifecycle = new FakeLifecycle(KafkaPartitionStorageTestSupport.binding(PROFILE));
+        ControlledOpener opener = new ControlledOpener();
+        DefaultKafkaPartitionStorageManager manager = new DefaultKafkaPartitionStorageManager(
+                lifecycle,
+                opener,
+                CLOCK,
+                "broker-run",
+                7,
+                Duration.ofSeconds(30),
+                java.util.Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
+
+        assertFailureCode(manager.openLeader(request(5, PROFILE)), ErrorCode.UNSUPPORTED_STORAGE_PROFILE);
+        assertThat(lifecycle.ensureCalls()).isZero();
+        assertThat(opener.calls()).isZero();
+    }
+
+    @Test
     void staleResignCannotCloseCurrentTermAndDeleteDrainsBeforeDurableDeletion() {
         FakeLifecycle lifecycle = new FakeLifecycle(KafkaPartitionStorageTestSupport.binding(PROFILE));
         ControlledOpener opener = new ControlledOpener();

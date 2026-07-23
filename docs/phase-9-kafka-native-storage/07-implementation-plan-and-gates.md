@@ -326,6 +326,8 @@ Kafka fork: nereusF9LogTest
 Kafka fork: nereusF9ProduceFetchTest
 Kafka fork: nereusF9DisabledCompatibilityTest
 Nereus: :nereus-kafka-adapter:f9M3IntegrationTest
+Nereus: :nereus-kafka-adapter:f9M3ProviderIntegrationTest
+Nereus: phase9M3ProviderCheck
 Nereus: phase9M3KafkaCheck
 Nereus: phase9M3Check
 Nereus: phase9M3FinalCheck --rerun-tasks
@@ -365,7 +367,8 @@ coordinator/transaction/compaction remain M4/M5。
   matrix remains open；
 - `DefaultKafkaPartitionStorageManagerTest` proves binding-before-open with the real deterministic lifecycle、exact
   binding/profile open plans、authority-open dedupe、operation-owned completion、stale-resign isolation、drain-before-delete and
-  shutdown fencing；
+  shutdown fencing；it now also proves the concrete runtime's executable-profile set rejects an unavailable profile before any
+  durable binding write；
 - `StableStreamHeadSnapshotTest`、`KafkaLeaderAuthorityIntegrationTest` and `DefaultStreamStorageAppendTest` prove the
   protocol-neutral exact-head seam、canonical durable digest、authority-session projection、renewal digest change、core facade
   delegation、genesis commitVersion `0` and exact mixed-chain ancestor proof；
@@ -391,6 +394,13 @@ coordinator/transaction/compaction remain M4/M5。
   `BrokerMetadataPublisherTest` prove stock-state-first preparation、old/new image identity selection、delete-before-recreate、
   callback-after-success、coordinator-election-after-recovery and `firstPublishFuture` non-readiness semantics。Time-index
   checkpoint candidate、provider-backed BrokerServer activation and real native-storage KRaft baseline remain open；
+- `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the first concrete provider graph to exactly
+  `OBJECT_WAL_SYNC_OBJECT`、matched cluster/writer/session/scan limits and disabled legacy auto-session；
+  `NereusKafkaObjectWalRuntimeFactoryTest` proves a checked provider-construction failure is propagated and every resource
+  registered before that cut is closed；
+  `f9M3ProviderIntegrationTest` passes against real Oxia plus the filesystem ObjectStore provider and covers deterministic
+  binding、authority acquire/recovery、leader open、one byte-exact stable Produce、committed Fetch and owned provider shutdown。
+  This is provider-backed adapter evidence，not yet a Kafka BrokerServer/KRaft or production S3 gate；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
   cleaner/AutoMQ/request-limit/directory validation。Six snapshot tests、four validator tests and the complete stock

@@ -2937,7 +2937,7 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
 tasks.register("phase9M3KafkaForkCheck") {
     group = "verification"
     description = "Run the partial F9-M3 Nereus adapter and local Kafka-fork bridge gates."
-    dependsOn("phase9M3CodecCheck")
+    dependsOn("phase9M3ProviderCheck")
     dependsOn("phase9M3KafkaForkStockCheck")
     dependsOn("phase9M3KafkaForkBridgeCheck")
 }
@@ -2998,4 +2998,11 @@ tasks.register("phase9M3CodecCheck") {
     dependsOn("phase9M2Check")
     dependsOn("phase9KafkaBaselineSourceLockCheck")
     dependsOn(":nereus-kafka-adapter:f9M3CodecTest")
+}
+
+tasks.register("phase9M3ProviderCheck") {
+    group = "verification"
+    description = "Run the partial F9-M3 provider-backed Object-WAL gate against real Oxia."
+    dependsOn("phase9M3CodecCheck")
+    dependsOn(":nereus-kafka-adapter:f9M3ProviderIntegrationTest")
 }

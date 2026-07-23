@@ -109,9 +109,10 @@ Adapter-side counterpart：
   `NereusListOffsetsLifecycle.beginDrain` 只负责 admission/revocation，standalone `shutdown` 仍 deduplicate manager shutdown；
 - stock/no-artifact factory tests 和 single-node KRaft start→shutdown→restart 已通过。
 
-product adapter 已实现 post-provider `NereusKafkaRuntimeFactory`，可从显式 `StreamStorage`、binding store、borrowed
-scheduler/recovery/clock、startup action 和 ownership ledger 组装同一 manager/runtime graph。尚未实现的是 Kafka typed
-config/context 到 Oxia/Object/BookKeeper client/resource 的 creator、enabled `NereusReplicaManager`/log selection、
+product adapter 已实现 `NereusKafkaRuntimeFactory`，并新增仅支持 `OBJECT_WAL_SYNC_OBJECT` 的 concrete
+`NereusKafkaObjectWalRuntimeFactory`：显式组装 Object provider、shared Oxia、L0/physical/binding stores、protection、
+callback executor 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader open/Produce/Fetch gate 已通过。
+尚未实现的是 Kafka typed config/context mapper、BookKeeper/async-object creator、enabled `NereusReplicaManager`/log selection、
 activation/capability advertisement 和 native-storage KRaft process test，所以当前仍只是可执行 lifecycle seam，不是
 可启用 broker runtime。
 

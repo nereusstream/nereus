@@ -3,6 +3,7 @@ package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.kafka.metadata.KafkaBindingRequest;
 import com.nereusstream.kafka.metadata.KafkaPartitionBinding;
 import com.nereusstream.kafka.metadata.KafkaPartitionBindingLifecycle;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -27,6 +29,7 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
     private final String operationOwnerId;
     private final long operationOwnerEpoch;
     private final Duration operationTtl;
+    private final Set<StorageProfile> executableProfiles;
     private final Map<KafkaPartitionIdentity, OpenIntent> intents = new HashMap<>();
     private boolean closed;
 
@@ -37,13 +40,37 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
             String operationOwnerId,
             long operationOwnerEpoch,
             Duration operationTtl) {
+        this(
+                bindings,
+                opener,
+                clock,
+                operationOwnerId,
+                operationOwnerEpoch,
+                operationTtl,
+                KafkaStorageProfilePolicy.activatedProfiles());
+    }
+
+    public DefaultKafkaPartitionStorageManager(
+            KafkaPartitionBindingLifecycle bindings,
+            KafkaPartitionOpener opener,
+            Clock clock,
+            String operationOwnerId,
+            long operationOwnerEpoch,
+            Duration operationTtl,
+            Set<StorageProfile> executableProfiles) {
         this.bindings = Objects.requireNonNull(bindings, "bindings");
         this.leaders = new KafkaPartitionLeaderManager(Objects.requireNonNull(opener, "opener"));
         this.clock = Objects.requireNonNull(clock, "clock");
         this.operationOwnerId = Objects.requireNonNull(operationOwnerId, "operationOwnerId");
         this.operationTtl = positive(Objects.requireNonNull(operationTtl, "operationTtl"), "operationTtl");
+        this.executableProfiles = Set.copyOf(Objects.requireNonNull(executableProfiles, "executableProfiles"));
         if (operationOwnerId.isBlank() || operationOwnerEpoch <= 0) {
             throw new IllegalArgumentException("Kafka partition manager owner must be nonblank and positive");
+        }
+        if (this.executableProfiles.isEmpty()
+                || !KafkaStorageProfilePolicy.activatedProfiles().containsAll(this.executableProfiles)) {
+            throw new IllegalArgumentException(
+                    "executableProfiles must be a non-empty subset of activated Kafka storage profiles");
         }
         this.operationOwnerEpoch = operationOwnerEpoch;
     }
@@ -53,6 +80,12 @@ public final class DefaultKafkaPartitionStorageManager implements KafkaPartition
             KafkaPartitionLeaderOpenRequest request) {
         Objects.requireNonNull(request, "request");
         KafkaStorageProfilePolicy policy = KafkaStorageProfilePolicy.forProfile(request.storageProfile());
+        if (!executableProfiles.contains(policy.storageProfile())) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.UNSUPPORTED_STORAGE_PROFILE,
+                    false,
+                    "Kafka storage profile is not executable by this runtime"));
+        }
         long deadline = deadline(request.timeout());
         OpenIntent intent = new OpenIntent(request, policy, deadline);
         OpenIntent superseded = null;

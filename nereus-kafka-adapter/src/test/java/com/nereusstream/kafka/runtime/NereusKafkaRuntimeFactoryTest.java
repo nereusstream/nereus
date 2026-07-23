@@ -2,6 +2,7 @@
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManager;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import java.lang.reflect.Proxy;
@@ -9,6 +10,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -124,7 +126,8 @@ class NereusKafkaRuntimeFactoryTest {
                 Duration.ofSeconds(30),
                 "broker-run",
                 1,
-                Duration.ofSeconds(30)))
+                Duration.ofSeconds(30),
+                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("shorter");
         assertThatThrownBy(() -> new NereusKafkaRuntimeConfiguration(
@@ -135,7 +138,8 @@ class NereusKafkaRuntimeFactoryTest {
                 Duration.ofSeconds(10),
                 "broker-run",
                 0,
-                Duration.ofSeconds(30)))
+                Duration.ofSeconds(30),
+                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("operationOwnerEpoch");
     }
@@ -149,7 +153,8 @@ class NereusKafkaRuntimeFactoryTest {
                 Duration.ofSeconds(10),
                 "broker-run",
                 7,
-                Duration.ofSeconds(30));
+                Duration.ofSeconds(30),
+                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
     }
 
     private static NereusKafkaRuntimeDependencies dependencies(

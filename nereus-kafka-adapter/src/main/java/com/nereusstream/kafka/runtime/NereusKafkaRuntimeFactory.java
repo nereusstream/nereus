@@ -56,7 +56,8 @@ public final class NereusKafkaRuntimeFactory {
                     exactDependencies.clock(),
                     exactConfiguration.operationOwnerId(),
                     exactConfiguration.operationOwnerEpoch(),
-                    exactConfiguration.operationTtl());
+                    exactConfiguration.operationTtl(),
+                    exactConfiguration.executableProfiles());
             return new DefaultNereusKafkaRuntime(
                     new KafkaStorageAdmission(),
                     manager,

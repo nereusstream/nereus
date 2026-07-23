@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + default process lifecycle/resource ownership + post-provider assembly、generic BrokerServer seam and adapter-backed typed bridge implemented；provider client creation/activation/observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + strict Object-WAL provider lifecycle、generic BrokerServer seam and adapter-backed typed bridge implemented；BookKeeper/async providers、activation/observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -32,20 +32,30 @@ activation/capability publication remain open；the startup action is the explic
 reflection or a global singleton。
 
 `NereusKafkaRuntimeFactory.create` is now executable after provider construction。Its immutable
-`NereusKafkaRuntimeConfiguration` freezes Nereus/Kafka cluster IDs、writer identity、session TTL/renewal interval and durable
-binding-operation owner/epoch/TTL。`NereusKafkaRuntimeDependencies` explicitly supplies `StreamStorage`、the Kafka binding
+`NereusKafkaRuntimeConfiguration` freezes Nereus/Kafka cluster IDs、writer identity、session TTL/renewal interval、durable
+binding-operation owner/epoch/TTL and the exact non-empty executable-profile set。`NereusKafkaRuntimeDependencies` explicitly supplies `StreamStorage`、the Kafka binding
 store、borrowed renewal scheduler、fork-owned recovery launcher、clock、startup action and provider resources with exact
 ownership。The factory constructs one keyspace/lifecycle/opener/manager/runtime graph and one shared RecordBatch codec；it has
 no Kafka server type、reflection、service loader、global registry or duplicate provider lifecycle。Broker/controller identity、
 KRaft metadata view、Kafka `Time`/metrics and the mapping from the fork's 58-key snapshot remain inputs to the not-yet-built
-provider/activation creator。Independent runtimes can run in one JVM。
+provider/activation creator。The manager checks that set before binding lifecycle I/O，so a partial provider deployment cannot
+persist an unusable binding。Independent runtimes can run in one JVM。
+
+`NereusKafkaObjectWalRuntimeFactory` is the first concrete provider creator。It accepts an explicit provider instance rather
+than a class-name lookup，verifies it against the typed `ObjectStoreConfiguration`，then constructs its `ObjectStore`、one shared
+Oxia runtime、L0/physical/Kafka binding stores、object-protection manager、owned callback executor and strict generation-zero
+`DefaultStreamStorage`。`NereusKafkaObjectWalRuntimeConfiguration` requires exactly
+`OBJECT_WAL_SYNC_OBJECT`、matching cluster/writer/session/commit-scan facts and `autoAcquireAppendSession=false`，preventing a
+missing adapter session from falling back to an unfenced legacy acquire。Bootstrap failures close every resource already
+created；successful construction transfers the exact ordered list to the process runtime。The injected startup action still
+owns cluster activation/capability proof，and the Kafka scheduler/recovery launcher/clock remain borrowed。
 
 Kafka fork commits `46e6703761..617451957c` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
 create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
 enabled mode before LogManager construction。`NereusBrokerStorageRuntimeFactory` is the concrete adapter bridge：typed creators
 return the product runtime and exact scan limits；it does not evaluate them while disabled and closes a created runtime if later
 assembly fails。`NereusBrokerStorageRuntime` binds the runtime's single manager to the exact BrokerServer `ReplicaManager` and
-constructs the ListOffsets/topic-delta lifecycle only at that point。Owned provider client creation remains open。
+constructs the ListOffsets/topic-delta lifecycle only at that point。Fork-side typed-config mapping and activation remain open。
 
 ### 1.2 Resource ownership
 

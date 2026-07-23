@@ -64,7 +64,10 @@ drain 和 irreversible drain/close 的 deterministic partial evidence；`Default
 late-start fencing、manager drain、idempotent manager-first close、owned/borrowed identity、reverse close 和 failure
 aggregation evidence；`NereusKafkaRuntimeFactoryTest` additionally proves immutable assembly validation、one concrete manager、
 startup deduplication、owned reverse close、borrowed dependency preservation and duplicate-identity rejection-before-transfer。
-Concrete provider client construction/activation、priority budgets and native-storage process cuts 仍未实现，
+`NereusKafkaObjectWalRuntimeConfigurationTest` and the real-Oxia `NereusKafkaObjectWalRuntimeIntegrationTest` further prove the
+strict Object-WAL executable-profile fence、no legacy auto-session fallback、provider graph ownership、authority leader open and
+stable Produce/Fetch。BookKeeper/async-object provider construction、activation、priority budgets and native-storage process cuts
+仍未实现，
 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
 BrokerServer stock start/drain/close compatibility；`NereusBrokerStorageRuntimeTest` additionally verifies disabled creator

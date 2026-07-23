@@ -15,6 +15,28 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
+val f9ProviderIntegrationTest by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + configurations.testRuntimeClasspath.get()
+    runtimeClasspath += output + compileClasspath
+}
+
+configurations[f9ProviderIntegrationTest.implementationConfigurationName].extendsFrom(
+    configurations.testImplementation.get(),
+)
+configurations[f9ProviderIntegrationTest.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.testRuntimeOnly.get(),
+)
+
+dependencies {
+    add(f9ProviderIntegrationTest.implementationConfigurationName, project())
+    add(f9ProviderIntegrationTest.implementationConfigurationName, testFixtures(project(":nereus-object-store")))
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.assertj)
+    add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
+}
+
 tasks.register<Test>("f9M2Test") {
     group = "verification"
     description = "Run F9-M2 deterministic Kafka binding, scanner, checkpoint, and recovery contracts."
@@ -50,6 +72,8 @@ tasks.register<Test>("f9M3CodecTest") {
         includeTestsMatching("com.nereusstream.kafka.runtime.KafkaRuntimeResourcesTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.DefaultNereusKafkaRuntimeTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaRuntimeFactoryTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeConfigurationTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaObjectWalRuntimeFactoryTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaFetchOperationTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaPartitionLeaderManagerTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaStorageProfilePolicyTest")
@@ -57,4 +81,13 @@ tasks.register<Test>("f9M3CodecTest") {
         includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionOpenerTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaListOffsetsResolverTest")
     }
+}
+
+tasks.register<Test>("f9M3ProviderIntegrationTest") {
+    group = "verification"
+    description = "Run the F9-M3 provider-backed leader open/Produce/Fetch gate against real Oxia."
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("f9M3CodecTest"))
+    useJUnitPlatform()
 }
