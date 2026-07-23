@@ -44,5 +44,7 @@ tasks.register<Test>("f9M3CodecTest") {
     filter {
         includeTestsMatching("com.nereusstream.kafka.codec.*")
         includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.KafkaBoundedAppendExecutorTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.KafkaAppendFailureClassifierTest")
     }
 }

@@ -313,6 +313,14 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
   `logStart <= LSO == HW == stable LEO`；`KNOWN_NOT_COMMITTED` 清空未执行 successor 并回退 admission 到 stable end，
   uncertain/known-committed/result mismatch 则 write-fence；read 使用 COMMITTED + CONTAINING_ENTRY + explicit
   first-overflow semantics，并按 captured stable upper bound 裁剪完整 batch；resign 停止 admission 后等待 lane drain。
+- `KafkaByteBudget` / `KafkaProduceBufferSnapshot` / `KafkaBoundedAppendExecutor`：在 queue admission 前取得全局
+  byte lease 并复制 caller remaining bytes，向 task 只暴露 owned read-only view；byte/queue saturation 均在 append
+  I/O 前返回 `KNOWN_NOT_COMMITTED`，所有 terminal/race path release once；client future cancel 不会取消已经入队的
+  append task，executor close 则拒绝新 admission 并 drain 已接受任务；
+- `KafkaAppendFailureClassifier`：生成 protocol-neutral `KafkaAppendFailureDisposition`；只有显式
+  `KNOWN_NOT_COMMITTED` 能保持 writable，authority/offset conflict、缺失 outcome、`MAY_HAVE_COMMITTED` 和
+  `KNOWN_COMMITTED` 一律进入 `WRITE_FENCE_RECOVERY_REQUIRED`，checksum/format/invariant failure 进入
+  `CORRUPT_OFFLINE`。Kafka exception class 映射仍由 fork 持有。
 
 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 production/runtime classpath。此切片尚未满足 M3 entry 中的组织 Kafka fork source lock，
@@ -340,6 +348,13 @@ handoff并提交到 bounded append executor。
 
 queue admission 失败发生在任何 append IO 前，返回 `ThrottlingQuotaExceededException`；已入队后 client cancel
 不能取消底层 append，因为可能已经提交。response callback 仍 exactly once，channel lifecycle 决定是否发送。
+
+当前 Nereus-side 实现使用 `KafkaProduceBufferSnapshot.capture(ByteBuffer, KafkaByteBudget)` 精确复制 caller
+`position..limit`，不修改 caller state；lease 先于 array allocation 取得，allocation/copy、queue reject、task failure、
+success 和 duplicate close 都只释放一次。`KafkaBoundedAppendExecutor.submit` 用 fixed thread count + bounded
+`ArrayBlockingQueue`，关闭 race 返回 `STORAGE_CLOSED + KNOWN_NOT_COMMITTED`。returned future 只是 response handle：
+取消它不会传播到 admitted task。fork 后续仍需把 `MemoryRecords` / request callback 接到这个 protocol-neutral
+boundary，并负责 `RequestLocal.NoCaching`。
 
 ### 6.3 Append ordering
 
@@ -518,6 +533,12 @@ timestamp lookup若 checkpoint index没有候选，bounded scan committed entrie
 
 unknown append completion **never** maps to an ordinary retriable client error while accepting later writes。client may retry
 to a new/current leader after partition recovery；idempotent producer logic deduplicates committed retry bytes。
+
+当前 `KafkaAppendFailureClassifier` 已把这个表的 partition action 固化为不依赖 Kafka artifact 的
+`REJECT_WITHOUT_FENCE`、`WRITE_FENCE_RECOVERY_REQUIRED`、`CORRUPT_OFFLINE`。它会展开
+`CompletionException`/`ExecutionException`；任意非 Nereus unknown failure 也 fail closed 为 invariant + write fence。
+`KafkaAppendFailureDisposition` 构造器禁止 empty/uncertain/known-committed outcome 搭配 `REJECT_WITHOUT_FENCE`，防止
+fork mapper 后续错误降级。Kafka exception/error 的具体实例化仍是尚未实现的 fork responsibility。
 
 ## 11. Partition write-fence integration
 

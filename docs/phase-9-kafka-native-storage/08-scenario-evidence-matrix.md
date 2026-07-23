@@ -40,8 +40,10 @@ method uniqueness：
 
 当前 `f9M3CodecTest` 为 KF-APP-002、KF-FET-001/KF-FET-002 的 deterministic adapter-level evidence，并覆盖
 KF-APP-003 的 pre-storage exact-byte/CRC invariant；`DefaultKafkaPartitionStorageTest` 还提供 KF-APP-005/006/008、
-KF-APP-013 和 KF-FET-003 的 adapter state-machine evidence。它们不替代这些 row 要求的 Kafka fork/real-service
-evidence，因此 row 状态仍不标记为完整通过。
+KF-APP-013 和 KF-FET-003 的 adapter state-machine evidence；`KafkaBoundedAppendExecutorTest` 为 KF-APP-011/012
+提供 queue/byte admission、owned buffer release-once 和 cancel-does-not-cancel-task 的 deterministic partial
+evidence，`KafkaAppendFailureClassifierTest` 固化 fail-closed outcome/action mapping。它们不替代这些 row 要求的
+Kafka fork/real-service evidence，因此 row 状态仍不标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。

@@ -348,6 +348,10 @@ coordinator/transaction/compaction remain M4/M5。
 - partition tests cover stable-only LEO/HW/LSO publication、acks 0/1/-1 invariant、same-partition serialization、
   speculative gap rejection、known-not-committed retry、uncertain/result-mismatch fencing、containing-entry/upper-bound/
   first-overflow Fetch and resign drain；
+- `KafkaBoundedAppendExecutorTest` proves owned remaining-byte snapshot、global byte lease、bounded queue rejection before
+  task/I/O、release-once on every terminal path、close admission and the rule that response-future cancellation cannot cancel
+  admitted append work；`KafkaAppendFailureClassifierTest` proves only explicit known-not-committed remains writable，while
+  authority/offset/unknown/uncertain/known-committed failures fence and checksum/format/invariant failures go offline；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、
