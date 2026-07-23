@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1 implementation slices complete；F9-M2 slices 1–5 complete，checkpoint/recovery in progress；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1 and F9-M2 implementation slices complete；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -282,14 +282,20 @@ checkpoint-before-trim proof。No Kafka fork coding starts until accepted。
 
 ### 6.1 Current implementation evidence（2026-07-23）
 
-- slices 1–5 are implemented：module/domain skeleton、canonical keys、25-field root + registry explicit V1 codecs、
-  fake/real Oxia stores、authority-bound head V2，and deterministic binding create/delete/all-shard scan；
+- slices 1–8 are implemented：module/domain skeleton、canonical keys、25-field root + registry explicit V1 codecs、
+  fake/real Oxia stores、authority-bound head V2、deterministic binding lifecycle/all-shard scan、NKC1 protected
+  publication/fallback and fresh-state exact committed replay；
 - frozen Phase 1 V1 codec goldens remain unchanged；binding/registry envelope SHA-256 values are
   `c196685df742d8ff9528bfa5eb4fa7e3c7a9ec8b7077818a19d100a4050ba578` and
   `8919c79ce1e19e4128ef905b78d18e45ec49d1df4a2f2a582e2e183f249a3b55`；
 - focused metadata/Oxia/adapter tests cover key round trips、unknown wire values、single-key CAS races、stream-create
-  response loss、idempotent delete、same-name/new-topic isolation and one-entry pagination across all 64 registry shards；
-- slices 6–8 remain in progress，so `phase9M2Check` / `phase9M2FinalCheck` are not yet claimed。
+  response loss、idempotent delete、same-name/new-topic isolation、all 64 registry shards、checkpoint PUT reconciliation、
+  physical protection/pins、newest-to-older fallback、trim fail-closed and pre/post-publication head-fenced synthetic batch replay；
+- frozen NKC1 full-object SHA-256 is
+  `c6d8848d7e946917e649b0fb0679f390ce76c8660a88bf447c797581285ce91c`；
+- `phase9M2Check --rerun-tasks` and the three direct real-service/integration tasks pass on current source；
+  `phase9M2FinalCheck --rerun-tasks` is blocked by the inherited Pulsar checkout HEAD mismatch
+  (`required 2f9c1eb...`，`local 5ffc2caa...`) rather than an F9-M2 test failure。
 
 ## 7. F9-M3 — Native Produce/Fetch
 

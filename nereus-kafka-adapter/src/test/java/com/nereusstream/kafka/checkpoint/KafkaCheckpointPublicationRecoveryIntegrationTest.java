@@ -17,9 +17,14 @@ import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.kafka.metadata.KafkaBindingRequest;
 import com.nereusstream.kafka.metadata.KafkaPartitionLifecycleCoordinator;
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
+import com.nereusstream.kafka.partition.KafkaPartitionState;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryCoordinator;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryResult;
+import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryCoordinator;
+import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
+import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
+import com.nereusstream.kafka.recovery.KafkaReplayBatch;
 import com.nereusstream.kafka.testing.TestStreamStorage;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
@@ -51,6 +56,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -153,6 +159,148 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
         }
     }
 
+    @Test
+    void hydratesFreshSyntheticKafkaStateAndReplaysExactBatchesToFrozenEnd() throws Exception {
+        try (Fixture fixture = fixture()) {
+            KafkaCheckpointSourceState checkpointSource = source(fixture.identity, 0, 2, 12, 'a');
+            fixture.publish(fixture.activeBinding(), checkpointSource);
+            KafkaCheckpointSourceState frozen = source(fixture.identity, 0, 5, 13, 'c');
+            fixture.validator.current.set(frozen);
+            AtomicReference<SyntheticKafkaState> published = new AtomicReference<>();
+            KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
+                    new KafkaPartitionRecoveryCoordinator<>(
+                            fixture.recovery(CLOCK),
+                            (start, end, timeout) -> CompletableFuture.completedFuture(List.of(
+                                    batch(2, 3, 2, 2),
+                                    batch(4, 4, 4, 1))),
+                            new SyntheticStateCodec(),
+                            recovered -> {
+                                published.set(recovered.state());
+                                return CompletableFuture.completedFuture(null);
+                            },
+                            CLOCK);
+            KafkaCheckpointRecoveryRequest checkpointRequest = new KafkaCheckpointRecoveryRequest(
+                    fixture.identity, fixture.currentBinding(), frozen, fixture.validator,
+                    Duration.ofSeconds(5));
+
+            var recovered = coordinator.recover(new KafkaPartitionRecoveryRequest(
+                    checkpointRequest, Duration.ofSeconds(5))).join();
+
+            assertThat(coordinator.state()).isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
+            assertThat(recovered.replayStartOffset()).isEqualTo(2);
+            assertThat(recovered.replayEndOffset()).isEqualTo(5);
+            assertThat(recovered.replayedBatchCount()).isEqualTo(2);
+            assertThat(recovered.checkpointObjectId()).isPresent();
+            assertThat(recovered.state()).isSameAs(published.get());
+            assertThat(recovered.state().hydrated).isTrue();
+            assertThat(recovered.state().nextOffset).isEqualTo(5);
+            assertThat(recovered.state().producerSequence).isEqualTo(5);
+        }
+    }
+
+    @Test
+    void fencesPublicationWhenTheFrozenHeadChangesDuringReplay() throws Exception {
+        try (Fixture fixture = fixture()) {
+            KafkaCheckpointSourceState checkpointSource = source(fixture.identity, 0, 2, 12, 'a');
+            fixture.publish(fixture.activeBinding(), checkpointSource);
+            KafkaCheckpointSourceState frozen = source(fixture.identity, 0, 5, 13, 'c');
+            fixture.validator.current.set(frozen);
+            AtomicBoolean published = new AtomicBoolean();
+            KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
+                    new KafkaPartitionRecoveryCoordinator<>(
+                            fixture.recovery(CLOCK),
+                            (start, end, timeout) -> {
+                                fixture.validator.current.set(source(fixture.identity, 0, 6, 14, 'd'));
+                                return CompletableFuture.completedFuture(List.of(
+                                        batch(2, 3, 2, 2),
+                                        batch(4, 4, 4, 1)));
+                            },
+                            new SyntheticStateCodec(),
+                            recovered -> {
+                                published.set(true);
+                                return CompletableFuture.completedFuture(null);
+                            },
+                            CLOCK);
+            KafkaCheckpointRecoveryRequest checkpointRequest = new KafkaCheckpointRecoveryRequest(
+                    fixture.identity, fixture.currentBinding(), frozen, fixture.validator,
+                    Duration.ofSeconds(5));
+
+            assertThatThrownBy(() -> coordinator.recover(new KafkaPartitionRecoveryRequest(
+                            checkpointRequest, Duration.ofSeconds(5))).join())
+                    .satisfies(failure -> assertThat(unwrap(failure))
+                            .isInstanceOfSatisfying(NereusException.class, nereus ->
+                                    assertThat(nereus.code()).isEqualTo(ErrorCode.FENCED_APPEND)));
+            assertThat(coordinator.state())
+                    .isEqualTo(KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED);
+            assertThat(published).isFalse();
+        }
+    }
+
+    @Test
+    void fullReplayStartsAtZeroOnlyForAnUntrimmedPartition() throws Exception {
+        try (Fixture fixture = fixture()) {
+            VersionedKafkaPartitionBinding binding = fixture.activeBinding();
+            KafkaCheckpointSourceState frozen = source(fixture.identity, 0, 3, 12, 'a');
+            fixture.validator.current.set(frozen);
+            KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
+                    new KafkaPartitionRecoveryCoordinator<>(
+                            fixture.recovery(CLOCK),
+                            (start, end, timeout) -> CompletableFuture.completedFuture(List.of(
+                                    batch(0, 1, 0, 2),
+                                    batch(2, 2, 2, 1))),
+                            new SyntheticStateCodec(),
+                            recovered -> CompletableFuture.completedFuture(null),
+                            CLOCK);
+            KafkaCheckpointRecoveryRequest checkpointRequest = new KafkaCheckpointRecoveryRequest(
+                    fixture.identity, binding, frozen, fixture.validator, Duration.ofSeconds(5));
+
+            var recovered = coordinator.recover(new KafkaPartitionRecoveryRequest(
+                    checkpointRequest, Duration.ofSeconds(5))).join();
+
+            assertThat(recovered.checkpointObjectId()).isEmpty();
+            assertThat(recovered.replayStartOffset()).isZero();
+            assertThat(recovered.state().hydrated).isFalse();
+            assertThat(recovered.state().nextOffset).isEqualTo(3);
+            assertThat(coordinator.state()).isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
+        }
+    }
+
+    @Test
+    void installedRecoveryNeverBecomesWritableWhenAuthorityChangesDuringPublication() throws Exception {
+        try (Fixture fixture = fixture()) {
+            KafkaCheckpointSourceState checkpointSource = source(fixture.identity, 0, 2, 12, 'a');
+            fixture.publish(fixture.activeBinding(), checkpointSource);
+            KafkaCheckpointSourceState frozen = source(fixture.identity, 0, 5, 13, 'c');
+            fixture.validator.current.set(frozen);
+            AtomicBoolean installed = new AtomicBoolean();
+            KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
+                    new KafkaPartitionRecoveryCoordinator<>(
+                            fixture.recovery(CLOCK),
+                            (start, end, timeout) -> CompletableFuture.completedFuture(List.of(
+                                    batch(2, 3, 2, 2),
+                                    batch(4, 4, 4, 1))),
+                            new SyntheticStateCodec(),
+                            recovered -> {
+                                installed.set(true);
+                                fixture.validator.current.set(source(fixture.identity, 0, 6, 14, 'd'));
+                                return CompletableFuture.completedFuture(null);
+                            },
+                            CLOCK);
+            KafkaCheckpointRecoveryRequest checkpointRequest = new KafkaCheckpointRecoveryRequest(
+                    fixture.identity, fixture.currentBinding(), frozen, fixture.validator,
+                    Duration.ofSeconds(5));
+
+            assertThatThrownBy(() -> coordinator.recover(new KafkaPartitionRecoveryRequest(
+                            checkpointRequest, Duration.ofSeconds(5))).join())
+                    .satisfies(failure -> assertThat(unwrap(failure))
+                            .isInstanceOfSatisfying(NereusException.class, nereus ->
+                                    assertThat(nereus.code()).isEqualTo(ErrorCode.FENCED_APPEND)));
+            assertThat(installed).isTrue();
+            assertThat(coordinator.state())
+                    .isEqualTo(KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED);
+        }
+    }
+
     private Fixture fixture() throws Exception {
         return new Fixture(temporaryDirectory);
     }
@@ -177,6 +325,14 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
 
     private static Checksum sha256(char value) {
         return new Checksum(ChecksumType.SHA256, Character.toString(value).repeat(64));
+    }
+
+    private static KafkaReplayBatch batch(
+            long baseOffset, long lastOffset, int firstSequence, int recordCount) {
+        return new KafkaReplayBatch(
+                baseOffset,
+                lastOffset,
+                ByteBuffer.allocate(8).putInt(firstSequence).putInt(recordCount).array());
     }
 
     private static KafkaPartitionIdentity identity() {
@@ -236,6 +392,60 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
                 KafkaCheckpointHeader captured, KafkaCheckpointSourceState current) {
             return CompletableFuture.completedFuture(
                     captured.sourceCommitVersion() <= current.commitVersion());
+        }
+    }
+
+    private static final class SyntheticKafkaState {
+        private boolean hydrated;
+        private long nextOffset;
+        private int producerSequence;
+    }
+
+    private static final class SyntheticStateCodec
+            implements KafkaRecoveryStateCodec<SyntheticKafkaState> {
+        @Override
+        public SyntheticKafkaState freshState() {
+            return new SyntheticKafkaState();
+        }
+
+        @Override
+        public void hydrateCheckpoint(
+                SyntheticKafkaState state,
+                List<KafkaCheckpointSection> sections,
+                long checkpointOffset) {
+            assertThat(state.hydrated).isFalse();
+            assertThat(sections).hasSize(KafkaCheckpointSectionType.values().length);
+            KafkaCheckpointSection producer = sections.stream()
+                    .filter(section -> section.sectionType()
+                            == KafkaCheckpointSectionType.PRODUCER_STATE.wireId())
+                    .findFirst()
+                    .orElseThrow();
+            ByteBuffer payload = ByteBuffer.wrap(producer.payload());
+            assertThat(payload.getInt()).isEqualTo(KafkaCheckpointSectionType.PRODUCER_STATE.wireId());
+            state.nextOffset = payload.getLong();
+            assertThat(state.nextOffset).isEqualTo(checkpointOffset);
+            state.producerSequence = Math.toIntExact(checkpointOffset);
+            state.hydrated = true;
+        }
+
+        @Override
+        public void replayBatch(SyntheticKafkaState state, KafkaReplayBatch batch) {
+            assertThat(batch.baseOffset()).isEqualTo(state.nextOffset);
+            ByteBuffer payload = ByteBuffer.wrap(batch.encodedBatch());
+            int firstSequence = payload.getInt();
+            int recordCount = payload.getInt();
+            assertThat(firstSequence).isEqualTo(state.producerSequence);
+            assertThat(recordCount).isEqualTo(batch.lastOffset() - batch.baseOffset() + 1);
+            assertThat(payload.hasRemaining()).isFalse();
+            state.nextOffset = batch.lastOffset() + 1;
+            state.producerSequence += recordCount;
+        }
+
+        @Override
+        public void validateRecoveredState(
+                SyntheticKafkaState state, KafkaCheckpointSourceState frozenSource) {
+            assertThat(state.nextOffset).isEqualTo(frozenSource.endOffset());
+            assertThat(state.producerSequence).isEqualTo(frozenSource.endOffset());
         }
     }
 

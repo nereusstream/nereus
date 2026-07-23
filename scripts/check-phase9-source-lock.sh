@@ -29,11 +29,11 @@ while read -r expected path; do
 done <<'LOCKS'
 c6bac3e4efcb0e597c3441071a638ebf8489934a nereus-api/src/main/java/com/nereusstream/api/AppendBatch.java
 ffa36d92a0e5bbe225358cde8ee9cdd1c829e6ac nereus-api/src/main/java/com/nereusstream/api/AppendEntry.java
-d182633ce4c341343aa31009bd82ae30c1c887e9 nereus-api/src/main/java/com/nereusstream/api/StreamStorage.java
+c49f798a3cd54471c63480a8945fef40b3a58ed0 nereus-api/src/main/java/com/nereusstream/api/StreamStorage.java
 799caf45554ffaab72927bf18e869cce9ba02d2a nereus-api/src/main/java/com/nereusstream/api/AppendPrecondition.java
 e43bd0bb99f1762cc4893e20da18450c9e94b76f nereus-api/src/main/java/com/nereusstream/api/ReadRequest.java
 3b2605616150ffb9efada7287df90fa557b92a34 nereus-api/src/main/java/com/nereusstream/api/SemanticReadResult.java
-7faae39346d90c1310ae9a0515a379a2e13d33b8 nereus-core/src/main/java/com/nereusstream/core/DefaultStreamStorage.java
+697be84f6ddf19926920cc969244f5f0ac0aa21e nereus-core/src/main/java/com/nereusstream/core/DefaultStreamStorage.java
 68c0457cddf7db051da12f676c8c0dc599458be7 nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java
 336d08fa1078248b31925f5a6391932f177999ec nereus-core/src/main/java/com/nereusstream/core/append/AppendResultValidator.java
 293b5bacd47c2908e226cadec32a6f67b01bdfb5 nereus-core/src/main/java/com/nereusstream/core/read/ReadCoordinator.java

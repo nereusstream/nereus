@@ -1,6 +1,6 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
-> 状态：F9-M2 implementation in progress；authority/head-V2 and deterministic binding slices implemented，checkpoint/recovery pending
+> 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -655,6 +655,20 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
 - `KafkaPartitionLifecycleCoordinator` implements deterministic CREATING → ACTIVE and ACTIVE → DELETING → DELETED，
   exact stream profile/attribute verification，post-ACTIVE hint publication，response-loss convergence and same-name/new-
   topic-ID isolation；
+- `KafkaCheckpointWriter` encodes to bounded private staging and runs the protection guard before immutable PUT；only
+  PUT/verify failures enter exact-key response-loss reconciliation，so a failed guard can never be bypassed by an old object；
+- NKC1 uses seven closed required sections、whole-object CRC32C/SHA-256 and deterministic object identity；the frozen
+  full-object SHA-256 is `c6d8848d7e946917e649b0fb0679f390ce76c8660a88bf447c797581285ce91c`；
+- `KafkaCheckpointPublicationCoordinator` performs pending protection → immutable PUT/full verify → source revalidation →
+  binding CAS → permanent root protection → pending release；idempotent retries converge without an unprotected PUT window；
+- `KafkaCheckpointRecoveryCoordinator` reads referenced keys newest-first under durable reader pins，falls back only for
+  object-local missing/corrupt/invariant failures，and fails closed when trim is non-zero without a usable checkpoint；
+- `KafkaPartitionRecoveryCoordinator` hydrates only a fresh state instance，requires exact contiguous committed batch
+  coverage to the frozen stable end，revalidates session/head before and after non-writable state installation，and fences
+  instead of enabling writes if the head changes during replay/publication；
 - `:nereus-metadata-oxia:f9MetadataTest`、`:nereus-metadata-oxia:f9OxiaIntegrationTest`、
-  `:nereus-kafka-adapter:f9M2Test` and `:nereus-kafka-adapter:f9M2IntegrationTest` pass for the implemented slices；
-- NKC1 physical protection/publication and partition recovery remain M2 work and are not claimed complete here。
+  `:nereus-object-store:kafkaCheckpointTest`、`:nereus-object-store:kafkaCheckpointS3IntegrationTest`、
+  `:nereus-kafka-adapter:f9M2Test` and `:nereus-kafka-adapter:f9M2IntegrationTest` pass on current source；
+- `phase9M2Check --rerun-tasks` passes on current source；`phase9M2FinalCheck --rerun-tasks` reaches the inherited
+  `checkPulsarSourceLock` and stops because the local Pulsar checkout is `5ffc2caa0e08dac95bc8c2ea76ed3d32382dfe3e`
+  while the repository requires `2f9c1eb93be96e2036fbdc8c5e39545f21fa6200`。

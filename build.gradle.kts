@@ -2801,3 +2801,22 @@ tasks.register("phase9M1FinalCheck") {
     dependsOn(":nereus-bookkeeper:test")
     dependsOn(":nereus-object-store:rangedFormatS3IntegrationTest")
 }
+
+tasks.register("phase9M2Check") {
+    group = "verification"
+    description = "Run deterministic F9-M2 authority, binding, NKC1 publication, and recovery gates."
+    dependsOn("phase9M1Check")
+    dependsOn(":nereus-metadata-oxia:f9MetadataTest")
+    dependsOn(":nereus-object-store:kafkaCheckpointTest")
+    dependsOn(":nereus-kafka-adapter:f9M2Test")
+}
+
+tasks.register("phase9M2FinalCheck") {
+    group = "verification"
+    description = "Run F9-M2 plus inherited and real Oxia/Object-store checkpoint acceptance gates."
+    dependsOn("phase9M2Check")
+    dependsOn("phase9M1FinalCheck")
+    dependsOn(":nereus-metadata-oxia:f9OxiaIntegrationTest")
+    dependsOn(":nereus-object-store:kafkaCheckpointS3IntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9M2IntegrationTest")
+}
