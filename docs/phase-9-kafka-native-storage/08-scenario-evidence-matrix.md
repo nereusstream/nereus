@@ -46,8 +46,10 @@ evidence，`KafkaAppendFailureClassifierTest` 固化 fail-closed outcome/action 
 Kafka fork/real-service evidence。`KafkaFetchOperationTest` 还为 KF-FET-004/005/016 提供 actual-byte minBytes、
 event coalescing、deadline、one-in-flight-read、listener/read cleanup 和 callback-once 的 deterministic partial
 evidence；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local higher-term takeover、late-open fencing 和
-stale-resign isolation 的 deterministic partial evidence，但不替代 durable authority/real process cut。各 row 状态仍不
-标记为完整通过。
+stale-resign isolation 的 deterministic partial evidence，但不替代 durable authority/real process cut；
+`KafkaStorageProfilePolicyTest` 为 KF-APP-016 提供 exactly-five canonical profile、profile-default durability 和
+`PROFILE_DEFAULT` completion 的 deterministic policy evidence，但不替代真实 provider/KRaft profile matrix。各 row
+状态仍不标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。

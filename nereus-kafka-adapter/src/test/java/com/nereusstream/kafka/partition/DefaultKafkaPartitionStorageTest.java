@@ -10,10 +10,10 @@ import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import com.nereusstream.kafka.codec.KafkaAppendBatchEncoder;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
@@ -44,7 +44,7 @@ class DefaultKafkaPartitionStorageTest {
         assertThat(fixture.streams.pendingPrecondition().expectedStartOffset()).hasValue(0);
         assertThat(fixture.streams.pendingOptions().appendSession()).contains(fixture.session.session());
         assertThat(fixture.streams.pendingOptions().completionPolicy())
-                .isEqualTo(AppendCompletionPolicy.STABLE_HEAD);
+                .isEqualTo(AppendCompletionPolicy.PROFILE_DEFAULT);
         assertThat(fixture.streams.pendingBatch().entries().get(0).payload()).isEqualTo(records);
 
         fixture.streams.completeNextSuccess();
@@ -303,8 +303,7 @@ class DefaultKafkaPartitionStorageTest {
                 session.session().streamId(),
                 session,
                 source,
-                DurabilityLevel.WAL_DURABLE,
-                AppendCompletionPolicy.STABLE_HEAD,
+                KafkaStorageProfilePolicy.forProfile(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT),
                 new KafkaAppendBatchEncoder(codec),
                 new KafkaFetchAssembler(codec));
     }

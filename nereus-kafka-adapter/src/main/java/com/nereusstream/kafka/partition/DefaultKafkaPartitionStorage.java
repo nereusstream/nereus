@@ -15,13 +15,11 @@
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.AcquiredAppendSession;
-import com.nereusstream.api.AppendCompletionPolicy;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendPrecondition;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
-import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
@@ -63,8 +61,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private final StreamId streamId;
     private final AppendSession appendSession;
     private final int leaderEpoch;
-    private final DurabilityLevel durabilityLevel;
-    private final AppendCompletionPolicy completionPolicy;
+    private final KafkaStorageProfilePolicy profilePolicy;
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
     private final ArrayDeque<AppendOperation> appendQueue = new ArrayDeque<>();
@@ -84,8 +81,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             StreamId streamId,
             AcquiredAppendSession acquiredSession,
             KafkaCheckpointSourceState recoveredSource,
-            DurabilityLevel durabilityLevel,
-            AppendCompletionPolicy completionPolicy,
+            KafkaStorageProfilePolicy profilePolicy,
             KafkaAppendBatchEncoder appendEncoder,
             KafkaFetchAssembler fetchAssembler) {
         this.identity = Objects.requireNonNull(identity, "identity");
@@ -93,8 +89,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         this.streamId = Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(acquiredSession, "acquiredSession");
         Objects.requireNonNull(recoveredSource, "recoveredSource");
-        this.durabilityLevel = Objects.requireNonNull(durabilityLevel, "durabilityLevel");
-        this.completionPolicy = Objects.requireNonNull(completionPolicy, "completionPolicy");
+        this.profilePolicy = Objects.requireNonNull(profilePolicy, "profilePolicy");
         this.appendEncoder = Objects.requireNonNull(appendEncoder, "appendEncoder");
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
         this.appendSession = acquiredSession.session();
@@ -275,8 +270,8 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         if (operation == null) return;
         AppendOptions options = new AppendOptions(
                 Optional.of(appendSession),
-                durabilityLevel,
-                completionPolicy,
+                profilePolicy.durabilityLevel(),
+                profilePolicy.completionPolicy(),
                 operation.context.timeout(),
                 false,
                 operation.context.tags());

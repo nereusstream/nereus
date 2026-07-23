@@ -359,6 +359,10 @@ coordinator/transaction/compaction remain M4/M5。
 - `KafkaPartitionLeaderManagerTest` proves exact-open deduplication、higher leader-term and same-owner broker-epoch takeover、
   conflicting/stale authority rejection、late-old-open fencing、stale-resign isolation、shutdown fencing and strict
   opener-result identity/epoch/state validation；durable authority acquire/recovery remains the opener responsibility；
+- `KafkaStorageProfilePolicyTest` freezes exactly five activated canonical profiles and proves every adapter append uses the
+  profile default durability plus `PROFILE_DEFAULT` completion；legacy alias、non-default durability and weakened completion
+  are rejected before I/O。This is deterministic partial evidence for KF-APP-016 only；the real provider/KRaft profile
+  matrix remains open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、

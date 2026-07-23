@@ -321,6 +321,9 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
   `KNOWN_NOT_COMMITTED` 能保持 writable，authority/offset conflict、缺失 outcome、`MAY_HAVE_COMMITTED` 和
   `KNOWN_COMMITTED` 一律进入 `WRITE_FENCE_RECOVERY_REQUIRED`，checksum/format/invariant failure 进入
   `CORRUPT_OFFLINE`。Kafka exception class 映射仍由 fork 持有。
+- `KafkaStorageProfilePolicy`：只允许五个已激活 canonical profile；durability 必须等于 profile default，completion
+  必须是 `PROFILE_DEFAULT`。`DefaultKafkaPartitionStorage` 只从该 policy 构造 `AppendOptions`，不会根据 request
+  `acks` 改写底层 success predicate；legacy `OBJECT_WAL` alias 和显式 weakened policy 在 I/O 前拒绝。
 
 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 production/runtime classpath。此切片尚未满足 M3 entry 中的组织 Kafka fork source lock，
@@ -399,6 +402,13 @@ Produce response eligibility
 
 F9 不提供比 selected Nereus profile completion policy 更弱的 Kafka success。profile 若要求 sync Object evidence，
 Produce 也等待；profile immutable，不能按 request acks 改写。
+
+当前 Nereus-side `KafkaStorageProfilePolicy` 将 activated set 显式冻结为
+`OBJECT_WAL_SYNC_OBJECT`、`OBJECT_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_ONLY`、
+`BOOKKEEPER_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_SYNC_OBJECT`。每档只允许
+`storageProfile.defaultDurabilityLevel() + PROFILE_DEFAULT`；最终 success predicate 仍由 core profile resolver
+权威解析。`KafkaStorageProfilePolicyTest` 是该 mapping 的 deterministic 证据，不替代 KF-APP-016 要求的五档真实
+provider/KRaft Produce matrix。
 
 ## 7. LEO, HW and LSO
 

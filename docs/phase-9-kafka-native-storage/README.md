@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + leader arbitration slices in progress；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka broker runtime
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + leader arbitration + storage-profile policy slices in progress；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka broker runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -15,7 +15,9 @@ deterministic create/delete、64-shard hint scanner、NKC1、受保护 publicati
 partition append、bounded containing-entry Fetch assembly、owned Produce byte budget/bounded executor 和 fail-closed append
 outcome classifier，以及 actual-byte minBytes/maxWait/event-coalescing 的 multi-partition async Fetch operation。
 process-local leader manager 也已按 KRaft leader/broker term 拒绝 stale/conflicting/late open。Kafka fork/broker runtime
-wiring、exact timestamp ListOffsets 与真实 KRaft Produce/Fetch 尚未实现。若以后
+wiring、exact timestamp ListOffsets、五档 real-service profile matrix 与真实 KRaft Produce/Fetch 尚未实现。Kafka
+storage profile policy 已冻结五个 canonical profile，并禁止 request acks 弱化 profile default durability/completion。
+若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 
 ## 1. 设计文档
