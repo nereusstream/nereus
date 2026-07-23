@@ -217,6 +217,9 @@ public interface KafkaPartitionStorageManager extends AutoCloseable {
 
 ### 4.2 Open partition storage
 
+当前 M3 adapter boundary 不把 Kafka artifact 泄漏到 production API；fork 对 stock `MemoryRecords.buffer` 做
+read-only duplicate 后传入 `ByteBuffer`。Kafka fork 仍在编译期负责证明该 buffer 来自 stock LogValidator 输出。
+
 ```java
 public interface KafkaPartitionStorage extends AutoCloseable {
     KafkaPartitionIdentity identity();
@@ -224,21 +227,19 @@ public interface KafkaPartitionStorage extends AutoCloseable {
     KafkaPartitionState state();
     KafkaStableSnapshot stableSnapshot();
 
-    CompletionStage<KafkaAppendResult> append(
-            MemoryRecords validatedRecords,
+    CompletableFuture<KafkaStableAppendResult> append(
+            ByteBuffer validatedRecords,
             KafkaAppendContext context);
 
-    CompletionStage<KafkaStorageReadResult> read(KafkaStorageReadRequest request);
-    CompletionStage<KafkaTrimResult> trim(long beforeOffset, KafkaTrimReason reason);
-    CompletionStage<KafkaRecoveryResult> recover();
-    CompletionStage<Void> checkpoint(CheckpointReason reason);
-    CompletionStage<Void> resign();
+    CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request);
+    CompletableFuture<Void> resign();
     void close();
 }
 ```
 
-`KafkaAppendContext` 至少包含 expected start/end、leader epoch、request deadline、origin、required acks、active
-virtual segment id。required acks 不改变 Nereus stable boundary，只用于 metrics/audit。
+`KafkaAppendContext` 当前包含 expected start、leader epoch、request deadline、origin tags 和 required acks；required
+acks 不改变 Nereus stable boundary，只用于返回 facts/metrics。M5 增加 trim，M2 recovery/checkpoint coordinator 由
+storage manager 在 open/periodic path 组合，不把可重复 `recover()` 暴露到已经 writable 的 instance。
 
 ## 5. Exact batch encode/decode
 
@@ -307,6 +308,11 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 - `KafkaFetchAssembler`：只接受 range 与 raw batch header 完全一致的 Kafka payload；COMMITTED 要求 dense，
   TOPIC_COMPACTED 允许 non-overlapping sparse；按 hard byte limit 分配 exact owned output，同时返回 actual first base、
   logical cursor、coverage、first-overflow、virtual position 和 aborted-transaction facts。
+- `DefaultKafkaPartitionStorage`：构造时要求 acquired session 与 recovery frozen authority/session 完全一致；每
+  partition append lane 以 `AppendPrecondition.expectedStartOffset` 串行提交；exact stable result 后才原子发布
+  `logStart <= LSO == HW == stable LEO`；`KNOWN_NOT_COMMITTED` 清空未执行 successor 并回退 admission 到 stable end，
+  uncertain/known-committed/result mismatch 则 write-fence；read 使用 COMMITTED + CONTAINING_ENTRY + explicit
+  first-overflow semantics，并按 captured stable upper bound 裁剪完整 batch；resign 停止 admission 后等待 lane drain。
 
 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 production/runtime classpath。此切片尚未满足 M3 entry 中的组织 Kafka fork source lock，

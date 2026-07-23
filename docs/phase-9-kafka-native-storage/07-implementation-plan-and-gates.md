@@ -340,11 +340,14 @@ coordinator/transaction/compaction remain M4/M5。
 
 ### 7.1 Current partial implementation evidence（2026-07-23）
 
-- implemented the Nereus-side `KafkaRecordBatchCodec`、`KafkaAppendBatchEncoder`、exact append-result validator and
-  `KafkaFetchAssembler` with owned byte arrays/read-only buffers；
+- implemented the Nereus-side `KafkaRecordBatchCodec`、`KafkaAppendBatchEncoder`、exact append-result validator、
+  `KafkaFetchAssembler` and authority-bound `DefaultKafkaPartitionStorage` with owned byte arrays/read-only buffers；
 - `:nereus-kafka-adapter:f9M3CodecTest --rerun-tasks` passes against test-only Kafka 3.9.0-generated batches，covering
   uncompressed/GZIP、multi-batch、producer facts、CRC/length/magic/compression corruption、offset gaps、containing-entry
   Fetch and sparse compacted coverage；
+- partition tests cover stable-only LEO/HW/LSO publication、acks 0/1/-1 invariant、same-partition serialization、
+  speculative gap rejection、known-not-committed retry、uncertain/result-mismatch fencing、containing-entry/upper-bound/
+  first-overflow Fetch and resign drain；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、

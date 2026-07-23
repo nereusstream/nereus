@@ -2,8 +2,8 @@
 
 Nereus is a protocol-neutral shared-storage streaming engine currently delivered through its Pulsar-native
 integration. Native KRaft Kafka Future 9 has completed the F9-M1 foundation and F9-M2 metadata/checkpoint
-implementation；the Nereus-side F9-M3 byte-exact RecordBatch/Fetch codec slice is in progress，but no native Kafka
-broker capability is available yet. Nereus is built around an Oxia
+implementation；the Nereus-side F9-M3 byte-exact RecordBatch and serialized partition append/read slice is in progress，
+but no native Kafka broker capability is available yet. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a
 single logical `streamId + offset` coordinate.
@@ -49,7 +49,7 @@ github.com/nereusstream/kafka   -> planned fork of apache/kafka for F9 native in
 
 The main Nereus repository holds product-owned modules and authoritative design documents.
 Forks hold changes that must land inside upstream Pulsar, KoP, or Kafka trees. The `nereus-kafka-adapter` now owns the
-F9-M2 binding/checkpoint/recovery boundary and the first M3 raw Kafka batch encode/Fetch assembly slice；its code-level
+F9-M2 binding/checkpoint/recovery boundary and the first M3 raw Kafka batch plus stable partition append/read slice；its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). Kafka fork wiring and end-to-end
 native Produce/Fetch remain future work，so this is not a current broker-runtime claim.

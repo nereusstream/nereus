@@ -37,11 +37,12 @@ tasks.register<Test>("f9M2IntegrationTest") {
 
 tasks.register<Test>("f9M3CodecTest") {
     group = "verification"
-    description = "Run F9-M3 byte-exact Kafka record-batch encode and Fetch assembly contracts."
+    description = "Run F9-M3 byte-exact codec and serialized partition append/read contracts."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
     filter {
         includeTestsMatching("com.nereusstream.kafka.codec.*")
+        includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageTest")
     }
 }

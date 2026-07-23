@@ -1,0 +1,321 @@
+/* Licensed under the Apache License, Version 2.0 */
+package com.nereusstream.kafka.partition;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.nereusstream.api.AcquiredAppendSession;
+import com.nereusstream.api.AppendCompletionPolicy;
+import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendSession;
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.DurabilityLevel;
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
+import com.nereusstream.api.StreamId;
+import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
+import com.nereusstream.kafka.codec.KafkaAppendBatchEncoder;
+import com.nereusstream.kafka.codec.KafkaFetchAssembler;
+import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import org.apache.kafka.common.record.CompressionType;
+import org.junit.jupiter.api.Test;
+
+class DefaultKafkaPartitionStorageTest {
+    @Test
+    void stableAppendUsesAuthoritySessionAndAdvancesLeoHwAndLsoOnlyAfterSuccess() {
+        Fixture fixture = fixture(0, 0);
+        byte[] records = KafkaPartitionStorageTestSupport.batch(0, CompressionType.GZIP, 1_000, "a", "b");
+
+        CompletableFuture<KafkaStableAppendResult> pending = fixture.storage.append(
+                ByteBuffer.wrap(records), context(0, (short) 1));
+
+        assertThat(fixture.streams.appendCalls()).isEqualTo(1);
+        assertThat(pending).isNotDone();
+        assertThat(fixture.storage.stableSnapshot().stableEndOffset()).isZero();
+        assertThat(fixture.streams.pendingPrecondition().expectedStartOffset()).hasValue(0);
+        assertThat(fixture.streams.pendingOptions().appendSession()).contains(fixture.session.session());
+        assertThat(fixture.streams.pendingOptions().completionPolicy())
+                .isEqualTo(AppendCompletionPolicy.STABLE_HEAD);
+        assertThat(fixture.streams.pendingBatch().entries().get(0).payload()).isEqualTo(records);
+
+        fixture.streams.completeNextSuccess();
+        KafkaStableAppendResult result = pending.join();
+
+        assertThat(result.appendResult().range().startOffset()).isZero();
+        assertThat(result.appendResult().range().endOffset()).isEqualTo(2);
+        assertThat(result.stableSnapshot())
+                .isEqualTo(new KafkaStableSnapshot(0, 2, 2, 2, 2));
+        assertThat(fixture.storage.stableSnapshot()).isEqualTo(result.stableSnapshot());
+        assertThat(result.requiredAcks()).isEqualTo((short) 1);
+    }
+
+    @Test
+    void serializesSamePartitionAppendsAndRejectsSpeculativeOffsetGaps() {
+        Fixture fixture = fixture(0, 0);
+        CompletableFuture<KafkaStableAppendResult> first = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 1_000, "a")),
+                context(0, (short) 0));
+        CompletableFuture<KafkaStableAppendResult> second = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        1, CompressionType.NONE, 2_000, "b")),
+                context(1, (short) -1));
+
+        assertThat(fixture.streams.appendCalls()).isEqualTo(1);
+        assertThat(first).isNotDone();
+        assertThat(second).isNotDone();
+        assertThatThrownBy(() -> fixture.storage.append(
+                        ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                                3, CompressionType.NONE, 3_000, "gap")),
+                        context(3, (short) 1)).join())
+                .hasRootCauseInstanceOf(NereusException.class)
+                .rootCause()
+                .extracting(value -> ((NereusException) value).code())
+                .isEqualTo(ErrorCode.OFFSET_CONFLICT);
+
+        fixture.streams.completeNextSuccess();
+        assertThat(first.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+        assertThat(fixture.streams.appendCalls()).isEqualTo(2);
+        fixture.streams.completeNextSuccess();
+
+        assertThat(second.join().stableSnapshot().stableEndOffset()).isEqualTo(2);
+        assertThat(fixture.storage.stableSnapshot().highWatermark()).isEqualTo(2);
+    }
+
+    @Test
+    void knownNotCommittedFailureDrainsSuccessorsAndAllowsRetryAtStableEnd() {
+        Fixture fixture = fixture(0, 0);
+        CompletableFuture<KafkaStableAppendResult> first = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 1_000, "a")),
+                context(0, (short) 1));
+        CompletableFuture<KafkaStableAppendResult> successor = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        1, CompressionType.NONE, 2_000, "b")),
+                context(1, (short) 1));
+
+        fixture.streams.failNext(new NereusException(
+                ErrorCode.TIMEOUT, true, "known safe timeout", AppendOutcome.KNOWN_NOT_COMMITTED));
+
+        assertFailureCode(first, ErrorCode.TIMEOUT);
+        assertFailureCode(successor, ErrorCode.OFFSET_CONFLICT);
+        assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
+        assertThat(fixture.storage.stableSnapshot().stableEndOffset()).isZero();
+        assertThat(fixture.streams.appendCalls()).isEqualTo(1);
+
+        CompletableFuture<KafkaStableAppendResult> retry = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 3_000, "retry")),
+                context(0, (short) 1));
+        fixture.streams.completeNextSuccess();
+        assertThat(retry.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+    }
+
+    @Test
+    void uncertainFailureFencesWritesButKeepsLastStableSnapshotReadable() {
+        Fixture fixture = fixture(0, 0);
+        CompletableFuture<KafkaStableAppendResult> append = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 1_000, "a")),
+                context(0, (short) 1));
+
+        fixture.streams.failNext(new NereusException(
+                ErrorCode.TIMEOUT, true, "uncertain", AppendOutcome.MAY_HAVE_COMMITTED));
+
+        assertFailureCode(append, ErrorCode.TIMEOUT);
+        assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED);
+        assertFailureCode(fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 2_000, "retry")),
+                context(0, (short) 1)), ErrorCode.FENCED_APPEND);
+        KafkaStorageReadResult empty = fixture.storage.read(readRequest(0, 1, 1_024, true)).join();
+        assertThat(empty.fetchAssembly().encodedRecords()).isEmpty();
+    }
+
+    @Test
+    void stableResponseMismatchFencesInsteadOfPublishingSpeculativeOffsets() {
+        Fixture fixture = fixture(0, 0);
+        CompletableFuture<KafkaStableAppendResult> append = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 1_000, "a")),
+                context(0, (short) 1));
+        fixture.streams.corruptNextResultStream();
+
+        fixture.streams.completeNextSuccess();
+
+        assertThatThrownBy(append::join)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("does not exactly match");
+        assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED);
+        assertThat(fixture.storage.stableSnapshot().stableEndOffset()).isZero();
+    }
+
+    @Test
+    void containingEntryReadHonorsStableUpperBoundAndFirstBatchOverflow() {
+        Fixture fixture = fixture(0, 0);
+        byte[] first = KafkaPartitionStorageTestSupport.batch(0, CompressionType.GZIP, 1_000, "a", "b");
+        byte[] second = KafkaPartitionStorageTestSupport.batch(2, CompressionType.NONE, 2_000, "c");
+        CompletableFuture<KafkaStableAppendResult> firstAppend = fixture.storage.append(
+                ByteBuffer.wrap(first), context(0, (short) 1));
+        fixture.streams.completeNextSuccess();
+        firstAppend.join();
+        CompletableFuture<KafkaStableAppendResult> secondAppend = fixture.storage.append(
+                ByteBuffer.wrap(second), context(2, (short) 1));
+        fixture.streams.completeNextSuccess();
+        secondAppend.join();
+
+        KafkaStorageReadResult containing = fixture.storage.read(readRequest(
+                1, 3, first.length + second.length, true)).join();
+        assertThat(containing.fetchAssembly().actualFirstBatchBaseOffset()).hasValue(0);
+        assertThat(containing.fetchAssembly().nextLogicalOffset()).isEqualTo(3);
+        assertThat(containing.fetchAssembly().encodedRecords())
+                .isEqualTo(KafkaPartitionStorageTestSupport.concat(first, second));
+
+        KafkaStorageReadResult bounded = fixture.storage.read(readRequest(
+                1, 2, first.length + second.length, true)).join();
+        assertThat(bounded.fetchAssembly().encodedRecords()).isEqualTo(first);
+        assertThat(bounded.fetchAssembly().nextLogicalOffset()).isEqualTo(2);
+
+        KafkaStorageReadResult overflow = fixture.storage.read(readRequest(
+                1, 3, first.length - 1, true)).join();
+        assertThat(overflow.fetchAssembly().encodedRecords()).isEqualTo(first);
+        assertThat(overflow.fetchAssembly().firstEntryOverflow()).isTrue();
+
+        KafkaStorageReadResult isolated = fixture.storage.read(readRequest(
+                0, 1, first.length + second.length, true)).join();
+        assertThat(isolated.fetchAssembly().encodedRecords()).isEmpty();
+        assertThat(isolated.fetchAssembly().nextLogicalOffset()).isZero();
+    }
+
+    @Test
+    void resignStopsAdmissionAndClosesOnlyAfterTheAppendLaneDrains() {
+        Fixture fixture = fixture(0, 0);
+        CompletableFuture<KafkaStableAppendResult> append = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 1_000, "a")),
+                context(0, (short) 1));
+
+        CompletableFuture<Void> resign = fixture.storage.resign();
+
+        assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.RESIGNING);
+        assertThat(resign).isNotDone();
+        assertFailureCode(fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        1, CompressionType.NONE, 2_000, "b")),
+                context(1, (short) 1)), ErrorCode.FENCED_APPEND);
+
+        fixture.streams.completeNextSuccess();
+        append.join();
+        resign.join();
+        assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.CLOSED);
+        assertThatThrownBy(() -> fixture.storage.read(readRequest(0, 1, 1_024, true)).join())
+                .hasRootCauseInstanceOf(NereusException.class);
+    }
+
+    @Test
+    void constructorRejectsAnythingOtherThanTheExactRecoveredAuthoritySession() {
+        Fixture fixture = fixture(0, 0);
+        KafkaCheckpointSourceState recovered = fixture.source;
+        AcquiredAppendSession wrong = new AcquiredAppendSession(
+                fixture.session.session(),
+                Optional.of(new com.nereusstream.api.AppendAuthority(
+                        "kafka-partition-leader-v1",
+                        fixture.identity.durableId().canonicalIdentity(),
+                        6,
+                        "1",
+                        9)));
+
+        assertThatThrownBy(() -> storage(fixture.identity, fixture.streams, wrong, recovered))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("exact recovered authority session");
+    }
+
+    private static Fixture fixture(long trimOffset, long endOffset) {
+        KafkaPartitionIdentity identity = KafkaPartitionStorageTestSupport.identity();
+        StreamId streamId = new StreamId("kafka-partition-stream");
+        var authority = new com.nereusstream.api.AppendAuthority(
+                "kafka-partition-leader-v1",
+                identity.durableId().canonicalIdentity(),
+                5,
+                "1",
+                9);
+        AppendSession session = new AppendSession(streamId, "broker-run", 7, "token", 11, 100_000);
+        AcquiredAppendSession acquired = new AcquiredAppendSession(session, Optional.of(authority));
+        KafkaCheckpointSourceState source = new KafkaCheckpointSourceState(
+                authority,
+                session.writerId(),
+                session.epoch(),
+                session.fencingToken(),
+                session.leaseVersion(),
+                trimOffset,
+                endOffset,
+                1,
+                "commit-1",
+                new Checksum(ChecksumType.SHA256, "00".repeat(32)),
+                false,
+                endOffset);
+        KafkaPartitionStreamStorageFake streams = new KafkaPartitionStreamStorageFake(streamId, endOffset, 1);
+        return new Fixture(identity, streams, acquired, source, storage(identity, streams, acquired, source));
+    }
+
+    private static DefaultKafkaPartitionStorage storage(
+            KafkaPartitionIdentity identity,
+            KafkaPartitionStreamStorageFake streams,
+            AcquiredAppendSession session,
+            KafkaCheckpointSourceState source) {
+        KafkaRecordBatchCodec codec = new KafkaRecordBatchCodec();
+        return new DefaultKafkaPartitionStorage(
+                identity,
+                streams,
+                session.session().streamId(),
+                session,
+                source,
+                DurabilityLevel.WAL_DURABLE,
+                AppendCompletionPolicy.STABLE_HEAD,
+                new KafkaAppendBatchEncoder(codec),
+                new KafkaFetchAssembler(codec));
+    }
+
+    private static KafkaAppendContext context(long expectedStart, short requiredAcks) {
+        return new KafkaAppendContext(
+                expectedStart, 5, requiredAcks, Duration.ofSeconds(5), Map.of("origin", "test"));
+    }
+
+    private static KafkaStorageReadRequest readRequest(
+            long startOffset, long maxOffset, int maxPartitionBytes, boolean minOneMessage) {
+        return new KafkaStorageReadRequest(
+                startOffset,
+                maxOffset,
+                100,
+                maxPartitionBytes,
+                1024 * 1024,
+                minOneMessage,
+                0,
+                0,
+                Duration.ofSeconds(5));
+    }
+
+    private static void assertFailureCode(CompletableFuture<?> future, ErrorCode expected) {
+        assertThatThrownBy(future::join)
+                .isInstanceOf(CompletionException.class)
+                .hasRootCauseInstanceOf(NereusException.class)
+                .rootCause()
+                .extracting(value -> ((NereusException) value).code())
+                .isEqualTo(expected);
+    }
+
+    private record Fixture(
+            KafkaPartitionIdentity identity,
+            KafkaPartitionStreamStorageFake streams,
+            AcquiredAppendSession session,
+            KafkaCheckpointSourceState source,
+            DefaultKafkaPartitionStorage storage) {}
+}
