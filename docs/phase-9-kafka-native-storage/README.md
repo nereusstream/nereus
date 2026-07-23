@@ -1,9 +1,10 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan slices in progress；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka broker runtime
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + local Kafka-fork exact-record bridge slices in progress；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka broker runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
+> Kafka fork development lock：local `nereus/future9-native-kafka-storage@2379c63933dd0a155d5a5bf90fca85c7b24db58b` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -17,7 +18,9 @@ outcome classifier，以及 actual-byte minBytes/maxWait/event-coalescing 的 mu
 process-local leader manager 也已按 KRaft leader/broker term 拒绝 stale/conflicting/late open。Nereus-side ListOffsets
 resolver 已以单一 stable snapshot 支持 exact earliest/latest 和由 fork record iterator 驱动的有界 timestamp/max
 timestamp committed-tail scan；Kafka fork handler wiring、checkpoint time-index candidate、五档 real-service profile
-matrix 与真实 KRaft Produce/Fetch/ListOffsets 尚未实现。Kafka
+matrix 与真实 KRaft Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地
+branch 使用 stock Kafka 4.3 `MemoryRecords` 实现并通过 test/checkstyle/SpotBugs/Spotless；当前 GitHub credential 对
+组织 fork 只有 read 权限，所以该 commit 尚未推送，不能升级为 production fork lock。Kafka
 storage profile policy 已冻结五个 canonical profile，并禁止 request acks 弱化 profile default durability/completion。
 binding-first storage manager 已把 deterministic ACTIVE binding、exact profile、leader authority 和 remaining recovery
 deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/authority/durable-digest snapshot seam 也已落地，

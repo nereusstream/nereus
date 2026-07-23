@@ -49,7 +49,9 @@ evidence；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local
 stale-resign isolation 的 deterministic partial evidence，但不替代 durable authority/real process cut；
 `KafkaListOffsetsResolverTest` 为 KF-FET-009 提供 stable-snapshot earliest/latest、compressed exact-record
 timestamp/max-timestamp、跨页硬预算、inspector invariant 与 mid-scan leadership fencing 的 deterministic partial
-evidence，但不替代 fork handler/time-index recovery/real KRaft baseline；
+evidence；local fork `NereusRecordTimestampInspectorTest` 进一步提供 stock 4.3 compressed `MemoryRecords` exact-record
+iterator、minimum-offset、buffer preservation 与 max-timestamp tie-break 证据，但尚未推送，也不替代 fork handler/
+time-index recovery/real KRaft baseline；
 `KafkaStorageProfilePolicyTest` 为 KF-APP-016 提供 exactly-five canonical profile、profile-default durability 和
 `PROFILE_DEFAULT` completion 的 deterministic policy evidence，但不替代真实 provider/KRaft profile matrix；
 `DefaultKafkaPartitionStorageManagerTest` 为 KF-META-005/019 和 KF-APP-014 提供 binding-first open plan、profile

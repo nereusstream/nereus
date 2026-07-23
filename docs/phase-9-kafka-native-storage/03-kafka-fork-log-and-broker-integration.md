@@ -362,9 +362,11 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
   timestamp query 不得低于 target；预算耗尽、无进展、并发 trim、inspector 越界或扫描中 authority 丢失均失败，
   不返回近似 offset。max timestamp 相等时选择最低 logical offset。
 
-测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
-format 对齐；该依赖不进入 production/runtime classpath。此切片尚未满足 M3 entry 中的组织 Kafka fork source lock，
-也不构成 Produce/Fetch runtime claim。
+adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
+format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
+消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork commit `2379c63933` 落地
+`NereusRecordTimestampInspector`。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
+构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading
 
@@ -611,8 +613,12 @@ error，不能返回一个未经证明的 nearby offset。
 `TIMEOUT`；空页无进展返回 `READ_LIMIT_TOO_SMALL`。上述错误都不会降级成近似 offset。
 
 `NereusTimeIndex` verified checkpoint candidate 尚未接入，因此当前 resolver 从冻结 log start 扫描，属于正确但受硬
-预算限制的 fallback。fork ListOffsets handler/exception mapping、leader-epoch cache、`KafkaVirtualPositionIndex`、
-`NereusTimeIndex` section codec、restart recovery 与真实 KRaft baseline integration tests 仍为 open M3/M4 work。
+预算限制的 fallback。local Kafka fork 的 `NereusRecordTimestampInspector` 已用锁定 4.3 stock
+`MemoryRecords.readableRecords(...).batches()` 实现 exact record iteration，保持 caller buffer state，不跳过
+minimum offset，并对 max timestamp 做 lowest-offset tie-break。该 bridge 的 compressed-record tests、checkstyle、
+SpotBugs、Spotless 与无 Nereus 参数的 stock compile/checkstyle 均通过。fork ListOffsets handler/exception mapping、
+leader-epoch cache、`KafkaVirtualPositionIndex`、`NereusTimeIndex` section codec、restart recovery、remote branch push 与
+真实 KRaft baseline integration tests 仍为 open M3/M4 work。
 
 ## 10. Error and outcome mapping
 

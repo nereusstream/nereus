@@ -28,6 +28,7 @@ plugins {
 
 group = providers.gradleProperty("nereusGroup").get()
 val phase2DevelopmentVersion = "0.1.0-f2-dev"
+val phase9DevelopmentVersion = "0.1.0-f9-dev"
 val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
     requested.substringAfterLast(':').startsWith("phase2")
         || requested.substringAfterLast(':').startsWith("phase3")
@@ -37,15 +38,29 @@ val pulsarDevelopmentGateRequested = gradle.startParameter.taskNames.any { reque
         || requested.substringAfterLast(':').startsWith("bookKeeperPrimaryWal")
         || requested.substringAfterLast(':') == "publishPhase2DevelopmentArtifacts"
 }
+val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { requested ->
+    requested.substringAfterLast(':').startsWith("phase9M3")
+        || requested.substringAfterLast(':') == "publishPhase9DevelopmentArtifacts"
+}
+check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
+    "Pulsar F2 and Kafka F9 development artifact gates require separate Gradle invocations"
+}
 version = gradle.startParameter.projectProperties["nereusVersion"]
     ?: if (pulsarDevelopmentGateRequested) {
         phase2DevelopmentVersion
+    } else if (kafkaDevelopmentGateRequested) {
+        phase9DevelopmentVersion
     } else {
         providers.gradleProperty("nereusVersion").getOrElse("0.1.0-SNAPSHOT")
     }
 if (pulsarDevelopmentGateRequested) {
     check(version.toString() == phase2DevelopmentVersion) {
         "Phase 2 development gates require version $phase2DevelopmentVersion, got $version"
+    }
+}
+if (kafkaDevelopmentGateRequested) {
+    check(version.toString() == phase9DevelopmentVersion) {
+        "Kafka F9 development gates require version $phase9DevelopmentVersion, got $version"
     }
 }
 
@@ -2783,6 +2798,10 @@ val kafkaBaselineCheckoutPath = providers.gradleProperty("kafkaCheckout")
     .orElse(providers.environmentVariable("NEREUS_KAFKA_CHECKOUT"))
     .orElse(layout.projectDirectory.dir("../kafka").asFile.absolutePath)
 
+val kafkaForkCheckoutPath = providers.gradleProperty("kafkaForkCheckout")
+    .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../kafka-nereus").asFile.absolutePath)
+
 tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
     group = "verification"
     description = "Verify the clean local Apache Kafka source baseline used for the F9-M3 fork probe."
@@ -2795,6 +2814,80 @@ tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "4.3.0-SNAPSHOT",
     )
+}
+
+tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
+    group = "verification"
+    description = "Verify the local organization-fork F9 branch, exact bridge commit, markers, and source blobs."
+    usesService(kafkaCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase9-kafka-fork-development-source-lock.sh",
+        kafkaForkCheckoutPath.get(),
+        "2379c63933dd0a155d5a5bf90fca85c7b24db58b",
+        "427b409cf440f745ad6195673d3342f6bd3974d4",
+        "c300006a7705c240642db6950b5a95fec982bfc5",
+        "4.3.0-SNAPSHOT",
+    )
+}
+
+val phase9PublishedModules = listOf(
+    ":nereus-api",
+    ":nereus-core",
+    ":nereus-metadata-oxia",
+    ":nereus-object-store",
+    ":nereus-materialization",
+    ":nereus-bookkeeper",
+    ":nereus-kafka-adapter",
+)
+
+tasks.register("publishPhase9DevelopmentArtifacts") {
+    group = "verification"
+    description = "Publish the exact Nereus F9 development coordinate for the Kafka fork gate."
+    dependsOn(phase9PublishedModules.map { "$it:publishAllPublicationsToDevelopmentRepository" })
+}
+
+val phase9DevelopmentRepository = layout.buildDirectory.dir("development-repository")
+val kafkaForkGradleWrapper = file(kafkaForkCheckoutPath.get()).resolve("gradlew").absolutePath
+
+tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
+    group = "verification"
+    description = "Compile and checkstyle the Kafka fork with no Nereus development artifact inputs."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:compileScala",
+        ":core:checkstyleMain",
+    )
+}
+
+tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
+    group = "verification"
+    description = "Run the Kafka fork exact-record timestamp bridge test against isolated Nereus F9 artifacts."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:spotlessCheck",
+        ":core:test",
+        "--tests",
+        "kafka.log.nereus.NereusRecordTimestampInspectorTest",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
+
+tasks.register("phase9M3KafkaForkCheck") {
+    group = "verification"
+    description = "Run the partial F9-M3 Nereus adapter and local Kafka-fork bridge gates."
+    dependsOn("phase9M3CodecCheck")
+    dependsOn("phase9M3KafkaForkStockCheck")
+    dependsOn("phase9M3KafkaForkBridgeCheck")
 }
 
 tasks.register("phase9M1ApiCheck") {

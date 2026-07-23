@@ -382,3 +382,23 @@ source-lock diff、method map、format/API compatibility review 和 scenario imp
 这是 fork API/format probe，不是 `nereusstream/kafka` production fork lock。任务名、输出和 M3 partial gate 均不得
 把它解释为完成 KF-SRC-004；组织 fork 建立后必须新增 fork commit/remote/marker/signature lock，并替换这里的
 baseline-only completion evidence。
+
+### 12.2 Current organization-fork development lock（2026-07-23）
+
+`github.com/nereusstream/kafka` 已存在且是 `apache/kafka` fork；审计时 remote `trunk` 为
+`c300006a7705c240642db6950b5a95fec982bfc5`，并包含锁定 Apache base
+`427b409cf440f745ad6195673d3342f6bd3974d4`。隔离 worktree
+`/Users/liusinan/apps/ideaproject/GITHUB/kafka-nereus` 的本地 branch
+`nereus/future9-native-kafka-storage` 从该 base 创建，首个 bridge commit 是
+`2379c63933dd0a155d5a5bf90fca85c7b24db58b`。
+
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/parent/version、Apache 与组织 remote identity、cached
+organization trunk ancestry、四文件 exact change set/blob、成对 inject marker、adapter method signature 和 no-reflection
+规则。`publishPhase9DevelopmentArtifacts` 只把 `0.1.0-f9-dev` 发布到 Nereus build 目录的隔离 Maven repository；
+fork build 必须显式同时传入 repository 与 version，缺任一参数即 configuration failure，不读取 Maven local。
+`phase9M3KafkaForkStockCheck` 不传参数验证 stock core compile/checkstyle；
+`phase9M3KafkaForkBridgeCheck` 传 exact 参数运行 bridge test、checkstyle、SpotBugs 与 Spotless。
+
+当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
+development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求
+`refs/remotes/nereus/nereus/future9-native-kafka-storage == expected HEAD`。
