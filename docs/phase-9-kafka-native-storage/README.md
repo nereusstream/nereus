@@ -47,8 +47,11 @@ server 类型；runtime configuration 同时冻结 executable profile set，mana
 逆序回收。real-Oxia + local-file provider gate 已通过 leader open、authority recovery、stable Produce/Fetch 与 close。
 activation control plane 已新增 V1 protocol activation、epoch-scoped broker capability、exact broker-set readiness records 与
 closed codecs；同一 deterministic Oxia partition 上的 create/exact-version CAS 会校验 key/value identity、不可变 tuple、
-one-way ACTIVE、heartbeat/readiness monotonicity，并恢复 applied-but-response-lost。deterministic 与 real-Oxia reconnect gates
-已通过。BookKeeper/async-object creator、KRaft-aware activation coordinator/startup action、fork config mapper、`UnifiedLog`/factory、
+one-way ACTIVE、heartbeat/readiness monotonicity，并恢复 applied-but-response-lost。broker 侧 capability publisher 已按固定周期
+续租并在首次失败后停止，ACTIVE verifier 会把当前 KRaft cluster/feature/broker epoch set 与 activation、readiness、逐 broker
+capability、profile 和 provider scope 一次性交叉校验后才允许启动继续；兼容能力摘要已冻结为 domain-separated canonical bytes。
+deterministic 与 real-Oxia reconnect gates 已通过。BookKeeper/async-object creator、controller-owned first-activation coordinator、
+Object-WAL startup-action composition、fork config mapper、`UnifiedLog`/factory、
 checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock

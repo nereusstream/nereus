@@ -3010,7 +3010,8 @@ tasks.register("phase9M3ProviderCheck") {
 
 tasks.register("phase9M6ActivationMetadataCheck") {
     group = "verification"
-    description = "Run the partial F9-M6 activation metadata codec, CAS, response-loss, and real-Oxia gates."
+    description = "Run partial F9-M6 activation metadata, broker publication, admission, and real-Oxia gates."
     dependsOn("phase9M2Check")
+    dependsOn(":nereus-kafka-adapter:f9ActivationTest")
     dependsOn(":nereus-metadata-oxia:f9ActivationOxiaIntegrationTest")
 }

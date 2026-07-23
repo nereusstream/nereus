@@ -304,6 +304,15 @@ provider proof 都可独立验证。Heartbeat CAS 只能严格增加 `heartbeatA
 Digest uses canonical field encoding，not JSON/property iteration order。Heartbeat only extends expiry if immutable capability
 facts match；changed facts require new broker epoch/runtime record。
 
+`KafkaStorageCapabilityDigests.compatibilitySha256` freezes the V1 readiness/activation capability digest as SHA-256 over
+length-prefixed ASCII domain `nereus-kafka-capability-v1`，then big-endian exact 11-field protocol tuple、profile count、each
+length-prefixed UTF-8 canonical profile、`configCompatibilitySha256[32]` and `codeCapabilitySha256[32]`。It deliberately excludes
+broker identity/epoch（owned by `brokerSetSha256`）、provider scope（owned by the separate provider digest）、lease times and
+human build labels，so a rolling binary with the same exact code capability can join without weakening protocol admission。
+`KafkaBrokerCapabilityPublisher` creates or resumes only the same runtime/epoch facts，clamps heartbeat/expiry monotonically under
+wall-clock rollback，owns its scheduled future but borrows the scheduler/store，and permanently stops plus calls the supplied
+failure handler after its first failed CAS。
+
 ### 4.3 Readiness snapshot
 
 `KafkaStorageReadinessRecord` closed field order：
@@ -333,6 +342,12 @@ codec、monotonic transition 都在 write/read 边界 fail closed。若 Oxia 已
 key，仅当 durable value 等于 intended value 且 version 已前进时恢复成功；否则保留 condition/availability failure。
 deterministic backend 与 real Oxia restart gates 已通过。Coordinator 仍需负责把当前 KRaft broker set、capability
 aggregate/provider scope 与 PREPARED/ACTIVE digest 交叉验证。
+
+Broker-side `KafkaStorageActivationVerifier` already implements the read-only half：it consumes a Kafka-type-free
+`KafkaStorageClusterSnapshot`，requires the local broker ID+epoch in the exact sorted current set，loads ACTIVE/readiness and every
+current capability，then rejects absent/expired authorities、older source offsets、feature/profile/default/provider mismatch、or any
+digest divergence before partition IO。Absence/expiry/image lag are retriable `METADATA_UNAVAILABLE`；durable contradictions are
+non-retriable `METADATA_INVARIANT_VIOLATION`。The controller-owned empty-cluster PREPARED→ACTIVE writer remains open。
 
 ## 5. First activation workflow
 

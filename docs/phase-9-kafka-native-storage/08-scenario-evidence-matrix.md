@@ -70,7 +70,11 @@ stable Produce/Fetch。`KafkaActivationMetadataCodecTest` freezes activation/cap
 non-canonical facts；`KafkaStorageActivationMetadataStoreContractTest` proves exact-key CAS、one-way ACTIVE、immutable heartbeat、
 readiness monotonicity、stale-version rejection and applied-but-response-lost recovery；
 `KafkaStorageActivationMetadataOxiaIntegrationTest` proves all three authorities survive real Oxia client close/reconnect。
-The KRaft-aware activation coordinator、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
+`KafkaBrokerCapabilityPublisherTest` proves broker-epoch fact fencing、monotonic heartbeat and stop-on-first-failure；
+`KafkaStorageActivationVerifierTest` freezes the canonical compatibility digest and proves exact live authority admission plus
+expired readiness、provider-scope mismatch and broker-epoch drift rejection before partition IO。These are deterministic partial
+evidence for KF-OPS-008/009/010/011，not process/controller completion。The controller-owned activation coordinator、runtime
+startup composition、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
 仍未实现，
 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及

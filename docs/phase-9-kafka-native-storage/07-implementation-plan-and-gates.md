@@ -516,13 +516,17 @@ for KF-OPS-012/014/017。`KafkaStorageProtocolActivationRecord`、`KafkaBrokerCa
 `KafkaStorageReadinessRecord` and their closed codecs now freeze the V1 protocol tuple/profile sets/digests/broker identities；
 `KafkaStorageActivationMetadataStore` supplies exact-key create/CAS、ACTIVE monotonicity、immutable capability heartbeat、
 readiness epoch/metadata-offset monotonicity and applied-but-response-lost recovery。Deterministic contracts and a real-Oxia
-close/reconnect gate pass。Typed Kafka-config-to-provider construction、the KRaft-aware activation coordinator、priority budgets
+close/reconnect gate pass。`KafkaBrokerCapabilitySpecification`/`Publisher`、the frozen canonical compatibility digest and
+`KafkaStorageActivationVerifier` now cover broker-epoch publication/renewal and exact KRaft↔ACTIVE↔readiness↔all-capability
+admission；heartbeat owns only its scheduled future and a failed CAS permanently invokes the fencing callback。Typed
+Kafka-config-to-provider construction、the controller-owned first-activation coordinator、runtime startup composition、priority budgets
 and real native-storage shutdown/process cuts remain open。
 
 ### Tasks
 
 ```text
 :nereus-kafka-adapter:f9ConfigTest
+:nereus-kafka-adapter:f9ActivationTest
 :nereus-kafka-adapter:f9ActivationOxiaIntegrationTest
 :nereus-metadata-oxia:f9ActivationOxiaIntegrationTest
 phase9M6ActivationMetadataCheck

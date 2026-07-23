@@ -91,3 +91,14 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
     shouldRunAfter(tasks.test, tasks.named("f9M3CodecTest"))
     useJUnitPlatform()
 }
+
+tasks.register<Test>("f9ActivationTest") {
+    group = "verification"
+    description = "Run F9 broker capability publication and ACTIVE/readiness admission contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.activation.*")
+    }
+}
