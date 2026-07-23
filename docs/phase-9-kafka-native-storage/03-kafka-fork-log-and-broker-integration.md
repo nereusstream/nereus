@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection and adapter-backed typed runtime bridge implemented；KafkaRaftServer selection and UnifiedLog data-plane composition remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge and authoritative UnifiedLog factory/shell selection implemented；KafkaRaftServer production selection and UnifiedLog adapter Produce/Fetch delegation remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -12,13 +12,17 @@ classes，并把 provider/Oxia 细节封装在 `nereus-kafka-adapter`。
 
 ```text
 Kafka stock protocol/controller/coordinators
-  -> NereusReplicaManager (async IO scheduling only)
-  -> Partition / UnifiedLog stock validation and producer-state ordering
-  -> NereusUnifiedLog
-  -> NereusLocalLog
-  -> NereusLogSegment / NereusLogRecords / derived indexes
-  -> KafkaPartitionStorage (adapter)
+  -> ReplicaManager / Partition
+  -> NereusUnifiedLog (current exact recovery/storage publication shell)
+  -> [current] fail Produce/Fetch closed; never use local durability
+  -> [next slice] adapter append/read execution
+  -> KafkaPartitionStorage
   -> StreamStorage
+
+Ephemeral cache-only stock state machine
+  -> NereusLocalLog
+  -> one synthetic local segment
+  -> never durable truth, never restart recovery input
 ```
 
 初版不需要 `NereusKafkaApis`：stock `KafkaApis` 已使用 callback-based ReplicaManager API，Produce/Fetch 的
@@ -30,15 +34,16 @@ Kafka stock protocol/controller/coordinators
 
 | Class | Base/role | Correctness responsibility |
 | --- | --- | --- |
-| `kafka.log.nereus.NereusUnifiedLog` | extends `UnifiedLog` | stock validation/state plus Nereus recovery publication |
-| `kafka.log.nereus.NereusLocalLog` | extends `LocalLog` | stable append/read/trim bridge；LEO only after success |
+| `kafka.log.UnifiedLogFactory` | stock per-broker construction seam | exact local fallback plus injected authoritative factory |
+| `kafka.log.nereus.NereusUnifiedLogFactory` | authoritative factory | select dedicated cache root；disable local scan/maintenance；require topicId |
+| `kafka.log.nereus.NereusUnifiedLog` | extends `UnifiedLog` | exact recovered-state/storage publication shell；Produce/Fetch currently fail closed |
+| `kafka.log.nereus.NereusLocalLog` | extends `LocalLog` | ephemeral stock state-machine backing only；never durable truth |
 | `kafka.log.nereus.NereusLogSegment` | extends `LogSegment` | virtual roll/size/index facade；no durable file |
 | `kafka.log.nereus.NereusLogRecords` | records facade | exact MemoryRecords encode/read and owned buffers |
 | `kafka.log.nereus.NereusProducerStateManager` | extends `ProducerStateManager` | in-memory stock semantics + checkpoint bridge |
 | `kafka.log.nereus.NereusTimeIndex` | Kafka `TimeIndex` facade | derived timestamp lookup/checkpoint state |
 | `kafka.log.nereus.NereusTransactionIndex` | Kafka `TransactionIndex` facade | derived aborted-txn lookup/checkpoint state |
 | `kafka.log.nereus.NereusLeaderEpochCache` | epoch cache facade/adapter | derived epoch ranges；no local checkpoint truth |
-| `kafka.log.nereus.NereusLogFactory` | factory | open/recover/construct exact topicId binding |
 | `kafka.server.nereus.NereusReplicaManager` | extends `ReplicaManager` | bounded append/fetch/lifecycle execution and callbacks |
 | `kafka.server.nereus.NereusProduceBufferSnapshot` | owned request bytes | buffer lifetime across async handoff |
 | `kafka.server.nereus.NereusFetchOperation` | async state machine | minBytes/maxWait/event/re-read/callback-once |
@@ -106,6 +111,9 @@ mapper；`c27305a7ad955ebc876de20da0fd045e97beba55` 增加 deferred activation-b
   不使用 reflection、service loader 或 process-global singleton；
 - runtime create 位于 LogManager 前；`start` 在 lifecycle manager 启动后异步发起，initial metadata publish 后、broker
   unfence/request processing 前等待 ready future；
+- runtime 在构造时拥有一个 per-broker `UnifiedLogFactory`；`BrokerServer` 把
+  `brokerStorageRuntime.unifiedLogFactory` 显式传给 `LogManager`。disabled runtime 返回
+  `UnifiedLogFactory.Local`，不依赖 process-global registry；
 - runtime 在 exact `ReplicaManager` 创建后才构造/缓存 `Option[AsyncTopicDeltaLifecycle]` 并传入
   `BrokerMetadataPublisher`；disabled branch 精确保持 `None`，同一 runtime 不能绑定第二个 manager；
 - shutdown 在停止 socket requests 后同步开始 admission drain，在 ReplicaManager 前 bounded `awaitDrained`，在 LogManager
@@ -141,27 +149,83 @@ callback executor、durable checkpoint read pins、checkpoint reader/verifier/re
 source、concrete recovery launcher 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader
 open/Produce/Fetch gate 已通过。Fork 不再承担 ObjectStore/Oxia/read-pin orchestration，只在 exact ReplicaManager
 可用后为每次 open 创建 fresh state codec 和 exact Partition publisher。尚未实现的是 BookKeeper/async-object
-creator、enabled `NereusReplicaManager`/log selection、controller activation scheduling、CLI/KafkaRaftServer factory
-selection、durable checkpoint-failure quarantine observer 和 native-storage KRaft process test。当前已有可执行的
-Object-WAL provider/runtime/recovery composition，但还没有一条可从 stock Kafka CLI 启用并完成真实 partition I/O
-的路径。
+creator、controller activation scheduling、CLI/KafkaRaftServer production factory selection、durable
+checkpoint-failure quarantine observer、UnifiedLog adapter Produce/Fetch delegation 和 native-storage KRaft process
+test。当前已有可执行的 Object-WAL provider/runtime/recovery composition 与 log-shell selection，但还没有一条可从
+stock Kafka CLI 启用并完成真实 partition I/O 的路径。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 
-涉及方法：`startup`、`getOrCreateLog`、`removeLogAndMetrics`、`shutdown`、scheduled retention/flush/checkpoint。
+`cfcdd55fbc571bc7187379d65504caa4fe23586e` 已在 stock package 新增
+`UnifiedLogFactory` 与 immutable `UnifiedLogOpenContext`。factory 的完整策略面是：
 
-enabled mode：
+```scala
+def logDirectories(configured: Seq[File]): Seq[File]
+def initialOfflineDirectories(configured: Seq[File], selected: Seq[File]): Seq[File]
+def loadExistingLogs: Boolean
+def scheduleLocalMaintenance: Boolean
+def open(context: UnifiedLogOpenContext): UnifiedLog
+```
 
-- `startup` 不扫描 local log dirs 作为 partition truth；只清理/建立 ephemeral cache dir；
-- 不启动 stock `LogCleaner`；
-- 不为 Nereus log 写 recovery point/HW/LEO checkpoint files；
-- `getOrCreateLog(topicPartition,...,topicId,leaderEpoch)` 必须要求 non-zero topicId，委托 `NereusLogFactory`；
-- remove/delete 先走 durable lifecycle coordinator，再从 current-log maps 移除；
-- flush scheduler 对 Nereus log no-op，不能把 no-op 当成 producer completion；
-- stock disabled branch byte-for-byte保留。
+`UnifiedLogFactory.Local` 逐参数调用 stock `UnifiedLog.create`，是 disabled/default path；`LogManagerBuilder` 也显式
+传该 local factory。`LogManager.apply` 先让 factory 选择 effective directories/offline directories，然后同一个
+factory 同时接管 startup existing-log construction 与 `getOrCreateLog` construction，避免只替换新建路径却让旧
+local log 在 restart 时重新成为 truth。
 
-同集群混用 local/Nereus topic 不在首版支持范围，因此 enabled branch 若发现 tracked local log，broker readiness
-失败并提示 migration unsupported，而不是把它当 stray 自动删除。
+`NereusUnifiedLogFactory` 的当前 executable contract：
+
+- 唯一 log root 是 `${nereus.kafka.storage.cache.dir}/{brokerId}/partition-logs`，不使用 `log.dirs` 作为 partition
+  shell root，也忽略 stock initial-offline list；
+- `loadExistingLogs=false`，broker restart 不扫描 cache 下的旧 topic-partition directories；
+- `scheduleLocalMaintenance=false`，不启动 cleaner、retention、flusher、recovery/HW/LEO checkpoint、clean-shutdown
+  marker 或 clean-shutdown epoch read；这些 local artifacts 都不能成为恢复或 durability evidence；
+- `open` 只接受 factory-selected cache root 的直接 child、`isFuture=false`、local start/recovery point 均为 `0`、
+  present 且 non-zero KRaft topic ID；identity 从 exact cluster ID/topic ID/topic name/partition 构造；
+- 每个 open 返回新 `NereusUnifiedLog` shell；旧 cache bytes 永不加载。shell 仍使用一个 ephemeral
+  `NereusLocalLog`/synthetic segment 维持 stock `UnifiedLog` 对象不变量，但它不承载 adapter append/read，也不参与
+  restart recovery。
+
+`LogManager.startup`、`shutdown`、checkpoint/flush/retention helpers 与 clean-shutdown read 都检查同一个 factory
+policy；因此 authoritative mode 不会偶然启动某一项 local maintenance。stock disabled branch 保持默认
+`loadExistingLogs=true`、`scheduleLocalMaintenance=true` 和原 `UnifiedLog.create` 行为。
+
+同集群混用 local/Nereus topic 不在首版支持范围。enabled mode 完全忽略 dedicated cache root 中的旧 shell，
+而 typed startup validator 继续拒绝 cache/spill 与 authoritative Kafka log dirs 重叠；不能把旧 local log 自动
+导入为 Nereus durable state。
+
+#### 3.3.1 Current `NereusUnifiedLog` publication state machine
+
+shell 以 immutable `KafkaPartitionIdentity` 和一个 private guard 持有两项可撤销 publication：
+
+```text
+installRecoveredState(epoch, frozenState)
+  -> validate exact topicId/topic/partition/epoch + frozen
+  -> align shell logStartOffset/LEO/HW to recovered stable facts
+
+installStorage(epoch, recoveredStorage)
+  -> validate exact identity/epoch/LEADER_WRITABLE
+  -> require storage.stableSnapshot == recoveredState stable facts
+
+nereusWritable(epoch)
+  -> recoveredState != null
+  -> storage != null
+  -> both exact epoch
+  -> storage state == LEADER_WRITABLE
+
+removeStorage(epoch, exactStorage)
+  -> remove only the same instance/epoch；never revoke a newer publication
+```
+
+`NereusKafkaRecoveryStateFactory.publish` 先把 frozen state 安装到 exact live log shell，再调用
+`Partition.installNereusRecoveredState`；Partition publication 失败时会撤销 shell state。
+`NereusListOffsetsLifecycle` 收到 product manager 返回的 writable storage 后，先验证 stock Partition、shell、
+storage identity/epoch/state，再调用 `installStorage`，最后安装 exact ListOffsets lookup。resign/delete/drain/open
+failure 按 shell/storage/lookup 的 exact instance/epoch 逆向撤销。
+
+这一切片只闭合“正确 shell 被选中且恢复结果发布到正确对象”。`appendAsLeader` 在 `nereusWritable` 前失败，
+在 writable 后仍抛 data-plane-pending `KafkaStorageException`；`read` 同理，`appendAsFollower` 永远拒绝。
+这是故意的 fail-closed cut：下一切片必须显式接入 adapter append/read executor、buffer ownership、Kafka
+`LogAppendInfo`/`FetchDataInfo` assembly 后才能开放协议数据面，绝不允许调用 ephemeral `LocalLog` fallback。
 
 ### 3.4 `core/.../kafka/cluster/Partition.scala`
 
@@ -480,8 +544,11 @@ M3 明确拒绝 idempotent/transaction/control batch 与任何 NKC1 derived-stat
 第十三个 commit `9a6ebed6d9` 把 `Partition` 持有类型收窄为 stock `LeaderEpochAwareRecoveryState`；
 artifact-only `NereusKafkaRecoveredState` 实现该接口，因此 disabled build 不加载/编译任何 Nereus package，同时
 enabled build 仍在 Partition lock 内校验 exact topicId/topic-partition/leader epoch/frozen facts。
-Controller scheduling、CLI/KafkaRaftServer selection 和 `UnifiedLog`/log factory 尚未实现。当前 commit
-尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
+第十四个 commit `cfcdd55fbc` 增加 stock `UnifiedLogFactory`/`UnifiedLogOpenContext`、LogManager factory
+delegation、runtime-owned `NereusUnifiedLogFactory`、ephemeral `NereusUnifiedLog`/`NereusLocalLog` shell，以及
+recovered-state → recovered-storage → ListOffsets lookup 顺序发布；第十五个 `7739351b7c` 补齐新 stock seam 的成对
+inject marker。Controller scheduling、CLI/KafkaRaftServer production selection 和 UnifiedLog adapter
+Produce/Fetch delegation尚未实现。当前 branch 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading

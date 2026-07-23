@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping and deferred Kafka context/provider composition implemented；Kafka controller scheduling、CLI/KafkaRaftServer log selection、BookKeeper/async providers and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition and runtime-owned authoritative log-shell factory implemented；Kafka controller scheduling、CLI/KafkaRaftServer production selection、UnifiedLog adapter Produce/Fetch、BookKeeper/async providers and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -249,13 +249,16 @@ scope and both unsupported-profile/provider pre-I/O failures。
 
 ### 2.8 Executable Kafka context-to-provider lifecycle
 
-Local fork `c27305a7ad..9a6ebed6d9` consumes the mapper through the following exact call path：
+Local fork `c27305a7ad..7739351b7c` consumes the mapper and log factory through the following exact call path：
 
 ```text
 NereusBrokerStorageRuntimeFactory.production(recoveryStateFactoryCreator)
   -> create(BrokerStorageRuntimeContext)
   -> mapper.listOffsets(typedConfig)                 # pure, no provider I/O
   -> new NereusKafkaDeferredRuntime(...)             # no provider I/O
+  -> new NereusUnifiedLogFactory(context)             # cache-root policy only
+  -> BrokerServer passes runtime.unifiedLogFactory to LogManager
+  -> LogManager skips local scan/maintenance in Nereus mode
   -> BrokerStorageRuntime.start()
   -> poll brokerEpochSupplier every min(25ms, remaining)
   -> NereusKafkaProductRuntimeCreator.create(exactEpoch, ...)
@@ -291,11 +294,19 @@ production factory therefore injects a `Function[ReplicaManager, KafkaRecoverySt
 `NereusBrokerStorageRuntime.asyncTopicDeltaLifecycle(exactReplicaManager)` creates it and one-time binds
 `NereusKafkaRecoveryStateFactoryBridge`。A second manager is rejected，and a pre-bind recovery call fails retriably。
 `NereusKafkaRecoveryStateFactory` then validates exact topic ID/name/partition/current leader epoch，creates a one-shot stock
-RecordBatch codec and publishes only a frozen state through `Partition.installNereusRecoveredState`。Publication is provisional
-until the product coordinator's final source revalidation succeeds；failed open cleanup calls
-`cancelLeaderEpochAwareOffsetLookup(epoch)`，which clears both lookup admission and provisional state。Idempotent、
+RecordBatch codec and first publishes the frozen state to the exact `NereusUnifiedLog` shell，then through
+`Partition.installNereusRecoveredState`。After final source revalidation，`NereusListOffsetsLifecycle` publishes the exact
+manager-returned writable storage to the same shell before installing the ListOffsets lookup。Publication is provisional until
+all steps succeed；failed open cleanup calls `cancelLeaderEpochAwareOffsetLookup(epoch)` and identity-safe shell revocation，
+which clear lookup admission、storage and provisional state without touching a newer epoch。Idempotent、
 transaction/control and NKC1-derived sections remain M4 fail-closed boundaries。`Partition` accepts only the stock
 `LeaderEpochAwareRecoveryState` interface；the artifact-only implementation remains excluded from disabled builds。
+
+The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only
+`${cacheDir}/{brokerId}/partition-logs`，sets `loadExistingLogs=false` and `scheduleLocalMaintenance=false`，and rejects local
+checkpoint offsets、future logs and missing/zero topic IDs。Current `appendAsLeader`/`read` deliberately throw
+`KafkaStorageException` even after exact state/storage publication；opening them requires the next explicit adapter data-plane
+slice and cannot be achieved by enabling a configuration flag。
 
 ## 3. Cross-Kafka validation
 

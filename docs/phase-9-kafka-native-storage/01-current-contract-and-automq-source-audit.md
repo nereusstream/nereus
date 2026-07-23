@@ -402,16 +402,20 @@ baseline-only completion evidence。
 `c27305a7ad955ebc876de20da0fd045e97beba55`，第十一个 Spotless import-order alignment commit 是
 `752953d0ef9c38ae50340147bb4f3172ee9ddc5a`，第十二个 concrete M3 recovery-state rebuild/publication commit 是
 `672429d94fd82679d7091585ef27c38a7a39f743`，第十三个 stock-without-artifacts recovery-state boundary fix 是
-`9a6ebed6d94a2d91fcf581b70c72ac71201c305b`。
+`9a6ebed6d94a2d91fcf581b70c72ac71201c305b`，第十四个 authoritative log-shell/factory selection commit 是
+`cfcdd55fbc571bc7187379d65504caa4fe23586e`，第十五个 stock-file inject-marker alignment commit 是
+`7739351b7cccd1fa388ad151bfb3e2cc78d7a8a4`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/thirteen-commit count/version、Apache 与组织 remote
-identity、cached organization trunk ancestry、五十八文件 exact change set/blob、成对 inject marker、adapter/async bridge/
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/fifteen-commit count/version、Apache 与组织 remote
+identity、cached organization trunk ancestry、六十五文件 exact change set/blob、成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding，以及 package-wide
 no-reflection/no-service-loader 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
 broker-capability、activation-backed Object-WAL creator、borrowed scheduler、single-image KRaft snapshot、
 post-registration broker epoch、per-operation admission recheck、one-time recovery-state-factory binding、stock
-`RecordBatch` CRC/fresh-state/frozen-source validation 与 exact `Partition` publication signatures。
+`RecordBatch` CRC/fresh-state/frozen-source validation、exact `Partition` publication，以及 stock-local
+`UnifiedLogFactory.Local` fallback、Nereus no-local-scan/no-local-maintenance factory、recovered-state/storage publication
+和 Produce/Fetch data-plane-pending fail-closed signatures。
 `publishPhase9DevelopmentArtifacts` 只把 `0.1.0-f9-dev` 发布到 Nereus build 目录的隔离 Maven repository；
 fork build 必须显式同时传入 repository 与 version，缺任一参数即 configuration failure，不读取 Maven local。
 `phase9M3KafkaForkStockCheck` 不传参数从头验证 stock server/core compile/static analysis、完整 `KafkaConfigTest`、
@@ -422,7 +426,7 @@ start/shutdown/restart、四个 `Partition` seam tests、一个 `ReplicaManager`
 manager-to-Partition lookup lifecycle 的 7 个 tests、topic-delta lifecycle 的 7 个 tests、四个 stock `Partition`
 seam tests、一个 `ReplicaManager` test、七个完整 `BrokerMetadataPublisherTest`、完整 `KafkaConfigTest`、上述
 13 个 config/runtime-specific tests、4 个 product-mapper tests、9 个 context/deferred/recovery tests、
-5 个 adapter-backed runtime tests、borrowed scheduler test 和 stock single-node KRaft restart，以及
+5 个 adapter-backed runtime tests、authoritative log-shell/factory tests、borrowed scheduler test 和 stock single-node KRaft restart，以及
 server/core/storage checkstyle、SpotBugs
 与 Spotless。lifecycle 只消费 manager 返回的已恢复 writable storage，不重建 storage/recovery；安装失败会按
 旧 epoch 调用 manager resign，stale resign 和 late old open 都不能移除新 lookup。metadata seam 还验证 stock state
@@ -448,6 +452,17 @@ recorded against Nereus `main@6f2ab6f`：`phase9M3KafkaForkCheck --rerun-tasks` 
 stock-without-artifacts and artifact-enabled Kafka builds passed 92/92 and 95/95 actionable tasks respectively。The run
 includes exact source locks、146/146 scenario-manifest synchronization、real provider gate、Checkstyle、SpotBugs、Spotless and
 stock single-node KRaft restart。
+
+At local head `7739351b7c`，the stock-without-artifacts compile plus stock `KafkaConfigTest`/`LogManagerTest`/
+`BrokerStorageRuntimeFactoryTest` pass；artifact-enabled compile and focused `NereusUnifiedLogFactoryTest`、
+`NereusListOffsetsLifecycleTest`、`NereusKafkaRecoveryStateFactoryTest`、`NereusBrokerStorageRuntimeTest` and
+`BrokerStorageRuntimeFactoryTest` pass with core Checkstyle、SpotBugs and Spotless。The factory selects only
+`${cacheDir}/{brokerId}/partition-logs`，does not scan stale local logs or run stock local maintenance，and requires a non-zero
+topic ID。The shell becomes writable only after exact frozen recovery state and manager-returned storage are both published；
+Produce/Fetch then still fail with a storage error until the next adapter-I/O slice，so this evidence is not an M3 completion
+claim。Against this exact head，`phase9M3KafkaForkCheck --rerun-tasks` passed 80/80 outer tasks；its nested
+stock-without-artifacts and artifact-enabled Kafka builds passed 92/92 and 95/95 actionable tasks respectively，including
+146/146 scenario-manifest synchronization、real provider recovery、stock KRaft restart、Checkstyle、SpotBugs and Spotless。
 
 当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
 development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求
