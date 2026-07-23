@@ -21,7 +21,7 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
     private final Object guard = new Object();
     private final KafkaStorageAdmission admission;
     private final KafkaPartitionStorageManager partitionStorageManager;
-    private final Supplier<? extends CompletionStage<Void>> startupAction;
+    private final KafkaRuntimeStartup startup;
     private final KafkaRuntimeResources resources;
     private CompletableFuture<Void> startOperation;
     private CompletableFuture<Void> drainOperation;
@@ -32,10 +32,18 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
             KafkaPartitionStorageManager partitionStorageManager,
             Supplier<? extends CompletionStage<Void>> startupAction,
             KafkaRuntimeResources resources) {
+        this(admission, partitionStorageManager, KafkaRuntimeStartup.from(startupAction), resources);
+    }
+
+    public DefaultNereusKafkaRuntime(
+            KafkaStorageAdmission admission,
+            KafkaPartitionStorageManager partitionStorageManager,
+            KafkaRuntimeStartup startup,
+            KafkaRuntimeResources resources) {
         this.admission = Objects.requireNonNull(admission, "admission");
         this.partitionStorageManager = Objects.requireNonNull(
                 partitionStorageManager, "partitionStorageManager");
-        this.startupAction = Objects.requireNonNull(startupAction, "startupAction");
+        this.startup = Objects.requireNonNull(startup, "startup");
         this.resources = Objects.requireNonNull(resources, "resources");
         if (admission.state() != KafkaStorageAdmissionState.STARTING) {
             throw new IllegalArgumentException("Kafka runtime admission must begin in STARTING state");
@@ -58,7 +66,8 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
         }
         CompletionStage<Void> startup;
         try {
-            startup = Objects.requireNonNull(startupAction.get(), "Kafka runtime startup future");
+            startup = Objects.requireNonNull(
+                    this.startup.start(admission), "Kafka runtime startup future");
         } catch (Throwable failure) {
             completeStartup(operation, failure);
             return protectedView(operation);

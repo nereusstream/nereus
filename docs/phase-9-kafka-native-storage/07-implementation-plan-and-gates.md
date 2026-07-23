@@ -396,10 +396,11 @@ coordinator/transaction/compaction remain M4/M5。
   checkpoint candidate、provider-backed BrokerServer activation and real native-storage KRaft baseline remain open；
 - `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the first concrete provider graph to exactly
   `OBJECT_WAL_SYNC_OBJECT`、matched cluster/writer/session/scan limits and disabled legacy auto-session；
-  `NereusKafkaObjectWalRuntimeFactoryTest` proves a checked provider-construction failure is propagated and every resource
-  registered before that cut is closed；
+  `NereusKafkaObjectWalRuntimeFactoryTest` proves activation scope is rejected before provider IO，and a checked
+  provider-construction failure is propagated with every resource registered before that cut closed；
   `f9M3ProviderIntegrationTest` passes against real Oxia plus the filesystem ObjectStore provider and covers deterministic
-  binding、authority acquire/recovery、leader open、one byte-exact stable Produce、committed Fetch and owned provider shutdown。
+  ACTIVE/readiness seeding、runtime capability resume/verification、binding、authority acquire/recovery、leader open、one byte-exact
+  stable Produce、committed Fetch and owned provider shutdown。
   This is provider-backed adapter evidence，not yet a Kafka BrokerServer/KRaft or production S3 gate；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
@@ -522,7 +523,7 @@ admission；heartbeat owns only its scheduled future and a failed CAS permanentl
 `KafkaStorageFirstActivationCoordinator` now executes empty-image proof → capability aggregation → readiness → PREPARED → second
 empty-image/capability proof → ACTIVE，resumes PREPARED without mutation，recovers a compatible concurrent winner and treats ACTIVE
 as idempotent without reapplying the first-activation emptiness rule。Typed Kafka-config-to-provider construction、Kafka controller
-snapshot/scheduling integration、runtime startup composition、priority budgets
+snapshot/scheduling integration、fork mapping、priority budgets
 and real native-storage shutdown/process cuts remain open。
 
 ### Tasks

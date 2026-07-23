@@ -26,10 +26,23 @@ public final class NereusKafkaRuntimeFactory {
     public static NereusKafkaRuntime create(
             NereusKafkaRuntimeConfiguration configuration,
             NereusKafkaRuntimeDependencies dependencies) {
+        return create(
+                configuration,
+                dependencies,
+                KafkaRuntimeStartup.from(Objects.requireNonNull(
+                        dependencies, "dependencies").startupAction()));
+    }
+
+    /** Assembles the same product graph with a startup component that can observe admission. */
+    public static NereusKafkaRuntime create(
+            NereusKafkaRuntimeConfiguration configuration,
+            NereusKafkaRuntimeDependencies dependencies,
+            KafkaRuntimeStartup startup) {
         NereusKafkaRuntimeConfiguration exactConfiguration = Objects.requireNonNull(
                 configuration, "configuration");
         NereusKafkaRuntimeDependencies exactDependencies = Objects.requireNonNull(
                 dependencies, "dependencies");
+        KafkaRuntimeStartup exactStartup = Objects.requireNonNull(startup, "startup");
         KafkaRuntimeResources resources = resources(exactDependencies);
         try {
             KafkaPartitionKeyspace keyspace = new KafkaPartitionKeyspace(
@@ -61,7 +74,7 @@ public final class NereusKafkaRuntimeFactory {
             return new DefaultNereusKafkaRuntime(
                     new KafkaStorageAdmission(),
                     manager,
-                    exactDependencies.startupAction(),
+                    exactStartup,
                     resources);
         } catch (RuntimeException | Error failure) {
             closeAfterFailure(resources, failure);

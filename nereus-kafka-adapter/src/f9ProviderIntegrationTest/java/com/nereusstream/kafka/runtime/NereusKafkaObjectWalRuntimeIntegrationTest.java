@@ -3,6 +3,9 @@ package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.kafka.activation.KafkaBrokerCapabilitySpecification;
+import com.nereusstream.kafka.activation.KafkaStorageCapabilityDigests;
+import com.nereusstream.kafka.activation.KafkaStorageClusterSnapshot;
 import com.nereusstream.kafka.partition.KafkaAppendContext;
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
 import com.nereusstream.kafka.partition.KafkaPartitionLeaderOpenRequest;
@@ -11,6 +14,14 @@ import com.nereusstream.kafka.partition.KafkaPartitionStorage;
 import com.nereusstream.kafka.partition.KafkaStorageReadRequest;
 import com.nereusstream.kafka.recovery.KafkaRecoveredPartition;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
+import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
+import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
+import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
+import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
+import com.nereusstream.metadata.oxia.records.KafkaPayloadMapping;
+import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
+import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
+import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
 import com.nereusstream.objectstore.ObjectPutRetryPolicy;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
@@ -24,6 +35,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -54,7 +66,7 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
     Path root;
 
     @Test
-    void opensLeaderAndRoundTripsStableKafkaBatchThroughRealOxiaProviderGraph() {
+    void activatesThenRoundTripsStableKafkaBatchThroughRealOxiaProviderGraph() {
         String nereusCluster = "f9-provider-" + java.util.UUID.randomUUID();
         String kafkaCluster = "kraft-cluster";
         String writer = "kafka-broker-1-epoch-9";
@@ -90,7 +102,31 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                             Duration.ofSeconds(5),
                             Duration.ofHours(24),
                             2);
-            runtime = NereusKafkaObjectWalRuntimeFactory.create(
+            KafkaBrokerIdentity broker = new KafkaBrokerIdentity(1, 9);
+            KafkaBrokerCapabilitySpecification capability = new KafkaBrokerCapabilitySpecification(
+                    kafkaCluster,
+                    broker,
+                    writer,
+                    "4.3.0",
+                    "f9-provider-test",
+                    System.getProperty("java.version"),
+                    Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT),
+                    StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                    bytes(1),
+                    bytes(2),
+                    bytes(3),
+                    Duration.ofSeconds(1),
+                    Duration.ofSeconds(30));
+            KafkaStorageClusterSnapshot clusterSnapshot = new KafkaStorageClusterSnapshot(
+                    kafkaCluster,
+                    101,
+                    KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
+                    List.of(broker),
+                    false,
+                    false,
+                    false);
+            seedActiveAuthority(oxia, nereusCluster, capability, clusterSnapshot, clock);
+            runtime = NereusKafkaObjectWalRuntimeFactory.createActivated(
                     configuration,
                     new NereusKafkaObjectWalRuntimeContext(
                             provider,
@@ -107,7 +143,12 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                                         Optional.empty()));
                             },
                             clock,
-                            () -> CompletableFuture.completedFuture(null)));
+                            () -> CompletableFuture.completedFuture(null)),
+                    new NereusKafkaObjectWalActivationContext(
+                            capability,
+                            () -> CompletableFuture.completedFuture(clusterSnapshot),
+                            Duration.ofSeconds(10),
+                            Duration.ofMillis(100)));
             runtime.start().toCompletableFuture().join();
 
             KafkaPartitionStorage storage = runtime.partitionStorageManager().openLeader(
@@ -165,6 +206,66 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
             scheduler.shutdownNow();
         }
         assertThat(provider.closed()).isTrue();
+    }
+
+    private static void seedActiveAuthority(
+            OxiaClientConfiguration oxia,
+            String nereusCluster,
+            KafkaBrokerCapabilitySpecification specification,
+            KafkaStorageClusterSnapshot snapshot,
+            Clock clock) {
+        try (SharedOxiaClientRuntime shared = SharedOxiaClientRuntime.connect(oxia, clock);
+                KafkaStorageActivationMetadataStore store =
+                        KafkaStorageActivationMetadataStore.usingSharedRuntime(
+                                oxia, shared, nereusCluster, snapshot.kafkaClusterId())) {
+            long now = clock.millis();
+            KafkaBrokerCapabilityRecord capability = specification.initialRecord(now);
+            byte[] capabilitySha256 = KafkaStorageCapabilityDigests.compatibilitySha256(capability);
+            byte[] brokerSetSha256 = KafkaStorageReadinessRecord.brokerSetSha256(snapshot.brokers());
+            store.createCapability(capability).join();
+            store.createReadiness(new KafkaStorageReadinessRecord(
+                    KafkaStorageReadinessRecord.RECORD_VERSION,
+                    snapshot.kafkaClusterId(),
+                    1,
+                    snapshot.metadataOffset(),
+                    snapshot.brokers(),
+                    brokerSetSha256,
+                    capabilitySha256,
+                    specification.providerScopeSha256(),
+                    now,
+                    now + 30_000,
+                    0)).join();
+            store.createActivation(new KafkaStorageProtocolActivationRecord(
+                    KafkaStorageProtocolActivationRecord.RECORD_VERSION,
+                    KafkaStorageActivationLifecycle.ACTIVE.wireId(),
+                    snapshot.kafkaClusterId(),
+                    KafkaStorageProtocolActivationRecord.PROTOCOL_VERSION,
+                    KafkaStorageProtocolActivationRecord.API_VERSION,
+                    KafkaStorageProtocolActivationRecord.STREAM_HEAD_SESSION_VERSION,
+                    KafkaStorageProtocolActivationRecord.BINDING_VERSION,
+                    KafkaPayloadMapping.KAFKA_RECORD_BATCH_V1.wireId(),
+                    KafkaStorageProtocolActivationRecord.OBJECT_WAL_ENTRY_INDEX_VERSION,
+                    KafkaStorageProtocolActivationRecord.NCP_VERSION,
+                    KafkaStorageProtocolActivationRecord.NTC_VERSION,
+                    KafkaStorageProtocolActivationRecord.CHECKPOINT_VERSION,
+                    KafkaStorageProtocolActivationRecord.COMPACTION_STRATEGY_VERSION,
+                    specification.supportedStorageProfiles(),
+                    specification.defaultStorageProfile(),
+                    capabilitySha256,
+                    brokerSetSha256,
+                    KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
+                    snapshot.metadataOffset(),
+                    1,
+                    now,
+                    now,
+                    0)).join();
+        }
+    }
+
+    private static byte[] bytes(int seed) {
+        byte[] value = new byte[32];
+        for (int index = 0; index < value.length; index++) value[index] = (byte) (seed + index);
+        return value;
     }
 
     private static StreamStorageConfig streamConfiguration(String cluster, String writer) {

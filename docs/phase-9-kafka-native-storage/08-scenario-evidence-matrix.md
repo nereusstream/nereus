@@ -66,7 +66,8 @@ aggregation evidence；`NereusKafkaRuntimeFactoryTest` additionally proves immut
 startup deduplication、owned reverse close、borrowed dependency preservation and duplicate-identity rejection-before-transfer。
 `NereusKafkaObjectWalRuntimeConfigurationTest` and the real-Oxia `NereusKafkaObjectWalRuntimeIntegrationTest` further prove the
 strict Object-WAL executable-profile fence、no legacy auto-session fallback、provider graph ownership、authority leader open and
-stable Produce/Fetch。`KafkaActivationMetadataCodecTest` freezes activation/capability/readiness V1 bytes and rejects unknown or
+stable Produce/Fetch；the real-service path now uses public `createActivated` and proves capability resume plus ACTIVE/readiness
+verification before leader IO。`KafkaActivationMetadataCodecTest` freezes activation/capability/readiness V1 bytes and rejects unknown or
 non-canonical facts；`KafkaStorageActivationMetadataStoreContractTest` proves exact-key CAS、one-way ACTIVE、immutable heartbeat、
 readiness monotonicity、stale-version rejection and applied-but-response-lost recovery；
 `KafkaStorageActivationMetadataOxiaIntegrationTest` proves all three authorities survive real Oxia client close/reconnect。
@@ -74,9 +75,11 @@ readiness monotonicity、stale-version rejection and applied-but-response-lost r
 `KafkaStorageActivationVerifierTest` freezes the canonical compatibility digest and proves exact live authority admission plus
 expired readiness、provider-scope mismatch and broker-epoch drift rejection before partition IO。These are deterministic partial
 evidence for KF-OPS-008/009/010/011，not process/controller completion。
+`KafkaStorageActivationRuntimeTest` proves publish-before-verify、bounded wait、downstream startup ordering、heartbeat-failure admission
+revocation and borrowed-scheduler ownership，adding deterministic partial evidence for KF-OPS-008/010/012/018。
 `KafkaStorageFirstActivationCoordinatorTest` adds deterministic partial evidence for KF-OPS-003/004/005：empty-cluster activation、
 non-destructive non-empty rejection、PREPARED crash resume、second-proof cut and post-ACTIVE idempotence。Kafka controller seam/process
-integration、runtime startup composition、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
+integration and fork mapping、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
 仍未实现，
 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及

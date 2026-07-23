@@ -7,7 +7,9 @@ import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublis
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
@@ -33,13 +35,31 @@ public final class NereusKafkaObjectWalRuntimeFactory {
 
     private NereusKafkaObjectWalRuntimeFactory() { }
 
-    /**
-     * Creates provider clients immediately and transfers their ownership to the returned runtime. The Kafka scheduler,
-     * clock, recovery launcher and startup action remain borrowed.
-     */
-    public static NereusKafkaRuntime create(
+    /** Provider-bootstrap-only path retained package-private for failure-cut tests. */
+    static NereusKafkaRuntime createUnactivatedForTesting(
             NereusKafkaObjectWalRuntimeConfiguration configuration,
             NereusKafkaObjectWalRuntimeContext context) {
+        return create(configuration, context, null);
+    }
+
+    /**
+     * Creates provider clients immediately and transfers their ownership to a production runtime fenced by
+     * capability publication and ACTIVE/readiness. The Kafka scheduler, clock and recovery launcher remain borrowed.
+     */
+    public static NereusKafkaRuntime createActivated(
+            NereusKafkaObjectWalRuntimeConfiguration configuration,
+            NereusKafkaObjectWalRuntimeContext context,
+            NereusKafkaObjectWalActivationContext activationContext) {
+        return create(
+                configuration,
+                context,
+                Objects.requireNonNull(activationContext, "activationContext"));
+    }
+
+    private static NereusKafkaRuntime create(
+            NereusKafkaObjectWalRuntimeConfiguration configuration,
+            NereusKafkaObjectWalRuntimeContext context,
+            NereusKafkaObjectWalActivationContext activationContext) {
         NereusKafkaObjectWalRuntimeConfiguration exactConfiguration = Objects.requireNonNull(
                 configuration, "configuration");
         NereusKafkaObjectWalRuntimeContext exactContext = Objects.requireNonNull(context, "context");
@@ -49,11 +69,13 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             throw new IllegalArgumentException(
                     "ObjectStore provider instance does not match configured providerClassName");
         }
+        validateActivationContext(exactConfiguration, activationContext);
 
         List<KafkaRuntimeResources.Resource> constructedResources = new ArrayList<>();
         List<KafkaRuntimeResources.Resource> providerResources = new ArrayList<>();
         KafkaPartitionMetadataStore partitionMetadataStore;
         StreamStorage streamStorage;
+        KafkaRuntimeStartup startup = KafkaRuntimeStartup.from(exactContext.startupAction());
         try {
             providerResources.add(registerOwned(
                     constructedResources, "object-store-provider", provider));
@@ -98,6 +120,32 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     constructedResources,
                     "kafka-partition-metadata-store",
                     partitionMetadataStore);
+            if (activationContext != null) {
+                KafkaStorageActivationMetadataStore activationStore =
+                        KafkaStorageActivationMetadataStore.usingSharedRuntime(
+                                exactConfiguration.oxia(),
+                                oxiaRuntime,
+                                exactConfiguration.runtime().nereusCluster(),
+                                exactConfiguration.runtime().kafkaClusterId());
+                providerResources.add(registerOwned(
+                        constructedResources,
+                        "kafka-storage-activation-metadata-store",
+                        activationStore));
+                KafkaStorageActivationRuntime activationRuntime = new KafkaStorageActivationRuntime(
+                        activationStore,
+                        activationContext.capability(),
+                        activationContext.clusterSnapshots(),
+                        exactContext.renewalScheduler(),
+                        exactContext.clock(),
+                        activationContext.activationWaitTimeout(),
+                        activationContext.activationPollInterval(),
+                        exactContext.startupAction());
+                providerResources.add(registerOwned(
+                        constructedResources,
+                        "kafka-storage-activation-runtime",
+                        activationRuntime));
+                startup = activationRuntime;
+            }
             GenerationZeroPhysicalReferencePublisher physicalReferences =
                     new DefaultGenerationZeroPhysicalReferencePublisher(
                             exactConfiguration.runtime().nereusCluster(),
@@ -118,18 +166,35 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             throw propagate(failure);
         }
 
+        NereusKafkaRuntimeDependencies dependencies = new NereusKafkaRuntimeDependencies(
+                streamStorage,
+                ResourceOwnership.OWNED,
+                partitionMetadataStore,
+                ResourceOwnership.OWNED,
+                exactContext.renewalScheduler(),
+                exactContext.recoveryLauncher(),
+                exactContext.clock(),
+                exactContext.startupAction(),
+                providerResources);
         return NereusKafkaRuntimeFactory.create(
-                exactConfiguration.runtime(),
-                new NereusKafkaRuntimeDependencies(
-                        streamStorage,
-                        ResourceOwnership.OWNED,
-                        partitionMetadataStore,
-                        ResourceOwnership.OWNED,
-                        exactContext.renewalScheduler(),
-                        exactContext.recoveryLauncher(),
-                        exactContext.clock(),
-                        exactContext.startupAction(),
-                        providerResources));
+                exactConfiguration.runtime(), dependencies, startup);
+    }
+
+    private static void validateActivationContext(
+            NereusKafkaObjectWalRuntimeConfiguration configuration,
+            NereusKafkaObjectWalActivationContext activationContext) {
+        if (activationContext == null) return;
+        if (!activationContext.capability().kafkaClusterId().equals(
+                configuration.runtime().kafkaClusterId())) {
+            throw new IllegalArgumentException(
+                    "activation capability Kafka cluster must match the runtime");
+        }
+        List<String> executableProfiles = configuration.runtime().executableProfiles()
+                .stream().map(Enum::name).sorted().toList();
+        if (!activationContext.capability().supportedStorageProfiles().equals(executableProfiles)) {
+            throw new IllegalArgumentException(
+                    "activation capability profiles must match executable runtime profiles");
+        }
     }
 
     private static KafkaRuntimeResources.Resource registerOwned(

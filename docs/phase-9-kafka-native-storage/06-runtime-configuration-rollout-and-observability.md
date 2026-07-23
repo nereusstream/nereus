@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + strict Object-WAL provider lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam and adapter-backed typed bridge implemented；Kafka controller/runtime composition、BookKeeper/async providers and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam and adapter-backed typed bridge implemented；Kafka controller scheduling/fork context mapping、BookKeeper/async providers and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -47,15 +47,20 @@ Oxia runtime、L0/physical/Kafka binding stores、object-protection manager、ow
 `DefaultStreamStorage`。`NereusKafkaObjectWalRuntimeConfiguration` requires exactly
 `OBJECT_WAL_SYNC_OBJECT`、matching cluster/writer/session/commit-scan facts and `autoAcquireAppendSession=false`，preventing a
 missing adapter session from falling back to an unfenced legacy acquire。Bootstrap failures close every resource already
-created；successful construction transfers the exact ordered list to the process runtime。The injected startup action still
-owns cluster activation/capability proof，and the Kafka scheduler/recovery launcher/clock remain borrowed。
+created；successful construction transfers the exact ordered list to the process runtime。The only public production creator is
+`createActivated`；the unactivated path is package-private for construction failure cuts。It creates the activation store from the
+same shared Oxia runtime and installs `KafkaStorageActivationRuntime` ahead of the downstream startup action：publish capability，
+poll ACTIVE/readiness under both a wall deadline and a maximum-attempt bound，then continue startup。A heartbeat failure removes
+admission immediately。Runtime close cancels its owned heartbeat/poll futures before closing the activation store，while the Kafka
+scheduler/recovery launcher/clock remain borrowed。
 
 Kafka fork commits `46e6703761..617451957c` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
 create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
 enabled mode before LogManager construction。`NereusBrokerStorageRuntimeFactory` is the concrete adapter bridge：typed creators
 return the product runtime and exact scan limits；it does not evaluate them while disabled and closes a created runtime if later
 assembly fails。`NereusBrokerStorageRuntime` binds the runtime's single manager to the exact BrokerServer `ReplicaManager` and
-constructs the ListOffsets/topic-delta lifecycle only at that point。Fork-side typed-config mapping and activation remain open。
+constructs the ListOffsets/topic-delta lifecycle only at that point。Fork-side typed-config/context mapping and Kafka controller
+scheduling remain open。
 
 ### 1.2 Resource ownership
 

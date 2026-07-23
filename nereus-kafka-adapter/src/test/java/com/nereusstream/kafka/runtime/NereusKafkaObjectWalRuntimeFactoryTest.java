@@ -3,7 +3,11 @@ package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.kafka.activation.KafkaBrokerCapabilitySpecification;
+import com.nereusstream.kafka.activation.KafkaStorageClusterSnapshot;
+import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
+import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
 import com.nereusstream.objectstore.ObjectPutRetryPolicy;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
@@ -13,6 +17,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -29,7 +34,7 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
         FailingObjectStoreProvider provider = new FailingObjectStoreProvider();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
-            assertThatThrownBy(() -> NereusKafkaObjectWalRuntimeFactory.create(
+            assertThatThrownBy(() -> NereusKafkaObjectWalRuntimeFactory.createUnactivatedForTesting(
                     configuration(provider),
                     new NereusKafkaObjectWalRuntimeContext(
                             provider,
@@ -46,6 +51,72 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
         }
 
         assertThat(provider.closed()).isTrue();
+    }
+
+    @Test
+    void rejectsActivationScopeMismatchBeforeProviderIo() {
+        FailingObjectStoreProvider provider = new FailingObjectStoreProvider();
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try {
+            assertThatThrownBy(() -> NereusKafkaObjectWalRuntimeFactory.createActivated(
+                    configuration(provider),
+                    context(provider, scheduler),
+                    activationContext("another-kafka-cluster")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("activation capability Kafka cluster must match the runtime");
+        } finally {
+            scheduler.shutdownNow();
+        }
+        assertThat(provider.closed()).isFalse();
+    }
+
+    private static NereusKafkaObjectWalRuntimeContext context(
+            ObjectStoreProvider provider,
+            ScheduledExecutorService scheduler) {
+        return new NereusKafkaObjectWalRuntimeContext(
+                provider,
+                reference -> Optional.empty(),
+                scheduler,
+                request -> CompletableFuture.failedFuture(new AssertionError("recovery not expected")),
+                Clock.systemUTC(),
+                () -> CompletableFuture.completedFuture(null));
+    }
+
+    private static NereusKafkaObjectWalActivationContext activationContext(String cluster) {
+        KafkaBrokerIdentity broker = new KafkaBrokerIdentity(1, 7);
+        KafkaBrokerCapabilitySpecification capability = new KafkaBrokerCapabilitySpecification(
+                cluster,
+                broker,
+                "runtime-1",
+                "4.3.0",
+                "nereus-test",
+                "21",
+                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT),
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                bytes(1),
+                bytes(2),
+                bytes(3),
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(30));
+        KafkaStorageClusterSnapshot snapshot = new KafkaStorageClusterSnapshot(
+                cluster,
+                1,
+                KafkaStorageProtocolActivationRecord.KAFKA_FEATURE_LEVEL,
+                List.of(broker),
+                false,
+                false,
+                false);
+        return new NereusKafkaObjectWalActivationContext(
+                capability,
+                () -> CompletableFuture.completedFuture(snapshot),
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(1));
+    }
+
+    private static byte[] bytes(int seed) {
+        byte[] value = new byte[32];
+        for (int index = 0; index < value.length; index++) value[index] = (byte) (seed + index);
+        return value;
     }
 
     private static NereusKafkaObjectWalRuntimeConfiguration configuration(
