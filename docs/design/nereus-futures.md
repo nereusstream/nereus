@@ -1,7 +1,7 @@
 # Nereus Capability Tracks and Delivery Plan
 
 > 状态：Current roadmap
-> `Future 1-8` 是稳定的能力轨道编号，不是“全部尚未开始”的阶段标签。
+> `Future 1-9` 是稳定的能力轨道编号，不是“全部尚未开始”的阶段标签。
 
 ## 1. 交付原则
 
@@ -36,6 +36,7 @@ protocol/table state = projection
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
+| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | Designed | F1 ranged-entry evolution + F4 generation/compaction + native Kafka fork boundary |
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
@@ -43,7 +44,7 @@ profile from the completed P15-M6 surface。Future 4's explicit production compo
 `OBJECT_WAL_ASYNC_OBJECT` without changing that legacy boundary；BK-M5 now installs BK_ONLY、BK_ASYNC_OBJECT and
 BK_SYNC_OBJECT in production behind exact activation/capability admission and immutable first-create profile binding。
 The exact F1-BK target is
-`../phase-bk-bookkeeper-primary-wal/README.md`；it is not Future 5 and does not renumber F5–F8。
+`../phase-bk-bookkeeper-primary-wal/README.md`；it is not Future 5 and does not renumber F5–F9。
 
 ## 3. Dependency graph
 
@@ -66,6 +67,10 @@ flowchart LR
     F4 --> F8
     F7 --> F8
     F5 -. shared retention/txn contracts .-> F8
+    P15 --> F9["F9 Native Kafka Shared Storage"]
+    F4 --> F9
+    FBK --> F9
+    F7 -. optional placement projection .-> F9
 ```
 
 这不是所有设计工作的严格串行计划。F2-M0R2 新发现的 P15-M6 cumulative-result handoff 与 F2-M1-M6
@@ -331,7 +336,41 @@ Detailed design: `nereus-future8-advanced-pulsar-semantics.md`
 - system topic bootstrap has a resumable order；
 - geo-replication stores explicit source/target offset translation。
 
-## 12. Cross-track verification waves
+## 12. F9 — Native Kafka Shared-Storage Integration
+
+Detailed design: `nereus-future9-kafka-native-storage.md`
+Code-level target contract: `../phase-9-kafka-native-storage/README.md`
+
+F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
+a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives
+but do not share coordinator-state ownership or payload mapping.
+
+### Owns
+
+- cluster-wide native Kafka/Nereus activation and RF=1 controller constraints；
+- `topicId + partition` to Nereus stream binding and partition lifecycle；
+- exact Kafka `RecordBatch` bytes mapped to ranged Nereus entries；
+- native Produce/Fetch、LEO/HW/LSO、leader-epoch and recovery integration；
+- Kafka producer-state、transaction/time/virtual-segment checkpoints derived from the committed stream；
+- native Kafka retention、DeleteRecords and F4-backed log compaction；
+- broker admission、failure mapping、observability and rolling-upgrade gates。
+
+### Entry/exit gates
+
+- one Kafka `RecordBatch` is one `AppendEntry` and consumes its complete Kafka offset span；
+- public Nereus append/read contracts support expected-start and containing-entry semantics without changing the
+  default exact-start behavior consumed by Pulsar；
+- append authority can be fenced immediately by a strictly newer KRaft leader epoch；
+- Produce success is emitted only after a stable Nereus append result；unknown completion write-fences and recovers
+  the partition before any later append；
+- Kafka coordinator truth stays in native compacted internal topics；Oxia does not become a second group or
+  transaction log；
+- NCP2/NTC2 preserve ranged entries and Kafka batch semantics；NCP1/NTC1 bytes are never reinterpreted；
+- KRaft metadata is protocol truth，Nereus stream head is logical data truth，and object checkpoints are derived；
+- stock Kafka local-log cleaner and local disk are never alternate correctness owners；
+- the full code-level scenario matrix passes before the capability can be called implemented。
+
+## 13. Cross-track verification waves
 
 Verification follows architecture dependencies rather than waiting for all tracks：
 
@@ -343,11 +382,12 @@ Verification follows architecture dependencies rather than waiting for all track
 | V3 | F4 materialization lag、generation、GC and corruption tests |
 | V4 | F5/F7 protocol routing/failover compatibility |
 | V5 | F6/F8 catalog、advanced semantics、geo/txn integration |
+| V6 | F9 native Kafka produce/fetch、recovery、transactions、compaction、retention and multi-broker fencing |
 
 Benchmark、chaos、model checking 和 production profile claims 只能在对应 implementation gate
 之后使用；不能用 future design 文本代替证据。
 
-## 13. Document template
+## 14. Document template
 
 每个 capability document 至少包含：
 

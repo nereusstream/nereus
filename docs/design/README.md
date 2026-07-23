@@ -6,7 +6,8 @@
 `docs/phase-2-managed-ledger-facade/`、
 `docs/phase-3-cursor-subscription/`、
 `docs/phase-4-compaction-generation/` 与
-`docs/phase-bk-bookkeeper-primary-wal/` 共同构成仓库内设计基线。已实现合同由代码/
+`docs/phase-bk-bookkeeper-primary-wal/` 共同构成仓库内设计基线；
+`docs/phase-9-kafka-native-storage/` 是新增的 Designed 代码级 target。已实现合同由代码/
 测试优先；Phase 4 目录同时记录已通过 M0 的 target contract，以及已 final-gated 的 F4-M1–M6 实现和
 checkpoint-BQ aggregate evidence；F1-BK 目录记录当前 BookKeeper primary-WAL 交付。
 BK-M0 documentation gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；BK-M2
@@ -33,6 +34,8 @@ the whole predecessor chain；its ordinary gate passes 123/123 and the complete 
 5. `nereus-futures.md`：能力轨道、依赖关系和交付顺序；
 6. 文件名以 `nereus-futureN-` 开头的文档：各能力轨道详细设计；
 7. `../phase-bk-bookkeeper-primary-wal/README.md`：F1-BK BookKeeper primary-WAL 代码级设计与 BK-M0–M6 gate。
+8. `../phase-9-kafka-native-storage/README.md`：F9 原生 Kafka shared-storage 代码级 target、AutoMQ source lock
+   与 F9-M0–M7 gates。
 
 Future 1 / Phase 1 和 Phase 1.5 P15-M0-M6 已完成并通过普通/Docker gate；F2-M0 API spike、F2-M0R
 和 2026-07-12 F2-M0R2 code-level review 也已完成。M0R2 使用用户提供的 exact Pulsar checkout 关闭了
@@ -90,3 +93,6 @@ F4 target contract、M0 结论和 M1-M6 实施计划以
 `../phase-4-compaction-generation/README.md` 及该目录下的 `01` 到 `07` 为准。
 F1-BK contract、BK-M0–M6 顺序和场景/可执行证据矩阵以
 `../phase-bk-bookkeeper-primary-wal/README.md` 及该目录下的 `01` 到 `09` 为准。
+F9 native Kafka target、ranged-entry contract、Kafka fork method map、Oxia/checkpoint/lifecycle、runtime rollout
+和验收矩阵以 `../phase-9-kafka-native-storage/README.md` 及该目录下的 `01` 到 `08` 为准；当前只有设计，
+没有 `nereus-kafka-adapter` 或 Kafka fork 实现。

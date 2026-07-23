@@ -1,7 +1,7 @@
 # Nereus Design Index
 
 > 状态：当前设计索引
-> 最近一次设计/实现同步：2026-07-22
+> 最近一次设计/实现同步：2026-07-23
 > 当前交付阶段：Future 2、Future 3 与 Future 4 均 complete/final-gated；Future 4 M3 format、
 > planner/worker、protection/checkpoint/service、Pulsar Entry/NCP1 exact-byte round trip、topic-compaction SPI/registry、
 > terminal workflow-metadata retirement、COMMITTED-source topic bootstrap、tagged-v1/sorted-spill two-pass engine
@@ -84,10 +84,12 @@ streamId + offset
 4. **当前 F1-BK 代码级 contract + BK-M1–M6 evidence**：`docs/phase-bk-bookkeeper-primary-wal/` 的 BK-M0–M6
    implementation contract；the complete BookKeeper Primary WAL Delivery is final-gated，while online profile
    migration remains explicitly outside this delivery；
-5. **已接受决策**：`docs/decisions/`；
-6. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
-7. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
-8. **历史材料**：dated review、legacy design 和 Phase 0 文档。
+5. **F9 native Kafka code-level target**：`docs/phase-9-kafka-native-storage/` 的 Designed 合同；它约束未来
+   实现，但不能覆盖已实现 API/format 行为，也不能被描述为可执行能力；
+6. **已接受决策**：`docs/decisions/`；
+7. **总体设计**：本目录中的 architecture、terminology、commit protocol 和 object format；
+8. **能力轨道设计**：文件名以 `nereus-futureN-` 开头；
+9. **历史材料**：dated review、legacy design 和 Phase 0 文档。
 
 如果 1 与 2 不一致，不能只改其中一边：实现和代码级合同必须在同一变更中对齐。如果未来设计
 与当前实现不同，文档必须明确标注 `Designed` 或 `Reserved`，不能写成已经支持。
@@ -119,6 +121,7 @@ streamId + offset
 | `nereus-managed-ledger` | `Implemented`（F2-M1-M4 + F3-M1-M6 + F4-M1-M6） | F2 ledger facade/cursor boundary plus F3 state machines、F4 projection/cursor reference domains、strict NPR1 authority、restart-reconstructable cursor candidates、AL ownerless snapshot-key inverse、AM exact cursor/retention retirement authority、durable registration/proof/activation、AR exact-scope deletion guard and factory/runtime activation surface、AS shared projection/global-scope interpretation、AT durable DELETING restart evidence、BC bounded atomic readiness-rollover handoff、pre-I/O async admission、versioned stable retention planner/F3 trim service、shared bounded lane、durable backlog accounting、per-ledger facade and registration-backed policy admission are implemented/tested；safe defaults do not activate physical deletion |
 | `nereus-pulsar-adapter` | `Implemented`（F2 + F3 + F4 complete/final-gated） | typed runtime/S3 provider plus fork binding/admission/capability/policy/admin compatibility、durable generation registration/readiness/activation、checkpoint-AF coupled Object-WAL composition、checkpoint-AH retention runtime/config mapping、checkpoint-AI exact policy/admin admission、checkpoint-AN metadata-first root/registration/inventory lifecycle、checkpoint-AO broker physical-GC config mapping、checkpoint-AQ ordered proof/atomic delete activation、checkpoint-AR provider/Pulsar/restart-scope composition、checkpoint-AS exact shared reference-domain assembly、checkpoint-AT real post-DELETE independent recovery、checkpoint-AU applied-DELETED-CAS response-loss exact reload、checkpoint-AV two-worker shared-intent convergence、checkpoint-AW all-256-shard mixed-state recovery/opaque LIST progress、checkpoint-AX real-Oxia hot-shard bounded pagination、checkpoint-AY remove-on-cancel shared runtime scheduler、checkpoint-AZ 10,000-cursor-root exact GC、checkpoint-BA source/protection post-delete recovery、checkpoint-BB real post-root external-reappearance inventory/GC、checkpoint-BC atomic deletion-active readiness rollover and checkpoint-BI real two-broker process-wide worker contention/exact read coexistence are implemented/tested；safe defaults keep destructive execution disabled |
 | `nereus-kop-adapter` | `Designed` | marker module only；F5 payload mapping gate not implemented |
+| `nereus-kafka-adapter` | `Designed / absent` | F9 planned module only；native Kafka integration、ranged API、binding、checkpoint and fork classes are not implemented |
 | Future 3 cursor/subscription | `Implemented / final-gated`（F3-M0-M6） | M1 metadata/snapshot、M2 durable cursor/retention state machines、M3 ManagedCursor facade、M4 Pulsar capability/admission/durable-ack integration、M5 recovery/retention/scale and M6 compatibility/incarnation/F4 handoff pass their gates |
 | Future 4 materialization/compaction | `Implemented / final-gated`（F4-M1–M6） | M4 NRC1/recovery、retirement/GC fences、activation/global domains、scale/failure/late-PUT cuts and retry-disabled real source-deletion acceptance are implemented/tested；M5 final-gates async/retention compatibility；M6 covers 32-ref merge、4,096/4,097 candidates、million-entry NRC1、1,000+1,000 references、the 128-source/1,048,576-record task with schema V2/capability V2、exact 16,448-stream registry restart、real two-broker/two-worker compressed exact-read convergence、protected-intent retirement、partitioned admin routes、provider-neutral Hadoop/Oxia logging composition、bounded Docker release scheduling、exclusive and fresh locked-Pulsar checkout builds、inherited cursor TTL expiry-monitor convergence and executable 52/52 traceability；checkpoint BQ passes the BP-source-lock aggregate with 203/203 tasks executed |
 | Routing、lakehouse、高级语义 | `Designed` | design docs only |
@@ -276,6 +279,7 @@ decision behind items 14 and 16-18。
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
 | `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | implemented / final-gated（F4-M1–M6 + checkpoint BQ） |
 | `../phase-bk-bookkeeper-primary-wal/README.md` | F1-BK writer/reader/ledger lifecycle/retention/profile rollout code-level target | implemented / final-gated（BK-M0–M6；online profile migration excluded） |
+| `../phase-9-kafka-native-storage/README.md` | F9 native Kafka ranged-entry/log/fork/metadata/recovery/rollout code-level target | designed；F9-M0 documentation only |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | implemented / final-gated（F4-M5 profile + F4-M6 aggregate） |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |
@@ -294,6 +298,7 @@ decision behind items 14 and 16-18。
 | `nereus-future6-lakehouse-sbt-sdt.md` | F6 SBT/SDT | `Designed` |
 | `nereus-future7-routing-brownout-elasticity.md` | F7 routing/brown-out/elasticity | `Designed` |
 | `nereus-future8-advanced-pulsar-semantics.md` | F8 advanced Pulsar semantics | `Designed` |
+| `nereus-future9-kafka-native-storage.md` | F9 native Kafka shared storage | `Designed`；精确 target 见 `../phase-9-kafka-native-storage/` |
 
 ## 8. 阅读路线
 
@@ -344,6 +349,19 @@ decision behind items 14 and 16-18。
 3. 该目录的 `01` 到 `05` code-level documents；
 4. 对照 `../phase-1-core-stream-storage/` 的 frozen legacy contract/goldens；
 5. P15-M1-M6 implemented code and passing gates。
+
+### 评审/实现 Future 9
+
+1. 先比较 `nereus-future5-kop-compatibility.md` 与 `nereus-future9-kafka-native-storage.md`，确认 KoP projection
+   与 native Kafka fork 是两个独立边界；
+2. 以 `../phase-9-kafka-native-storage/README.md` 为入口，按 `01` 到 `08` 阅读代码级合同；
+3. source audit 固定 AutoMQ `1c648d84819d5c3fef2af585f02149c397584870` 与该文档列出的 blobs；参考源码
+   漂移时先更新审计，不能直接移植记忆中的 call path；
+4. F9-M1 必须先交付 protocol-neutral ranged-entry/read/format foundation，Kafka adapter 不得绕过 public API；
+5. 实现按 F9-M0–M7 及 scenario matrix 推进；未通过对应 executable gate 时状态保持 `Designed` 或
+   `In progress`，不得写成 supported；
+6. `nereus.kafka.storage.enabled=false` 的 stock Kafka fallback 与现有 Pulsar/KoP contracts 都是 mandatory
+   non-regression gate。
 
 ### 评审目标架构
 
