@@ -352,6 +352,10 @@ coordinator/transaction/compaction remain M4/M5。
   task/I/O、release-once on every terminal path、close admission and the rule that response-future cancellation cannot cancel
   admitted append work；`KafkaAppendFailureClassifierTest` proves only explicit known-not-committed remains writable，while
   authority/offset/unknown/uncertain/known-committed failures fence and checksum/format/invariant failures go offline；
+- `KafkaFetchOperationTest` proves actual-byte minBytes、stable-event wakeup、event coalescing、one read in flight per
+  partition、deadline final read、request-wide ordered byte budget、executor rejection before storage read、leadership/runtime
+  cancellation cleanup and callback exactly once；`DefaultKafkaPartitionStorageTest` proves event publication after stable
+  state and that listener failure cannot reclassify append I/O；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、

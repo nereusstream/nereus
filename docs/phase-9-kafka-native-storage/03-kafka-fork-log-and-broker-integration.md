@@ -479,6 +479,33 @@ Operation 注册：
 terminal transition 先 CAS，后注销 listener/release buffers/callback。callback executor 不是 storage IO executor，
 避免 slow response callback占满 read pool。
 
+### 8.2.1 Current Nereus-side implementation（2026-07-23）
+
+`KafkaPartitionStorage.subscribe` 与 `DefaultKafkaPartitionStorage` 已实现独立、幂等的 event subscription：
+
+- stable append 只在 exact stable snapshot 发布后发 `STABLE_APPEND`；resign 发 `LEADERSHIP_LOST`；future trim/corrupt
+  owner 使用 `LOG_START_CHANGED` / `CORRUPT_OFFLINE`；
+- listener snapshot 在 partition lock 内冻结、在 lock 外调用；listener 抛出的任意 failure 都不能改变已完成 I/O；
+- leadership/corrupt terminal event 先复制再清空 registration，operation cleanup 再 close 仍为幂等。
+
+`KafkaFetchOperation` 已实现 `NEW -> READING -> WAITING -> TIMED_READING -> COMPLETE` 和显式 `CANCELLED`：
+
+- 每个 request 的 immutable ordered partition list、`minBytes`、global `maxResponseBytes`、`maxWait`、
+  `maxRereads` 在构造时校验；重复 partition 或 partition hard limit 大于 request limit 直接拒绝；
+- 一个 trampoline control queue 在 caller 提供的 bounded read executor 上串行状态转换，避免 completed future 递归；
+  partition reads 可并发，但同一 partition 的前一 future terminal 前绝不发第二次 read；
+- event 只置 dirty；一个 read wave 中的多次 event 合并成下一 wave。minBytes 使用实际 included assembly bytes；
+  maxWait 到期时执行最后一个 bounded read wave，reread safety budget 用尽时直接使用最新 frozen results；
+- request-wide byte budget 按 partition request order 应用；included buffers 总和绝不超过 hard limit，无法容纳的
+  non-empty partition 只暴露 `omittedForResponseBudget=true`，不把该 buffer 交给 fork；
+- executor rejection 在第一次 storage read 前以 `BACKPRESSURE_REJECTED` terminal；leadership/corrupt/read failure
+  fail closed；runtime cancel 取消 read future、deadline 和 listener；所有 terminal path 在独立 callback executor
+  complete exactly once；外部 future cancel/complete/obtrude 不能绕过 operation cleanup。
+
+`KafkaFetchOperationTest` 已为 KF-FET-004/005/016 提供 deterministic adapter evidence；Kafka fork 中
+`ReplicaManager.fetchMessages` / stock delayed-fetch callback wiring、真实 KRaft broker process 和 request-level Kafka
+exception assembly 仍未实现，因此不是 M3 completion claim。
+
 ### 8.3 Virtual `LogOffsetMetadata`
 
 F9 不伪造 local file position。`KafkaVirtualPositionIndex` 从 committed append facts/checkpoint 维护：

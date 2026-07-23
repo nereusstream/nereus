@@ -44,11 +44,14 @@ import com.nereusstream.kafka.codec.KafkaFetchAssembly;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Serialized stable append and bounded committed-read implementation for one recovered Kafka leader. */
 public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage {
@@ -65,6 +68,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
     private final ArrayDeque<AppendOperation> appendQueue = new ArrayDeque<>();
+    private final Set<ListenerRegistration> eventListeners = new HashSet<>();
     private final CompletableFuture<Void> resigned = new CompletableFuture<>();
 
     private KafkaPartitionState state = KafkaPartitionState.LEADER_WRITABLE;
@@ -198,14 +202,38 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     }
 
     @Override
+    public KafkaPartitionEventSubscription subscribe(KafkaPartitionEventListener listener) {
+        Objects.requireNonNull(listener, "listener");
+        synchronized (guard) {
+            if (state != KafkaPartitionState.LEADER_WRITABLE
+                    && state != KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED) {
+                throw new NereusException(
+                        ErrorCode.STORAGE_CLOSED,
+                        false,
+                        "Kafka partition cannot accept Fetch listeners: " + state);
+            }
+            ListenerRegistration registration = new ListenerRegistration(listener);
+            eventListeners.add(registration);
+            return registration;
+        }
+    }
+
+    @Override
     public CompletableFuture<Void> resign() {
         boolean complete;
+        boolean leadershipChanged = false;
+        KafkaStableSnapshot snapshot;
         synchronized (guard) {
             if (state == KafkaPartitionState.CLOSED) return resigned;
-            if (state != KafkaPartitionState.RESIGNING) state = KafkaPartitionState.RESIGNING;
+            if (state != KafkaPartitionState.RESIGNING) {
+                state = KafkaPartitionState.RESIGNING;
+                leadershipChanged = true;
+            }
+            snapshot = stableSnapshot;
             complete = !appendRunning && appendQueue.isEmpty();
             if (complete) state = KafkaPartitionState.CLOSED;
         }
+        if (leadershipChanged) publishEvent(KafkaPartitionEventType.LEADERSHIP_LOST, snapshot);
         if (complete) resigned.complete(null);
         return resigned;
     }
@@ -316,6 +344,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         }
 
         if (failure == null) {
+            publishEvent(KafkaPartitionEventType.STABLE_APPEND, success.stableSnapshot());
             operation.result.complete(success);
         } else {
             operation.result.completeExceptionally(failure);
@@ -416,6 +445,25 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         return false;
     }
 
+    private void publishEvent(KafkaPartitionEventType type, KafkaStableSnapshot snapshot) {
+        KafkaPartitionEvent event = new KafkaPartitionEvent(identity, type, snapshot);
+        List<ListenerRegistration> listeners;
+        synchronized (guard) {
+            listeners = List.copyOf(eventListeners);
+            if (type == KafkaPartitionEventType.LEADERSHIP_LOST
+                    || type == KafkaPartitionEventType.CORRUPT_OFFLINE) {
+                eventListeners.clear();
+            }
+        }
+        for (ListenerRegistration listener : listeners) {
+            try {
+                listener.listener.onPartitionEvent(event);
+            } catch (Throwable ignored) {
+                // Listener code is observation-only and cannot change a completed storage outcome.
+            }
+        }
+    }
+
     private static boolean isKnownNotCommitted(Throwable failure) {
         return failure instanceof NereusException nereus
                 && nereus.appendOutcome().orElse(AppendOutcome.MAY_HAVE_COMMITTED)
@@ -447,6 +495,24 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         private AppendOperation(EncodedKafkaAppend encoded, KafkaAppendContext context) {
             this.encoded = encoded;
             this.context = context;
+        }
+    }
+
+    private final class ListenerRegistration implements KafkaPartitionEventSubscription {
+        private final KafkaPartitionEventListener listener;
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        private ListenerRegistration(KafkaPartitionEventListener listener) {
+            this.listener = listener;
+        }
+
+        @Override
+        public void close() {
+            if (closed.compareAndSet(false, true)) {
+                synchronized (guard) {
+                    eventListeners.remove(this);
+                }
+            }
         }
     }
 }

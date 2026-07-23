@@ -19,6 +19,8 @@ public interface KafkaPartitionStorage extends AutoCloseable {
 
     CompletableFuture<KafkaStorageReadResult> read(KafkaStorageReadRequest request);
 
+    KafkaPartitionEventSubscription subscribe(KafkaPartitionEventListener listener);
+
     CompletableFuture<Void> resign();
 
     @Override

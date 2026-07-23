@@ -20,6 +20,7 @@ import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -218,6 +219,30 @@ class DefaultKafkaPartitionStorageTest {
         assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.CLOSED);
         assertThatThrownBy(() -> fixture.storage.read(readRequest(0, 1, 1_024, true)).join())
                 .hasRootCauseInstanceOf(NereusException.class);
+    }
+
+    @Test
+    void publishesStableAndLeadershipEventsWithoutLettingListenersReclassifyIo() {
+        Fixture fixture = fixture(0, 0);
+        List<KafkaPartitionEventType> events = new ArrayList<>();
+        KafkaPartitionEventSubscription subscription = fixture.storage.subscribe(
+                event -> events.add(event.type()));
+        fixture.storage.subscribe(event -> {
+            throw new IllegalStateException("observer failure");
+        });
+        CompletableFuture<KafkaStableAppendResult> append = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        0, CompressionType.NONE, 1_000, "a")),
+                context(0, (short) 1));
+
+        fixture.streams.completeNextSuccess();
+
+        assertThat(append.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+        fixture.storage.resign().join();
+        assertThat(events).containsExactly(
+                KafkaPartitionEventType.STABLE_APPEND,
+                KafkaPartitionEventType.LEADERSHIP_LOST);
+        subscription.close();
     }
 
     @Test

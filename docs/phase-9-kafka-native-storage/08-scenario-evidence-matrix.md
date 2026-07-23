@@ -43,7 +43,9 @@ KF-APP-003 的 pre-storage exact-byte/CRC invariant；`DefaultKafkaPartitionStor
 KF-APP-013 和 KF-FET-003 的 adapter state-machine evidence；`KafkaBoundedAppendExecutorTest` 为 KF-APP-011/012
 提供 queue/byte admission、owned buffer release-once 和 cancel-does-not-cancel-task 的 deterministic partial
 evidence，`KafkaAppendFailureClassifierTest` 固化 fail-closed outcome/action mapping。它们不替代这些 row 要求的
-Kafka fork/real-service evidence，因此 row 状态仍不标记为完整通过。
+Kafka fork/real-service evidence。`KafkaFetchOperationTest` 还为 KF-FET-004/005/016 提供 actual-byte minBytes、
+event coalescing、deadline、one-in-flight-read、listener/read cleanup 和 callback-once 的 deterministic partial
+evidence；这些 row 状态仍不标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。

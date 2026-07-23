@@ -37,7 +37,7 @@ tasks.register<Test>("f9M2IntegrationTest") {
 
 tasks.register<Test>("f9M3CodecTest") {
     group = "verification"
-    description = "Run F9-M3 byte-exact codec and serialized partition append/read contracts."
+    description = "Run F9-M3 byte-exact codec, partition IO, and bounded async runtime contracts."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
@@ -46,5 +46,6 @@ tasks.register<Test>("f9M3CodecTest") {
         includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.KafkaBoundedAppendExecutorTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.KafkaAppendFailureClassifierTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.KafkaFetchOperationTest")
     }
 }
