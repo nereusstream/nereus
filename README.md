@@ -3,13 +3,14 @@
 Nereus is a protocol-neutral shared-storage streaming engine currently delivered through its Pulsar-native
 integration. Native KRaft Kafka Future 9 has completed the F9-M1 foundation and F9-M2 metadata/checkpoint
 implementation；the Nereus-side F9-M3 byte-exact RecordBatch、serialized partition IO、bounded append execution、async
-Fetch-operation、binding-first leader manager、exact stable-head/commit-reachability、default recovery opener and
+Fetch-operation、binding-first leader manager、exact stable-head/commit-reachability、default recovery opener、
+checkpoint-pinned paged COMMITTED replay and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the adapter now also has the process admission/runtime lifecycle and an explicit owned/borrowed resource
-ledger with reverse-order close；the Kafka fork now has local stock-`MemoryRecords` timestamp inspection、Kafka
+ledger with reverse-order close；the Kafka fork now has local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
 leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation
-and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline，
+plus provisional exact-`Partition` state publication/rollback and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline，
 but no native Kafka broker capability is available yet. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a
@@ -58,11 +59,13 @@ The main Nereus repository holds product-owned modules and authoritative design 
 Forks hold changes that must land inside upstream Pulsar, KoP, or Kafka trees. The `nereus-kafka-adapter` now owns the
 F9-M2 binding/checkpoint/recovery boundary and the M3 raw Kafka batch、stable partition append/read、profile-policy、
 authority-session renewal and exact bounded ListOffsets scan slices；the isolated Kafka fork branch owns the exact
-record iterator、async `OffsetResultHolder` bridge、optional stock `Partition`/`ReplicaManager` request seam、a generic
+record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHolder` bridge、optional stock
+`Partition`/`ReplicaManager` request seam、a generic
 `BrokerServer` runtime lifecycle injection boundary and the typed adapter-backed runtime bridge。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The fork branch is not yet pushed because
-the current GitHub credential has read-only fork access；the concrete provider-backed broker factory、log wiring and
+the current GitHub credential has read-only fork access；the concrete provider-backed broker factory exists but is not selected
+by KafkaRaftServer/CLI，and `UnifiedLog`/log wiring plus
 end-to-end native Produce/Fetch remain future work，
 so this is not a current broker-runtime claim.
 

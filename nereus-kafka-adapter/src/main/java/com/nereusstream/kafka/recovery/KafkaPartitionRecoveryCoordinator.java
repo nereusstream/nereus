@@ -8,10 +8,10 @@ import com.nereusstream.kafka.partition.KafkaPartitionState;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import java.time.Clock;
 import java.time.Duration;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** One-shot deterministic leader-open recovery from a verified checkpoint plus exact committed batch replay. */
@@ -22,6 +22,7 @@ public final class KafkaPartitionRecoveryCoordinator<S> {
     private final KafkaRecoveryBatchSource batches;
     private final KafkaRecoveryStateCodec<S> stateCodec;
     private final KafkaRecoveryPublisher<S> publisher;
+    private final Executor recoveryExecutor;
     private final Clock clock;
     private final AtomicReference<KafkaPartitionState> state =
             new AtomicReference<>(KafkaPartitionState.NEW);
@@ -34,10 +35,21 @@ public final class KafkaPartitionRecoveryCoordinator<S> {
             KafkaRecoveryStateCodec<S> stateCodec,
             KafkaRecoveryPublisher<S> publisher,
             Clock clock) {
+        this(checkpoints, batches, stateCodec, publisher, Runnable::run, clock);
+    }
+
+    public KafkaPartitionRecoveryCoordinator(
+            KafkaCheckpointRecoveryCoordinator checkpoints,
+            KafkaRecoveryBatchSource batches,
+            KafkaRecoveryStateCodec<S> stateCodec,
+            KafkaRecoveryPublisher<S> publisher,
+            Executor recoveryExecutor,
+            Clock clock) {
         this.checkpoints = Objects.requireNonNull(checkpoints, "checkpoints");
         this.batches = Objects.requireNonNull(batches, "batches");
         this.stateCodec = Objects.requireNonNull(stateCodec, "stateCodec");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
+        this.recoveryExecutor = Objects.requireNonNull(recoveryExecutor, "recoveryExecutor");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -98,7 +110,7 @@ public final class KafkaPartitionRecoveryCoordinator<S> {
             return CompletableFuture.failedFuture(new IllegalArgumentException(
                     "Kafka partition recovery deadline overflows", failure));
         }
-        return checkpoints.recover(request.checkpointRequest()).thenCompose(checkpoint -> {
+        return checkpoints.recover(request.checkpointRequest()).thenComposeAsync(checkpoint -> {
             transition(KafkaPartitionState.LOADING_CHECKPOINT, KafkaPartitionState.REPLAYING);
             KafkaCheckpointSourceState frozen = request.checkpointRequest().currentSource();
             S fresh = stateCodec.freshState();
@@ -109,32 +121,50 @@ public final class KafkaPartitionRecoveryCoordinator<S> {
                         return value.header().checkpointOffset();
                     })
                     .orElse(0L);
-            Duration remaining = remaining(deadline);
-            return batches.readCommitted(replayStart, frozen.endOffset(), remaining)
-                    .thenApply(values -> replay(fresh, replayStart, frozen.endOffset(), values))
+            return replayPages(fresh, replayStart, frozen.endOffset(), 0, deadline)
                     .thenCompose(count -> validateAndPublish(
                             request, checkpoint, fresh, replayStart, count, deadline));
-        });
+        }, recoveryExecutor);
     }
 
-    private int replay(S fresh, long startOffset, long endOffset, List<KafkaReplayBatch> values) {
-        List<KafkaReplayBatch> exact = List.copyOf(Objects.requireNonNull(values, "batches"));
-        long cursor = startOffset;
-        for (KafkaReplayBatch batch : exact) {
-            if (batch.baseOffset() != cursor || batch.lastOffset() >= endOffset) {
-                throw invariant("Kafka recovery batches are not exact, contiguous, and bounded");
-            }
-            stateCodec.replayBatch(fresh, batch);
-            try {
-                cursor = Math.addExact(batch.lastOffset(), 1);
-            } catch (ArithmeticException failure) {
-                throw invariant("Kafka recovery batch offset overflows");
-            }
+    private CompletableFuture<Integer> replayPages(
+            S fresh,
+            long startOffset,
+            long endOffset,
+            int replayedBatchCount,
+            long deadline) {
+        if (startOffset == endOffset) {
+            return CompletableFuture.completedFuture(replayedBatchCount);
         }
-        if (cursor != endOffset) {
-            throw invariant("Kafka recovery batches do not cover the frozen stable range");
-        }
-        return exact.size();
+        Duration remaining = remaining(deadline);
+        return batches.readCommittedPage(startOffset, endOffset, remaining)
+                .thenComposeAsync(page -> {
+                    Objects.requireNonNull(page, "Kafka recovery batch page");
+                    if (page.requestedOffset() != startOffset
+                            || page.nextOffset() <= startOffset
+                            || page.nextOffset() > endOffset) {
+                        throw invariant("Kafka recovery page is not exact, progressing, and bounded");
+                    }
+                    long cursor = startOffset;
+                    int count = replayedBatchCount;
+                    for (KafkaReplayBatch batch : page.batches()) {
+                        if (batch.baseOffset() != cursor || batch.lastOffset() >= endOffset) {
+                            throw invariant(
+                                    "Kafka recovery batches are not exact, contiguous, and bounded");
+                        }
+                        stateCodec.replayBatch(fresh, batch);
+                        try {
+                            cursor = Math.addExact(batch.lastOffset(), 1);
+                            count = Math.addExact(count, 1);
+                        } catch (ArithmeticException failure) {
+                            throw invariant("Kafka recovery batch offset/count overflows");
+                        }
+                    }
+                    if (cursor != page.nextOffset()) {
+                        throw invariant("Kafka recovery page cursor does not match replayed batches");
+                    }
+                    return replayPages(fresh, cursor, endOffset, count, deadline);
+                }, recoveryExecutor);
     }
 
     private CompletableFuture<KafkaRecoveredPartition<S>> validateAndPublish(

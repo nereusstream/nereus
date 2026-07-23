@@ -10,10 +10,12 @@ import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
 import com.nereusstream.api.DeleteOptions;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
 import com.nereusstream.api.SealOptions;
+import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
@@ -25,6 +27,7 @@ import com.nereusstream.api.TrimOptions;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 
 /** In-memory stream lifecycle fake for adapter state-machine tests. */
 public final class TestStreamStorage implements StreamStorage {
@@ -32,6 +35,13 @@ public final class TestStreamStorage implements StreamStorage {
     private final Map<StreamId, StreamMetadata> byId = new LinkedHashMap<>();
     private int creates;
     private boolean loseNextCreateResponse;
+    private BiFunction<StreamId, ReadRequest, CompletableFuture<SemanticReadResult>>
+            semanticReader;
+
+    public synchronized void semanticReader(
+            BiFunction<StreamId, ReadRequest, CompletableFuture<SemanticReadResult>> reader) {
+        semanticReader = reader;
+    }
 
     public synchronized void loseNextCreateResponseAfterCommit() {
         loseNextCreateResponse = true;
@@ -117,6 +127,14 @@ public final class TestStreamStorage implements StreamStorage {
     public CompletableFuture<ReadResult> read(
             StreamId streamId, long startOffset, ReadOptions options) {
         return unsupported();
+    }
+
+    @Override
+    public synchronized CompletableFuture<SemanticReadResult> read(
+            StreamId streamId, ReadRequest request) {
+        return semanticReader == null
+                ? unsupported()
+                : semanticReader.apply(streamId, request);
     }
 
     @Override

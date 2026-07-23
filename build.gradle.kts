@@ -2819,14 +2819,14 @@ tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
 
 tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
     group = "verification"
-    description = "Verify the local organization-fork F9 branch, exact bridge/metadata-lifecycle commits, markers, and source blobs."
+    description = "Verify the local organization-fork F9 branch, exact bridge/recovery/metadata-lifecycle commits, markers, and source blobs."
     usesService(kafkaCheckoutGate)
     workingDir = layout.projectDirectory.asFile
     commandLine(
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "752953d0ef9c38ae50340147bb4f3172ee9ddc5a",
+        "672429d94fd82679d7091585ef27c38a7a39f743",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",

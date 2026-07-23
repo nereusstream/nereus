@@ -424,8 +424,26 @@ checkpoint/replay coordinator under the remaining deadline、validates the retur
 storage renews only its current exact recovered token。A renewal failure or non-monotonic/mismatched result immediately removes
 write admission，resets speculative admission to the last stable end and publishes `LEADERSHIP_LOST`。An already-dispatched
 append is not cancelled because it may commit；after its exact completion no queued successor is dispatched。`resign()` cancels
-the pending timer but does not close the shared scheduler。The launcher remains the Kafka-fork state hydration/publication seam，
-and fork callback wiring remains open；neither may bypass opener/source revalidation。
+the pending timer but does not close the shared scheduler。
+
+The executable recovery boundary is now split by resource ownership：
+
+1. `NereusKafkaObjectWalRuntimeFactory` owns `DefaultObjectReadPinManager`、`KafkaCheckpointReader`、
+   `KafkaCheckpointVerifier`、`KafkaCheckpointRecoveryCoordinator` and
+   `DefaultKafkaPartitionRecoveryLauncher` because those components require the concrete ObjectStore/Oxia/physical-reference
+   graph；
+2. `DefaultKafkaRecoveryBatchSource` translates each bounded `StreamStorage.read` into one exact dense page using
+   `COMMITTED + EXACT_START + ALLOW_FIRST_ENTRY_OVERFLOW`，requires
+   `PayloadFormat.KAFKA_RECORD_BATCH`，never advances on an empty page and never returns a batch past the frozen end；
+3. `KafkaPartitionRecoveryCoordinator` runs page-by-page on the owned callback executor under one wall deadline，hydrates only
+   a fresh state，checks exact progress/contiguity，revalidates the current source after replay，publishes through a short
+   critical-section callback，then revalidates again before returning writable state；
+4. the Kafka fork supplies only `KafkaRecoveryStateFactory`，which creates a fresh stock-RecordBatch-derived codec and an exact
+   `Partition` publisher after ReplicaManager exists。The one-time bridge fails retriably before binding。
+
+The Object-WAL composition currently installs a no-op checkpoint `FailureObserver`；missing/corrupt referenced objects still
+fail/fallback according to the recovery coordinator, but durable quarantine/audit recording is not yet implemented and must not
+be claimed as complete。Neither the product launcher nor the fork publisher may bypass opener/source revalidation。
 
 If no checkpoint：
 
@@ -712,8 +730,15 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
 - `KafkaCheckpointRecoveryCoordinator` reads referenced keys newest-first under durable reader pins，falls back only for
   object-local missing/corrupt/invariant failures，and fails closed when trim is non-zero without a usable checkpoint；
 - `KafkaPartitionRecoveryCoordinator` hydrates only a fresh state instance，requires exact contiguous committed batch
-  coverage to the frozen stable end，revalidates session/head before and after non-writable state installation，and fences
-  instead of enabling writes if the head changes during replay/publication；
+  coverage to the frozen stable end across bounded pages，revalidates session/head before and after non-writable state
+  installation，and fences instead of enabling writes if the head changes during replay/publication；
+- `DefaultKafkaRecoveryBatchSourceTest` proves the exact COMMITTED/EXACT_START request, configured record/byte bounds,
+  source-fact matching and fail-closed empty/non-Kafka pages；`KafkaCheckpointPublicationRecoveryIntegrationTest` proves
+  multi-page replay to the frozen end；
+- fork `NereusKafkaRecoveryStateCodecTest` proves exact magic-v2 single-batch parsing、CRC、compressed and uncompressed dense
+  record replay、timestamps/leader-epoch ranges、trailing/source mismatch rejection and M3 fail-closed
+  producer/transaction/NKC1 behavior；`NereusKafkaRecoveryStateFactoryTest` proves exact current-Partition publication and
+  stale epoch rejection；
 - `:nereus-metadata-oxia:f9MetadataTest`、`:nereus-metadata-oxia:f9OxiaIntegrationTest`、
   `:nereus-object-store:kafkaCheckpointTest`、`:nereus-object-store:kafkaCheckpointS3IntegrationTest`、
   `:nereus-kafka-adapter:f9M2Test` and `:nereus-kafka-adapter:f9M2IntegrationTest` pass on current source；

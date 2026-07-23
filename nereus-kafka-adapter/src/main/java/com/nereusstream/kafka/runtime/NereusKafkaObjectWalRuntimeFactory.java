@@ -5,10 +5,15 @@ import com.nereusstream.api.StreamStorage;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
+import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
 import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
+import com.nereusstream.kafka.recovery.DefaultKafkaPartitionRecoveryLauncher;
+import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryCoordinator;
+import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
@@ -19,6 +24,9 @@ import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreProvider;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointCodecV1;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointReader;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointVerifier;
 import com.nereusstream.objectstore.wal.DefaultWalObjectReader;
 import com.nereusstream.objectstore.wal.DefaultWalObjectWriter;
 import java.util.ArrayList;
@@ -76,6 +84,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
         List<KafkaRuntimeResources.Resource> providerResources = new ArrayList<>();
         KafkaPartitionMetadataStore partitionMetadataStore;
         StreamStorage streamStorage;
+        KafkaPartitionRecoveryLauncher recoveryLauncher;
         KafkaRuntimeStartup startup = KafkaRuntimeStartup.from(exactContext.startupAction());
         try {
             providerResources.add(registerOwned(
@@ -163,6 +172,35 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     exactContext.clock(),
                     callbackExecutor);
             registerOwned(constructedResources, "stream-storage", streamStorage);
+            ObjectReadPinManager readPins = new DefaultObjectReadPinManager(
+                    exactConfiguration.runtime().nereusCluster(),
+                    exactConfiguration.streamStorage().processRunId(),
+                    physicalMetadataStore,
+                    exactConfiguration.pendingProtectionDuration(),
+                    exactConfiguration.maximumClockSkew(),
+                    exactConfiguration.orphanGrace(),
+                    exactContext.clock());
+            providerResources.add(registerOwned(
+                    constructedResources, "kafka-checkpoint-read-pins", readPins));
+            KafkaCheckpointRecoveryCoordinator checkpoints =
+                    new KafkaCheckpointRecoveryCoordinator(
+                            exactConfiguration.runtime().nereusCluster(),
+                            partitionMetadataStore,
+                            physicalMetadataStore,
+                            readPins,
+                            new KafkaCheckpointReader(
+                                    objectStore, new KafkaCheckpointCodecV1()),
+                            new KafkaCheckpointVerifier(),
+                            exactContext.clock(),
+                            (reference, failure) -> { });
+            recoveryLauncher = new DefaultKafkaPartitionRecoveryLauncher(
+                    checkpoints,
+                    streamStorage,
+                    exactContext.recoveryStateFactory(),
+                    exactConfiguration.runtime().recoveryChunkRecords(),
+                    exactConfiguration.runtime().recoveryChunkBytes(),
+                    callbackExecutor,
+                    exactContext.clock());
         } catch (Throwable failure) {
             closeAfterFailure(constructedResources, failure);
             throw propagate(failure);
@@ -174,7 +212,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 partitionMetadataStore,
                 ResourceOwnership.OWNED,
                 exactContext.renewalScheduler(),
-                exactContext.recoveryLauncher(),
+                recoveryLauncher,
                 exactContext.clock(),
                 exactContext.startupAction(),
                 providerResources);

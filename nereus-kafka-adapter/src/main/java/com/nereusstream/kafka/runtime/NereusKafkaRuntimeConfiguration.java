@@ -17,6 +17,8 @@ public record NereusKafkaRuntimeConfiguration(
         String operationOwnerId,
         long operationOwnerEpoch,
         Duration operationTtl,
+        int recoveryChunkRecords,
+        int recoveryChunkBytes,
         Set<StorageProfile> executableProfiles) {
     public NereusKafkaRuntimeConfiguration {
         nereusCluster = nonblank(nereusCluster, "nereusCluster");
@@ -27,6 +29,9 @@ public record NereusKafkaRuntimeConfiguration(
                 appendSessionRenewalInterval, "appendSessionRenewalInterval");
         operationOwnerId = nonblank(operationOwnerId, "operationOwnerId");
         operationTtl = positive(operationTtl, "operationTtl");
+        if (recoveryChunkRecords <= 0 || recoveryChunkBytes <= 0) {
+            throw new IllegalArgumentException("recovery chunk limits must be positive");
+        }
         executableProfiles = Set.copyOf(Objects.requireNonNull(executableProfiles, "executableProfiles"));
         if (appendSessionRenewalInterval.compareTo(appendSessionTtl) >= 0) {
             throw new IllegalArgumentException(

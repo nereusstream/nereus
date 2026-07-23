@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec slice in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec/partition IO/checkpoint-pinned paged recovery/fork-derived-state slices in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -165,6 +165,11 @@ codec/KafkaFetchAssembler.java
 metadata/KafkaPartitionLifecycleCoordinator.java
 checkpoint/KafkaCheckpoint*.java + section codecs
 recovery/KafkaPartitionRecoveryCoordinator.java
+recovery/DefaultKafkaPartitionRecoveryLauncher.java
+recovery/DefaultKafkaRecoveryBatchSource.java
+recovery/KafkaRecoveryBatchPage.java
+recovery/KafkaRecoveryState.java
+recovery/KafkaRecoveryStateFactory.java
 retention/KafkaRetention*.java
 compaction/KafkaCompaction*.java
 admin/NereusKafkaStorageAdmin.java
@@ -377,7 +382,7 @@ coordinator/transaction/compaction remain M4/M5。
   frozen result validation and writable storage construction；`DefaultStreamStorageAppendTest` and
   `DefaultKafkaPartitionStorageTest` prove the public exact-session renewal path、strict monotonic returned token、renewed token
   use by later appends、failure-to-write-fence transition、leadership-loss event and no queued append dispatch after authority
-  loss。Kafka fork launcher/runtime wiring remains open；
+  loss。The product/fork recovery composition is now wired；native log consumption remains open；
 - `KafkaListOffsetsResolverTest` proves stable-snapshot earliest/latest、compressed exact-record timestamp lookup、
   bounded cross-page scan、max-timestamp lowest-offset tie-break、budget exhaustion without approximate answers、invalid
   inspector result rejection and leadership loss during inspection。This is deterministic Nereus-side partial evidence for
@@ -402,6 +407,16 @@ coordinator/transaction/compaction remain M4/M5。
   ACTIVE/readiness seeding、runtime capability resume/verification、binding、authority acquire/recovery、leader open、one byte-exact
   stable Produce、committed Fetch and owned provider shutdown。
   This is provider-backed adapter evidence，not yet a Kafka BrokerServer/KRaft or production S3 gate；
+- `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
+  configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
+  `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
+  results；`KafkaCheckpointPublicationRecoveryIntegrationTest` proves multi-page replay。The installed checkpoint failure
+  observer is currently no-op，so durable quarantine/audit is still open；
+- fork `NereusKafkaRecoveryStateCodecTest` proves three stock magic-v2 RecordBatch recovery cases covering CRC、single
+  entry/batch、compressed/uncompressed dense offsets、timestamp/leader-epoch derivation、trailing/source mismatch and M3
+  producer/transaction/NKC1 rejection。`NereusKafkaRecoveryStateFactoryTest` proves two exact live-Partition publication/stale
+  epoch cases；`NereusKafkaRecoveryStateFactoryBridgeTest` proves two one-time/pre-bind cases。State is provisional under the
+  Partition write lock and topic-lifecycle failed-open cleanup removes it before coordinator readiness；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
   cleaner/AutoMQ/request-limit/directory validation。Six snapshot tests、four validator tests and the complete stock
@@ -410,25 +425,27 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@752953d0ef` contains eleven reviewed commits and the fifty-two-file
-  bridge/request/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
+  `nereus/future9-native-kafka-storage@672429d94f` contains twelve reviewed commits and the fifty-seven-file
+  bridge/request/recovery/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
   read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
   final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/eleven-commit count/remotes/fifty-two bridge/metadata-lifecycle/configuration/runtime-composition
+  fork branch/head/base ancestry/twelve-commit count/remotes/fifty-seven bridge/recovery/metadata-lifecycle/configuration/runtime-composition
   blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、four stock Partition seam tests、one
   ReplicaManager publication test、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
-  four product-runtime mapper tests、three KRaft context adapters、four deferred-runtime tests、two recovery-bridge tests、
+  four product-runtime mapper tests、three KRaft context adapters、four deferred-runtime tests、two recovery-state bridge tests、
+  three recovery codec tests、two exact Partition recovery-state factory tests、
   one borrowed-scheduler test、
   complete `KafkaConfigTest`、three stock runtime-factory tests、five adapter-backed runtime tests、stock single-node KRaft
   restart and server/core/storage format/static-analysis
-  gates。At current `752953d0ef` the aggregate rerun passed 71/71 outer tasks；nested stock/artifact-enabled Kafka builds completed
-  92/92 and 95/95 actionable tasks。Because the exact
+  gates。The exact `672429d94f` aggregate rerun result is recorded after the Nereus recovery composition and updated source lock
+  are committed；the preceding `752953d0ef` aggregate passed 71/71 outer tasks and nested stock/artifact-enabled Kafka builds
+  completed 92/92 and 95/95 actionable tasks。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics
@@ -511,7 +528,8 @@ isolation、late-start fencing、manager-first close、exact OWNED/BORROWED iden
 aggregation executable。`NereusKafkaRuntimeConfiguration`、`NereusKafkaRuntimeDependencies` and
 `NereusKafkaRuntimeFactory` now make the post-provider product graph executable：one binding keyspace/lifecycle、one
 authority/recovery opener、one partition manager、one codec pair and one process runtime，with fixed/extra provider resources
-entered into the exact close ledger and Kafka scheduler/clock/recovery launcher remaining borrowed。The local Kafka fork also
+entered into the exact close ledger；the Object-WAL creator now additionally owns checkpoint read pins and concrete
+checkpoint/COMMITTED replay composition，while Kafka scheduler/clock and the fork recovery-state factory remain borrowed。The local Kafka fork also
 has an explicitly injected generic `BrokerStorageRuntimeFactory` with
 stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。`NereusBrokerStorageRuntimeFactory`
 and `NereusBrokerStorageRuntime` now add typed runtime/scan-limit creators、failure rollback、one exact ReplicaManager binding、
@@ -531,8 +549,9 @@ already has durable Nereus Kafka binding history。The fork now maps its typed c
 Object-WAL/Oxia/StreamStorage/capability/ListOffsets configurations with deterministic compatibility/provider/code digests and
 pre-I/O profile/provider rejection。The fork now also performs no-I/O factory assembly，waits for the exact registered epoch，
 constructs the activation-backed S3/Object-WAL runtime from borrowed scheduler/clock，captures one KRaft/local-log snapshot and
-one-time binds a recovery bridge to the exact ReplicaManager。Concrete recovery execution、Kafka controller activation scheduling、
-CLI/log selection、priority budgets
+one-time binds a recovery-state factory bridge to the exact ReplicaManager。Concrete M3 recovery execution is wired across the
+product/fork boundary；Kafka controller activation scheduling、CLI/KafkaRaftServer log selection、durable checkpoint-failure
+quarantine/audit、priority budgets
 and real native-storage shutdown/process cuts remain open。
 
 ### Tasks

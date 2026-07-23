@@ -40,8 +40,9 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
                             provider,
                             reference -> Optional.empty(),
                             scheduler,
-                            request -> CompletableFuture.failedFuture(
-                                    new AssertionError("recovery not expected")),
+                            request -> {
+                                throw new AssertionError("recovery not expected");
+                            },
                             Clock.systemUTC(),
                             () -> CompletableFuture.completedFuture(null))))
                     .isInstanceOf(IllegalStateException.class)
@@ -77,7 +78,9 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
                 provider,
                 reference -> Optional.empty(),
                 scheduler,
-                request -> CompletableFuture.failedFuture(new AssertionError("recovery not expected")),
+                request -> {
+                    throw new AssertionError("recovery not expected");
+                },
                 Clock.systemUTC(),
                 () -> CompletableFuture.completedFuture(null));
     }
@@ -130,6 +133,8 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
                 "broker-run",
                 7,
                 Duration.ofSeconds(30),
+                100_000,
+                256 * 1024 * 1024,
                 Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
         return new NereusKafkaObjectWalRuntimeConfiguration(
                 runtime,

@@ -12,7 +12,9 @@ import com.nereusstream.kafka.partition.KafkaPartitionLeaderOpenRequest;
 import com.nereusstream.kafka.partition.KafkaPartitionState;
 import com.nereusstream.kafka.partition.KafkaPartitionStorage;
 import com.nereusstream.kafka.partition.KafkaStorageReadRequest;
-import com.nereusstream.kafka.recovery.KafkaRecoveredPartition;
+import com.nereusstream.kafka.recovery.KafkaRecoveryState;
+import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
+import com.nereusstream.kafka.recovery.KafkaReplayBatch;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
@@ -84,6 +86,8 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                     writer,
                     9,
                     Duration.ofSeconds(30),
+                    100_000,
+                    256 * 1024 * 1024,
                     Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
             OxiaClientConfiguration oxia = new OxiaClientConfiguration(
                     OXIA.getServiceAddress(),
@@ -132,16 +136,9 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                             provider,
                             reference -> Optional.empty(),
                             scheduler,
-                            request -> {
-                                var source = request.checkpointRequest().currentSource();
-                                return CompletableFuture.completedFuture(new KafkaRecoveredPartition<>(
-                                        new Object(),
-                                        source,
-                                        source.endOffset(),
-                                        source.endOffset(),
-                                        0,
-                                        Optional.empty()));
-                            },
+                            request -> new KafkaRecoveryState<>(
+                                    new EmptyRecoveryStateCodec(),
+                                    recovered -> CompletableFuture.completedFuture(null)),
                             clock,
                             () -> CompletableFuture.completedFuture(null)),
                     new NereusKafkaObjectWalActivationContext(
@@ -308,6 +305,36 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
+    }
+
+    private static final class EmptyRecoveryStateCodec
+            implements KafkaRecoveryStateCodec<Object> {
+        @Override
+        public Object freshState() {
+            return new Object();
+        }
+
+        @Override
+        public void hydrateCheckpoint(
+                Object state,
+                List<com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection> sections,
+                long checkpointOffset) {
+            throw new AssertionError("checkpoint hydration not expected");
+        }
+
+        @Override
+        public void replayBatch(Object state, KafkaReplayBatch batch) {
+            throw new AssertionError("batch replay not expected");
+        }
+
+        @Override
+        public void validateRecoveredState(
+                Object state,
+                com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState frozenSource) {
+            if (frozenSource.endOffset() != 0) {
+                throw new AssertionError("empty recovery expected");
+            }
+        }
     }
 
     private static final class LocalObjectStoreProvider implements ObjectStoreProvider {

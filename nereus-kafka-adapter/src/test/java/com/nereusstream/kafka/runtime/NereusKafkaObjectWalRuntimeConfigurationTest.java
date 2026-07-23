@@ -65,6 +65,8 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
                 "broker-run",
                 7,
                 Duration.ofSeconds(30),
+                100_000,
+                256 * 1024 * 1024,
                 profiles);
     }
 

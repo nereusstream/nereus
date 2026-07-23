@@ -1,7 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.kafka.runtime;
 
-import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
+import com.nereusstream.kafka.recovery.KafkaRecoveryStateFactory;
 import com.nereusstream.objectstore.ObjectStoreProvider;
 import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import java.time.Clock;
@@ -15,14 +15,14 @@ public record NereusKafkaObjectWalRuntimeContext(
         ObjectStoreProvider objectStoreProvider,
         ObjectStoreSecretResolver secretResolver,
         ScheduledExecutorService renewalScheduler,
-        KafkaPartitionRecoveryLauncher recoveryLauncher,
+        KafkaRecoveryStateFactory recoveryStateFactory,
         Clock clock,
         Supplier<? extends CompletionStage<Void>> startupAction) {
     public NereusKafkaObjectWalRuntimeContext {
         Objects.requireNonNull(objectStoreProvider, "objectStoreProvider");
         Objects.requireNonNull(secretResolver, "secretResolver");
         Objects.requireNonNull(renewalScheduler, "renewalScheduler");
-        Objects.requireNonNull(recoveryLauncher, "recoveryLauncher");
+        Objects.requireNonNull(recoveryStateFactory, "recoveryStateFactory");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(startupAction, "startupAction");
     }

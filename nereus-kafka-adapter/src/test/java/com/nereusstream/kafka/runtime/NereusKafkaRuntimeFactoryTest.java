@@ -127,6 +127,8 @@ class NereusKafkaRuntimeFactoryTest {
                 "broker-run",
                 1,
                 Duration.ofSeconds(30),
+                100_000,
+                256 * 1024 * 1024,
                 Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("shorter");
@@ -139,9 +141,25 @@ class NereusKafkaRuntimeFactoryTest {
                 "broker-run",
                 0,
                 Duration.ofSeconds(30),
+                100_000,
+                256 * 1024 * 1024,
                 Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("operationOwnerEpoch");
+        assertThatThrownBy(() -> new NereusKafkaRuntimeConfiguration(
+                "nereus",
+                "kraft",
+                "broker-run",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(10),
+                "broker-run",
+                1,
+                Duration.ofSeconds(30),
+                0,
+                1_024,
+                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("recovery chunk");
     }
 
     private static NereusKafkaRuntimeConfiguration configuration() {
@@ -154,6 +172,8 @@ class NereusKafkaRuntimeFactoryTest {
                 "broker-run",
                 7,
                 Duration.ofSeconds(30),
+                100_000,
+                256 * 1024 * 1024,
                 Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
     }
 

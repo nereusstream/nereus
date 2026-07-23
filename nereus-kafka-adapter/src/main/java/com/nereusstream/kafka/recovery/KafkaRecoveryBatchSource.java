@@ -2,12 +2,11 @@
 package com.nereusstream.kafka.recovery;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/** Reads exact committed batch bytes for the frozen half-open recovery range. */
+/** Reads one bounded exact COMMITTED page within the frozen half-open recovery range. */
 @FunctionalInterface
 public interface KafkaRecoveryBatchSource {
-    CompletableFuture<List<KafkaReplayBatch>> readCommitted(
+    CompletableFuture<KafkaRecoveryBatchPage> readCommittedPage(
             long startOffset, long endOffset, Duration timeout);
 }

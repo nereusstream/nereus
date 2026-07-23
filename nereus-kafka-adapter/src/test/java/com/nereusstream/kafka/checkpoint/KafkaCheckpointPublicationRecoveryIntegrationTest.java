@@ -23,6 +23,7 @@ import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryResult;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryCoordinator;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
+import com.nereusstream.kafka.recovery.KafkaRecoveryBatchPage;
 import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
 import com.nereusstream.kafka.recovery.KafkaReplayBatch;
 import com.nereusstream.kafka.testing.TestStreamStorage;
@@ -57,6 +58,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -167,12 +169,20 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             KafkaCheckpointSourceState frozen = source(fixture.identity, 0, 5, 13, 'c');
             fixture.validator.current.set(frozen);
             AtomicReference<SyntheticKafkaState> published = new AtomicReference<>();
+            AtomicInteger pages = new AtomicInteger();
             KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
                     new KafkaPartitionRecoveryCoordinator<>(
                             fixture.recovery(CLOCK),
-                            (start, end, timeout) -> CompletableFuture.completedFuture(List.of(
-                                    batch(2, 3, 2, 2),
-                                    batch(4, 4, 4, 1))),
+                            (start, end, timeout) -> {
+                                pages.incrementAndGet();
+                                return start == 2
+                                        ? CompletableFuture.completedFuture(
+                                                new KafkaRecoveryBatchPage(
+                                                        2, 4, List.of(batch(2, 3, 2, 2))))
+                                        : CompletableFuture.completedFuture(
+                                                new KafkaRecoveryBatchPage(
+                                                        4, 5, List.of(batch(4, 4, 4, 1))));
+                            },
                             new SyntheticStateCodec(),
                             recovered -> {
                                 published.set(recovered.state());
@@ -190,6 +200,7 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             assertThat(recovered.replayStartOffset()).isEqualTo(2);
             assertThat(recovered.replayEndOffset()).isEqualTo(5);
             assertThat(recovered.replayedBatchCount()).isEqualTo(2);
+            assertThat(pages).hasValue(2);
             assertThat(recovered.checkpointObjectId()).isPresent();
             assertThat(recovered.state()).isSameAs(published.get());
             assertThat(recovered.state().hydrated).isTrue();
@@ -211,9 +222,10 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
                             fixture.recovery(CLOCK),
                             (start, end, timeout) -> {
                                 fixture.validator.current.set(source(fixture.identity, 0, 6, 14, 'd'));
-                                return CompletableFuture.completedFuture(List.of(
-                                        batch(2, 3, 2, 2),
-                                        batch(4, 4, 4, 1)));
+                                return CompletableFuture.completedFuture(
+                                        new KafkaRecoveryBatchPage(start, end, List.of(
+                                                batch(2, 3, 2, 2),
+                                                batch(4, 4, 4, 1))));
                             },
                             new SyntheticStateCodec(),
                             recovered -> {
@@ -245,9 +257,10 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
                     new KafkaPartitionRecoveryCoordinator<>(
                             fixture.recovery(CLOCK),
-                            (start, end, timeout) -> CompletableFuture.completedFuture(List.of(
-                                    batch(0, 1, 0, 2),
-                                    batch(2, 2, 2, 1))),
+                            (start, end, timeout) -> CompletableFuture.completedFuture(
+                                    new KafkaRecoveryBatchPage(start, end, List.of(
+                                            batch(0, 1, 0, 2),
+                                            batch(2, 2, 2, 1)))),
                             new SyntheticStateCodec(),
                             recovered -> CompletableFuture.completedFuture(null),
                             CLOCK);
@@ -276,9 +289,10 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             KafkaPartitionRecoveryCoordinator<SyntheticKafkaState> coordinator =
                     new KafkaPartitionRecoveryCoordinator<>(
                             fixture.recovery(CLOCK),
-                            (start, end, timeout) -> CompletableFuture.completedFuture(List.of(
-                                    batch(2, 3, 2, 2),
-                                    batch(4, 4, 4, 1))),
+                            (start, end, timeout) -> CompletableFuture.completedFuture(
+                                    new KafkaRecoveryBatchPage(start, end, List.of(
+                                            batch(2, 3, 2, 2),
+                                            batch(4, 4, 4, 1)))),
                             new SyntheticStateCodec(),
                             recovered -> {
                                 installed.set(true);
