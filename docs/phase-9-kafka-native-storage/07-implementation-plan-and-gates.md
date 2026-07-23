@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec/partition IO/checkpoint-pinned paged recovery/fork-derived-state/log-shell-factory/bounded Produce and whole-request async Fetch handoff slices in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 producer/open/aborted canonical state and strict V1 codec partial slice implemented；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -498,7 +498,7 @@ coordinator/transaction/compaction remain M4/M5。
 
 ### Slices
 
-1. canonical NKC1 producer/open-txn/aborted/epoch/segment/time/byte sections；
+1. canonical NKC1 producer/open-txn/aborted/epoch/segment/time/byte sections（section 1/2/7 product model + strict codec implemented；section 3–6 pending）；
 2. `NereusProducerStateManager`/txn/time/epoch facades；
 3. stable post-commit failure fence/replay；
 4. idempotent producer retries/epochs/sequences；
@@ -520,6 +520,12 @@ phase9M4FinalCheck --rerun-tasks
 ```
 
 Final includes Kafka upstream producer/group/transaction focused suites plus real two-broker takeover。
+
+Current partial gate（2026-07-24）：`:nereus-kafka-adapter:f9ProducerStatePropertyTest` and
+`phase9M4ProducerStateCheck` cover section 1/2/7 structural invariants、frozen canonical bytes、sequence wrap and 200
+deterministic randomized round trips。The task deliberately does not use the `phase9M4Check` completion name；stock
+`ProducerStateManager` import/replay、idempotent/transaction request paths、LSO/aborted filtering and internal-topic
+coordinator ordering are still required before M4 completion。
 
 ## 9. F9-M5 — Retention and compaction
 

@@ -93,6 +93,18 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
     useJUnitPlatform()
 }
 
+tasks.register<Test>("f9ProducerStatePropertyTest") {
+    group = "verification"
+    description = "Run the partial F9-M4 canonical producer and transaction checkpoint contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaProducerTransactionStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaProducerStatePropertyTest")
+    }
+}
+
 tasks.register<Test>("f9ActivationTest") {
     group = "verification"
     description = "Run F9 broker capability publication and ACTIVE/readiness admission contracts."

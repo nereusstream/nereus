@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：Designed target；F9-M4/F9-M5
+> 状态：F9-M4 producer/open/aborted canonical state + strict V1 codec partial slice implemented；Kafka import/replay and request semantics remain in progress；F9-M5 designed target
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -105,6 +105,13 @@ re-established by stock protocol。
 
 `mapEndOffset == NKC1.checkpointOffset`。Import into a fresh manager only；merging with existing state is forbidden。
 
+Current implementation（2026-07-24）：product side now owns the Kafka-artifact-neutral
+`KafkaProducerTransactionState`、`KafkaProducerTransactionStateCodecV1` and deterministic
+`f9ProducerStatePropertyTest` gate。The model preserves at most five batches in oldest-to-newest order，uses Kafka
+sequence wrap arithmetic，requires producer IDs to be strictly sorted and requires `mapEndOffset` to equal the outer
+checkpoint offset。The codec is strict big-endian and rejects count/length/flag/version/trailing-byte ambiguity before a
+fork can import it。It is not yet evidence that stock `ProducerStateManager` import or replay is complete。
+
 ## 4. Transaction state and indexes
 
 ### 4.1 Data truth
@@ -128,7 +135,8 @@ for transaction sorted (firstOffset, producerId):
 ```
 
 Cross-check every entry with producer section。At a normal checkpoint barrier，completed-but-not-finalized entries should be
-zero；decoder supports them only for a crash-consistent captured boundary explicitly marked in section flags。
+zero；the current decoder rejects them。A future crash-consistent captured boundary may support them only after an explicit
+section flag is assigned and frozen；accepting an unflagged entry is forbidden。
 
 ### 4.3 Aborted transaction section V1
 
@@ -145,6 +153,8 @@ for entries sorted (lastOffset, firstOffset, producerId):
 
 Fields match Kafka `AbortedTxn` semantics，not its Java buffer layout。Entries must be non-overflowing、within checkpoint
 history，and monotonic for search。Entries with `lastOffset < current logStartOffset` may be pruned at checkpoint creation。
+The current product codec implements this canonical payload and requires strict `(lastOffset, firstOffset, producerId)`
+ordering；the fork-side `TransactionIndex` import/filter bridge remains open。
 
 ### 4.4 `NereusTransactionIndex`
 

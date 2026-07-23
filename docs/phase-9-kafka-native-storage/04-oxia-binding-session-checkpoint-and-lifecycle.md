@@ -1,6 +1,6 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
-> 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift
+> 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 section 1/2/7 canonical payload codec partial slice implemented
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -543,6 +543,13 @@ has tighter bound。Decoder checks lengths before allocation、no overflow、kno
 
 每 section 的 canonical fields 见文档 05。Unknown optional section 仅当 header forward-compatible flag允许时可跳过；
 unknown required section flag fail closed。
+
+Current implementation note（2026-07-24）：`nereus-kafka-adapter` 已实现 required section 1/2/7 的
+Kafka-artifact-neutral model 和 strict V1 codec。Decoder 在 allocation 前验证 unsigned count/remaining bytes，
+并校验 exact outer required/version/flags、payload version、排序、cross-section equivalence、checkpoint offset 和
+EOF；encode→decode→encode 由 frozen digest 与 200 轮固定种子随机状态覆盖。该切片只接受 normal checkpoint
+barrier；section 7 的 completed-but-not-finalized entry 在定义并实现显式 section flag 前必须 fail closed。
+Section 3–6、full NKC1 publication composition，以及 Kafka fork import/replay 仍是后续切片。
 
 ## 10. Checkpoint publication
 

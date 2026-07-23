@@ -237,6 +237,11 @@ hash。Markdown/JSON ID sets must match。
 | KF-TXN-015 | group offset lag does not protect user-topic retention；client observes normal reset/out-of-range | `KafkaGroupRetentionIndependenceTest` | R,P,K | M5 |
 | KF-TXN-016 | mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback | `KafkaInternalTopicNoResurrectionTest` | P,C,K | M5 |
 
+Implementation note（2026-07-24）：the product-side `KafkaProducerStatePropertyTest` now covers the canonical-format and
+sequence-wrap portions of KF-TXN-002/003 with a frozen digest and 200 deterministic randomized round trips。Both rows remain
+`PLANNED` in the manifest until the same state is imported into stock `ProducerStateManager` and proven equal to committed
+full replay；no request-path or recovery claim is inferred from codec-only evidence。
+
 ## 9. Retention and DeleteRecords
 
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
