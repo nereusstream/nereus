@@ -487,6 +487,12 @@ No-resurrection is a release blocker，including policy compact→delete、missi
 8. empty-cluster first activation and rolling compatible maintenance；
 9. incompatible old/disabled broker exclusion。
 
+Current partial implementation：`NereusKafkaRuntime`、`DrainReason`、`KafkaStorageAdmissionState`、immutable
+`KafkaStorageHealth` and the atomic admission gate are present in the adapter。`KafkaStorageAdmissionTest` proves readiness
+recovery before drain、stable pre-I/O rejection、one-winner concurrent drain and irreversible drain/close against late
+callbacks。This is deterministic partial evidence for KF-OPS-014/017 only；concrete resource ownership、BrokerServer wiring、
+priority budgets and real shutdown/process cuts remain open。
+
 ### Tasks
 
 ```text

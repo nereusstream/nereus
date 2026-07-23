@@ -30,7 +30,9 @@ follower/delete callback 等待 manager lifecycle 完成，delete→同名 recre
 optional lifecycle 的实际装配仍未完成。fork 已注册完整 58-key `nereus.kafka.storage.*` `ConfigDef`，构建无副作用
 immutable typed snapshot，并在 enabled-only pure validator 中拒绝非 broker、RF/minISR、remote log、stock cleaner、
 AutoMQ mode、request hard limit 与 authoritative log-directory conflicts；disabled default 不创建资源。BrokerServer
-runtime factory、`UnifiedLog`/factory、checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
+runtime factory seam 尚未接入；adapter 已新增 exact `NereusKafkaRuntime`、drain reason、immutable health snapshot 和
+thread-safe admission gate，且保证 drain/close 终态不能被 late readiness callback 重新打开。`UnifiedLog`/factory、
+checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock
 `KafkaConfigTest` 以及 server/core/storage checkstyle/SpotBugs/Spotless 已通过；当前 GitHub credential 对

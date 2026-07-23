@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot 和 enabled-only pure startup validation implemented；runtime/activation/observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation and adapter runtime/admission contracts implemented；BrokerServer composition/activation/observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -11,7 +11,6 @@
 Target package：`com.nereusstream.kafka.runtime`
 
 ```java
-// target
 public interface NereusKafkaRuntime extends AutoCloseable {
     CompletionStage<Void> start();
     KafkaStorageAdmission admission();
@@ -22,6 +21,11 @@ public interface NereusKafkaRuntime extends AutoCloseable {
     @Override void close();
 }
 ```
+
+Adapter contract is now executable：`KafkaStorageAdmission` publishes immutable `KafkaStorageHealth` snapshots and permits
+`STARTING/NOT_READY -> READY` recovery only before drain。`DRAINING` and `CLOSED` are irreversible；exactly one concurrent
+`beginDrain` caller wins，late provider/start callbacks cannot reopen traffic，and `requireReady` rejects before allocation/I/O
+with stable Nereus error classification。Concrete provider/resource composition remains open。
 
 `NereusKafkaRuntimeFactory.create` accepts an immutable typed config plus explicit dependencies：Kafka broker/controller IDs、
 broker epoch supplier、KRaft metadata-view supplier、Kafka `Time`、metrics registry and scheduler。No static singleton；tests can
@@ -319,7 +323,7 @@ leader replays。Borrowed Kafka scheduler/time/metrics stay open。
 
 ## 9. Admission and backpressure
 
-`KafkaStorageAdmission` states：`STARTING`、`READY`、`DRAINING`、`NOT_READY`、`CLOSED`。
+`KafkaStorageAdmission` implements states：`STARTING`、`READY`、`DRAINING`、`NOT_READY`、`CLOSED`。
 
 Checks before buffer allocation/IO：activation/readiness、partition state、authority、deadline、queue slots、byte budget and
 provider circuit state。Priority classes：
