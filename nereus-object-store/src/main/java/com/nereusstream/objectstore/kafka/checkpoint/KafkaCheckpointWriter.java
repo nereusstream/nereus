@@ -89,17 +89,19 @@ public final class KafkaCheckpointWriter {
                 encoded.objectLength(),
                 encoded.storageCrc32c(),
                 encoded.objectSha256());
-        CompletableFuture<KafkaCheckpointObject> primary = preUploadGuard.authorize(physical)
-                .thenCompose(ignored -> objectStore.putObject(key, encoded.stagingFile(), options))
+        return preUploadGuard.authorize(physical).thenCompose(ignored -> {
+            CompletableFuture<KafkaCheckpointObject> primary = objectStore
+                .putObject(key, encoded.stagingFile(), options)
                 .thenCompose(result -> {
                     validatePut(result, key, encoded);
                     return openExpected(request, encoded, key);
                 });
-        return primary.exceptionallyCompose(original -> openExpected(request, encoded, key)
-                .handle((reconciled, recoveryFailure) -> {
-                    if (recoveryFailure == null) return reconciled;
-                    throw new CompletionException(unwrap(original));
-                }));
+            return primary.exceptionallyCompose(original -> openExpected(request, encoded, key)
+                    .handle((reconciled, recoveryFailure) -> {
+                        if (recoveryFailure == null) return reconciled;
+                        throw new CompletionException(unwrap(original));
+                    }));
+        });
     }
 
     private CompletableFuture<KafkaCheckpointObject> openExpected(

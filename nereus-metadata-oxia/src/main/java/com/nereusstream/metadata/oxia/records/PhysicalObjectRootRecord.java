@@ -38,7 +38,7 @@ public record PhysicalObjectRootRecord(
             throw new IllegalArgumentException("objectKeyHash does not match objectKey");
         }
         objectId = F4RecordValidation.requireOptionalText(objectId, "objectId", 512);
-        if (objectKindId < 1 || objectKindId > 7) {
+        if (objectKindId < 1 || objectKindId > 8) {
             throw new IllegalArgumentException("objectKindId is unknown");
         }
         F4RecordValidation.requirePositive(objectLength, "objectLength");
