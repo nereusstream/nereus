@@ -36,7 +36,7 @@ protocol/table state = projection
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
-| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | Designed；F9-M0 documentation gate complete | F9-M1 protocol-neutral ranged-entry API/read/format foundation |
+| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | In progress；F9-M1 public API slice implemented，no Kafka capability | finish F9-M1 core/read/Object-WAL/NCP2/NTC2 foundation |
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL

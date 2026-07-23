@@ -31,6 +31,30 @@ public interface StreamStorage extends AutoCloseable {
             AppendBatch batch,
             AppendOptions options);
 
+    /**
+     * Appends with an optional caller-visible logical-offset precondition.
+     *
+     * <p>The default preserves binary compatibility for existing providers. Providers that do not implement
+     * conditional append fail closed rather than silently ignoring a non-empty precondition.
+     */
+    default CompletableFuture<AppendResult> append(
+            StreamId streamId,
+            AppendBatch batch,
+            AppendOptions options,
+            AppendPrecondition precondition) {
+        if (precondition == null) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "append precondition is required");
+        }
+        if (precondition.equals(AppendPrecondition.none())) {
+            return append(streamId, batch, options);
+        }
+        return NereusException.failedFuture(
+                ErrorCode.UNSUPPORTED_APPEND_PRECONDITION,
+                false,
+                "storage provider does not support conditional append");
+    }
+
     CompletableFuture<AppendResult> recoverAppend(
             StreamId streamId,
             AppendAttemptId attemptId,
@@ -40,6 +64,30 @@ public interface StreamStorage extends AutoCloseable {
             StreamId streamId,
             long startOffset,
             ReadOptions options);
+
+    /**
+     * Reads through the public semantic-view contract.
+     *
+     * <p>Existing providers can serve the exact legacy request through their original method. New boundary, view,
+     * or first-entry semantics require an explicit provider implementation and otherwise fail closed.
+     */
+    default CompletableFuture<SemanticReadResult> read(
+            StreamId streamId,
+            ReadRequest request) {
+        if (request == null) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "read request is required");
+        }
+        if (!request.isLegacyEquivalent()) {
+            return NereusException.failedFuture(
+                    ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                    false,
+                    "storage provider does not support the requested read semantics");
+        }
+        return read(streamId, request.startOffset(), request.options())
+                .thenApply(result -> SemanticReadResult.forRequest(
+                        request, result, result.nextOffset()));
+    }
 
     CompletableFuture<ResolveResult> resolve(
             StreamId streamId,

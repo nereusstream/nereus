@@ -1,14 +1,15 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：Designed；F9-M0 文档门禁于 2026-07-23 完成；无生产代码
+> 状态：In progress；F9-M1 public API/default-overload slice implemented；无 native Kafka runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Nereus 基线：本分支 fork point `7d89eea`
+> F9 implementation base：`main@112c459`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
-gate 是未来实现约束，不是当前能力。若以后实现与本文不同，必须先更新合同、版本和兼容性分析，不能让
-代码静默改变 durable bytes 或 correctness owner。
+gate 是实现约束。当前仅 `nereus-api` ranged values、Kafka batch validation、binary-safe default overloads 与
+scenario manifest/check gate 已落地；core provider 仍会 fail closed，Kafka broker capability 仍不存在。若以后
+实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 
 ## 1. 设计文档
 

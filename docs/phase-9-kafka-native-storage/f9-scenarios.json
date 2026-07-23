@@ -1,0 +1,3535 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "docs/phase-9-kafka-native-storage/08-scenario-evidence-matrix.md",
+  "scenarios": [
+    {
+      "id": "KF-SRC-001",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "Phase9SourceLockTest",
+      "testMethod": "scenarioKfSrc001",
+      "scenario": "AutoMQ checkout HEAD/version equals locked `1c648d...` / `3.9.0-SNAPSHOT`",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "automq",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M0",
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SRC-002",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "Phase9SourceLockTest",
+      "testMethod": "scenarioKfSrc002",
+      "scenario": "every AutoMQ reference file blob matches document 01",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "automq",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M0",
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SRC-003",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "Phase9SourceLockTest",
+      "testMethod": "scenarioKfSrc003",
+      "scenario": "Nereus locked API/reader/materialization blobs drift is reported，not silently accepted",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SRC-004",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusSourceLockTest",
+      "testMethod": "scenarioKfSrc004",
+      "scenario": "production Kafka fork exact upstream/fork commits and relevant signatures match reviewed lock",
+      "evidenceTier": [
+        "D",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SRC-005",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusForkMarkerTest",
+      "testMethod": "scenarioKfSrc005",
+      "scenario": "Nereus inject markers are balanced/narrow and no reflection bypass exists",
+      "evidenceTier": [
+        "D",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SRC-006",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaTrackIsolationTest",
+      "testMethod": "scenarioKfSrc006",
+      "scenario": "F5 KoP payload/binding/coordinator records cannot be opened as F9",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SRC-007",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusDisabledCompatibilityTest",
+      "testMethod": "scenarioKfSrc007",
+      "scenario": "disabled mode loads no Nereus runtime/classes with side effects and passes stock focused suite",
+      "evidenceTier": [
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3",
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SRC-008",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusKafkaConfigTest",
+      "testMethod": "scenarioKfSrc008",
+      "scenario": "AutoMQ `elasticstream.enable=true` and F9 enabled are rejected as conflicting modes",
+      "evidenceTier": [
+        "D",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "automq",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-001",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedAppendApiTest",
+      "testMethod": "scenarioKfApi001",
+      "scenario": "legacy OPAQUE one-entry/one-offset constructors/results remain exact",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-002",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedAppendApiTest",
+      "testMethod": "scenarioKfApi002",
+      "scenario": "Kafka ranged entries accept positive counts and exact sum/count/order",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-003",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedAppendApiTest",
+      "testMethod": "scenarioKfApi003",
+      "scenario": "zero/negative/overflow/mismatched record counts fail before IO",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-004",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedAppendApiTest",
+      "testMethod": "scenarioKfApi004",
+      "scenario": "concatenated payload CRC32C covers exact entry order and detects mutation",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-005",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "StreamStorageCompatibilityTest",
+      "testMethod": "scenarioKfApi005",
+      "scenario": "old `append` delegates none precondition；old provider rejects non-empty new semantics explicitly",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-006",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "ConditionalAppendContractTest",
+      "testMethod": "scenarioKfApi006",
+      "scenario": "expected start equal succeeds；lower/higher produces OFFSET_CONFLICT with no physical append",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-007",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "ConditionalAppendContractTest",
+      "testMethod": "scenarioKfApi007",
+      "scenario": "exact result matches requested range/count/bytes across every storage profile",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-008",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedReadContractTest",
+      "testMethod": "scenarioKfApi008",
+      "scenario": "EXACT_START at entry start works；inside ranged entry fails，never skips to next",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-009",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedReadContractTest",
+      "testMethod": "scenarioKfApi009",
+      "scenario": "CONTAINING_ENTRY at first/middle/last returns full exact range/payload",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-010",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedReadContractTest",
+      "testMethod": "scenarioKfApi010",
+      "scenario": "first-entry overflow can exceed records/bytes exactly once；second entry cannot",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-011",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "RangedReadContractTest",
+      "testMethod": "scenarioKfApi011",
+      "scenario": "containing semantics propagate across resolved slices and only global first entry overflows",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-012",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "WalRangedEntryRoundTripTest",
+      "testMethod": "scenarioKfApi012",
+      "scenario": "WAL writer/reader preserves mixed entry counts and Kafka payload format",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-013",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "BookKeeperRangedReadIntegrationTest",
+      "testMethod": "scenarioKfApi013",
+      "scenario": "BookKeeper reader has exact parity with Object WAL for boundaries/limits",
+      "evidenceTier": [
+        "R"
+      ],
+      "requiredServices": [
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-014",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "Ncp2GoldenAndCorruptionTest",
+      "testMethod": "scenarioKfApi014",
+      "scenario": "NCP2 dense rows preserve start/count/payload/CRC and reject every schema/count corruption",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-015",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "Ntc2GoldenAndCorruptionTest",
+      "testMethod": "scenarioKfApi015",
+      "scenario": "NTC2 sparse rows/coverage/key tags/control dispositions round-trip and reject corruption",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-API-016",
+      "milestone": "F9-M1",
+      "task": "phase9M1FinalCheck",
+      "testClass": "CompactedFormatCompatibilityTest",
+      "testMethod": "scenarioKfApi016",
+      "scenario": "V1 bytes remain readable；V1/V2 exact dispatch never guesses/reinterprets",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M1"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-001",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaPartitionKeyspaceTest",
+      "testMethod": "scenarioKfMeta001",
+      "scenario": "Kafka key builders/parsers canonical round-trip and reject wrong cluster/depth/encoding",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-002",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaBindingLifecycleTest",
+      "testMethod": "scenarioKfMeta002",
+      "scenario": "topic name reuse with new topicId creates a different root/stream；old data cannot alias",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-003",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaBindingRaceIntegrationTest",
+      "testMethod": "scenarioKfMeta003",
+      "scenario": "two brokers racing absent binding converge to one deterministic stream",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-004",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaBindingRaceIntegrationTest",
+      "testMethod": "scenarioKfMeta004",
+      "scenario": "every create response-loss cut reloads/converges without extra stream",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-005",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaBindingTransitionTest",
+      "testMethod": "scenarioKfMeta005",
+      "scenario": "binding profile/mapping/authority attributes are immutable and mismatch becomes CORRUPT",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-006",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaLeaderAuthorityPropertyTest",
+      "testMethod": "scenarioKfMeta006",
+      "scenario": "lower KRaft leader epoch cannot acquire/renew session",
+      "evidenceTier": [
+        "D",
+        "M",
+        "R"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-007",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaLeaderAuthorityIntegrationTest",
+      "testMethod": "scenarioKfMeta007",
+      "scenario": "higher leader epoch immediately preempts live old session before TTL",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-008",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaLeaderAuthorityPropertyTest",
+      "testMethod": "scenarioKfMeta008",
+      "scenario": "same leader/owner term renews only exact writer/token；different owner is fenced",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-009",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaLeaderAuthorityIntegrationTest",
+      "testMethod": "scenarioKfMeta009",
+      "scenario": "same broker restart with higher broker epoch preempts same leader term",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-010",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaLeaderAuthorityPropertyTest",
+      "testMethod": "scenarioKfMeta010",
+      "scenario": "higher broker epoch from different owner at same leader epoch is rejected",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-011",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaLeaderAuthorityIntegrationTest",
+      "testMethod": "scenarioKfMeta011",
+      "scenario": "legacy caller cannot acquire authority-required Kafka stream after lease expiry",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-012",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaLeaderAuthorityIntegrationTest",
+      "testMethod": "scenarioKfMeta012",
+      "scenario": "old writer primary/protection/head CAS fails after authority preemption",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-013",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "StreamHeadV2CodecTest",
+      "testMethod": "scenarioKfMeta013",
+      "scenario": "StreamHead V1 goldens decode to empty authority；V2 round-trip and old reader rejects",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-014",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaCheckpointFormatTest",
+      "testMethod": "scenarioKfMeta014",
+      "scenario": "NKC1 all required sections/golden SHA/CRC/EOF round-trip deterministically",
+      "evidenceTier": [
+        "D"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-015",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaCheckpointCorruptionTest",
+      "testMethod": "scenarioKfMeta015",
+      "scenario": "NKC1 length/flag/section/checksum/duplicate/unknown-required corruption fails before unsafe allocation",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-016",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaCheckpointPublicationIntegrationTest",
+      "testMethod": "scenarioKfMeta016",
+      "scenario": "checkpoint PUT/HEAD/root-CAS response loss converges across fresh runtime",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-017",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaCheckpointRecoveryIntegrationTest",
+      "testMethod": "scenarioKfMeta017",
+      "scenario": "newest corrupt/missing checkpoint falls back to referenced older checkpoint only",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-018",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaCheckpointRecoveryIntegrationTest",
+      "testMethod": "scenarioKfMeta018",
+      "scenario": "trim>0 with no sufficient checkpoint fails closed；trim=0 permits full replay",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-019",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaBindingDeleteIntegrationTest",
+      "testMethod": "scenarioKfMeta019",
+      "scenario": "topic delete without leader progresses ACTIVE→DELETING→DELETED and survives every cut",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2",
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-020",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaRegistryScannerIntegrationTest",
+      "testMethod": "scenarioKfMeta020",
+      "scenario": "64-shard registry scanner pages strictly、recovers leases and treats hints as non-authoritative",
+      "evidenceTier": [
+        "D",
+        "R",
+        "M"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2",
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-021",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionCoverageTransitionTest",
+      "testMethod": "scenarioKfMeta021",
+      "scenario": "compaction coverage root never decreases and rejects unverified generation digest",
+      "evidenceTier": [
+        "D",
+        "M",
+        "R"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-META-022",
+      "milestone": "F9-M2",
+      "task": "phase9M2FinalCheck",
+      "testClass": "KafkaBindingReconciliationTest",
+      "testMethod": "scenarioKfMeta022",
+      "scenario": "binding/root observed offsets never override a newer stream head/trim",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "oxia",
+        "object-store"
+      ],
+      "sourceLocks": [
+        "nereus"
+      ],
+      "gates": [
+        "F9-M2"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-001",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusUnifiedLogTest",
+      "testMethod": "scenarioKfApp001",
+      "scenario": "stock LogValidator assigns offsets/leader epoch before Nereus encoder",
+      "evidenceTier": [
+        "D",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-002",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaAppendBatchEncoderTest",
+      "testMethod": "scenarioKfApp002",
+      "scenario": "one MemoryRecords/multiple RecordBatches maps one AppendBatch/one entry per batch",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-003",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaBatchExactBytesIntegrationTest",
+      "testMethod": "scenarioKfApp003",
+      "scenario": "raw batch bytes/CRC/compression/producer fields identical before and after append/read",
+      "evidenceTier": [
+        "D",
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-004",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaBatchExactBytesIntegrationTest",
+      "testMethod": "scenarioKfApp004",
+      "scenario": "gzip/snappy/lz4/zstd/uncompressed supported formats pass exact round trip",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-005",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeProduceIntegrationTest",
+      "testMethod": "scenarioKfApp005",
+      "scenario": "acks=1 response occurs only after stable head and Kafka derived state update",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-006",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeProduceIntegrationTest",
+      "testMethod": "scenarioKfApp006",
+      "scenario": "acks=-1 RF1 response follows stable HW；acks=0 still commits/updates exactly once",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-007",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeAppendRecoveryIntegrationTest",
+      "testMethod": "scenarioKfApp007",
+      "scenario": "response loss after head CAS fences until exact recovery；no successor append",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-008",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeAppendRecoveryIntegrationTest",
+      "testMethod": "scenarioKfApp008",
+      "scenario": "known-not-committed timeout leaves LEO/producer/HW unchanged and permits safe retry",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-009",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaPostCommitFailureTest",
+      "testMethod": "scenarioKfApp009",
+      "scenario": "post-stable producer/txn/segment derived update failure becomes known-committed fence/replay",
+      "evidenceTier": [
+        "D",
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3",
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-010",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaNativeIdempotenceIntegrationTest",
+      "testMethod": "scenarioKfApp010",
+      "scenario": "duplicate idempotent request returns original offsets without second StreamStorage append",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-011",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusProduceBufferTest",
+      "testMethod": "scenarioKfApp011",
+      "scenario": "append executor queue/byte rejection occurs before IO and releases owned buffer",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-012",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusProduceBufferTest",
+      "testMethod": "scenarioKfApp012",
+      "scenario": "client disconnect/cancel after enqueue cannot cancel uncertain append；callback/buffer terminal once",
+      "evidenceTier": [
+        "D",
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-013",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaAppendExecutorIntegrationTest",
+      "testMethod": "scenarioKfApp013",
+      "scenario": "different partitions run concurrently，same partition never reorders under saturation",
+      "evidenceTier": [
+        "D",
+        "R",
+        "M"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-014",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeLeaderTakeoverIntegrationTest",
+      "testMethod": "scenarioKfApp014",
+      "scenario": "leader takeover during old in-flight append leaves only current-term publication",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-015",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeProcessCutIntegrationTest",
+      "testMethod": "scenarioKfApp015",
+      "scenario": "broker kill before/after each append cut recovers exact LEO/HW/bytes",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3",
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-APP-016",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeProfileMatrixIntegrationTest",
+      "testMethod": "scenarioKfApp016",
+      "scenario": "each claimed Nereus storage profile passes identical Produce correctness contract",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3",
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-001",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeFetchIntegrationTest",
+      "testMethod": "scenarioKfFet001",
+      "scenario": "committed Fetch returns exact Kafka batches and respects response/partition byte budgets",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-002",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeFetchIntegrationTest",
+      "testMethod": "scenarioKfFet002",
+      "scenario": "fetch offset inside compressed batch returns containing batch without split",
+      "evidenceTier": [
+        "D",
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-003",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeFetchLimitTest",
+      "testMethod": "scenarioKfFet003",
+      "scenario": "first batch greater than max bytes progresses only when Kafka minOneMessage allows",
+      "evidenceTier": [
+        "D",
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-004",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusFetchOperationTest",
+      "testMethod": "scenarioKfFet004",
+      "scenario": "minBytes waits on actual bytes，stable append wakes，maxWait returns once",
+      "evidenceTier": [
+        "D",
+        "R",
+        "M"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-005",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "NereusFetchOperationTest",
+      "testMethod": "scenarioKfFet005",
+      "scenario": "multi-partition fetch coalesces events，has at most one read in flight and callback once",
+      "evidenceTier": [
+        "D",
+        "M",
+        "R"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-006",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaNativeIsolationIntegrationTest",
+      "testMethod": "scenarioKfFet006",
+      "scenario": "READ_UNCOMMITTED upper bound HW and READ_COMMITTED upper bound LSO",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-007",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaNativeIsolationIntegrationTest",
+      "testMethod": "scenarioKfFet007",
+      "scenario": "aborted transaction list/filter matches Kafka baseline",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-008",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaNativeDeleteRecordsIntegrationTest",
+      "testMethod": "scenarioKfFet008",
+      "scenario": "request below durable logStart is out-of-range；mid-batch trim hides prefix",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-009",
+      "milestone": "F9-M3",
+      "task": "phase9M3FinalCheck",
+      "testClass": "KafkaNativeListOffsetsIntegrationTest",
+      "testMethod": "scenarioKfFet009",
+      "scenario": "ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M3",
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-010",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaNativeLeaderEpochIntegrationTest",
+      "testMethod": "scenarioKfFet010",
+      "scenario": "leader-epoch end-offset lookup survives checkpoint/restart/takeover",
+      "evidenceTier": [
+        "R",
+        "P",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-011",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactedFetchIntegrationTest",
+      "testMethod": "scenarioKfFet011",
+      "scenario": "compacted sparse holes advance by source coverage without loop/phantom row",
+      "evidenceTier": [
+        "D",
+        "R"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-012",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactedFetchIntegrationTest",
+      "testMethod": "scenarioKfFet012",
+      "scenario": "mandatory compacted prefix switches exactly once to committed tail at coverage end",
+      "evidenceTier": [
+        "D",
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-013",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactedNoResurrectionIntegrationTest",
+      "testMethod": "scenarioKfFet013",
+      "scenario": "missing/corrupt newest NTC2 uses verified same-view fallback only",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-014",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactedNoResurrectionIntegrationTest",
+      "testMethod": "scenarioKfFet014",
+      "scenario": "no healthy mandatory NTC2 fails closed and never exposes COMMITTED source",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-015",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaNcp2CommittedViewIntegrationTest",
+      "testMethod": "scenarioKfFet015",
+      "scenario": "NCP2 may replace COMMITTED primary for recovery/fetch without changing Kafka bytes/offsets",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-FET-016",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusFetchOperationTest",
+      "testMethod": "scenarioKfFet016",
+      "scenario": "broker shutdown cancels/wakes fetch operations，unregisters listeners and releases buffers",
+      "evidenceTier": [
+        "D",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-001",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "NereusProducerStateCompatibilityTest",
+      "testMethod": "scenarioKfTxn001",
+      "scenario": "producer epoch/sequence validation matches selected Kafka baseline",
+      "evidenceTier": [
+        "M",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-002",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaProducerStatePropertyTest",
+      "testMethod": "scenarioKfTxn002",
+      "scenario": "sequence wrap and retained duplicate-batch window survive checkpoint/replay",
+      "evidenceTier": [
+        "M",
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-003",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaProducerStatePropertyTest",
+      "testMethod": "scenarioKfTxn003",
+      "scenario": "canonical producer snapshot encode/decode/replay equals full replay state",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-004",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaProducerTrimIntegrationTest",
+      "testMethod": "scenarioKfTxn004",
+      "scenario": "producer expiration and checkpoint-before-trim preserve subsequent validation",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4",
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-005",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaTransactionRecoveryIntegrationTest",
+      "testMethod": "scenarioKfTxn005",
+      "scenario": "open transaction crossing checkpoint restores first unstable offset/LSO",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-006",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaTransactionRecoveryIntegrationTest",
+      "testMethod": "scenarioKfTxn006",
+      "scenario": "commit marker stable append advances LSO in stock order",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-007",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaTransactionRecoveryIntegrationTest",
+      "testMethod": "scenarioKfTxn007",
+      "scenario": "abort marker builds exact aborted index and read-committed filtering",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-008",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaTransactionProcessCutIntegrationTest",
+      "testMethod": "scenarioKfTxn008",
+      "scenario": "crash after transactional data/marker commit before derived update replays correctly",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-009",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaTransactionProcessCutIntegrationTest",
+      "testMethod": "scenarioKfTxn009",
+      "scenario": "transaction spanning virtual segments/checkpoint/takeover remains atomic to consumers",
+      "evidenceTier": [
+        "P",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-010",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "NereusTransactionVerificationTest",
+      "testMethod": "scenarioKfTxn010",
+      "scenario": "transaction verification guard survives async executor handoff without request-thread local use",
+      "evidenceTier": [
+        "D",
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-011",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaInternalTopicOrderingIntegrationTest",
+      "testMethod": "scenarioKfTxn011",
+      "scenario": "`__consumer_offsets` opens/replays before group coordinator election",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-012",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaInternalTopicOrderingIntegrationTest",
+      "testMethod": "scenarioKfTxn012",
+      "scenario": "`__transaction_state` opens/replays before transaction coordinator election",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-013",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaGroupCoordinatorIntegrationTest",
+      "testMethod": "scenarioKfTxn013",
+      "scenario": "group commit/rebalance/restart/takeover works with native internal topic",
+      "evidenceTier": [
+        "P",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-014",
+      "milestone": "F9-M4",
+      "task": "phase9M4FinalCheck",
+      "testClass": "KafkaTransactionCoordinatorIntegrationTest",
+      "testMethod": "scenarioKfTxn014",
+      "scenario": "ongoing transaction coordinator failover resolves from internal topic",
+      "evidenceTier": [
+        "P",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M4"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-015",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaGroupRetentionIndependenceTest",
+      "testMethod": "scenarioKfTxn015",
+      "scenario": "group offset lag does not protect user-topic retention；client observes normal reset/out-of-range",
+      "evidenceTier": [
+        "R",
+        "P",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-TXN-016",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaInternalTopicNoResurrectionTest",
+      "testMethod": "scenarioKfTxn016",
+      "scenario": "mandatory internal-topic NTC2 unavailable blocks coordinator election，no full-source fallback",
+      "evidenceTier": [
+        "P",
+        "C",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-001",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionOracleTest",
+      "testMethod": "scenarioKfRet001",
+      "scenario": "time retention over virtual closed segments matches stock predicate",
+      "evidenceTier": [
+        "D",
+        "M",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-002",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionOracleTest",
+      "testMethod": "scenarioKfRet002",
+      "scenario": "size retention uses exact Kafka logical bytes and matches stock predicate",
+      "evidenceTier": [
+        "D",
+        "M",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-003",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionOracleTest",
+      "testMethod": "scenarioKfRet003",
+      "scenario": "combined policies choose monotonic next-segment boundary，never active segment",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-004",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionBarrierIntegrationTest",
+      "testMethod": "scenarioKfRet004",
+      "scenario": "insufficient checkpoint blocks trim；new checkpoint then permits exact candidate",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-005",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionBarrierIntegrationTest",
+      "testMethod": "scenarioKfRet005",
+      "scenario": "trim response loss reloads durable head and completes idempotently",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-006",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaNativeDeleteRecordsIntegrationTest",
+      "testMethod": "scenarioKfRet006",
+      "scenario": "DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-007",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionRacePropertyTest",
+      "testMethod": "scenarioKfRet007",
+      "scenario": "retention/config/new-append races revalidate and never over-trim",
+      "evidenceTier": [
+        "M",
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-008",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionRetentionIntegrationTest",
+      "testMethod": "scenarioKfRet008",
+      "scenario": "compact+delete preserves compacted visibility until logical trim passes range",
+      "evidenceTier": [
+        "R",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-009",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionPhysicalGcIntegrationTest",
+      "testMethod": "scenarioKfRet009",
+      "scenario": "logical trim success is independent of delayed protected physical GC",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-RET-010",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaRetentionProfileMatrixTest",
+      "testMethod": "scenarioKfRet010",
+      "scenario": "all storage profiles obey same checkpoint barrier and trim semantics",
+      "evidenceTier": [
+        "R"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5",
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-001",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionOraclePropertyTest",
+      "testMethod": "scenarioKfCmp001",
+      "scenario": "latest keyed value survives；older values removed at same offsets as oracle",
+      "evidenceTier": [
+        "M",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-002",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionKeyEncodingTest",
+      "testMethod": "scenarioKfCmp002",
+      "scenario": "empty key is keyed；null key is uniquely retained；encodings cannot collide",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-003",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionOraclePropertyTest",
+      "testMethod": "scenarioKfCmp003",
+      "scenario": "tombstone retention/drop boundary matches Kafka delete-retention oracle",
+      "evidenceTier": [
+        "M",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-004",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionHorizonTest",
+      "testMethod": "scenarioKfCmp004",
+      "scenario": "newer key in decision-horizon tail removes eligible older output record",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-005",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionHorizonTest",
+      "testMethod": "scenarioKfCmp005",
+      "scenario": "append after frozen horizon can leave extra old record but never drops newest incorrectly",
+      "evidenceTier": [
+        "D",
+        "M",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-006",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionSpillPropertyTest",
+      "testMethod": "scenarioKfCmp006",
+      "scenario": "spill/no-spill/restart produce deterministic same NTC2 SHA/rows",
+      "evidenceTier": [
+        "M",
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-007",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionRewriteTest",
+      "testMethod": "scenarioKfCmp007",
+      "scenario": "all compression formats、headers、timestamps rewrite to equivalent valid records",
+      "evidenceTier": [
+        "D",
+        "M",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-008",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionTransactionOracleTest",
+      "testMethod": "scenarioKfCmp008",
+      "scenario": "idempotent/transactional/control/open/aborted traces match stock cleaner views",
+      "evidenceTier": [
+        "M",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-009",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionResourceLimitTest",
+      "testMethod": "scenarioKfCmp009",
+      "scenario": "decode ratio/key/task limits abort without publication or lost source refs",
+      "evidenceTier": [
+        "D",
+        "M",
+        "R"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-010",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionActivationCutTest",
+      "testMethod": "scenarioKfCmp010",
+      "scenario": "generation commit before coverage CAS is not client-visible mandatory compaction",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-011",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionActivationCutTest",
+      "testMethod": "scenarioKfCmp011",
+      "scenario": "coverage CAS response loss reloads exact activation and never double-advances epoch",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-012",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionPolicyTransitionTest",
+      "testMethod": "scenarioKfCmp012",
+      "scenario": "compact→delete preserves old mandatory coverage；delete→compact activates only after verified output",
+      "evidenceTier": [
+        "R",
+        "K",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-013",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaCompactionReplacementIntegrationTest",
+      "testMethod": "scenarioKfCmp013",
+      "scenario": "same-range NTC2 replacement protects readers and retires old generation after proof",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-CMP-014",
+      "milestone": "F9-M5",
+      "task": "phase9M5FinalCheck",
+      "testClass": "KafkaNativeCompactionEndToEndTest",
+      "testMethod": "scenarioKfCmp014",
+      "scenario": "user and both internal compacted topics pass differential/restart/takeover suite",
+      "evidenceTier": [
+        "P",
+        "K",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M5",
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-001",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusKafkaStorageConfigTest",
+      "testMethod": "scenarioKfOps001",
+      "scenario": "every config default/bound/static rule and secret redaction is executable",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-002",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusKafkaConfigTest",
+      "testMethod": "scenarioKfOps002",
+      "scenario": "KRaft-only、remote-log/cleaner/conflicting mode/message-limit violations reject before IO",
+      "evidenceTier": [
+        "D",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-003",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaActivationIntegrationTest",
+      "testMethod": "scenarioKfOps003",
+      "scenario": "empty cluster first activation PREPARED→ACTIVE succeeds with exact brokers/digests",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-004",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaActivationIntegrationTest",
+      "testMethod": "scenarioKfOps004",
+      "scenario": "any topic/internal topic/local authoritative log/binding makes first activation fail non-destructively",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-005",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaActivationControllerFailoverTest",
+      "testMethod": "scenarioKfOps005",
+      "scenario": "controller failover at every activation cut preserves one-way state",
+      "evidenceTier": [
+        "P",
+        "C",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-006",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusReplicationControlManagerTest",
+      "testMethod": "scenarioKfOps006",
+      "scenario": "controller enforces RF=1/minISR=1 for create/create-partitions/manual assignment",
+      "evidenceTier": [
+        "D",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-007",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusReplicationControlManagerTest",
+      "testMethod": "scenarioKfOps007",
+      "scenario": "ISR/reassignment/directory APIs cannot create follower/local-placement semantics",
+      "evidenceTier": [
+        "D",
+        "K"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-008",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaCapabilityReadinessIntegrationTest",
+      "testMethod": "scenarioKfOps008",
+      "scenario": "missing/mismatched/expired broker capability excludes leader ownership",
+      "evidenceTier": [
+        "R",
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-009",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaRollingRestartIntegrationTest",
+      "testMethod": "scenarioKfOps009",
+      "scenario": "compatible rolling restart/new broker epoch reacquires readiness/leadership",
+      "evidenceTier": [
+        "P",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-010",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaRollingRestartIntegrationTest",
+      "testMethod": "scenarioKfOps010",
+      "scenario": "unsupported binary rollback or locally disabled broker remains fenced",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-011",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaCapabilityReadinessIntegrationTest",
+      "testMethod": "scenarioKfOps011",
+      "scenario": "wrong Kafka cluster/provider scope/profile digest blocks readiness before partition IO",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-012",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusKafkaRuntimeLifecycleTest",
+      "testMethod": "scenarioKfOps012",
+      "scenario": "startup failure closes only owned resources in reverse order；borrowed stay open",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-013",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaRuntimeShutdownIntegrationTest",
+      "testMethod": "scenarioKfOps013",
+      "scenario": "graceful/timeout/kill shutdown classifies appends，drains/cancels and next leader recovers",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-014",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaStorageAdmissionStressTest",
+      "testMethod": "scenarioKfOps014",
+      "scenario": "priority/backpressure budgets pause background first and never allocate unbounded",
+      "evidenceTier": [
+        "D",
+        "M",
+        "R"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-015",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "KafkaObservabilitySecurityTest",
+      "testMethod": "scenarioKfOps015",
+      "scenario": "metrics have bounded labels，logs/admin redact payload/token/secrets，callbacks cannot reclassify IO",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-016",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusKafkaStorageAdminTest",
+      "testMethod": "scenarioKfOps016",
+      "scenario": "admin mutations require exact binding/leader/broker guard；read-only verify is bounded",
+      "evidenceTier": [
+        "D",
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-017",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusBrokerMetadataPublisherTest",
+      "testMethod": "scenarioKfOps017",
+      "scenario": "metadata publisher waits partition recovery before internal coordinator callback",
+      "evidenceTier": [
+        "D",
+        "P",
+        "C",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-OPS-018",
+      "milestone": "F9-M6",
+      "task": "phase9M6FinalCheck",
+      "testClass": "NereusKafkaRuntimeLifecycleTest",
+      "testMethod": "scenarioKfOps018",
+      "scenario": "registry/retention/checkpoint/compaction schedulers stop and remove deadlines on close",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M6"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-001",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaBindingScaleIntegrationTest",
+      "testMethod": "scenarioKfScl001",
+      "scenario": "16,384 bindings across 64 shards plus hot-shard pagination/restart complete without omission",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-002",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaPartitionScaleIntegrationTest",
+      "testMethod": "scenarioKfScl002",
+      "scenario": "10,000 active partition state/open/close/checkpoint scheduling stays bounded",
+      "evidenceTier": [
+        "R",
+        "P"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-003",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaIoConcurrencyStressTest",
+      "testMethod": "scenarioKfScl003",
+      "scenario": "1,000 concurrent Produce/Fetch operations obey queue/byte/thread limits and make progress",
+      "evidenceTier": [
+        "R",
+        "P",
+        "M"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-004",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaRangedCountLimitTest",
+      "testMethod": "scenarioKfScl004",
+      "scenario": "ranged count near Integer.MAX_VALUE uses checked metadata math without per-record allocation",
+      "evidenceTier": [
+        "D",
+        "M"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-005",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaMaterializationScaleIntegrationTest",
+      "testMethod": "scenarioKfScl005",
+      "scenario": "128-source/million-record NCP2/NTC2 task respects memory/spill/source protection",
+      "evidenceTier": [
+        "R",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-006",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaLeaderChurnChaosTest",
+      "testMethod": "scenarioKfScl006",
+      "scenario": "repeated leader churn across three brokers never accepts stale-term write/publication",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-007",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaProviderChaosIntegrationTest",
+      "testMethod": "scenarioKfScl007",
+      "scenario": "Oxia/Object/BK/network response-loss matrix converges after fresh process restart",
+      "evidenceTier": [
+        "P",
+        "C"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-008",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaClientCompatibilitySuite",
+      "testMethod": "scenarioKfScl008",
+      "scenario": "supported Kafka client/protocol versions pass Produce/Fetch/group/txn/admin compatibility",
+      "evidenceTier": [
+        "P",
+        "K"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-009",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "KafkaNativePerformanceGate",
+      "testMethod": "scenarioKfScl009",
+      "scenario": "performance report records per-profile latency/throughput/recovery/resource baselines without skipped samples",
+      "evidenceTier": [
+        "P",
+        "A"
+      ],
+      "requiredServices": [
+        "kraft",
+        "oxia",
+        "object-store",
+        "bookkeeper"
+      ],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    },
+    {
+      "id": "KF-SCL-010",
+      "milestone": "F9-M7",
+      "task": "phase9M7FinalCheck",
+      "testClass": "Phase9EvidenceAggregatorTest",
+      "testMethod": "scenarioKfScl010",
+      "scenario": "clean `phase9FinalCheck --rerun-tasks` maps every Markdown/JSON ID to one passing result and exact sources",
+      "evidenceTier": [
+        "A"
+      ],
+      "requiredServices": [],
+      "sourceLocks": [
+        "nereus",
+        "kafka"
+      ],
+      "gates": [
+        "F9-M7"
+      ],
+      "status": "PLANNED"
+    }
+  ]
+}

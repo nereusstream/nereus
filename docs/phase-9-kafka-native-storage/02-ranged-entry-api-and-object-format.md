@@ -1,15 +1,15 @@
 # 02 — Ranged-Entry API and Object Format
 
-> 状态：Designed target；F9-M1
+> 状态：Implementation in progress；public values/default overloads/Kafka batch validation complete；core/read/V2 formats pending
 > 前置：Phase 1.5 generic L0、F4 generation/read-view、F1-BK profiles 均保持现有已实现合同
 > 核心原则：先把“一个 entry 覆盖多个 logical offsets”做成 protocol-neutral 能力，再允许 Kafka adapter 使用
 
 ## 1. 问题定义
 
 一个 Kafka `RecordBatch` 可以包含多个 records，并且 compressed batch 不能按 Nereus read limit 任意拆开。
-当前 Nereus domain model 已有 `AppendEntry.recordCount` 和 ranged `ReadBatch`，Object WAL entry index 也保存
-`relativeBaseOffset + recordCount`；但 append validation、reader clipping、core result validation、NCP1 与 NTC1
-仍假设 one-entry-per-offset。
+当前 F9-M1 public slice 已让 `AppendBatch` 校验支持 ranged Kafka entries，并增加 public request/result values；
+Object WAL entry index 原本也保存 `relativeBaseOffset + recordCount`。但 production conditional append、reader
+clipping、core result validation、NCP1 与 NTC1 仍假设或只执行 one-entry-per-offset。
 
 F9-M1 必须一次关闭整条链：
 
@@ -76,7 +76,7 @@ UNSUPPORTED_READ_SEMANTICS
 `nereus-api/src/main/java/com/nereusstream/api/AppendPrecondition.java`
 
 ```java
-// target, not implemented
+// implemented in the F9-M1 public API slice
 public record AppendPrecondition(OptionalLong expectedStartOffset) {
     public AppendPrecondition {
         Objects.requireNonNull(expectedStartOffset, "expectedStartOffset");
@@ -96,7 +96,7 @@ public record AppendPrecondition(OptionalLong expectedStartOffset) {
 ### 3.2 `StreamStorage.append` overload
 
 ```java
-// target, not implemented
+// default overload implemented；DefaultStreamStorage override pending
 default CompletableFuture<AppendResult> append(
         StreamId streamId,
         AppendBatch batch,
@@ -171,7 +171,7 @@ AppendResultValidator.requireExactRequest(
 目标文件均在 `nereus-api/...`：
 
 ```java
-// target, not implemented
+// public values implemented；provider semantics pending
 public enum ReadBoundaryMode {
     EXACT_START,
     CONTAINING_ENTRY
@@ -207,7 +207,7 @@ Constructor invariants：
 ### 4.2 `StreamStorage.read` overload
 
 ```java
-// target, not implemented
+// default overload implemented；DefaultStreamStorage override pending
 default CompletableFuture<SemanticReadResult> read(
         StreamId streamId,
         ReadRequest request);

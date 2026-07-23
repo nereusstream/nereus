@@ -7,8 +7,8 @@
 `docs/phase-3-cursor-subscription/`、
 `docs/phase-4-compaction-generation/` 与
 `docs/phase-bk-bookkeeper-primary-wal/` 共同构成仓库内设计基线；
-`docs/phase-9-kafka-native-storage/` 是新增的 Designed 代码级 target；F9-M0 documentation gate 已于
-2026-07-23 完成。已实现合同由代码/
+`docs/phase-9-kafka-native-storage/` 是 F9 代码级 target；F9-M0 documentation gate 已于 2026-07-23 完成，
+F9-M1 public API/default-overload slice 正在实现。已实现合同由代码/
 测试优先；Phase 4 目录同时记录已通过 M0 的 target contract，以及已 final-gated 的 F4-M1–M6 实现和
 checkpoint-BQ aggregate evidence；F1-BK 目录记录当前 BookKeeper primary-WAL 交付。
 BK-M0 documentation gate 与 BK-M1 provider-neutral foundation 已于 2026-07-19 complete/final-gated；BK-M2
@@ -96,5 +96,5 @@ F1-BK contract、BK-M0–M6 顺序和场景/可执行证据矩阵以
 `../phase-bk-bookkeeper-primary-wal/README.md` 及该目录下的 `01` 到 `09` 为准。
 F9 native Kafka target、ranged-entry contract、Kafka fork method map、Oxia/checkpoint/lifecycle、runtime rollout
 和验收矩阵以 `../phase-9-kafka-native-storage/README.md` 及该目录下的 `01` 到 `08` 为准；`09` 是 dated
-F9-M0 review evidence。当前只有设计，
-没有 `nereus-kafka-adapter` 或 Kafka fork 实现。
+F9-M0 review evidence。当前只有 protocol-neutral F9-M1 public API slice，尚无完成的 ranged storage pipeline、
+`nereus-kafka-adapter` 或 Kafka fork 实现。

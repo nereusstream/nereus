@@ -41,14 +41,14 @@ public record AppendBatch(
                 Integer.MAX_VALUE,
                 "projectionHints");
         checksum = Objects.requireNonNull(checksum, "checksum");
-        if (payloadFormat != PayloadFormat.OPAQUE_RECORD_BATCH) {
-            throw new IllegalArgumentException("Phase 1 append accepts only OPAQUE_RECORD_BATCH");
-        }
         if (!projectionHints.isEmpty()) {
-            throw new IllegalArgumentException("Phase 1 append does not accept projectionHints");
+            throw new IllegalArgumentException("executable append formats do not accept projectionHints");
         }
         if (entries.isEmpty()) {
             throw new IllegalArgumentException("entries cannot be empty");
+        }
+        if (entries.size() > ApiLimits.MAX_APPEND_ENTRIES) {
+            throw new IllegalArgumentException("entries exceed the maximum append entry count");
         }
         if (recordCount <= 0) {
             throw new IllegalArgumentException("recordCount must be positive");
@@ -56,21 +56,30 @@ public record AppendBatch(
         if (entryCount != entries.size()) {
             throw new IllegalArgumentException("entryCount must equal entries.size");
         }
-        long sum = 0;
+        if (minEventTimeMillis < 0 || maxEventTimeMillis < minEventTimeMillis) {
+            throw new IllegalArgumentException("invalid event time range");
+        }
+        if (payloadFormat != PayloadFormat.OPAQUE_RECORD_BATCH
+                && payloadFormat != PayloadFormat.KAFKA_RECORD_BATCH) {
+            throw new IllegalArgumentException("payload format is reserved and not executable: " + payloadFormat);
+        }
+        int sum = 0;
         for (AppendEntry entry : entries) {
-            if (entry.recordCount() != 1) {
+            Objects.requireNonNull(entry, "entry");
+            if (payloadFormat == PayloadFormat.OPAQUE_RECORD_BATCH && entry.recordCount() != 1) {
                 throw new IllegalArgumentException("OPAQUE_RECORD_BATCH entries must have recordCount == 1");
             }
-            sum = Math.addExact(sum, entry.recordCount());
+            try {
+                sum = Math.addExact(sum, entry.recordCount());
+            } catch (ArithmeticException overflow) {
+                throw new IllegalArgumentException("sum of entry record counts overflows int", overflow);
+            }
             if (entry.eventTimeMillis() < minEventTimeMillis || entry.eventTimeMillis() > maxEventTimeMillis) {
                 throw new IllegalArgumentException("entry event time must be within batch range");
             }
         }
         if (sum != recordCount) {
             throw new IllegalArgumentException("recordCount must equal the sum of entry record counts");
-        }
-        if (minEventTimeMillis < 0 || maxEventTimeMillis < minEventTimeMillis) {
-            throw new IllegalArgumentException("invalid event time range");
         }
         validatePayloadChecksum(entries, checksum);
     }

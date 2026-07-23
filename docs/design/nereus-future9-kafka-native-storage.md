@@ -1,6 +1,6 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
-> 状态：Designed；尚未实现
+> 状态：In progress；F9-M1 public ranged API/default-overload slice implemented，core/read/formats pending
 > 代码级合同：`../phase-9-kafka-native-storage/README.md`
 > 参考源码：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`，`3.9.0-SNAPSHOT`
 > 设计基线日期：2026-07-23

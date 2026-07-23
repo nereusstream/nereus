@@ -24,7 +24,11 @@ public record AppendEntry(
         long eventTimeMillis,
         Map<String, String> attributes) {
     public AppendEntry {
-        payload = Objects.requireNonNull(payload, "payload").clone();
+        Objects.requireNonNull(payload, "payload");
+        if (payload.length > ApiLimits.MAX_ENTRY_PAYLOAD_BYTES) {
+            throw new IllegalArgumentException("payload exceeds the maximum entry size");
+        }
+        payload = payload.clone();
         attributes = MetadataCanonicalizer.canonicalStringMap(
                 attributes,
                 ApiLimits.MAX_ENTRY_ATTRIBUTES_ENCODED_BYTES,

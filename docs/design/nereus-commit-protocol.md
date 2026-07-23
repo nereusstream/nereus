@@ -711,8 +711,8 @@ F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publi
 
 ## 19. F9 designed append and leadership extension
 
-> Status: Designed only. These rules do not change the currently implemented append overloads or Pulsar session
-> behavior until F9-M1/M2 code and compatibility gates land.
+> Status: F9-M1 in progress. Public precondition/read value objects and binary-safe default overloads are implemented；
+> production conditional append/read semantics and leader authority remain unavailable until their M1/M2 gates land.
 
 Native Kafka needs one Nereus entry to consume the complete offset range of one Kafka `RecordBatch`. F9 therefore
 extends the protocol-neutral contract instead of teaching L0 about Kafka classes：

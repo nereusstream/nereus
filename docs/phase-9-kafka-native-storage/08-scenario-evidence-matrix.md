@@ -1,8 +1,8 @@
 # 08 — Scenario and Evidence Matrix
 
-> 状态：Designed scenario contract；all rows `PLANNED`
+> 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
-> 当前没有 executable F9 test，本文不构成通过证据
+> 当前仅有 F9-M1 public API focused tests；尚无任何完整 milestone/final gate 通过声明
 
 ## 1. Evidence tiers
 
@@ -20,7 +20,9 @@
 
 ## 2. Machine-readable manifest target
 
-At implementation start，create `docs/phase-9-kafka-native-storage/f9-scenarios.json` with one object per row：
+F9-M1 implementation start 已创建 `docs/phase-9-kafka-native-storage/f9-scenarios.json`，每个 Markdown row 对应
+一个 object；`checkPhase9ScenarioManifest` 当前验证 146/146 ID、required fields、status vocabulary 和 planned
+method uniqueness：
 
 ```json
 {

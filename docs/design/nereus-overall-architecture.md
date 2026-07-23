@@ -695,7 +695,7 @@ and secondary materialization lag；这些故障的 correctness 和恢复路径�
 | F6 | SBT/SDT lakehouse | Designed |
 | F7 | Routing/brown-out/elasticity | Designed |
 | F8 | Advanced Pulsar semantics | Designed |
-| F9 | Native KRaft Kafka fork backed directly by Nereus | Designed；F9-M0 documentation gate complete，no production code |
+| F9 | Native KRaft Kafka fork backed directly by Nereus | In progress；F9-M1 public API slice implemented，core/read/formats and Kafka runtime absent |
 
 Dependencies and implementation gates live in `nereus-futures.md`。Future numbers are capability IDs, not
 claims that all work is unstarted.

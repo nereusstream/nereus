@@ -279,7 +279,7 @@ decision behind items 14 and 16-18。
 | `../phase-3-cursor-subscription/README.md` | F3 API/metadata/wire/state-machine/implementation plan | implemented / final-gated（M0/M0R + M1-M6） |
 | `../phase-4-compaction-generation/README.md` | F4 API/metadata/object/state-machine/rollout/implementation target contract | implemented / final-gated（F4-M1–M6 + checkpoint BQ） |
 | `../phase-bk-bookkeeper-primary-wal/README.md` | F1-BK writer/reader/ledger lifecycle/retention/profile rollout code-level target | implemented / final-gated（BK-M0–M6；online profile migration excluded） |
-| `../phase-9-kafka-native-storage/README.md` | F9 native Kafka ranged-entry/log/fork/metadata/recovery/rollout code-level target | designed；F9-M0 documentation gate complete，no implementation |
+| `../phase-9-kafka-native-storage/README.md` | F9 native Kafka ranged-entry/log/fork/metadata/recovery/rollout code-level target | in progress；F9-M1 public API/default-overload slice implemented，no native Kafka runtime |
 | `../automq-like-stream-storage/README.md` | async materialization profile 的专门状态机和门禁 | implemented / final-gated（F4-M5 profile + F4-M6 aggregate） |
 | `../decisions/0002-separate-append-commit-index-and-materialization.md` | 分离逻辑提交、读索引物化和 higher generation | accepted ADR |
 | `../decisions/0004-insert-phase-1-5-generic-storage-foundation.md` | Phase 1.5 sequencing、dual-read/new-write and F2 gate | accepted ADR |

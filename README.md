@@ -1,7 +1,8 @@
 # Nereus
 
 Nereus is a protocol-neutral shared-storage streaming engine currently delivered through its Pulsar-native
-integration, with native KRaft Kafka integration defined as Designed Future 9. It is built around an Oxia
+integration. Native KRaft Kafka Future 9 is in F9-M1 foundation implementation；no native Kafka broker capability is
+available yet. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a
 single logical `streamId + offset` coordinate.

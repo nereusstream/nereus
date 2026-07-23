@@ -2741,3 +2741,17 @@ tasks.register("phase4FinalCheck") {
     dependsOn("checkPhase4FinalDockerIsolation")
     dependsOn("checkPhase4FinalPulsarCheckoutIsolation")
 }
+
+tasks.register<Exec>("checkPhase9ScenarioManifest") {
+    group = "verification"
+    description = "Verify the F9 Markdown and JSON scenario contracts have the same 146 stable IDs."
+    workingDir = layout.projectDirectory.asFile
+    commandLine("bash", "scripts/check-phase9-scenario-manifest.sh")
+}
+
+tasks.register("phase9M1ApiCheck") {
+    group = "verification"
+    description = "Run the in-progress F9-M1 public ranged-entry API slice and scenario-manifest gate."
+    dependsOn("checkPhase9ScenarioManifest")
+    dependsOn(":nereus-api:test")
+}

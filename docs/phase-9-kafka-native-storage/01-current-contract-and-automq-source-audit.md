@@ -151,16 +151,23 @@ AutoMQ 能让 stock `LogCleaner` 对 elastic virtual segments 做 replacement。
 与 stable commit chain 不允许原地替换；F4 已定义 higher generation/read view。因此 F9 禁用 stock local
 cleaner，使用 Kafka-aware F4 topic compaction。这是有意差异，不是遗漏。
 
-## 4. Locked Nereus files
+## 4. Locked/current Nereus files
+
+M0 的初始 blobs 保留在 Git 历史。下表在 F9-M1 public API slice 后刷新；未修改的 core/object/materialization
+rows 仍是待实现 gap，新增 API rows 是当前已实现事实。
 
 | Nereus file | Git blob | Current fact |
 | --- | --- | --- |
-| `nereus-api/.../AppendBatch.java` | `6287f6152a5203cd2dd3eec3500c5e6e4cf06c64` | only opaque format executable；entries require count 1 |
-| `nereus-api/.../AppendEntry.java` | `de4552974e3765c026b5e4e76aec49f049b7acd8` | positive `recordCount` already modeled |
+| `nereus-api/.../AppendBatch.java` | `c6bac3e4efcb0e597c3441071a638ebf8489934a` | OPAQUE stays one-per-offset；Kafka format accepts checked ranged counts；reserved formats fail closed |
+| `nereus-api/.../AppendEntry.java` | `ffa36d92a0e5bbe225358cde8ee9cdd1c829e6ac` | positive `recordCount` plus 64 MiB hard payload cap |
 | `nereus-api/.../AppendOptions.java` | `ffecb3eb26aac56c47372a195d3cf1e6a3631808` | no caller expected-start precondition |
 | `nereus-api/.../ReadOptions.java` | `40d7bff17bb6490b341d4613c8c8fd9777633f2c` | records/bytes/isolation/timeout；no boundary mode |
 | `nereus-api/.../ReadBatch.java` | `1f3ccc4344de26bae9b4dd245cf1dd5cf6db7fed` | result already carries an `OffsetRange` |
-| `nereus-api/.../StreamStorage.java` | `0f89e6122dc2b19232dc3dcc7251452a3ac96683` | no expected-start/read-view public overload |
+| `nereus-api/.../StreamStorage.java` | `d182633ce4c341343aa31009bd82ae30c1c887e9` | binary-safe append/read overloads；legacy-equivalent delegates，new unsupported semantics fail closed |
+| `nereus-api/.../AppendPrecondition.java` | `799caf45554ffaab72927bf18e869cce9ba02d2a` | implemented optional non-negative expected start |
+| `nereus-api/.../ReadRequest.java` | `e43bd0bb99f1762cc4893e20da18450c9e94b76f` | implemented view/boundary/first-entry/options request |
+| `nereus-api/.../SemanticReadResult.java` | `e753a0e71df00df4e127114e90ccd0815d116a33` | implemented request/result boundary、density and coverage validation |
+| `nereus-api/.../ErrorCode.java` | `2be9e0ca8ac3638755a294ef4380665ff03a0225` | unsupported append/read semantics codes appended at enum tail |
 | `nereus-core/.../AppendSessionManager.java` | `67a5a9202f8ab0caeca994ec359a0eb5ee5a379b` | writer-id/TTL session；no KRaft authority epoch |
 | `nereus-core/.../ReadCoordinator.java` | `0d69ba2148a4986f7093e487c98babe00883b500` | first result must start exactly at requested offset |
 | `nereus-core/.../StreamViewReader.java` | `8e5fc343c301d0a9cb82ca11024cc7dd46b7c18b` | semantic view is core-internal |
@@ -176,17 +183,19 @@ signature digest 和 clean-worktree assertion。
 
 ## 5. Current Nereus append facts
 
-### 5.1 Domain model is half-ready
+### 5.1 Public domain slice is range-ready；storage pipeline is not
 
-`AppendEntry` 已经有 `recordCount`，`AppendResult` 也能表达 `OffsetRange.recordCount`。`PayloadFormat` 已 reserve
-`KAFKA_RECORD_BATCH`。但 `AppendBatch` 当前 constructor：
+`AppendEntry`、`AppendResult` 与 `PayloadFormat.KAFKA_RECORD_BATCH` 原有 ranged shape 之上，F9-M1 API slice 已：
 
-- 只允许 `OPAQUE_RECORD_BATCH`；
-- 要求 projection hints empty；
-- 要求每个 entry `recordCount == 1`。
+- 保留 `OPAQUE_RECORD_BATCH` 每 entry count=1；
+- 为 `KAFKA_RECORD_BATCH` 接受 positive ranged counts 并做 int checked sum；
+- 对所有 executable formats 要求 projection hints empty；
+- 拒绝 reserved formats、超过 65,536 entries 与超过 64 MiB 的单 entry payload；
+- 建立 146-row scenario manifest 和 API focused gate。
 
-因此“enum 已有”不等于 ranged Kafka batch 已支持。F9-M1 必须同时修改 validation、tests、reader 和 higher
-generation；只放开 constructor 会制造无法正确读/物化的格式。
+这仍不等于 ranged Kafka storage 已支持：`DefaultStreamStorage`、primary readers 和 higher generations 尚未消费
+新语义。默认 provider 对 non-empty precondition/non-legacy read fail closed，避免仅放开 constructor 就写入无法
+正确读取或物化的格式。
 
 ### 5.2 Stable append already has the needed internal CAS
 
@@ -200,9 +209,10 @@ generation；只放开 constructor 会制造无法正确读/物化的格式。
 - CAS protected stream head；
 - 对 retained attempt 执行 exact recovery。
 
-缺口在 public caller 无法声明 Kafka 已分配的 expected start。F9 target 不把字段直接塞进现有
-`AppendOptions` record，以避免 source/binary constructor break；它新增 overload/value object，默认 overload
-仍是 `AppendPrecondition.none()`。
+Public caller 现在可通过 additive `AppendPrecondition` overload 声明 Kafka 已分配的 expected start，且旧
+`AppendOptions` record/old method descriptor 不变。当前 production `DefaultStreamStorage` 尚未 override 新方法，
+因此 non-empty precondition 以 `UNSUPPORTED_APPEND_PRECONDITION` 在 IO 前拒绝；下一 slice 才把它传入同一
+stream lane/head CAS。
 
 ### 5.3 Session cannot immediately fence a live Kafka leader
 
@@ -242,11 +252,12 @@ eventTime / checksum / attributes
 `ReadCoordinator.buildReadResult` 还要求第一 batch start 精确等于 request start，无法承认 containing entry。
 这两层必须一起版本化；只改 object reader 会被 core 再次拒绝。
 
-### 6.3 View API exists but adapter cannot use it cleanly
+### 6.3 Public view API shape exists；provider implementation pending
 
-F4 core 已有 `StreamViewReader` 和带 `sourceCoverageEndOffset` 的 `ViewReadResult`，可以表达 sparse
-`TOPIC_COMPACTED` coverage。但它们位于 core internal package，public `StreamStorage.read` 默认只读 committed
-view。F9 compacted fetch 需要稳定 public view-read surface，且普通 committed API 保持默认行为。
+F9-M1 API slice 已增加 `ReadRequest`、`SemanticReadResult` 和 binary-safe `StreamStorage.read` overload。旧 provider
+只对 legacy-equivalent COMMITTED/EXACT/STRICT request 委托旧方法，其余 fail closed。F4 core 仍使用 internal
+`StreamViewReader`/`ViewReadResult`，reader 也尚未实现 containing/first-overflow；下一 slice 迁移 production owner，
+同时保持普通 committed API 默认行为。
 
 ## 7. Current materialization/compaction facts
 

@@ -116,9 +116,20 @@ class ApiValueValidationTest {
     }
 
     @Test
-    void appendBatchRejectsNonOpaqueProjectionHintsAndBadPayloadChecksums() {
+    void appendBatchRejectsReservedFormatsProjectionHintsAndBadPayloadChecksums() {
         AppendEntry entry = entry(new byte[] {1, 2, 3}, 10);
 
+        assertThatThrownBy(() -> new AppendBatch(
+                PayloadFormat.PULSAR_ENTRY_BATCH,
+                List.of(entry),
+                1,
+                1,
+                10,
+                10,
+                List.of(),
+                Map.of(),
+                Optional.empty()))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendBatch(
                 PayloadFormat.KAFKA_RECORD_BATCH,
                 List.of(entry),
@@ -127,7 +138,7 @@ class ApiValueValidationTest {
                 10,
                 10,
                 List.of(),
-                Map.of(),
+                Map.of("future", "projection"),
                 Optional.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new AppendBatch(
