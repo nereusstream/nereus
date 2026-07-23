@@ -82,7 +82,7 @@ non-destructive non-empty rejection、PREPARED crash resume、second-proof cut a
 `KafkaStorageBindingAwareClusterSnapshotProviderTest` proves all 64 binding-registry shards are examined before an empty result，
 any non-empty shard is projected into the activation snapshot，and an already-positive fork fact avoids a weaker rescan；the
 activation-backed Object-WAL integration test proves this wrapper remains on the public production path。Kafka controller seam/process
-integration and fork mapping、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
+integration and fork provider/context binding、BookKeeper/async-object provider construction、priority budgets and native-storage process cuts
 仍未实现，
 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及

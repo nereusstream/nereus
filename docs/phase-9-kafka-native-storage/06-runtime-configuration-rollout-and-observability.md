@@ -58,13 +58,14 @@ is preserved without scanning。This is intentionally conservative because a sta
 while ACTIVE admission does not require the cluster to remain empty。Runtime close cancels its owned heartbeat/poll futures before
 closing the activation store，while the Kafka scheduler/recovery launcher/clock remain borrowed。
 
-Kafka fork commits `46e6703761..617451957c` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
+Kafka fork commits `46e6703761..94ecf8c105` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
 create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
 enabled mode before LogManager construction。`NereusBrokerStorageRuntimeFactory` is the concrete adapter bridge：typed creators
 return the product runtime and exact scan limits；it does not evaluate them while disabled and closes a created runtime if later
 assembly fails。`NereusBrokerStorageRuntime` binds the runtime's single manager to the exact BrokerServer `ReplicaManager` and
-constructs the ListOffsets/topic-delta lifecycle only at that point。Fork-side typed-config/context mapping and Kafka controller
-scheduling remain open。
+constructs the ListOffsets/topic-delta lifecycle only at that point。`NereusKafkaRuntimeConfigurationMapper` now implements the
+side-effect-free typed-config/broker-identity half of the fork mapping；provider creation、borrowed context/snapshot/recovery
+binding and Kafka controller scheduling remain open。
 
 ### 1.2 Resource ownership
 
@@ -210,6 +211,35 @@ config，not these broker defaults。This table controls engine capacity/safety 
 | `nereus.kafka.storage.capability.expiry.ms` | long | `30000` | >= 3 heartbeat |
 | `nereus.kafka.storage.shutdown.drain.timeout.ms` | long | `120000` | `1000..900000` |
 | `nereus.kafka.storage.shutdown.checkpoint.timeout.ms` | long | `60000` | <= drain timeout or explicit warning |
+
+### 2.7 Executable fork-to-product mapping
+
+Local fork `94ecf8c105` freezes the first production mapper as follows；all checked arithmetic failures and unsupported values
+terminate before provider I/O：
+
+| Product field | Exact source/mapping |
+| --- | --- |
+| executable/default profile | exactly `OBJECT_WAL_SYNC_OBJECT`；other profiles fail closed until their creators exist |
+| provider | canonical token exactly `s3` → `S3CompatibleObjectStoreProvider.class.getName()`；no class loading |
+| S3 region/endpoint | configured values；otherwise `us-east-1` and `https://s3.us-east-1.amazonaws.com` |
+| object prefix | `nereus/kafka/` + lowercase SHA-256 of Kafka cluster ID |
+| provider timeout | `min(append.timeout, fetch.timeout)` |
+| Oxia request/session | provider timeout / append-session TTL；commit-chain scan `10000` |
+| writer/operation owner | `kafka-broker-{brokerId}-epoch-{brokerEpoch}` |
+| operation epoch | checked `brokerEpoch + 1`；capability keeps exact unmodified KRaft epoch |
+| operation TTL | `max(recovery.timeout, session.ttl)` |
+| StreamStorage session | exact TTL/renew interval；`autoAcquireAppendSession=false` |
+| append/read budgets | typed append/fetch byte and executor limits；object max is `min(append.request, fetch.maxEntry)` |
+| ListOffsets | records/bytes from recovery chunk；read operations from fetch reread limit；target `min(1 MiB, object max)` |
+| activation wait/publish | readiness timeout、capability heartbeat/expiry from rollout config |
+
+`configCompatibilitySha256` uses a length-prefixed `nereus-kafka-config-compatibility-v1` domain and hashes profile、
+append/session hard semantics、fetch hard limits、recovery/checkpoint ceilings、compaction decode/coverage ceilings and mandatory
+activation。Local paths、thread/queue capacity and timeout tuning are deliberately excluded。`providerScopeSha256` separately
+hashes Nereus/Kafka cluster IDs、Oxia address/namespace、provider、resolved endpoint/region/bucket/prefix and path-style flag。
+`codeCapabilitySha256` hashes the exact protocol/API/session/binding/index/NCP2/NTC2/NKC1/compaction/feature tuple plus the
+single executable profile。The mapper tests freeze deterministic process-independent digests、epoch-zero handling、derived S3
+scope and both unsupported-profile/provider pre-I/O failures。
 
 ## 3. Cross-Kafka validation
 

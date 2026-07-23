@@ -410,21 +410,22 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@617451957c` contains eight reviewed commits and the thirty-nine-file
-  bridge/request/metadata-lifecycle/configuration/runtime seam，but the current GitHub credential has
+  `nereus/future9-native-kafka-storage@94ecf8c105` contains nine reviewed commits and the forty-two-file
+  bridge/request/metadata-lifecycle/configuration/runtime-mapping seam，but the current GitHub credential has
   read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
   final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/eight-commit count/remotes/thirty-nine bridge/metadata-lifecycle/configuration/runtime blobs/markers；`phase9M3KafkaForkCheck` publishes exact
+  fork branch/head/base ancestry/nine-commit count/remotes/forty-two bridge/metadata-lifecycle/configuration/runtime-mapping blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、four stock Partition seam tests、one
   ReplicaManager publication test、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
+  four product-runtime mapper tests、
   complete `KafkaConfigTest`、three stock runtime-factory tests、four adapter-backed runtime tests、stock single-node KRaft
   restart and server/core/storage format/static-analysis
-  gates。At `617451957c` the aggregate rerun passed 78/78 outer tasks；nested stock/artifact-enabled Kafka builds completed
+  gates。At predecessor `617451957c` the aggregate rerun passed 78/78 outer tasks；nested stock/artifact-enabled Kafka builds completed
   92/92 and 95/95 actionable tasks。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 
@@ -524,8 +525,10 @@ admission；heartbeat owns only its scheduled future and a failed CAS permanentl
 empty-image/capability proof → ACTIVE，resumes PREPARED without mutation，recovers a compatible concurrent winner and treats ACTIVE
 as idempotent without reapplying the first-activation emptiness rule。The Object-WAL production creator now wraps every fork
 snapshot with a 64-shard exact binding-registry existence scan，so first activation cannot accept a KRaft-empty cluster that
-already has durable Nereus Kafka binding history。Typed Kafka-config-to-provider construction、Kafka controller
-snapshot/scheduling integration、fork mapping、priority budgets
+already has durable Nereus Kafka binding history。The fork now maps its typed config plus exact broker epoch into provider-neutral
+Object-WAL/Oxia/StreamStorage/capability/ListOffsets configurations with deterministic compatibility/provider/code digests and
+pre-I/O profile/provider rejection。Kafka context-to-provider construction、Kafka controller snapshot/scheduling integration、
+priority budgets
 and real native-storage shutdown/process cuts remain open。
 
 ### Tasks

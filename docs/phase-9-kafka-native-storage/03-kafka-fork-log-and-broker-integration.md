@@ -90,7 +90,8 @@ Adapter-side counterpart：
 禁止把 field type 写死为 `NereusReplicaManager`；对外仍暴露 `ReplicaManager`，避免 disabled mode cast。
 
 `46e67037615a60a39320836cc5f34ddaf4a9b347` 已实现 generic lifecycle seam；`617451957c886d4247f6d2f1a88e44a35edfbba7`
-增加 adapter-backed bridge：
+增加 adapter-backed bridge；`94ecf8c105ad2d765aa9fd4a4929ff86c20882a1` 增加 side-effect-free product configuration
+mapper：
 
 - `KafkaRaftServer`/`BrokerServer` 通过显式 constructor 参数接收 `BrokerStorageRuntimeFactory`，默认 factory 仅允许
   disabled mode 并返回 no-op；enabled 且未安装 concrete factory 在 LogManager 创建前抛 `ConfigException`；
@@ -106,6 +107,12 @@ Adapter-side counterpart：
   registry；disabled mode 不调用 creator，runtime 已创建后的 scan-config/wrapper failure 会 close 并保留 suppressed failure；
 - `NereusBrokerStorageRuntime` 把四种 drain reason 显式映射到 adapter enum，以同一
   `KafkaPartitionStorageManager` 构造 lookup/topic-delta lifecycle，并在 delegate drain 的同步边界撤销全部 lookup；
+- `NereusKafkaRuntimeConfigurationMapper` 仅在真实 broker epoch 已知后接受 enabled typed snapshot；它精确构造
+  ObjectStore/Oxia/StreamStorage/runtime/capability/ListOffsets 配置，但不创建 provider、线程、client 或文件；
+- 当前 executable provider set 是 `{OBJECT_WAL_SYNC_OBJECT}`，object provider token 只允许小写 canonical `s3`；
+  其他四种 profile 或自定义 class name 均在资源创建前 `ConfigException`，不能回退到 reflection/service loader；
+- KRaft broker epoch 原值进入 capability，generic binding-operation epoch 使用 checked `brokerEpoch + 1`，避免合法
+  Kafka epoch `0` 与 product positive-epoch invariant 冲突；
   `NereusListOffsetsLifecycle.beginDrain` 只负责 admission/revocation，standalone `shutdown` 仍 deduplicate manager shutdown；
 - stock/no-artifact factory tests 和 single-node KRaft start→shutdown→restart 已通过。
 
@@ -429,7 +436,7 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
-消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `617451957c` 落地
+消费 exact F9 development modules，并已在 local fork `94ecf8c105` 落地
 `NereusRecordTimestampInspector`、`NereusListOffsetsBridge`、`NereusListOffsetsScanConfig` 和
 `NereusKafkaExceptionMapper`，并通过 Kafka-only `LeaderEpochAwareOffsetLookup` 接入 stock `Partition`/
 `ReplicaManager` request path。`NereusListOffsetsLifecycle` 包装 product-owned manager，在 manager 返回 fully recovered
@@ -438,7 +445,8 @@ authority/recovery。第五个 commit 另加入 `AsyncTopicDeltaLifecycle`、`Ne
 `BrokerMetadataPublisher` routing；第六个 commit 注册 58-key config surface、immutable typed snapshot 和 enabled-only
 cross-Kafka validator；第七个 commit 增加 explicit stock-compatible runtime factory、publisher lifecycle injection、
 pre-unfence ready wait 和 ordered drain/close；第八个 commit 增加 adapter-backed runtime、typed creator factory、
-exact ReplicaManager metadata lifecycle binding 和 lookup-only drain。Provider composition 尚未实现。当前 commit
+exact ReplicaManager metadata lifecycle binding 和 lookup-only drain；第九个 commit 增加 closed runtime/product
+configuration mapper 与四个 deterministic tests。Provider/context composition 尚未实现。当前 commit
 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
