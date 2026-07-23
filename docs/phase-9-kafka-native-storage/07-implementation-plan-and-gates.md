@@ -390,7 +390,7 @@ coordinator/transaction/compaction remain M4/M5。
   `BrokerMetadataPublisher` routing。`NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` and
   `BrokerMetadataPublisherTest` prove stock-state-first preparation、old/new image identity selection、delete-before-recreate、
   callback-after-success、coordinator-election-after-recovery and `firstPublishFuture` non-readiness semantics。Time-index
-  checkpoint candidate、BrokerServer runtime composition、restart and real KRaft baseline remain open；
+  checkpoint candidate、concrete BrokerServer runtime composition and real native-storage KRaft baseline remain open；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
   cleaner/AutoMQ/request-limit/directory validation。Six snapshot tests、four validator tests and the complete stock
@@ -399,19 +399,19 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@d312e8e58d` contains six reviewed commits and the twenty-nine-file
-  bridge/request/metadata-lifecycle/configuration seam，but the current GitHub credential has
+  `nereus/future9-native-kafka-storage@46e6703761` contains seven reviewed commits and the thirty-six-file
+  bridge/request/metadata-lifecycle/configuration/runtime seam，but the current GitHub credential has
   read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
   final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/six-commit count/remotes/twenty-nine bridge/metadata-lifecycle/configuration blobs/markers；`phase9M3KafkaForkCheck` publishes exact
+  fork branch/head/base ancestry/seven-commit count/remotes/thirty-six bridge/metadata-lifecycle/configuration/runtime blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、four stock Partition seam tests、one
   ReplicaManager publication test、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
-  complete `KafkaConfigTest` and server/core/storage format/static-analysis
+  complete `KafkaConfigTest`、three runtime-factory tests、stock single-node KRaft restart and server/core/storage format/static-analysis
   gates。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 

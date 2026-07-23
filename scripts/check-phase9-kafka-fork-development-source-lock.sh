@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "6" ]] \
-    || fail "expected six reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "7" ]] \
+    || fail "expected seven reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -63,10 +63,16 @@ core/src/main/scala/kafka/cluster/Partition.scala
 core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
 core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
 core/src/main/scala/kafka/server/KafkaConfig.scala
+core/src/main/scala/kafka/server/BrokerServer.scala
+core/src/main/scala/kafka/server/KafkaRaftServer.scala
 core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
 core/src/main/scala/kafka/server/ReplicaManager.scala
 core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
 core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
+core/src/main/scala/kafka/server/storage/BrokerStorageDrainReason.scala
+core/src/main/scala/kafka/server/storage/BrokerStorageRuntime.scala
+core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeContext.scala
+core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeFactory.scala
 core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
@@ -77,6 +83,7 @@ core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
+core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
 server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java
 server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java
 server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java
@@ -85,7 +92,7 @@ storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOff
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed twenty-nine-file bridge/metadata-lifecycle/configuration slice"
+    || fail "fork change set differs from the reviewed thirty-six-file bridge/metadata-lifecycle/configuration/runtime slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -111,12 +118,19 @@ c2bd8e03152a23547044a42f439b33698ace4251 core/src/test/java/kafka/log/nereus/Ner
 1707eb1ee360baaed845404ced5ba2e872bc62d4 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 898c9b8e37028a79183fab32a65e830554b1bd30 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 c1490dc3f9af754c2111a1c4d6d6bcfdfcb8c53f core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
+aedbe70413c90e0f5a5ba29699148638d6c37047 core/src/main/scala/kafka/server/BrokerServer.scala
 457e08ad6714dd972abdb92d9f7471bb258469b7 core/src/main/scala/kafka/server/KafkaConfig.scala
+1bb02848026399255535c83f667daa1d1777ad59 core/src/main/scala/kafka/server/KafkaRaftServer.scala
 1526e85d891d075c173fd50c22dc017219d8aa73 core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
 14358b2d91ae9a25ea683946509cd3fd1657b6ca core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
 7bd6e2c1512fbc2e0879d4c9df3f3e8f8d40a7e2 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
 4d4507ca06c365a23fc336adfcfd4b98a7836203 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 b69cb745a04454dc890429498d44ce61c6b4a70a core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
+876bde2298de1e772d6bcd4eee2e38bb0817bbde core/src/main/scala/kafka/server/storage/BrokerStorageDrainReason.scala
+9f6fbe6ab5ce424e8391172e5f626dd09814dcb6 core/src/main/scala/kafka/server/storage/BrokerStorageRuntime.scala
+b2d6eccbc8169932d4104c6f494d945476becfd1 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeContext.scala
+ec9dcfbccd14852dc2429a71890e2535aa832552 core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeFactory.scala
+f2f7530d274c5f365a027e0b26a0c6a26788d625 core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
 3036df4e77ad23fabb6533d1dc173458356ea6b3 server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java
 159b5b49316f9284df524b855409837fae0641b1 server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java
 bcf3d34104255dba08937f27b9642ee20f40de5d server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java
@@ -127,7 +141,9 @@ LOCKS
 marker_start="$(grep -h -F -c 'Nereus inject start:' \
     "$kafka_checkout/build.gradle" "$kafka_checkout/checkstyle/import-control-core.xml" \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/BrokerServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/KafkaConfig.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/KafkaRaftServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala" \
     "$kafka_checkout/server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java" \
@@ -135,7 +151,9 @@ marker_start="$(grep -h -F -c 'Nereus inject start:' \
 marker_end="$(grep -h -F -c 'Nereus inject end:' \
     "$kafka_checkout/build.gradle" "$kafka_checkout/checkstyle/import-control-core.xml" \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/BrokerServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/KafkaConfig.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/KafkaRaftServer.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala" \
     "$kafka_checkout/server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java" \
@@ -262,6 +280,30 @@ grep -F -q 'requireSingleReplicaSemantics(config)' "$config_validator" \
 grep -F -q 'requireConflictingStorageDisabled(config)' "$config_validator" \
     || fail "Nereus Kafka validator lost conflicting storage-mode rejection"
 
+runtime_factory="$kafka_checkout/core/src/main/scala/kafka/server/storage/BrokerStorageRuntimeFactory.scala"
+grep -F -q 'val Disabled: BrokerStorageRuntimeFactory' "$runtime_factory" \
+    || fail "broker storage runtime lost its stock-disabled factory"
+grep -F -q 'requires an explicitly installed BrokerStorageRuntimeFactory' "$runtime_factory" \
+    || fail "enabled storage no longer fails closed without an explicit runtime factory"
+
+broker_server="$kafka_checkout/core/src/main/scala/kafka/server/BrokerServer.scala"
+grep -F -q 'brokerStorageRuntimeFactory.create(BrokerStorageRuntimeContext(' "$broker_server" \
+    || fail "BrokerServer lost explicit storage runtime creation"
+grep -F -q 'brokerStorageRuntime.asyncTopicDeltaLifecycle' "$broker_server" \
+    || fail "BrokerServer lost storage metadata lifecycle composition"
+grep -F -q '"the broker storage runtime to become ready"' "$broker_server" \
+    || fail "BrokerServer lost pre-unfence storage readiness"
+grep -F -q 'brokerStorageRuntime.beginDrain(brokerStorageDrainReason)' "$broker_server" \
+    || fail "BrokerServer lost pre-handler storage admission drain"
+grep -F -q 'brokerStorageRuntime.awaitDrained(drainTimeout)' "$broker_server" \
+    || fail "BrokerServer lost pre-ReplicaManager storage drain wait"
+grep -F -q 'closeBrokerStorageRuntime()' "$broker_server" \
+    || fail "BrokerServer lost post-log storage runtime close"
+
+kafka_raft_server="$kafka_checkout/core/src/main/scala/kafka/server/KafkaRaftServer.scala"
+grep -F -q 'brokerStorageRuntimeFactory: BrokerStorageRuntimeFactory = BrokerStorageRuntimeFactory.Disabled' "$kafka_raft_server" \
+    || fail "KafkaRaftServer lost explicit stock-default runtime injection"
+
 if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
         "$kafka_checkout/core/src/main/java/kafka/log/nereus" \
         "$kafka_checkout/core/src/main/scala/kafka/log/nereus" \
@@ -269,4 +311,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; six commits, twenty-nine bridge/metadata-lifecycle/configuration blobs and markers match"
+echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; seven commits, thirty-six bridge/metadata-lifecycle/configuration/runtime blobs and markers match"

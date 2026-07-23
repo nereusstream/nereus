@@ -4,7 +4,7 @@
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development lock：local `nereus/future9-native-kafka-storage@d312e8e58d64f326261dd36592a1b5e6398fa5a3` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
+> Kafka fork development lock：local `nereus/future9-native-kafka-storage@46e67037615a60a39320836cc5f34ddaf4a9b347` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -26,12 +26,15 @@ resign 均不能覆盖或移除新 lookup。fork 的 stock-compatible `AsyncTopi
 leader-publication callback、`NereusTopicDeltaLifecycle` 与 `BrokerMetadataPublisher` optional branch 已落地：新 leader
 在 stock state publication 后同步进入 exact-epoch recovery-pending，恢复成功后才通知 internal coordinator election；
 follower/delete callback 等待 manager lifecycle 完成，delete→同名 recreation 按 partition 串行；
-`firstPublishFuture` 明确不是 partition-readiness barrier。`UnifiedLog`/factory、BrokerServer config/runtime factory 对该
-optional lifecycle 的实际装配仍未完成。fork 已注册完整 58-key `nereus.kafka.storage.*` `ConfigDef`，构建无副作用
+`firstPublishFuture` 明确不是 partition-readiness barrier。fork 已注册完整 58-key
+`nereus.kafka.storage.*` `ConfigDef`，构建无副作用
 immutable typed snapshot，并在 enabled-only pure validator 中拒绝非 broker、RF/minISR、remote log、stock cleaner、
-AutoMQ mode、request hard limit 与 authoritative log-directory conflicts；disabled default 不创建资源。BrokerServer
-runtime factory seam 尚未接入；adapter 已新增 exact `NereusKafkaRuntime`、drain reason、immutable health snapshot 和
-thread-safe admission gate，且保证 drain/close 终态不能被 late readiness callback 重新打开。`UnifiedLog`/factory、
+AutoMQ mode、request hard limit 与 authoritative log-directory conflicts；disabled default 不创建资源。Kafka fork
+现有 stock-compatible `BrokerStorageRuntimeFactory` 显式注入 seam：runtime 在 LogManager IO 前创建，start future 在
+unfence/request processing 前等待，optional metadata lifecycle 传给 publisher，shutdown 在 request handlers 前关闭
+admission、ReplicaManager 前等待 drain、LogManager 后关闭 runtime；enabled 且无 concrete factory 会 fail closed。
+adapter 已新增 exact `NereusKafkaRuntime`、drain reason、immutable health snapshot 和 thread-safe admission gate，且保证
+drain/close 终态不能被 late readiness callback 重新打开。concrete Nereus runtime factory、`UnifiedLog`/factory、
 checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock
@@ -42,8 +45,8 @@ binding-first storage manager 已把 deterministic ACTIVE binding、exact profil
 deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/authority/durable-digest snapshot seam 也已落地，
 并支持 genesis commitVersion `0`。Exact commit-ancestor reachability、source validator 与 concrete
 session/head/recovery opener 已组装；public binary-safe session renewal 与 partition-owned periodic renewal 已落地，
-renew failure/invalid token 会立即 write-fence 且阻止 queued append dispatch。Kafka fork BrokerServer runtime wiring 和真实
-KRaft gate 尚未闭合。
+renew failure/invalid token 会立即 write-fence 且阻止 queued append dispatch。Kafka fork generic BrokerServer lifecycle
+wiring 已落地并通过 stock KRaft restart；concrete Nereus runtime/log wiring 和真实 native-storage KRaft gate 尚未闭合。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 

@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation and adapter runtime/admission contracts implemented；BrokerServer composition/activation/observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission contracts and generic BrokerServer lifecycle seam implemented；concrete runtime/activation/observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -30,6 +30,10 @@ with stable Nereus error classification。Concrete provider/resource composition
 `NereusKafkaRuntimeFactory.create` accepts an immutable typed config plus explicit dependencies：Kafka broker/controller IDs、
 broker epoch supplier、KRaft metadata-view supplier、Kafka `Time`、metrics registry and scheduler。No static singleton；tests can
 run independent runtimes in one JVM。
+
+Kafka fork commit `46e6703761` now supplies the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
+create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
+enabled mode before LogManager construction。A concrete adapter-backed factory and owned provider resources remain open。
 
 ### 1.2 Resource ownership
 
