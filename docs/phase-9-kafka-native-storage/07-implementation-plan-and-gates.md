@@ -375,6 +375,11 @@ coordinator/transaction/compaction remain M4/M5。
   `DefaultKafkaPartitionStorageTest` prove the public exact-session renewal path、strict monotonic returned token、renewed token
   use by later appends、failure-to-write-fence transition、leadership-loss event and no queued append dispatch after authority
   loss。Kafka fork launcher/runtime wiring remains open；
+- `KafkaListOffsetsResolverTest` proves stable-snapshot earliest/latest、compressed exact-record timestamp lookup、
+  bounded cross-page scan、max-timestamp lowest-offset tie-break、budget exhaustion without approximate answers、invalid
+  inspector result rejection and leadership loss during inspection。This is deterministic Nereus-side partial evidence for
+  KF-FET-009；fork `MemoryRecords` implementation、time-index checkpoint candidate、restart and real KRaft baseline remain
+  open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、

@@ -354,6 +354,13 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 - `KafkaStorageProfilePolicy`：只允许五个已激活 canonical profile；durability 必须等于 profile default，completion
   必须是 `PROFILE_DEFAULT`。`DefaultKafkaPartitionStorage` 只从该 policy 构造 `AppendOptions`，不会根据 request
   `acks` 改写底层 success predicate；legacy `OBJECT_WAL` alias 和显式 weakened policy 在 I/O 前拒绝。
+- `KafkaListOffsetsResolver`：把 `EARLIEST`、`LATEST`、`TIMESTAMP`、`MAX_TIMESTAMP` 收敛到一个
+  leader-epoch-fenced boundary。每次请求只捕获一个 `KafkaStableSnapshot`；timestamp 类查询从该 snapshot 的
+  `logStartOffset` 分页读取到冻结的 `stableEndOffset`，同时强制 records、bytes、read-operation 与 deadline 四重
+  上限。`KafkaRecordTimestampInspector` 是 fork-owned exact-record seam：adapter 只交付 read-only exact Kafka
+  bytes 与 minimum offset，由 fork 使用 stock `MemoryRecords` 迭代压缩/非压缩 records。命中必须位于本页且
+  timestamp query 不得低于 target；预算耗尽、无进展、并发 trim、inspector 越界或扫描中 authority 丢失均失败，
+  不返回近似 offset。max timestamp 相等时选择最低 logical offset。
 
 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 production/runtime classpath。此切片尚未满足 M3 entry 中的组织 Kafka fork source lock，
@@ -592,13 +599,20 @@ cumulativeLogicalBytesAtEntryStart
 - disk alter APIs → unsupported for Nereus mode；
 - remote/tiered log API → disabled，because all Nereus bytes already shared primary/higher-generation storage。
 
-timestamp lookup若 checkpoint index没有候选，bounded scan committed entries；scan 预算/timeout 超限映射 storage error，
-不能返回一个未经证明的 nearby offset。
+timestamp lookup 若 checkpoint index 没有候选，bounded scan committed entries；scan 预算/timeout 超限映射 storage
+error，不能返回一个未经证明的 nearby offset。
 
-当前 adapter 的 batch codec 只拥有 Kafka batch header，不拥有 stock Kafka record iterator。因而 earliest/latest 可由
-`KafkaStableSnapshot` 精确给出，但 timestamp lookup 仍保留为 fork `MemoryRecords` iterator + adapter candidate/read
-组合；在该 wiring 落地前不会把 batch base 伪装成 first-record timestamp result。`KafkaVirtualPositionIndex`、
-`NereusTimeIndex` section codec 和 fork ListOffsets tests 仍为 open M3/M4 work。
+当前 adapter 已实现 `KafkaListOffsetsRequest` / `KafkaListOffsetResult` / `KafkaListOffsetsResolver`：earliest/latest
+直接取同一 stable snapshot 的 log start/end；timestamp/max timestamp 则在同一冻结区间内执行 exact committed-tail
+分页扫描。adapter 不解析 record payload，也不把 batch base 伪装成 first-record result；它通过
+`KafkaRecordTimestampInspector` 把每页 read-only exact bytes 交给 fork 的 stock `MemoryRecords` iterator，并校验
+返回的 offset/timestamp 仍在该页证明范围内。扫描期间 stale epoch、resign 或 write-fence 会返回 `FENCED_APPEND`；
+并发 trim 返回 `OFFSET_TRIMMED`；records/bytes/read-count 预算耗尽返回 `METADATA_LIMIT_EXCEEDED`；deadline 到期返回
+`TIMEOUT`；空页无进展返回 `READ_LIMIT_TOO_SMALL`。上述错误都不会降级成近似 offset。
+
+`NereusTimeIndex` verified checkpoint candidate 尚未接入，因此当前 resolver 从冻结 log start 扫描，属于正确但受硬
+预算限制的 fallback。fork ListOffsets handler/exception mapping、leader-epoch cache、`KafkaVirtualPositionIndex`、
+`NereusTimeIndex` section codec、restart recovery 与真实 KRaft baseline integration tests 仍为 open M3/M4 work。
 
 ## 10. Error and outcome mapping
 
