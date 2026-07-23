@@ -1,0 +1,487 @@
+# 06 — Runtime, Configuration, Rollout and Observability
+
+> 状态：Designed target；F9-M6
+> Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
+> Safe default：`nereus.kafka.storage.enabled=false`
+
+## 1. Runtime composition
+
+### 1.1 `NereusKafkaRuntime`
+
+Target package：`com.nereusstream.kafka.runtime`
+
+```java
+// target
+public interface NereusKafkaRuntime extends AutoCloseable {
+    CompletionStage<Void> start();
+    KafkaStorageAdmission admission();
+    KafkaPartitionStorageManager partitionStorageManager();
+    KafkaStorageHealth health();
+    CompletionStage<Void> beginDrain(DrainReason reason);
+    CompletionStage<Void> awaitDrained(Duration timeout);
+    @Override void close();
+}
+```
+
+`NereusKafkaRuntimeFactory.create` accepts an immutable typed config plus explicit dependencies：Kafka broker/controller IDs、
+broker epoch supplier、KRaft metadata-view supplier、Kafka `Time`、metrics registry and scheduler。No static singleton；tests can
+run independent runtimes in one JVM。
+
+### 1.2 Resource ownership
+
+| Resource | Owner | Close rule |
+| --- | --- | --- |
+| `StreamStorage` | Kafka runtime when factory-created | close after all partitions drained |
+| Oxia clients/stores | runtime | close after scanners/checkpoints stopped |
+| ObjectStore provider | runtime | close after checkpoint/materialization/GC drained |
+| BookKeeper client | runtime when selected profiles need it | close after StreamStorage/materialization |
+| append/fetch/lifecycle/recovery executors | runtime | stop admission，drain，then interrupt only at final timeout |
+| compaction/materialization services | runtime | stop planning，drain workers before provider close |
+| Kafka `Time`/metrics/scheduler/metadata suppliers | borrowed | never close |
+| request-owned buffers | individual produce/fetch operation | release exactly once at terminal callback |
+
+Every constructor marks each dependency `OWNED` or `BORROWED` in a `KafkaRuntimeResources` value；mixed ambiguity is rejected。
+
+## 2. Configuration namespace
+
+All keys below are target keys registered in Kafka `ConfigDef`。Defaults are design values，not current executable behavior。
+
+### 2.1 Core and providers
+
+| Key | Type | Default | Mutability | Validation |
+| --- | --- | --- | --- | --- |
+| `nereus.kafka.storage.enabled` | boolean | `false` | static | cluster-wide equal on broker/controller roles |
+| `nereus.kafka.storage.cluster` | string | no default | static | non-blank canonical Nereus namespace |
+| `nereus.kafka.storage.profile` | enum | `BOOKKEEPER_WAL_ASYNC_OBJECT` | activation epoch | executable/activated；immutable per created stream |
+| `nereus.kafka.storage.oxia.service.address` | string | no default | static | URI/list parsed by existing Oxia config |
+| `nereus.kafka.storage.oxia.namespace` | string | `default` | static | canonical provider namespace |
+| `nereus.kafka.storage.object.provider` | enum | no default | static | required for Object-using profile |
+| `nereus.kafka.storage.object.bucket` | string | no default | static | required/non-blank；never logged with credentials |
+| `nereus.kafka.storage.object.endpoint` | string | provider default | static | URI；TLS policy validated |
+| `nereus.kafka.storage.object.region` | string | provider default | static | provider validation |
+| `nereus.kafka.storage.object.path.style.access` | boolean | `false` | static | provider-specific |
+| `nereus.kafka.storage.bookkeeper.metadata.service.uri` | string | no default | static | required for BK profile |
+| `nereus.kafka.storage.cache.dir` | path | no default | static | dedicated writable empty/ephemeral directory |
+
+Credentials are supplied through existing provider credential mechanisms/environment/secret files，not echoed into Kafka
+effective-config logs。Config mapper redacts any key matching access/secret/token/password/private-key patterns。
+
+Allowed initial profiles after their existing activation proofs：
+
+```text
+OBJECT_WAL_SYNC_OBJECT
+OBJECT_WAL_ASYNC_OBJECT
+BOOKKEEPER_WAL_ONLY
+BOOKKEEPER_WAL_ASYNC_OBJECT
+BOOKKEEPER_WAL_SYNC_OBJECT
+```
+
+Activation record freezes allowed set/default。Existing partition binding profile never changes；online profile migration is
+out of scope。A later default applies only to new bindings after a new readiness/activation epoch。
+
+### 2.2 Append/session
+
+| Key | Type | Default | Validation |
+| --- | --- | --- | --- |
+| `nereus.kafka.storage.append.timeout.ms` | long | `30000` | `1000..300000` |
+| `nereus.kafka.storage.append.executor.threads` | int | `max(8,2*CPU)` capped 64 | `1..256` |
+| `nereus.kafka.storage.append.executor.queue.capacity` | int | `4096` | `1..65536` |
+| `nereus.kafka.storage.append.inflight.bytes` | bytes | `512 MiB` | `64 MiB..16 GiB` |
+| `nereus.kafka.storage.append.request.bytes` | bytes | `128 MiB` | `1 MiB..256 MiB` and >= Kafka request limit |
+| `nereus.kafka.storage.session.ttl.ms` | long | `30000` | `>= 3 * renew interval` |
+| `nereus.kafka.storage.session.renew.interval.ms` | long | `5000` | `500..ttl/3` |
+| `nereus.kafka.storage.session.renew.failure.grace` | int | `2` | `0..10`；never beyond durable expiry |
+
+Queue and byte budget both gate admission。One request reserves owned buffer bytes before enqueue；release only on terminal path。
+Changing timeouts/executor sizes is static in initial release。
+
+### 2.3 Fetch
+
+| Key | Type | Default | Validation |
+| --- | --- | --- | --- |
+| `nereus.kafka.storage.fetch.timeout.ms` | long | `30000` | `1000..300000` |
+| `nereus.kafka.storage.fetch.executor.threads` | int | `max(16,4*CPU)` capped 128 | `1..512` |
+| `nereus.kafka.storage.fetch.executor.queue.capacity` | int | `4096` | `1..65536` |
+| `nereus.kafka.storage.fetch.inflight.bytes` | bytes | `1 GiB` | `64 MiB..32 GiB` |
+| `nereus.kafka.storage.fetch.max.entry.bytes` | bytes | `64 MiB` | exactly <= NCP2/WAL hard limit |
+| `nereus.kafka.storage.fetch.max.response.bytes` | bytes | `128 MiB` | <= Kafka/socket hard limit |
+| `nereus.kafka.storage.fetch.operation.max.rereads` | int | `1024` | safety bound，deadline still primary |
+
+Kafka `fetch.max.bytes`/partition max remain request-level lower bounds。First-entry overflow may return one batch up to 64 MiB，
+never exceed format hard limit。
+
+### 2.4 Lifecycle/recovery/checkpoint
+
+| Key | Type | Default | Validation |
+| --- | --- | --- | --- |
+| `nereus.kafka.storage.lifecycle.executor.threads` | int | `8` | `1..64` |
+| `nereus.kafka.storage.lifecycle.executor.queue.capacity` | int | `2048` | `1..65536` |
+| `nereus.kafka.storage.recovery.executor.threads` | int | `8` | `1..128` |
+| `nereus.kafka.storage.recovery.timeout.ms` | long | `900000` | `10000..3600000` |
+| `nereus.kafka.storage.recovery.chunk.records` | int | `100000` | `1..1000000` |
+| `nereus.kafka.storage.recovery.chunk.bytes` | bytes | `256 MiB` | `1 MiB..1 GiB` |
+| `nereus.kafka.storage.recovery.warn.bytes` | bytes | `8 GiB` | positive soft threshold |
+| `nereus.kafka.storage.checkpoint.interval.records` | long | `1000000` | positive |
+| `nereus.kafka.storage.checkpoint.interval.bytes` | bytes | `1 GiB` | `64 MiB..1 TiB` |
+| `nereus.kafka.storage.checkpoint.interval.ms` | long | `300000` | `10000..86400000` |
+| `nereus.kafka.storage.checkpoint.retained.references` | int | `3` | exactly `1..3` initially |
+| `nereus.kafka.storage.checkpoint.max.bytes` | bytes | `1 GiB` | <= NKC1 hard limit |
+| `nereus.kafka.storage.registry.scan.interval.ms` | long | `30000` | dynamic safe；`1000..3600000` |
+| `nereus.kafka.storage.registry.scan.page.size` | int | `256` | `1..1024` |
+
+Checkpoint triggers coalesce；one partition at most one encoder/upload。A retention barrier can request an immediate checkpoint
+and wait independently of periodic thresholds。
+
+### 2.5 Retention/compaction
+
+| Key | Type | Default | Validation |
+| --- | --- | --- | --- |
+| `nereus.kafka.storage.retention.check.interval.ms` | long | `300000` | dynamic safe；`1000..86400000` |
+| `nereus.kafka.storage.compaction.enabled` | boolean | `true` | activation-bound；must be true for compatibility claim |
+| `nereus.kafka.storage.compaction.worker.threads` | int | `4` | `1..128` |
+| `nereus.kafka.storage.compaction.max.concurrent.tasks` | int | `8` | `1..256` |
+| `nereus.kafka.storage.compaction.task.max.source.bytes` | bytes | `8 GiB` | `64 MiB..1 TiB` |
+| `nereus.kafka.storage.compaction.task.max.records` | long | `100000000` | positive |
+| `nereus.kafka.storage.compaction.key.max.bytes` | bytes | `1 MiB` | <= NTC2 hard limit |
+| `nereus.kafka.storage.compaction.decode.max.uncompressed.bytes` | bytes | `1 GiB` | per task chunk hard guard |
+| `nereus.kafka.storage.compaction.decode.max.ratio` | int | `100` | `1..1000` decompression-bomb guard |
+| `nereus.kafka.storage.compaction.spill.dir` | path | `${cache.dir}/spill` | writable private ephemeral |
+| `nereus.kafka.storage.compaction.spill.max.bytes` | bytes | `100 GiB` | positive/global budget |
+
+Kafka topic configs `cleanup.policy`、retention、segment、compaction lag/ratio and delete-retention come from KRaft dynamic
+config，not these broker defaults。This table controls engine capacity/safety only。
+
+### 2.6 Rollout/shutdown
+
+| Key | Type | Default | Validation |
+| --- | --- | --- | --- |
+| `nereus.kafka.storage.activation.required` | boolean | `true` | must stay true in production；test-only override not shipped |
+| `nereus.kafka.storage.readiness.timeout.ms` | long | `300000` | positive |
+| `nereus.kafka.storage.capability.heartbeat.ms` | long | `5000` | `1000..30000` |
+| `nereus.kafka.storage.capability.expiry.ms` | long | `30000` | >= 3 heartbeat |
+| `nereus.kafka.storage.shutdown.drain.timeout.ms` | long | `120000` | `1000..900000` |
+| `nereus.kafka.storage.shutdown.checkpoint.timeout.ms` | long | `60000` | <= drain timeout or explicit warning |
+
+## 3. Cross-Kafka validation
+
+When enabled，startup rejects before any partition IO unless：
+
+- process uses KRaft；broker role has stable broker ID and registration epoch；
+- `default.replication.factor=1`；offsets/transaction-state topic replication factors=1；
+- all effective `min.insync.replicas` defaults for new topics=1；
+- `remote.log.storage.system.enable=false` for Nereus partitions/cluster；
+- stock `LogCleaner` is not started for Nereus mode；
+- if based on the audited AutoMQ fork，`elasticstream.enable=false`；
+- `message.max.bytes <= 64 MiB` and socket/request/fetch limits fit Nereus hard bounds；
+- cache/spill dirs are dedicated and not Kafka authoritative log dirs；
+- selected profile dependencies/configs pass existing typed provider validation；
+- activation Kafka cluster ID exactly matches current KRaft cluster ID。
+
+Controller validates RF/assignment independently from broker config using the KRaft `nereus.storage.version` feature。
+
+## 4. Activation records
+
+### 4.1 `KafkaStorageProtocolActivationRecord` V1
+
+Oxia key：`.../kafka/{kafkaClusterId}/activation`。
+
+Field order：
+
+```text
+recordVersion:int=1
+lifecycleId:int                    PREPARED=1, ACTIVE=2
+kafkaClusterId:string
+protocolVersion:int=1
+apiVersion:int=1
+streamHeadSessionVersion:int=2
+bindingVersion:int=1
+payloadMappingId:int=1
+objectWalEntryIndexVersion:int=1
+ncpVersion:int=2
+ntcVersion:int=2
+checkpointVersion:int=1
+compactionStrategyVersion:int=1
+allowedStorageProfiles:list<string sorted>
+defaultStorageProfile:string
+requiredCapabilitySha256:32 bytes
+requiredBrokerSetSha256:32 bytes
+kafkaFeatureLevel:int              nereus.storage.version
+preparedAtMetadataOffset:long
+activationEpoch:long
+preparedAtMillis:long
+activatedAtMillis:long             0 while PREPARED
+metadataVersion:long               hydrated
+```
+
+ACTIVE is one-way at a protocol version；cannot return to PREPARED or change digest/profile/version in place。Future protocol
+upgrade uses a new preparation/activation epoch and explicit dual-read/write gates。
+
+### 4.2 Broker capability record
+
+Key includes broker ID + KRaft broker epoch，so restart cannot inherit stale readiness。Record：
+
+```text
+brokerId:int
+brokerEpoch:long
+runtimeInstanceId:string
+kafkaVersion:string
+nereusBuild:string
+javaVersion:string
+supported version/range fields matching activation
+supportedStorageProfiles:sorted list
+configCompatibilitySha256[32]
+codeCapabilitySha256[32]
+startedAtMillis:long
+heartbeatAtMillis:long
+expiresAtMillis:long
+metadataVersion:long
+```
+
+Digest uses canonical field encoding，not JSON/property iteration order。Heartbeat only extends expiry if immutable capability
+facts match；changed facts require new broker epoch/runtime record。
+
+### 4.3 Readiness snapshot
+
+`KafkaStorageReadinessRecord` contains readiness epoch、KRaft metadata offset、exact unfenced broker IDs/epochs、broker-set
+digest、capability digest、provider-scope digest、created/expiry and metadata version。It is an admission proof，not leadership
+truth。Membership change invalidates cached readiness；new leader open reloads proof。
+
+## 5. First activation workflow
+
+Initial release supports only a new/empty Kafka cluster：
+
+```text
+1. deploy capable code with storage disabled/no client traffic
+2. verify KRaft image has zero topics and brokers have no authoritative local topic logs
+3. configure Nereus providers/profile identically
+4. start brokers; publish exact capabilities
+5. controller sets/prepares KRaft feature nereus.storage.version=1
+6. build exact current-broker readiness snapshot
+7. write PREPARED activation with digests/source metadata offset
+8. re-read KRaft emptiness, broker registrations, capabilities and provider scope
+9. CAS PREPARED -> ACTIVE
+10. enable broker request readiness and internal/user topic creation
+```
+
+If any topic/internal topic/binding/local authoritative log exists before step 9，activation aborts。It does not auto-import or
+delete。ACTIVE rollback to local storage is unsupported；restore requires cluster recovery from backups or future migration design。
+
+## 6. Rolling broker maintenance after ACTIVE
+
+- a restarting broker advertises same active protocol/digests under a newer broker epoch before leader eligibility；
+- controller excludes missing/mismatched capability brokers from Nereus single-replica assignment；
+- current leader resigns/drains，new leader gets higher KRaft leader epoch and immediately preempts session；
+- broker binary rollback is allowed only if old binary supports exact ACTIVE versions；otherwise it stays fenced/not ready；
+- changing provider scope/default profile requires new readiness + activation epoch，not one broker config edit；
+- no broker can locally set `enabled=false` and still join ACTIVE cluster。
+
+## 7. Startup order
+
+```text
+parse/validate config (no IO)
+  -> construct providers/clients/executors
+  -> connect Oxia/Object/BK and run non-destructive capability probes
+  -> read ACTIVE activation and KRaft feature
+  -> publish broker capability
+  -> obtain current readiness proof
+  -> create StreamStorage/materialization/checkpoint/scanner services
+  -> construct LogManager/NereusReplicaManager
+  -> apply initial KRaft image and recover assigned partitions
+  -> recover internal topics, then elect coordinators
+  -> mark broker traffic-ready
+```
+
+Provider probe is scoped/non-destructive except writing/reading/deleting an exact activation probe object/key in a reserved prefix
+with unique attempt and protected cleanup。Failure cannot partially activate。
+
+## 8. Shutdown order
+
+```text
+admission RUNNING -> DRAINING
+  -> stop accepting Produce/new Fetch/lifecycle opens
+  -> resign/fence leaders through Kafka metadata flow where available
+  -> complete or classify all queued/running appends
+  -> cancel/wake fetch operations
+  -> checkpoint eligible stable partitions within checkpoint timeout
+  -> close partition logs/sessions
+  -> stop retention/compaction planning and drain workers
+  -> stop registry/checkpoint/renew schedulers
+  -> close StreamStorage
+  -> close BookKeeper/Object/Oxia owned clients
+  -> stop owned executors
+  -> CLOSED
+```
+
+Drain timeout does not mark unknown append successful。On timeout runtime preserves fencing/attempt evidence and closes；next
+leader replays。Borrowed Kafka scheduler/time/metrics stay open。
+
+## 9. Admission and backpressure
+
+`KafkaStorageAdmission` states：`STARTING`、`READY`、`DRAINING`、`NOT_READY`、`CLOSED`。
+
+Checks before buffer allocation/IO：activation/readiness、partition state、authority、deadline、queue slots、byte budget and
+provider circuit state。Priority classes：
+
+1. session renew/recovery/control markers/internal coordinator writes；
+2. normal Produce；
+3. Fetch；
+4. checkpoint/materialization/compaction/retention background。
+
+Priority never bypasses hard memory budget or correctness checks。Background work pauses first under pressure。Internal writes
+still use bounded reserved capacity；if exhausted，coordinator fails visibly rather than unbounded allocation。
+
+## 10. Metrics
+
+Kafka metrics group：`nereus-kafka-storage`。Prometheus/JMX adapters may rename separators but semantic names stable。
+
+### 10.1 Bounded-label process metrics
+
+| Metric | Type | Labels |
+| --- | --- | --- |
+| `runtime_state` | gauge enum | broker |
+| `activation_epoch` | gauge | broker |
+| `readiness` | gauge 0/1 | broker |
+| `partition_state_count` | gauge | state |
+| `append_requests_total` | counter | outcome,profile |
+| `append_latency_ms` | histogram | outcome,profile |
+| `append_queue_depth` / `append_inflight_bytes` | gauge | none |
+| `fetch_requests_total` / `fetch_latency_ms` | counter/hist | outcome,view |
+| `fetch_queue_depth` / `fetch_inflight_bytes` | gauge | none |
+| `session_fence_total` | counter | reason |
+| `session_renew_failures_total` | counter | reason |
+| `recovery_total` / `recovery_duration_ms` | counter/hist | outcome,source |
+| `recovery_replay_bytes` / `recovery_replay_records` | histogram | none |
+| `checkpoint_age_ms` / `checkpoint_lag_offsets` | gauge/hist aggregate | none |
+| `checkpoint_total` | counter | outcome |
+| `retention_trim_total` | counter | reason,outcome |
+| `compaction_task_total` / `compaction_latency_ms` | counter/hist | outcome |
+| `compaction_mandatory_coverage_lag` | gauge/hist aggregate | none |
+| `same_view_fallback_total` | counter | format,reason |
+| `corruption_total` | counter | layer,format |
+| `metadata_cas_retry_total` | counter | operation |
+| `executor_rejection_total` | counter | executor |
+
+Default exporters do not label topicId/partition to avoid unbounded cardinality。Kafka per-topic metrics can expose sampled
+topic-name aggregates under existing quotas。Exact partition details belong to admin diagnostics。
+
+### 10.2 Per-partition diagnostic snapshot
+
+`KafkaPartitionDiagnostic` read-only API returns on explicit query：identity/binding version/lifecycle、stream/profile、leader/
+broker epoch、session hash/expiry、logStart/LSO/HW/LEO、checkpoint refs/age、virtual segments、mandatory compaction coverage、
+in-flight operation IDs and last bounded error。No raw token、credentials、keys/values or message payload。
+
+## 11. Structured logs and audit events
+
+Stable event IDs：
+
+| ID | Event |
+| --- | --- |
+| `NKF100` | runtime start/config digest |
+| `NKF110` | capability/readiness change |
+| `NKF120` | activation transition |
+| `NKF200` | binding create/recover/delete transition |
+| `NKF210` | leader authority acquire/preempt/fence |
+| `NKF220` | unknown append fence/recovery |
+| `NKF230` | partition open/replay/publication |
+| `NKF300` | checkpoint publish/fallback/quarantine |
+| `NKF400` | retention trim plan/result |
+| `NKF410` | compaction generation/coverage activation |
+| `NKF500` | corruption/offline repair decision |
+| `NKF900` | drain/close timeout summary |
+
+Fields use stable IDs/hashes and offsets；payload、Kafka key/value、fencing token、secret config never logged。Repeated errors are
+rate-limited but first/last/count preserved。
+
+## 12. Alerts
+
+Initial target alerts：
+
+- any `CORRUPT_OFFLINE` or mandatory NTC2 unavailable > 0；
+- session renew remaining lease < 2 renew intervals；
+- partition recovery > 15 min or replay > 8 GiB；
+- checkpoint age > 3 intervals and retention blocked；
+- append/fetch executor rejection sustained > 1% over 5 min；
+- append p99 > selected SLO for 10 min；
+- readiness/activation mismatch on any registered broker；
+- registry scanner no successful full pass for 3 intervals；
+- compaction mandatory coverage lag beyond `max.compaction.lag.ms`；
+- physical GC lag is alerted separately and never treated as logical retention failure。
+
+Thresholds configurable by deployment，but alert semantic names remain stable。
+
+## 13. Admin/diagnostic surface
+
+No new Kafka wire API in first release。A local authenticated admin CLI/service consumes adapter APIs：
+
+```text
+kafka-nereus-storage activation describe
+kafka-nereus-storage broker readiness
+kafka-nereus-storage partition describe --topic-id ... --partition ...
+kafka-nereus-storage partition verify --read-only
+kafka-nereus-storage partition checkpoint --if-current-leader
+kafka-nereus-storage partition recover --if-fenced
+kafka-nereus-storage compaction status
+kafka-nereus-storage registry scan --read-only
+```
+
+Mutation commands require exact binding version、leader/broker epoch and explicit confirmation token；they call the same guarded
+coordinators，never write Oxia/object keys directly。Read-only verify has strict byte/time budgets。
+
+## 14. Runbooks
+
+### 14.1 `WRITE_FENCED_RECOVERY_REQUIRED`
+
+1. inspect KRaft leader/broker epoch and authority diagnostic；
+2. check exact append attempt/outcome and recovery progress；
+3. do not manually clear session or advance stream head；
+4. allow guarded recover/reopen or transfer leadership；
+5. if recurring，collect event IDs/commit/head facts without payload。
+
+### 14.2 Checkpoint/retention blocked
+
+1. confirm Produce/stable head remains healthy；
+2. inspect object provider and checkpoint protection/root CAS；
+3. verify older checkpoint fallback；
+4. do not force trim without a checkpoint at/after candidate；
+5. repair provider/reference then trigger guarded checkpoint。
+
+### 14.3 Mandatory NTC2 unavailable
+
+1. stop coordinator/client reads for affected partition；
+2. try verified same-view generation fallback；
+3. inspect F4 generation/object pins/protections；
+4. rebuild NTC2 deterministically from lossless COMMITTED source under same coverage and CAS replacement；
+5. never toggle cleanup policy or force COMMITTED fallback。
+
+### 14.4 Metadata/Oxia unavailable
+
+Read already pinned immutable bytes may complete within its proof；new append/leader open/checkpoint/trim fails closed。Do not use
+cached leadership/session beyond durable lease。Restore metadata quorum，then reopen/reconcile。
+
+### 14.5 Executor saturation
+
+Pause background planners，inspect inflight latency/provider health，increase capacity only within byte budgets，and preserve
+queue rejection as backpressure。Never switch to network-thread blocking as emergency workaround。
+
+## 15. Security and tenancy
+
+- provider connections require TLS/auth per existing adapters；
+- Oxia namespace and object prefix are cluster-scoped；binding verifies exact Kafka cluster ID；
+- object keys use encoded IDs，not topic names/user keys；
+- payload buffers zero/release according to allocator where supported；
+- diagnostic/admin endpoints authenticated/authorized/audited；
+- no cross-cluster binding repair；wrong provider-scope digest blocks readiness；
+- checkpoint/Parquet decoders treat bytes as hostile：bounds before allocation、strict UTF-8/flags/EOF/checksums。
+
+## 16. Rollout tests
+
+- config matrix for every key/default/bound/secret redaction；
+- disabled stock Kafka boot and compatibility suite；
+- empty-cluster activation success and every partial cut；non-empty rejection；
+- controller failover during PREPARED/ACTIVE；
+- rolling restart/new broker epoch/capability mismatch/unsupported rollback；
+- profile/provider scope mismatch and mixed executable profiles；
+- startup/shutdown at every resource cut，owned/borrowed close assertions；
+- append/fetch/background saturation and priority budgets；
+- metrics label-cardinality/log redaction/admin guard tests；
+- real two/three-broker KRaft + Oxia + selected WAL/Object profiles。
