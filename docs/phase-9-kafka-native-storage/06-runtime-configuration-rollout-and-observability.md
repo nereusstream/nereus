@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam and adapter-backed typed bridge implemented；Kafka controller scheduling/fork context mapping、BookKeeper/async providers and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping and deferred Kafka context/provider composition implemented；Kafka controller scheduling、concrete recovery/CLI/log selection、BookKeeper/async providers and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -58,14 +58,17 @@ is preserved without scanning。This is intentionally conservative because a sta
 while ACTIVE admission does not require the cluster to remain empty。Runtime close cancels its owned heartbeat/poll futures before
 closing the activation store，while the Kafka scheduler/recovery launcher/clock remain borrowed。
 
-Kafka fork commits `46e6703761..94ecf8c105` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
+Kafka fork commits `46e6703761..c27305a7ad` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
 create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
 enabled mode before LogManager construction。`NereusBrokerStorageRuntimeFactory` is the concrete adapter bridge：typed creators
 return the product runtime and exact scan limits；it does not evaluate them while disabled and closes a created runtime if later
 assembly fails。`NereusBrokerStorageRuntime` binds the runtime's single manager to the exact BrokerServer `ReplicaManager` and
 constructs the ListOffsets/topic-delta lifecycle only at that point。`NereusKafkaRuntimeConfigurationMapper` now implements the
-side-effect-free typed-config/broker-identity half of the fork mapping；provider creation、borrowed context/snapshot/recovery
-binding and Kafka controller scheduling remain open。
+side-effect-free typed-config/broker-identity mapping。The production companion now creates a no-I/O deferred runtime，waits for
+the exact registered broker epoch at `start()`，constructs the activation-backed S3/Object-WAL provider graph with borrowed Kafka
+scheduler/clock，captures one KRaft image plus conservative local-log facts，and binds a one-time recovery bridge to the exact
+ReplicaManager。Concrete recovery execution、Kafka controller activation scheduling、CLI factory selection and native log
+selection remain open。
 
 ### 1.2 Resource ownership
 
@@ -240,6 +243,47 @@ hashes Nereus/Kafka cluster IDs、Oxia address/namespace、provider、resolved e
 `codeCapabilitySha256` hashes the exact protocol/API/session/binding/index/NCP2/NTC2/NKC1/compaction/feature tuple plus the
 single executable profile。The mapper tests freeze deterministic process-independent digests、epoch-zero handling、derived S3
 scope and both unsupported-profile/provider pre-I/O failures。
+
+### 2.8 Executable Kafka context-to-provider lifecycle
+
+Local fork `c27305a7ad` consumes the mapper through the following exact call path：
+
+```text
+NereusBrokerStorageRuntimeFactory.production(recoveryLauncherCreator)
+  -> create(BrokerStorageRuntimeContext)
+  -> mapper.listOffsets(typedConfig)                 # pure, no provider I/O
+  -> new NereusKafkaDeferredRuntime(...)             # no provider I/O
+  -> BrokerStorageRuntime.start()
+  -> poll brokerEpochSupplier every min(25ms, remaining)
+  -> NereusKafkaProductRuntimeCreator.create(exactEpoch, ...)
+  -> new S3CompatibleObjectStoreProvider()
+  -> NereusKafkaObjectWalRuntimeFactory.createActivated(...)
+  -> product start publishes capability and waits ACTIVE/readiness
+```
+
+The broker-epoch wait deadline is the typed rollout readiness timeout。The exact epoch is captured once and passed unchanged into
+the capability；the mapper derives only the separate checked operation epoch。`KafkaScheduler.scheduledExecutorService()` exposes
+the already-started executor as `BORROWED`；neither the fork creator nor product runtime may shut it down。
+`NereusKafkaClock` delegates `millis()/instant()` to the borrowed Kafka `Time`。
+
+`NereusKafkaStorageClusterSnapshotProvider.currentSnapshot()` reads one immutable `metadataCache.currentImage()`，rejects a
+negative provenance offset or empty broker set retriably，sorts exact `(brokerId, brokerEpoch)` identities，and derives
+`topicsPresent` from that same image。It ignores only directories parsed as the KRaft metadata topic；any other directory or
+unparseable directory is conservatively treated as authoritative local log data。It reports `bindingsPresent=false` because the
+product-owned `KafkaStorageBindingAwareClusterSnapshotProvider` merges the 64-shard durable binding proof before activation。
+
+`NereusKafkaDeferredRuntime.partitionStorageManager()` is available immediately so the metadata publisher can be assembled before
+the first image。Leader open/resign/delete/shutdown futures wait for activation-backed runtime readiness；before dispatch they
+re-check the delegate admission, so a capability-heartbeat fence cannot leak queued operations。`beginDrain()`/`close()` cancel the
+owned epoch poll, fail pending manager operations closed and prevent late provider creation；a product startup failure drains and
+closes every already-created provider resource。
+
+The exact recovery launcher cannot exist before ReplicaManager construction。The production factory therefore injects a
+`Function[ReplicaManager, KafkaPartitionRecoveryLauncher]`；the first
+`NereusBrokerStorageRuntime.asyncTopicDeltaLifecycle(exactReplicaManager)` creates it and one-time binds
+`NereusKafkaPartitionRecoveryLauncherBridge`。A second manager is rejected，and a pre-bind recovery call fails retriably。
+The bridge is only construction-order plumbing；the concrete fork-owned checkpoint/state recovery launcher remains an M3/M4
+implementation item。
 
 ## 3. Cross-Kafka validation
 

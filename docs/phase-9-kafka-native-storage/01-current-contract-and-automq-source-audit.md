@@ -398,14 +398,17 @@ baseline-only completion evidence。
 `d312e8e58d64f326261dd36592a1b5e6398fa5a3`，第七个 explicit BrokerServer runtime lifecycle seam commit 是
 `46e67037615a60a39320836cc5f34ddaf4a9b347`，第八个 adapter-backed typed runtime bridge commit 是
 `617451957c886d4247f6d2f1a88e44a35edfbba7`，第九个 side-effect-free product runtime configuration mapper commit 是
-`94ecf8c105ad2d765aa9fd4a4929ff86c20882a1`。
+`94ecf8c105ad2d765aa9fd4a4929ff86c20882a1`，第十个 deferred activation-backed product runtime composition commit 是
+`c27305a7ad955ebc876de20da0fd045e97beba55`，第十一个 Spotless import-order alignment commit 是
+`752953d0ef9c38ae50340147bb4f3172ee9ddc5a`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/nine-commit count/version、Apache 与组织 remote
-identity、cached organization trunk ancestry、四十二文件 exact change set/blob、成对 inject marker、adapter/async bridge/
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/eleven-commit count/version、Apache 与组织 remote
+identity、cached organization trunk ancestry、五十二文件 exact change set/blob、成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding，以及 package-wide
-no-reflection/no-service-loader 规则；新增 mapper 还被锁定 executable-profile、explicit-provider、
-broker-capability 与 Object-WAL product-configuration construction signatures。
+no-reflection/no-service-loader 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
+broker-capability、activation-backed Object-WAL creator、borrowed scheduler、single-image KRaft snapshot、
+post-registration broker epoch、per-operation admission recheck 与 one-time recovery-launcher binding signatures。
 `publishPhase9DevelopmentArtifacts` 只把 `0.1.0-f9-dev` 发布到 Nereus build 目录的隔离 Maven repository；
 fork build 必须显式同时传入 repository 与 version，缺任一参数即 configuration failure，不读取 Maven local。
 `phase9M3KafkaForkStockCheck` 不传参数从头验证 stock server/core compile/static analysis、完整 `KafkaConfigTest`、
@@ -415,7 +418,8 @@ start/shutdown/restart、四个 `Partition` seam tests、一个 `ReplicaManager`
 `phase9M3KafkaForkBridgeCheck` 传 exact 参数运行 record inspector、async ListOffsets、error mapping 的 12 个 tests、
 manager-to-Partition lookup lifecycle 的 7 个 tests、topic-delta lifecycle 的 7 个 tests、四个 stock `Partition`
 seam tests、一个 `ReplicaManager` test、七个完整 `BrokerMetadataPublisherTest`、完整 `KafkaConfigTest`、上述
-13 个 config/runtime-specific tests、4 个 product-mapper tests、4 个 adapter-backed runtime tests 和 stock single-node KRaft restart，以及
+13 个 config/runtime-specific tests、4 个 product-mapper tests、9 个 context/deferred/recovery tests、
+5 个 adapter-backed runtime tests、borrowed scheduler test 和 stock single-node KRaft restart，以及
 server/core/storage checkstyle、SpotBugs
 与 Spotless。lifecycle 只消费 manager 返回的已恢复 writable storage，不重建 storage/recovery；安装失败会按
 旧 epoch 调用 manager resign，stale resign 和 late old open 都不能移除新 lookup。metadata seam 还验证 stock state
@@ -424,8 +428,12 @@ delete→同名 recreation 串行以及 `firstPublishFuture` 不承担 partition
 At local head `617451957c`，`phase9M3KafkaForkCheck --rerun-tasks` passed 78/78 outer tasks；its nested stock and
 artifact-enabled Kafka invocations completed 92/92 and 95/95 actionable tasks respectively，including both stock KRaft
 restart and all four `NereusBrokerStorageRuntimeTest` methods。
-At current local head `94ecf8c105`，the new mapper's four tests plus core compile/checkstyle/SpotBugs passed；the full aggregate
-rerun has not yet been repeated for this head，so the prior 78/78 result is retained only as predecessor evidence。
+At current local head `752953d0ef`，the four mapper、three KRaft context adapter、four deferred runtime、two recovery bridge、
+five adapter-backed runtime and borrowed-scheduler focused methods passed with core/server checkstyle and core/server SpotBugs；
+after the formatter/source-lock update，`phase9M3KafkaForkCheck --rerun-tasks` passed 71/71 outer tasks；its nested stock and
+artifact-enabled Kafka invocations passed 92/92 and 95/95 actionable tasks respectively，including Spotless and the new runtime
+composition tests。The inherited manifest-only timeout test was made deterministic by reserving two seconds for its local
+object/manifest writes before the intentionally non-completing head-commit future。
 
 当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
 development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求

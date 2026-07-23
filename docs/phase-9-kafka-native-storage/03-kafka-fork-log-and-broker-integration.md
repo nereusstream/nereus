@@ -91,7 +91,7 @@ Adapter-side counterpart：
 
 `46e67037615a60a39320836cc5f34ddaf4a9b347` 已实现 generic lifecycle seam；`617451957c886d4247f6d2f1a88e44a35edfbba7`
 增加 adapter-backed bridge；`94ecf8c105ad2d765aa9fd4a4929ff86c20882a1` 增加 side-effect-free product configuration
-mapper：
+mapper；`c27305a7ad955ebc876de20da0fd045e97beba55` 增加 deferred activation-backed product composition：
 
 - `KafkaRaftServer`/`BrokerServer` 通过显式 constructor 参数接收 `BrokerStorageRuntimeFactory`，默认 factory 仅允许
   disabled mode 并返回 no-op；enabled 且未安装 concrete factory 在 LogManager 创建前抛 `ConfigException`；
@@ -103,8 +103,10 @@ mapper：
   `BrokerMetadataPublisher`；disabled branch 精确保持 `None`，同一 runtime 不能绑定第二个 manager；
 - shutdown 在停止 socket requests 后同步开始 admission drain，在 ReplicaManager 前 bounded `awaitDrained`，在 LogManager
   后 close；earlier stock shutdown failure 仍执行 best-effort idempotent close；
-- `NereusBrokerStorageRuntimeFactory` 只接受两个 typed `Function` creators，不使用 reflection/service loader/global
-  registry；disabled mode 不调用 creator，runtime 已创建后的 scan-config/wrapper failure 会 close 并保留 suppressed failure；
+- `NereusBrokerStorageRuntimeFactory` 保留两个 typed `Function` creators 的 injectable constructor，并以
+  `production(Function[ReplicaManager, KafkaPartitionRecoveryLauncher])` 增加显式 production path；不使用
+  reflection/service loader/global registry；disabled mode 不调用 creator，runtime 已创建后的 scan-config/wrapper
+  failure 会 close 并保留 suppressed failure；
 - `NereusBrokerStorageRuntime` 把四种 drain reason 显式映射到 adapter enum，以同一
   `KafkaPartitionStorageManager` 构造 lookup/topic-delta lifecycle，并在 delegate drain 的同步边界撤销全部 lookup；
 - `NereusKafkaRuntimeConfigurationMapper` 仅在真实 broker epoch 已知后接受 enabled typed snapshot；它精确构造
@@ -113,15 +115,25 @@ mapper：
   其他四种 profile 或自定义 class name 均在资源创建前 `ConfigException`，不能回退到 reflection/service loader；
 - KRaft broker epoch 原值进入 capability，generic binding-operation epoch 使用 checked `brokerEpoch + 1`，避免合法
   Kafka epoch `0` 与 product positive-epoch invariant 冲突；
+- production factory 构造时只创建无 I/O 的 `NereusKafkaDeferredRuntime`；`start()` 以 25ms poll 等待真实
+  post-registration broker epoch，并在 readiness timeout 内才调用 `NereusKafkaProductRuntimeCreator.create(...)`；
+- product creator 显式构造 `S3CompatibleObjectStoreProvider`、借入 Kafka scheduler/Time、以当前 immutable KRaft image
+  加 conservative local-log scan 形成 activation snapshot，再调用 public
+  `NereusKafkaObjectWalRuntimeFactory.createActivated(...)`；任何 durable binding fact 仍由 product 侧 64-shard wrapper 补齐；
+- deferred manager 在 runtime ready 前保持 future pending，ready 后每次 dispatch 都再次调用真实 runtime
+  `admission().requireReady(...)`；epoch wait、startup failure、drain 与 close 都取消 owned poll 并阻止 late creation；
+- `NereusKafkaPartitionRecoveryLauncherBridge` 只允许 exact launcher one-time bind；binding 发生在同一 runtime 第一次
+  `asyncTopicDeltaLifecycle(exactReplicaManager)`，在此之前 recovery 返回 retriable `METADATA_UNAVAILABLE`；
   `NereusListOffsetsLifecycle.beginDrain` 只负责 admission/revocation，standalone `shutdown` 仍 deduplicate manager shutdown；
 - stock/no-artifact factory tests 和 single-node KRaft start→shutdown→restart 已通过。
 
 product adapter 已实现 `NereusKafkaRuntimeFactory`，并新增仅支持 `OBJECT_WAL_SYNC_OBJECT` 的 concrete
 `NereusKafkaObjectWalRuntimeFactory`：显式组装 Object provider、shared Oxia、L0/physical/binding stores、protection、
 callback executor 和同一 manager/runtime graph；real Oxia + local-file provider 的 leader open/Produce/Fetch gate 已通过。
-尚未实现的是 Kafka typed config/context mapper、BookKeeper/async-object creator、enabled `NereusReplicaManager`/log selection、
-activation/capability advertisement 和 native-storage KRaft process test，所以当前仍只是可执行 lifecycle seam，不是
-可启用 broker runtime。
+尚未实现的是 concrete fork-owned recovery launcher、BookKeeper/async-object creator、enabled
+`NereusReplicaManager`/log selection、controller activation scheduling、CLI/default launcher factory selection 和
+native-storage KRaft process test。当前已有可执行的 Object-WAL provider/runtime composition，但还没有一条可从 stock
+Kafka CLI 启用并完成真实 partition I/O 的路径。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 
@@ -436,7 +448,7 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
-消费 exact F9 development modules，并已在 local fork `94ecf8c105` 落地
+消费 exact F9 development modules，并已在 local fork `c27305a7ad` 落地
 `NereusRecordTimestampInspector`、`NereusListOffsetsBridge`、`NereusListOffsetsScanConfig` 和
 `NereusKafkaExceptionMapper`，并通过 Kafka-only `LeaderEpochAwareOffsetLookup` 接入 stock `Partition`/
 `ReplicaManager` request path。`NereusListOffsetsLifecycle` 包装 product-owned manager，在 manager 返回 fully recovered
@@ -446,7 +458,9 @@ authority/recovery。第五个 commit 另加入 `AsyncTopicDeltaLifecycle`、`Ne
 cross-Kafka validator；第七个 commit 增加 explicit stock-compatible runtime factory、publisher lifecycle injection、
 pre-unfence ready wait 和 ordered drain/close；第八个 commit 增加 adapter-backed runtime、typed creator factory、
 exact ReplicaManager metadata lifecycle binding 和 lookup-only drain；第九个 commit 增加 closed runtime/product
-configuration mapper 与四个 deterministic tests。Provider/context composition 尚未实现。当前 commit
+configuration mapper 与四个 deterministic tests；第十个 commit 增加 Kafka Clock/KRaft snapshot adapters、
+borrowed scheduler boundary、one-time recovery bridge、deferred broker-epoch/runtime lifecycle 和 production factory
+composition。Concrete recovery launcher、controller scheduling、CLI selection 和 log factory 尚未实现。当前 commit
 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
@@ -714,7 +728,7 @@ stock leader state/epoch 和 manager-result identity/epoch/profile/writable-stat
 resign/delete/shutdown 先撤销 lookup 再委托 manager，安装失败先 resign recovered storage 再失败 open，late old open
 按旧 epoch 清理且不能移除新 lookup。topic-delta composer 还验证 old-image delete identity、new-image follower/leader
 identity、broker epoch、metadata offset、delete→同名 recreation 串行、ready/resigned callback-after-success 和
-coordinator election-after-open。`UnifiedLog`/factory/BrokerServer lifecycle composition、
+coordinator election-after-open。Concrete recovery/CLI selection、`UnifiedLog`/factory composition、
 leader-epoch cache、`KafkaVirtualPositionIndex`、`NereusTimeIndex` section codec、restart recovery、remote branch push 与
 真实 KRaft baseline integration tests 仍为 open M3/M4 work。
 
