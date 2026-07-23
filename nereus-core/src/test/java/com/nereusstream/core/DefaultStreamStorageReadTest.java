@@ -536,7 +536,8 @@ class DefaultStreamStorageReadTest {
             AppendOptions shortAppend = new AppendOptions(
                     Optional.empty(),
                     DurabilityLevel.WAL_DURABLE_AND_INDEX_COMMITTED,
-                    Duration.ofMillis(40),
+                    // Leave enough time for the local object and manifest writes; only the injected head commit must time out.
+                    Duration.ofSeconds(2),
                     true,
                     Map.of());
             NereusException uncertain = failure(
