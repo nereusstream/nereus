@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec/partition IO/checkpoint-pinned paged recovery/fork-derived-state/log-shell-factory slices in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1/M2 slices complete；F9-M3 Nereus codec/partition IO/checkpoint-pinned paged recovery/fork-derived-state/log-shell-factory/bounded Produce handoff slices in progress；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -355,9 +355,11 @@ coordinator/transaction/compaction remain M4/M5。
 - partition tests cover stable-only LEO/HW/LSO publication、acks 0/1/-1 invariant、same-partition serialization、
   speculative gap rejection、known-not-committed retry、uncertain/result-mismatch fencing、containing-entry/upper-bound/
   first-overflow Fetch and resign drain；
-- `KafkaBoundedAppendExecutorTest` proves owned remaining-byte snapshot、global byte lease、bounded queue rejection before
-  task/I/O、release-once on every terminal path、close admission and the rule that response-future cancellation cannot cancel
-  admitted append work；`KafkaAppendFailureClassifierTest` proves only explicit known-not-committed remains writable，while
+- `KafkaBoundedAppendExecutorTest` proves owned remaining-byte snapshot、global byte lease、logical
+  `threads + queueCapacity` rejection before task/I/O、release-once on every terminal path、strict equal-key FIFO、
+  cross-key concurrency、single-worker fairness、close-then-drain of logical lane work and the rule that response-future
+  cancellation cannot cancel admitted append work；`KafkaAppendFailureClassifierTest` proves only explicit
+  known-not-committed remains writable，while
   authority/offset/unknown/uncertain/known-committed failures fence and checksum/format/invariant failures go offline；
 - `KafkaFetchOperationTest` proves actual-byte minBytes、stable-event wakeup、event coalescing、one read in flight per
   partition、deadline final read、request-wide ordered byte budget、executor rejection before storage read、leadership/runtime
@@ -425,6 +427,12 @@ coordinator/transaction/compaction remain M4/M5。
   synthetic local size stays zero。Fault injection proves invalid stable result and post-stable failure resign/fence；
   required-acks routing has a stock `Partition` regression test。Stock-without-artifacts `LogManagerTest`、
   `PartitionTest` and `BrokerStorageRuntimeFactoryTest` preserve local behavior；
+- at `ee608625e4`，`NereusBrokerStorageAppendExecutorTest` proves exact copy-before-return、same-partition FIFO and
+  request-limit rejection；the product executor test additionally proves cross-partition concurrency、single-worker fairness、
+  cancellation isolation and close/drain。A stock `ReplicaManagerTest` proves the optional path defers append、validation stats
+  and response until executor completion；runtime tests prove disabled `None`、enabled `Some` and combined append/product
+  drain。Focused stock/artifact-enabled tests and core format/static gates pass；fresh exact-head aggregate evidence is
+  recorded below；
 - the sixth local fork commit registers the complete 58-key inert `ConfigDef` with safe disabled default，builds an immutable
   side-effect-free typed snapshot and executes enabled-only provider/budget/liveness plus broker-role/RF/minISR/remote-log/
   cleaner/AutoMQ/request-limit/directory validation。Six snapshot tests、four validator tests and the complete stock
@@ -433,24 +441,25 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@dc8c66388a` contains sixteen reviewed commits and the sixty-six-file
+  `nereus/future9-native-kafka-storage@ee608625e4` contains seventeen reviewed commits and the seventy-file
   log-IO/bridge/request/recovery/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
-  read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。The bridge still blocks its
-  `UnifiedLog` caller；bounded append handoff、multi-partition async Fetch、Broker runtime selection and the real KRaft final
-  gate remain open；
+  read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Produce now hands off exact owned bytes
+  to a bounded per-partition FIFO executor before invoking the synchronous `UnifiedLog` bridge；multi-partition async Fetch、
+  Broker runtime selection and the real KRaft final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/sixteen-commit count/remotes/sixty-six log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition
+  fork branch/head/base ancestry/seventeen-commit count/remotes/seventy log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition
   blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
-  seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、five stock Partition seam tests、one
-  ReplicaManager publication test、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
+  seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、five stock Partition seam tests、two
+  focused ReplicaManager tests、all seven BrokerMetadataPublisher tests、six typed-config tests、four config-validator tests、
   four product-runtime mapper tests、three KRaft context adapters、four deferred-runtime tests、two recovery-state bridge tests、
   three recovery codec tests、two exact Partition recovery-state factory tests、authoritative log-shell/factory tests、
   one borrowed-scheduler test、
-  complete `KafkaConfigTest`、three stock runtime-factory tests、five adapter-backed runtime tests、stock single-node KRaft
+  complete `KafkaConfigTest`、three stock runtime-factory tests、five adapter-backed runtime tests、two append-executor
+  integration tests、stock single-node KRaft
   restart and server/core/storage format/static-analysis
   gates。The `672429d94f` aggregate rerun correctly failed because stock `Partition` referenced an artifact-only recovery class；
   `9a6ebed6d9` replaces it with stock `LeaderEpochAwareRecoveryState` and focused stock/artifact-enabled builds pass。The
@@ -463,7 +472,10 @@ coordinator/transaction/compaction remain M4/M5。
   At `dc8c66388a`，the updated source lock、product adapter error mapping、artifact-enabled append/fetch/fencing tests and
   exact required-acks Partition test are included in another successful exact-head aggregate：80/80 outer tasks，nested
   stock-without-artifacts 92/92 and artifact-enabled 95/95 actionable tasks，including 146/146 scenarios、real provider
-  recovery、stock KRaft restart、Checkstyle、SpotBugs and Spotless。
+  recovery、stock KRaft restart、Checkstyle、SpotBugs and Spotless。At `ee608625e4`，the bounded keyed product executor、
+  stock optional seam、Kafka wrapper、ReplicaManager handoff and combined runtime drain are included in a fresh successful
+  exact-head aggregate with the same 80/80 outer、92/92 stock and 95/95 artifact-enabled actionable task counts，including
+  146/146 scenarios、real provider recovery、stock KRaft restart、Checkstyle、SpotBugs and Spotless。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics
 

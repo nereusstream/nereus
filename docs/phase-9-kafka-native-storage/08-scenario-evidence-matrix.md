@@ -41,8 +41,11 @@ method uniqueness：
 当前 `f9M3CodecTest` 为 KF-APP-002、KF-FET-001/KF-FET-002 的 deterministic adapter-level evidence，并覆盖
 KF-APP-003 的 pre-storage exact-byte/CRC invariant；`DefaultKafkaPartitionStorageTest` 还提供 KF-APP-005/006/008、
 KF-APP-013 和 KF-FET-003 的 adapter state-machine evidence；`KafkaBoundedAppendExecutorTest` 为 KF-APP-011/012
-提供 queue/byte admission、owned buffer release-once 和 cancel-does-not-cancel-task 的 deterministic partial
-evidence，`KafkaAppendFailureClassifierTest` 固化 fail-closed outcome/action mapping。它们不替代这些 row 要求的
+提供 logical queue/byte admission、owned buffer release-once、equal-key FIFO、cross-key concurrency、
+single-worker fairness、close/drain 和 cancel-does-not-cancel-task 的 deterministic partial evidence；local fork
+`NereusBrokerStorageAppendExecutorTest` 再证明 exact Kafka `MemoryRecords` copy-before-return、per-partition FIFO 与
+request-limit mapping，stock `ReplicaManagerTest` 证明 append/validation-stats/response callback 延后到 executor
+terminal。`KafkaAppendFailureClassifierTest` 固化 fail-closed outcome/action mapping。它们不替代这些 row 要求的
 Kafka fork/real-service evidence。`KafkaFetchOperationTest` 还为 KF-FET-004/005/016 提供 actual-byte minBytes、
 event coalescing、deadline、one-in-flight-read、listener/read cleanup 和 callback-once 的 deterministic partial
 evidence；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local higher-term takeover、late-open fencing 和
@@ -56,8 +59,8 @@ time-index recovery/real KRaft baseline；local fork `NereusTopicDeltaLifecycleT
 和 `firstPublishFuture` non-readiness 的 deterministic Kafka-fork partial evidence，但 provider-backed BrokerServer
 activation、per-partition failure/offline policy 及 real KRaft process/chaos evidence 仍未实现，所以该 row 保持
 `PLANNED`；fork
-`NereusBrokerStorageRuntimeTest` further proves exact one-ReplicaManager binding and construction of that same
-ListOffsets/topic-delta chain；
+`NereusBrokerStorageRuntimeTest` further proves exact one-ReplicaManager binding、construction of that same
+ListOffsets/topic-delta chain、disabled/optional append-executor selection and combined append/product drain；
 `KafkaStorageAdmissionTest` 为 KF-OPS-014/017 提供 readiness recovery、stable pre-I/O rejection、one-winner concurrent
 drain 和 irreversible drain/close 的 deterministic partial evidence；`DefaultNereusKafkaRuntimeTest` 与
 `KafkaRuntimeResourcesTest` 进一步为 KF-OPS-012/014 提供 protected/deduplicated startup、timeout-view isolation、

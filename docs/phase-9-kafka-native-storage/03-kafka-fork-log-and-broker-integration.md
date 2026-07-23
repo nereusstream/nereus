@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection and synchronous correctness-only append/read bridge implemented；KafkaRaftServer production selection、bounded ReplicaManager append handoff、multi-partition async Fetch wiring and real KRaft process gate remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge and bounded per-partition ReplicaManager Produce handoff implemented；KafkaRaftServer production selection、multi-partition async Fetch wiring and real KRaft process gate remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -12,9 +12,13 @@ classes，并把 provider/Oxia 细节封装在 `nereus-kafka-adapter`。
 
 ```text
 Kafka stock protocol/controller/coordinators
-  -> ReplicaManager / Partition
+  -> ReplicaManager
+       -> optional BrokerStorageAppendExecutor
+       -> request-wide byte validation + exact owned MemoryRecords capture
+       -> per-TopicIdPartition FIFO / cross-partition bounded workers
+  -> Partition
   -> RequiredAcksAwareAppend (optional stock-package seam)
-  -> NereusUnifiedLog (exact recovery/storage publication + synchronous IO bridge)
+  -> NereusUnifiedLog (exact recovery/storage publication + synchronous worker-side IO bridge)
   -> stock validation/offset assignment
   -> NereusLocalLog stable-append callback / NereusUnifiedLog.read
   -> KafkaPartitionStorage
@@ -25,13 +29,13 @@ Ephemeral cache-only stock state machine
   -> one or more empty synthetic local segments
   -> never durable truth, never restart recovery input
 
-Pending request-thread boundary
-  -> bounded append executor + owned MemoryRecords snapshot
+Remaining request-thread boundary
   -> multi-partition async Fetch operation
 ```
 
 初版不需要 `NereusKafkaApis`：stock `KafkaApis` 已使用 callback-based ReplicaManager API，Produce/Fetch 的
-异步存储调度放在 `NereusReplicaManager`。只有未来需要协议扩展时才新增 API subclass。
+异步存储调度通过 stock-owned optional executor seam 注入 `ReplicaManager`，不新增 manager subclass。只有未来需要协议
+扩展时才新增 API subclass。
 
 ## 2. Planned Kafka-side classes
 
@@ -50,9 +54,10 @@ Pending request-thread boundary
 | `kafka.log.nereus.NereusTimeIndex` | Kafka `TimeIndex` facade | derived timestamp lookup/checkpoint state |
 | `kafka.log.nereus.NereusTransactionIndex` | Kafka `TransactionIndex` facade | derived aborted-txn lookup/checkpoint state |
 | `kafka.log.nereus.NereusLeaderEpochCache` | epoch cache facade/adapter | derived epoch ranges；no local checkpoint truth |
-| `kafka.server.nereus.NereusReplicaManager` | extends `ReplicaManager` | bounded append/fetch/lifecycle execution and callbacks |
-| `kafka.server.nereus.NereusProduceBufferSnapshot` | owned request bytes | buffer lifetime across async handoff |
-| `kafka.server.nereus.NereusFetchOperation` | async state machine | minBytes/maxWait/event/re-read/callback-once |
+| `kafka.server.storage.BrokerStorageAppendExecutor` | optional stock-owned seam | request prevalidation、owned submit、drain contract without Nereus types |
+| `kafka.server.nereus.NereusBrokerStorageAppendExecutor` | product-backed implementation | typed limits、exact capture、per-partition FIFO、Kafka error mapping |
+| `kafka.server.storage.BrokerStorageFetchExecutor` | planned optional stock-owned seam | immutable request submit and async completion without Nereus types |
+| `kafka.server.nereus.NereusBrokerStorageFetchExecutor` | planned product-backed implementation | bind Kafka fetch request/callback to product operation |
 | `kafka.log.nereus.NereusKafkaExceptionMapper` | mapper | Nereus error/outcome → Kafka exception |
 | `kafka.log.nereus.NereusKafkaRecoveredState` | fresh M3 derived state | validate/rebuild exact stock RecordBatch offsets/timestamps/leader epochs |
 | `kafka.log.nereus.NereusKafkaRecoveryStateCodec` | adapter recovery codec | one fresh state per leader open；M4 sections fail closed |
@@ -68,6 +73,8 @@ Adapter-side counterpart：
 | `NereusKafkaRuntime` | `start()`、`admission()`、`partitionStorageManager()`、`close()` |
 | `KafkaPartitionStorageManager` | `openLeader`、`resign`、`delete`、`reconcile` |
 | `KafkaPartitionStorage` | `append`、`recoverAppend`、`read`、`trim`、`stableSnapshot`、`close` |
+| `KafkaProduceBufferSnapshot` / `KafkaBoundedAppendExecutor` | exact owned bytes、keyed bounded submit、drain |
+| `KafkaFetchOperation` | multi-partition minBytes/maxWait/event/re-read/callback-once |
 | `KafkaAppendBatchEncoder` | exact `MemoryRecords` → ranged `AppendBatch` |
 | `KafkaFetchAssembler` | `ReadBatch` list → exact `MemoryRecords`/fetch facts |
 | `KafkaRecordBatchCodec` | batch syntax/CRC/offset/producer facts validation |
@@ -101,11 +108,11 @@ Adapter-side counterpart：
 
 1. config 已解析、metrics/time 可用后，创建 `NereusKafkaRuntime`；
 2. runtime connectivity/capability advertisement 完成后，创建 LogManager/ReplicaManager；
-3. enabled 时构造 `NereusReplicaManager`，disabled 时构造 stock `ReplicaManager`；
+3. 始终构造 stock `ReplicaManager`；enabled runtime 注入 `Some(BrokerStorageAppendExecutor)`，disabled 注入 `None`；
 4. request processors 开始前等待 local broker readiness；
 5. shutdown 先停止 admission，再关闭 ReplicaManager/partition logs，最后关闭 runtime。
 
-禁止把 field type 写死为 `NereusReplicaManager`；对外仍暴露 `ReplicaManager`，避免 disabled mode cast。
+不新增 `NereusReplicaManager`，也不把 field type 写死为 adapter class；对外仍暴露 stock `ReplicaManager`。
 
 `46e67037615a60a39320836cc5f34ddaf4a9b347` 已实现 generic lifecycle seam；`617451957c886d4247f6d2f1a88e44a35edfbba7`
 增加 adapter-backed bridge；`94ecf8c105ad2d765aa9fd4a4929ff86c20882a1` 增加 side-effect-free product configuration
@@ -122,6 +129,8 @@ mapper；`c27305a7ad955ebc876de20da0fd045e97beba55` 增加 deferred activation-b
   `UnifiedLogFactory.Local`，不依赖 process-global registry；
 - runtime 在 exact `ReplicaManager` 创建后才构造/缓存 `Option[AsyncTopicDeltaLifecycle]` 并传入
   `BrokerMetadataPublisher`；disabled branch 精确保持 `None`，同一 runtime 不能绑定第二个 manager；
+- runtime 在 `ReplicaManager` 构造前交付 optional `BrokerStorageAppendExecutor`；disabled branch 是 `None`，enabled
+  branch 是 runtime-owned `NereusBrokerStorageAppendExecutor`，不会通过 global registry 或 downcast 查找；
 - shutdown 在停止 socket requests 后同步开始 admission drain，在 ReplicaManager 前 bounded `awaitDrained`，在 LogManager
   后 close；earlier stock shutdown failure 仍执行 best-effort idempotent close；
 - `NereusBrokerStorageRuntimeFactory` 保留两个 typed `Function` creators 的 injectable constructor，并以
@@ -156,10 +165,10 @@ source、concrete recovery launcher 和同一 manager/runtime graph；real Oxia 
 open/Produce/Fetch gate 已通过。Fork 不再承担 ObjectStore/Oxia/read-pin orchestration，只在 exact ReplicaManager
 可用后为每次 open 创建 fresh state codec 和 exact Partition publisher。尚未实现的是 BookKeeper/async-object
 creator、controller activation scheduling、CLI/KafkaRaftServer production factory selection、durable
-checkpoint-failure quarantine observer、bounded ReplicaManager append/Fetch composition 和 native-storage KRaft process
-test。当前已有可执行的 Object-WAL provider/runtime/recovery composition、log-shell selection 与直接
-`NereusUnifiedLog` correctness I/O bridge，但还没有一条可从 stock Kafka CLI 启用并以非阻塞 request path 完成真实
-partition I/O 的路径。
+checkpoint-failure quarantine observer、bounded ReplicaManager Fetch composition 和 native-storage KRaft process
+test。当前已有可执行的 Object-WAL provider/runtime/recovery composition、log-shell selection、直接
+`NereusUnifiedLog` correctness I/O bridge 与 bounded Produce handoff，但还没有一条可从 stock Kafka CLI 启用并完成
+真实 KRaft Produce/Fetch 的 production path。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 
@@ -229,9 +238,18 @@ removeStorage(epoch, exactStorage)
 storage identity/epoch/state，再调用 `installStorage`，最后安装 exact ListOffsets lookup。resign/delete/drain/open
 failure 按 shell/storage/lookup 的 exact instance/epoch 逆向撤销。
 
-`dc8c66388a` 在该 publication state machine 后增加第一条 correctness-only 数据面：
+`dc8c66388a` 在该 publication state machine 后增加第一条 correctness-only UnifiedLog 数据面；
+`ee608625e4` 再把 Produce 入口迁到 bounded ReplicaManager worker：
 
 ```text
+KafkaApis.handleProduceRequest
+  -> ReplicaManager.appendRecords
+  -> BrokerStorageAppendExecutor.validateRequest(all partition bytes)
+  -> NereusBrokerStorageAppendExecutor.submit(each TopicIdPartition)
+       -> copy exact MemoryRecords before submit returns
+       -> keyed bounded executor
+       -> rebuild owned MemoryRecords
+
 Partition.appendRecordsToLeader(requiredAcks)
   -> optional RequiredAcksAwareAppend
   -> NereusUnifiedLog.appendAsLeader
@@ -264,12 +282,17 @@ overflow 语义并受 partition bytes、hard response bytes、stable upper bound
 同一份 `LEADER_WRITABLE` storage。virtual segment base/relative position 目前由 request 传 `0/0`，完整 virtual index
 仍是后续切片。
 
-这一实现仍在 `UnifiedLog` caller 上同步等待 future，尚未接入 product 已有的 bounded append executor 与
-`KafkaFetchOperation`。因此它证明 bytes/state/fencing 顺序，不能作为 request-thread scalability、multi-partition
-minBytes/maxWait 或真实 BrokerServer/KRaft 数据面完成声明。
+`NereusUnifiedLog` 仍同步等待 future，因为 stock validation/LEO/producer-state ordering 必须看到 stable terminal；
+现在该 caller 是 runtime-owned bounded worker，不再是 Kafka request handler。每个 worker append 完成后在
+`finally` 中调用 shared `defaultActionQueue.tryCompleteActions()`，因为原 request handler epilogue 已经返回。所有
+partition future 终态后，ReplicaManager 才复用同一 `completeAppendRecords` 路径计算 produce status、调用一次
+validation-stats callback，并进入 stock delayed-produce/response callback。`KafkaFetchOperation` 尚未接入
+ReplicaManager，因此当前证据仍不能作为 multi-partition minBytes/maxWait 或真实 BrokerServer/KRaft 数据面完成声明。
 `dc8c66388a` exact-head aggregate 已通过 80/80 outer tasks；nested stock-without-artifacts 与 artifact-enabled Kafka
 分别通过 92/92、95/95 actionable tasks，包含 required-acks routing、stable append/read/fencing、stock KRaft
-restart 与全部 format/static gates。
+restart 与全部 format/static gates。`ee608625e4` 的 fresh exact-head aggregate 同样通过 80/80 outer、
+92/92 stock-without-artifacts 和 95/95 artifact-enabled actionable tasks，并包含新 executor/ReplicaManager/runtime
+tests、146/146 scenarios、real provider recovery、stock KRaft restart 与全部 format/static gates。
 
 ### 3.4 `core/.../kafka/cluster/Partition.scala`
 
@@ -346,19 +369,36 @@ def applyDelta(
 `Partition.isLeader`、topic ID 与 leader epoch 已可精确校验。ISR-only leader updates 不调用 preparation callback。
 callback 抛错沿 metadata publication fault path 传播，不通过 reflection 或异步访问 ReplicaManager 内部状态。
 
-保留 stock class，抽取两个 `protected` completion helper，避免 subclass 复制整个方法：
+`ee608625e4` 保留 stock class 并在 constructor 尾部增加默认 `None` 的
+`Option[BrokerStorageAppendExecutor]`。没有 subclass，也不让 stock seam 引用 Nereus type：
 
 ```scala
-// target seam, default stock call remains synchronous
-protected def completeAppendRecordsAfterLocalAppend(...): Unit
-protected def completeFetchAfterLogRead(...): Unit
+trait BrokerStorageAppendExecutor extends AutoCloseable {
+  def validateRequest(entries: Iterable[MemoryRecords]): Unit
+  def submit(
+    partition: TopicIdPartition,
+    records: MemoryRecords,
+    append: MemoryRecords => LogAppendResult
+  ): CompletionStage[LogAppendResult]
+  def drained: CompletionStage[Void]
+}
 ```
 
-stock `appendRecords`/`fetchMessages` 调用它们，disabled behavior 不变。`NereusReplicaManager` override 只负责
-提交 IO future，再调用相同 completion logic。helper 不接触 Nereus types。
+`appendRecords` 在 required-acks 校验后分两支：
 
-`appendToLocalLog` 已是 protected，Nereus executor 可以复用。`readFromLog` 是 public，Nereus fetch executor
-可以复用。若升级 baseline 改变可见性，source-lock review 必须更新，不用 reflection 绕过。
+- `None`：执行原同步 `appendRecordsToLeader`，然后进入共享 `completeAppendRecords`；调用顺序和普通 local-log
+  behavior 不变；
+- `Some`：先对 immutable entries snapshot 做整请求校验；每个 partition submit 一个 owned task。worker 以
+  `RequestLocal.noCaching` 调用 singleton `appendRecordsToLeader`，避免跨线程借用 request-local
+  `BufferSupplier`；completion/failure 均转为该 partition 的 `LogAppendResult`。全部 normalized future terminal 后
+  只调用一次共享 completion。
+
+整请求字节超限在任何 partition submit 前拒绝。task/byte saturation 是 per-partition known-not-committed
+结果；因此同一 Produce request 可以包含 stable-success partition 和 admission-rejected partition，仍按 Kafka
+per-partition response contract 聚合。已接纳 future 的 caller cancellation 不传播到底层 append。
+
+`fetchMessages`/`readFromLog` 尚未迁到 optional fetch executor；该切片必须沿用同样的 stock-owned seam 原则，不能
+用 reflection 或复制整个 `ReplicaManager`。
 
 ### 3.7 `core/.../kafka/server/DelayedFetch.scala`
 
@@ -596,10 +636,11 @@ enabled build 仍在 Partition lock 内校验 exact topicId/topic-partition/lead
 delegation、runtime-owned `NereusUnifiedLogFactory`、ephemeral `NereusUnifiedLog`/`NereusLocalLog` shell，以及
 recovered-state → recovered-storage → ListOffsets lookup 顺序发布；第十五个 `7739351b7c` 补齐新 stock seam 的成对
 inject marker；第十六个 `dc8c66388a` 增加 optional `RequiredAcksAwareAppend`、stable
-`NereusLocalLog` callback、`NereusUnifiedLog` append/read bridge、post-stable fence 与 focused tests。Controller
-scheduling、CLI/KafkaRaftServer production selection、bounded request-path handoff 和 real KRaft process gate 尚未
-实现。当前 branch 尚未推送，因而仍未满足 M3 production fork source-lock entry；同步 correctness bridge 也不
-构成 scalable Produce/Fetch runtime claim。
+`NereusLocalLog` callback、`NereusUnifiedLog` append/read bridge、post-stable fence 与 focused tests；第十七个
+`ee608625e4` 增加 stock `BrokerStorageAppendExecutor`、product-backed keyed executor wrapper、ReplicaManager
+Produce aggregation 和 drain composition。Controller scheduling、CLI/KafkaRaftServer production selection、bounded
+Fetch request-path handoff 和 real KRaft process gate 尚未实现。当前 branch 尚未推送，因而仍未满足 M3 production
+fork source-lock entry；bounded Produce 单元/组合证据也不构成完整 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading
 
@@ -607,21 +648,22 @@ scheduling、CLI/KafkaRaftServer production selection、bounded request-path han
 
 `UnifiedLog.appendAsLeader` 是同步 API；`NereusLocalLog.append` 必须等待 stable storage result，才能让 stock
 code 更新 ProducerStateManager。直接在 network request thread join 会把 object/BookKeeper latency 变成 request
-handler starvation。因此 `NereusReplicaManager.appendRecords` 在进入 stock local append 前完成 owned-buffer
-handoff并提交到 bounded append executor。
+handler starvation。`ee608625e4` 因此在 stock `ReplicaManager.appendRecords` 进入 local append 前完成
+owned-buffer handoff 并提交到 runtime-owned bounded append executor。
 
-`dc8c66388a` 暂时选择同步等待作为代码级 correctness bridge，以先锁定 validation → stable bytes → LEO/derived
-state 的顺序。它没有改变上述最终 threading contract；在 bounded handoff 落地前不能开启 production traffic。
+同步 wait 仍保留在 executor worker 内部，以锁定 validation → stable bytes → LEO/derived state 的顺序。request
+thread 在所有 partition submit 返回后立即退出；只有 request-wide validation failure 或全部同步 admission
+failure 可以在 caller 上直接完成 response。
 
 ### 6.2 Buffer handoff
 
-`NereusProduceBufferSnapshot.capture` 在 request thread：
+`validateRequest` 和 `NereusBrokerStorageAppendExecutor.submit` 在 request thread：
 
-- 计算 request/partition bytes with checked arithmetic；
+- 先用 checked long arithmetic 计算整请求 bytes 并与 `append.request.bytes` 比较，失败时不 submit 任何 partition；
 - 从 product-owned bounded pool 申请 buffer；
 - copy exact `MemoryRecords.buffer`；
 - 构造 read-only `MemoryRecords` view；
-- 使用 `RequestLocal.NoCaching` 在 executor 上做 validation，绝不跨线程使用 request-thread BufferSupplier；
+- worker 使用 `RequestLocal.noCaching` 执行 stock validation，绝不跨线程使用 request-thread BufferSupplier；
 - future terminal callback 后 release once。
 
 queue admission 失败发生在任何 append IO 前，返回 `ThrottlingQuotaExceededException`；已入队后 client cancel
@@ -629,10 +671,16 @@ queue admission 失败发生在任何 append IO 前，返回 `ThrottlingQuotaExc
 
 当前 Nereus-side 实现使用 `KafkaProduceBufferSnapshot.capture(ByteBuffer, KafkaByteBudget)` 精确复制 caller
 `position..limit`，不修改 caller state；lease 先于 array allocation 取得，allocation/copy、queue reject、task failure、
-success 和 duplicate close 都只释放一次。`KafkaBoundedAppendExecutor.submit` 用 fixed thread count + bounded
-`ArrayBlockingQueue`，关闭 race 返回 `STORAGE_CLOSED + KNOWN_NOT_COMMITTED`。returned future 只是 response handle：
-取消它不会传播到 admitted task。fork 后续仍需把 `MemoryRecords` / request callback 接到这个 protocol-neutral
-boundary，并负责 `RequestLocal.NoCaching`。
+success 和 duplicate close 都只释放一次。`KafkaBoundedAppendExecutor` 的逻辑 admission 上限是
+`executorThreads + executorQueueCapacity`；同一 ordering key 进入一条 FIFO lane，不同 key 可以并发。每个 runner
+只执行一个 work item 后重新排到 pool tail，防止单线程配置下 hot partition 永久饿死其他 partition。关闭 race
+返回 `STORAGE_CLOSED + KNOWN_NOT_COMMITTED`；close 只停止外部 admission，已接纳但仍位于逻辑 lane 的 work 可继续
+内部 reschedule，最后一个 terminal 才 shutdown pool 并完成非可变 `drainedFuture` view。returned future 只是
+response handle，取消它不会传播到 admitted task。
+
+fork wrapper 以 exact `TopicIdPartition` 作为 key，把 owned bytes 重建为 `MemoryRecords.readableRecords`，并把
+Nereus rejection/failure 映射成 Kafka `ApiException`。inflight byte budget 与 logical task capacity 在每个 submit
+时再次校验。
 
 ### 6.3 Append ordering
 
@@ -643,9 +691,10 @@ boundary，并负责 `RequestLocal.NoCaching`。
 - Nereus `StreamLane` 与 head CAS 是底层保证；
 - executor 可以并发不同 partitions，不允许同 partition reorder。
 
-目标态等待发生在 append executor，不持有 ReplicaManager global lock。当前 correctness bridge 仍由
-`Partition.appendRecordsToLeader` caller 进入并持有当前 UnifiedLog partition lock；Nereus completion path 不得
-反向获取该 lock。下一切片迁移到 bounded executor 后，metrics/checkpoint scheduling 仍只能在 append 返回后执行。
+等待发生在 append executor，不持有 ReplicaManager global lock。worker 进入
+`Partition.appendRecordsToLeader` 后只持有当前 UnifiedLog partition lock；Nereus completion path 不得反向获取
+该 lock。metrics、validation stats、delayed-produce eligibility 与 response completion 都在 stable append terminal
+后执行。
 
 ### 6.4 Stock state ordering retained
 
@@ -736,7 +785,7 @@ LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，re
 
 ### 8.1 Async read path
 
-目标态 `NereusReplicaManager.fetchMessages` 把 storage read 调度到 bounded fetch executor；每个 request snapshot
+目标态在 stock `ReplicaManager.fetchMessages` 注入 optional bounded fetch executor；每个 request snapshot
 immutable fetch params/info，不携带 thread-local buffer supplier。executor 调用 stock `readFromLog`，最终由
 `NereusUnifiedLog.read` 等待 adapter future。`dc8c66388a` 已实现后半段 exact read/assembly，但前半段
 ReplicaManager handoff 尚未实现，因此当前仍可能阻塞 request caller。

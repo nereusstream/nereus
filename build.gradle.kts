@@ -2826,7 +2826,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "dc8c66388a8b093f219d314d97188feb8fd93f92",
+        "ee608625e4dde95089b25765e874d50edec044d4",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2888,6 +2888,8 @@ tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
         "--tests",
         "kafka.server.ReplicaManagerTest.testApplyDeltaPreparesOnlyNewLeaderAfterPartitionStatePublication",
         "--tests",
+        "kafka.server.ReplicaManagerTest.testStorageAppendExecutorDefersAppendAndCallbacksUntilOwnedWorkCompletes",
+        "--tests",
         "kafka.server.metadata.BrokerMetadataPublisherTest",
     )
 }
@@ -2932,6 +2934,8 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
         "kafka.cluster.PartitionTest.testAuthoritativeAppendPreservesRequiredAcks",
         "--tests",
         "kafka.server.ReplicaManagerTest.testApplyDeltaPreparesOnlyNewLeaderAfterPartitionStatePublication",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testStorageAppendExecutorDefersAppendAndCallbacksUntilOwnedWorkCompletes",
         "--tests",
         "kafka.server.metadata.BrokerMetadataPublisherTest",
         "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
