@@ -68,6 +68,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "oxiaCapabilitySpike",
         "oxiaIntegrationTest",
         "f4OxiaIntegrationTest",
+        "f9OxiaIntegrationTest",
     ),
     ":nereus-object-store" to setOf("s3IntegrationTest", "rangedFormatS3IntegrationTest"),
     ":nereus-pulsar-adapter" to setOf(

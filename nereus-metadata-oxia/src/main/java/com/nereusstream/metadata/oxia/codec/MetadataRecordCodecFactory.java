@@ -57,7 +57,11 @@ public final class MetadataRecordCodecFactory {
                         try {
                             return F4MetadataCodecs.registry().codecForClass(recordClass);
                         } catch (MetadataCodecException ignoredF4) {
-                            return BookKeeperMetadataCodecs.registry().codecForClass(recordClass);
+                            try {
+                                return KafkaMetadataCodecs.registry().codecForClass(recordClass);
+                            } catch (MetadataCodecException ignoredKafka) {
+                                return BookKeeperMetadataCodecs.registry().codecForClass(recordClass);
+                            }
                         }
                     }
                 }
@@ -82,7 +86,11 @@ public final class MetadataRecordCodecFactory {
                         try {
                             return F4MetadataCodecs.registry().codecForType(type);
                         } catch (MetadataCodecException ignoredF4) {
-                            return BookKeeperMetadataCodecs.registry().codecForType(type);
+                            try {
+                                return KafkaMetadataCodecs.registry().codecForType(type);
+                            } catch (MetadataCodecException ignoredKafka) {
+                                return BookKeeperMetadataCodecs.registry().codecForType(type);
+                            }
                         }
                     }
                 }

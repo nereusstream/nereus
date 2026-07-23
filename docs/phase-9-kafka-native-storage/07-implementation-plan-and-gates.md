@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1 implementation slices complete；deterministic and real-S3 gates pass，inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1 implementation slices complete；F9-M2 slices 1–5 complete，checkpoint/recovery in progress；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -282,9 +282,14 @@ checkpoint-before-trim proof。No Kafka fork coding starts until accepted。
 
 ### 6.1 Current implementation evidence（2026-07-23）
 
-- slice 4 authority/head V2 is implemented in API、core、real/fake Oxia stores and explicit dual codecs；
-- frozen Phase 1 V1 codec goldens and focused authority state-machine/integration tests pass；
-- slices 1–3 and 5–8 remain in progress，so `phase9M2Check` / `phase9M2FinalCheck` are not yet claimed。
+- slices 1–5 are implemented：module/domain skeleton、canonical keys、25-field root + registry explicit V1 codecs、
+  fake/real Oxia stores、authority-bound head V2，and deterministic binding create/delete/all-shard scan；
+- frozen Phase 1 V1 codec goldens remain unchanged；binding/registry envelope SHA-256 values are
+  `c196685df742d8ff9528bfa5eb4fa7e3c7a9ec8b7077818a19d100a4050ba578` and
+  `8919c79ce1e19e4128ef905b78d18e45ec49d1df4a2f2a582e2e183f249a3b55`；
+- focused metadata/Oxia/adapter tests cover key round trips、unknown wire values、single-key CAS races、stream-create
+  response loss、idempotent delete、same-name/new-topic isolation and one-entry pagination across all 64 registry shards；
+- slices 6–8 remain in progress，so `phase9M2Check` / `phase9M2FinalCheck` are not yet claimed。
 
 ## 7. F9-M3 — Native Produce/Fetch
 

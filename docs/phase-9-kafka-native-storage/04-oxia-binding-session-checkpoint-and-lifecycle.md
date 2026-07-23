@@ -1,6 +1,6 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
-> 状态：F9-M2 implementation in progress；authority/head-V2 slice implemented，binding/checkpoint pending
+> 状态：F9-M2 implementation in progress；authority/head-V2 and deterministic binding slices implemented，checkpoint/recovery pending
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -645,5 +645,16 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
 - `StreamHeadV2CodecTest`、`KafkaLeaderAuthorityPropertyTest` and `KafkaLeaderAuthorityIntegrationTest` prove V1 decode,
   V2 round trip, schema mismatch rejection, leader/broker term ordering, immediate live-session preemption and old-session
   fencing；
-- this evidence is the authority slice only；Kafka binding records/store/scanner and NKC1 publication/recovery remain M2
-  work and are not claimed complete here。
+- config-free Kafka identity/domain values、the `nereus-kafka-adapter` module skeleton、canonical binding/registry keys、
+  all 25 binding-root fields、closed lifecycle/mapping/operation wire IDs and explicit V1 codecs are implemented；
+- frozen Kafka metadata envelope SHA-256 values are binding
+  `c196685df742d8ff9528bfa5eb4fa7e3c7a9ec8b7077818a19d100a4050ba578` and registry
+  `8919c79ce1e19e4128ef905b78d18e45ec49d1df4a2f2a582e2e183f249a3b55`；
+- fake and real Oxia stores enforce exact single-key CAS and bounded per-shard continuation；the registry remains a hint，
+  and `KafkaPartitionRegistryScanner` reloads each authoritative root across all 64 shards；
+- `KafkaPartitionLifecycleCoordinator` implements deterministic CREATING → ACTIVE and ACTIVE → DELETING → DELETED，
+  exact stream profile/attribute verification，post-ACTIVE hint publication，response-loss convergence and same-name/new-
+  topic-ID isolation；
+- `:nereus-metadata-oxia:f9MetadataTest`、`:nereus-metadata-oxia:f9OxiaIntegrationTest`、
+  `:nereus-kafka-adapter:f9M2Test` and `:nereus-kafka-adapter:f9M2IntegrationTest` pass for the implemented slices；
+- NKC1 physical protection/publication and partition recovery remain M2 work and are not claimed complete here。

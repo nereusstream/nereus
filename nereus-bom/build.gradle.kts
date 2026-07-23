@@ -32,6 +32,7 @@ dependencies {
         api(project(":nereus-managed-ledger"))
         api(project(":nereus-pulsar-adapter"))
         api(project(":nereus-kop-adapter"))
+        api(project(":nereus-kafka-adapter"))
     }
 }
 
