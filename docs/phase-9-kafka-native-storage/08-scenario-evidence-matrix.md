@@ -51,9 +51,10 @@ stale-resign isolation 的 deterministic partial evidence，但不替代 durable
 `PROFILE_DEFAULT` completion 的 deterministic policy evidence，但不替代真实 provider/KRaft profile matrix；
 `DefaultKafkaPartitionStorageManagerTest` 为 KF-META-005/019 和 KF-APP-014 提供 binding-first open plan、profile
 mismatch、stale resign、drain-before-delete 与 late-open fencing 的 deterministic composition evidence，但不替代真实
-Oxia/KRaft process cuts；stable-head API/metadata/core tests 为 KF-META-006/007/009 的 opener-side exact authority/head
-observation 提供 deterministic partial evidence，但 commit-ancestor reachability/concrete opener 尚未闭合。各 row 状态仍
-不标记为完整通过。
+Oxia/KRaft process cuts；stable-head API/metadata/core、source-validator 与 default-opener tests 为
+KF-META-006/007/009 的 exact authority/head observation、descendant-bound commit reachability 和 recovery composition
+提供 deterministic partial evidence，但 session 周期续租、fork runtime wiring 与 real process cuts 尚未闭合。各 row
+状态仍不标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。

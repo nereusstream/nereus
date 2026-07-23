@@ -321,9 +321,12 @@ envelope。The digest is computed from metadata-version-zero durable bytes，not
 
 Production Oxia and `FakeOxiaMetadataStore` use the same `StableStreamHeadSnapshots` mapper。Authority renewal changes the
 digest and metadata version；empty streams are represented canonically by end/size/commitVersion `0` and empty lastCommitId。
-This API supplies the exact head half of the concrete Kafka opener/source validator without exposing Oxia records through the
-adapter。Commit-ancestor reachability remains a separate required seam；same-version digest equality alone must not validate
-an older checkpoint against a newer head。
+`StableStreamHeadSnapshot.commitAnchor()` returns a canonical `StreamCommitAnchor`；
+`StreamStorage.isCommitReachable(descendant,id,version)` walks backward from that exact immutable descendant through mixed
+legacy/generic commit records。Missing/mismatched ancestors return false；broken chains fail as metadata invariant and the
+configured scan budget fails retriably instead of returning a false proof。Production Oxia and the fake share these semantics。
+This supplies the concrete validator without exposing Oxia records through the adapter；same-version digest equality is never
+used to validate an older checkpoint against a newer head。
 
 ## 6. Binding creation state machine
 
@@ -402,9 +405,11 @@ No user append is admitted during steps 1–10。Materialization generation chan
 `KafkaPartitionLifecycleCoordinator.ensureBinding` first，freezes the ACTIVE stream identity and exact storage-profile policy
 into `KafkaPartitionOpenPlan`，then delegates steps 2–10 to one `KafkaPartitionOpener` operation。The plan carries the remaining
 deadline；same authority may share an open only when stream ID/name and profile policy are identical。Delete/shutdown remove the
-desired local term before any late opener result can install。The concrete opener that acquires the session and composes current-
-head source validation with checkpoint recovery remains open M3 work；the exact stable-head/session/digest read required by
-that opener is now available through `StreamStorage`，while commit-ancestor reachability remains open。
+desired local term before any late opener result can install。`DefaultKafkaPartitionOpener` now acquires the exact authority
+session、uses `DefaultKafkaCheckpointSourceValidator` to freeze ACTIVE profile/head/session facts、launches one fresh existing
+checkpoint/replay coordinator under the remaining deadline、validates the returned frozen range and constructs
+`DefaultKafkaPartitionStorage`。The launcher remains the Kafka-fork state hydration/publication seam。Periodic session renewal
+and the fork callback wiring remain open；neither may bypass opener/source revalidation。
 
 If no checkpoint：
 

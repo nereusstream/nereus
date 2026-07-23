@@ -44,7 +44,10 @@ class StableStreamHeadSnapshotTest {
 
         assertThat(empty.appendSession()).isEmpty();
         assertThat(empty.commitVersion()).isZero();
+        assertThat(empty.commitAnchor().isGenesis()).isTrue();
         assertThat(owned.appendSession()).contains(acquired);
+        assertThat(owned.commitAnchor()).isEqualTo(
+                new StreamCommitAnchor(streamId, "commit-1", 2, 10, 1));
     }
 
     @Test
@@ -68,5 +71,8 @@ class StableStreamHeadSnapshotTest {
                         new Checksum(ChecksumType.CRC32C, "00000000"), 1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SHA256");
+        assertThatThrownBy(() -> new StreamCommitAnchor(streamId, "commit-1", 0, 0, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not canonical");
     }
 }

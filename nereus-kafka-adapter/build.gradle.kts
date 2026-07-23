@@ -50,5 +50,6 @@ tasks.register<Test>("f9M3CodecTest") {
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaPartitionLeaderManagerTest")
         includeTestsMatching("com.nereusstream.kafka.partition.KafkaStorageProfilePolicyTest")
         includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManagerTest")
+        includeTestsMatching("com.nereusstream.kafka.partition.DefaultKafkaPartitionOpenerTest")
     }
 }

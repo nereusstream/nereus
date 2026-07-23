@@ -19,7 +19,8 @@ wiring、exact timestamp ListOffsets、五档 real-service profile matrix 与真
 storage profile policy 已冻结五个 canonical profile，并禁止 request acks 弱化 profile default durability/completion。
 binding-first storage manager 已把 deterministic ACTIVE binding、exact profile、leader authority 和 remaining recovery
 deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/authority/durable-digest snapshot seam 也已落地，
-并支持 genesis commitVersion `0`。commit-ancestor reachability 与 concrete session/head/recovery opener 尚未组装。
+并支持 genesis commitVersion `0`。Exact commit-ancestor reachability、source validator 与 concrete
+session/head/recovery opener 已组装；session 周期续租、Kafka fork callback/runtime wiring 和真实 KRaft gate 尚未闭合。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 

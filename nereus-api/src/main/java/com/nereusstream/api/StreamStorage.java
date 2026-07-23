@@ -14,6 +14,7 @@
 
 package com.nereusstream.api;
 
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 
 /** Protocol-neutral L0 storage API. */
@@ -138,6 +139,27 @@ public interface StreamStorage extends AutoCloseable {
                 ErrorCode.UNSUPPORTED_READ_SEMANTICS,
                 false,
                 "storage provider does not expose exact stable stream-head snapshots");
+    }
+
+    /**
+     * Proves that one commit ID/version is an ancestor of the supplied exact descendant anchor.
+     *
+     * <p>Missing or mismatched ancestors return {@code false}; broken chains and exhausted provider scan budgets fail closed.
+     */
+    default CompletableFuture<Boolean> isCommitReachable(
+            StreamCommitAnchor descendant,
+            String ancestorCommitId,
+            long ancestorCommitVersion) {
+        if (descendant == null || ancestorCommitId == null || ancestorCommitId.isBlank()
+                || ancestorCommitId.getBytes(StandardCharsets.UTF_8).length > 64 * 1024
+                || ancestorCommitVersion <= 0) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "valid descendant and ancestor commit anchors are required");
+        }
+        return NereusException.failedFuture(
+                ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                false,
+                "storage provider does not expose exact commit reachability");
     }
 
     CompletableFuture<StreamMetadata> seal(StreamId streamId, SealOptions options);

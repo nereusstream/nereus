@@ -47,4 +47,9 @@ public record StableStreamHeadSnapshot(
             }
         });
     }
+
+    public StreamCommitAnchor commitAnchor() {
+        return new StreamCommitAnchor(
+                streamId, lastCommitId, committedEndOffset, cumulativeSize, commitVersion);
+    }
 }

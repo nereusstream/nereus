@@ -33,6 +33,7 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StableStreamHeadSnapshot;
+import com.nereusstream.api.StreamCommitAnchor;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
@@ -229,6 +230,16 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             String cluster, StreamId streamId) {
         return complete(() -> StableStreamHeadSnapshots.from(
                 headOrThrow(new OxiaKeyspace(cluster), streamId)));
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isCommitReachable(
+            String cluster,
+            StreamCommitAnchor descendant,
+            String ancestorCommitId,
+            long ancestorCommitVersion) {
+        return complete(() -> isCommitReachableSync(
+                new OxiaKeyspace(cluster), descendant, ancestorCommitId, ancestorCommitVersion));
     }
 
     @Override
@@ -1880,6 +1891,54 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                         default -> throw invariant("unexpected record type at commit-log key: " + type);
                     };
                 });
+    }
+
+    private boolean isCommitReachableSync(
+            OxiaKeyspace keyspace,
+            StreamCommitAnchor descendant,
+            String ancestorCommitId,
+            long ancestorCommitVersion) {
+        Objects.requireNonNull(descendant, "descendant");
+        Objects.requireNonNull(ancestorCommitId, "ancestorCommitId");
+        if (ancestorCommitId.isBlank() || ancestorCommitVersion <= 0) {
+            throw new IllegalArgumentException("ancestor commit ID/version must be nonblank and positive");
+        }
+        if (ancestorCommitVersion > descendant.commitVersion() || descendant.isGenesis()) {
+            return false;
+        }
+
+        StreamId streamId = descendant.streamId();
+        String current = descendant.lastCommitId();
+        ChainExpectation expectation = new ChainExpectation(
+                descendant.committedEndOffset(),
+                descendant.cumulativeSize(),
+                descendant.commitVersion());
+        int scanned = 0;
+        while (!current.isEmpty() && scanned < configuration.maxCommitChainScan()) {
+            Object durable = getCommitValue(keyspace, streamId, current)
+                    .orElseThrow(() -> invariant("commit reachability found a missing descendant commit"));
+            AnyCommit view = anyCommit(durable);
+            validateAnyCommit(streamId, current, view, expectation);
+            scanned++;
+            if (current.equals(ancestorCommitId)) {
+                return view.commitVersion() == ancestorCommitVersion;
+            }
+            if (view.commitVersion() <= ancestorCommitVersion) {
+                return false;
+            }
+            expectation = predecessorExpectation(view);
+            current = view.previousCommitId();
+        }
+        if (current.isEmpty()) {
+            if (!isGenesis(expectation)) {
+                throw invariant("commit reachability did not terminate at canonical genesis");
+            }
+            return false;
+        }
+        throw failure(
+                ErrorCode.METADATA_UNAVAILABLE,
+                true,
+                "commit reachability exhausted the configured commit-chain scan budget");
     }
 
     private static AnyCommit anyCommit(Object durable) {

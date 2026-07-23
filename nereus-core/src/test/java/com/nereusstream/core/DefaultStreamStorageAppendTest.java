@@ -86,6 +86,7 @@ class DefaultStreamStorageAppendTest {
 
             AppendResult first = context.storage.append(
                     stream.streamId(), batch("a", "bb"), appendOptions(Duration.ofSeconds(5))).join();
+            var firstHead = context.storage.getStableHeadSnapshot(stream.streamId()).join();
             AppendResult second = context.storage.append(
                     stream.streamId(), batch("ccc"), appendOptions(Duration.ofSeconds(5))).join();
 
@@ -110,6 +111,14 @@ class DefaultStreamStorageAppendTest {
             assertThat(stableHead.commitVersion()).isEqualTo(2);
             assertThat(stableHead.lastCommitId()).isNotBlank();
             assertThat(stableHead.appendSession()).isPresent();
+            assertThat(context.storage.isCommitReachable(
+                    stableHead.commitAnchor(), firstHead.lastCommitId(), firstHead.commitVersion()).join()).isTrue();
+            assertThat(context.storage.isCommitReachable(
+                    stableHead.commitAnchor(), stableHead.lastCommitId(), stableHead.commitVersion()).join()).isTrue();
+            assertThat(context.storage.isCommitReachable(
+                    stableHead.commitAnchor(), firstHead.lastCommitId(), stableHead.commitVersion()).join()).isFalse();
+            assertThat(context.storage.isCommitReachable(
+                    firstHead.commitAnchor(), stableHead.lastCommitId(), stableHead.commitVersion()).join()).isFalse();
         }
     }
 

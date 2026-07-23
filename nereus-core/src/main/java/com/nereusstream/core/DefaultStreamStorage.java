@@ -37,6 +37,7 @@ import com.nereusstream.api.SealOptions;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StableStreamHeadSnapshot;
+import com.nereusstream.api.StreamCommitAnchor;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
@@ -637,6 +638,20 @@ public final class DefaultStreamStorage implements StreamStorage {
         return rejection != null
                 ? rejection
                 : metadataStore.getStableStreamHeadSnapshot(config.cluster(), streamId);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> isCommitReachable(
+            StreamCommitAnchor descendant,
+            String ancestorCommitId,
+            long ancestorCommitVersion) {
+        Objects.requireNonNull(descendant, "descendant");
+        Objects.requireNonNull(ancestorCommitId, "ancestorCommitId");
+        CompletableFuture<Boolean> rejection = rejectIfClosed();
+        return rejection != null
+                ? rejection
+                : metadataStore.isCommitReachable(
+                        config.cluster(), descendant, ancestorCommitId, ancestorCommitVersion);
     }
 
     @Override

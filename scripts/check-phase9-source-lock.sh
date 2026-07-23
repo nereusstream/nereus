@@ -29,12 +29,13 @@ while read -r expected path; do
 done <<'LOCKS'
 c6bac3e4efcb0e597c3441071a638ebf8489934a nereus-api/src/main/java/com/nereusstream/api/AppendBatch.java
 ffa36d92a0e5bbe225358cde8ee9cdd1c829e6ac nereus-api/src/main/java/com/nereusstream/api/AppendEntry.java
-cb2af2053cf43d877fc57ff136d36f569791431b nereus-api/src/main/java/com/nereusstream/api/StreamStorage.java
-b77879fcbd8612a8d1e6bdbeb18382eb1df4d9e7 nereus-api/src/main/java/com/nereusstream/api/StableStreamHeadSnapshot.java
+eb0d309b33676c4786b5134ded3840ce761386bd nereus-api/src/main/java/com/nereusstream/api/StreamStorage.java
+a642b6488cf6f12c488e68949b8ec09a32d28451 nereus-api/src/main/java/com/nereusstream/api/StableStreamHeadSnapshot.java
+41fc221d99a1ec612a121739a2d01ef59af0758c nereus-api/src/main/java/com/nereusstream/api/StreamCommitAnchor.java
 799caf45554ffaab72927bf18e869cce9ba02d2a nereus-api/src/main/java/com/nereusstream/api/AppendPrecondition.java
 e43bd0bb99f1762cc4893e20da18450c9e94b76f nereus-api/src/main/java/com/nereusstream/api/ReadRequest.java
 3b2605616150ffb9efada7287df90fa557b92a34 nereus-api/src/main/java/com/nereusstream/api/SemanticReadResult.java
-c4bf3a4a2e05c9bba15a365c1dd1bf0d24623276 nereus-core/src/main/java/com/nereusstream/core/DefaultStreamStorage.java
+2b6aa2510c3a110839988fd0b849200f00b67523 nereus-core/src/main/java/com/nereusstream/core/DefaultStreamStorage.java
 68c0457cddf7db051da12f676c8c0dc599458be7 nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java
 336d08fa1078248b31925f5a6391932f177999ec nereus-core/src/main/java/com/nereusstream/core/append/AppendResultValidator.java
 293b5bacd47c2908e226cadec32a6f67b01bdfb5 nereus-core/src/main/java/com/nereusstream/core/read/ReadCoordinator.java
@@ -51,4 +52,4 @@ dd6233c9a084b4473ba9bc9b1c77fbbf85511c75 nereus-bookkeeper/src/main/java/com/ner
 f4e35b83ffeb0fb630a9b45893f2f9630608dc3e nereus-materialization/src/main/java/com/nereusstream/materialization/RangedLosslessMaterializationRowPublisher.java
 LOCKS
 
-echo "F9 source lock: AutoMQ and 22 Nereus ranged/head-foundation sources match"
+echo "F9 source lock: AutoMQ and 23 Nereus ranged/head-foundation sources match"
