@@ -8,6 +8,7 @@ import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
 import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
+import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
@@ -134,7 +135,8 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 KafkaStorageActivationRuntime activationRuntime = new KafkaStorageActivationRuntime(
                         activationStore,
                         activationContext.capability(),
-                        activationContext.clusterSnapshots(),
+                        new KafkaStorageBindingAwareClusterSnapshotProvider(
+                                activationContext.clusterSnapshots(), partitionMetadataStore),
                         exactContext.renewalScheduler(),
                         exactContext.clock(),
                         activationContext.activationWaitTimeout(),

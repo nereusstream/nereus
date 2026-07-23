@@ -522,7 +522,9 @@ close/reconnect gate pass。`KafkaBrokerCapabilitySpecification`/`Publisher`、t
 admission；heartbeat owns only its scheduled future and a failed CAS permanently invokes the fencing callback。
 `KafkaStorageFirstActivationCoordinator` now executes empty-image proof → capability aggregation → readiness → PREPARED → second
 empty-image/capability proof → ACTIVE，resumes PREPARED without mutation，recovers a compatible concurrent winner and treats ACTIVE
-as idempotent without reapplying the first-activation emptiness rule。Typed Kafka-config-to-provider construction、Kafka controller
+as idempotent without reapplying the first-activation emptiness rule。The Object-WAL production creator now wraps every fork
+snapshot with a 64-shard exact binding-registry existence scan，so first activation cannot accept a KRaft-empty cluster that
+already has durable Nereus Kafka binding history。Typed Kafka-config-to-provider construction、Kafka controller
 snapshot/scheduling integration、fork mapping、priority budgets
 and real native-storage shutdown/process cuts remain open。
 

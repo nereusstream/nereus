@@ -48,7 +48,9 @@ server 类型；runtime configuration 同时冻结 executable profile set，mana
 在双重（wall deadline + 最大尝试数）有界轮询内等待 ACTIVE/readiness，严格校验后才执行原 startup action；续租失败会撤销
 admission，关闭顺序保证先取消续租/轮询再关 activation store，借入 scheduler 不关闭。未激活 creator 已降为 package-private
 failure-cut test seam。real-Oxia + local-file provider gate 已升级为 activation-backed startup、leader open、authority recovery、
-stable Produce/Fetch 与 close。
+stable Produce/Fetch 与 close。production creator 还会把 fork 的 KRaft/local-log snapshot 与全部 64 个 binding-registry
+shard 的首键 existence proof 合并；任一历史 binding hint 都会阻止 first activation，只有全分片为空才保留
+`bindingsPresent=false`。
 activation control plane 已新增 V1 protocol activation、epoch-scoped broker capability、exact broker-set readiness records 与
 closed codecs；同一 deterministic Oxia partition 上的 create/exact-version CAS 会校验 key/value identity、不可变 tuple、
 one-way ACTIVE、heartbeat/readiness monotonicity，并恢复 applied-but-response-lost。broker 侧 capability publisher 已按固定周期

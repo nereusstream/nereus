@@ -28,8 +28,8 @@ Adapter contract is now executable：`KafkaStorageAdmission` publishes immutable
 with stable Nereus error classification。`DefaultNereusKafkaRuntime` now owns one deduplicated/protected startup operation、
 publishes readiness only after its injected startup action completes、starts manager shutdown after synchronous admission
 drain、returns a caller-local timeout view from `awaitDrained` and closes manager/resources once。Provider client creation and
-activation/capability publication remain open；the startup action is the explicit seam for those later steps rather than hidden
-reflection or a global singleton。
+activation/capability publication are now implemented for the synchronous Object-WAL profile；the startup action remains the
+explicit downstream seam rather than hidden reflection or a global singleton。
 
 `NereusKafkaRuntimeFactory.create` is now executable after provider construction。Its immutable
 `NereusKafkaRuntimeConfiguration` freezes Nereus/Kafka cluster IDs、writer identity、session TTL/renewal interval、durable
@@ -51,8 +51,12 @@ created；successful construction transfers the exact ordered list to the proces
 `createActivated`；the unactivated path is package-private for construction failure cuts。It creates the activation store from the
 same shared Oxia runtime and installs `KafkaStorageActivationRuntime` ahead of the downstream startup action：publish capability，
 poll ACTIVE/readiness under both a wall deadline and a maximum-attempt bound，then continue startup。A heartbeat failure removes
-admission immediately。Runtime close cancels its owned heartbeat/poll futures before closing the activation store，while the Kafka
-scheduler/recovery launcher/clock remain borrowed。
+admission immediately。Before each activation verification，`KafkaStorageBindingAwareClusterSnapshotProvider` enriches the
+fork-owned KRaft/local-log snapshot by reading the first key from every one of the 64 durable binding-registry shards；a single
+hint makes `bindingsPresent=true`，and “no bindings” is returned only after all shards prove empty。An already-positive fork fact
+is preserved without scanning。This is intentionally conservative because a stale registry hint must block first activation，
+while ACTIVE admission does not require the cluster to remain empty。Runtime close cancels its owned heartbeat/poll futures before
+closing the activation store，while the Kafka scheduler/recovery launcher/clock remain borrowed。
 
 Kafka fork commits `46e6703761..617451957c` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
 create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
