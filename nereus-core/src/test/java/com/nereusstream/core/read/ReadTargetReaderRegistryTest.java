@@ -53,12 +53,37 @@ class ReadTargetReaderRegistryTest {
                         error -> assertThat(error.code()).isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
     }
 
+    @Test
+    void keepsLogicalFormatsDistinctUnderTheSamePhysicalContainer() {
+        ReadTargetReaderKey opaqueKey = key(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1");
+        ReadTargetReaderKey kafkaKey = new ReadTargetReaderKey(
+                com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
+                1,
+                Optional.of(ObjectType.MULTI_STREAM_WAL_OBJECT),
+                Optional.of("WAL_OBJECT_V1"),
+                Optional.of("KAFKA_RECORD_BATCH_V1"));
+        TestReader opaque = new TestReader(opaqueKey);
+        TestReader kafka = new TestReader(kafkaKey);
+        ReadTargetReaderRegistry registry = new ReadTargetReaderRegistry(List.of(opaque, kafka));
+
+        assertThat(registry.require(target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1")))
+                .isSameAs(opaque);
+        ObjectSliceReadTarget kafkaTarget = withLogicalFormat(
+                target(ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1"),
+                "KAFKA_RECORD_BATCH_V1");
+        assertThat(registry.require(kafkaTarget)).isSameAs(kafka);
+        assertThatThrownBy(() -> registry.require(withLogicalFormat(kafkaTarget, "UNKNOWN_LOGICAL")))
+                .isInstanceOfSatisfying(NereusException.class,
+                        error -> assertThat(error.code()).isEqualTo(ErrorCode.UNSUPPORTED_READ_TARGET));
+    }
+
     static ReadTargetReaderKey key(ObjectType type, String format) {
         return new ReadTargetReaderKey(
                 com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
                 1,
                 Optional.of(type),
-                Optional.of(format));
+                Optional.of(format),
+                Optional.of("OPAQUE_SLICE"));
     }
 
     static ObjectSliceReadTarget target(ObjectType type, String format) {
@@ -84,6 +109,15 @@ class ReadTargetReaderRegistryTest {
                 8,
                 new Checksum(ChecksumType.CRC32C, "00000002"),
                 index);
+    }
+
+    private static ObjectSliceReadTarget withLogicalFormat(
+            ObjectSliceReadTarget target,
+            String logicalFormat) {
+        return new ObjectSliceReadTarget(
+                target.version(), target.objectId(), target.objectKey(), target.objectType(),
+                target.physicalFormat(), logicalFormat, target.sliceId(), target.objectOffset(),
+                target.objectLength(), target.sliceChecksum(), target.entryIndexRef());
     }
 
     static final class TestReader implements ReadTargetReader {

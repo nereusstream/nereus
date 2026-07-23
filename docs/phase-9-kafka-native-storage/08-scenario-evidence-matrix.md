@@ -2,7 +2,7 @@
 
 > 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
-> 当前有 F9-M1 public、conditional append、Object/BookKeeper ranged deterministic tests；尚无完整 milestone/final gate 通过声明
+> 当前 F9-M1 implementation、deterministic gate 与真实 LocalStack NCP2/NTC2 已通过；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 M1 rows 暂不升级为 `PASSED_CURRENT_SOURCE`
 
 ## 1. Evidence tiers
 

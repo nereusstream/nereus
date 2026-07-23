@@ -21,6 +21,7 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
     private final ExactSourceRangeReader reader;
     private final ReadOptions options;
     private final SerialExecutor serial;
+    private final boolean rangedEntries;
     private final AtomicBoolean subscribed = new AtomicBoolean();
     private final AtomicBoolean closeRequested = new AtomicBoolean();
 
@@ -39,11 +40,21 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
             ExactSourceRangeReader reader,
             ReadOptions options,
             Executor callbackExecutor) {
+        this(task, reader, options, callbackExecutor, false);
+    }
+
+    ExactSourceBatchPublisher(
+            MaterializationTask task,
+            ExactSourceRangeReader reader,
+            ReadOptions options,
+            Executor callbackExecutor,
+            boolean rangedEntries) {
         MaterializationTask exactTask = Objects.requireNonNull(task, "task");
         this.sources = exactTask.sources();
         this.reader = Objects.requireNonNull(reader, "reader");
         this.options = Objects.requireNonNull(options, "options");
         this.serial = new SerialExecutor(Objects.requireNonNull(callbackExecutor, "callbackExecutor"));
+        this.rangedEntries = rangedEntries;
         this.expectedOffset = exactTask.coverage().startOffset();
     }
 
@@ -180,15 +191,16 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
         upstreamRequested = false;
         try {
             ReadBatch exact = Objects.requireNonNull(batch, "batch");
-            if (exact.range().recordCount() != 1
+            if ((!rangedEntries && exact.range().recordCount() != 1)
                     || exact.range().startOffset() != expectedOffset
                     || !source.range().contains(expectedOffset)
+                    || exact.range().endOffset() > source.range().endOffset()
                     || exact.payloadFormat() != source.payloadFormat()
                     || !exact.schemaRefs().equals(source.schemaRefs())
                     || !exact.projectionRef().equals(source.projectionRef())) {
-                throw invariant("exact source batch is not one dense task record");
+                throw invariant("exact source batch is not a dense task entry");
             }
-            expectedOffset = Math.addExact(expectedOffset, 1);
+            expectedOffset = exact.range().endOffset();
             demand--;
             downstream.onNext(exact);
         } catch (Throwable failure) {

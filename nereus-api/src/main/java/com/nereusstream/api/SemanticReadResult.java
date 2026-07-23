@@ -57,11 +57,15 @@ public record SemanticReadResult(
         }
         OffsetRange first = batches.get(0).range();
         if (request.boundaryMode() == ReadBoundaryMode.EXACT_START
-                && first.startOffset() != request.startOffset()) {
+                && (first.startOffset() < request.startOffset()
+                        || (request.view() == ReadView.COMMITTED
+                                && first.startOffset() != request.startOffset()))) {
             throw new IllegalArgumentException("EXACT_START result must begin at the requested offset");
         }
         if (request.boundaryMode() == ReadBoundaryMode.CONTAINING_ENTRY
-                && !first.contains(request.startOffset())) {
+                && !first.contains(request.startOffset())
+                && (request.view() == ReadView.COMMITTED
+                        || first.startOffset() < request.startOffset())) {
             throw new IllegalArgumentException("CONTAINING_ENTRY result must contain the requested offset");
         }
         long previousEnd = first.endOffset();

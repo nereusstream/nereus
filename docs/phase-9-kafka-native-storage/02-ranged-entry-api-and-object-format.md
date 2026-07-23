@@ -1,6 +1,6 @@
 # 02 — Ranged-Entry API and Object Format
 
-> 状态：Implementation in progress；public/append/Object-WAL/BookKeeper ranged slices complete；NCP2/NTC2 pending
+> 状态：F9-M1 implementation complete；public/append/read、NCP2/NTC2、exact dispatch/capability and S3 evidence implemented
 > 前置：Phase 1.5 generic L0、F4 generation/read-view、F1-BK profiles 均保持现有已实现合同
 > 核心原则：先把“一个 entry 覆盖多个 logical offsets”做成 protocol-neutral 能力，再允许 Kafka adapter 使用
 
@@ -178,7 +178,7 @@ metadata head；lower/higher mismatch 均在 `WalObjectWriter.prepare`/primary a
 目标文件均在 `nereus-api/...`：
 
 ```java
-// public values implemented；provider semantics pending
+// public values and production provider semantics implemented in F9-M1
 public enum ReadBoundaryMode {
     EXACT_START,
     CONTAINING_ENTRY

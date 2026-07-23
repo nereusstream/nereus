@@ -7,7 +7,6 @@ import com.nereusstream.api.target.ReadTarget;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** Immutable exact-key reader registry with fail-closed lookup. */
@@ -19,8 +18,9 @@ public final class ReadTargetReaderRegistry {
         try {
             this.readers = readers.stream()
                     .map(reader -> Objects.requireNonNull(reader, "reader"))
+                    .flatMap(reader -> reader.keys().stream().map(key -> Map.entry(key, reader)))
                     .collect(Collectors.toUnmodifiableMap(
-                            ReadTargetReader::key, Function.identity(), (left, right) -> {
+                            Map.Entry::getKey, Map.Entry::getValue, (left, right) -> {
                                 throw new IllegalArgumentException(
                                         "duplicate read target reader key: " + left.key());
                             }));

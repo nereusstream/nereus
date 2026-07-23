@@ -69,7 +69,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "oxiaIntegrationTest",
         "f4OxiaIntegrationTest",
     ),
-    ":nereus-object-store" to setOf("s3IntegrationTest"),
+    ":nereus-object-store" to setOf("s3IntegrationTest", "rangedFormatS3IntegrationTest"),
     ":nereus-pulsar-adapter" to setOf(
         "f4M4IntegrationTest",
         "bkM2IntegrationTest",
@@ -2749,9 +2749,50 @@ tasks.register<Exec>("checkPhase9ScenarioManifest") {
     commandLine("bash", "scripts/check-phase9-scenario-manifest.sh")
 }
 
+val autoMqCheckoutPath = providers.gradleProperty("autoMqCheckout")
+    .orElse(providers.environmentVariable("NEREUS_AUTOMQ_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../automq").asFile.absolutePath)
+
+tasks.register<Exec>("phase9SourceLockCheck") {
+    group = "verification"
+    description = "Verify the F9 AutoMQ reference and current Nereus ranged-foundation source locks."
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase9-source-lock.sh",
+        autoMqCheckoutPath.get(),
+        "1c648d84819d5c3fef2af585f02149c397584870",
+        "3.9.0-SNAPSHOT",
+    )
+}
+
 tasks.register("phase9M1ApiCheck") {
     group = "verification"
     description = "Run the in-progress F9-M1 public ranged-entry API slice and scenario-manifest gate."
     dependsOn("checkPhase9ScenarioManifest")
     dependsOn(":nereus-api:test")
+}
+
+tasks.register("phase9M1Check") {
+    group = "verification"
+    description = "Run the complete deterministic F9-M1 ranged-entry and NCP2/NTC2 foundation gate."
+    dependsOn("phase9M1ApiCheck")
+    dependsOn("phase9SourceLockCheck")
+    dependsOn(":nereus-core:rangedEntryTest")
+    dependsOn(":nereus-object-store:rangedFormatTest")
+    dependsOn(":nereus-bookkeeper:rangedBookKeeperIntegrationTest")
+    dependsOn(":nereus-materialization:test")
+}
+
+tasks.register("phase9M1FinalCheck") {
+    group = "verification"
+    description = "Run F9-M1 plus inherited protocol-neutral regression and real-object-store gates."
+    dependsOn("phase9M1Check")
+    dependsOn("checkPulsarSourceLock")
+    dependsOn("phase1FinalCheck")
+    dependsOn("phase15FinalCheck")
+    dependsOn(":nereus-managed-ledger:test")
+    dependsOn(":nereus-materialization:test")
+    dependsOn(":nereus-bookkeeper:test")
+    dependsOn(":nereus-object-store:rangedFormatS3IntegrationTest")
 }

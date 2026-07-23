@@ -14,24 +14,27 @@ public record ReadTargetReaderKey(
         ReadTargetType targetType,
         int targetVersion,
         Optional<ObjectType> objectType,
-        Optional<String> physicalFormat) {
+        Optional<String> physicalFormat,
+        Optional<String> logicalFormat) {
     public ReadTargetReaderKey {
         Objects.requireNonNull(targetType, "targetType");
         objectType = Objects.requireNonNull(objectType, "objectType");
         physicalFormat = Objects.requireNonNull(physicalFormat, "physicalFormat")
                 .map(value -> requireText(value, "physicalFormat"));
+        logicalFormat = Objects.requireNonNull(logicalFormat, "logicalFormat")
+                .map(value -> requireText(value, "logicalFormat"));
         if (targetVersion <= 0) {
             throw new IllegalArgumentException("targetVersion must be positive");
         }
         switch (targetType) {
             case OBJECT_SLICE -> {
-                if (objectType.isEmpty() || physicalFormat.isEmpty()) {
+                if (objectType.isEmpty() || physicalFormat.isEmpty() || logicalFormat.isEmpty()) {
                     throw new IllegalArgumentException(
-                            "object-slice reader key requires objectType and physicalFormat");
+                            "object-slice reader key requires objectType, physicalFormat, and logicalFormat");
                 }
             }
             case BOOKKEEPER_ENTRY_RANGE -> {
-                if (objectType.isPresent() || physicalFormat.isPresent()) {
+                if (objectType.isPresent() || physicalFormat.isPresent() || logicalFormat.isPresent()) {
                     throw new IllegalArgumentException(
                             "BookKeeper reader key cannot carry object fields");
                 }
@@ -39,12 +42,21 @@ public record ReadTargetReaderKey(
         }
     }
 
+    /** Compatibility constructor for non-object target keys. */
+    public ReadTargetReaderKey(
+            ReadTargetType targetType,
+            int targetVersion,
+            Optional<ObjectType> objectType,
+            Optional<String> physicalFormat) {
+        this(targetType, targetVersion, objectType, physicalFormat, Optional.empty());
+    }
+
     public static ReadTargetReaderKey from(ReadTarget target) {
         Objects.requireNonNull(target, "target");
         if (target instanceof ObjectSliceReadTarget object) {
             return new ReadTargetReaderKey(
                     object.type(), object.version(), Optional.of(object.objectType()),
-                    Optional.of(object.physicalFormat()));
+                    Optional.of(object.physicalFormat()), Optional.of(object.logicalFormat()));
         }
         if (target instanceof BookKeeperEntryRangeReadTarget bookKeeper) {
             return new ReadTargetReaderKey(

@@ -20,17 +20,26 @@ import com.nereusstream.objectstore.wal.WalReadResult;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 public final class ObjectWalReaderAdapter implements PrimaryWalReader {
     public static final ReadTargetReaderKey KEY = new ReadTargetReaderKey(
             com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
             1,
             Optional.of(ObjectType.MULTI_STREAM_WAL_OBJECT),
-            Optional.of("WAL_OBJECT_V1"));
+            Optional.of("WAL_OBJECT_V1"),
+            Optional.of("OPAQUE_SLICE"));
+    public static final ReadTargetReaderKey KAFKA_KEY = new ReadTargetReaderKey(
+            com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
+            1,
+            Optional.of(ObjectType.MULTI_STREAM_WAL_OBJECT),
+            Optional.of("WAL_OBJECT_V1"),
+            Optional.of("KAFKA_RECORD_BATCH_V1"));
 
     private final WalObjectReader reader;
     public ObjectWalReaderAdapter(WalObjectReader reader) { this.reader = Objects.requireNonNull(reader); }
     @Override public ReadTargetReaderKey key() { return KEY; }
+    @Override public Set<ReadTargetReaderKey> keys() { return Set.of(KEY, KAFKA_KEY); }
     @Override public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
             StreamId streamId, long startOffset, List<ResolvedRange> ranges, ReadOptions options) {
         Objects.requireNonNull(streamId, "streamId");

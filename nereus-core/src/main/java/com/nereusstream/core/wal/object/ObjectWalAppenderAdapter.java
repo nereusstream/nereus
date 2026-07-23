@@ -81,8 +81,11 @@ public final class ObjectWalAppenderAdapter implements PrimaryWalAppender<Object
         Objects.requireNonNull(timeout, "timeout");
         return writer.upload(prepared.preparedObject(), attemptGuard).thenApply(result -> {
             var slice = result.slices().get(0);
+            String logicalFormat = slice.payloadFormat() == com.nereusstream.api.PayloadFormat.KAFKA_RECORD_BATCH
+                    ? "KAFKA_RECORD_BATCH_V1"
+                    : "OPAQUE_SLICE";
             ObjectSliceReadTarget target = new ObjectSliceReadTarget(1, result.objectId(), result.objectKey(),
-                    ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1", "OPAQUE_SLICE", slice.sliceId(),
+                    ObjectType.MULTI_STREAM_WAL_OBJECT, "WAL_OBJECT_V1", logicalFormat, slice.sliceId(),
                     slice.objectOffset(), slice.objectLength(), slice.sliceChecksum(), slice.entryIndexRef());
             return new DurablePrimaryAppend(prepared.streamId(), target,
                     ObjectPrimaryPhysicalIdentity.from(target), slice.sliceChecksum(),

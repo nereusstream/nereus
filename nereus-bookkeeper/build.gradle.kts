@@ -74,3 +74,11 @@ registerFocusedTest(
     "com.nereusstream.bookkeeper.BookKeeperAppendRecoveryCoordinatorTest",
     "com.nereusstream.bookkeeper.BookKeeperWalRetentionGateTest",
 )
+
+registerFocusedTest(
+    "rangedBookKeeperIntegrationTest",
+    "Run the F9-M1 BookKeeper ranged codec, boundary, overflow, and L0 composition contracts.",
+    "com.nereusstream.bookkeeper.BookKeeperRangedEntryCodecV1Test",
+    "com.nereusstream.bookkeeper.BookKeeperPrimaryWalReaderTest",
+    "com.nereusstream.bookkeeper.BookKeeperStreamStorageIntegrationTest",
+)

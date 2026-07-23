@@ -12,6 +12,7 @@ import com.nereusstream.core.wal.PrimaryWalRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 
 /** Validates and dispatches maximal adjacent exact-reader-key runs without provider fall-through. */
@@ -64,16 +65,22 @@ public final class ReadTargetDispatcher {
                 new ArrayList<>(),
                 new ArrayList<>(),
                 0,
-                0);
+                0,
+                OptionalLong.empty());
     }
 
     private CompletableFuture<PhysicalReadResult> readRun(
             StreamId streamId,
             List<Run> runs, int index, ReadRequest request,
-            List<ReadBatch> batches, List<PhysicalReadStats> stats, long records, long bytes) {
+            List<ReadBatch> batches,
+            List<PhysicalReadStats> stats,
+            long records,
+            long bytes,
+            OptionalLong sourceCoverageEndOffset) {
         ReadOptions options = request.options();
         if (index >= runs.size() || records >= options.maxRecords() || bytes >= options.maxBytes()) {
-            return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
+            return CompletableFuture.completedFuture(
+                    new PhysicalReadResult(batches, stats, sourceCoverageEndOffset));
         }
         Run run = runs.get(index);
         ReadOptions remaining = new ReadOptions(
@@ -96,16 +103,19 @@ public final class ReadTargetDispatcher {
                 newRecords = Math.addExact(newRecords, batch.range().recordCount());
                 newBytes = Math.addExact(newBytes, batch.payload().length);
             }
-            if (result.batches().isEmpty()
-                    || next < run.ranges().get(run.ranges().size() - 1).offsetRange().endOffset()) {
-                return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
+            long runProgress = result.sourceCoverageEndOffset().orElse(next);
+            OptionalLong coverage = OptionalLong.of(sourceCoverageEndOffset.isPresent()
+                    ? Math.max(sourceCoverageEndOffset.getAsLong(), runProgress)
+                    : runProgress);
+            if (runProgress < run.ranges().get(run.ranges().size() - 1).offsetRange().endOffset()) {
+                return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats, coverage));
             }
             return readRun(
                     streamId,
                     runs,
                     index + 1,
                     new ReadRequest(
-                            next,
+                            runProgress,
                             request.view(),
                             request.boundaryMode(),
                             FirstEntryPolicy.LEGACY_STRICT_LIMIT,
@@ -113,7 +123,8 @@ public final class ReadTargetDispatcher {
                     batches,
                     stats,
                     newRecords,
-                    newBytes);
+                    newBytes,
+                    coverage);
         });
     }
 

@@ -4,17 +4,44 @@ package com.nereusstream.objectstore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nereusstream.api.Checksum;
+import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
+import com.nereusstream.api.OffsetRange;
+import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.StreamId;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV2;
+import com.nereusstream.objectstore.compacted.KafkaCompactionDispositionV2;
+import com.nereusstream.objectstore.compacted.KafkaCompactionKeyEncodingV2;
+import com.nereusstream.objectstore.compacted.KafkaTopicCompactedFormatSpecV2;
+import com.nereusstream.objectstore.compacted.KafkaTopicCompactedObjectRow;
+import com.nereusstream.objectstore.compacted.KafkaTopicCompactedObjectWriteRequest;
+import com.nereusstream.objectstore.compacted.ParquetKafkaTopicCompactedReader;
+import com.nereusstream.objectstore.compacted.ParquetKafkaTopicCompactedWriter;
+import com.nereusstream.objectstore.compacted.ParquetRangedCompactedObjectReader;
+import com.nereusstream.objectstore.compacted.ParquetRangedCompactedObjectWriter;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectRow;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectVerificationRequest;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectVerifier;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteRequest;
+import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteResult;
+import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
-import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Flow;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -27,6 +54,92 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 class S3CompatibleObjectStoreLocalStackIntegrationTest {
     private static final DockerImageName IMAGE =
             DockerImageName.parse("localstack/localstack:4.14.0");
+
+    @TempDir
+    Path temporaryDirectory;
+
+    @Test
+    void ncp2AndNtc2RoundTripThroughRealS3Provider() throws Exception {
+        try (LocalStackContainer localstack = new LocalStackContainer(IMAGE)
+                .withServices(LocalStackContainer.Service.S3)) {
+            localstack.start();
+            try (S3AsyncClient admin = client(localstack)) {
+                admin.createBucket(CreateBucketRequest.builder().bucket("nereus-v2-test").build()).join();
+            }
+            S3CompatibleObjectStoreProvider provider = new S3CompatibleObjectStoreProvider();
+            ObjectStore store = provider.create(
+                    config(localstack, "nereus-v2-test"),
+                    ref -> Optional.of(("access".equals(ref)
+                            ? localstack.getAccessKey()
+                            : localstack.getSecretKey()).toCharArray()));
+            Path stagingDirectory = Files.createDirectory(temporaryDirectory.resolve("v2-staging"));
+            Files.setPosixFilePermissions(stagingDirectory, PosixFilePermissions.fromString("rwx------"));
+            try (StagingFileManager staging = new StagingFileManager(
+                            stagingDirectory,
+                            64L << 20,
+                            StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+                            Duration.ofHours(1),
+                            Runnable::run)) {
+                RangedCompactedObjectWriteRequest ncp2 = new RangedCompactedObjectWriteRequest(
+                        "test-cluster", new StreamId("s-s3-ncp2"), new OffsetRange(0, 3), "a".repeat(26),
+                        sha256('1'), sha256('2'), PayloadFormat.KAFKA_RECORD_BATCH,
+                        CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT, 3, 1, 3, 3,
+                        1, "UNCOMPRESSED", "s3-integration");
+                byte[] committedPayload = new byte[] {1, 2, 3};
+                ParquetRangedCompactedObjectWriter ncp2Writer =
+                        new ParquetRangedCompactedObjectWriter(staging, Runnable::run);
+                ParquetRangedCompactedObjectReader ncp2Reader =
+                        new ParquetRangedCompactedObjectReader(store, Runnable::run);
+                ParquetKafkaTopicCompactedReader ntc2Reader =
+                        new ParquetKafkaTopicCompactedReader(store, Runnable::run);
+                RangedCompactedObjectVerifier verifier =
+                        new RangedCompactedObjectVerifier(store, ncp2Reader, ntc2Reader);
+                try (RangedCompactedObjectWriteResult written = ncp2Writer.write(
+                                ncp2,
+                                publisher(List.of(new RangedCompactedObjectRow(
+                                        0, 3, 0, ByteBuffer.wrap(committedPayload),
+                                        Crc32cChecksums.intValue(Crc32cChecksums.checksum(committedPayload)),
+                                        OptionalLong.empty()))))
+                        .join()) {
+                    upload(store, written);
+                    verifier.verifyExact(
+                                    RangedCompactedObjectVerificationRequest.from(
+                                            ncp2, written, Duration.ofSeconds(20)),
+                                    ncp2)
+                            .join();
+                }
+
+                KafkaTopicCompactedObjectWriteRequest ntc2 = new KafkaTopicCompactedObjectWriteRequest(
+                        "test-cluster", new StreamId("s-s3-ntc2"), new OffsetRange(10, 20), "b".repeat(26),
+                        sha256('3'), sha256('4'), 1, 1, 1, 1,
+                        1, "UNCOMPRESSED", "s3-integration",
+                        new KafkaTopicCompactedFormatSpecV2(
+                                "latest", 1, CompactedObjectFormatV2.KAFKA_KEY_CODEC,
+                                CompactedObjectFormatV2.KAFKA_REWRITE_CODEC, sha256('5'), 1, 1));
+                byte[] survivor = new byte[] {9};
+                ParquetKafkaTopicCompactedWriter ntc2Writer =
+                        new ParquetKafkaTopicCompactedWriter(staging, Runnable::run);
+                try (RangedCompactedObjectWriteResult written = ntc2Writer.write(
+                                ntc2,
+                                publisher(List.of(new KafkaTopicCompactedObjectRow(
+                                        15, 1, KafkaCompactionDispositionV2.RETAIN_UNKEYED,
+                                        KafkaCompactionKeyEncodingV2.nullKey(15), ByteBuffer.wrap(survivor),
+                                        Crc32cChecksums.intValue(Crc32cChecksums.checksum(survivor)),
+                                        15, 0, sha256('6'), OptionalLong.empty()))))
+                        .join()) {
+                    upload(store, written);
+                    verifier.verifyExact(
+                                    RangedCompactedObjectVerificationRequest.from(
+                                            ntc2, written, Duration.ofSeconds(20)),
+                                    ntc2)
+                            .join();
+                }
+            } finally {
+                store.close();
+                provider.close();
+            }
+        }
+    }
 
     @Test
     void conditionalPutRangeChecksumZeroLengthAndRestart() throws Exception {
@@ -158,5 +271,46 @@ class S3CompatibleObjectStoreLocalStackIntegrationTest {
             assertThat(current).isInstanceOfSatisfying(NereusException.class,
                     nereus -> assertThat(nereus.code()).isEqualTo(code));
         });
+    }
+
+    private static void upload(ObjectStore store, RangedCompactedObjectWriteResult result) {
+        store.putObject(
+                        result.objectKey(),
+                        result.stagingFile(),
+                        new PutObjectOptions(
+                                "application/vnd.apache.parquet", result.storageCrc32c(), true,
+                                Map.of(), Duration.ofSeconds(20)))
+                .join();
+    }
+
+    private static <T> Flow.Publisher<T> publisher(List<T> values) {
+        List<T> exact = List.copyOf(values);
+        return subscriber -> subscriber.onSubscribe(new Flow.Subscription() {
+            private int index;
+            private boolean done;
+
+            @Override
+            public void request(long count) {
+                if (done) {
+                    return;
+                }
+                while (count-- > 0 && index < exact.size()) {
+                    subscriber.onNext(exact.get(index++));
+                }
+                if (index == exact.size()) {
+                    done = true;
+                    subscriber.onComplete();
+                }
+            }
+
+            @Override
+            public void cancel() {
+                done = true;
+            }
+        });
+    }
+
+    private static Checksum sha256(char value) {
+        return new Checksum(ChecksumType.SHA256, Character.toString(value).repeat(64));
     }
 }

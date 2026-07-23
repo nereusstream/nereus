@@ -39,7 +39,8 @@ public final class ParquetCompactedTargetReader implements ReadTargetReader {
             ReadTargetType.OBJECT_SLICE,
             1,
             Optional.of(ObjectType.STREAM_COMPACTED_OBJECT),
-            Optional.of(CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT));
+            Optional.of(CompactedObjectFormatV1.COMMITTED_PHYSICAL_FORMAT),
+            Optional.of(com.nereusstream.api.PayloadFormat.PULSAR_ENTRY_BATCH.name()));
 
     private final CompactedObjectReader reader;
 

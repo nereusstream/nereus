@@ -1,14 +1,14 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1 public API、conditional append、Object/BookKeeper ranged-read slices implemented；无 native Kafka runtime
+> 状态：In progress；F9-M1 ranged foundation implementation complete，fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
 > F9 implementation base：`main@112c459`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
-gate 是实现约束。当前仅 `nereus-api` ranged values、Kafka batch validation、binary-safe default overloads 与
-scenario manifest/check gate 已落地；core provider 仍会 fail closed，Kafka broker capability 仍不存在。若以后
+gate 是实现约束。F9-M1 已落地 conditional append、Object/BookKeeper ranged readers、semantic views、
+NCP2/NTC2、exact format dispatch/capability 和真实 S3 round trip；Kafka broker capability/runtime 仍不存在。若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 
 ## 1. 设计文档

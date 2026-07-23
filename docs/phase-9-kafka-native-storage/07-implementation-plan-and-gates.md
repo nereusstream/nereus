@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1 implementation in progress；public/conditional-append/Object-WAL/BookKeeper ranged slices pass focused checks
+> 状态：F9-M1 implementation slices complete；deterministic and real-S3 gates pass，inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -123,10 +123,10 @@ RangedCompactedObjectMetadata.java
 ParquetRangedCompactedObjectWriter.java
 ParquetRangedCompactedObjectReader.java
 RangedCompactedObjectVerifier.java
-KafkaTopicCompactedObjectFormatV2.java
+KafkaTopicCompactedFormatSpecV2.java
 ParquetKafkaTopicCompactedWriter.java
 ParquetKafkaTopicCompactedReader.java
-KafkaTopicCompactedVerifier.java
+RangedCompactedObjectVerifier.java             shared exact NCP2/NTC2 verifier
 
 nereus-object-store/.../kafka/checkpoint/KafkaCheckpointFormatV1.java
 KafkaCheckpointWriter.java
@@ -226,6 +226,20 @@ phase9M1FinalCheck --rerun-tasks
 
 `phase9M1FinalCheck` also depends on current Phase 1/1.5/F2/F3/F4/F1-BK public/format/reader gates。Docker tests use existing
 shared gate service。
+
+### 5.1 Current implementation evidence（2026-07-23）
+
+- `phase9SourceLockCheck` locks AutoMQ `1c648d...` / `3.9.0-SNAPSHOT` and 21 current Nereus ranged-foundation source blobs；
+- `phase9M1Check --rerun-tasks` passes API、conditional append/result、semantic read、Object WAL、BookKeeper、
+  exact reader registry/capability and materialization tests；
+- `:nereus-object-store:rangedFormatS3IntegrationTest --rerun-tasks` passes NCP2 and NTC2 upload/read/full verification
+  against pinned LocalStack `4.14.0`；
+- frozen object SHA-256：NCP2 `671ac184f5b1fbf898329cd868f88d53a569e229cfeb451ebdb4c618b5591532`，
+  NTC2 `367da6663bb4e8d6e83e942277b3a250b86ec13f4f4a5863235aed32157bd2e8`；
+- frozen capability digest：`3c99feb81221497e1e1e7401766ecad898ace0cce2a68312c91bbec25b09bace`；
+- `phase9M1FinalCheck --rerun-tasks` currently stops in inherited `:nereus-managed-ledger:compileJava` because the local
+  Pulsar checkout is `5ffc2caa...` while Nereus locks `2f9c1eb...`；this is recorded as environment/source-lock drift，
+  not counted as a passed milestone final gate。
 
 ### Exit
 

@@ -70,3 +70,29 @@ tasks.register<Test>("s3IntegrationTest") {
     shouldRunAfter(tasks.test)
     useJUnitPlatform()
 }
+
+tasks.register<Test>("rangedFormatTest") {
+    group = "verification"
+    description = "Run the F9-M1 Object WAL ranged and closed NCP2/NTC2 format contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.objectstore.wal.WalObjectWriterReaderTest")
+        includeTestsMatching("com.nereusstream.objectstore.compacted.Ncp2Ntc2GoldenAndCorruptionTest")
+    }
+}
+
+tasks.register<Test>("rangedFormatS3IntegrationTest") {
+    group = "verification"
+    description = "Run the F9-M1 NCP2/NTC2 round trip against pinned LocalStack S3."
+    testClassesDirs = s3IntegrationTest.output.classesDirs
+    classpath = s3IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("rangedFormatTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.objectstore.S3CompatibleObjectStoreLocalStackIntegrationTest.ncp2AndNtc2RoundTripThroughRealS3Provider",
+        )
+    }
+}

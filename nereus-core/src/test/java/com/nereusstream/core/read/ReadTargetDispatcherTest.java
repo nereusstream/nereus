@@ -32,7 +32,8 @@ class ReadTargetDispatcherTest {
                     com.nereusstream.api.target.ReadTargetType.OBJECT_SLICE,
                     1,
                     Optional.of(ObjectType.MULTI_STREAM_WAL_OBJECT),
-                    Optional.of("WAL_OBJECT_V1")); }
+                    Optional.of("WAL_OBJECT_V1"),
+                    Optional.of("OPAQUE_SLICE")); }
             @Override public long reservationBytes(ResolvedRange range) { calls.incrementAndGet(); return 1; }
             @Override public CompletableFuture<WalReadResult> readWithStats(
                     com.nereusstream.api.StreamId streamId,

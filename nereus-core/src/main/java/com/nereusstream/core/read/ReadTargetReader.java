@@ -17,11 +17,17 @@ import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.objectstore.wal.WalReadResult;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /** Exact-format physical reader used after generation resolution. */
 public interface ReadTargetReader extends AutoCloseable {
     ReadTargetReaderKey key();
+
+    /** Exact target identities accepted by this reader; no physical or logical format wildcard exists. */
+    default Set<ReadTargetReaderKey> keys() {
+        return Set.of(key());
+    }
 
     long reservationBytes(ResolvedRange range);
 

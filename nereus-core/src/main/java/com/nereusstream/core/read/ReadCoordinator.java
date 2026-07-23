@@ -397,18 +397,16 @@ public final class ReadCoordinator implements StreamViewReader {
             PinnedResolvedRange pinned,
             Set<GenerationReadCandidate> excludedCandidates,
             Map<GenerationReadCandidate, Integer> transientRetries) {
-        CompletableFuture<ReadResult> read = readSemanticRanges(
+        CompletableFuture<SemanticPhysicalRead> read = readSemanticRanges(
                 streamId,
                 request,
                 List.of(pinned.resolvedRange()),
                 deadline);
         return releaseAfter(read, pinned).handle((value, failure) -> {
             if (failure == null) {
-                long coverage = request.view() == ReadView.COMMITTED
-                        ? value.nextOffset()
-                        : pinned.resolvedRange().offsetRange().endOffset();
                 return CompletableFuture.completedFuture(
-                        SemanticReadResult.forRequest(request, value, coverage));
+                        SemanticReadResult.forRequest(
+                                request, value.result(), value.sourceCoverageEndOffset()));
             }
             Throwable cause = unwrap(failure);
             java.util.Optional<PhysicalReadFailureKind> physicalFailure = PhysicalReadFailures.classify(cause);
@@ -521,7 +519,7 @@ public final class ReadCoordinator implements StreamViewReader {
                         resolution.result().ranges(),
                         deadline)
                 .thenApply(value -> SemanticReadResult.forRequest(
-                        request, value, value.nextOffset()));
+                        request, value.result(), value.sourceCoverageEndOffset()));
         if (!allowCacheRefresh || !resolution.cacheUsed()) {
             return attempted;
         }
@@ -543,7 +541,7 @@ public final class ReadCoordinator implements StreamViewReader {
         });
     }
 
-    private CompletableFuture<ReadResult> readSemanticRanges(
+    private CompletableFuture<SemanticPhysicalRead> readSemanticRanges(
             StreamId streamId,
             ReadRequest request,
             List<ResolvedRange> ranges,
@@ -678,7 +676,7 @@ public final class ReadCoordinator implements StreamViewReader {
         return new ReadResult(streamId, startOffset, expectedOffset, result.batches(), false);
     }
 
-    private ReadResult buildSemanticReadResult(
+    private SemanticPhysicalRead buildSemanticReadResult(
             StreamId streamId,
             ReadRequest request,
             List<ResolvedRange> ranges,
@@ -689,13 +687,26 @@ public final class ReadCoordinator implements StreamViewReader {
                 stats.physicalPayloadBytesRead(),
                 stats.physicalAuxiliaryBytesRead(),
                 stats.returnedPayloadBytes())));
-        if (result.batches().isEmpty()) {
+        long coverageEndOffset = result.sourceCoverageEndOffset().orElseGet(() ->
+                result.batches().isEmpty()
+                        ? request.startOffset()
+                        : result.batches().get(result.batches().size() - 1).range().endOffset());
+        long resolvedCoverageEnd = ranges.get(ranges.size() - 1).offsetRange().endOffset();
+        if (coverageEndOffset < request.startOffset() || coverageEndOffset > resolvedCoverageEnd) {
+            throw new NereusException(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "physical reader returned invalid semantic source coverage");
+        }
+        if (result.batches().isEmpty() && request.view() != ReadView.TOPIC_COMPACTED) {
             throw new NereusException(
                     ErrorCode.READ_RESOLUTION_FAILED,
                     false,
                     "resolved ranges produced no readable entry for the semantic request");
         }
-        long expectedOffset = result.batches().get(0).range().startOffset();
+        long expectedOffset = result.batches().isEmpty()
+                ? request.startOffset()
+                : result.batches().get(0).range().startOffset();
         long payloadBytes = 0;
         long records = 0;
         try {
@@ -743,7 +754,7 @@ public final class ReadCoordinator implements StreamViewReader {
                 result.batches(),
                 false);
         try {
-            SemanticReadResult.forRequest(request, readResult, expectedOffset);
+            SemanticReadResult.forRequest(request, readResult, coverageEndOffset);
         } catch (IllegalArgumentException invalid) {
             throw new NereusException(
                     request.boundaryMode() == ReadBoundaryMode.EXACT_START
@@ -753,7 +764,7 @@ public final class ReadCoordinator implements StreamViewReader {
                     "physical reader violated semantic boundary requirements",
                     invalid);
         }
-        return readResult;
+        return new SemanticPhysicalRead(readResult, coverageEndOffset);
     }
 
     private static void requireExactLogicalSources(
@@ -785,6 +796,11 @@ public final class ReadCoordinator implements StreamViewReader {
             current = current.getCause();
         }
         return current;
+    }
+
+    private record SemanticPhysicalRead(
+            ReadResult result,
+            long sourceCoverageEndOffset) {
     }
 
     private static <T> void completeFrom(
