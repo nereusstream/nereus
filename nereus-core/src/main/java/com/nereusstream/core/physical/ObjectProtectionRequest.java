@@ -36,6 +36,7 @@ public record ObjectProtectionRequest(
 
     static boolean isPending(ObjectProtectionType type) {
         return type == ObjectProtectionType.CURSOR_SNAPSHOT_PENDING
-                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING;
+                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING
+                || type == ObjectProtectionType.KAFKA_CHECKPOINT_PENDING;
     }
 }

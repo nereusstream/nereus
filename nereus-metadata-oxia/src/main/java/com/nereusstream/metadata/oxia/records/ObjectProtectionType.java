@@ -27,7 +27,9 @@ public enum ObjectProtectionType {
     REPAIR(9),
     CATALOG_SNAPSHOT(10),
     CATALOG_DELIVERY(11),
-    RECOVERY_CHECKPOINT_PENDING(12);
+    RECOVERY_CHECKPOINT_PENDING(12),
+    KAFKA_CHECKPOINT_PENDING(13),
+    KAFKA_CHECKPOINT_ROOT(14);
 
     private final int wireId;
 

@@ -96,3 +96,28 @@ tasks.register<Test>("rangedFormatS3IntegrationTest") {
         )
     }
 }
+
+tasks.register<Test>("kafkaCheckpointTest") {
+    group = "verification"
+    description = "Run the F9-M2 strict NKC1 format, corruption, and immutable publication contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpoint*")
+    }
+}
+
+tasks.register<Test>("kafkaCheckpointS3IntegrationTest") {
+    group = "verification"
+    description = "Run the F9-M2 NKC1 round trip against pinned LocalStack S3."
+    testClassesDirs = s3IntegrationTest.output.classesDirs
+    classpath = s3IntegrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test, tasks.named("kafkaCheckpointTest"))
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.objectstore.S3CompatibleObjectStoreLocalStackIntegrationTest.nkc1RoundTripThroughRealS3Provider",
+        )
+    }
+}

@@ -27,7 +27,8 @@ public record ObjectProtectionRecord(
         F4RecordValidation.requireNonNegative(createdAtMillis, "createdAtMillis");
         F4RecordValidation.requireNonNegative(expiresAtMillis, "expiresAtMillis");
         boolean pending = type == ObjectProtectionType.CURSOR_SNAPSHOT_PENDING
-                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING;
+                || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING
+                || type == ObjectProtectionType.KAFKA_CHECKPOINT_PENDING;
         if (pending != (expiresAtMillis > createdAtMillis)) {
             throw new IllegalArgumentException("protection expiry does not match permanent/pending type");
         }

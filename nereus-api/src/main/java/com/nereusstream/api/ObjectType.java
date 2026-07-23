@@ -16,8 +16,28 @@ package com.nereusstream.api;
 
 /** Durable object format family. */
 public enum ObjectType {
-    MULTI_STREAM_WAL_OBJECT,
-    INDEX_OBJECT,
-    STREAM_COMPACTED_OBJECT,
-    CURSOR_SNAPSHOT_OBJECT
+    MULTI_STREAM_WAL_OBJECT(1),
+    INDEX_OBJECT(2),
+    STREAM_COMPACTED_OBJECT(3),
+    CURSOR_SNAPSHOT_OBJECT(4),
+    KAFKA_PARTITION_CHECKPOINT(5);
+
+    private final int wireId;
+
+    ObjectType(int wireId) {
+        this.wireId = wireId;
+    }
+
+    public int wireId() {
+        return wireId;
+    }
+
+    public static ObjectType fromWireId(int wireId) {
+        for (ObjectType value : values()) {
+            if (value.wireId == wireId) {
+                return value;
+            }
+        }
+        throw new IllegalArgumentException("unknown object type wire id: " + wireId);
+    }
 }

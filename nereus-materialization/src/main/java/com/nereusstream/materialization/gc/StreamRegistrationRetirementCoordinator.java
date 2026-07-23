@@ -941,7 +941,9 @@ public final class StreamRegistrationRetirementCoordinator {
                         || type == ObjectProtectionType.VISIBLE_GENERATION;
                 case RECOVERY_ROOT -> type == ObjectProtectionType.RECOVERY_CHECKPOINT_OBJECT
                         || type == ObjectProtectionType.RECOVERY_CHECKPOINT_TARGET
-                        || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING;
+                        || type == ObjectProtectionType.RECOVERY_CHECKPOINT_PENDING
+                        || type == ObjectProtectionType.KAFKA_CHECKPOINT_PENDING
+                        || type == ObjectProtectionType.KAFKA_CHECKPOINT_ROOT;
             };
             if (!allowed) {
                 throw invariant("durable owner holds an unexpected protection type");

@@ -27,6 +27,15 @@ import com.nereusstream.objectstore.compacted.RangedCompactedObjectVerificationR
 import com.nereusstream.objectstore.compacted.RangedCompactedObjectVerifier;
 import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteRequest;
 import com.nereusstream.objectstore.compacted.RangedCompactedObjectWriteResult;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointCodecV1;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointHeader;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointObject;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointReader;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSection;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointSectionType;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointVerifier;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointWriteRequest;
+import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointWriter;
 import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -57,6 +66,56 @@ class S3CompatibleObjectStoreLocalStackIntegrationTest {
 
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void nkc1RoundTripThroughRealS3Provider() throws Exception {
+        try (LocalStackContainer localstack = new LocalStackContainer(IMAGE)
+                .withServices(LocalStackContainer.Service.S3)) {
+            localstack.start();
+            try (S3AsyncClient admin = client(localstack)) {
+                admin.createBucket(CreateBucketRequest.builder().bucket("nereus-nkc1-test").build()).join();
+            }
+            S3CompatibleObjectStoreProvider provider = new S3CompatibleObjectStoreProvider();
+            ObjectStore store = provider.create(
+                    config(localstack, "nereus-nkc1-test"),
+                    ref -> Optional.of(("access".equals(ref)
+                            ? localstack.getAccessKey()
+                            : localstack.getSecretKey()).toCharArray()));
+            Path stagingDirectory = Files.createDirectory(temporaryDirectory.resolve("nkc1-staging"));
+            Files.setPosixFilePermissions(stagingDirectory, PosixFilePermissions.fromString("rwx------"));
+            try (StagingFileManager staging = new StagingFileManager(
+                    stagingDirectory, 32L << 20, StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+                    Duration.ofHours(1), Runnable::run)) {
+                KafkaCheckpointCodecV1 codec = new KafkaCheckpointCodecV1();
+                KafkaCheckpointReader reader = new KafkaCheckpointReader(store, codec);
+                KafkaCheckpointVerifier verifier = new KafkaCheckpointVerifier();
+                KafkaCheckpointWriter writer = new KafkaCheckpointWriter(
+                        store, staging, Runnable::run, codec, reader, verifier);
+                KafkaCheckpointHeader header = new KafkaCheckpointHeader(
+                        0, "kraft", "EjRWeJq83vAAAAAAAAAAAQ", 1, 1,
+                        new StreamId("s-s3-nkc1"), 1, 9, 20, 0, 20, 5,
+                        "commit-5", sha256('7'));
+                List<KafkaCheckpointSection> sections = java.util.Arrays.stream(
+                                KafkaCheckpointSectionType.values())
+                        .map(type -> KafkaCheckpointSection.required(
+                                type, new byte[] {(byte) type.wireId()}))
+                        .toList();
+                KafkaCheckpointWriteRequest request = new KafkaCheckpointWriteRequest(
+                        "test-cluster", header, sections, sha256('8'), Duration.ofSeconds(20));
+
+                KafkaCheckpointObject object = writer.write(request).join();
+                KafkaCheckpointObject reopened = reader.openAndVerify(
+                        object.objectKey(), object.objectLength(), object.storageCrc32c(),
+                        object.objectSha256(), Duration.ofSeconds(20)).join();
+
+                verifier.verifyExpected(reopened, "test-cluster", header, request.contentPolicySha256());
+                assertThat(reopened.sections()).isEqualTo(sections);
+            } finally {
+                store.close();
+                provider.close();
+            }
+        }
+    }
 
     @Test
     void ncp2AndNtc2RoundTripThroughRealS3Provider() throws Exception {

@@ -89,6 +89,8 @@ public final class MetadataPhysicalObjectIdentityResolver implements PhysicalObj
                             : PhysicalObjectKind.TOPIC_COMPACTED);
             case INDEX_OBJECT -> identity.kind() == PhysicalObjectKind.INDEX_OBJECT;
             case CURSOR_SNAPSHOT_OBJECT -> identity.kind() == PhysicalObjectKind.CURSOR_SNAPSHOT;
+            case KAFKA_PARTITION_CHECKPOINT ->
+                    identity.kind() == PhysicalObjectKind.KAFKA_PARTITION_CHECKPOINT;
         };
         long targetEnd;
         try {

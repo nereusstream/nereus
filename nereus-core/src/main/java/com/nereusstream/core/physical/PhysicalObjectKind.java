@@ -9,7 +9,8 @@ public enum PhysicalObjectKind {
     RECOVERY_CHECKPOINT(4),
     CURSOR_SNAPSHOT(5),
     INDEX_OBJECT(6),
-    FUTURE_CATALOG_OBJECT(7);
+    FUTURE_CATALOG_OBJECT(7),
+    KAFKA_PARTITION_CHECKPOINT(8);
 
     private final int wireId;
 
