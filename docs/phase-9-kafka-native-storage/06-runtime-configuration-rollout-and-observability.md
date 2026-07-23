@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Designed target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot 和 enabled-only pure startup validation implemented；runtime/activation/observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -44,7 +44,9 @@ Every constructor marks each dependency `OWNED` or `BORROWED` in a `KafkaRuntime
 
 ## 2. Configuration namespace
 
-All keys below are target keys registered in Kafka `ConfigDef`。Defaults are design values，not current executable behavior。
+All 58 keys below are registered in Kafka `ConfigDef` by local fork `d312e8e58d`。Primitive types、defaults、independent
+hard ranges、profile dependencies and broker-local cross-field rules are executable；dynamic mutation、provider connectivity、
+activation/controller enforcement and runtime resource creation remain target behavior。
 
 ### 2.1 Core and providers
 

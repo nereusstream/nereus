@@ -151,7 +151,7 @@
       "id": "KF-SRC-008",
       "milestone": "F9-M6",
       "task": "phase9M6FinalCheck",
-      "testClass": "NereusKafkaConfigTest",
+      "testClass": "NereusKafkaConfigValidatorTest",
       "testMethod": "scenarioKfSrc008",
       "scenario": "AutoMQ `elasticstream.enable=true` and F9 enabled are rejected as conflicting modes",
       "evidenceTier": [
@@ -2866,7 +2866,7 @@
       "id": "KF-OPS-002",
       "milestone": "F9-M6",
       "task": "phase9M6FinalCheck",
-      "testClass": "NereusKafkaConfigTest",
+      "testClass": "NereusKafkaConfigValidatorTest",
       "testMethod": "scenarioKfOps002",
       "scenario": "KRaft-only、remote-log/cleaner/conflicting mode/message-limit violations reject before IO",
       "evidenceTier": [

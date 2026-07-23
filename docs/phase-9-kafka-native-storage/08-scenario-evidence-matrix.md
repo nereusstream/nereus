@@ -79,7 +79,7 @@ hash。Markdown/JSON ID sets must match。
 | KF-SRC-005 | Nereus inject markers are balanced/narrow and no reflection bypass exists | fork `NereusForkMarkerTest` | D,K | M3 |
 | KF-SRC-006 | F5 KoP payload/binding/coordinator records cannot be opened as F9 | `KafkaTrackIsolationTest` | D | M2 |
 | KF-SRC-007 | disabled mode loads no Nereus runtime/classes with side effects and passes stock focused suite | fork `NereusDisabledCompatibilityTest` | K | M3/M7 |
-| KF-SRC-008 | AutoMQ `elasticstream.enable=true` and F9 enabled are rejected as conflicting modes | fork `NereusKafkaConfigTest` | D,K | M6 |
+| KF-SRC-008 | AutoMQ `elasticstream.enable=true` and F9 enabled are rejected as conflicting modes | fork `NereusKafkaConfigValidatorTest` | D,K | M6 |
 
 ## 4. Ranged append/read and physical formats
 
@@ -231,7 +231,7 @@ hash。Markdown/JSON ID sets must match。
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
 | --- | --- | --- | --- | --- |
 | KF-OPS-001 | every config default/bound/static rule and secret redaction is executable | `NereusKafkaStorageConfigTest` | D,M | M6 |
-| KF-OPS-002 | KRaft-only、remote-log/cleaner/conflicting mode/message-limit violations reject before IO | fork `NereusKafkaConfigTest` | D,K | M6 |
+| KF-OPS-002 | KRaft-only、remote-log/cleaner/conflicting mode/message-limit violations reject before IO | fork `NereusKafkaConfigValidatorTest` | D,K | M6 |
 | KF-OPS-003 | empty cluster first activation PREPARED→ACTIVE succeeds with exact brokers/digests | `KafkaActivationIntegrationTest` | R,P,C | M6 |
 | KF-OPS-004 | any topic/internal topic/local authoritative log/binding makes first activation fail non-destructively | `KafkaActivationIntegrationTest` | R,P | M6 |
 | KF-OPS-005 | controller failover at every activation cut preserves one-way state | `KafkaActivationControllerFailoverTest` | P,C,K | M6 |

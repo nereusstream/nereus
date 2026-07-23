@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "5" ]] \
-    || fail "expected five reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "6" ]] \
+    || fail "expected six reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -62,6 +62,8 @@ core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
 core/src/main/scala/kafka/cluster/Partition.scala
 core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
 core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
+core/src/main/scala/kafka/server/KafkaConfig.scala
+core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
 core/src/main/scala/kafka/server/ReplicaManager.scala
 core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
 core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
@@ -71,13 +73,19 @@ core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
+core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
+core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
+server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java
+server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java
+server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java
+server/src/test/java/org/apache/kafka/server/config/NereusKafkaStorageConfigTest.java
 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOffsetLookup.java
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed twenty-one-file bridge/metadata-lifecycle slice"
+    || fail "fork change set differs from the reviewed twenty-nine-file bridge/metadata-lifecycle/configuration slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -103,22 +111,34 @@ c2bd8e03152a23547044a42f439b33698ace4251 core/src/test/java/kafka/log/nereus/Ner
 1707eb1ee360baaed845404ced5ba2e872bc62d4 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 898c9b8e37028a79183fab32a65e830554b1bd30 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 c1490dc3f9af754c2111a1c4d6d6bcfdfcb8c53f core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
+457e08ad6714dd972abdb92d9f7471bb258469b7 core/src/main/scala/kafka/server/KafkaConfig.scala
+1526e85d891d075c173fd50c22dc017219d8aa73 core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala
+14358b2d91ae9a25ea683946509cd3fd1657b6ca core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
+7bd6e2c1512fbc2e0879d4c9df3f3e8f8d40a7e2 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
 4d4507ca06c365a23fc336adfcfd4b98a7836203 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 b69cb745a04454dc890429498d44ce61c6b4a70a core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
+3036df4e77ad23fabb6533d1dc173458356ea6b3 server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java
+159b5b49316f9284df524b855409837fae0641b1 server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java
+bcf3d34104255dba08937f27b9642ee20f40de5d server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java
+cb1fc8b5fca7a7c97ec0a5c383474d8eab9f23ec server/src/test/java/org/apache/kafka/server/config/NereusKafkaStorageConfigTest.java
 6a9a43c81b0b60e69fb95099a76d80e7894ba453 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOffsetLookup.java
 LOCKS
 
 marker_start="$(grep -h -F -c 'Nereus inject start:' \
     "$kafka_checkout/build.gradle" "$kafka_checkout/checkstyle/import-control-core.xml" \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/KafkaConfig.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala" \
+    "$kafka_checkout/server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java" \
     | awk '{ total += $1 } END { print total + 0 }')"
 marker_end="$(grep -h -F -c 'Nereus inject end:' \
     "$kafka_checkout/build.gradle" "$kafka_checkout/checkstyle/import-control-core.xml" \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/KafkaConfig.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala" \
+    "$kafka_checkout/server/src/main/java/org/apache/kafka/server/config/AbstractKafkaConfig.java" \
     | awk '{ total += $1 } END { print total + 0 }')"
 [[ "$marker_start" -gt 0 && "$marker_start" == "$marker_end" ]] \
     || fail "Nereus inject markers are absent or unbalanced: $marker_start/$marker_end"
@@ -212,6 +232,36 @@ grep -F -q 'handleTopicsDeltaAsync(deltaName, topicsDelta, newImage, lifecycle)'
 grep -F -q 'onAsyncLeaderReady' "$metadata_publisher" \
     || fail "BrokerMetadataPublisher lost post-recovery coordinator election"
 
+config_def="$kafka_checkout/server/src/main/java/org/apache/kafka/server/config/NereusKafkaConfigs.java"
+grep -F -q 'public static final boolean ENABLED_DEFAULT = false' "$config_def" \
+    || fail "Nereus storage configuration lost its safe disabled default"
+grep -F -q 'public static final ConfigDef CONFIG_DEF' "$config_def" \
+    || fail "Nereus storage configuration surface is missing"
+grep -F -q 'MAX_KAFKA_ENTRY_BYTES = 64L * MIB' "$config_def" \
+    || fail "Nereus storage configuration lost the protocol entry hard limit"
+
+typed_config="$kafka_checkout/server/src/main/java/org/apache/kafka/server/config/NereusKafkaStorageConfig.java"
+grep -F -q 'public record NereusKafkaStorageConfig(' "$typed_config" \
+    || fail "Nereus immutable storage configuration snapshot is missing"
+grep -F -q 'if (enabled)' "$typed_config" \
+    || fail "Nereus configuration lost enabled-only cross-field validation"
+grep -F -q 'validateProviders(core)' "$typed_config" \
+    || fail "Nereus configuration lost profile provider validation"
+
+kafka_config="$kafka_checkout/core/src/main/scala/kafka/server/KafkaConfig.scala"
+grep -F -q 'val nereusKafkaStorageConfig: NereusKafkaStorageConfig = NereusKafkaStorageConfig.from(this)' "$kafka_config" \
+    || fail "KafkaConfig lost the immutable Nereus storage snapshot"
+grep -F -q 'NereusKafkaConfigValidator.validate(this, nereusKafkaStorageConfig)' "$kafka_config" \
+    || fail "KafkaConfig lost enabled-only Nereus/Kafka validation"
+
+config_validator="$kafka_checkout/core/src/main/scala/kafka/server/NereusKafkaConfigValidator.scala"
+grep -F -q 'if (!storage.enabled()) return' "$config_validator" \
+    || fail "Nereus Kafka validator lost stock-disabled fallback"
+grep -F -q 'requireSingleReplicaSemantics(config)' "$config_validator" \
+    || fail "Nereus Kafka validator lost single-replica protocol enforcement"
+grep -F -q 'requireConflictingStorageDisabled(config)' "$config_validator" \
+    || fail "Nereus Kafka validator lost conflicting storage-mode rejection"
+
 if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
         "$kafka_checkout/core/src/main/java/kafka/log/nereus" \
         "$kafka_checkout/core/src/main/scala/kafka/log/nereus" \
@@ -219,4 +269,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; five commits, twenty-one bridge/metadata-lifecycle blobs and markers match"
+echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; six commits, twenty-nine bridge/metadata-lifecycle/configuration blobs and markers match"

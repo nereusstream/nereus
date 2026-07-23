@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup lifecycle and optional async metadata-publisher seam implemented；BrokerServer runtime composition remains open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup lifecycle、optional async metadata-publisher seam and M6 typed config validation implemented；BrokerServer runtime composition remains open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -62,13 +62,17 @@ Adapter-side counterpart：
 
 ### 3.1 `core/.../kafka/server/KafkaConfig.scala`
 
-目标 change：
+`d312e8e58d64f326261dd36592a1b5e6398fa5a3` 已实现：
 
-- 注册 `nereus.kafka.storage.*` keys（完整表见文档 06）；
-- build `NereusKafkaStorageConfig` typed snapshot；
+- `AbstractKafkaConfig.CONFIG_DEF` 注册完整 58 个 `nereus.kafka.storage.*` keys（完整表见文档 06）；
+- build immutable `NereusKafkaStorageConfig` typed snapshot，解析过程不创建 client/thread/file；
 - `validateValues` 调用纯函数 `NereusKafkaConfigValidator.validate`；
 - disabled mode 不连接 Nereus，不改变 stock defaults；
-- enabled mode 拒绝 ZooKeeper mode、remote log、log cleaner、RF/minISR conflicts 和超出 hard format limits。
+- enabled mode 拒绝非 broker process、remote log、log cleaner、AutoMQ elastic stream、RF/minISR conflicts、超出 hard
+  format limits 和 cache/spill 与 authoritative log dirs 重叠。
+
+尚未闭合的 controller/cluster validation：cluster ID/activation match、feature gate、create-topic RF/assignment enforcement
+和 KRaft real-process readiness；这些不能由 broker-local `KafkaConfig` 代替。
 
 不得在 config constructor 创建 client、thread 或 metadata key。
 
@@ -396,13 +400,14 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
-消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `c3af5f30fa` 落地
+消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `d312e8e58d` 落地
 `NereusRecordTimestampInspector`、`NereusListOffsetsBridge`、`NereusListOffsetsScanConfig` 和
 `NereusKafkaExceptionMapper`，并通过 Kafka-only `LeaderEpochAwareOffsetLookup` 接入 stock `Partition`/
 `ReplicaManager` request path。`NereusListOffsetsLifecycle` 包装 product-owned manager，在 manager 返回 fully recovered
 writable storage 后构造 resolver/bridge 并安装到相同 leader epoch；它不创建第二份 storage，也不接管 durable
 authority/recovery。第五个 commit 另加入 `AsyncTopicDeltaLifecycle`、`NereusTopicDeltaLifecycle` 和 optional
-`BrokerMetadataPublisher` routing，但尚未由 `BrokerServer` 创建或传入。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
+`BrokerMetadataPublisher` routing；第六个 commit 注册 58-key config surface、immutable typed snapshot 和 enabled-only
+cross-Kafka validator，但尚未由 `BrokerServer` 创建 runtime 或传入 lifecycle。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading

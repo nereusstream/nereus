@@ -2825,7 +2825,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "c3af5f30facc27dcaf26e2de6e566fc9dd062d0c",
+        "d312e8e58d64f326261dd36592a1b5e6398fa5a3",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2853,12 +2853,18 @@ val kafkaForkGradleWrapper = file(kafkaForkCheckoutPath.get()).resolve("gradlew"
 
 tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
     group = "verification"
-    description = "Compile and test the stock Kafka ListOffsets and metadata lifecycle seams with no Nereus artifact inputs."
+    description = "Compile and test the stock Kafka ListOffsets, metadata lifecycle, and inert configuration seams with no Nereus artifact inputs."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     usesService(kafkaCheckoutGate)
     workingDir = file(kafkaForkCheckoutPath.get())
     commandLine(
         kafkaForkGradleWrapper,
+        ":server:checkstyleMain",
+        ":server:checkstyleTest",
+        ":server:spotbugsMain",
+        ":server:test",
+        "--tests",
+        "org.apache.kafka.server.config.NereusKafkaStorageConfigTest",
         ":storage:checkstyleMain",
         ":storage:spotbugsMain",
         ":core:compileScala",
@@ -2866,6 +2872,10 @@ tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
         ":core:checkstyleTest",
         ":core:spotbugsMain",
         ":core:test",
+        "--tests",
+        "kafka.server.KafkaConfigTest",
+        "--tests",
+        "kafka.server.NereusKafkaConfigValidatorTest",
         "--tests",
         "kafka.cluster.PartitionTest.testLeaderEpochAwareOffsetLookup*",
         "--tests",
@@ -2884,6 +2894,12 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
     workingDir = file(kafkaForkCheckoutPath.get())
     commandLine(
         kafkaForkGradleWrapper,
+        ":server:checkstyleMain",
+        ":server:checkstyleTest",
+        ":server:spotbugsMain",
+        ":server:test",
+        "--tests",
+        "org.apache.kafka.server.config.NereusKafkaStorageConfigTest",
         ":storage:checkstyleMain",
         ":storage:spotbugsMain",
         ":core:spotlessCheck",
@@ -2891,6 +2907,10 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
         ":core:checkstyleTest",
         ":core:spotbugsMain",
         ":core:test",
+        "--tests",
+        "kafka.server.KafkaConfigTest",
+        "--tests",
+        "kafka.server.NereusKafkaConfigValidatorTest",
         "--tests",
         "kafka.log.nereus.*Test",
         "--tests",
