@@ -24,6 +24,7 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
 import com.nereusstream.api.EntryIndexRef;
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
@@ -31,8 +32,11 @@ import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadBoundaryMode;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
+import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StreamId;
@@ -112,6 +116,69 @@ class WalObjectWriterReaderTest {
             assertThat(stats.returnedPayloadBytes()).isEqualTo(2);
             assertThat(stats.amplificationBytes()).isEqualTo(stats.entryIndexBytes());
         });
+    }
+
+    @Test
+    void rangedKafkaEntriesHonorExactContainingAndFirstOverflowPolicies() {
+        LocalFileObjectStore store = new LocalFileObjectStore(root);
+        WalWriteResult result = writer(store).write(new WalWriteRequest(
+                "cluster",
+                "writer",
+                RUN_HASH,
+                7,
+                List.of(new WalStreamSliceInput(
+                        new StreamId("stream-a"),
+                        rangedKafkaBatch(List.of("aaa", "bb"), List.of(3, 2)))),
+                options(false, 1 << 20))).join();
+        ResolvedObjectRange range = resolved(result.slices().get(0), result, 10);
+
+        WalReadResult exact = reader(store).readWithStats(
+                request(10, ReadBoundaryMode.EXACT_START,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
+                List.of(range)).join();
+        assertThat(exact.batches()).extracting(ReadBatch::range)
+                .containsExactly(new OffsetRange(10, 13), new OffsetRange(13, 15));
+        assertThat(exact.batches()).extracting(ReadBatch::payloadFormat)
+                .containsOnly(PayloadFormat.KAFKA_RECORD_BATCH);
+
+        assertCode(() -> reader(store).readWithStats(
+                        request(11, ReadBoundaryMode.EXACT_START,
+                                FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
+                        List.of(range)).join(),
+                ErrorCode.OFFSET_NOT_AVAILABLE);
+
+        WalReadResult containingFirst = reader(store).readWithStats(
+                request(11, ReadBoundaryMode.CONTAINING_ENTRY,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
+                List.of(range)).join();
+        assertThat(containingFirst.batches()).extracting(ReadBatch::range)
+                .containsExactly(new OffsetRange(10, 13), new OffsetRange(13, 15));
+        WalReadResult containingLast = reader(store).readWithStats(
+                request(14, ReadBoundaryMode.CONTAINING_ENTRY,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 100),
+                List.of(range)).join();
+        assertThat(containingLast.batches()).extracting(ReadBatch::range)
+                .containsExactly(new OffsetRange(13, 15));
+
+        WalReadResult overflow = reader(store).readWithStats(
+                request(11, ReadBoundaryMode.CONTAINING_ENTRY,
+                        FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW, 1, 1),
+                List.of(range)).join();
+        assertThat(overflow.batches()).singleElement().satisfies(batch -> {
+            assertThat(batch.range()).isEqualTo(new OffsetRange(10, 13));
+            assertThat(new String(batch.payload(), StandardCharsets.UTF_8)).isEqualTo("aaa");
+        });
+
+        WalReadResult strictRecordLimit = reader(store).readWithStats(
+                request(10, ReadBoundaryMode.EXACT_START,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT, 1, 100),
+                List.of(range)).join();
+        assertThat(strictRecordLimit.batches()).isEmpty();
+        assertCode(() -> reader(store).readWithStats(
+                        request(10, ReadBoundaryMode.EXACT_START,
+                                FirstEntryPolicy.LEGACY_STRICT_LIMIT, 10, 1),
+                        List.of(range)).join(),
+                ErrorCode.READ_LIMIT_TOO_SMALL);
     }
 
     @Test
@@ -644,6 +711,44 @@ class WalObjectWriterReaderTest {
                 List.of(new SchemaRef("ns", "schema", 1)),
                 Map.of(),
                 Optional.empty());
+    }
+
+    private AppendBatch rangedKafkaBatch(List<String> payloads, List<Integer> recordCounts) {
+        List<AppendEntry> entries = new ArrayList<>();
+        int records = 0;
+        for (int index = 0; index < payloads.size(); index++) {
+            int recordCount = recordCounts.get(index);
+            records = Math.addExact(records, recordCount);
+            entries.add(new AppendEntry(
+                    payloads.get(index).getBytes(StandardCharsets.UTF_8),
+                    recordCount,
+                    10 + index,
+                    Map.of("entry", Integer.toString(index))));
+        }
+        return new AppendBatch(
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                entries,
+                records,
+                entries.size(),
+                10,
+                10 + entries.size(),
+                List.of(new SchemaRef("ns", "kafka", 1)),
+                Map.of(),
+                Optional.empty());
+    }
+
+    private ReadRequest request(
+            long startOffset,
+            ReadBoundaryMode boundaryMode,
+            FirstEntryPolicy firstEntryPolicy,
+            int maxRecords,
+            int maxBytes) {
+        return new ReadRequest(
+                startOffset,
+                ReadView.COMMITTED,
+                boundaryMode,
+                firstEntryPolicy,
+                readOptions(maxRecords, maxBytes));
     }
 
     private ReadOptions readOptions(int maxRecords, int maxBytes) {

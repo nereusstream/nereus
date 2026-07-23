@@ -1,6 +1,6 @@
 # 02 — Ranged-Entry API and Object Format
 
-> 状态：Implementation in progress；public values、Kafka batch validation、production conditional append/result validation complete；read/V2 formats pending
+> 状态：Implementation in progress；public/append/Object-WAL/BookKeeper ranged slices complete；NCP2/NTC2 pending
 > 前置：Phase 1.5 generic L0、F4 generation/read-view、F1-BK profiles 均保持现有已实现合同
 > 核心原则：先把“一个 entry 覆盖多个 logical offsets”做成 protocol-neutral 能力，再允许 Kafka adapter 使用
 
@@ -9,7 +9,8 @@
 一个 Kafka `RecordBatch` 可以包含多个 records，并且 compressed batch 不能按 Nereus read limit 任意拆开。
 当前 F9-M1 public slice 已让 `AppendBatch` 校验支持 ranged Kafka entries，并增加 public request/result values；
 Object WAL entry index 原本也保存 `relativeBaseOffset + recordCount`。Production conditional append 与 exact
-result validation 已接通；reader clipping、NCP1 与 NTC1 仍假设或只执行 one-entry-per-offset。
+result validation、Object WAL 与 BookKeeper generation-zero readers 已接通；NCP1 与 NTC1 仍只执行
+one-entry-per-offset。
 
 F9-M1 必须一次关闭整条链：
 
@@ -213,7 +214,7 @@ Constructor invariants：
 ### 4.2 `StreamStorage.read` overload
 
 ```java
-// default overload implemented；DefaultStreamStorage override pending
+// default overload and DefaultStreamStorage override implemented
 default CompletableFuture<SemanticReadResult> read(
         StreamId streamId,
         ReadRequest request);
@@ -222,8 +223,8 @@ default CompletableFuture<SemanticReadResult> read(
 default implementation 只接受 legacy-equivalent request，调用旧 read 后包装 `COMMITTED` result；其他组合返回
 `UNSUPPORTED_READ_SEMANTICS`。`DefaultStreamStorage` override 并替代 core-internal `StreamViewReader` 暴露面。
 
-现有 `com.nereusstream.core.read.ViewReadResult` 在一个 release 内保留为 deprecated adapter；生产 owner 迁移到
-API `SemanticReadResult` 后删除，不能维护两份不同 validation。
+现有 `com.nereusstream.core.read.ViewReadResult`/`StreamViewReader` 已标记 deprecated-for-removal，仅适配到 API
+`SemanticReadResult` production owner；不维护第二份 generation selection、fallback 或 validation。
 
 ### 4.3 Boundary semantics
 
@@ -263,7 +264,7 @@ ReadResult.nextOffset = last returned batch.range.end
 
 ### 4.5 Object-WAL reader algorithm
 
-`DefaultWalObjectReader.clip` target pseudo-code：
+`DefaultWalObjectReader.clip` 已按以下算法实现：
 
 ```java
 for (EntryIndexItem item : index.entries()) {
@@ -285,12 +286,12 @@ for (EntryIndexItem item : index.entries()) {
 }
 ```
 
-`returnedBeforeRange` 改名 `returnedEntryBeforeSlice`，它必须跨 resolved ranges 传播；否则第二个 slice 会错误地
-获得 first-entry overflow。records/bytes 使用 `long` 做 checked accumulation，再安全转换 metrics。
+first-entry 状态通过 `ReadTargetDispatcher` 和 reader 内部跨 resolved ranges/target runs 传播；第二个 slice/run 不会
+再次获得 overflow。records/bytes 使用 `long` 做 checked accumulation，再安全转换 metrics。
 
 ### 4.6 Core coordinator validation
 
-`ReadCoordinator.buildReadResult` 新增 request-aware validator：
+`ReadCoordinator.buildSemanticReadResult` 已实现 request-aware validator：
 
 - EXACT_START：首 batch start == requested；
 - CONTAINING_ENTRY：首 batch range contains requested；
@@ -316,6 +317,26 @@ Object WAL container 和 entry-index v1 已保存 `recordCount`，F9-M1 **不 bu
 
 Compatibility：旧 reader 遇到 `KAFKA_RECORD_BATCH` 仍 fail closed；activation 必须先证明所有 eligible brokers
 支持 payload format 和 containing read，再允许写。旧 OPAQUE objects bytes/goldens 不改变。
+
+### 5.1 BookKeeper ranged mapping
+
+旧 `ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY` target/bytes/goldens 保持不变，并继续要求
+`entryCount == recordCount`。Kafka ranged append 选择追加在 enum 尾部的 `RANGED_NEREUS_ENTRY_V1`，每个物理
+BookKeeper entry 使用 closed `NBKE1` frame：
+
+```text
+magic[5] = "NBKE1"
+recordCount:int32 big-endian (>0)
+payloadLength:int32 big-endian (0..64 MiB)
+payloadCrc32c:int32 big-endian
+payload[payloadLength]
+EOF (no trailing bytes)
+```
+
+NBKR1 range SHA-256 覆盖 framed physical entries；per-entry CRC32C 覆盖 exact unframed payload。reader 在分配前
+验证 header/length bound，解码后校验 aggregate entry/record/logical-byte facts，并按 recordCount 构造 offset range。
+BookKeeper read reservation 使用 `logicalBytes + 17 * entryCount`，不会把 framing overhead 漏出预算。
+旧 binary reader 对未知 mapping name fail closed；不把 NBKE1 猜成 legacy raw payload。
 
 ## 6. Layered checksum contract
 
@@ -552,6 +573,8 @@ activation 前验证不超过这些 hard bounds。不能依赖 OOM 把超限 req
 | core | `StreamViewReader` | deprecating adapter to public result |
 | object | `DefaultWalObjectReader` | containing/overflow + Kafka format |
 | object | `DefaultWalObjectWriter` | activated Kafka format validation |
+| BookKeeper | `BookKeeperRangedEntryCodecV1` | NBKE1 count/length/CRC framing；legacy raw mapping unchanged |
+| BookKeeper | `BookKeeperPrimaryWalReader` | exact/containing/overflow parity and frame-overhead reservation |
 | object | V2 compacted classes | closed NCP2/NTC2 implementation |
 | materialization | `RangedLosslessMaterializationRowPublisher` | one source entry → one NCP2 row |
 | materialization | Kafka topic-compaction publisher | decoded survivor → NTC2 row |

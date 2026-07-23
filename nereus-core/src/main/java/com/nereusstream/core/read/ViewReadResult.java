@@ -6,6 +6,7 @@ import com.nereusstream.api.ReadView;
 import java.util.Objects;
 
 /** Read result plus the exclusive dense source coverage consumed by a semantic view. */
+@Deprecated(forRemoval = true)
 public record ViewReadResult(
         ReadView view,
         ReadResult result,

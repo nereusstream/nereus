@@ -185,12 +185,10 @@ class BookKeeperStreamStorageIntegrationTest {
                                 new StreamName("persistent://tenant/namespace/bk-oversize"),
                                 new StreamCreateOptions(StorageProfile.BOOKKEEPER_WAL_ONLY, Map.of()))
                         .join();
-                assertThatThrownBy(() -> storage.append(
-                                admitted.streamId(),
-                                batchWithEntryCount(Math.toIntExact(
-                                        runtime.configuration.maxEntriesPerLedger() + 1)),
-                                strictOptions()).join())
-                        .hasCauseInstanceOf(NereusException.class);
+                assertThatThrownBy(() -> batchWithEntryCount(Math.toIntExact(
+                                runtime.configuration.maxEntriesPerLedger() + 1)))
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("maximum append entry count");
                 assertThat(runtime.operations.providerCalls()).isZero();
             } finally {
                 l0.close();

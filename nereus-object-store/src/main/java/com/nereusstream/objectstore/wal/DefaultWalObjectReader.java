@@ -16,15 +16,19 @@ package com.nereusstream.objectstore.wal;
 
 import com.nereusstream.api.EntryIndexLocation;
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadBoundaryMode;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadSourceRef;
 import com.nereusstream.api.ReadTargetIdentities;
+import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.objectstore.Crc32cChecksums;
 import com.nereusstream.objectstore.ObjectStore;
@@ -64,11 +68,25 @@ public final class DefaultWalObjectReader implements WalObjectReader {
             long startOffset,
             List<ResolvedObjectRange> ranges,
             ReadOptions options) {
-        Objects.requireNonNull(ranges, "ranges");
-        Objects.requireNonNull(options, "options");
-        if (startOffset < 0) {
-            return NereusException.failedFuture(ErrorCode.INVALID_ARGUMENT, false, "startOffset must be non-negative");
+        if (options == null) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "read options are required");
         }
+        return readWithStats(new ReadRequest(
+                startOffset,
+                ReadView.COMMITTED,
+                ReadBoundaryMode.EXACT_START,
+                FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                options), ranges);
+    }
+
+    @Override
+    public CompletableFuture<WalReadResult> readWithStats(
+            ReadRequest request,
+            List<ResolvedObjectRange> ranges) {
+        Objects.requireNonNull(ranges, "ranges");
+        Objects.requireNonNull(request, "request");
+        ReadOptions options = request.options();
         try {
             List<ReadBatch> batches = new ArrayList<>();
             List<WalSliceReadStats> sliceStats = new ArrayList<>();
@@ -82,7 +100,7 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                 SliceRead sliceRead = readSlice(range, deadline);
                 int returnedBefore = batches.stream().mapToInt(batch -> batch.payload().length).sum();
                 ClipResult clipped = clip(
-                        startOffset,
+                        request,
                         range,
                         sliceRead.payload(),
                         sliceRead.entryIndex(),
@@ -143,12 +161,19 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                     payload.length,
                     minEventTime(range),
                     maxEventTime(range));
+            if (entryIndex.recordCount() != range.offsetRange().recordCount()
+                    || payload.length != range.objectLength()) {
+                throw failure(
+                        ErrorCode.METADATA_INVARIANT_VIOLATION,
+                        false,
+                        "WAL slice counts or logical bytes do not match the resolved range");
+            }
             return new SliceRead(payload, entryIndex);
         }
     }
 
     private ClipResult clip(
-            long startOffset,
+            ReadRequest request,
             ResolvedObjectRange range,
             byte[] payload,
             EntryIndex entryIndex,
@@ -161,15 +186,33 @@ public final class DefaultWalObjectReader implements WalObjectReader {
         boolean selectedAny = false;
         for (EntryIndexItem item : entryIndex.entries()) {
             long absoluteOffset = Math.addExact(range.offsetRange().startOffset(), item.relativeBaseOffset());
-            if (absoluteOffset < startOffset || absoluteOffset >= range.offsetRange().endOffset()) {
+            long absoluteEndOffset = Math.addExact(absoluteOffset, item.recordCount());
+            if (absoluteEndOffset > range.offsetRange().endOffset()) {
+                throw failure(
+                        ErrorCode.METADATA_INVARIANT_VIOLATION,
+                        false,
+                        "entry index range exceeds its resolved range");
+            }
+            if (absoluteEndOffset <= request.startOffset()
+                    || absoluteOffset >= range.offsetRange().endOffset()) {
                 continue;
             }
-            selectedAny = true;
-            if (recordsReturned + item.recordCount() > maxRecords) {
-                return new ClipResult(batches, recordsReturned, bytesReturned, true);
+            if (request.boundaryMode() == ReadBoundaryMode.EXACT_START
+                    && absoluteOffset < request.startOffset()) {
+                throw failure(
+                        ErrorCode.OFFSET_NOT_AVAILABLE,
+                        false,
+                        "requested offset is inside a ranged WAL entry");
             }
-            if (item.payloadLength() > maxBytes - bytesReturned) {
-                if (!returnedRecordBeforeRange && batches.isEmpty()) {
+            selectedAny = true;
+            boolean recordLimitExceeded = (long) recordsReturned + item.recordCount() > maxRecords;
+            boolean byteLimitExceeded = item.payloadLength() > (long) maxBytes - bytesReturned;
+            boolean firstEntryOverflow = request.firstEntryPolicy()
+                    == FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW
+                    && !returnedRecordBeforeRange
+                    && batches.isEmpty();
+            if ((recordLimitExceeded || byteLimitExceeded) && !firstEntryOverflow) {
+                if (byteLimitExceeded && !returnedRecordBeforeRange && batches.isEmpty()) {
                     throw failure(ErrorCode.READ_LIMIT_TOO_SMALL, true, "first readable entry exceeds maxBytes");
                 }
                 return new ClipResult(batches, recordsReturned, bytesReturned, true);
@@ -192,6 +235,9 @@ public final class DefaultWalObjectReader implements WalObjectReader {
                     item.payloadLength()));
             recordsReturned += item.recordCount();
             bytesReturned += entryPayload.length;
+            if (recordLimitExceeded || byteLimitExceeded) {
+                return new ClipResult(batches, recordsReturned, bytesReturned, true);
+            }
         }
         return new ClipResult(batches, recordsReturned, bytesReturned, selectedAny && recordsReturned >= maxRecords);
     }
@@ -231,7 +277,8 @@ public final class DefaultWalObjectReader implements WalObjectReader {
         if (range.objectType() != ObjectType.MULTI_STREAM_WAL_OBJECT) {
             throw failure(ErrorCode.UNSUPPORTED_FORMAT, false, "unsupported object type");
         }
-        if (range.payloadFormat() != PayloadFormat.OPAQUE_RECORD_BATCH) {
+        if (range.payloadFormat() != PayloadFormat.OPAQUE_RECORD_BATCH
+                && range.payloadFormat() != PayloadFormat.KAFKA_RECORD_BATCH) {
             throw failure(ErrorCode.UNSUPPORTED_FORMAT, false, "unsupported payload format");
         }
         if (range.entryIndexRef().location() != EntryIndexLocation.OBJECT_FOOTER) {

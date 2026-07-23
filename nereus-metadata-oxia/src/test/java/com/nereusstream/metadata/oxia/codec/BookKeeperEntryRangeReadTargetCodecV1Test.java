@@ -57,4 +57,19 @@ class BookKeeperEntryRangeReadTargetCodecV1Test {
                 target.rangeChecksum()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rangedMappingRoundTripsWithoutChangingTheLegacyGolden() {
+        ReadTargetCodecRegistry codecs = ReadTargetCodecRegistry.phase15();
+        BookKeeperEntryRangeReadTarget ranged = new BookKeeperEntryRangeReadTarget(
+                1,
+                "primary",
+                3,
+                5,
+                2,
+                BookKeeperEntryMapping.RANGED_NEREUS_ENTRY_V1,
+                new Checksum(ChecksumType.SHA256, "44".repeat(32)));
+
+        assertThat(codecs.decode(codecs.encode(ranged))).isEqualTo(ranged);
+    }
 }

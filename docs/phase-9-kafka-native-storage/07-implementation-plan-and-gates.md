@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1 implementation in progress；public API + conditional append/result-validation slices pass focused checks
+> 状态：F9-M1 implementation in progress；public/conditional-append/Object-WAL/BookKeeper ranged slices pass focused checks
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 

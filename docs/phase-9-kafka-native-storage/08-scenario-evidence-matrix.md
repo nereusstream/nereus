@@ -2,7 +2,7 @@
 
 > 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
-> 当前有 F9-M1 public API 与 conditional append deterministic focused tests；尚无任何完整 milestone/final gate 通过声明
+> 当前有 F9-M1 public、conditional append、Object/BookKeeper ranged deterministic tests；尚无完整 milestone/final gate 通过声明
 
 ## 1. Evidence tiers
 

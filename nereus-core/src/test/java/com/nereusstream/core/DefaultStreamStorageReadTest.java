@@ -23,15 +23,20 @@ import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.DurabilityLevel;
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadIsolation;
+import com.nereusstream.api.ReadBoundaryMode;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
+import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
 import com.nereusstream.api.SchemaRef;
+import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
@@ -113,6 +118,58 @@ class DefaultStreamStorageReadTest {
             assertThat(eof.batches()).isEmpty();
             assertThat(eof.nextOffset()).isEqualTo(3);
             assertThat(eof.endOfStream()).isTrue();
+        }
+    }
+
+    @Test
+    void semanticReadReturnsWholeRangedKafkaEntriesAndAllowsOneFirstOverflow() {
+        try (TestContext context = context(defaultConfig(false), new RecordingReadMetrics())) {
+            StreamId streamId = context.createStream("ranged-read").streamId();
+            context.storage.append(
+                    streamId,
+                    rangedKafkaBatch(List.of("aaa", "bb"), List.of(3, 2)),
+                    appendOptions()).join();
+
+            NereusException insideExact = failure(context.storage.read(
+                    streamId,
+                    new ReadRequest(
+                            1,
+                            ReadView.COMMITTED,
+                            ReadBoundaryMode.EXACT_START,
+                            FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                            readOptions(10, 100, Duration.ofSeconds(5)))));
+            assertThat(insideExact.code()).isEqualTo(ErrorCode.OFFSET_NOT_AVAILABLE);
+
+            SemanticReadResult containing = context.storage.read(
+                    streamId,
+                    new ReadRequest(
+                            1,
+                            ReadView.COMMITTED,
+                            ReadBoundaryMode.CONTAINING_ENTRY,
+                            FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                            readOptions(10, 100, Duration.ofSeconds(5)))).join();
+            assertThat(containing.result().requestedOffset()).isEqualTo(1);
+            assertThat(containing.result().batches()).extracting(batch -> batch.range())
+                    .containsExactly(new OffsetRange(0, 3), new OffsetRange(3, 5));
+            assertThat(containing.result().batches()).extracting(batch -> text(batch.payload()))
+                    .containsExactly("aaa", "bb");
+            assertThat(containing.result().nextOffset()).isEqualTo(5);
+            assertThat(containing.sourceCoverageEndOffset()).isEqualTo(5);
+
+            SemanticReadResult overflow = context.storage.read(
+                    streamId,
+                    new ReadRequest(
+                            1,
+                            ReadView.COMMITTED,
+                            ReadBoundaryMode.CONTAINING_ENTRY,
+                            FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
+                            readOptions(1, 1, Duration.ofSeconds(5)))).join();
+            assertThat(overflow.result().batches()).singleElement().satisfies(batch -> {
+                assertThat(batch.range()).isEqualTo(new OffsetRange(0, 3));
+                assertThat(text(batch.payload())).isEqualTo("aaa");
+            });
+            assertThat(overflow.result().nextOffset()).isEqualTo(3);
+            assertThat(overflow.sourceCoverageEndOffset()).isEqualTo(3);
         }
     }
 
@@ -618,6 +675,32 @@ class DefaultStreamStorageReadTest {
                 NOW.toEpochMilli(),
                 NOW.toEpochMilli(),
                 schemaRefs,
+                Map.of(),
+                Optional.empty());
+    }
+
+    private static AppendBatch rangedKafkaBatch(
+            List<String> payloads,
+            List<Integer> recordCounts) {
+        List<AppendEntry> entries = new ArrayList<>();
+        int records = 0;
+        for (int index = 0; index < payloads.size(); index++) {
+            int recordCount = recordCounts.get(index);
+            records = Math.addExact(records, recordCount);
+            entries.add(new AppendEntry(
+                    payloads.get(index).getBytes(StandardCharsets.UTF_8),
+                    recordCount,
+                    NOW.toEpochMilli(),
+                    Map.of()));
+        }
+        return new AppendBatch(
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                entries,
+                records,
+                entries.size(),
+                NOW.toEpochMilli(),
+                NOW.toEpochMilli(),
+                List.of(),
                 Map.of(),
                 Optional.empty());
     }

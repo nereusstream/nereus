@@ -26,9 +26,11 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.DeleteOptions;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
+import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.SealOptions;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
@@ -583,6 +585,13 @@ public final class DefaultStreamStorage implements StreamStorage {
             long startOffset,
             ReadOptions options) {
         return readCoordinator.read(streamId, startOffset, options);
+    }
+
+    @Override
+    public CompletableFuture<SemanticReadResult> read(
+            StreamId streamId,
+            ReadRequest request) {
+        return readCoordinator.read(streamId, request);
     }
 
     @Override

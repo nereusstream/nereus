@@ -2,9 +2,11 @@
 package com.nereusstream.core.read;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ResolvedRange;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.wal.PrimaryWalRegistry;
 import java.util.ArrayList;
@@ -35,15 +37,30 @@ public final class ReadTargetDispatcher {
             long startOffset,
             List<ResolvedRange> ranges,
             ReadOptions options) {
+        return read(
+                streamId,
+                new ReadRequest(
+                        startOffset,
+                        com.nereusstream.api.ReadView.COMMITTED,
+                        com.nereusstream.api.ReadBoundaryMode.EXACT_START,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                        options),
+                ranges);
+    }
+
+    public CompletableFuture<PhysicalReadResult> read(
+            StreamId streamId,
+            ReadRequest request,
+            List<ResolvedRange> ranges) {
         Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(request, "request");
         validateAdapters(ranges);
         List<Run> runs = runs(ranges);
         return readRun(
                 streamId,
                 runs,
                 0,
-                startOffset,
-                options,
+                request,
                 new ArrayList<>(),
                 new ArrayList<>(),
                 0,
@@ -52,8 +69,9 @@ public final class ReadTargetDispatcher {
 
     private CompletableFuture<PhysicalReadResult> readRun(
             StreamId streamId,
-            List<Run> runs, int index, long startOffset, ReadOptions options,
+            List<Run> runs, int index, ReadRequest request,
             List<ReadBatch> batches, List<PhysicalReadStats> stats, long records, long bytes) {
+        ReadOptions options = request.options();
         if (index >= runs.size() || records >= options.maxRecords() || bytes >= options.maxBytes()) {
             return CompletableFuture.completedFuture(new PhysicalReadResult(batches, stats));
         }
@@ -61,10 +79,16 @@ public final class ReadTargetDispatcher {
         ReadOptions remaining = new ReadOptions(
                 Math.toIntExact(options.maxRecords() - records), Math.toIntExact(options.maxBytes() - bytes),
                 options.isolation(), options.timeout());
+        ReadRequest remainingRequest = new ReadRequest(
+                request.startOffset(),
+                request.view(),
+                request.boundaryMode(),
+                batches.isEmpty() ? request.firstEntryPolicy() : FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                remaining);
         ReadTargetReader reader = registry.require(run.key());
-        return reader.readPhysicalWithStats(streamId, startOffset, run.ranges(), remaining).thenCompose(result -> {
+        return reader.readPhysicalWithStats(streamId, remainingRequest, run.ranges()).thenCompose(result -> {
             batches.addAll(result.batches()); stats.addAll(result.rangeStats());
-            long next = startOffset;
+            long next = request.startOffset();
             long newRecords = records;
             long newBytes = bytes;
             for (ReadBatch batch : result.batches()) {
@@ -80,8 +104,12 @@ public final class ReadTargetDispatcher {
                     streamId,
                     runs,
                     index + 1,
-                    next,
-                    options,
+                    new ReadRequest(
+                            next,
+                            request.view(),
+                            request.boundaryMode(),
+                            FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                            options),
                     batches,
                     stats,
                     newRecords,

@@ -9,6 +9,7 @@ import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadSourceRef;
 import com.nereusstream.api.ReadTargetIdentities;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ResolvedObjectRange;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
@@ -40,6 +41,23 @@ public final class ObjectWalReaderAdapter implements PrimaryWalReader {
         }
         catch (IllegalArgumentException e) { return NereusException.failedFuture(ErrorCode.UNSUPPORTED_READ_TARGET,
                 false, "Object WAL reader received a non-object target", e); }
+    }
+
+    @Override public CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
+            StreamId streamId, ReadRequest request, List<ResolvedRange> ranges) {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(request, "request");
+        try {
+            List<ResolvedObjectRange> objectRanges = ranges.stream().map(ResolvedObjectRange::from).toList();
+            return reader.readWithStats(request, objectRanges)
+                    .thenApply(result -> genericResult(objectRanges, result));
+        } catch (IllegalArgumentException e) {
+            return NereusException.failedFuture(
+                    ErrorCode.UNSUPPORTED_READ_TARGET,
+                    false,
+                    "Object WAL reader received a non-object target",
+                    e);
+        }
     }
 
     private static PhysicalReadResult genericResult(

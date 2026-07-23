@@ -1,16 +1,21 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.core.read;
 
-import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadBoundaryMode;
+import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadSourceRef;
 import com.nereusstream.api.ReadTargetIdentities;
-import com.nereusstream.api.target.ObjectSliceReadTarget;
-import com.nereusstream.objectstore.wal.WalReadResult;
 import com.nereusstream.api.ResolvedRange;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.objectstore.wal.WalReadResult;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -28,6 +33,25 @@ public interface ReadTargetReader extends AutoCloseable {
             ReadOptions options) {
         return readWithStats(streamId, startOffset, ranges, options)
                 .thenApply(result -> fromLegacy(ranges, result));
+    }
+
+    /** Request-aware physical read used by ranged-entry callers. */
+    default CompletableFuture<PhysicalReadResult> readPhysicalWithStats(
+            StreamId streamId,
+            ReadRequest request,
+            List<ResolvedRange> ranges) {
+        if (request.boundaryMode() != ReadBoundaryMode.EXACT_START
+                || request.firstEntryPolicy() != FirstEntryPolicy.LEGACY_STRICT_LIMIT) {
+            return CompletableFuture.failedFuture(new NereusException(
+                    ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                    false,
+                    "physical reader does not support ranged-entry semantics"));
+        }
+        return readPhysicalWithStats(
+                streamId,
+                request.startOffset(),
+                ranges,
+                request.options());
     }
 
     /** Transitional Object-only surface for one milestone; new readers must implement {@link #readPhysicalWithStats}. */

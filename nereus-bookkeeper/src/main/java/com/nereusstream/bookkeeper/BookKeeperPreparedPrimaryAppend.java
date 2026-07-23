@@ -2,6 +2,8 @@
 package com.nereusstream.bookkeeper;
 
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.target.BookKeeperEntryMapping;
 import com.nereusstream.core.wal.PreparedPrimaryAppend;
 import com.nereusstream.core.wal.PrimaryAppendRequest;
 import io.netty.buffer.ByteBuf;
@@ -14,13 +16,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class BookKeeperPreparedPrimaryAppend implements PreparedPrimaryAppend, AutoCloseable {
     private final PrimaryAppendRequest request;
     private final List<ByteBuf> entries;
+    private final BookKeeperEntryMapping entryMapping;
     private final long physicalBytes;
     private final AtomicBoolean closed = new AtomicBoolean();
 
     public BookKeeperPreparedPrimaryAppend(PrimaryAppendRequest request) {
         this.request = Objects.requireNonNull(request, "request");
+        this.entryMapping = request.batch().payloadFormat() == PayloadFormat.KAFKA_RECORD_BATCH
+                ? BookKeeperEntryMapping.RANGED_NEREUS_ENTRY_V1
+                : BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY;
         this.entries = request.batch().entries().stream()
-                .map(entry -> Unpooled.wrappedBuffer(entry.payload()))
+                .map(entry -> entryMapping == BookKeeperEntryMapping.RANGED_NEREUS_ENTRY_V1
+                        ? Unpooled.wrappedBuffer(BookKeeperRangedEntryCodecV1.encode(entry))
+                        : Unpooled.wrappedBuffer(entry.payload()))
                 .toList();
         long total = 0;
         try {
@@ -38,6 +46,7 @@ public final class BookKeeperPreparedPrimaryAppend implements PreparedPrimaryApp
         return entries.stream().map(ByteBuf::retainedDuplicate).toList();
     }
     public long physicalBytes() { return physicalBytes; }
+    public BookKeeperEntryMapping entryMapping() { return entryMapping; }
     public com.nereusstream.api.Checksum rangeChecksum(long firstEntryId) {
         requireOpen();
         return BookKeeperRangeChecksums.compute(firstEntryId, entries);

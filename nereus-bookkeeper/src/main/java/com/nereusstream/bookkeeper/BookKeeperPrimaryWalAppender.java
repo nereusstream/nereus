@@ -418,7 +418,7 @@ public final class BookKeeperPrimaryWalAppender
                         ? active : current);
         BookKeeperEntryRangeReadTarget target = new BookKeeperEntryRangeReadTarget(
                 1, configuration.clusterAlias(), active.root().value().ledgerId(), firstEntryId,
-                prepared.entryCount(), BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY, rangeChecksum);
+                prepared.entryCount(), prepared.entryMapping(), rangeChecksum);
         BookKeeperPrimaryPhysicalIdentity identity = new BookKeeperPrimaryPhysicalIdentity(
                 configuration.clusterAlias(), target.ledgerId(), active.root().value().lifecycleEpoch(),
                 target.firstEntryId(), target.entryCount(), target.rangeChecksum());

@@ -9,5 +9,6 @@ package com.nereusstream.api.target;
 
 /** Framing reserved by the version-one BookKeeper target codec. */
 public enum BookKeeperEntryMapping {
-    ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY
+    ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+    RANGED_NEREUS_ENTRY_V1
 }

@@ -302,7 +302,9 @@ public final class BookKeeperAppendRecoveryCoordinator {
                 reservation.ledgerId(),
                 reservation.firstEntryId(),
                 reservation.entryCount(),
-                BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                PayloadFormat.valueOf(reservation.payloadFormat()) == PayloadFormat.KAFKA_RECORD_BATCH
+                        ? BookKeeperEntryMapping.RANGED_NEREUS_ENTRY_V1
+                        : BookKeeperEntryMapping.ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
                 new Checksum(ChecksumType.SHA256, reservation.rangeChecksumSha256()));
         return new CommitAppendRequest(
                 session.streamId(),

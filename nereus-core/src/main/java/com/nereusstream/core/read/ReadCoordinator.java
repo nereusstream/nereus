@@ -15,17 +15,21 @@
 package com.nereusstream.core.read;
 
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.PhysicalReadResult;
 import com.nereusstream.api.PhysicalReadStats;
 import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadBoundaryMode;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolveOptions;
 import com.nereusstream.api.ResolveResult;
 import com.nereusstream.api.ResolvedRange;
+import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.core.StreamStorageConfig;
 import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
@@ -257,6 +261,62 @@ public final class ReadCoordinator implements StreamViewReader {
         return result;
     }
 
+    /** Executes the public ranged-entry and semantic-view read contract. */
+    public CompletableFuture<SemanticReadResult> read(
+            StreamId streamId,
+            ReadRequest request) {
+        if (request != null && request.isLegacyEquivalent() && generationResolver == null) {
+            return read(streamId, request.startOffset(), request.options())
+                    .thenApply(value -> SemanticReadResult.forRequest(
+                            request, value, value.nextOffset()));
+        }
+        CancelAwareFuture<SemanticReadResult> result = new CancelAwareFuture<>();
+        if (closed.get()) {
+            result.completeExceptionally(
+                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "stream storage is closed"));
+            return result;
+        }
+        if (streamId == null || request == null) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.INVALID_ARGUMENT, false, "streamId and read request are required"));
+            return result;
+        }
+        if (request.options().isolation() != ReadIsolation.COMMITTED) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.INVALID_ARGUMENT, false, "semantic reads require committed isolation"));
+            return result;
+        }
+        if (generationResolver == null && request.view() != ReadView.COMMITTED) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                    false,
+                    "the configured storage does not expose higher-generation semantic views"));
+            return result;
+        }
+        Duration effectiveTimeout = request.options().timeout().compareTo(config.readTimeout()) <= 0
+                ? request.options().timeout()
+                : config.readTimeout();
+        ReadOperationDeadline deadline = new ReadOperationDeadline(effectiveTimeout);
+        result.onCancel(deadline::cancel);
+        CompletableFuture<SemanticReadResult> pipeline;
+        if (generationResolver == null) {
+            ResolveOptions resolveOptions = new ResolveOptions(
+                    config.maxResolveRanges(), true, true);
+            pipeline = resolver.resolve(streamId, request.startOffset(), resolveOptions, deadline)
+                    .thenComposeAsync(resolution -> readSemanticResolution(
+                            streamId, request, resolution, deadline, true), callbackExecutor);
+        } else {
+            pipeline = readSemanticGeneration(
+                    streamId,
+                    request,
+                    deadline,
+                    new LinkedHashSet<>(),
+                    new HashMap<>());
+        }
+        completeFrom(result, pipeline);
+        return result;
+    }
+
     @Override
     public CompletableFuture<ViewReadResult> read(
             StreamId streamId,
@@ -271,11 +331,6 @@ public final class ReadCoordinator implements StreamViewReader {
                     "semantic-view reads require the F4 generation resolver"));
             return result;
         }
-        if (closed.get()) {
-            result.completeExceptionally(
-                    new NereusException(ErrorCode.STORAGE_CLOSED, false, "stream storage is closed"));
-            return result;
-        }
         if (streamId == null || view == null || options == null || startOffset < 0) {
             result.completeExceptionally(new NereusException(
                     ErrorCode.INVALID_ARGUMENT,
@@ -283,89 +338,82 @@ public final class ReadCoordinator implements StreamViewReader {
                     "streamId, view, valid startOffset and read options are required"));
             return result;
         }
-        if (options.isolation() != ReadIsolation.COMMITTED) {
-            result.completeExceptionally(new NereusException(
-                    ErrorCode.INVALID_ARGUMENT,
-                    false,
-                    "semantic-view reads require committed isolation"));
-            return result;
-        }
-        Duration effectiveTimeout = options.timeout().compareTo(config.readTimeout()) <= 0
-                ? options.timeout()
-                : config.readTimeout();
-        ReadOperationDeadline deadline = new ReadOperationDeadline(effectiveTimeout);
-        result.onCancel(deadline::cancel);
-        CompletableFuture<ViewReadResult> pipeline = readGeneration(
+        CompletableFuture<SemanticReadResult> semantic = read(
                 streamId,
-                startOffset,
-                view,
-                options,
-                deadline,
-                new LinkedHashSet<>(),
-                new HashMap<>());
+                new ReadRequest(
+                        startOffset,
+                        view,
+                        ReadBoundaryMode.EXACT_START,
+                        FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                        options));
+        result.onCancel(() -> semantic.cancel(true));
+        CompletableFuture<ViewReadResult> pipeline = semantic.thenApply(value ->
+                new ViewReadResult(
+                        value.view(),
+                        value.result(),
+                        value.sourceCoverageEndOffset()));
         completeFrom(result, pipeline);
         return result;
     }
 
-    private CompletableFuture<ViewReadResult> readGeneration(
+    private CompletableFuture<SemanticReadResult> readSemanticGeneration(
             StreamId streamId,
-            long startOffset,
-            ReadView view,
-            ReadOptions options,
+            ReadRequest request,
             ReadOperationDeadline deadline,
             Set<GenerationReadCandidate> excludedCandidates,
             Map<GenerationReadCandidate, Integer> transientRetries) {
         return generationResolver.resolve(
                         streamId,
-                        startOffset,
-                        view,
+                        request.startOffset(),
+                        request.view(),
                         deadline,
                         true,
                         excludedCandidates)
                 .thenCompose(optional -> optional
-                        .map(pinned -> readPinned(
+                        .map(pinned -> readSemanticPinned(
                                 streamId,
-                                startOffset,
-                                view,
-                                options,
+                                request,
                                 deadline,
                                 pinned,
                                 excludedCandidates,
                                 transientRetries))
-                        .orElseGet(() -> CompletableFuture.completedFuture(new ViewReadResult(
-                                view,
-                                new ReadResult(streamId, startOffset, startOffset, List.of(), true),
-                                startOffset))));
+                        .orElseGet(() -> {
+                            ReadResult empty = new ReadResult(
+                                    streamId,
+                                    request.startOffset(),
+                                    request.startOffset(),
+                                    List.of(),
+                                    true);
+                            return CompletableFuture.completedFuture(
+                                    SemanticReadResult.forRequest(
+                                            request, empty, request.startOffset()));
+                        }));
     }
 
-    private CompletableFuture<ViewReadResult> readPinned(
+    private CompletableFuture<SemanticReadResult> readSemanticPinned(
             StreamId streamId,
-            long startOffset,
-            ReadView view,
-            ReadOptions options,
+            ReadRequest request,
             ReadOperationDeadline deadline,
             PinnedResolvedRange pinned,
             Set<GenerationReadCandidate> excludedCandidates,
             Map<GenerationReadCandidate, Integer> transientRetries) {
-        CompletableFuture<ReadResult> read = readRanges(
+        CompletableFuture<ReadResult> read = readSemanticRanges(
                 streamId,
-                startOffset,
-                options,
+                request,
                 List.of(pinned.resolvedRange()),
                 deadline);
         return releaseAfter(read, pinned).handle((value, failure) -> {
             if (failure == null) {
-                return CompletableFuture.completedFuture(new ViewReadResult(
-                        view,
-                        value,
-                        view == ReadView.COMMITTED
-                                ? value.nextOffset()
-                                : pinned.resolvedRange().offsetRange().endOffset()));
+                long coverage = request.view() == ReadView.COMMITTED
+                        ? value.nextOffset()
+                        : pinned.resolvedRange().offsetRange().endOffset();
+                return CompletableFuture.completedFuture(
+                        SemanticReadResult.forRequest(request, value, coverage));
             }
             Throwable cause = unwrap(failure);
             java.util.Optional<PhysicalReadFailureKind> physicalFailure = PhysicalReadFailures.classify(cause);
             if (physicalFailure.isEmpty()) {
-                return CompletableFuture.<ViewReadResult>failedFuture(cause);
+                return CompletableFuture.<SemanticReadResult>failedFuture(cause);
             }
             if (physicalFailure.orElseThrow() == PhysicalReadFailureKind.TRANSIENT_IO
                     && cause instanceof NereusException nereus
@@ -375,11 +423,9 @@ public final class ReadCoordinator implements StreamViewReader {
                     Map<GenerationReadCandidate, Integer> nextRetries =
                             new HashMap<>(transientRetries);
                     nextRetries.put(pinned.candidate(), completedRetries + 1);
-                    return readGeneration(
+                    return readSemanticGeneration(
                             streamId,
-                            startOffset,
-                            view,
-                            options,
+                            request,
                             deadline,
                             excludedCandidates,
                             nextRetries);
@@ -389,11 +435,9 @@ public final class ReadCoordinator implements StreamViewReader {
             nextExclusions.add(pinned.candidate());
             return generationFailureHandler.handle(streamId, pinned.candidate(), cause)
                     .exceptionally(ignored -> null)
-                    .thenCompose(ignored -> readGeneration(
+                    .thenCompose(ignored -> readSemanticGeneration(
                             streamId,
-                            startOffset,
-                            view,
-                            options,
+                            request,
                             deadline,
                             nextExclusions,
                             transientRetries));
@@ -452,6 +496,97 @@ public final class ReadCoordinator implements StreamViewReader {
                                 streamId, startOffset, options, fresh, deadline, false);
                     });
         });
+    }
+
+    private CompletableFuture<SemanticReadResult> readSemanticResolution(
+            StreamId streamId,
+            ReadRequest request,
+            ReadResolver.Resolution resolution,
+            ReadOperationDeadline deadline,
+            boolean allowCacheRefresh) {
+        if (resolution.result().ranges().isEmpty()) {
+            ReadResult empty = new ReadResult(
+                    streamId,
+                    request.startOffset(),
+                    request.startOffset(),
+                    List.of(),
+                    true);
+            return CompletableFuture.completedFuture(
+                    SemanticReadResult.forRequest(
+                            request, empty, request.startOffset()));
+        }
+        CompletableFuture<SemanticReadResult> attempted = readSemanticRanges(
+                        streamId,
+                        request,
+                        resolution.result().ranges(),
+                        deadline)
+                .thenApply(value -> SemanticReadResult.forRequest(
+                        request, value, value.nextOffset()));
+        if (!allowCacheRefresh || !resolution.cacheUsed()) {
+            return attempted;
+        }
+        return attempted.exceptionallyCompose(error -> {
+            Throwable cause = unwrap(error);
+            if (PhysicalReadFailures.classify(cause).isEmpty()) {
+                return CompletableFuture.failedFuture(cause);
+            }
+            resolver.invalidate(streamId);
+            ResolveOptions noCache = new ResolveOptions(config.maxResolveRanges(), false, true);
+            return resolver.resolve(streamId, request.startOffset(), noCache, deadline)
+                    .thenCompose(fresh -> {
+                        if (fresh.result().ranges().equals(resolution.result().ranges())) {
+                            return CompletableFuture.failedFuture(cause);
+                        }
+                        return readSemanticResolution(
+                                streamId, request, fresh, deadline, false);
+                    });
+        });
+    }
+
+    private CompletableFuture<ReadResult> readSemanticRanges(
+            StreamId streamId,
+            ReadRequest request,
+            List<ResolvedRange> ranges,
+            ReadOperationDeadline deadline) {
+        long reservationBytes;
+        try {
+            reservationBytes = targetDispatcher.reservationBytes(ranges);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        ReadResourceLimiter.Reservation reservation;
+        try {
+            deadline.check("reserve semantic read resources");
+            reservation = resourceLimiter.reserve(reservationBytes);
+        } catch (NereusException e) {
+            if (e.code() == ErrorCode.BACKPRESSURE_REJECTED) {
+                observe(() -> observer.onBackpressureRejected(reservationBytes));
+            }
+            return CompletableFuture.failedFuture(e);
+        }
+        ReadRequest boundedRequest;
+        try {
+            ReadOptions options = request.options();
+            boundedRequest = new ReadRequest(
+                    request.startOffset(),
+                    request.view(),
+                    request.boundaryMode(),
+                    request.firstEntryPolicy(),
+                    new ReadOptions(
+                            options.maxRecords(),
+                            options.maxBytes(),
+                            options.isolation(),
+                            deadline.remaining()));
+        } catch (RuntimeException e) {
+            reservation.close();
+            return CompletableFuture.failedFuture(e);
+        }
+        CompletableFuture<PhysicalReadResult> physicalRead = deadline.bound(
+                () -> targetDispatcher.read(streamId, boundedRequest, ranges),
+                "read semantic resolved ranges");
+        return physicalRead.whenComplete((ignored, error) -> reservation.close())
+                .thenApplyAsync(result -> buildSemanticReadResult(
+                        streamId, request, ranges, result), callbackExecutor);
     }
 
     private CompletableFuture<ReadResult> readRanges(
@@ -541,6 +676,107 @@ public final class ReadCoordinator implements StreamViewReader {
                     "WAL reader exceeded caller read limits");
         }
         return new ReadResult(streamId, startOffset, expectedOffset, result.batches(), false);
+    }
+
+    private ReadResult buildSemanticReadResult(
+            StreamId streamId,
+            ReadRequest request,
+            List<ResolvedRange> ranges,
+            PhysicalReadResult result) {
+        ProviderNeutralReadAccounting.validate(ranges, result);
+        requireExactLogicalSources(ranges, result.batches());
+        result.rangeStats().forEach(stats -> observe(() -> observer.onSliceRead(
+                stats.physicalPayloadBytesRead(),
+                stats.physicalAuxiliaryBytesRead(),
+                stats.returnedPayloadBytes())));
+        if (result.batches().isEmpty()) {
+            throw new NereusException(
+                    ErrorCode.READ_RESOLUTION_FAILED,
+                    false,
+                    "resolved ranges produced no readable entry for the semantic request");
+        }
+        long expectedOffset = result.batches().get(0).range().startOffset();
+        long payloadBytes = 0;
+        long records = 0;
+        try {
+            for (ReadBatch batch : result.batches()) {
+                if (request.view() == ReadView.COMMITTED
+                        && batch.range().startOffset() != expectedOffset) {
+                    throw new NereusException(
+                            ErrorCode.METADATA_INVARIANT_VIOLATION,
+                            false,
+                            "physical reader returned a non-dense committed range");
+                }
+                if (request.view() == ReadView.TOPIC_COMPACTED
+                        && batch.range().startOffset() < expectedOffset) {
+                    throw new NereusException(
+                            ErrorCode.METADATA_INVARIANT_VIOLATION,
+                            false,
+                            "physical reader returned overlapping compacted ranges");
+                }
+                expectedOffset = batch.range().endOffset();
+                payloadBytes = Math.addExact(payloadBytes, batch.payload().length);
+                records = Math.addExact(records, batch.range().recordCount());
+            }
+        } catch (ArithmeticException e) {
+            throw new NereusException(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "semantic read result accounting overflows",
+                    e);
+        }
+        boolean exceedsLimits = payloadBytes > request.options().maxBytes()
+                || records > request.options().maxRecords();
+        boolean permittedFirstOverflow = request.firstEntryPolicy()
+                == FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW
+                && result.batches().size() == 1;
+        if (exceedsLimits && !permittedFirstOverflow) {
+            throw new NereusException(
+                    ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "physical reader exceeded semantic read limits");
+        }
+        ReadResult readResult = new ReadResult(
+                streamId,
+                request.startOffset(),
+                expectedOffset,
+                result.batches(),
+                false);
+        try {
+            SemanticReadResult.forRequest(request, readResult, expectedOffset);
+        } catch (IllegalArgumentException invalid) {
+            throw new NereusException(
+                    request.boundaryMode() == ReadBoundaryMode.EXACT_START
+                            ? ErrorCode.OFFSET_NOT_AVAILABLE
+                            : ErrorCode.METADATA_INVARIANT_VIOLATION,
+                    false,
+                    "physical reader violated semantic boundary requirements",
+                    invalid);
+        }
+        return readResult;
+    }
+
+    private static void requireExactLogicalSources(
+            List<ResolvedRange> ranges,
+            List<ReadBatch> batches) {
+        for (ReadBatch batch : batches) {
+            boolean exactSource = ranges.stream().anyMatch(range ->
+                    range.offsetRange().equals(batch.source().resolvedRange())
+                            && range.generation() == batch.source().generation()
+                            && range.commitVersion() == batch.source().commitVersion()
+                            && range.readTarget().equals(batch.source().target())
+                            && range.payloadFormat() == batch.payloadFormat()
+                            && range.schemaRefs().equals(batch.schemaRefs())
+                            && range.projectionRef().equals(batch.projectionRef())
+                            && range.offsetRange().startOffset() <= batch.range().startOffset()
+                            && batch.range().endOffset() <= range.offsetRange().endOffset());
+            if (!exactSource) {
+                throw new NereusException(
+                        ErrorCode.METADATA_INVARIANT_VIOLATION,
+                        false,
+                        "physical reader returned logical facts outside its exact resolved source");
+            }
+        }
     }
 
     private static Throwable unwrap(Throwable error) {
