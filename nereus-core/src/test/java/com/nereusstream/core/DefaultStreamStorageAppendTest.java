@@ -21,6 +21,7 @@ import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendPrecondition;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendSession;
@@ -103,6 +104,57 @@ class DefaultStreamStorageAppendTest {
             StreamMetadata current = context.storage.getStreamMetadata(stream.streamId()).join();
             assertThat(current.committedEndOffset()).isEqualTo(3);
             assertThat(current.cumulativeSize()).isEqualTo(6);
+        }
+    }
+
+    @Test
+    void conditionalAppendUsesFreshHeadAndRejectsMismatchBeforeWalPreparation() {
+        CountingWriter writer = new CountingWriter(newWriter(new LocalFileObjectStore(root)));
+        try (TestContext context = context(
+                StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                Runnable::run,
+                writer)) {
+            StreamId streamId = context.createStream("conditional").streamId();
+
+            AppendResult accepted = context.storage.append(
+                    streamId,
+                    kafkaBatch("first-secret", 3),
+                    appendOptions(Duration.ofSeconds(5)),
+                    AppendPrecondition.expectedStartOffset(0)).join();
+
+            assertThat(accepted.range()).isEqualTo(new OffsetRange(0, 3));
+            assertThat(accepted.recordCount()).isEqualTo(3);
+            assertThat(accepted.entryCount()).isEqualTo(1);
+            assertThat(accepted.payloadFormat()).isEqualTo(PayloadFormat.KAFKA_RECORD_BATCH);
+            assertThat(writer.prepareCount).hasValue(1);
+
+            NereusException lower = appendFailure(context.storage.append(
+                    streamId,
+                    kafkaBatch("lower-secret", 1),
+                    appendOptions(Duration.ofSeconds(5)),
+                    AppendPrecondition.expectedStartOffset(2)));
+            NereusException higher = appendFailure(context.storage.append(
+                    streamId,
+                    kafkaBatch("higher-secret", 1),
+                    appendOptions(Duration.ofSeconds(5)),
+                    AppendPrecondition.expectedStartOffset(4)));
+
+            assertThat(lower.code()).isEqualTo(ErrorCode.OFFSET_CONFLICT);
+            assertThat(lower.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
+            assertThat(lower.getMessage()).contains("expected start offset 2", "committed end offset is 3");
+            assertThat(lower.getMessage()).doesNotContain("lower-secret");
+            assertThat(higher.code()).isEqualTo(ErrorCode.OFFSET_CONFLICT);
+            assertThat(higher.appendOutcome()).contains(AppendOutcome.KNOWN_NOT_COMMITTED);
+            assertThat(higher.getMessage()).contains("expected start offset 4", "committed end offset is 3");
+            assertThat(higher.getMessage()).doesNotContain("higher-secret");
+            assertThat(writer.prepareCount).hasValue(1);
+
+            AppendResult legacy = context.storage.append(
+                    streamId,
+                    batch("legacy"),
+                    appendOptions(Duration.ofSeconds(5))).join();
+            assertThat(legacy.range()).isEqualTo(new OffsetRange(3, 4));
+            assertThat(writer.prepareCount).hasValue(2);
         }
     }
 
@@ -650,6 +702,24 @@ class DefaultStreamStorageAppendTest {
                 entries,
                 entries.size(),
                 entries.size(),
+                NOW.toEpochMilli(),
+                NOW.toEpochMilli(),
+                List.of(),
+                Map.of(),
+                Optional.empty());
+    }
+
+    private static AppendBatch kafkaBatch(String value, int recordCount) {
+        AppendEntry entry = new AppendEntry(
+                value.getBytes(StandardCharsets.UTF_8),
+                recordCount,
+                NOW.toEpochMilli(),
+                Map.of());
+        return new AppendBatch(
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                List.of(entry),
+                recordCount,
+                1,
                 NOW.toEpochMilli(),
                 NOW.toEpochMilli(),
                 List.of(),

@@ -18,6 +18,7 @@ import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendOptions;
+import com.nereusstream.api.AppendPrecondition;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
@@ -559,6 +560,15 @@ public final class DefaultStreamStorage implements StreamStorage {
             AppendBatch batch,
             AppendOptions options) {
         return appendCoordinator.append(streamId, batch, options);
+    }
+
+    @Override
+    public CompletableFuture<AppendResult> append(
+            StreamId streamId,
+            AppendBatch batch,
+            AppendOptions options,
+            AppendPrecondition precondition) {
+        return appendCoordinator.append(streamId, batch, options, precondition);
     }
 
     @Override

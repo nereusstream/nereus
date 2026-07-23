@@ -19,6 +19,7 @@ import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendOptions;
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AppendPrecondition;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.DurabilityLevel;
@@ -347,9 +348,18 @@ public final class AppendCoordinator implements AutoCloseable {
             StreamId streamId,
             AppendBatch batch,
             AppendOptions options) {
+        return append(streamId, batch, options, AppendPrecondition.none());
+    }
+
+    public CompletableFuture<AppendResult> append(
+            StreamId streamId,
+            AppendBatch batch,
+            AppendOptions options,
+            AppendPrecondition precondition) {
         Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(batch, "batch");
         Objects.requireNonNull(options, "options");
+        Objects.requireNonNull(precondition, "precondition");
         AppendFuture result = new AppendFuture();
         Duration effectiveTimeout = options.timeout().compareTo(config.appendTimeout()) <= 0
                 ? options.timeout()
@@ -391,7 +401,7 @@ public final class AppendCoordinator implements AutoCloseable {
                     AppendOutcome.KNOWN_NOT_COMMITTED));
             return result;
         }
-        Attempt attempt = new Attempt(attemptId, streamId, batch, options, deadline);
+        Attempt attempt = new Attempt(attemptId, streamId, batch, options, precondition, deadline);
         CompletableFuture<AppendResult> pipeline = deadline.bound(
                         () -> metadataStore.getStream(config.cluster(), streamId),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
@@ -554,7 +564,8 @@ public final class AppendCoordinator implements AutoCloseable {
                     }
                     return searchRecovery(attempt);
                 })
-                .thenApply(commit -> toAppendResult(commit, attempt.durableAppend()))
+                .thenApply(commit -> toValidatedAppendResult(
+                        attempt, commit, attempt.durableAppend()))
                 .handle((result, error) -> finishRecovery(attempt, result, error)));
     }
 
@@ -763,27 +774,65 @@ public final class AppendCoordinator implements AutoCloseable {
                                         attempt.deadline().remaining())),
                         AppendOutcome.KNOWN_NOT_COMMITTED,
                         "admit append before primary WAL IO")
-                .thenCompose(ignored -> lane.expectedOffset() == null
-                        ? attempt.deadline().bound(
-                                        () -> metadataStore.getCommittedEndOffset(
-                                                config.cluster(),
-                                                attempt.streamId()),
-                                        AppendOutcome.KNOWN_NOT_COMMITTED,
-                                        "load committed end offset")
-                                .thenApply(record -> {
-                                    lane.initializeExpectedOffset(
-                                            record.committedEndOffset());
-                                    return record.committedEndOffset();
-                                })
-                        : CompletableFuture.completedFuture(
-                                lane.expectedOffset()))
-                .thenCompose(offset -> sessionManager.ensureSession(
+                .thenCompose(ignored -> resolveSessionAndOffset(lane, attempt))
+                .thenApplyAsync(state -> prepareAttempt(attempt, state, reservation), callbackExecutor)
+                .thenCompose(prepared -> uploadAndCommit(lane, attempt, prepared));
+    }
+
+    private CompletableFuture<SessionAndOffset> resolveSessionAndOffset(
+            StreamLane lane,
+            Attempt attempt) {
+        if (attempt.precondition().expectedStartOffset().isPresent()) {
+            return sessionManager.ensureSession(
+                            attempt.streamId(),
+                            attempt.options().appendSession(),
+                            attempt.options().autoAcquireSession(),
+                            attempt.deadline())
+                    .thenCompose(session -> attempt.deadline().bound(
+                                    () -> metadataStore.getCommittedEndOffset(
+                                            config.cluster(),
+                                            attempt.streamId()),
+                                    AppendOutcome.KNOWN_NOT_COMMITTED,
+                                    "load committed end offset for conditional append")
+                            .thenApply(record -> {
+                                long actual = record.committedEndOffset();
+                                lane.advanceExpectedOffset(actual);
+                                requireExpectedStart(attempt.precondition(), actual);
+                                return new SessionAndOffset(session, actual);
+                            }));
+        }
+        CompletableFuture<Long> offset = lane.expectedOffset() == null
+                ? attempt.deadline().bound(
+                                () -> metadataStore.getCommittedEndOffset(
+                                        config.cluster(),
+                                        attempt.streamId()),
+                                AppendOutcome.KNOWN_NOT_COMMITTED,
+                                "load committed end offset")
+                        .thenApply(record -> {
+                            lane.initializeExpectedOffset(record.committedEndOffset());
+                            return record.committedEndOffset();
+                        })
+                : CompletableFuture.completedFuture(lane.expectedOffset());
+        return offset.thenCompose(value -> sessionManager.ensureSession(
                         attempt.streamId(),
                         attempt.options().appendSession(),
                         attempt.options().autoAcquireSession(),
-                        attempt.deadline()).thenApply(session -> new SessionAndOffset(session, offset)))
-                .thenApplyAsync(state -> prepareAttempt(attempt, state, reservation), callbackExecutor)
-                .thenCompose(prepared -> uploadAndCommit(lane, attempt, prepared));
+                        attempt.deadline())
+                .thenApply(session -> new SessionAndOffset(session, value)));
+    }
+
+    private static void requireExpectedStart(
+            AppendPrecondition precondition,
+            long actualStartOffset) {
+        long expectedStartOffset = precondition.expectedStartOffset().orElse(actualStartOffset);
+        if (expectedStartOffset != actualStartOffset) {
+            throw new NereusException(
+                    ErrorCode.OFFSET_CONFLICT,
+                    false,
+                    "conditional append expected start offset " + expectedStartOffset
+                            + " but current committed end offset is " + actualStartOffset,
+                    AppendOutcome.KNOWN_NOT_COMMITTED);
+        }
     }
 
     private PreparedAttempt prepareAttempt(
@@ -1037,7 +1086,7 @@ public final class AppendCoordinator implements AutoCloseable {
             attempt.markHeadKnownCommitted();
             lane.advanceExpectedOffset(commitResult.range().endOffset());
             attempt.deadline().check(AppendOutcome.KNOWN_COMMITTED, "ack append result");
-            return toAppendResult(commitResult, durable);
+            return toValidatedAppendResult(attempt, commitResult, durable);
         }, callbackExecutor);
     }
 
@@ -1171,6 +1220,18 @@ public final class AppendCoordinator implements AutoCloseable {
                 commit.commitVersion());
     }
 
+    private static AppendResult toValidatedAppendResult(
+            Attempt attempt,
+            CommittedAppend commit,
+            DurablePrimaryAppend durable) {
+        AppendResult result = toAppendResult(commit, durable);
+        return AppendResultValidator.requireExactRequest(
+                attempt.streamId(),
+                attempt.batch(),
+                attempt.precondition(),
+                result);
+    }
+
     private static NereusException normalizeAppendFailure(Throwable throwable, AppendOutcome fallback) {
         Throwable cause = unwrap(throwable);
         if (cause instanceof NereusException nereus) {
@@ -1277,6 +1338,7 @@ public final class AppendCoordinator implements AutoCloseable {
         private final StreamId streamId;
         private final AppendBatch batch;
         private final AppendOptions options;
+        private final AppendPrecondition precondition;
         private final AppendDeadline deadline;
         private final AtomicBoolean headSent = new AtomicBoolean();
         private final AtomicBoolean headKnownCommitted = new AtomicBoolean();
@@ -1294,11 +1356,12 @@ public final class AppendCoordinator implements AutoCloseable {
         private boolean recoveryUsed;
 
         Attempt(AppendAttemptId id, StreamId streamId, AppendBatch batch,
-                AppendOptions options, AppendDeadline deadline) {
+                AppendOptions options, AppendPrecondition precondition, AppendDeadline deadline) {
             this.id = id;
             this.streamId = streamId;
             this.batch = batch;
             this.options = options;
+            this.precondition = precondition;
             this.deadline = deadline;
             this.nextBackoffNanos = config.appendRecoveryBackoffMin().toNanos();
         }
@@ -1307,6 +1370,7 @@ public final class AppendCoordinator implements AutoCloseable {
         StreamId streamId() { return streamId; }
         AppendBatch batch() { return batch; }
         AppendOptions options() { return options; }
+        AppendPrecondition precondition() { return precondition; }
         AppendDeadline deadline() { return deadline; }
 
         void attachLane(StreamLane value) { lane = value; }

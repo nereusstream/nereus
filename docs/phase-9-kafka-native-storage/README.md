@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1 public API/default-overload slice implemented；无 native Kafka runtime
+> 状态：In progress；F9-M1 public API、conditional append/result-validation slices implemented；无 native Kafka runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）

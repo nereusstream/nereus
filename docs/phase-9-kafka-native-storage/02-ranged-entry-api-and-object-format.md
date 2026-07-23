@@ -1,6 +1,6 @@
 # 02 — Ranged-Entry API and Object Format
 
-> 状态：Implementation in progress；public values/default overloads/Kafka batch validation complete；core/read/V2 formats pending
+> 状态：Implementation in progress；public values、Kafka batch validation、production conditional append/result validation complete；read/V2 formats pending
 > 前置：Phase 1.5 generic L0、F4 generation/read-view、F1-BK profiles 均保持现有已实现合同
 > 核心原则：先把“一个 entry 覆盖多个 logical offsets”做成 protocol-neutral 能力，再允许 Kafka adapter 使用
 
@@ -8,8 +8,8 @@
 
 一个 Kafka `RecordBatch` 可以包含多个 records，并且 compressed batch 不能按 Nereus read limit 任意拆开。
 当前 F9-M1 public slice 已让 `AppendBatch` 校验支持 ranged Kafka entries，并增加 public request/result values；
-Object WAL entry index 原本也保存 `relativeBaseOffset + recordCount`。但 production conditional append、reader
-clipping、core result validation、NCP1 与 NTC1 仍假设或只执行 one-entry-per-offset。
+Object WAL entry index 原本也保存 `relativeBaseOffset + recordCount`。Production conditional append 与 exact
+result validation 已接通；reader clipping、NCP1 与 NTC1 仍假设或只执行 one-entry-per-offset。
 
 F9-M1 必须一次关闭整条链：
 
@@ -96,7 +96,7 @@ public record AppendPrecondition(OptionalLong expectedStartOffset) {
 ### 3.2 `StreamStorage.append` overload
 
 ```java
-// default overload implemented；DefaultStreamStorage override pending
+// default overload and DefaultStreamStorage override implemented
 default CompletableFuture<AppendResult> append(
         StreamId streamId,
         AppendBatch batch,
@@ -156,6 +156,7 @@ optional batch CRC32C == CRC32C(concat exact entry payloads in order)
 ```java
 // target
 AppendResultValidator.requireExactRequest(
+    StreamId streamId,
     AppendBatch request,
     AppendPrecondition precondition,
     AppendResult result);
@@ -163,6 +164,11 @@ AppendResultValidator.requireExactRequest(
 
 它检查 stream、payload format、record/entry count、logical bytes、schema refs、range count 和 expected start；
 不比较 physical target 类型，因为不同 storage profile 合法返回不同 generation-zero target。
+
+Production 实现对带 expected-start 的调用不复用可能过期的 lane offset cache，而是在 lane 内重新读当前
+metadata head；lower/higher mismatch 均在 `WalObjectWriter.prepare`/primary appender prepare 前失败。无条件旧调用
+仍走既有 cache/session 顺序。成功 commit 与 retained-attempt recovery 共用 validator；validator failure 明确标为
+`KNOWN_COMMITTED`，避免调用方误以为可以安全生成新 expected 并重试。
 
 ## 4. Target read API
 
