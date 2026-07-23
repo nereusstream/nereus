@@ -371,8 +371,10 @@ coordinator/transaction/compaction remain M4/M5。
   delegation、genesis commitVersion `0` and exact mixed-chain ancestor proof；
 - `DefaultKafkaCheckpointSourceValidatorTest` and `DefaultKafkaPartitionOpenerTest` prove exact authority/profile/session
   source loading、foreign/stale head fencing、descendant-bound ancestor delegation、remaining-deadline recovery launch、exact
-  frozen result validation and writable storage construction。Periodic session renewal and Kafka fork launcher/runtime wiring
-  remain open；
+  frozen result validation and writable storage construction；`DefaultStreamStorageAppendTest` and
+  `DefaultKafkaPartitionStorageTest` prove the public exact-session renewal path、strict monotonic returned token、renewed token
+  use by later appends、failure-to-write-fence transition、leadership-loss event and no queued append dispatch after authority
+  loss。Kafka fork launcher/runtime wiring remains open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、

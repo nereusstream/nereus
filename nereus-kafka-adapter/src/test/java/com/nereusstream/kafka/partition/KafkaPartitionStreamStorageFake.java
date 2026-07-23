@@ -43,6 +43,8 @@ final class KafkaPartitionStreamStorageFake implements StreamStorage {
     private int appendCalls;
     private int objectOrdinal;
     private boolean corruptNextResultStream;
+    private CompletableFuture<AppendSession> pendingRenewal;
+    private int renewalCalls;
 
     KafkaPartitionStreamStorageFake(StreamId streamId, long endOffset, long commitVersion) {
         this.streamId = streamId;
@@ -114,6 +116,18 @@ final class KafkaPartitionStreamStorageFake implements StreamStorage {
         pending.removeFirst().result.completeExceptionally(failure);
     }
 
+    synchronized int renewalCalls() {
+        return renewalCalls;
+    }
+
+    synchronized void completeRenewal(AppendSession renewed) {
+        pendingRenewal.complete(renewed);
+    }
+
+    synchronized void failRenewal(Throwable failure) {
+        pendingRenewal.completeExceptionally(failure);
+    }
+
     @Override
     public synchronized CompletableFuture<AppendResult> append(
             StreamId requestedStreamId,
@@ -164,6 +178,14 @@ final class KafkaPartitionStreamStorageFake implements StreamStorage {
     @Override
     public CompletableFuture<AppendSession> acquireAppendSession(StreamId streamId, AppendSessionOptions options) {
         return unsupported();
+    }
+
+    @Override
+    public synchronized CompletableFuture<AppendSession> renewAppendSession(
+            AppendSession session, java.time.Duration ttl) {
+        renewalCalls++;
+        pendingRenewal = new CompletableFuture<>();
+        return pendingRenewal;
     }
 
     @Override

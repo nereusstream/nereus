@@ -41,6 +41,7 @@ import com.nereusstream.kafka.codec.KafkaAppendResultValidator;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaFetchAssembly;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -50,6 +51,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Serialized stable append and bounded committed-read implementation for one recovered Kafka leader. */
@@ -60,11 +65,14 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private final KafkaPartitionIdentity identity;
     private final StreamStorage streams;
     private final StreamId streamId;
-    private final AppendSession appendSession;
+    private volatile AppendSession appendSession;
     private final int leaderEpoch;
     private final KafkaStorageProfilePolicy profilePolicy;
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
+    private final ScheduledExecutorService renewalScheduler;
+    private final Duration sessionTtl;
+    private final long renewalIntervalMillis;
     private final ArrayDeque<AppendOperation> appendQueue = new ArrayDeque<>();
     private final Set<ListenerRegistration> eventListeners = new HashSet<>();
     private final CompletableFuture<Void> resigned = new CompletableFuture<>();
@@ -75,6 +83,8 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private boolean appendRunning;
     private boolean dispatching;
     private boolean dispatchRequested;
+    private boolean renewalInFlight;
+    private ScheduledFuture<?> renewalTask;
 
     public DefaultKafkaPartitionStorage(
             KafkaPartitionIdentity identity,
@@ -85,6 +95,62 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             KafkaStorageProfilePolicy profilePolicy,
             KafkaAppendBatchEncoder appendEncoder,
             KafkaFetchAssembler fetchAssembler) {
+        this(
+                identity,
+                streams,
+                streamId,
+                acquiredSession,
+                recoveredSource,
+                profilePolicy,
+                appendEncoder,
+                fetchAssembler,
+                null,
+                null,
+                0);
+    }
+
+    public DefaultKafkaPartitionStorage(
+            KafkaPartitionIdentity identity,
+            StreamStorage streams,
+            StreamId streamId,
+            AcquiredAppendSession acquiredSession,
+            KafkaCheckpointSourceState recoveredSource,
+            KafkaStorageProfilePolicy profilePolicy,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            ScheduledExecutorService renewalScheduler,
+            Duration sessionTtl,
+            Duration renewalInterval) {
+        this(
+                identity,
+                streams,
+                streamId,
+                acquiredSession,
+                recoveredSource,
+                profilePolicy,
+                appendEncoder,
+                fetchAssembler,
+                Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
+                positive(sessionTtl, "sessionTtl"),
+                positive(renewalInterval, "renewalInterval").toMillis());
+        if (renewalInterval.compareTo(sessionTtl) >= 0) {
+            throw new IllegalArgumentException("renewalInterval must be shorter than sessionTtl");
+        }
+        scheduleRenewal(true);
+    }
+
+    private DefaultKafkaPartitionStorage(
+            KafkaPartitionIdentity identity,
+            StreamStorage streams,
+            StreamId streamId,
+            AcquiredAppendSession acquiredSession,
+            KafkaCheckpointSourceState recoveredSource,
+            KafkaStorageProfilePolicy profilePolicy,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            ScheduledExecutorService renewalScheduler,
+            Duration sessionTtl,
+            long renewalIntervalMillis) {
         this.identity = Objects.requireNonNull(identity, "identity");
         this.streams = Objects.requireNonNull(streams, "streams");
         this.streamId = Objects.requireNonNull(streamId, "streamId");
@@ -93,6 +159,9 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         this.profilePolicy = Objects.requireNonNull(profilePolicy, "profilePolicy");
         this.appendEncoder = Objects.requireNonNull(appendEncoder, "appendEncoder");
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
+        this.renewalScheduler = renewalScheduler;
+        this.sessionTtl = sessionTtl;
+        this.renewalIntervalMillis = renewalIntervalMillis;
         this.appendSession = acquiredSession.session();
         validateRecoveredSession(acquiredSession, recoveredSource);
         this.leaderEpoch = Math.toIntExact(recoveredSource.authority().authorityEpoch());
@@ -224,6 +293,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         boolean complete;
         boolean leadershipChanged = false;
         KafkaStableSnapshot snapshot;
+        ScheduledFuture<?> renewal;
         synchronized (guard) {
             if (state == KafkaPartitionState.CLOSED) return resigned;
             if (state != KafkaPartitionState.RESIGNING) {
@@ -231,9 +301,12 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 leadershipChanged = true;
             }
             snapshot = stableSnapshot;
+            renewal = renewalTask;
+            renewalTask = null;
             complete = !appendRunning && appendQueue.isEmpty();
             if (complete) state = KafkaPartitionState.CLOSED;
         }
+        if (renewal != null) renewal.cancel(false);
         if (leadershipChanged) publishEvent(KafkaPartitionEventType.LEADERSHIP_LOST, snapshot);
         if (complete) resigned.complete(null);
         return resigned;
@@ -319,13 +392,21 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         List<AppendOperation> rejected = List.of();
         boolean startNext = false;
         boolean completeResign = false;
+        boolean rejectBecauseFenced = false;
         synchronized (guard) {
             if (appendQueue.peekFirst() != operation) {
                 throw new IllegalStateException("Kafka append lane completion is out of order");
             }
             appendQueue.removeFirst();
             if (failure == null) {
-                if (appendQueue.isEmpty()) {
+                if (!appendQueue.isEmpty()
+                        && state == KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED) {
+                    rejected = new ArrayList<>(appendQueue);
+                    appendQueue.clear();
+                    admittedEndOffset = stableSnapshot.stableEndOffset();
+                    appendRunning = false;
+                    completeResign = finishResignIfDrained();
+                } else if (appendQueue.isEmpty()) {
                     appendRunning = false;
                     completeResign = finishResignIfDrained();
                 } else {
@@ -340,6 +421,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 if (!knownNotCommitted && state == KafkaPartitionState.LEADER_WRITABLE) {
                     state = KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED;
                 }
+                rejectBecauseFenced = state == KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED;
                 completeResign = finishResignIfDrained();
             }
         }
@@ -347,10 +429,14 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         if (failure == null) {
             publishEvent(KafkaPartitionEventType.STABLE_APPEND, success.stableSnapshot());
             operation.result.complete(success);
+            NereusException rejectedFailure = fenced(
+                    "Kafka append was rejected because partition authority renewal failed");
+            rejected.forEach(value -> value.result.completeExceptionally(rejectedFailure));
         } else {
             operation.result.completeExceptionally(failure);
-            NereusException rejectedFailure = offsetConflict(
-                    "Kafka append was rejected because an earlier lane append did not complete");
+            NereusException rejectedFailure = rejectBecauseFenced
+                    ? fenced("Kafka append was rejected because partition authority was lost")
+                    : offsetConflict("Kafka append was rejected because an earlier lane append did not complete");
             rejected.forEach(value -> value.result.completeExceptionally(rejectedFailure));
         }
         if (completeResign) resigned.complete(null);
@@ -436,6 +522,110 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             throw new IllegalArgumentException(
                     "Kafka partition storage requires the exact recovered authority session");
         }
+    }
+
+    private void scheduleRenewal(boolean initial) {
+        if (renewalScheduler == null) return;
+        try {
+            synchronized (guard) {
+                if (state != KafkaPartitionState.LEADER_WRITABLE || renewalTask != null || renewalInFlight) {
+                    return;
+                }
+                renewalTask = renewalScheduler.schedule(
+                        this::beginRenewal,
+                        renewalIntervalMillis,
+                        TimeUnit.MILLISECONDS);
+            }
+        } catch (RejectedExecutionException failure) {
+            if (initial) {
+                throw new NereusException(
+                        ErrorCode.BACKPRESSURE_REJECTED,
+                        true,
+                        "Kafka append-session renewal scheduler rejected leader storage",
+                        failure);
+            }
+            fenceRenewalFailure();
+        }
+    }
+
+    private void beginRenewal() {
+        AppendSession current;
+        synchronized (guard) {
+            renewalTask = null;
+            if (state != KafkaPartitionState.LEADER_WRITABLE || renewalInFlight) return;
+            renewalInFlight = true;
+            current = appendSession;
+        }
+        CompletableFuture<AppendSession> renewal;
+        try {
+            renewal = streams.renewAppendSession(current, sessionTtl);
+            if (renewal == null) {
+                throw new IllegalStateException("StreamStorage returned a null append-session renewal future");
+            }
+        } catch (Throwable failure) {
+            renewal = CompletableFuture.failedFuture(failure);
+        }
+        renewal.whenComplete((renewed, failure) -> completeRenewal(current, renewed, failure));
+    }
+
+    private void completeRenewal(
+            AppendSession previous,
+            AppendSession renewed,
+            Throwable failure) {
+        boolean failed = failure != null || !validRenewal(previous, renewed);
+        synchronized (guard) {
+            renewalInFlight = false;
+            if (state != KafkaPartitionState.LEADER_WRITABLE) return;
+            if (failed) {
+                state = KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED;
+                admittedEndOffset = stableSnapshot.stableEndOffset();
+            } else {
+                appendSession = renewed;
+            }
+        }
+        if (failed) {
+            publishEvent(KafkaPartitionEventType.LEADERSHIP_LOST, stableSnapshot());
+        } else {
+            scheduleRenewal(false);
+        }
+    }
+
+    private void fenceRenewalFailure() {
+        boolean changed;
+        KafkaStableSnapshot snapshot;
+        synchronized (guard) {
+            changed = state == KafkaPartitionState.LEADER_WRITABLE;
+            if (changed) {
+                state = KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED;
+                admittedEndOffset = stableSnapshot.stableEndOffset();
+            }
+            snapshot = stableSnapshot;
+        }
+        if (changed) publishEvent(KafkaPartitionEventType.LEADERSHIP_LOST, snapshot);
+    }
+
+    private static boolean validRenewal(AppendSession previous, AppendSession renewed) {
+        return renewed != null
+                && renewed.streamId().equals(previous.streamId())
+                && renewed.writerId().equals(previous.writerId())
+                && renewed.epoch() == previous.epoch()
+                && renewed.fencingToken().equals(previous.fencingToken())
+                && renewed.leaseVersion() > previous.leaseVersion()
+                && renewed.expiresAtMillis() > previous.expiresAtMillis();
+    }
+
+    private static Duration positive(Duration value, String name) {
+        Objects.requireNonNull(value, name);
+        boolean valid;
+        try {
+            valid = !value.isZero() && !value.isNegative() && value.toMillis() > 0;
+        } catch (ArithmeticException failure) {
+            valid = false;
+        }
+        if (!valid) {
+            throw new IllegalArgumentException(name + " must be positive and millisecond-representable");
+        }
+        return value;
     }
 
     private boolean finishResignIfDrained() {

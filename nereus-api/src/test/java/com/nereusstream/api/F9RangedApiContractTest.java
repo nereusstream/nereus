@@ -169,6 +169,19 @@ class F9RangedApiContractTest {
     }
 
     @Test
+    void legacyProviderRejectsExplicitSessionRenewalWithoutThrowingFromValidation() {
+        LegacyStorage storage = new LegacyStorage();
+
+        assertThat(failure(storage.renewAppendSession(storage.appendSession, Duration.ofSeconds(1))).code())
+                .isEqualTo(ErrorCode.UNSUPPORTED_APPEND_AUTHORITY);
+        assertThat(failure(storage.renewAppendSession(storage.appendSession, Duration.ofNanos(1))).code())
+                .isEqualTo(ErrorCode.INVALID_ARGUMENT);
+        assertThat(failure(storage.renewAppendSession(
+                        storage.appendSession, Duration.ofSeconds(Long.MAX_VALUE))).code())
+                .isEqualTo(ErrorCode.INVALID_ARGUMENT);
+    }
+
+    @Test
     void legacyProviderWrapsOnlyLegacyEquivalentReadRequest() {
         LegacyStorage storage = new LegacyStorage();
         ReadRequest legacy = new ReadRequest(
@@ -252,6 +265,8 @@ class F9RangedApiContractTest {
                 "read", StreamId.class, ReadRequest.class).isDefault()).isTrue();
         assertThat(StreamStorage.class.getMethod(
                 "acquireAppendSession", StreamId.class, AppendSessionRequest.class).isDefault()).isTrue();
+        assertThat(StreamStorage.class.getMethod(
+                "renewAppendSession", AppendSession.class, Duration.class).isDefault()).isTrue();
         assertThat(StreamStorage.class.getMethod(
                 "append", StreamId.class, AppendBatch.class, AppendOptions.class).isDefault()).isFalse();
         assertThat(StreamStorage.class.getMethod(

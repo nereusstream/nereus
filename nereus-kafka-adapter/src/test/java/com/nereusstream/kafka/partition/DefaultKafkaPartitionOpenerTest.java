@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,7 @@ class DefaultKafkaPartitionOpenerTest {
         assertThat(storage.storageProfile()).isEqualTo(plan.profilePolicy().storageProfile());
         assertThat(storage.state()).isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
         assertThat(storage.stableSnapshot()).isEqualTo(KafkaStableSnapshot.nonTransactional(0, 0, 0));
+        storage.resign().join();
     }
 
     @Test
@@ -115,6 +117,12 @@ class DefaultKafkaPartitionOpenerTest {
                 streams,
                 "broker-run",
                 Duration.ofSeconds(30),
+                Duration.ofSeconds(10),
+                Executors.newSingleThreadScheduledExecutor(runnable -> {
+                    Thread thread = new Thread(runnable, "opener-test-renewal");
+                    thread.setDaemon(true);
+                    return thread;
+                }),
                 launcher,
                 new KafkaAppendBatchEncoder(codec),
                 new KafkaFetchAssembler(codec),

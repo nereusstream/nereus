@@ -20,7 +20,9 @@ storage profile policy 已冻结五个 canonical profile，并禁止 request ack
 binding-first storage manager 已把 deterministic ACTIVE binding、exact profile、leader authority 和 remaining recovery
 deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/authority/durable-digest snapshot seam 也已落地，
 并支持 genesis commitVersion `0`。Exact commit-ancestor reachability、source validator 与 concrete
-session/head/recovery opener 已组装；session 周期续租、Kafka fork callback/runtime wiring 和真实 KRaft gate 尚未闭合。
+session/head/recovery opener 已组装；public binary-safe session renewal 与 partition-owned periodic renewal 已落地，
+renew failure/invalid token 会立即 write-fence 且阻止 queued append dispatch。Kafka fork callback/runtime wiring 和真实
+KRaft gate 尚未闭合。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 

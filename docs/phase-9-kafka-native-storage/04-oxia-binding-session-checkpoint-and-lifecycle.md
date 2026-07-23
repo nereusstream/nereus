@@ -328,6 +328,15 @@ configured scan budget fails retriably instead of returning a false proof。Prod
 This supplies the concrete validator without exposing Oxia records through the adapter；same-version digest equality is never
 used to validate an older checkpoint against a newer head。
 
+### 5.6 Public exact-session renewal API（implemented 2026-07-23）
+
+`StreamStorage.renewAppendSession(AppendSession, Duration)` is a binary-safe default。Null、non-positive、sub-millisecond
+or millisecond-overflow TTL returns `INVALID_ARGUMENT`；a legacy provider returns `UNSUPPORTED_APPEND_AUTHORITY` without
+receiving an acquire fallback。`DefaultStreamStorage` delegates through `AppendSessionManager` only when the session writer
+matches `StreamStorageConfig.writerId`，then production/fake Oxia performs the existing exact stream/writer/epoch/token CAS。
+The returned session retains authority identity、epoch and fencing token while strictly advancing lease version/expiry；the
+head digest/version changes because the renewed session is durable state。
+
 ## 6. Binding creation state machine
 
 ```text
@@ -408,8 +417,12 @@ deadline；same authority may share an open only when stream ID/name and profile
 desired local term before any late opener result can install。`DefaultKafkaPartitionOpener` now acquires the exact authority
 session、uses `DefaultKafkaCheckpointSourceValidator` to freeze ACTIVE profile/head/session facts、launches one fresh existing
 checkpoint/replay coordinator under the remaining deadline、validates the returned frozen range and constructs
-`DefaultKafkaPartitionStorage`。The launcher remains the Kafka-fork state hydration/publication seam。Periodic session renewal
-and the fork callback wiring remain open；neither may bypass opener/source revalidation。
+`DefaultKafkaPartitionStorage`。The opener also injects the runtime-owned renewal scheduler、session TTL and interval；the
+storage renews only its current exact recovered token。A renewal failure or non-monotonic/mismatched result immediately removes
+write admission，resets speculative admission to the last stable end and publishes `LEADERSHIP_LOST`。An already-dispatched
+append is not cancelled because it may commit；after its exact completion no queued successor is dispatched。`resign()` cancels
+the pending timer but does not close the shared scheduler。The launcher remains the Kafka-fork state hydration/publication seam，
+and fork callback wiring remains open；neither may bypass opener/source revalidation。
 
 If no checkpoint：
 
@@ -671,6 +684,9 @@ F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kaf
   constructors；explicit dual V1/V2 codecs preserve every frozen Phase 1 V1 golden envelope byte；
 - both fake and production Oxia metadata stores execute authority comparison inside the existing stream-head CAS；renewal
   preserves authority and a legacy acquisition is rejected for `EXTERNAL_MONOTONIC_TERM_V1` streams even after expiry；
+- public `StreamStorage.renewAppendSession` and `AppendSessionManager.renew` expose that exact CAS without leaking Oxia；
+  `DefaultKafkaPartitionStorageTest` proves monotonic token installation、later append propagation、renewal-failure fencing、
+  leadership-loss publication and queued-append drain while preserving the real outcome of the already-dispatched append；
 - `StreamHeadV2CodecTest`、`KafkaLeaderAuthorityPropertyTest` and `KafkaLeaderAuthorityIntegrationTest` prove V1 decode,
   V2 round trip, schema mismatch rejection, leader/broker term ordering, immediate live-session preemption and old-session
   fencing；

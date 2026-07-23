@@ -73,6 +73,32 @@ public final class AppendSessionManager {
                 .thenApply(record -> new AcquiredAppendSession(cacheRecord(record), record.authority()));
     }
 
+    public CompletableFuture<AppendSession> renew(AppendSession session, java.time.Duration ttl) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(ttl, "ttl");
+        if (!config.writerId().equals(session.writerId())) {
+            return NereusException.failedFuture(
+                    ErrorCode.FENCED_APPEND,
+                    false,
+                    "append session writerId must match StreamStorageConfig.writerId");
+        }
+        long ttlMillis = durationMillis(ttl);
+        if (ttl.isZero() || ttl.isNegative() || ttlMillis <= 0 || ttlMillis == Long.MAX_VALUE) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "append session renewal TTL must be positive and millisecond-representable");
+        }
+        return metadataStore.renewAppendSession(
+                        config.cluster(),
+                        session.streamId(),
+                        session.writerId(),
+                        session.epoch(),
+                        session.fencingToken(),
+                        ttl)
+                .thenApply(this::cacheRecord);
+    }
+
     CompletableFuture<AppendSession> ensureSession(
             StreamId streamId,
             Optional<AppendSession> supplied,

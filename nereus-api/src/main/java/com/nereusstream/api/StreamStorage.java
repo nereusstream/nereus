@@ -15,6 +15,7 @@
 package com.nereusstream.api;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 /** Protocol-neutral L0 storage API. */
@@ -48,6 +49,29 @@ public interface StreamStorage extends AutoCloseable {
                 ErrorCode.UNSUPPORTED_APPEND_AUTHORITY,
                 false,
                 "storage provider does not support external append authority");
+    }
+
+    /** Renews the exact append-session token while preserving any durable external authority binding. */
+    default CompletableFuture<AppendSession> renewAppendSession(
+            AppendSession session,
+            Duration ttl) {
+        if (session == null || ttl == null || ttl.isZero() || ttl.isNegative()) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "valid append session and renewal TTL are required");
+        }
+        try {
+            if (ttl.toMillis() <= 0) {
+                return NereusException.failedFuture(
+                        ErrorCode.INVALID_ARGUMENT, false, "append session renewal TTL must include a millisecond");
+            }
+        } catch (ArithmeticException failure) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "append session renewal TTL is outside millisecond range");
+        }
+        return NereusException.failedFuture(
+                ErrorCode.UNSUPPORTED_APPEND_AUTHORITY,
+                false,
+                "storage provider does not support explicit append-session renewal");
     }
 
     CompletableFuture<AppendResult> append(

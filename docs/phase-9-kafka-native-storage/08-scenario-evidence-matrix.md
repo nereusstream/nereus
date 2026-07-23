@@ -53,8 +53,9 @@ stale-resign isolation 的 deterministic partial evidence，但不替代 durable
 mismatch、stale resign、drain-before-delete 与 late-open fencing 的 deterministic composition evidence，但不替代真实
 Oxia/KRaft process cuts；stable-head API/metadata/core、source-validator 与 default-opener tests 为
 KF-META-006/007/009 的 exact authority/head observation、descendant-bound commit reachability 和 recovery composition
-提供 deterministic partial evidence，但 session 周期续租、fork runtime wiring 与 real process cuts 尚未闭合。各 row
-状态仍不标记为完整通过。
+提供 deterministic partial evidence；public exact-session renewal 和 partition scheduler tests 进一步覆盖 renewal token
+传播、strict monotonic validation、failure fencing、leadership-loss publication 与 queued-append drain，但 fork runtime
+wiring 与 real process cuts 尚未闭合。各 row 状态仍不标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。

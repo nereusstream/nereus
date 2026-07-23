@@ -119,6 +119,12 @@ class DefaultStreamStorageAppendTest {
                     stableHead.commitAnchor(), firstHead.lastCommitId(), stableHead.commitVersion()).join()).isFalse();
             assertThat(context.storage.isCommitReachable(
                     firstHead.commitAnchor(), stableHead.lastCommitId(), stableHead.commitVersion()).join()).isFalse();
+            AppendSession beforeRenewal = stableHead.appendSession().orElseThrow().session();
+            AppendSession renewed = context.storage.renewAppendSession(
+                    beforeRenewal, Duration.ofSeconds(30)).join();
+            assertThat(renewed.fencingToken()).isEqualTo(beforeRenewal.fencingToken());
+            assertThat(renewed.epoch()).isEqualTo(beforeRenewal.epoch());
+            assertThat(renewed.leaseVersion()).isGreaterThan(beforeRenewal.leaseVersion());
         }
     }
 

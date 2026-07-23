@@ -571,6 +571,16 @@ public final class DefaultStreamStorage implements StreamStorage {
     }
 
     @Override
+    public CompletableFuture<AppendSession> renewAppendSession(
+            AppendSession session,
+            Duration ttl) {
+        Objects.requireNonNull(session, "session");
+        Objects.requireNonNull(ttl, "ttl");
+        CompletableFuture<AppendSession> rejection = rejectIfClosed();
+        return rejection != null ? rejection : appendSessionManager.renew(session, ttl);
+    }
+
+    @Override
     public CompletableFuture<AppendResult> append(
             StreamId streamId,
             AppendBatch batch,

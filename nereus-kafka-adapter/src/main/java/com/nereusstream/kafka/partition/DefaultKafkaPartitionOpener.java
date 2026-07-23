@@ -20,12 +20,15 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 
 /** Product-owned composition of authority acquisition, exact source recovery, and leader storage construction. */
 public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     private final StreamStorage streams;
     private final String writerId;
     private final Duration sessionTtl;
+    private final Duration renewalInterval;
+    private final ScheduledExecutorService renewalScheduler;
     private final KafkaPartitionRecoveryLauncher recoveryLauncher;
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
@@ -35,6 +38,8 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
             StreamStorage streams,
             String writerId,
             Duration sessionTtl,
+            Duration renewalInterval,
+            ScheduledExecutorService renewalScheduler,
             KafkaPartitionRecoveryLauncher recoveryLauncher,
             KafkaAppendBatchEncoder appendEncoder,
             KafkaFetchAssembler fetchAssembler,
@@ -42,6 +47,11 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
         this.streams = Objects.requireNonNull(streams, "streams");
         this.writerId = requireText(writerId, "writerId");
         this.sessionTtl = positive(sessionTtl, "sessionTtl");
+        this.renewalInterval = positive(renewalInterval, "renewalInterval");
+        if (renewalInterval.compareTo(sessionTtl) >= 0) {
+            throw new IllegalArgumentException("renewalInterval must be shorter than sessionTtl");
+        }
+        this.renewalScheduler = Objects.requireNonNull(renewalScheduler, "renewalScheduler");
         this.recoveryLauncher = Objects.requireNonNull(recoveryLauncher, "recoveryLauncher");
         this.appendEncoder = Objects.requireNonNull(appendEncoder, "appendEncoder");
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
@@ -104,7 +114,10 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 recovered.recovered().frozenSource(),
                 plan.profilePolicy(),
                 appendEncoder,
-                fetchAssembler);
+                fetchAssembler,
+                renewalScheduler,
+                sessionTtl,
+                renewalInterval);
     }
 
     private RecoveredOpen validateRecovered(

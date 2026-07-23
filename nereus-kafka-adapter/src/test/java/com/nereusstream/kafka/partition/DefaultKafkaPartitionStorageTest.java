@@ -26,6 +26,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.common.record.CompressionType;
 import org.junit.jupiter.api.Test;
 
@@ -203,6 +209,10 @@ class DefaultKafkaPartitionStorageTest {
                 ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
                         0, CompressionType.NONE, 1_000, "a")),
                 context(0, (short) 1));
+        CompletableFuture<KafkaStableAppendResult> queued = fixture.storage.append(
+                ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                        1, CompressionType.NONE, 2_000, "b")),
+                context(1, (short) 1));
 
         CompletableFuture<Void> resign = fixture.storage.resign();
 
@@ -210,11 +220,15 @@ class DefaultKafkaPartitionStorageTest {
         assertThat(resign).isNotDone();
         assertFailureCode(fixture.storage.append(
                 ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
-                        1, CompressionType.NONE, 2_000, "b")),
-                context(1, (short) 1)), ErrorCode.FENCED_APPEND);
+                        2, CompressionType.NONE, 3_000, "c")),
+                context(2, (short) 1)), ErrorCode.FENCED_APPEND);
 
         fixture.streams.completeNextSuccess();
         append.join();
+        assertThat(fixture.streams.appendCalls()).isEqualTo(2);
+        assertThat(resign).isNotDone();
+        fixture.streams.completeNextSuccess();
+        queued.join();
         resign.join();
         assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.CLOSED);
         assertThatThrownBy(() -> fixture.storage.read(readRequest(0, 1, 1_024, true)).join())
@@ -263,6 +277,75 @@ class DefaultKafkaPartitionStorageTest {
                 .hasMessageContaining("exact recovered authority session");
     }
 
+    @Test
+    void renewsTheExactSessionAndUsesTheNewLeaseForLaterAppends() throws Exception {
+        Fixture fixture = fixture(0, 0);
+        ManualRenewalScheduler scheduler = new ManualRenewalScheduler();
+        DefaultKafkaPartitionStorage storage = renewingStorage(fixture, scheduler);
+        try {
+            scheduler.fireRenewal();
+            AppendSession renewed = new AppendSession(
+                    fixture.session.session().streamId(),
+                    fixture.session.session().writerId(),
+                    fixture.session.session().epoch(),
+                    fixture.session.session().fencingToken(),
+                    fixture.session.session().leaseVersion() + 1,
+                    fixture.session.session().expiresAtMillis() + 100_000);
+            fixture.streams.completeRenewal(renewed);
+
+            CompletableFuture<KafkaStableAppendResult> append = storage.append(
+                    ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                            0, CompressionType.NONE, 1_000, "renewed")),
+                    context(0, (short) 1));
+
+            assertThat(fixture.streams.pendingOptions().appendSession()).contains(renewed);
+            fixture.streams.completeNextSuccess();
+            assertThat(append.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+            assertThat(fixture.streams.renewalCalls()).isGreaterThanOrEqualTo(1);
+            storage.resign().get(5, TimeUnit.SECONDS);
+        } finally {
+            storage.resign();
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
+    void renewalFailureFencesWritesAndPublishesLeadershipLoss() throws Exception {
+        Fixture fixture = fixture(0, 0);
+        ManualRenewalScheduler scheduler = new ManualRenewalScheduler();
+        DefaultKafkaPartitionStorage storage = renewingStorage(fixture, scheduler);
+        List<KafkaPartitionEventType> events = new ArrayList<>();
+        storage.subscribe(event -> events.add(event.type()));
+        try {
+            scheduler.fireRenewal();
+            CompletableFuture<KafkaStableAppendResult> inFlight = storage.append(
+                    ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                            0, CompressionType.NONE, 1_000, "in-flight")),
+                    context(0, (short) 1));
+            CompletableFuture<KafkaStableAppendResult> queued = storage.append(
+                    ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                            1, CompressionType.NONE, 2_000, "queued")),
+                    context(1, (short) 1));
+            fixture.streams.failRenewal(new NereusException(
+                    ErrorCode.METADATA_UNAVAILABLE, true, "renewal unavailable"));
+
+            assertThat(storage.state()).isEqualTo(KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED);
+            assertThat(events).containsExactly(KafkaPartitionEventType.LEADERSHIP_LOST);
+            fixture.streams.completeNextSuccess();
+            assertThat(inFlight.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+            assertFailureCode(queued, ErrorCode.FENCED_APPEND);
+            assertThat(fixture.streams.appendCalls()).isEqualTo(1);
+            assertFailureCode(storage.append(
+                    ByteBuffer.wrap(KafkaPartitionStorageTestSupport.batch(
+                            1, CompressionType.NONE, 3_000, "rejected")),
+                    context(1, (short) 1)), ErrorCode.FENCED_APPEND);
+            storage.resign().get(5, TimeUnit.SECONDS);
+        } finally {
+            storage.resign();
+            scheduler.shutdownNow();
+        }
+    }
+
     private static Fixture fixture(long trimOffset, long endOffset) {
         KafkaPartitionIdentity identity = KafkaPartitionStorageTestSupport.identity();
         StreamId streamId = new StreamId("kafka-partition-stream");
@@ -309,6 +392,23 @@ class DefaultKafkaPartitionStorageTest {
                 new KafkaFetchAssembler(codec));
     }
 
+    private static DefaultKafkaPartitionStorage renewingStorage(
+            Fixture fixture, ScheduledExecutorService scheduler) {
+        KafkaRecordBatchCodec codec = new KafkaRecordBatchCodec();
+        return new DefaultKafkaPartitionStorage(
+                fixture.identity,
+                fixture.streams,
+                fixture.session.session().streamId(),
+                fixture.session,
+                fixture.source,
+                KafkaStorageProfilePolicy.forProfile(StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT),
+                new KafkaAppendBatchEncoder(codec),
+                new KafkaFetchAssembler(codec),
+                scheduler,
+                Duration.ofSeconds(30),
+                Duration.ofMillis(10));
+    }
+
     private static KafkaAppendContext context(long expectedStart, short requiredAcks) {
         return new KafkaAppendContext(
                 expectedStart, 5, requiredAcks, Duration.ofSeconds(5), Map.of("origin", "test"));
@@ -343,4 +443,44 @@ class DefaultKafkaPartitionStorageTest {
             AcquiredAppendSession session,
             KafkaCheckpointSourceState source,
             DefaultKafkaPartitionStorage storage) {}
+
+    private static final class ManualRenewalScheduler extends ScheduledThreadPoolExecutor {
+        private ManualScheduledFuture renewal;
+
+        private ManualRenewalScheduler() {
+            super(1);
+        }
+
+        @Override
+        public synchronized ScheduledFuture<?> schedule(
+                Runnable command, long delay, TimeUnit unit) {
+            if (renewal != null && !renewal.isDone()) {
+                throw new AssertionError("only one append-session renewal may be scheduled");
+            }
+            renewal = new ManualScheduledFuture(command);
+            return renewal;
+        }
+
+        private synchronized void fireRenewal() {
+            if (renewal == null) throw new AssertionError("append-session renewal was not scheduled");
+            renewal.run();
+        }
+    }
+
+    private static final class ManualScheduledFuture
+            extends FutureTask<Void> implements ScheduledFuture<Void> {
+        private ManualScheduledFuture(Runnable command) {
+            super(command, null);
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return 0;
+        }
+
+        @Override
+        public int compareTo(Delayed other) {
+            return 0;
+        }
+    }
 }
