@@ -87,7 +87,7 @@ storage profile policy 已冻结五个 canonical profile，并禁止 request ack
 M4 的首个产品侧切片新增 Kafka-artifact-neutral `KafkaProducerTransactionState` 和
 `KafkaProducerTransactionStateCodecV1`：section 1/2/7 按文档规定的 big-endian canonical layout 编码，严格校验
 排序、producer/current-open-transaction 等价、五批 duplicate window、sequence wrap、checkpoint offset、aborted
-transaction bounds、required/version/flags/count/truncation/EOF，并以 frozen digest 和 200 轮固定种子随机状态证明
+transaction marker offset 单调性及允许 LSO 低于 marker 的 stock 语义、required/version/flags/count/truncation/EOF，并以 frozen digest 和 200 轮固定种子随机状态证明
 decode/re-encode byte exact。当前只允许 normal checkpoint barrier；completed-but-not-finalized open transaction
 在没有显式 section flag 前 fail closed。该切片尚未导入 Kafka `ProducerStateManager`，也不解除 fork M3 对
 idempotent/transaction/control batches 的拒绝。

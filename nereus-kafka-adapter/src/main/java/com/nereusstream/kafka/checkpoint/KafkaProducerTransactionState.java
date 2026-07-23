@@ -149,20 +149,13 @@ public record KafkaProducerTransactionState(
                 throw new IllegalArgumentException(
                         "Kafka aborted transaction extends beyond the checkpoint");
             }
-            if (previous != null && compareAborted(previous, transaction) >= 0) {
+            if (previous != null
+                    && previous.lastOffset() >= transaction.lastOffset()) {
                 throw new IllegalArgumentException(
-                        "Kafka aborted transactions must be unique and strictly sorted");
+                        "Kafka aborted transaction marker offsets must be strictly increasing");
             }
             previous = transaction;
         }
-    }
-
-    private static int compareAborted(AbortedTransaction left, AbortedTransaction right) {
-        int byLastOffset = Long.compare(left.lastOffset(), right.lastOffset());
-        if (byLastOffset != 0) return byLastOffset;
-        int byFirstOffset = Long.compare(left.firstOffset(), right.firstOffset());
-        if (byFirstOffset != 0) return byFirstOffset;
-        return Long.compare(left.producerId(), right.producerId());
     }
 
     private static int incrementSequence(int sequence) {
@@ -264,7 +257,7 @@ public record KafkaProducerTransactionState(
                     || producerId < 0
                     || firstOffset < 0
                     || lastOffset < firstOffset
-                    || lastStableOffset <= lastOffset) {
+                    || lastStableOffset < 0) {
                 throw new IllegalArgumentException("invalid Kafka aborted transaction");
             }
         }

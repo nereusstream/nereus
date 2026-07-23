@@ -143,7 +143,7 @@ section flag is assigned and frozen；accepting an unflagged entry is forbidden�
 ```text
 sectionVersion:u16 = 1
 entryCount:u32
-for entries sorted (lastOffset, firstOffset, producerId):
+for entries sorted by strictly increasing lastOffset:
   kafkaAbortedTxnVersion:i16
   producerId:i64
   firstOffset:i64
@@ -152,9 +152,11 @@ for entries sorted (lastOffset, firstOffset, producerId):
 ```
 
 Fields match Kafka `AbortedTxn` semantics，not its Java buffer layout。Entries must be non-overflowing、within checkpoint
-history，and monotonic for search。Entries with `lastOffset < current logStartOffset` may be pruned at checkpoint creation。
-The current product codec implements this canonical payload and requires strict `(lastOffset, firstOffset, producerId)`
-ordering；the fork-side `TransactionIndex` import/filter bridge remains open。
+history，and monotonic for search。`lastStableOffset` is non-negative and may be lower than `lastOffset` when another earlier
+transaction remains unstable；it must not be validated as the marker's successor。Entries with
+`lastOffset < current logStartOffset` may be pruned at checkpoint creation。The current product codec implements this
+canonical payload and requires strictly increasing marker offsets，matching stock `TransactionIndex.append`；the fork-side
+`TransactionIndex` import/filter bridge remains open。
 
 ### 4.4 `NereusTransactionIndex`
 

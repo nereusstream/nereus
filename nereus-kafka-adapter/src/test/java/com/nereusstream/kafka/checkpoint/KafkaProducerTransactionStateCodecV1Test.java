@@ -139,14 +139,33 @@ class KafkaProducerTransactionStateCodecV1Test {
     @Test
     void rejectsAbortedTransactionOrderingAndCheckpointOverflow() {
         AbortedTransaction later = new AbortedTransaction((short) 0, 1, 3, 7, 8);
-        AbortedTransaction earlier = new AbortedTransaction((short) 0, 2, 1, 4, 5);
+        AbortedTransaction earlier = new AbortedTransaction((short) 0, 2, 1, 4, 2);
 
         assertThatThrownBy(() -> new KafkaProducerTransactionState(
                 10, List.of(), List.of(), List.of(later, earlier)))
-                .hasMessageContaining("strictly sorted");
+                .hasMessageContaining("strictly increasing");
         assertThatThrownBy(() -> new KafkaProducerTransactionState(
                 7, List.of(), List.of(), List.of(later)))
                 .hasMessageContaining("extends beyond");
+
+        KafkaProducerTransactionState overlapping = new KafkaProducerTransactionState(
+                20,
+                List.of(),
+                List.of(),
+                List.of(
+                        new AbortedTransaction((short) 0, 2, 1, 10, 2),
+                        new AbortedTransaction((short) 0, 3, 5, 15, 13)));
+        assertThat(codec.decodeSections(codec.encodeSections(overlapping, 20), 20))
+                .isEqualTo(overlapping);
+
+        assertThatThrownBy(() -> new KafkaProducerTransactionState(
+                20,
+                List.of(),
+                List.of(),
+                List.of(
+                        new AbortedTransaction((short) 0, 2, 1, 10, 2),
+                        new AbortedTransaction((short) 0, 3, 5, 10, 13))))
+                .hasMessageContaining("strictly increasing");
     }
 
     @Test
