@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges and stock Partition/ReplicaManager request seam implemented；runtime installation remains open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges、stock Partition/ReplicaManager request seam and manager-to-Partition lookup lifecycle implemented；metadata-publisher invocation remains open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -364,10 +364,12 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
-消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `f36b9123a6` 落地
+消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `16377ac44b` 落地
 `NereusRecordTimestampInspector`、`NereusListOffsetsBridge`、`NereusListOffsetsScanConfig` 和
 `NereusKafkaExceptionMapper`，并通过 Kafka-only `LeaderEpochAwareOffsetLookup` 接入 stock `Partition`/
-`ReplicaManager` request path。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
+`ReplicaManager` request path。`NereusListOffsetsLifecycle` 包装 product-owned manager，在 manager 返回 fully recovered
+writable storage 后构造 resolver/bridge 并安装到相同 leader epoch；它不创建第二份 storage，也不接管 durable
+authority/recovery。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading
@@ -624,8 +626,11 @@ timestamp 映射成 adapter query，复用 Kafka 已有 `AsyncOffsetReadFutureHo
 timeout 的 Kafka protocol 语义。Kafka-only `LeaderEpochAwareOffsetLookup` 不依赖 Nereus artifact；stock `Partition`
 只允许 current leader epoch 安装，按 identity/epoch 移除，并在 higher epoch、follower、offline/delete transition
 撤销；`ReplicaManager.fetchOffset` 把 callback 接到现有 delayed ListOffsets purgatory。三个 bridge test classes 的
-12 tests 加三个 stock lifecycle tests、core/storage checkstyle、SpotBugs、Spotless 与无 Nereus 参数的 stock test
-均通过。`UnifiedLog`/factory/runtime lookup installation、
+12 tests、`NereusListOffsetsLifecycleTest` 的 7 tests 加三个 stock lifecycle tests、core/storage checkstyle、
+SpotBugs、Spotless 与无 Nereus 参数的 stock test 均通过。runtime lifecycle 对 open 做 topic ID/name/partition、
+stock leader state/epoch 和 manager-result identity/epoch/profile/writable-state 双重校验；only-after-recovery install，
+resign/delete/shutdown 先撤销 lookup 再委托 manager，安装失败先 resign recovered storage 再失败 open，late old open
+按旧 epoch 清理且不能移除新 lookup。`UnifiedLog`/factory/metadata-publisher lifecycle invocation、
 leader-epoch cache、`KafkaVirtualPositionIndex`、`NereusTimeIndex` section codec、restart recovery、remote branch push 与
 真实 KRaft baseline integration tests 仍为 open M3/M4 work。
 

@@ -392,16 +392,19 @@ baseline-only completion evidence。
 `nereus/future9-native-kafka-storage` 从该 base 创建；首个 exact-record bridge commit 是
 `2379c63933dd0a155d5a5bf90fca85c7b24db58b`，第二个 async ListOffsets/error-mapping commit 是
 `c2b1b4b3a00fb7cfa222a3e6df659011795f3b3e`，第三个 stock request-path seam commit 是
-`f36b9123a6322c41ea25ee4544196f7e689ed625`。
+`f36b9123a6322c41ea25ee4544196f7e689ed625`，第四个 recovered-storage lookup lifecycle commit 是
+`16377ac44b20b7c010e697b22fce5a2e55cb02ac`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/three-commit count/version、Apache 与组织 remote
-identity、cached organization trunk ancestry、十三文件 exact change set/blob、成对 inject marker、adapter/async bridge/
-exception-mapper method signature 和 package-wide no-reflection
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/four-commit count/version、Apache 与组织 remote
+identity、cached organization trunk ancestry、十五文件 exact change set/blob、成对 inject marker、adapter/async bridge/
+exception-mapper/lifecycle method signature 和 package-wide no-reflection
 规则。`publishPhase9DevelopmentArtifacts` 只把 `0.1.0-f9-dev` 发布到 Nereus build 目录的隔离 Maven repository；
 fork build 必须显式同时传入 repository 与 version，缺任一参数即 configuration failure，不读取 Maven local。
 `phase9M3KafkaForkStockCheck` 不传参数验证 stock core compile/checkstyle；
-`phase9M3KafkaForkBridgeCheck` 传 exact 参数运行 record inspector、async ListOffsets、error mapping 的 12 个 tests 和
-stock `Partition` lookup lifecycle 的 3 个 tests，以及 core/storage checkstyle、SpotBugs 与 Spotless。
+`phase9M3KafkaForkBridgeCheck` 传 exact 参数运行 record inspector、async ListOffsets、error mapping 的 12 个 tests、
+manager-to-Partition lookup lifecycle 的 7 个 tests 和 stock `Partition` seam 的 3 个 tests，以及 core/storage
+checkstyle、SpotBugs 与 Spotless。lifecycle 只消费 manager 返回的已恢复 writable storage，不重建 storage/recovery；
+安装失败会按旧 epoch 调用 manager resign，stale resign 和 late old open 都不能移除新 lookup。
 
 当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
 development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求

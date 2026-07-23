@@ -4,7 +4,7 @@
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development lock：local `nereus/future9-native-kafka-storage@f36b9123a6322c41ea25ee4544196f7e689ed625` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
+> Kafka fork development lock：local `nereus/future9-native-kafka-storage@16377ac44b20b7c010e697b22fce5a2e55cb02ac` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -20,16 +20,18 @@ resolver 已以单一 stable snapshot 支持 exact earliest/latest 和由 fork r
 timestamp committed-tail scan；fork 已把该 resolver 转为 Kafka `OffsetResultHolder` 的同步/异步结果并接好取消、
 delayed-operation wakeup 与错误映射；stock `Partition` 已支持同 leader epoch 的 lookup install/remove 并在 epoch/
 follower/offline/delete 时撤销，`ReplicaManager.fetchOffset` 已把完成唤醒接到现有 delayed ListOffsets purgatory。
-`UnifiedLog`/factory/lifecycle runtime installation、checkpoint time-index candidate、五档 real-service profile matrix 与
+fork-owned `NereusListOffsetsLifecycle` 现把同一个 manager-returned recovered storage 组装为 resolver/bridge，并保证
+stock leader epoch publication 之后才安装、resign/delete/shutdown 之前先 identity-safe 撤销；late old open 和 stale
+resign 均不能覆盖或移除新 lookup。`UnifiedLog`/factory、metadata-publisher lifecycle invocation、checkpoint time-index candidate、五档 real-service profile matrix 与
 真实 KRaft Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
-stock Kafka 4.3 `MemoryRecords` 实现，15 个 fork/request-path tests 和 core/storage checkstyle/SpotBugs/Spotless 已通过；当前 GitHub credential 对
+stock Kafka 4.3 `MemoryRecords` 实现，22 个 fork/request-path tests 和 core/storage checkstyle/SpotBugs/Spotless 已通过；当前 GitHub credential 对
 组织 fork 只有 read 权限，所以该 commit 尚未推送，不能升级为 production fork lock。Kafka
 storage profile policy 已冻结五个 canonical profile，并禁止 request acks 弱化 profile default durability/completion。
 binding-first storage manager 已把 deterministic ACTIVE binding、exact profile、leader authority 和 remaining recovery
 deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/authority/durable-digest snapshot seam 也已落地，
 并支持 genesis commitVersion `0`。Exact commit-ancestor reachability、source validator 与 concrete
 session/head/recovery opener 已组装；public binary-safe session renewal 与 partition-owned periodic renewal 已落地，
-renew failure/invalid token 会立即 write-fence 且阻止 queued append dispatch。Kafka fork callback/runtime wiring 和真实
+renew failure/invalid token 会立即 write-fence 且阻止 queued append dispatch。Kafka fork metadata callback/broker runtime wiring 和真实
 KRaft gate 尚未闭合。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。

@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "3" ]] \
-    || fail "expected three reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "4" ]] \
+    || fail "expected four reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -60,16 +60,18 @@ core/src/main/java/kafka/log/nereus/NereusListOffsetsBridge.java
 core/src/main/java/kafka/log/nereus/NereusListOffsetsScanConfig.java
 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
 core/src/main/scala/kafka/cluster/Partition.scala
+core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
 core/src/main/scala/kafka/server/ReplicaManager.scala
 core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
+core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOffsetLookup.java
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed thirteen-file bridge"
+    || fail "fork change set differs from the reviewed fifteen-file bridge/lifecycle slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -77,18 +79,20 @@ while read -r expected path; do
     [[ "$actual" == "$expected" ]] \
         || fail "fork source drifted: $path expected $expected, got $actual"
 done <<'LOCKS'
-f564fde6c76eef4913b2b82fa96e952d68293bf8 build.gradle
+eebf0d6ddc8bcdd57fc1dcfb79c30d8945000331 build.gradle
 5fa025b8a70a52364d5a9bfdbff092f63ae7563d checkstyle/import-control-core.xml
 60dbfb45a00f3c007c624ea31c1aca32ea49a8b2 core/src/main/java/kafka/log/nereus/NereusKafkaExceptionMapper.java
 47eca0ad9a439e952794b2030d46c5b48714a839 core/src/main/java/kafka/log/nereus/NereusListOffsetsBridge.java
 6f1e5f76fb4ed51f786e7f07a22c3fc3f46cf9ae core/src/main/java/kafka/log/nereus/NereusListOffsetsScanConfig.java
 aadcc658a9e74de9798b06d674ecb784947c8762 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
 b17be9d830b44ed3a00cee03fb2ee0c2aa14aab9 core/src/main/scala/kafka/cluster/Partition.scala
+db85db65ccb5aff6074dad616d93791b9698240c core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
 8467478e391ed739cccee9cef16c1ab704e2b957 core/src/main/scala/kafka/server/ReplicaManager.scala
 f81ec4137daa9e9fff7b7262733ded7998c86eba core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 c2bd8e03152a23547044a42f439b33698ace4251 core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 205989c5d3adf68127d71be28c6ff9f521abcbf1 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 690f4ff0826499b250bc5753aa101f0ad5214b40 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
+811a02f2a81e6a353d5383d176b74fe7c00c7fdc core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 6a9a43c81b0b60e69fb95099a76d80e7894ba453 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOffsetLookup.java
 LOCKS
 
@@ -152,9 +156,22 @@ replica_manager="$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager
 grep -F -q 'delayedRemoteListOffsetsPurgatory.checkAndComplete' "$replica_manager" \
     || fail "ReplicaManager lost async ListOffsets wakeup"
 
+list_offsets_lifecycle="$kafka_checkout/core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala"
+grep -F -q 'storageManager.openLeader(request)' "$list_offsets_lifecycle" \
+    || fail "ListOffsets lifecycle no longer delegates leader recovery to the adapter manager"
+grep -F -q 'new KafkaListOffsetsResolver(storage, inspector)' "$list_offsets_lifecycle" \
+    || fail "ListOffsets lifecycle lost exact recovered-storage resolver construction"
+grep -F -q 'installLeaderEpochAwareOffsetLookup(attempt.request.leaderEpoch(), lookup)' "$list_offsets_lifecycle" \
+    || fail "ListOffsets lifecycle lost post-recovery exact-epoch installation"
+grep -F -q 'removeLeaderEpochAwareOffsetLookup(' "$list_offsets_lifecycle" \
+    || fail "ListOffsets lifecycle lost request-path revocation"
+grep -F -q 'storageManager.resign(identity, observedLeaderEpoch, timeout)' "$list_offsets_lifecycle" \
+    || fail "ListOffsets lifecycle no longer delegates resign to the adapter manager"
+
 if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
-        "$kafka_checkout/core/src/main/java/kafka/log/nereus"; then
+        "$kafka_checkout/core/src/main/java/kafka/log/nereus" \
+        "$kafka_checkout/core/src/main/scala/kafka/log/nereus"; then
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; three commits, thirteen bridge blobs and markers match"
+echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; four commits, fifteen bridge/lifecycle blobs and markers match"

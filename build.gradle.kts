@@ -2818,14 +2818,14 @@ tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
 
 tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
     group = "verification"
-    description = "Verify the local organization-fork F9 branch, exact bridge commits, markers, and source blobs."
+    description = "Verify the local organization-fork F9 branch, exact bridge/lifecycle commits, markers, and source blobs."
     usesService(kafkaCheckoutGate)
     workingDir = layout.projectDirectory.asFile
     commandLine(
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "f36b9123a6322c41ea25ee4544196f7e689ed625",
+        "16377ac44b20b7c010e697b22fce5a2e55cb02ac",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2873,7 +2873,7 @@ tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
 
 tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
     group = "verification"
-    description = "Run the Kafka fork record-inspector and async ListOffsets bridge tests against isolated F9 artifacts."
+    description = "Run the Kafka fork ListOffsets bridge and leader-lifecycle tests against isolated F9 artifacts."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     dependsOn("publishPhase9DevelopmentArtifacts")
     usesService(kafkaCheckoutGate)
