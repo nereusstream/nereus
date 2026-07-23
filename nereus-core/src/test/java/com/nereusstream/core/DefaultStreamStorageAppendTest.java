@@ -104,6 +104,12 @@ class DefaultStreamStorageAppendTest {
             StreamMetadata current = context.storage.getStreamMetadata(stream.streamId()).join();
             assertThat(current.committedEndOffset()).isEqualTo(3);
             assertThat(current.cumulativeSize()).isEqualTo(6);
+            var stableHead = context.storage.getStableHeadSnapshot(stream.streamId()).join();
+            assertThat(stableHead.committedEndOffset()).isEqualTo(3);
+            assertThat(stableHead.cumulativeSize()).isEqualTo(6);
+            assertThat(stableHead.commitVersion()).isEqualTo(2);
+            assertThat(stableHead.lastCommitId()).isNotBlank();
+            assertThat(stableHead.appendSession()).isPresent();
         }
     }
 

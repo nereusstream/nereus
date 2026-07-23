@@ -311,6 +311,20 @@ Stream attribute controls admissible calls：
 This prevents a legacy auto-acquire caller from waiting out TTL and stealing a Kafka stream。Pulsar streams retain current
 behavior。
 
+### 5.5 Exact stable-head snapshot API（implemented 2026-07-23）
+
+`StreamStorage.getStableHeadSnapshot(StreamId)` is a binary-safe default that unsupported providers fail closed；
+`DefaultStreamStorage` delegates to the metadata store exact head read。`StableStreamHeadSnapshot` exposes one atomic
+observation of stream state/profile、trim、committed end/cumulative size/commit version/last commit ID、optional exact
+`AcquiredAppendSession`（including authority）、metadata version and SHA-256 of the canonical durable `StreamHeadRecord`
+envelope。The digest is computed from metadata-version-zero durable bytes，not reconstructed from public metadata views。
+
+Production Oxia and `FakeOxiaMetadataStore` use the same `StableStreamHeadSnapshots` mapper。Authority renewal changes the
+digest and metadata version；empty streams are represented canonically by end/size/commitVersion `0` and empty lastCommitId。
+This API supplies the exact head half of the concrete Kafka opener/source validator without exposing Oxia records through the
+adapter。Commit-ancestor reachability remains a separate required seam；same-version digest equality alone must not validate
+an older checkpoint against a newer head。
+
 ## 6. Binding creation state machine
 
 ```text
@@ -389,7 +403,8 @@ No user append is admitted during steps 1–10。Materialization generation chan
 into `KafkaPartitionOpenPlan`，then delegates steps 2–10 to one `KafkaPartitionOpener` operation。The plan carries the remaining
 deadline；same authority may share an open only when stream ID/name and profile policy are identical。Delete/shutdown remove the
 desired local term before any late opener result can install。The concrete opener that acquires the session and composes current-
-head source validation with checkpoint recovery remains open M3 work。
+head source validation with checkpoint recovery remains open M3 work；the exact stable-head/session/digest read required by
+that opener is now available through `StreamStorage`，while commit-ancestor reachability remains open。
 
 If no checkpoint：
 

@@ -36,6 +36,7 @@ import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.SealOptions;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamCreateOptions;
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamMetadata;
 import com.nereusstream.api.StreamName;
@@ -627,6 +628,15 @@ public final class DefaultStreamStorage implements StreamStorage {
         Objects.requireNonNull(streamId, "streamId");
         CompletableFuture<StreamMetadata> rejection = rejectIfClosed();
         return rejection != null ? rejection : loadStreamMetadata(streamId);
+    }
+
+    @Override
+    public CompletableFuture<StableStreamHeadSnapshot> getStableHeadSnapshot(StreamId streamId) {
+        Objects.requireNonNull(streamId, "streamId");
+        CompletableFuture<StableStreamHeadSnapshot> rejection = rejectIfClosed();
+        return rejection != null
+                ? rejection
+                : metadataStore.getStableStreamHeadSnapshot(config.cluster(), streamId);
     }
 
     @Override

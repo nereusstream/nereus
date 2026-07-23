@@ -124,6 +124,22 @@ public interface StreamStorage extends AutoCloseable {
 
     CompletableFuture<StreamMetadata> getStreamMetadata(StreamId streamId);
 
+    /**
+     * Reads one exact durable stream-head observation for authority-bound recovery and checkpoint validation.
+     *
+     * <p>The default is binary safe and fails closed. Providers must not synthesize the digest from public metadata fields.
+     */
+    default CompletableFuture<StableStreamHeadSnapshot> getStableHeadSnapshot(StreamId streamId) {
+        if (streamId == null) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "stream ID is required");
+        }
+        return NereusException.failedFuture(
+                ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                false,
+                "storage provider does not expose exact stable stream-head snapshots");
+    }
+
     CompletableFuture<StreamMetadata> seal(StreamId streamId, SealOptions options);
 
     CompletableFuture<StreamMetadata> delete(StreamId streamId, DeleteOptions options);

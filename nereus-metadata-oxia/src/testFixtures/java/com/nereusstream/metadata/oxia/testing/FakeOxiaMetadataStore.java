@@ -32,6 +32,7 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.StreamCreateOptions;
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
@@ -81,6 +82,7 @@ import com.nereusstream.metadata.oxia.OxiaMetadataStore;
 import com.nereusstream.metadata.oxia.OffsetIndexEntry;
 import com.nereusstream.metadata.oxia.ProjectionIdentity;
 import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
+import com.nereusstream.metadata.oxia.StableStreamHeadSnapshots;
 import com.nereusstream.metadata.oxia.VersionedObjectProtection;
 import com.nereusstream.metadata.oxia.VersionedGcRetirementManifest;
 import com.nereusstream.metadata.oxia.VersionedGcRetirementProtection;
@@ -446,6 +448,12 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
                             observedAtMillis,
                             head.metadataVersion()));
         });
+    }
+
+    @Override
+    public CompletableFuture<StableStreamHeadSnapshot> getStableStreamHeadSnapshot(
+            String cluster, StreamId streamId) {
+        return complete(() -> StableStreamHeadSnapshots.from(headOrThrow(cluster, streamId)));
     }
 
     @Override

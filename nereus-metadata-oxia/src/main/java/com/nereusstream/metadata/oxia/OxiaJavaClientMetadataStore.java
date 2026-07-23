@@ -32,6 +32,7 @@ import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ProjectionRef;
 import com.nereusstream.api.StreamCreateOptions;
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
@@ -221,6 +222,13 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     @Override
     public CompletableFuture<StreamMetadataSnapshot> getStreamSnapshot(String cluster, StreamId streamId) {
         return complete(() -> snapshot(headOrThrow(new OxiaKeyspace(cluster), streamId)));
+    }
+
+    @Override
+    public CompletableFuture<StableStreamHeadSnapshot> getStableStreamHeadSnapshot(
+            String cluster, StreamId streamId) {
+        return complete(() -> StableStreamHeadSnapshots.from(
+                headOrThrow(new OxiaKeyspace(cluster), streamId)));
     }
 
     @Override

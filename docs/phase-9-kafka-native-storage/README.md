@@ -18,7 +18,8 @@ process-local leader manager 也已按 KRaft leader/broker term 拒绝 stale/con
 wiring、exact timestamp ListOffsets、五档 real-service profile matrix 与真实 KRaft Produce/Fetch 尚未实现。Kafka
 storage profile policy 已冻结五个 canonical profile，并禁止 request acks 弱化 profile default durability/completion。
 binding-first storage manager 已把 deterministic ACTIVE binding、exact profile、leader authority 和 remaining recovery
-deadline 冻结为 opener plan，但 concrete session/head/recovery opener 尚未组装。
+deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/authority/durable-digest snapshot seam 也已落地，
+并支持 genesis commitVersion `0`。commit-ancestor reachability 与 concrete session/head/recovery opener 尚未组装。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 

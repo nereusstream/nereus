@@ -11,6 +11,7 @@ import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StreamCreateOptions;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
@@ -46,11 +47,23 @@ class KafkaLeaderAuthorityIntegrationTest {
         assertThat(takeover.fencingToken()).isNotEqualTo(first.fencingToken());
         assertThat(takeover.authority()).contains(authority(8, "2", 3));
         assertFailure(() -> store.revalidateAppendSession("nereus", oldPublicSession).join(), ErrorCode.FENCED_APPEND);
+        StableStreamHeadSnapshot beforeRenew =
+                store.getStableStreamHeadSnapshot("nereus", streamId).join();
+        assertThat(beforeRenew.commitVersion()).isZero();
+        assertThat(beforeRenew.lastCommitId()).isEmpty();
+        assertThat(beforeRenew.appendSession().orElseThrow().authority())
+                .contains(authority(8, "2", 3));
+        assertThat(beforeRenew.appendSession().orElseThrow().session())
+                .isEqualTo(publicSession(streamId, takeover));
 
         AppendSessionRecord renewed = store.renewAppendSession(
                 "nereus", streamId, takeover.writerId(), takeover.epoch(), takeover.fencingToken(),
                 Duration.ofSeconds(2)).join();
         assertThat(renewed.authority()).isEqualTo(takeover.authority());
+        StableStreamHeadSnapshot afterRenew =
+                store.getStableStreamHeadSnapshot("nereus", streamId).join();
+        assertThat(afterRenew.durableHeadSha256()).isNotEqualTo(beforeRenew.durableHeadSha256());
+        assertThat(afterRenew.metadataVersion()).isGreaterThan(beforeRenew.metadataVersion());
 
         clock.set(renewed.expiresAtMillis() + 1);
         assertFailure(() -> store.acquireAppendSession(

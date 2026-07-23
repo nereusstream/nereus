@@ -22,6 +22,7 @@ import com.nereusstream.api.NereusException;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.StreamCreateOptions;
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamName;
 import com.nereusstream.metadata.oxia.records.AppendSessionRecord;
@@ -47,6 +48,10 @@ public interface OxiaMetadataStore extends AutoCloseable {
             StreamId streamId);
 
     CompletableFuture<StreamMetadataSnapshot> getStreamSnapshot(
+            String cluster,
+            StreamId streamId);
+
+    CompletableFuture<StableStreamHeadSnapshot> getStableStreamHeadSnapshot(
             String cluster,
             StreamId streamId);
 

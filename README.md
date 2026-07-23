@@ -3,7 +3,7 @@
 Nereus is a protocol-neutral shared-storage streaming engine currently delivered through its Pulsar-native
 integration. Native KRaft Kafka Future 9 has completed the F9-M1 foundation and F9-M2 metadata/checkpoint
 implementation；the Nereus-side F9-M3 byte-exact RecordBatch、serialized partition IO、bounded append execution、async
-Fetch-operation、binding-first leader manager and storage-profile policy slices are in progress，
+Fetch-operation、binding-first leader manager、exact stable-head snapshot and storage-profile policy slices are in progress，
 but no native Kafka broker capability is available yet. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a

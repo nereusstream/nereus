@@ -53,7 +53,7 @@ class DefaultKafkaPartitionStorageTest {
         assertThat(result.appendResult().range().startOffset()).isZero();
         assertThat(result.appendResult().range().endOffset()).isEqualTo(2);
         assertThat(result.stableSnapshot())
-                .isEqualTo(new KafkaStableSnapshot(0, 2, 2, 2, 2));
+                .isEqualTo(new KafkaStableSnapshot(0, 2, 2, 2, 1));
         assertThat(fixture.storage.stableSnapshot()).isEqualTo(result.stableSnapshot());
         assertThat(result.requiredAcks()).isEqualTo((short) 1);
     }
@@ -282,12 +282,13 @@ class DefaultKafkaPartitionStorageTest {
                 session.leaseVersion(),
                 trimOffset,
                 endOffset,
-                1,
-                "commit-1",
+                endOffset == 0 ? 0 : 1,
+                endOffset == 0 ? "" : "commit-1",
                 new Checksum(ChecksumType.SHA256, "00".repeat(32)),
                 false,
                 endOffset);
-        KafkaPartitionStreamStorageFake streams = new KafkaPartitionStreamStorageFake(streamId, endOffset, 1);
+        KafkaPartitionStreamStorageFake streams = new KafkaPartitionStreamStorageFake(
+                streamId, endOffset, endOffset == 0 ? 0 : 1);
         return new Fixture(identity, streams, acquired, source, storage(identity, streams, acquired, source));
     }
 

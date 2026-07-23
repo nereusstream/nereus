@@ -229,7 +229,7 @@ shared gate service。
 
 ### 5.1 Current implementation evidence（2026-07-23）
 
-- `phase9SourceLockCheck` locks AutoMQ `1c648d...` / `3.9.0-SNAPSHOT` and 21 current Nereus ranged-foundation source blobs；
+- `phase9SourceLockCheck` locks AutoMQ `1c648d...` / `3.9.0-SNAPSHOT` and 22 current Nereus ranged/head-foundation source blobs；
 - `phase9M1Check --rerun-tasks` passes API、conditional append/result、semantic read、Object WAL、BookKeeper、
   exact reader registry/capability and materialization tests；
 - `:nereus-object-store:rangedFormatS3IntegrationTest --rerun-tasks` passes NCP2 and NTC2 upload/read/full verification
@@ -366,6 +366,9 @@ coordinator/transaction/compaction remain M4/M5。
 - `DefaultKafkaPartitionStorageManagerTest` proves binding-before-open with the real deterministic lifecycle、exact
   binding/profile open plans、authority-open dedupe、operation-owned completion、stale-resign isolation、drain-before-delete and
   shutdown fencing。The injected opener still owns durable authority/session acquisition and fresh recovery；
+- `StableStreamHeadSnapshotTest`、`KafkaLeaderAuthorityIntegrationTest` and `DefaultStreamStorageAppendTest` prove the
+  protocol-neutral exact-head seam、canonical durable digest、authority-session projection、renewal digest change、core facade
+  delegation and genesis commitVersion `0`；checkpoint commit-ancestor reachability and concrete opener composition remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、

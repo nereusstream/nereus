@@ -13,7 +13,7 @@ public record KafkaStableSnapshot(
                 || lastStableOffset < logStartOffset
                 || highWatermark < lastStableOffset
                 || stableEndOffset < highWatermark
-                || commitVersion <= 0) {
+                || commitVersion < 0) {
             throw new IllegalArgumentException("invalid Kafka stable offset snapshot");
         }
     }
