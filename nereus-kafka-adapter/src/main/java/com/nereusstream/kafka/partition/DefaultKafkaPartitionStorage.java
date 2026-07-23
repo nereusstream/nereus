@@ -80,6 +80,8 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private KafkaPartitionState state = KafkaPartitionState.LEADER_WRITABLE;
     private KafkaStableSnapshot stableSnapshot;
     private long admittedEndOffset;
+    private long derivedOffsetsPendingEnd = -1;
+    private boolean derivedOffsetsInitialized;
     private boolean appendRunning;
     private boolean dispatching;
     private boolean dispatchRequested;
@@ -200,6 +202,61 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     }
 
     @Override
+    public KafkaStableSnapshot publishDerivedOffsets(
+            long expectedStableEndOffset,
+            long highWatermark,
+            long lastStableOffset) {
+        KafkaStableSnapshot published;
+        boolean startNext = false;
+        boolean completeResign = false;
+        synchronized (guard) {
+            if (state != KafkaPartitionState.LEADER_WRITABLE
+                    && state != KafkaPartitionState.WRITE_FENCED_RECOVERY_REQUIRED
+                    && state != KafkaPartitionState.RESIGNING) {
+                throw fenced("Kafka partition cannot publish derived offsets: " + state);
+            }
+            if (expectedStableEndOffset != stableSnapshot.stableEndOffset()
+                    || (derivedOffsetsPendingEnd >= 0
+                    && derivedOffsetsPendingEnd != expectedStableEndOffset)) {
+                throw new IllegalStateException(
+                        "Kafka derived offsets do not match the exact pending stable end");
+            }
+            if (highWatermark < stableSnapshot.logStartOffset()
+                    || highWatermark > expectedStableEndOffset
+                    || lastStableOffset < stableSnapshot.logStartOffset()
+                    || lastStableOffset > highWatermark) {
+                throw new IllegalArgumentException(
+                        "Kafka derived offsets are outside the stable snapshot");
+            }
+            if (derivedOffsetsInitialized
+                    && (highWatermark < stableSnapshot.highWatermark()
+                    || lastStableOffset < stableSnapshot.lastStableOffset())) {
+                throw new IllegalArgumentException(
+                        "Kafka derived offsets cannot move backward after initialization");
+            }
+            published = new KafkaStableSnapshot(
+                    stableSnapshot.logStartOffset(),
+                    expectedStableEndOffset,
+                    highWatermark,
+                    lastStableOffset,
+                    stableSnapshot.commitVersion());
+            stableSnapshot = published;
+            derivedOffsetsInitialized = true;
+            derivedOffsetsPendingEnd = -1;
+            if (!appendQueue.isEmpty() && !appendRunning) {
+                appendRunning = true;
+                startNext = true;
+            } else {
+                completeResign = finishResignIfDrained();
+            }
+        }
+        publishEvent(KafkaPartitionEventType.STABLE_APPEND, published);
+        if (completeResign) resigned.complete(null);
+        if (startNext) requestAppendDispatch();
+        return published;
+    }
+
+    @Override
     public CompletableFuture<KafkaStableAppendResult> append(
             ByteBuffer validatedRecords, KafkaAppendContext context) {
         Objects.requireNonNull(context, "context");
@@ -225,7 +282,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             }
             admittedEndOffset = encoded.range().endOffset();
             appendQueue.addLast(operation);
-            start = !appendRunning;
+            start = !appendRunning && derivedOffsetsPendingEnd < 0;
             if (start) appendRunning = true;
         }
         if (start) requestAppendDispatch();
@@ -303,7 +360,9 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             snapshot = stableSnapshot;
             renewal = renewalTask;
             renewalTask = null;
-            complete = !appendRunning && appendQueue.isEmpty();
+            complete = !appendRunning
+                    && appendQueue.isEmpty()
+                    && derivedOffsetsPendingEnd < 0;
             if (complete) state = KafkaPartitionState.CLOSED;
         }
         if (renewal != null) renewal.cancel(false);
@@ -379,8 +438,13 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                             || exact.range().startOffset() != stableSnapshot.stableEndOffset()) {
                         throw new IllegalStateException("Kafka stable append result is stale or non-contiguous");
                     }
-                    stableSnapshot = KafkaStableSnapshot.nonTransactional(
-                            stableSnapshot.logStartOffset(), exact.committedEndOffset(), exact.commitVersion());
+                    stableSnapshot = new KafkaStableSnapshot(
+                            stableSnapshot.logStartOffset(),
+                            exact.committedEndOffset(),
+                            stableSnapshot.highWatermark(),
+                            stableSnapshot.lastStableOffset(),
+                            exact.commitVersion());
+                    derivedOffsetsPendingEnd = exact.committedEndOffset();
                     success = new KafkaStableAppendResult(
                             exact, operation.encoded, stableSnapshot, operation.context.requiredAcks());
                 }
@@ -390,7 +454,6 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         }
 
         List<AppendOperation> rejected = List.of();
-        boolean startNext = false;
         boolean completeResign = false;
         boolean rejectBecauseFenced = false;
         synchronized (guard) {
@@ -410,7 +473,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                     appendRunning = false;
                     completeResign = finishResignIfDrained();
                 } else {
-                    startNext = true;
+                    appendRunning = false;
                 }
             } else {
                 boolean knownNotCommitted = isKnownNotCommitted(failure);
@@ -427,7 +490,6 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         }
 
         if (failure == null) {
-            publishEvent(KafkaPartitionEventType.STABLE_APPEND, success.stableSnapshot());
             operation.result.complete(success);
             NereusException rejectedFailure = fenced(
                     "Kafka append was rejected because partition authority renewal failed");
@@ -440,7 +502,6 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             rejected.forEach(value -> value.result.completeExceptionally(rejectedFailure));
         }
         if (completeResign) resigned.complete(null);
-        if (startNext) requestAppendDispatch();
     }
 
     private KafkaStorageReadResult assembleRead(
@@ -629,7 +690,10 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     }
 
     private boolean finishResignIfDrained() {
-        if (state == KafkaPartitionState.RESIGNING && !appendRunning && appendQueue.isEmpty()) {
+        if (state == KafkaPartitionState.RESIGNING
+                && !appendRunning
+                && appendQueue.isEmpty()
+                && derivedOffsetsPendingEnd < 0) {
             state = KafkaPartitionState.CLOSED;
             return true;
         }

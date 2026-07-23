@@ -223,7 +223,9 @@ class KafkaListOffsetsResolverTest {
                 new KafkaAppendContext(
                         startOffset, 5, (short) 1, Duration.ofSeconds(5), java.util.Map.of()));
         fixture.streams.completeNextSuccess();
-        append.join();
+        long stableEndOffset = append.join().stableSnapshot().stableEndOffset();
+        fixture.storage.publishDerivedOffsets(
+                stableEndOffset, stableEndOffset, stableEndOffset);
     }
 
     private static Fixture fixture() {

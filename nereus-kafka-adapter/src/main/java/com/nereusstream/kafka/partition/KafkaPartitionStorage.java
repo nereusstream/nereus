@@ -17,6 +17,21 @@ public interface KafkaPartitionStorage extends AutoCloseable {
 
     KafkaStableSnapshot stableSnapshot();
 
+    /**
+     * Publish Kafka-derived HW/LSO after the stock state machine has consumed the exact stable append.
+     *
+     * <p>The durable end may advance before these derived offsets. Implementations keep the previous visibility bounds
+     * and do not dispatch the next same-partition append or publish its stable event until this method confirms the
+     * matching stable end.
+     */
+    default KafkaStableSnapshot publishDerivedOffsets(
+            long expectedStableEndOffset,
+            long highWatermark,
+            long lastStableOffset) {
+        throw new UnsupportedOperationException(
+                "Kafka partition storage does not support derived-offset publication");
+    }
+
     CompletableFuture<KafkaStableAppendResult> append(
             ByteBuffer validatedRecords, KafkaAppendContext context);
 

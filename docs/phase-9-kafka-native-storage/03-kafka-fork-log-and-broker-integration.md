@@ -514,6 +514,11 @@ public interface KafkaPartitionStorage extends AutoCloseable {
     KafkaPartitionState state();
     KafkaStableSnapshot stableSnapshot();
 
+    KafkaStableSnapshot publishDerivedOffsets(
+            long expectedStableEndOffset,
+            long highWatermark,
+            long lastStableOffset);
+
     CompletableFuture<KafkaStableAppendResult> append(
             ByteBuffer validatedRecords,
             KafkaAppendContext context);
@@ -527,6 +532,12 @@ public interface KafkaPartitionStorage extends AutoCloseable {
 `KafkaAppendContext` 当前包含 expected start、leader epoch、request deadline、origin tags 和 required acks；required
 acks 不改变 Nereus stable boundary，只用于返回 facts/metrics。M5 增加 trim，M2 recovery/checkpoint coordinator 由
 storage manager 在 open/periodic path 组合，不把可重复 `recover()` 暴露到已经 writable 的 instance。
+
+M4 将 stable append 与 Kafka-derived visibility publication 分成两个明确阶段：`append` 的 durable result 只推进
+`stableEndOffset`/commit version，保留前一版 HW/LSO；fork 在 stock `ProducerStateManager`、transaction index 和
+first-unstable state 更新成功后调用 `publishDerivedOffsets(exactEnd, HW, LSO)`。在 exact end 确认前，同 partition
+下一次 storage append 不 dispatch，`STABLE_APPEND` 事件也不发布。expected end 不匹配、offset 越界或 initialized
+HW/LSO 回退均 fail closed；post-stable publication failure 进入 write-fence/replay。
 
 ### 4.3 Current binding-first storage manager（2026-07-23）
 
@@ -750,6 +761,7 @@ NereusLocalLog.append                 stable wait here
 update local LEO
 update ProducerStateManager
 update transaction index / LSO
+publishDerivedOffsets(exact LEO, HW, LSO)
 Partition maybeIncrementLeaderHW
 Produce response eligibility
 ```
@@ -792,13 +804,15 @@ def recoveryState: KafkaPartitionState
 logStartOffset <= LSO <= HW <= stableEndOffset == LEO
 ```
 
-首版 serialized path 中 stable end 与 LEO 同步前进。HW update：
+Serialized path 中 durable stable end 与 LEO 同步前进，但新 stable bytes 在 stock derived state 完成前继续受旧
+HW/LSO 限制。HW update：
 
 - leader open 完成时从 stable head 初始化；
 - append stable 后 `Partition.maybeIncrementLeaderHW` 取 stable end；
 - 绝不使用 future/in-flight expected end；
 - HW 只能单调增长且不能越过 current leader authority session；
 - old leader completion callback 在 authority 失效后不能更新 installed log。
+- `STABLE_APPEND` wakeup and next same-partition dispatch occur only after exact derived-offset publication。
 
 LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，recovery 从 checkpoint + committed replay
 重建。`read_committed` upper bound 是 min(HW,LSO)。

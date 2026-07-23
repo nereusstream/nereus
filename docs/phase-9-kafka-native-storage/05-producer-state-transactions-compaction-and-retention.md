@@ -39,6 +39,11 @@ After stable append，a failure updating ProducerStateManager/transaction index/
 normal non-committed retry while partition remains writable。`NereusUnifiedLog` catches this boundary，marks
 `WRITE_FENCED_RECOVERY_REQUIRED`，and reopens from committed bytes。Client idempotence resolves retry after recovery。
 
+The product storage boundary now enforces this ordering directly：durable completion advances only stable end/commit
+version while retaining the previous HW/LSO；`publishDerivedOffsets(exactEnd, HW, LSO)` is required after stock producer/
+transaction updates。Until that exact confirmation，the next same-partition append and `STABLE_APPEND` event remain
+blocked。This closes the race where a transactional stable event could wake a read before first-unstable state existed。
+
 ## 3. `NereusProducerStateManager`
 
 ### 3.1 Responsibility

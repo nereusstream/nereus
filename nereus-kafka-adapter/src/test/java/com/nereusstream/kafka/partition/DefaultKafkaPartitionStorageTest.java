@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 
 class DefaultKafkaPartitionStorageTest {
     @Test
-    void stableAppendUsesAuthoritySessionAndAdvancesLeoHwAndLsoOnlyAfterSuccess() {
+    void stableAppendAdvancesDurableEndBeforeStockDerivedVisibilityOffsets() {
         Fixture fixture = fixture(0, 0);
         byte[] records = KafkaPartitionStorageTestSupport.batch(0, CompressionType.GZIP, 1_000, "a", "b");
 
@@ -59,9 +59,17 @@ class DefaultKafkaPartitionStorageTest {
         assertThat(result.appendResult().range().startOffset()).isZero();
         assertThat(result.appendResult().range().endOffset()).isEqualTo(2);
         assertThat(result.stableSnapshot())
-                .isEqualTo(new KafkaStableSnapshot(0, 2, 2, 2, 1));
+                .isEqualTo(new KafkaStableSnapshot(0, 2, 0, 0, 1));
         assertThat(fixture.storage.stableSnapshot()).isEqualTo(result.stableSnapshot());
         assertThat(result.requiredAcks()).isEqualTo((short) 1);
+        assertThat(fixture.storage.publishDerivedOffsets(2, 2, 0))
+                .isEqualTo(new KafkaStableSnapshot(0, 2, 2, 0, 1));
+        assertThat(fixture.storage.publishDerivedOffsets(2, 2, 2))
+                .isEqualTo(new KafkaStableSnapshot(0, 2, 2, 2, 1));
+        assertThatThrownBy(() -> fixture.storage.publishDerivedOffsets(1, 1, 1))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> fixture.storage.publishDerivedOffsets(2, 3, 2))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -90,10 +98,13 @@ class DefaultKafkaPartitionStorageTest {
 
         fixture.streams.completeNextSuccess();
         assertThat(first.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+        assertThat(fixture.streams.appendCalls()).isEqualTo(1);
+        fixture.storage.publishDerivedOffsets(1, 1, 1);
         assertThat(fixture.streams.appendCalls()).isEqualTo(2);
         fixture.streams.completeNextSuccess();
 
         assertThat(second.join().stableSnapshot().stableEndOffset()).isEqualTo(2);
+        fixture.storage.publishDerivedOffsets(2, 2, 2);
         assertThat(fixture.storage.stableSnapshot().highWatermark()).isEqualTo(2);
     }
 
@@ -174,10 +185,12 @@ class DefaultKafkaPartitionStorageTest {
                 ByteBuffer.wrap(first), context(0, (short) 1));
         fixture.streams.completeNextSuccess();
         firstAppend.join();
+        fixture.storage.publishDerivedOffsets(2, 2, 2);
         CompletableFuture<KafkaStableAppendResult> secondAppend = fixture.storage.append(
                 ByteBuffer.wrap(second), context(2, (short) 1));
         fixture.streams.completeNextSuccess();
         secondAppend.join();
+        fixture.storage.publishDerivedOffsets(3, 3, 3);
 
         KafkaStorageReadResult containing = fixture.storage.read(readRequest(
                 1, 3, first.length + second.length, true)).join();
@@ -225,10 +238,12 @@ class DefaultKafkaPartitionStorageTest {
 
         fixture.streams.completeNextSuccess();
         append.join();
+        fixture.storage.publishDerivedOffsets(1, 1, 1);
         assertThat(fixture.streams.appendCalls()).isEqualTo(2);
         assertThat(resign).isNotDone();
         fixture.streams.completeNextSuccess();
         queued.join();
+        fixture.storage.publishDerivedOffsets(2, 2, 2);
         resign.join();
         assertThat(fixture.storage.state()).isEqualTo(KafkaPartitionState.CLOSED);
         assertThatThrownBy(() -> fixture.storage.read(readRequest(0, 1, 1_024, true)).join())
@@ -252,6 +267,7 @@ class DefaultKafkaPartitionStorageTest {
         fixture.streams.completeNextSuccess();
 
         assertThat(append.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+        fixture.storage.publishDerivedOffsets(1, 1, 1);
         fixture.storage.resign().join();
         assertThat(events).containsExactly(
                 KafkaPartitionEventType.STABLE_APPEND,
@@ -301,6 +317,7 @@ class DefaultKafkaPartitionStorageTest {
             assertThat(fixture.streams.pendingOptions().appendSession()).contains(renewed);
             fixture.streams.completeNextSuccess();
             assertThat(append.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+            storage.publishDerivedOffsets(1, 1, 1);
             assertThat(fixture.streams.renewalCalls()).isGreaterThanOrEqualTo(1);
             storage.resign().get(5, TimeUnit.SECONDS);
         } finally {
@@ -333,6 +350,7 @@ class DefaultKafkaPartitionStorageTest {
             assertThat(events).containsExactly(KafkaPartitionEventType.LEADERSHIP_LOST);
             fixture.streams.completeNextSuccess();
             assertThat(inFlight.join().stableSnapshot().stableEndOffset()).isEqualTo(1);
+            storage.publishDerivedOffsets(1, 1, 1);
             assertFailureCode(queued, ErrorCode.FENCED_APPEND);
             assertThat(fixture.streams.appendCalls()).isEqualTo(1);
             assertFailureCode(storage.append(

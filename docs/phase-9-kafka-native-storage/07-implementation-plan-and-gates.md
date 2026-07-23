@@ -352,9 +352,10 @@ coordinator/transaction/compaction remain M4/M5。
 - `:nereus-kafka-adapter:f9M3CodecTest --rerun-tasks` passes against test-only Kafka 3.9.0-generated batches，covering
   uncompressed/GZIP、multi-batch、producer facts、CRC/length/magic/compression corruption、offset gaps、containing-entry
   Fetch and sparse compacted coverage；
-- partition tests cover stable-only LEO/HW/LSO publication、acks 0/1/-1 invariant、same-partition serialization、
+- partition tests cover two-phase durable-end then exact derived HW/LSO publication、acks 0/1/-1 invariant、same-partition serialization、
   speculative gap rejection、known-not-committed retry、uncertain/result-mismatch fencing、containing-entry/upper-bound/
-  first-overflow Fetch and resign drain；
+  first-overflow Fetch and resign drain；the next same-partition append and `STABLE_APPEND` event wait for exact
+  `publishDerivedOffsets` confirmation；
 - `KafkaBoundedAppendExecutorTest` proves owned remaining-byte snapshot、global byte lease、logical
   `threads + queueCapacity` rejection before task/I/O、release-once on every terminal path、strict equal-key FIFO、
   cross-key concurrency、single-worker fairness、close-then-drain of logical lane work and the rule that response-future

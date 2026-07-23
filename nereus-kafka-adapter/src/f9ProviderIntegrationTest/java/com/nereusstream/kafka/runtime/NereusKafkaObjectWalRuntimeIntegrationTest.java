@@ -11,6 +11,7 @@ import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
 import com.nereusstream.kafka.partition.KafkaPartitionLeaderOpenRequest;
 import com.nereusstream.kafka.partition.KafkaPartitionState;
 import com.nereusstream.kafka.partition.KafkaPartitionStorage;
+import com.nereusstream.kafka.partition.KafkaStableAppendResult;
 import com.nereusstream.kafka.partition.KafkaStorageReadRequest;
 import com.nereusstream.kafka.recovery.KafkaRecoveryState;
 import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
@@ -170,7 +171,7 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                             new SimpleRecord(1_000, "value".getBytes()))
                     .buffer()
                     .duplicate();
-            assertThat(storage.append(
+            KafkaStableAppendResult appendResult = storage.append(
                             records,
                             new KafkaAppendContext(
                                     0,
@@ -178,10 +179,9 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                                     (short) -1,
                                     Duration.ofSeconds(10),
                                     Map.of()))
-                    .join()
-                    .stableSnapshot()
-                    .stableEndOffset())
-                    .isEqualTo(1);
+                    .join();
+            assertThat(appendResult.stableSnapshot().stableEndOffset()).isEqualTo(1);
+            storage.publishDerivedOffsets(1, 1, 1);
             assertThat(storage.read(new KafkaStorageReadRequest(
                             0,
                             1,
