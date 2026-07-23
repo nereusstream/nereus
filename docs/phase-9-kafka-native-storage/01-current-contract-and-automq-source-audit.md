@@ -444,7 +444,10 @@ committed；the earlier 71/92/95 figures must not be attributed to `672429d94f` 
 That rerun exposed a stock-without-artifacts compile dependency from `Partition` to an excluded Nereus class；current head
 `9a6ebed6d9` fixes it with stock `LeaderEpochAwareRecoveryState` in `storage`，retains exact topicId/topic-partition/leader-epoch/
 frozen validation and passes both stock and artifact-enabled focused compilation/tests。The exact current-head aggregate is
-recorded only after the corresponding Nereus source-lock commit。
+recorded against Nereus `main@6f2ab6f`：`phase9M3KafkaForkCheck --rerun-tasks` passed 80/80 outer tasks，its nested
+stock-without-artifacts and artifact-enabled Kafka builds passed 92/92 and 95/95 actionable tasks respectively。The run
+includes exact source locks、146/146 scenario-manifest synchronization、real provider gate、Checkstyle、SpotBugs、Spotless and
+stock single-node KRaft restart。
 
 当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
 development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求

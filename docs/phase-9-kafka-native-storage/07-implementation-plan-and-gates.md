@@ -445,8 +445,9 @@ coordinator/transaction/compaction remain M4/M5。
   restart and server/core/storage format/static-analysis
   gates。The `672429d94f` aggregate rerun correctly failed because stock `Partition` referenced an artifact-only recovery class；
   `9a6ebed6d9` replaces it with stock `LeaderEpochAwareRecoveryState` and focused stock/artifact-enabled builds pass。The exact
-  current-head aggregate result is recorded after this source-lock update；the preceding `752953d0ef` aggregate passed 71/71
-  outer tasks and nested stock/artifact-enabled Kafka builds completed 92/92 and 95/95 actionable tasks。Because the exact
+  current-head gate against Nereus `main@6f2ab6f` passes 80/80 outer tasks；nested stock-without-artifacts and artifact-enabled
+  Kafka builds pass 92/92 and 95/95 actionable tasks，including real provider recovery、static/format gates and stock KRaft
+  restart。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics

@@ -67,7 +67,7 @@ checkpoint time-index candidate、五档 real-service profile matrix 与真实 K
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、18 个 mapper/context/runtime-focused tests、完整 stock
 `KafkaConfigTest` 以及 server/core/storage checkstyle/SpotBugs/Spotless 已通过；当前
-`phase9M3KafkaForkCheck --rerun-tasks` 通过 71/71 outer tasks，nested stock/artifact-enabled Kafka builds 通过 92/92 与 95/95 actionable
+current `phase9M3KafkaForkCheck --rerun-tasks` 通过 80/80 outer tasks，nested stock/artifact-enabled Kafka builds 通过 92/92 与 95/95 actionable
 tasks；当前 GitHub credential 对
 组织 fork 只有 read 权限，所以该 commit 尚未推送，不能升级为 production fork lock。Kafka
 storage profile policy 已冻结五个 canonical profile，并禁止 request acks 弱化 profile default durability/completion。
