@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "4" ]] \
-    || fail "expected four reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "5" ]] \
+    || fail "expected five reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -61,17 +61,23 @@ core/src/main/java/kafka/log/nereus/NereusListOffsetsScanConfig.java
 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
 core/src/main/scala/kafka/cluster/Partition.scala
 core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
+core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
 core/src/main/scala/kafka/server/ReplicaManager.scala
+core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
+core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
 core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
+core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
+core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
+core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOffsetLookup.java
 FILES
 )"
 [[ "$actual_changes" == "$expected_changes" ]] \
-    || fail "fork change set differs from the reviewed fifteen-file bridge/lifecycle slice"
+    || fail "fork change set differs from the reviewed twenty-one-file bridge/metadata-lifecycle slice"
 
 while read -r expected path; do
     [[ -n "$expected" ]] || continue
@@ -85,14 +91,20 @@ eebf0d6ddc8bcdd57fc1dcfb79c30d8945000331 build.gradle
 47eca0ad9a439e952794b2030d46c5b48714a839 core/src/main/java/kafka/log/nereus/NereusListOffsetsBridge.java
 6f1e5f76fb4ed51f786e7f07a22c3fc3f46cf9ae core/src/main/java/kafka/log/nereus/NereusListOffsetsScanConfig.java
 aadcc658a9e74de9798b06d674ecb784947c8762 core/src/main/java/kafka/log/nereus/NereusRecordTimestampInspector.java
-b17be9d830b44ed3a00cee03fb2ee0c2aa14aab9 core/src/main/scala/kafka/cluster/Partition.scala
-db85db65ccb5aff6074dad616d93791b9698240c core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
-8467478e391ed739cccee9cef16c1ab704e2b957 core/src/main/scala/kafka/server/ReplicaManager.scala
+165e66c97d3335b528f457df8725d4fbab0790d9 core/src/main/scala/kafka/cluster/Partition.scala
+7a7a1d1f4c99de4be9766f199f2e39960613934b core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
+a7a1d616651a146d6eec3377fcf2455c3777ef8c core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
+6a45b8cd21600cc95884492737a627c6656091a0 core/src/main/scala/kafka/server/ReplicaManager.scala
+7a3674d0cb71daa8830ea1ef89273181733ba661 core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala
+7c4da64c61aff4cefe9769764a9ff05306e5de73 core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala
 f81ec4137daa9e9fff7b7262733ded7998c86eba core/src/test/java/kafka/log/nereus/NereusKafkaExceptionMapperTest.java
 c2bd8e03152a23547044a42f439b33698ace4251 core/src/test/java/kafka/log/nereus/NereusListOffsetsBridgeTest.java
 205989c5d3adf68127d71be28c6ff9f521abcbf1 core/src/test/java/kafka/log/nereus/NereusRecordTimestampInspectorTest.java
-690f4ff0826499b250bc5753aa101f0ad5214b40 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
-811a02f2a81e6a353d5383d176b74fe7c00c7fdc core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
+1707eb1ee360baaed845404ced5ba2e872bc62d4 core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
+898c9b8e37028a79183fab32a65e830554b1bd30 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
+c1490dc3f9af754c2111a1c4d6d6bcfdfcb8c53f core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
+4d4507ca06c365a23fc336adfcfd4b98a7836203 core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
+b69cb745a04454dc890429498d44ce61c6b4a70a core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
 6a9a43c81b0b60e69fb95099a76d80e7894ba453 storage/src/main/java/org/apache/kafka/storage/internals/log/LeaderEpochAwareOffsetLookup.java
 LOCKS
 
@@ -100,11 +112,13 @@ marker_start="$(grep -h -F -c 'Nereus inject start:' \
     "$kafka_checkout/build.gradle" "$kafka_checkout/checkstyle/import-control-core.xml" \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala" \
     | awk '{ total += $1 } END { print total + 0 }')"
 marker_end="$(grep -h -F -c 'Nereus inject end:' \
     "$kafka_checkout/build.gradle" "$kafka_checkout/checkstyle/import-control-core.xml" \
     "$kafka_checkout/core/src/main/scala/kafka/cluster/Partition.scala" \
     "$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala" \
+    "$kafka_checkout/core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala" \
     | awk '{ total += $1 } END { print total + 0 }')"
 [[ "$marker_start" -gt 0 && "$marker_start" == "$marker_end" ]] \
     || fail "Nereus inject markers are absent or unbalanced: $marker_start/$marker_end"
@@ -151,10 +165,16 @@ grep -F -q 'installedEpoch == leaderEpoch' "$partition" \
     || fail "Partition lost request-time lookup fencing"
 grep -F -q 'leaderEpochAwareOffsetLookup = None' "$partition" \
     || fail "Partition lost lookup revocation"
+grep -F -q 'leaderEpochAwareOffsetLookupPending.contains(leaderEpoch)' "$partition" \
+    || fail "Partition lost fail-closed lookup recovery routing"
+grep -F -q 'def beginLeaderEpochAwareOffsetLookup(expectedLeaderEpoch: Int)' "$partition" \
+    || fail "Partition lost synchronous exact-epoch recovery preparation"
 
 replica_manager="$kafka_checkout/core/src/main/scala/kafka/server/ReplicaManager.scala"
 grep -F -q 'delayedRemoteListOffsetsPurgatory.checkAndComplete' "$replica_manager" \
     || fail "ReplicaManager lost async ListOffsets wakeup"
+grep -F -q 'onLeaderStatePublished: (Partition, Uuid, Int) => Unit' "$replica_manager" \
+    || fail "ReplicaManager lost synchronous new-leader preparation callback"
 
 list_offsets_lifecycle="$kafka_checkout/core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala"
 grep -F -q 'storageManager.openLeader(request)' "$list_offsets_lifecycle" \
@@ -168,10 +188,35 @@ grep -F -q 'removeLeaderEpochAwareOffsetLookup(' "$list_offsets_lifecycle" \
 grep -F -q 'storageManager.resign(identity, observedLeaderEpoch, timeout)' "$list_offsets_lifecycle" \
     || fail "ListOffsets lifecycle no longer delegates resign to the adapter manager"
 
+topic_delta_lifecycle="$kafka_checkout/core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala"
+grep -F -q 'extends AsyncTopicDeltaLifecycle' "$topic_delta_lifecycle" \
+    || fail "Nereus topic-delta lifecycle no longer implements the stock-compatible seam"
+grep -F -q 'delta.localChanges(brokerId)' "$topic_delta_lifecycle" \
+    || fail "Nereus topic-delta lifecycle lost exact broker-local reconciliation"
+grep -F -q 'new KafkaPartitionLeaderOpenRequest(' "$topic_delta_lifecycle" \
+    || fail "Nereus topic-delta lifecycle lost exact leader-open request construction"
+grep -F -q 'partitionLifecycle.delete(identity, metadataOffset, operationTimeout)' "$topic_delta_lifecycle" \
+    || fail "Nereus topic-delta lifecycle lost metadata-ordered delete"
+
+async_lifecycle="$kafka_checkout/core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala"
+grep -F -q 'trait AsyncTopicDeltaLifecycle' "$async_lifecycle" \
+    || fail "stock-compatible asynchronous topic lifecycle seam is missing"
+grep -F -q 'def onLeaderStatePublished(partition: Partition, topicId: Uuid, leaderEpoch: Int): Unit' "$async_lifecycle" \
+    || fail "asynchronous topic lifecycle lost synchronous leader preparation"
+
+metadata_publisher="$kafka_checkout/core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala"
+grep -F -q 'asyncTopicDeltaLifecycle: Option[AsyncTopicDeltaLifecycle] = None' "$metadata_publisher" \
+    || fail "BrokerMetadataPublisher lost its stock-default optional lifecycle"
+grep -F -q 'handleTopicsDeltaAsync(deltaName, topicsDelta, newImage, lifecycle)' "$metadata_publisher" \
+    || fail "BrokerMetadataPublisher lost asynchronous topic lifecycle routing"
+grep -F -q 'onAsyncLeaderReady' "$metadata_publisher" \
+    || fail "BrokerMetadataPublisher lost post-recovery coordinator election"
+
 if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
         "$kafka_checkout/core/src/main/java/kafka/log/nereus" \
-        "$kafka_checkout/core/src/main/scala/kafka/log/nereus"; then
+        "$kafka_checkout/core/src/main/scala/kafka/log/nereus" \
+        "$async_lifecycle" "$metadata_publisher"; then
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; four commits, fifteen bridge/lifecycle blobs and markers match"
+echo "F9 Kafka fork development source lock: local $actual_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; five commits, twenty-one bridge/metadata-lifecycle blobs and markers match"

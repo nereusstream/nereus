@@ -51,7 +51,10 @@ stale-resign isolation 的 deterministic partial evidence，但不替代 durable
 timestamp/max-timestamp、跨页硬预算、inspector invariant 与 mid-scan leadership fencing 的 deterministic partial
 evidence；local fork `NereusRecordTimestampInspectorTest` 进一步提供 stock 4.3 compressed `MemoryRecords` exact-record
 iterator、minimum-offset、buffer preservation 与 max-timestamp tie-break 证据，但尚未推送，也不替代 fork handler/
-time-index recovery/real KRaft baseline；
+time-index recovery/real KRaft baseline；local fork `NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` 与
+`BrokerMetadataPublisherTest` 已为 KF-OPS-017 提供 stock-state-first recovery preparation、coordinator callback-after-open
+和 `firstPublishFuture` non-readiness 的 deterministic Kafka-fork partial evidence，但 `BrokerServer` runtime composition、
+per-partition failure/offline policy 及 real KRaft process/chaos evidence 仍未实现，所以该 row 保持 `PLANNED`；
 `KafkaStorageProfilePolicyTest` 为 KF-APP-016 提供 exactly-five canonical profile、profile-default durability 和
 `PROFILE_DEFAULT` completion 的 deterministic policy evidence，但不替代真实 provider/KRaft profile matrix；
 `DefaultKafkaPartitionStorageManagerTest` 为 KF-META-005/019 和 KF-APP-014 提供 binding-first open plan、profile

@@ -2818,14 +2818,14 @@ tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
 
 tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
     group = "verification"
-    description = "Verify the local organization-fork F9 branch, exact bridge/lifecycle commits, markers, and source blobs."
+    description = "Verify the local organization-fork F9 branch, exact bridge/metadata-lifecycle commits, markers, and source blobs."
     usesService(kafkaCheckoutGate)
     workingDir = layout.projectDirectory.asFile
     commandLine(
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "16377ac44b20b7c010e697b22fce5a2e55cb02ac",
+        "c3af5f30facc27dcaf26e2de6e566fc9dd062d0c",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2853,7 +2853,7 @@ val kafkaForkGradleWrapper = file(kafkaForkCheckoutPath.get()).resolve("gradlew"
 
 tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
     group = "verification"
-    description = "Compile and test the stock Kafka ListOffsets seam with no Nereus development artifact inputs."
+    description = "Compile and test the stock Kafka ListOffsets and metadata lifecycle seams with no Nereus artifact inputs."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     usesService(kafkaCheckoutGate)
     workingDir = file(kafkaForkCheckoutPath.get())
@@ -2868,12 +2868,16 @@ tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
         ":core:test",
         "--tests",
         "kafka.cluster.PartitionTest.testLeaderEpochAwareOffsetLookup*",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testApplyDeltaPreparesOnlyNewLeaderAfterPartitionStatePublication",
+        "--tests",
+        "kafka.server.metadata.BrokerMetadataPublisherTest",
     )
 }
 
 tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
     group = "verification"
-    description = "Run the Kafka fork ListOffsets bridge and leader-lifecycle tests against isolated F9 artifacts."
+    description = "Run the Kafka fork ListOffsets and async metadata-lifecycle tests against isolated F9 artifacts."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     dependsOn("publishPhase9DevelopmentArtifacts")
     usesService(kafkaCheckoutGate)
@@ -2891,6 +2895,10 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
         "kafka.log.nereus.*Test",
         "--tests",
         "kafka.cluster.PartitionTest.testLeaderEpochAwareOffsetLookup*",
+        "--tests",
+        "kafka.server.ReplicaManagerTest.testApplyDeltaPreparesOnlyNewLeaderAfterPartitionStatePublication",
+        "--tests",
+        "kafka.server.metadata.BrokerMetadataPublisherTest",
         "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
         "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
     )

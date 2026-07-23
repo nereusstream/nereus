@@ -385,20 +385,26 @@ coordinator/transaction/compaction remain M4/M5。
   before a newer leader epoch is published；`ReplicaManager.fetchOffset` supplies the existing delayed-purgatory wakeup。
   `NereusListOffsetsLifecycleTest` additionally proves only-after-recovery installation、exact stock/adapter identity and
   leader-epoch validation、operation-owned open completion、late-old-open cleanup、stale-resign isolation and
-  remove-before-resign/delete/shutdown ordering。Time-index checkpoint candidate、metadata-publisher lifecycle invocation、
-  restart and real KRaft baseline remain open；
+  remove-before-resign/delete/shutdown ordering。The fifth local fork commit adds same-epoch recovery-pending fail-closed
+  routing、a stock-compatible `AsyncTopicDeltaLifecycle`、exact local-change composition and optional
+  `BrokerMetadataPublisher` routing。`NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` and
+  `BrokerMetadataPublisherTest` prove stock-state-first preparation、old/new image identity selection、delete-before-recreate、
+  callback-after-success、coordinator-election-after-recovery and `firstPublishFuture` non-readiness semantics。Time-index
+  checkpoint candidate、BrokerServer runtime composition、restart and real KRaft baseline remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@16377ac44b` contains four reviewed commits and the fifteen-file bridge/request/lifecycle seam，but the current GitHub credential has
+  `nereus/future9-native-kafka-storage@c3af5f30fa` contains five reviewed commits and the twenty-one-file
+  bridge/request/metadata-lifecycle seam，but the current GitHub credential has
   read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
   final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/four-commit count/remotes/fifteen bridge/lifecycle blobs/markers；`phase9M3KafkaForkCheck` publishes exact
+  fork branch/head/base ancestry/five-commit count/remotes/twenty-one bridge/metadata-lifecycle blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
-  seven manager-to-Partition lifecycle tests、the three stock Partition lifecycle tests and core/storage format/static-analysis
+  seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、four stock Partition seam tests、one
+  ReplicaManager publication test、all seven BrokerMetadataPublisher tests and core/storage format/static-analysis
   gates。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 

@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges、stock Partition/ReplicaManager request seam and manager-to-Partition lookup lifecycle implemented；metadata-publisher invocation remains open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets、Kafka-fork record/async-result bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup lifecycle and optional async metadata-publisher seam implemented；BrokerServer runtime composition remains open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -122,22 +122,54 @@ executor 完成 replay，final publication 才以短 critical section 安装 log
 
 ### 3.5 `core/.../kafka/server/metadata/BrokerMetadataPublisher.scala`
 
-AutoMQ source 使用 async topic-delta path。F9 采用同类 ordering，但接口归属于 Nereus：
+AutoMQ source 使用 async topic-delta path。F9 采用同类 ordering，但接口归属于 Nereus。锁定 fork
+`c3af5f30fa` 已实现以下 narrow seam：
 
 ```text
 metadataCache.setImage
-  -> KafkaPartitionStorageManager.reconcile(topicsDelta, newImage)
-  -> NereusReplicaManager.applyDeltaAsync
-  -> for each successfully opened/resigned partition callback
-  -> group/transaction coordinator election/resignation
-  -> deleted-partition coordinator notification
+  -> ReplicaManager.applyDelta(topicsDelta, newImage, onLeaderStatePublished)
+       -> stock Partition.makeLeader
+       -> elected leader 同步 beginLeaderEpochAwareOffsetLookup(exact epoch)
+  -> AsyncTopicDeltaLifecycle.applyAfterReplicaManager
+       -> delete(old image topic ID, metadata offset)
+       -> resign(new observed leader epoch)
+       -> openLeader(exact cluster/topic/partition/leader/broker/profile/offset/deadline)
+  -> each successful operation callback
+       -> group/transaction/share coordinator election or resignation
+  -> aggregate completion
+       -> share coordinator deleted-topic notification
 ```
 
-internal-topic coordinator election 必须晚于对应 log fully recovered；否则 coordinator 可能从未恢复的
-`__consumer_offsets`/`__transaction_state` 提供服务。一个 partition open 失败只 offline 该 partition并触发
-fault handling；不能把 `firstPublishFuture` 成功当成 all partitions ready。
+`AsyncTopicDeltaLifecycle` 位于 stock-compatible package 且不引用 Nereus artifact；
+`BrokerMetadataPublisher` constructor 的最后一个参数是默认 `None`，所以 disabled branch 仍执行原有同步
+`ReplicaManager.applyDelta` 和 coordinator 更新。`Some(lifecycle)` 时，`NereusTopicDeltaLifecycle` 从
+`TopicsDelta.localChanges(brokerId)` 构造 exact operation；同一 topic-partition 的 delete 必须先于同 delta 的同名
+recreation。只有 `electedLeaders` 的成功 open 才触发 election，ISR-only leader update 不重复 election；失败 future
+不发 ready callback，并交给 `metadataPublishingFaultHandler`。broker epoch supplier、metadata offset、stock topic ID/
+leader state 的同步异常也必须撤销已准备的 exact epoch，不能永久留下 pending marker。
+
+internal-topic coordinator election 必须晚于对应 storage fully recovered；否则 coordinator 可能从未恢复的
+`__consumer_offsets`/`__transaction_state` 提供服务。`firstPublishFuture` 仍在 metadata publication 主流程结束时完成，
+不是 all-partition readiness barrier。当前尚未实现 `BrokerServer` 的 config/runtime factory 与
+`Some(NereusTopicDeltaLifecycle)` 实际注入，也尚未把异步 open failure 转成最终的 per-partition offline policy；因此
+本节是已测试的 invocation seam，不是可启用 broker runtime 或 KF-OPS-017 完成声明。
 
 ### 3.6 `core/.../kafka/server/ReplicaManager.scala`
+
+metadata slice 已增加一个 stock-type-only overload：
+
+```scala
+def applyDelta(
+  delta: TopicsDelta,
+  newImage: MetadataImage,
+  onLeaderStatePublished: (Partition, Uuid, Int) => Unit
+): Unit
+```
+
+原二参数方法委托 no-op callback，disabled behavior 不变。三参数方法只对
+`localChanges.electedLeaders` 在 `Partition.makeLeader` 返回后、state-change lock 释放前调用 callback；此时
+`Partition.isLeader`、topic ID 与 leader epoch 已可精确校验。ISR-only leader updates 不调用 preparation callback。
+callback 抛错沿 metadata publication fault path 传播，不通过 reflection 或异步访问 ReplicaManager 内部状态。
 
 保留 stock class，抽取两个 `protected` completion helper，避免 subclass 复制整个方法：
 
@@ -364,12 +396,13 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
-消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `16377ac44b` 落地
+消费 `nereus-kafka-adapter:0.1.0-f9-dev`，并已在 local fork `c3af5f30fa` 落地
 `NereusRecordTimestampInspector`、`NereusListOffsetsBridge`、`NereusListOffsetsScanConfig` 和
 `NereusKafkaExceptionMapper`，并通过 Kafka-only `LeaderEpochAwareOffsetLookup` 接入 stock `Partition`/
 `ReplicaManager` request path。`NereusListOffsetsLifecycle` 包装 product-owned manager，在 manager 返回 fully recovered
 writable storage 后构造 resolver/bridge 并安装到相同 leader epoch；它不创建第二份 storage，也不接管 durable
-authority/recovery。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
+authority/recovery。第五个 commit 另加入 `AsyncTopicDeltaLifecycle`、`NereusTopicDeltaLifecycle` 和 optional
+`BrokerMetadataPublisher` routing，但尚未由 `BrokerServer` 创建或传入。当前 commit 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。
 
 ## 6. Produce execution and threading
@@ -496,7 +529,8 @@ LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，re
   走 superseded close path。
 
 该 manager 不替代 durable Oxia/head authority CAS；`KafkaPartitionOpener` 必须先完成文档 04 的 session acquisition
-和 fresh recovery。Kafka fork metadata callback wiring 尚未实现。
+和 fresh recovery。Kafka fork metadata callback seam 已实现；BrokerServer config/runtime factory、manager ownership
+与 shutdown wiring 尚未实现。
 
 ## 8. Fetch execution
 
@@ -625,12 +659,17 @@ timestamp 映射成 adapter query，复用 Kafka 已有 `AsyncOffsetReadFutureHo
 `NereusKafkaExceptionMapper` 对当前 `ErrorCode` 做 exhaustive switch，保持 fencing、trim、checksum、backpressure 和
 timeout 的 Kafka protocol 语义。Kafka-only `LeaderEpochAwareOffsetLookup` 不依赖 Nereus artifact；stock `Partition`
 只允许 current leader epoch 安装，按 identity/epoch 移除，并在 higher epoch、follower、offline/delete transition
-撤销；`ReplicaManager.fetchOffset` 把 callback 接到现有 delayed ListOffsets purgatory。三个 bridge test classes 的
-12 tests、`NereusListOffsetsLifecycleTest` 的 7 tests 加三个 stock lifecycle tests、core/storage checkstyle、
-SpotBugs、Spotless 与无 Nereus 参数的 stock test 均通过。runtime lifecycle 对 open 做 topic ID/name/partition、
+撤销；new-leader publication 到 exact lookup 安装之间保留同 epoch `recovery pending`，普通 earliest/latest/timestamp
+请求返回 `OffsetNotAvailableException`，不会短暂落回尚未恢复的 local-log lookup；stale cancel 不影响新 epoch。
+`ReplicaManager.fetchOffset` 把 callback 接到现有 delayed ListOffsets purgatory。三个 bridge test classes 的 12 tests、
+`NereusListOffsetsLifecycleTest` 的 7 tests、`NereusTopicDeltaLifecycleTest` 的 7 tests、四个 stock `Partition`
+seam tests、一个 `ReplicaManager` publication test、七个完整 `BrokerMetadataPublisherTest`、core/storage checkstyle、
+SpotBugs、Spotless 与无 Nereus artifact 的 stock-from-scratch tests 均通过。runtime lifecycle 对 open 做 topic ID/name/partition、
 stock leader state/epoch 和 manager-result identity/epoch/profile/writable-state 双重校验；only-after-recovery install，
 resign/delete/shutdown 先撤销 lookup 再委托 manager，安装失败先 resign recovered storage 再失败 open，late old open
-按旧 epoch 清理且不能移除新 lookup。`UnifiedLog`/factory/metadata-publisher lifecycle invocation、
+按旧 epoch 清理且不能移除新 lookup。topic-delta composer 还验证 old-image delete identity、new-image follower/leader
+identity、broker epoch、metadata offset、delete→同名 recreation 串行、ready/resigned callback-after-success 和
+coordinator election-after-open。`UnifiedLog`/factory/BrokerServer lifecycle composition、
 leader-epoch cache、`KafkaVirtualPositionIndex`、`NereusTimeIndex` section codec、restart recovery、remote branch push 与
 真实 KRaft baseline integration tests 仍为 open M3/M4 work。
 
