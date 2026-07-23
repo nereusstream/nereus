@@ -75,6 +75,7 @@ Adapter-side counterpart：
 | `KafkaPartitionStorage` | `append`、`recoverAppend`、`read`、`trim`、`stableSnapshot`、`close` |
 | `KafkaProduceBufferSnapshot` / `KafkaBoundedAppendExecutor` | exact owned bytes、keyed bounded submit、drain |
 | `KafkaFetchOperation` | multi-partition minBytes/maxWait/event/re-read/callback-once |
+| `KafkaFetchWaveOperation<T>` | stock-compatible opaque whole-request read wave、event/deadline/callback-once |
 | `KafkaAppendBatchEncoder` | exact `MemoryRecords` → ranged `AppendBatch` |
 | `KafkaFetchAssembler` | `ReadBatch` list → exact `MemoryRecords`/fetch facts |
 | `KafkaRecordBatchCodec` | batch syntax/CRC/offset/producer facts validation |
@@ -860,6 +861,28 @@ terminal transition 先 CAS，后注销 listener/release buffers/callback。call
 `KafkaFetchOperationTest` 已为 KF-FET-004/005/016 提供 deterministic adapter evidence；Kafka fork 中
 `ReplicaManager.fetchMessages` / stock delayed-fetch callback wiring、真实 KRaft broker process 和 request-level Kafka
 exception assembly 仍未实现，因此不是 M3 completion claim。
+
+直接把 fixed `KafkaStorageReadRequest.maxOffsetExclusive` 复用到下一次 event reread 会冻结首次 stable upper
+bound，不能看到后续稳定 append；同时在 adapter wrapper 中逐项重写 `Partition.fetchRecords` 会丢失 stock leader
+epoch、divergence、follower-state 和 request-order byte-budget 语义。为避免这两类错误，product 侧已增加
+`KafkaFetchWaveOperation<T>`：
+
+- `KafkaFetchWaveSource<T>.read(initialWave)` 把整次 stock `readFromLog` wave 保持为 opaque payload；`true` 只出现
+  在 initial wave，后续 event/deadline wave 使用 delayed-fetch 等价的 side-effect mode；
+- `subscribe(wakeup)` 必须在 initial read 排队前覆盖请求全部 partition，关闭返回 subscription 即注销全部 listener；
+- control/read 在 caller 注入的 bounded executor 上串行，同一 request 最多一个 wave in flight；in-flight 期间任意
+  数量事件只形成一个 dirty bit；
+- `maxEventRereads` 只限制 event storm，绝不能吞掉 deadline final read；deadline 与 initial/event wave 竞态时，
+  当前 wave terminal 后仍精确发一次 final read；
+- `ToIntFunction<T>` 使用最终 stock records 的实际字节判定 `minBytes`；`Predicate<T>` 让 error、divergence、
+  preferred replica 等 stock terminal fact 立即完成；
+- operation-owned future 禁止 caller `cancel/complete/obtrude`；terminal 先取消 timer/read、注销 listener，再在独立
+  callback executor 完成一次。
+
+`KafkaFetchWaveOperationTest` 已覆盖 initial enough、signal coalescing/one-in-flight、event-reread budget 后 deadline
+final read、executor rejection before source read、external cancellation isolation/explicit cleanup。该类是下一步
+`NereusBrokerStorageFetchExecutor` 的 product 状态机；当前尚未注入 fork runtime/ReplicaManager，所以本段仍是
+request-path partial evidence。
 
 ### 8.3 Virtual `LogOffsetMetadata`
 

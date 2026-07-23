@@ -365,6 +365,9 @@ coordinator/transaction/compaction remain M4/M5。
   partition、deadline final read、request-wide ordered byte budget、executor rejection before storage read、leadership/runtime
   cancellation cleanup and callback exactly once；`DefaultKafkaPartitionStorageTest` proves event publication after stable
   state and that listener failure cannot reclassify append I/O；
+- `KafkaFetchWaveOperationTest` further proves an opaque stock-compatible whole-request wave registers signals before the
+  initial read、coalesces events with one wave in flight、always performs one deadline final read after the event-reread
+  safety budget、rejects before source I/O、isolates caller cancellation and cleans the subscription before callback；
 - `KafkaPartitionLeaderManagerTest` proves exact-open deduplication、higher leader-term and same-owner broker-epoch takeover、
   conflicting/stale authority rejection、late-old-open fencing、stale-resign isolation、shutdown fencing and strict
   opener-result identity/epoch/state validation；durable authority acquire/recovery remains the opener responsibility；

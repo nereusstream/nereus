@@ -84,6 +84,9 @@ runtime drain 同步停止新 admission，并同时等待已接纳 Produce 与 p
 通过 92/92 与 95/95 actionable tasks，包含 146/146 scenarios、real provider recovery、stock KRaft restart 和
 全部 format/static gates。Kafka
 storage profile policy 已冻结五个 canonical profile，并禁止 request acks 弱化 profile default durability/completion。
+product 侧另新增 whole-request `KafkaFetchWaveOperation`，把 stock read-wave 保持为 opaque payload，只负责
+subscribe-before-read、事件合并、single in-flight wave、独立 callback、显式 cancel/cleanup，以及不受 event-reread
+预算影响的 deadline final read；它为 fork 保留完整 `readFromLog` 语义，尚未计作 ReplicaManager wiring 完成。
 binding-first storage manager 已把 deterministic ACTIVE binding、exact profile、leader authority 和 remaining recovery
 deadline 冻结为 opener plan；protocol-neutral exact stable-head/session/authority/durable-digest snapshot seam 也已落地，
 并支持 genesis commitVersion `0`。Exact commit-ancestor reachability、source validator 与 concrete

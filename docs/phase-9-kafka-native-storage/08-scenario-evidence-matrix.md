@@ -48,7 +48,9 @@ request-limit mapping，stock `ReplicaManagerTest` 证明 append/validation-stat
 terminal。`KafkaAppendFailureClassifierTest` 固化 fail-closed outcome/action mapping。它们不替代这些 row 要求的
 Kafka fork/real-service evidence。`KafkaFetchOperationTest` 还为 KF-FET-004/005/016 提供 actual-byte minBytes、
 event coalescing、deadline、one-in-flight-read、listener/read cleanup 和 callback-once 的 deterministic partial
-evidence；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local higher-term takeover、late-open fencing 和
+evidence；`KafkaFetchWaveOperationTest` additionally covers the stock-compatible whole-request source boundary、
+subscribe-before-read、event coalescing、deadline-final-read independent of the event safety budget and caller-cancel
+isolation；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local higher-term takeover、late-open fencing 和
 stale-resign isolation 的 deterministic partial evidence，但不替代 durable authority/real process cut；
 `KafkaListOffsetsResolverTest` 为 KF-FET-009 提供 stable-snapshot earliest/latest、compressed exact-record
 timestamp/max-timestamp、跨页硬预算、inspector invariant 与 mid-scan leadership fencing 的 deterministic partial
