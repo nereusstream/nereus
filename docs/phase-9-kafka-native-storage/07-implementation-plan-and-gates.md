@@ -524,7 +524,9 @@ Final includes Kafka upstream producer/group/transaction focused suites plus rea
 
 Current partial gate（2026-07-24）：`:nereus-kafka-adapter:f9ProducerStatePropertyTest` and
 `phase9M4ProducerStateCheck` cover section 1/2/7 structural invariants、frozen canonical bytes、sequence wrap and 200
-deterministic randomized round trips。The task deliberately does not use the `phase9M4Check` completion name；stock
+deterministic randomized round trips。`KafkaAppendBatchEncoderTest` additionally proves byte-exact acceptance of
+idempotent、transactional and abort-control magic-v2 batches without moving producer semantics into the adapter。
+The task deliberately does not use the `phase9M4Check` completion name；stock
 `ProducerStateManager` import/replay、idempotent/transaction request paths、LSO/aborted filtering and internal-topic
 coordinator ordering are still required before M4 completion。
 

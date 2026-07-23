@@ -293,8 +293,9 @@ KafkaApis.handleFetchRequest
 继续走原调用。stable result 必须回显 exact acks、assigned range、encoded byte count 和当前 stable snapshot，
 否则立即 resign。append timeout/interrupt 是 `MAY_HAVE_COMMITTED` 并 resign；stable commit 后任何 stock shell
 步骤失败也 resign，阻止 successor append。LEO 只在 callback 成功返回后推进，synthetic local log size 保持 `0`。
-M3 producer/idempotent、transaction 与 control batch 由 adapter 返回 `UNSUPPORTED_FORMAT`，fork 映射为
-`UNSUPPORTED_FOR_MESSAGE_FORMAT`；follower append 永远拒绝。
+M4 产品 encoder 已接受通过严格 magic-v2/CRC/producer-fact 校验的 idempotent、transaction 与 control batch；
+是否可写仍由 fork 的 stock `UnifiedLog` producer/transaction validation 决定，adapter 不复制该状态机。
+当前锁定 fork head 仍保留 M3 request-path 闸门，直至 M4 bridge 独立提交；follower append 永远拒绝。
 
 Fetch 当前只支持 M3 非事务数据；result 必须不含 aborted transaction。它复用 adapter containing-entry/first-entry
 overflow 语义并受 partition bytes、hard response bytes、stable upper bound 与 typed timeout 约束；返回前复核仍是
@@ -621,8 +622,9 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 - `KafkaRecordBatch`：只暴露校验后的 header/range/producer facts，所有 byte array/buffer accessor 都是 defensive
   owned/read-only view；
 - `KafkaAppendBatchEncoder`：要求 dense first-base/next-base chain，每个 Kafka batch 对应一个
-  `AppendEntry`，保留 exact bytes，event hint 取 normalized max timestamp，生成 concatenated CRC32C；M3 明确拒绝
-  idempotent/transaction/control batches，它们必须等 M4 producer-state/transaction owner 落地后再启用；
+  `AppendEntry`，保留 exact bytes，entry `recordCount` 取 logical offset span，event hint 取 normalized max
+  timestamp，生成 concatenated CRC32C；M4 已允许 codec 验证后的 idempotent/transaction/control batches，原始
+  producer/transaction/control facts 只存在于 exact batch bytes，语义校验仍由 fork stock state machine 持有；
 - `KafkaAppendResultValidator`：逐项验证 stream/range/end/format/record count/entry count/logical bytes 和空
   schema/projection；
 - `KafkaFetchAssembler`：只接受 range 与 raw batch header 完全一致的 Kafka payload；COMMITTED 要求 dense，

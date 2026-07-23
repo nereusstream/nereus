@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.api.AppendResult;
-import com.nereusstream.api.ErrorCode;
-import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.StreamId;
@@ -15,7 +13,10 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.record.CompressionType;
+import org.apache.kafka.common.record.ControlRecordType;
+import org.apache.kafka.common.record.EndTransactionMarker;
 import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.SimpleRecord;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +46,7 @@ class KafkaAppendBatchEncoderTest {
     }
 
     @Test
-    void rejectsWrongStartGapsEmptyAndM4ProducerStateBatches() {
+    void rejectsWrongStartGapsAndEmptyAppends() {
         byte[] first = KafkaRecordBatchTestSupport.batch(10, CompressionType.NONE, 1_000, "a");
         byte[] gap = KafkaRecordBatchTestSupport.batch(12, CompressionType.NONE, 2_000, "b");
 
@@ -57,6 +58,10 @@ class KafkaAppendBatchEncoderTest {
         assertThatThrownBy(() -> encoder.encode(ByteBuffer.allocate(0), 0))
                 .hasMessageContaining("cannot be empty");
 
+    }
+
+    @Test
+    void preservesIdempotentTransactionalAndControlBatchesExactly() {
         MemoryRecords idempotent = MemoryRecords.withIdempotentRecords(
                 10,
                 Compression.of(CompressionType.NONE).build(),
@@ -65,12 +70,52 @@ class KafkaAppendBatchEncoderTest {
                 0,
                 2,
                 new SimpleRecord(1_000, "v".getBytes()));
-        assertThatThrownBy(() -> encoder.encode(
-                        ByteBuffer.wrap(KafkaRecordBatchTestSupport.bytes(idempotent)), 10))
-                .isInstanceOfSatisfying(NereusException.class,
-                        failure -> assertThat(failure.code()).isEqualTo(ErrorCode.UNSUPPORTED_FORMAT))
-                .hasMessageContaining("F9-M3")
-                .hasMessageContaining("non-idempotent");
+        byte[] idempotentBytes = KafkaRecordBatchTestSupport.bytes(idempotent);
+        EncodedKafkaAppend encodedIdempotent =
+                encoder.encode(ByteBuffer.wrap(idempotentBytes), 10);
+
+        assertThat(encodedIdempotent.range())
+                .isEqualTo(new OffsetRange(10, 11));
+        assertThat(encodedIdempotent.recordBatches().get(0).producerId())
+                .isEqualTo(7);
+        assertThat(encodedIdempotent.appendBatch().entries().get(0).payload())
+                .isEqualTo(idempotentBytes);
+
+        MemoryRecords transactional = MemoryRecords.withTransactionalRecords(
+                11,
+                Compression.of(CompressionType.GZIP).build(),
+                8,
+                (short) 2,
+                5,
+                3,
+                new SimpleRecord(2_000, "txn".getBytes()));
+        MemoryRecords marker = MemoryRecords.withEndTransactionMarker(
+                12,
+                2_001,
+                3,
+                8,
+                (short) 2,
+                new EndTransactionMarker(ControlRecordType.ABORT, 4));
+        byte[] transactionalBytes =
+                KafkaRecordBatchTestSupport.bytes(transactional);
+        byte[] markerBytes = KafkaRecordBatchTestSupport.bytes(marker);
+        EncodedKafkaAppend encodedTransaction = encoder.encode(
+                ByteBuffer.wrap(KafkaRecordBatchTestSupport.concat(
+                        transactionalBytes, markerBytes)),
+                11);
+
+        assertThat(encodedTransaction.range())
+                .isEqualTo(new OffsetRange(11, 13));
+        assertThat(encodedTransaction.recordBatches().get(0).transactional())
+                .isTrue();
+        assertThat(encodedTransaction.recordBatches().get(1).controlBatch())
+                .isTrue();
+        assertThat(encodedTransaction.recordBatches().get(1).baseSequence())
+                .isEqualTo(RecordBatch.NO_SEQUENCE);
+        assertThat(encodedTransaction.appendBatch().entries().get(0).payload())
+                .isEqualTo(transactionalBytes);
+        assertThat(encodedTransaction.appendBatch().entries().get(1).payload())
+                .isEqualTo(markerBytes);
     }
 
     @Test

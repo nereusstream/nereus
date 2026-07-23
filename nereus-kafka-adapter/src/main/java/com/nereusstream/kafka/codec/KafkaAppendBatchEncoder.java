@@ -18,8 +18,6 @@ import com.nereusstream.api.AppendBatch;
 import com.nereusstream.api.AppendEntry;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
-import com.nereusstream.api.ErrorCode;
-import com.nereusstream.api.NereusException;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import java.nio.ByteBuffer;
@@ -59,16 +57,6 @@ public final class KafkaAppendBatchEncoder {
             if (batch.baseOffset() != expectedBase) {
                 throw new IllegalArgumentException(
                         "Kafka batches are not dense: expected base " + expectedBase + " but found " + batch.baseOffset());
-            }
-            if (batch.recordCount() != batch.logicalRecordCount()) {
-                throw new IllegalArgumentException(
-                        "ordinary Produce batch physical count must equal its logical offset span");
-            }
-            if (batch.producerId() >= 0 || batch.transactional() || batch.controlBatch()) {
-                throw new NereusException(
-                        ErrorCode.UNSUPPORTED_FORMAT,
-                        false,
-                        "F9-M3 accepts only non-idempotent, non-transactional user-record batches");
             }
             int recordCount = batch.logicalRecordCount();
             long eventTimeMillis = Math.max(0, batch.maxTimestamp());

@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 producer/open/aborted canonical state + strict V1 codec partial slice implemented；Kafka import/replay and request semantics remain in progress；F9-M5 designed target
+> 状态：F9-M4 producer/open/aborted canonical state + strict V1 codec + exact idempotent/transaction/control append encoding partial slices implemented；Kafka import/replay and request semantics remain in progress；F9-M5 designed target
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
