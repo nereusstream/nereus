@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission contracts and generic BrokerServer lifecycle seam implemented；concrete runtime/activation/observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + default process lifecycle/resource ownership and generic BrokerServer lifecycle seam implemented；provider composition/activation/observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -25,7 +25,11 @@ public interface NereusKafkaRuntime extends AutoCloseable {
 Adapter contract is now executable：`KafkaStorageAdmission` publishes immutable `KafkaStorageHealth` snapshots and permits
 `STARTING/NOT_READY -> READY` recovery only before drain。`DRAINING` and `CLOSED` are irreversible；exactly one concurrent
 `beginDrain` caller wins，late provider/start callbacks cannot reopen traffic，and `requireReady` rejects before allocation/I/O
-with stable Nereus error classification。Concrete provider/resource composition remains open。
+with stable Nereus error classification。`DefaultNereusKafkaRuntime` now owns one deduplicated/protected startup operation、
+publishes readiness only after its injected startup action completes、starts manager shutdown after synchronous admission
+drain、returns a caller-local timeout view from `awaitDrained` and closes manager/resources once。Provider client creation、
+activation/capability publication and the concrete runtime factory remain open；the startup action is the explicit seam for
+those later steps rather than hidden reflection or a global singleton。
 
 `NereusKafkaRuntimeFactory.create` accepts an immutable typed config plus explicit dependencies：Kafka broker/controller IDs、
 broker epoch supplier、KRaft metadata-view supplier、Kafka `Time`、metrics registry and scheduler。No static singleton；tests can
@@ -48,7 +52,12 @@ enabled mode before LogManager construction。A concrete adapter-backed factory 
 | Kafka `Time`/metrics/scheduler/metadata suppliers | borrowed | never close |
 | request-owned buffers | individual produce/fetch operation | release exactly once at terminal callback |
 
-Every constructor marks each dependency `OWNED` or `BORROWED` in a `KafkaRuntimeResources` value；mixed ambiguity is rejected。
+`KafkaRuntimeResources` implements this ledger now。Every entry has a nonblank name、exact `AutoCloseable` identity and
+`OWNED` or `BORROWED` flag。Duplicate identity is rejected even when both declarations use the same flag；mixed ownership is
+therefore rejected too。`close()` is idempotent，skips borrowed dependencies，attempts every owned close in reverse list
+construction order and aggregates named failures。`DefaultNereusKafkaRuntime.close()` closes the partition manager before
+this provider ledger；BrokerServer still owns the outer stop-admission → await-drain → ReplicaManager → LogManager → runtime
+ordering。The concrete factory must populate the ledger at construction time and may not infer ownership during shutdown。
 
 ## 2. Configuration namespace
 

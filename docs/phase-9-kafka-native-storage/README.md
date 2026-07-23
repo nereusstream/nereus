@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + local Kafka-fork record-inspector/async-result/metadata-lifecycle slices in progress；F9-M6 config schema/typed snapshot/pure startup validation partial slice implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 native Kafka broker runtime
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + local Kafka-fork record-inspector/async-result/metadata-lifecycle slices in progress；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 concrete provider-backed native Kafka broker runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -34,7 +34,10 @@ AutoMQ mode、request hard limit 与 authoritative log-directory conflicts；dis
 unfence/request processing 前等待，optional metadata lifecycle 传给 publisher，shutdown 在 request handlers 前关闭
 admission、ReplicaManager 前等待 drain、LogManager 后关闭 runtime；enabled 且无 concrete factory 会 fail closed。
 adapter 已新增 exact `NereusKafkaRuntime`、drain reason、immutable health snapshot 和 thread-safe admission gate，且保证
-drain/close 终态不能被 late readiness callback 重新打开。concrete Nereus runtime factory、`UnifiedLog`/factory、
+drain/close 终态不能被 late readiness callback 重新打开；`DefaultNereusKafkaRuntime` 进一步提供 operation-owned
+start/drain、non-destructive timeout view、partition-manager shutdown 和 idempotent close，`KafkaRuntimeResources` 明确
+OWNED/BORROWED 身份、拒绝同一实例的重复/混合所有权，并按构造逆序 attempt-all close。concrete provider
+composition/activation factory、adapter-backed Kafka factory、`UnifiedLog`/factory、
 checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock

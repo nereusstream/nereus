@@ -56,8 +56,11 @@ time-index recovery/real KRaft baseline；local fork `NereusTopicDeltaLifecycleT
 和 `firstPublishFuture` non-readiness 的 deterministic Kafka-fork partial evidence，但 `BrokerServer` runtime composition、
 per-partition failure/offline policy 及 real KRaft process/chaos evidence 仍未实现，所以该 row 保持 `PLANNED`；
 `KafkaStorageAdmissionTest` 为 KF-OPS-014/017 提供 readiness recovery、stable pre-I/O rejection、one-winner concurrent
-drain 和 irreversible drain/close 的 deterministic partial evidence；concrete runtime resources、priority budgets、
-native-storage process cuts 仍未实现，rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
+drain 和 irreversible drain/close 的 deterministic partial evidence；`DefaultNereusKafkaRuntimeTest` 与
+`KafkaRuntimeResourcesTest` 进一步为 KF-OPS-012/014 提供 protected/deduplicated startup、timeout-view isolation、
+late-start fencing、manager drain、idempotent manager-first close、owned/borrowed identity、reverse close 和 failure
+aggregation evidence。Concrete provider construction/activation、priority budgets and native-storage process cuts 仍未实现，
+rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
 BrokerServer stock start/drain/close compatibility，但不替代 concrete Nereus runtime evidence；
 `KafkaStorageProfilePolicyTest` 为 KF-APP-016 提供 exactly-five canonical profile、profile-default durability 和

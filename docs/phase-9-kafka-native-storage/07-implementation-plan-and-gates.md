@@ -490,8 +490,12 @@ No-resurrection is a release blocker，including policy compact→delete、missi
 Current partial implementation：`NereusKafkaRuntime`、`DrainReason`、`KafkaStorageAdmissionState`、immutable
 `KafkaStorageHealth` and the atomic admission gate are present in the adapter。`KafkaStorageAdmissionTest` proves readiness
 recovery before drain、stable pre-I/O rejection、one-winner concurrent drain and irreversible drain/close against late
-callbacks。This is deterministic partial evidence for KF-OPS-014/017 only；concrete resource ownership、BrokerServer wiring、
-priority budgets and real shutdown/process cuts remain open。
+callbacks。`DefaultNereusKafkaRuntime` and `KafkaRuntimeResources` now make start/drain operation ownership、timeout-view
+isolation、late-start fencing、manager-first close、exact OWNED/BORROWED identity、reverse-order close and attempt-all failure
+aggregation executable。The local Kafka fork also has an explicitly injected generic `BrokerStorageRuntimeFactory` with
+stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。This is deterministic partial evidence
+for KF-OPS-012/014/017；provider construction/activation、adapter-backed Kafka factory、priority budgets and real
+native-storage shutdown/process cuts remain open。
 
 ### Tasks
 
