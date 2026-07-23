@@ -280,6 +280,12 @@ phase9M2FinalCheck --rerun-tasks
 Review durable bytes/keys/wire IDs、head V1→V2 migration、authority comparison、no-cross-shard cuts、NKC1 bounds and
 checkpoint-before-trim proof。No Kafka fork coding starts until accepted。
 
+### 6.1 Current implementation evidence（2026-07-23）
+
+- slice 4 authority/head V2 is implemented in API、core、real/fake Oxia stores and explicit dual codecs；
+- frozen Phase 1 V1 codec goldens and focused authority state-machine/integration tests pass；
+- slices 1–3 and 5–8 remain in progress，so `phase9M2Check` / `phase9M2FinalCheck` are not yet claimed。
+
 ## 7. F9-M3 — Native Produce/Fetch
 
 ### Entry

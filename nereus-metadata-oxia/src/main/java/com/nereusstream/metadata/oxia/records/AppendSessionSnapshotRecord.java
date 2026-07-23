@@ -21,13 +21,32 @@ public record AppendSessionSnapshotRecord(
         long epoch,
         String fencingToken,
         long leaseVersion,
-        long expiresAtMillis) {
-    public static final AppendSessionSnapshotRecord EMPTY = new AppendSessionSnapshotRecord("", 0, "", 0, 0);
+        long expiresAtMillis,
+        String authorityType,
+        String authorityId,
+        long authorityEpoch,
+        String authorityOwnerId,
+        long authorityOwnerEpoch) {
+    public static final AppendSessionSnapshotRecord EMPTY =
+            new AppendSessionSnapshotRecord("", 0, "", 0, 0, "", "", 0, "", 0);
+
+    public AppendSessionSnapshotRecord(
+            String writerId,
+            long epoch,
+            String fencingToken,
+            long leaseVersion,
+            long expiresAtMillis) {
+        this(writerId, epoch, fencingToken, leaseVersion, expiresAtMillis, "", "", 0, "", 0);
+    }
 
     public AppendSessionSnapshotRecord {
         Objects.requireNonNull(writerId, "writerId");
         Objects.requireNonNull(fencingToken, "fencingToken");
-        if (epoch < 0 || leaseVersion < 0 || expiresAtMillis < 0) {
+        Objects.requireNonNull(authorityType, "authorityType");
+        Objects.requireNonNull(authorityId, "authorityId");
+        Objects.requireNonNull(authorityOwnerId, "authorityOwnerId");
+        if (epoch < 0 || leaseVersion < 0 || expiresAtMillis < 0
+                || authorityEpoch < 0 || authorityOwnerEpoch < 0) {
             throw new IllegalArgumentException("append session fields must be non-negative");
         }
         if (writerId.isEmpty() != fencingToken.isEmpty()) {
@@ -36,9 +55,22 @@ public record AppendSessionSnapshotRecord(
         if (!writerId.isEmpty() && (epoch == 0 || leaseVersion == 0 || expiresAtMillis == 0)) {
             throw new IllegalArgumentException("non-empty append session fields must be positive");
         }
+        boolean authorityEmpty = authorityType.isEmpty();
+        if (authorityEmpty != authorityId.isEmpty()
+                || authorityEmpty != authorityOwnerId.isEmpty()
+                || (authorityEmpty && (authorityEpoch != 0 || authorityOwnerEpoch != 0))) {
+            throw new IllegalArgumentException("append authority fields must be all empty or all set");
+        }
+        if (!authorityEmpty && writerId.isEmpty()) {
+            throw new IllegalArgumentException("append authority requires a non-empty session");
+        }
     }
 
     public boolean isEmpty() {
         return writerId.isEmpty();
+    }
+
+    public boolean hasAuthority() {
+        return !authorityType.isEmpty();
     }
 }

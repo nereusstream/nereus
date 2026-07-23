@@ -1,6 +1,6 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
-> 状态：Designed target；F9-M2
+> 状态：F9-M2 implementation in progress；authority/head-V2 slice implemented，binding/checkpoint pending
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -632,3 +632,18 @@ in-flight futures。
 - process kill during every create/checkpoint/delete cut。
 
 F9-M2 final gate proves metadata/session/checkpoint primitives only；native Kafka compatibility remains F9-M3+。
+
+### 16.4 Current implementation evidence（2026-07-23）
+
+- public `AppendAuthority`、`AppendSessionRequest`、`AcquiredAppendSession` and the binary-safe `StreamStorage` overload
+  are implemented；a legacy provider delegates only the empty-authority request and otherwise fails closed with
+  `UNSUPPORTED_APPEND_AUTHORITY`；
+- `AppendSessionSnapshotRecord` and `AppendSessionRecord` carry the exact authority tuple while retaining their old
+  constructors；explicit dual V1/V2 codecs preserve every frozen Phase 1 V1 golden envelope byte；
+- both fake and production Oxia metadata stores execute authority comparison inside the existing stream-head CAS；renewal
+  preserves authority and a legacy acquisition is rejected for `EXTERNAL_MONOTONIC_TERM_V1` streams even after expiry；
+- `StreamHeadV2CodecTest`、`KafkaLeaderAuthorityPropertyTest` and `KafkaLeaderAuthorityIntegrationTest` prove V1 decode,
+  V2 round trip, schema mismatch rejection, leader/broker term ordering, immediate live-session preemption and old-session
+  fencing；
+- this evidence is the authority slice only；Kafka binding records/store/scanner and NKC1 publication/recovery remain M2
+  work and are not claimed complete here。

@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia.testing;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -70,6 +71,7 @@ import com.nereusstream.metadata.oxia.AppendReplayCursor;
 import com.nereusstream.metadata.oxia.AppendReplayRecords;
 import com.nereusstream.metadata.oxia.AppendReplaySearchResult;
 import com.nereusstream.metadata.oxia.AppendReplayStatus;
+import com.nereusstream.metadata.oxia.AppendAuthoritySessionTransitions;
 import com.nereusstream.metadata.oxia.StreamStateTransitionRequest;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairCursor;
 import com.nereusstream.metadata.oxia.DerivedIndexRepairResult;
@@ -483,6 +485,7 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
         return complete(() -> {
             StreamHeadRecord head = headOrThrow(cluster, streamId);
             requireActive(head);
+            AppendAuthoritySessionTransitions.requireLegacyMode(head);
             long now = clock.getAsLong();
             AppendSessionSnapshotRecord current = head.appendSession();
             boolean empty = current.isEmpty();
@@ -513,6 +516,34 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
     }
 
     @Override
+    public CompletableFuture<AppendSessionRecord> acquireAppendSession(
+            String cluster,
+            StreamId streamId,
+            AppendSessionRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.authority().isEmpty()) {
+            return acquireAppendSession(cluster, streamId, request.options());
+        }
+        return complete(() -> {
+            StreamHeadRecord head = headOrThrow(cluster, streamId);
+            requireActive(head);
+            long now = clock.getAsLong();
+            AppendSessionSnapshotRecord updatedSession = AppendAuthoritySessionTransitions.acquire(
+                    head,
+                    request.options(),
+                    request.authority().orElseThrow(),
+                    now,
+                    leaseExpiration(now, request.options().ttl()),
+                    epoch -> newFencingToken(streamId, request.options().writerId(), epoch));
+            StreamHeadRecord updated = withSession(head, updatedSession, nextVersion());
+            recordHeadCas(cluster, streamId);
+            streamHeads.put(headMapKey(cluster, streamId), updated);
+            notifyAppendSessionChanged(cluster, streamId, updatedSession.epoch(), updatedSession.leaseVersion());
+            return AppendSessionRecord.fromHead(streamId.value(), updatedSession);
+        });
+    }
+
+    @Override
     public CompletableFuture<AppendSessionRecord> renewAppendSession(
             String cluster,
             StreamId streamId,
@@ -532,12 +563,9 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
                     || !current.fencingToken().equals(fencingToken)) {
                 throw failure(ErrorCode.FENCED_APPEND, true, "append session token does not match");
             }
-            AppendSessionSnapshotRecord updatedSession = new AppendSessionSnapshotRecord(
-                    writerId,
-                    epoch,
-                    fencingToken,
-                    current.leaseVersion() + 1,
-                    leaseExpiration(now, ttl));
+            AppendSessionSnapshotRecord updatedSession =
+                    AppendAuthoritySessionTransitions.preserveAuthorityOnRenewal(
+                            current, leaseExpiration(now, ttl));
             StreamHeadRecord updated = withSession(head, updatedSession, nextVersion());
             recordHeadCas(cluster, streamId);
             streamHeads.put(headMapKey(cluster, streamId), updated);
@@ -2249,12 +2277,9 @@ public final class FakeOxiaMetadataStore implements OxiaMetadataStore, PhysicalO
             if (current.isEmpty() || current.expiresAtMillis() <= now) {
                 throw failure(ErrorCode.APPEND_SESSION_EXPIRED, true, "append session expired during interleaved renew");
             }
-            AppendSessionSnapshotRecord updatedSession = new AppendSessionSnapshotRecord(
-                    current.writerId(),
-                    current.epoch(),
-                    current.fencingToken(),
-                    current.leaseVersion() + 1,
-                    leaseExpiration(now, interleaveRenewTtl));
+            AppendSessionSnapshotRecord updatedSession =
+                    AppendAuthoritySessionTransitions.preserveAuthorityOnRenewal(
+                            current, leaseExpiration(now, interleaveRenewTtl));
             StreamHeadRecord updated = withSession(head, updatedSession, nextVersion());
             recordHeadCas(cluster, streamId);
             streamHeads.put(headMapKey(cluster, streamId), updated);

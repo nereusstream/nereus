@@ -149,6 +149,26 @@ class F9RangedApiContractTest {
     }
 
     @Test
+    void legacyProviderDelegatesOnlyEmptyAppendAuthority() {
+        LegacyStorage storage = new LegacyStorage();
+        AppendSessionOptions options = new AppendSessionOptions("writer", Duration.ofSeconds(1), false);
+
+        AcquiredAppendSession acquired = storage.acquireAppendSession(
+                STREAM_ID, AppendSessionRequest.legacy(options)).join();
+
+        assertThat(acquired.session()).isEqualTo(storage.appendSession);
+        assertThat(acquired.authority()).isEmpty();
+        assertThat(storage.sessionCalls).hasValue(1);
+        NereusException failure = failure(storage.acquireAppendSession(
+                STREAM_ID,
+                AppendSessionRequest.authoritative(
+                        options,
+                        new AppendAuthority("authority", "id", 1, "owner", 2))));
+        assertThat(failure.code()).isEqualTo(ErrorCode.UNSUPPORTED_APPEND_AUTHORITY);
+        assertThat(storage.sessionCalls).hasValue(1);
+    }
+
+    @Test
     void legacyProviderWrapsOnlyLegacyEquivalentReadRequest() {
         LegacyStorage storage = new LegacyStorage();
         ReadRequest legacy = new ReadRequest(
@@ -230,6 +250,8 @@ class F9RangedApiContractTest {
                 AppendPrecondition.class).isDefault()).isTrue();
         assertThat(StreamStorage.class.getMethod(
                 "read", StreamId.class, ReadRequest.class).isDefault()).isTrue();
+        assertThat(StreamStorage.class.getMethod(
+                "acquireAppendSession", StreamId.class, AppendSessionRequest.class).isDefault()).isTrue();
         assertThat(StreamStorage.class.getMethod(
                 "append", StreamId.class, AppendBatch.class, AppendOptions.class).isDefault()).isFalse();
         assertThat(StreamStorage.class.getMethod(
@@ -321,7 +343,10 @@ class F9RangedApiContractTest {
 
     private static final class LegacyStorage implements StreamStorage {
         private final CompletableFuture<AppendResult> appendResult = new CompletableFuture<>();
+        private final AppendSession appendSession =
+                new AppendSession(STREAM_ID, "writer", 1, "token", 1, 1_000);
         private final AtomicInteger appendCalls = new AtomicInteger();
+        private final AtomicInteger sessionCalls = new AtomicInteger();
         private final AtomicInteger readCalls = new AtomicInteger();
 
         @Override
@@ -333,7 +358,8 @@ class F9RangedApiContractTest {
         @Override
         public CompletableFuture<AppendSession> acquireAppendSession(
                 StreamId streamId, AppendSessionOptions options) {
-            return unsupported();
+            sessionCalls.incrementAndGet();
+            return CompletableFuture.completedFuture(appendSession);
         }
 
         @Override

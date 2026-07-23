@@ -15,6 +15,7 @@
 package com.nereusstream.core;
 
 import com.nereusstream.api.AppendBatch;
+import com.nereusstream.api.AcquiredAppendSession;
 import com.nereusstream.api.AppendAttemptId;
 import com.nereusstream.api.AppendRecoveryOptions;
 import com.nereusstream.api.AppendOptions;
@@ -22,6 +23,7 @@ import com.nereusstream.api.AppendPrecondition;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.DeleteOptions;
 import com.nereusstream.api.NereusException;
@@ -554,6 +556,16 @@ public final class DefaultStreamStorage implements StreamStorage {
         Objects.requireNonNull(options, "options");
         CompletableFuture<AppendSession> rejection = rejectIfClosed();
         return rejection != null ? rejection : appendSessionManager.acquire(streamId, options);
+    }
+
+    @Override
+    public CompletableFuture<AcquiredAppendSession> acquireAppendSession(
+            StreamId streamId,
+            AppendSessionRequest request) {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(request, "request");
+        CompletableFuture<AcquiredAppendSession> rejection = rejectIfClosed();
+        return rejection != null ? rejection : appendSessionManager.acquire(streamId, request);
     }
 
     @Override

@@ -15,8 +15,10 @@
 package com.nereusstream.core.append;
 
 import com.nereusstream.api.AppendOutcome;
+import com.nereusstream.api.AcquiredAppendSession;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.StreamId;
@@ -55,6 +57,20 @@ public final class AppendSessionManager {
         }
         return metadataStore.acquireAppendSession(config.cluster(), streamId, options)
                 .thenApply(this::cacheRecord);
+    }
+
+    public CompletableFuture<AcquiredAppendSession> acquire(
+            StreamId streamId, AppendSessionRequest request) {
+        Objects.requireNonNull(streamId, "streamId");
+        Objects.requireNonNull(request, "request");
+        if (!config.writerId().equals(request.options().writerId())) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "append session writerId must match StreamStorageConfig.writerId");
+        }
+        return metadataStore.acquireAppendSession(config.cluster(), streamId, request)
+                .thenApply(record -> new AcquiredAppendSession(cacheRecord(record), record.authority()));
     }
 
     CompletableFuture<AppendSession> ensureSession(

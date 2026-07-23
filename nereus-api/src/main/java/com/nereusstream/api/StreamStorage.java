@@ -26,6 +26,29 @@ public interface StreamStorage extends AutoCloseable {
             StreamId streamId,
             AppendSessionOptions options);
 
+    /**
+     * Acquires a session optionally fenced by an external monotonic authority term.
+     *
+     * <p>The empty-authority form preserves the legacy method descriptor. Providers must explicitly implement
+     * non-empty authority and otherwise fail closed.
+     */
+    default CompletableFuture<AcquiredAppendSession> acquireAppendSession(
+            StreamId streamId,
+            AppendSessionRequest request) {
+        if (request == null) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "append session request is required");
+        }
+        if (request.authority().isEmpty()) {
+            return acquireAppendSession(streamId, request.options())
+                    .thenApply(AcquiredAppendSession::legacy);
+        }
+        return NereusException.failedFuture(
+                ErrorCode.UNSUPPORTED_APPEND_AUTHORITY,
+                false,
+                "storage provider does not support external append authority");
+    }
+
     CompletableFuture<AppendResult> append(
             StreamId streamId,
             AppendBatch batch,

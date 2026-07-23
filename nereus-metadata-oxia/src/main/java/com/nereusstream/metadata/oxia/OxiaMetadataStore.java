@@ -16,6 +16,9 @@ package com.nereusstream.metadata.oxia;
 
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.AppendSessionRequest;
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.NereusException;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.StreamCreateOptions;
@@ -56,6 +59,23 @@ public interface OxiaMetadataStore extends AutoCloseable {
             String cluster,
             StreamId streamId,
             AppendSessionOptions options);
+
+    default CompletableFuture<AppendSessionRecord> acquireAppendSession(
+            String cluster,
+            StreamId streamId,
+            AppendSessionRequest request) {
+        if (request == null) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT, false, "append session request is required");
+        }
+        if (request.authority().isEmpty()) {
+            return acquireAppendSession(cluster, streamId, request.options());
+        }
+        return NereusException.failedFuture(
+                ErrorCode.UNSUPPORTED_APPEND_AUTHORITY,
+                false,
+                "metadata provider does not support external append authority");
+    }
 
     CompletableFuture<AppendSessionRecord> renewAppendSession(
             String cluster,

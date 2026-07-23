@@ -57,8 +57,8 @@ public final class Phase1MetadataCodecs {
     private static final byte TYPE_RECORD = 8;
 
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
-            registered(AppendSessionRecord.class),
-            registered(AppendSessionSnapshotRecord.class),
+            registered(AppendSessionRecord.class, new AppendSessionRecordCodecV2()),
+            registered(AppendSessionSnapshotRecord.class, new AppendSessionSnapshotRecordCodecV2()),
             registered(CommittedEndOffsetRecord.class),
             registered(CommittedSliceRecord.class),
             registered(EntryIndexReferenceRecord.class),
@@ -66,7 +66,7 @@ public final class Phase1MetadataCodecs {
             registered(ObjectReferenceRecord.class),
             registered(OffsetIndexRecord.class),
             registered(StreamCommitRecord.class),
-            registered(StreamHeadRecord.class),
+            registered(StreamHeadRecord.class, new StreamHeadRecordCodecV2()),
             registered(StreamMetadataRecord.class),
             registered(StreamNameRecord.class),
             registered(StreamSliceManifestRecord.class),
@@ -84,8 +84,8 @@ public final class Phase1MetadataCodecs {
         MetadataRecordCodec<T> codec = REGISTRY.codecForClass(recordClass);
         return MetadataRecordEnvelope.encode(
                 codec.recordType(),
-                codec.schemaVersion(),
-                codec.minReaderSchemaVersion(),
+                codec.schemaVersion(record),
+                codec.minReaderSchemaVersion(record),
                 MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1,
                 codec.encode(record));
     }
@@ -100,13 +100,18 @@ public final class Phase1MetadataCodecs {
         if (!MetadataRecordEnvelope.PAYLOAD_ENCODING_BINARY_V1.equals(envelope.payloadEncoding())) {
             throw new MetadataCodecException("unsupported metadata payload encoding: " + envelope.payloadEncoding());
         }
-        if (envelope.minReaderSchemaVersion() > codec.schemaVersion()
-                || envelope.schemaVersion() != codec.schemaVersion()) {
+        if (!codec.supportsEnvelopeSchema(
+                envelope.schemaVersion(), envelope.minReaderSchemaVersion())) {
             throw new MetadataCodecException("unsupported metadata schema version for " + codec.recordType()
                     + ": writer=" + envelope.schemaVersion()
                     + ", minReader=" + envelope.minReaderSchemaVersion());
         }
-        return codec.decode(envelope.payload());
+        T value = codec.decode(envelope.payload());
+        if (codec.schemaVersion(value) != envelope.schemaVersion()
+                || codec.minReaderSchemaVersion(value) != envelope.minReaderSchemaVersion()) {
+            throw new MetadataCodecException("metadata payload schema does not match its envelope");
+        }
+        return value;
     }
 
     public static String envelopeHex(Object record, Class<?> recordClass) {
@@ -120,6 +125,12 @@ public final class Phase1MetadataCodecs {
 
     private static <T extends Record> MapMetadataCodecRegistry.RegisteredCodec<T> registered(Class<T> recordClass) {
         return new MapMetadataCodecRegistry.RegisteredCodec<>(recordClass, new RecordMetadataCodec<>(recordClass));
+    }
+
+    private static <T> MapMetadataCodecRegistry.RegisteredCodec<T> registered(
+            Class<T> recordClass,
+            MetadataRecordCodec<T> codec) {
+        return new MapMetadataCodecRegistry.RegisteredCodec<>(recordClass, codec);
     }
 
     static <T extends Record> MetadataRecordCodec<T> recordCodec(Class<T> recordClass) {

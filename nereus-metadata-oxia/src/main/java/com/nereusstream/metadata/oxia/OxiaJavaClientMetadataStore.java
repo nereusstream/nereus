@@ -17,6 +17,7 @@ package com.nereusstream.metadata.oxia;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.AppendSessionOptions;
+import com.nereusstream.api.AppendSessionRequest;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
@@ -263,6 +264,7 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
             for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
                 StreamHeadRecord head = headOrThrow(keyspace, streamId);
                 requireActive(head);
+                AppendAuthoritySessionTransitions.requireLegacyMode(head);
                 long now = clock.millis();
                 AppendSessionSnapshotRecord current = head.appendSession();
                 boolean empty = current.isEmpty();
@@ -295,6 +297,36 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
     }
 
     @Override
+    public CompletableFuture<AppendSessionRecord> acquireAppendSession(
+            String cluster,
+            StreamId streamId,
+            AppendSessionRequest request) {
+        Objects.requireNonNull(request, "request");
+        if (request.authority().isEmpty()) {
+            return acquireAppendSession(cluster, streamId, request.options());
+        }
+        return complete(() -> {
+            OxiaKeyspace keyspace = new OxiaKeyspace(cluster);
+            for (int attempt = 0; attempt < MAX_CAS_RETRIES; attempt++) {
+                StreamHeadRecord head = headOrThrow(keyspace, streamId);
+                requireActive(head);
+                long now = clock.millis();
+                AppendSessionSnapshotRecord session = AppendAuthoritySessionTransitions.acquire(
+                        head,
+                        request.options(),
+                        request.authority().orElseThrow(),
+                        now,
+                        leaseExpiration(now, request.options().ttl()),
+                        epoch -> newFencingToken(streamId, request.options().writerId(), epoch));
+                if (casHead(keyspace, streamId, head, withSession(head, session)).isPresent()) {
+                    return AppendSessionRecord.fromHead(streamId.value(), session);
+                }
+            }
+            throw condition("authority-bound append session CAS retry budget exhausted");
+        });
+    }
+
+    @Override
     public CompletableFuture<AppendSessionRecord> renewAppendSession(
             String cluster,
             StreamId streamId,
@@ -320,12 +352,9 @@ public final class OxiaJavaClientMetadataStore implements OxiaMetadataStore {
                         || !current.fencingToken().equals(fencingToken)) {
                     throw failure(ErrorCode.FENCED_APPEND, true, "append session token does not match");
                 }
-                AppendSessionSnapshotRecord session = new AppendSessionSnapshotRecord(
-                        writerId,
-                        epoch,
-                        fencingToken,
-                        current.leaseVersion() + 1,
-                        leaseExpiration(now, ttl));
+                AppendSessionSnapshotRecord session =
+                        AppendAuthoritySessionTransitions.preserveAuthorityOnRenewal(
+                                current, leaseExpiration(now, ttl));
                 if (casHead(keyspace, streamId, head, withSession(head, session)).isPresent()) {
                     return AppendSessionRecord.fromHead(streamId.value(), session);
                 }
