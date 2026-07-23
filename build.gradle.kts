@@ -2825,7 +2825,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "c2b1b4b3a00fb7cfa222a3e6df659011795f3b3e",
+        "f36b9123a6322c41ea25ee4544196f7e689ed625",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2853,14 +2853,21 @@ val kafkaForkGradleWrapper = file(kafkaForkCheckoutPath.get()).resolve("gradlew"
 
 tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
     group = "verification"
-    description = "Compile and checkstyle the Kafka fork with no Nereus development artifact inputs."
+    description = "Compile and test the stock Kafka ListOffsets seam with no Nereus development artifact inputs."
     dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
     usesService(kafkaCheckoutGate)
     workingDir = file(kafkaForkCheckoutPath.get())
     commandLine(
         kafkaForkGradleWrapper,
+        ":storage:checkstyleMain",
+        ":storage:spotbugsMain",
         ":core:compileScala",
         ":core:checkstyleMain",
+        ":core:checkstyleTest",
+        ":core:spotbugsMain",
+        ":core:test",
+        "--tests",
+        "kafka.cluster.PartitionTest.testLeaderEpochAwareOffsetLookup*",
     )
 }
 
@@ -2873,6 +2880,8 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
     workingDir = file(kafkaForkCheckoutPath.get())
     commandLine(
         kafkaForkGradleWrapper,
+        ":storage:checkstyleMain",
+        ":storage:spotbugsMain",
         ":core:spotlessCheck",
         ":core:checkstyleMain",
         ":core:checkstyleTest",
@@ -2880,6 +2889,8 @@ tasks.register<Exec>("phase9M3KafkaForkBridgeCheck") {
         ":core:test",
         "--tests",
         "kafka.log.nereus.*Test",
+        "--tests",
+        "kafka.cluster.PartitionTest.testLeaderEpochAwareOffsetLookup*",
         "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
         "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
     )

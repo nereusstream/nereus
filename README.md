@@ -6,7 +6,8 @@ implementation；the Nereus-side F9-M3 byte-exact RecordBatch、serialized parti
 Fetch-operation、binding-first leader manager、exact stable-head/commit-reachability、default recovery opener and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the Kafka fork now has local stock-`MemoryRecords` timestamp inspection、Kafka sentinel/request mapping、
-async delayed-operation completion/cancellation and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline，
+leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation
+and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline，
 but no native Kafka broker capability is available yet. Nereus is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a
@@ -55,7 +56,7 @@ The main Nereus repository holds product-owned modules and authoritative design 
 Forks hold changes that must land inside upstream Pulsar, KoP, or Kafka trees. The `nereus-kafka-adapter` now owns the
 F9-M2 binding/checkpoint/recovery boundary and the M3 raw Kafka batch、stable partition append/read、profile-policy、
 authority-session renewal and exact bounded ListOffsets scan slices；the isolated Kafka fork branch owns the exact
-record iterator and async `OffsetResultHolder` bridge。Its code-level
+record iterator、async `OffsetResultHolder` bridge and optional stock `Partition`/`ReplicaManager` request seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The fork branch is not yet pushed because
 the current GitHub credential has read-only fork access；broker wiring and end-to-end native Produce/Fetch remain future work，
