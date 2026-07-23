@@ -19,6 +19,8 @@ abstract class DockerIntegrationGateService : BuildService<BuildServiceParameter
 
 abstract class PulsarCheckoutGateService : BuildService<BuildServiceParameters.None>
 
+abstract class KafkaCheckoutGateService : BuildService<BuildServiceParameters.None>
+
 plugins {
     `base`
     `maven-publish`
@@ -57,6 +59,12 @@ val dockerIntegrationGate = gradle.sharedServices.registerIfAbsent(
 val pulsarCheckoutGate = gradle.sharedServices.registerIfAbsent(
     "nereusPulsarCheckoutGate",
     PulsarCheckoutGateService::class,
+) {
+    maxParallelUsages.set(1)
+}
+val kafkaCheckoutGate = gradle.sharedServices.registerIfAbsent(
+    "nereusKafkaCheckoutGate",
+    KafkaCheckoutGateService::class,
 ) {
     maxParallelUsages.set(1)
 }
@@ -2771,6 +2779,24 @@ tasks.register<Exec>("phase9SourceLockCheck") {
     )
 }
 
+val kafkaBaselineCheckoutPath = providers.gradleProperty("kafkaCheckout")
+    .orElse(providers.environmentVariable("NEREUS_KAFKA_CHECKOUT"))
+    .orElse(layout.projectDirectory.dir("../kafka").asFile.absolutePath)
+
+tasks.register<Exec>("phase9KafkaBaselineSourceLockCheck") {
+    group = "verification"
+    description = "Verify the clean local Apache Kafka source baseline used for the F9-M3 fork probe."
+    usesService(kafkaCheckoutGate)
+    workingDir = layout.projectDirectory.asFile
+    commandLine(
+        "bash",
+        "scripts/check-phase9-kafka-baseline-source-lock.sh",
+        kafkaBaselineCheckoutPath.get(),
+        "427b409cf440f745ad6195673d3342f6bd3974d4",
+        "4.3.0-SNAPSHOT",
+    )
+}
+
 tasks.register("phase9M1ApiCheck") {
     group = "verification"
     description = "Run the in-progress F9-M1 public ranged-entry API slice and scenario-manifest gate."
@@ -2819,4 +2845,12 @@ tasks.register("phase9M2FinalCheck") {
     dependsOn(":nereus-metadata-oxia:f9OxiaIntegrationTest")
     dependsOn(":nereus-object-store:kafkaCheckpointS3IntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9M2IntegrationTest")
+}
+
+tasks.register("phase9M3CodecCheck") {
+    group = "verification"
+    description = "Run the partial F9-M3 Kafka baseline and byte-exact adapter codec gate."
+    dependsOn("phase9M2Check")
+    dependsOn("phase9KafkaBaselineSourceLockCheck")
+    dependsOn(":nereus-kafka-adapter:f9M3CodecTest")
 }

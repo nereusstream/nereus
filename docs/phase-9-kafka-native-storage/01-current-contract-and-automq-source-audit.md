@@ -368,3 +368,15 @@ emit deterministic JSON report under build/reports (not committed)
 
 这个 task 不是代码兼容测试；它只防止后续实现建立在漂移的参考源码上。升级 Kafka baseline 必须提交新的
 source-lock diff、method map、format/API compatibility review 和 scenario impact。
+
+### 12.1 Current Apache Kafka baseline probe（2026-07-23）
+
+`phase9KafkaBaselineSourceLockCheck` 当前只读锁定本地 clean Apache Kafka
+`trunk@427b409cf440f745ad6195673d3342f6bd3974d4`（`4.3.0-SNAPSHOT`）和 10 个 M3/M6 seam source blobs：
+`DefaultRecordBatch`、`MemoryRecords`、`UnifiedLog`、`LocalLog`、`Partition`、`ReplicaManager`、`BrokerServer`、
+`LogManager`、`BrokerMetadataPublisher`、`ReplicationControlManager`。它还要求 `origin` 精确指向
+`apache/kafka` 且 worktree clean。
+
+这是 fork API/format probe，不是 `nereusstream/kafka` production fork lock。任务名、输出和 M3 partial gate 均不得
+把它解释为完成 KF-SRC-004；组织 fork 建立后必须新增 fork commit/remote/marker/signature lock，并替换这里的
+baseline-only completion evidence。

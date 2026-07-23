@@ -349,6 +349,10 @@ coordinator/transaction/compaction remain M4/M5。
 - this is not M3 completion：the local Kafka checkout is clean Apache `trunk@427b409c` with only an Apache `origin`，not
   an organization-owned `nereusstream/kafka` fork；therefore no fork file has been modified or pushed，and the M3 entry、
   broker runtime tasks and real KRaft final gate remain open。
+- `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
+  `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
+  `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
+  does not use the `phase9M3Check` completion name。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics
 
