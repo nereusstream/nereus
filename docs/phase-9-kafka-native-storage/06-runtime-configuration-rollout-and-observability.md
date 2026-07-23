@@ -249,7 +249,7 @@ scope and both unsupported-profile/provider pre-I/O failures。
 
 ### 2.8 Executable Kafka context-to-provider lifecycle
 
-Local fork `c27305a7ad..672429d94f` consumes the mapper through the following exact call path：
+Local fork `c27305a7ad..9a6ebed6d9` consumes the mapper through the following exact call path：
 
 ```text
 NereusBrokerStorageRuntimeFactory.production(recoveryStateFactoryCreator)
@@ -294,7 +294,8 @@ production factory therefore injects a `Function[ReplicaManager, KafkaRecoverySt
 RecordBatch codec and publishes only a frozen state through `Partition.installNereusRecoveredState`。Publication is provisional
 until the product coordinator's final source revalidation succeeds；failed open cleanup calls
 `cancelLeaderEpochAwareOffsetLookup(epoch)`，which clears both lookup admission and provisional state。Idempotent、
-transaction/control and NKC1-derived sections remain M4 fail-closed boundaries。
+transaction/control and NKC1-derived sections remain M4 fail-closed boundaries。`Partition` accepts only the stock
+`LeaderEpochAwareRecoveryState` interface；the artifact-only implementation remains excluded from disabled builds。
 
 ## 3. Cross-Kafka validation
 

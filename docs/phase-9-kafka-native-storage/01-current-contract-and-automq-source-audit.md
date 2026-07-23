@@ -401,10 +401,11 @@ baseline-only completion evidence。
 `94ecf8c105ad2d765aa9fd4a4929ff86c20882a1`，第十个 deferred activation-backed product runtime composition commit 是
 `c27305a7ad955ebc876de20da0fd045e97beba55`，第十一个 Spotless import-order alignment commit 是
 `752953d0ef9c38ae50340147bb4f3172ee9ddc5a`，第十二个 concrete M3 recovery-state rebuild/publication commit 是
-`672429d94fd82679d7091585ef27c38a7a39f743`。
+`672429d94fd82679d7091585ef27c38a7a39f743`，第十三个 stock-without-artifacts recovery-state boundary fix 是
+`9a6ebed6d94a2d91fcf581b70c72ac71201c305b`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/twelve-commit count/version、Apache 与组织 remote
-identity、cached organization trunk ancestry、五十七文件 exact change set/blob、成对 inject marker、adapter/async bridge/
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/head/base ancestry/thirteen-commit count/version、Apache 与组织 remote
+identity、cached organization trunk ancestry、五十八文件 exact change set/blob、成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding，以及 package-wide
 no-reflection/no-service-loader 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
@@ -435,11 +436,15 @@ five adapter-backed runtime and borrowed-scheduler focused methods passed with c
 after the formatter/source-lock update，`phase9M3KafkaForkCheck --rerun-tasks` passed 71/71 outer tasks；its nested stock and
 artifact-enabled Kafka invocations passed 92/92 and 95/95 actionable tasks respectively，including Spotless and the new runtime
 composition tests。The inherited manifest-only timeout test was made deterministic by reserving two seconds for its local
-object/manifest writes before the intentionally non-completing head-commit future。At current head `672429d94f`，focused
+object/manifest writes before the intentionally non-completing head-commit future。At `672429d94f`，focused
 fork tests additionally pass three stock-RecordBatch recovery codec cases、two exact Partition recovery-state factory cases、
 two one-time state-factory bridge cases and seven topic lifecycle cases，with core Checkstyle、SpotBugs and Spotless。The
 aggregate rerun result for this exact head is recorded only after the updated source lock and product recovery changes are
 committed；the earlier 71/92/95 figures must not be attributed to `672429d94f` before that rerun。
+That rerun exposed a stock-without-artifacts compile dependency from `Partition` to an excluded Nereus class；current head
+`9a6ebed6d9` fixes it with stock `LeaderEpochAwareRecoveryState` in `storage`，retains exact topicId/topic-partition/leader-epoch/
+frozen validation and passes both stock and artifact-enabled focused compilation/tests。The exact current-head aggregate is
+recorded only after the corresponding Nereus source-lock commit。
 
 当前 GitHub credential 对组织 fork 的 API permission 是 `read`，因此该 branch/commit 尚未推送。这个 task 只能称为
 development source lock，不能标记 KF-SRC-004 complete；取得 write 权限并推送后，production lock 必须再要求

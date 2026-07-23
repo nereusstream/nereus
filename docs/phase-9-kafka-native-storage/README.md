@@ -4,7 +4,7 @@
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development lock：local `nereus/future9-native-kafka-storage@672429d94fd82679d7091585ef27c38a7a39f743` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
+> Kafka fork development lock：local `nereus/future9-native-kafka-storage@9a6ebed6d94a2d91fcf581b70c72ac71201c305b` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和

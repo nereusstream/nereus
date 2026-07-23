@@ -46,6 +46,7 @@ Kafka stock protocol/controller/coordinators
 | `kafka.log.nereus.NereusKafkaRecoveredState` | fresh M3 derived state | validate/rebuild exact stock RecordBatch offsets/timestamps/leader epochs |
 | `kafka.log.nereus.NereusKafkaRecoveryStateCodec` | adapter recovery codec | one fresh state per leader open；M4 sections fail closed |
 | `kafka.server.nereus.NereusKafkaRecoveryStateFactory` | exact Partition publisher | validate topicId/name/partition/leader epoch and install frozen provisional state |
+| `org.apache.kafka.storage.internals.log.LeaderEpochAwareRecoveryState` | stock inert seam | keep `Partition` compilable without unpublished Nereus artifacts |
 | `kafka.server.nereus.NereusBrokerStorageRuntime` | runtime bridge | exact ReplicaManager binding、boot/readiness/drain/shutdown delegation |
 | `kafka.server.nereus.NereusBrokerStorageRuntimeFactory` | typed factory | disabled isolation、explicit runtime/scan-limit creators、failure rollback |
 
@@ -476,6 +477,9 @@ factory composition。第十二个 commit `672429d94f` 增加 `NereusKafkaRecove
 类型校验；冻结状态只在 exact current leader `Partition` 的短 write-lock 临界区 provisional 安装。open 的 final
 source revalidation 失败时 topic lifecycle 会撤销该 epoch 的 lookup 和 state，成功后才通知 coordinator leader-ready。
 M3 明确拒绝 idempotent/transaction/control batch 与任何 NKC1 derived-state section，M4 才接管这些语义。
+第十三个 commit `9a6ebed6d9` 把 `Partition` 持有类型收窄为 stock `LeaderEpochAwareRecoveryState`；
+artifact-only `NereusKafkaRecoveredState` 实现该接口，因此 disabled build 不加载/编译任何 Nereus package，同时
+enabled build 仍在 Partition lock 内校验 exact topicId/topic-partition/leader epoch/frozen facts。
 Controller scheduling、CLI/KafkaRaftServer selection 和 `UnifiedLog`/log factory 尚未实现。当前 commit
 尚未推送，因而仍未满足 M3 production fork source-lock entry，也不
 构成 Produce/Fetch runtime claim。

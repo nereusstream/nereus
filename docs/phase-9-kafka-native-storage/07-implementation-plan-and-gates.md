@@ -425,7 +425,7 @@ coordinator/transaction/compaction remain M4/M5。
   redaction and real-process cuts remain open；
 - M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
 - this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@672429d94f` contains twelve reviewed commits and the fifty-seven-file
+  `nereus/future9-native-kafka-storage@9a6ebed6d9` contains thirteen reviewed commits and the fifty-eight-file
   bridge/request/recovery/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
   read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Broker runtime tasks and the real KRaft
   final gate remain open；
@@ -433,7 +433,7 @@ coordinator/transaction/compaction remain M4/M5。
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the local
-  fork branch/head/base ancestry/twelve-commit count/remotes/fifty-seven bridge/recovery/metadata-lifecycle/configuration/runtime-composition
+  fork branch/head/base ancestry/thirteen-commit count/remotes/fifty-eight bridge/recovery/metadata-lifecycle/configuration/runtime-composition
   blobs/markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
   seven manager-to-Partition lifecycle tests、seven topic-delta lifecycle tests、four stock Partition seam tests、one
@@ -443,9 +443,10 @@ coordinator/transaction/compaction remain M4/M5。
   one borrowed-scheduler test、
   complete `KafkaConfigTest`、three stock runtime-factory tests、five adapter-backed runtime tests、stock single-node KRaft
   restart and server/core/storage format/static-analysis
-  gates。The exact `672429d94f` aggregate rerun result is recorded after the Nereus recovery composition and updated source lock
-  are committed；the preceding `752953d0ef` aggregate passed 71/71 outer tasks and nested stock/artifact-enabled Kafka builds
-  completed 92/92 and 95/95 actionable tasks。Because the exact
+  gates。The `672429d94f` aggregate rerun correctly failed because stock `Partition` referenced an artifact-only recovery class；
+  `9a6ebed6d9` replaces it with stock `LeaderEpochAwareRecoveryState` and focused stock/artifact-enabled builds pass。The exact
+  current-head aggregate result is recorded after this source-lock update；the preceding `752953d0ef` aggregate passed 71/71
+  outer tasks and nested stock/artifact-enabled Kafka builds completed 92/92 and 95/95 actionable tasks。Because the exact
   branch is not remote, both task names deliberately retain `Development`/`Fork` partial semantics。
 
 ## 8. F9-M4 — Idempotence, transactions and internal topics

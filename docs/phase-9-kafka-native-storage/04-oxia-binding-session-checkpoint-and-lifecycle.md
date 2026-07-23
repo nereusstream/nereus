@@ -439,7 +439,9 @@ The executable recovery boundary is now split by resource ownership：
    a fresh state，checks exact progress/contiguity，revalidates the current source after replay，publishes through a short
    critical-section callback，then revalidates again before returning writable state；
 4. the Kafka fork supplies only `KafkaRecoveryStateFactory`，which creates a fresh stock-RecordBatch-derived codec and an exact
-   `Partition` publisher after ReplicaManager exists。The one-time bridge fails retriably before binding。
+   `Partition` publisher after ReplicaManager exists。The published state implements stock
+   `LeaderEpochAwareRecoveryState`，so `Partition` preserves exact identity/epoch/frozen validation without an
+   artifact-only compile dependency。The one-time bridge fails retriably before binding。
 
 The Object-WAL composition currently installs a no-op checkpoint `FailureObserver`；missing/corrupt referenced objects still
 fail/fallback according to the recovery coordinator, but durable quarantine/audit recording is not yet implemented and must not
