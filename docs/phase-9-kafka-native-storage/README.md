@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：Designed；F9-M0 文档设计中；无生产代码
+> 状态：Designed；F9-M0 文档门禁于 2026-07-23 完成；无生产代码
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -22,6 +22,7 @@ gate 是未来实现约束，不是当前能力。若以后实现与本文不同
 | `06-runtime-configuration-rollout-and-observability.md` | config、runtime ownership、activation、upgrade、metrics/alerts/runbook |
 | `07-implementation-plan-and-gates.md` | package/file ownership、milestone DAG、build/test gates、definition of done |
 | `08-scenario-evidence-matrix.md` | requirement-to-test traceability、failure cuts、scale/compatibility aggregate |
+| `09-f9-m0-design-review-2026-07-23.md` | dated M0 coverage/status/scope audit；非新的运行时合同 |
 
 North-star 摘要见 `../design/nereus-future9-kafka-native-storage.md`。发生冲突时：已实现代码/测试优先于
 代码级合同；代码级合同优先于 Future 摘要；本地锁定源码优先于对 AutoMQ 或 Kafka 的记忆。
@@ -231,18 +232,18 @@ M4 与 M5 可以在 M3 后并行开发，但 M6 writable rollout 必须消费两
 
 F9-M0 只有在以下条件全部满足时完成：
 
-- [ ] AutoMQ source commit、version、关键 file blob hash 全部锁定；
-- [ ] Nereus 当前 API/reader/materialization 的 ranged-entry gap 有具体 class/method 证据；
-- [ ] F5/F9 ownership 与 coordinator-state 差异写入 roadmap/index；
-- [ ] public API 变更有 source/binary compatibility 策略；
-- [ ] NCP2/NTC2 byte layout、limits、golden/corruption tests 完整；
-- [ ] Kafka fork 每个 stock file 的 inject point、subclass 与 fallback path 列出；
-- [ ] Oxia keys、records、codec field order、CAS guards、scanner bounds 完整；
-- [ ] append/leader/delete/recovery/checkpoint/retention/compaction 状态机完整；
-- [ ] config default、validation、activation、shutdown、metrics、alerts 和 runbooks 完整；
-- [ ] 每个 MUST invariant 映射到 scenario ID 和计划测试 class；
-- [ ] 文档内部链接和状态词审计通过；
-- [ ] 没有提交任何 production implementation code。
+- [x] AutoMQ source commit、version、关键 file blob hash 全部锁定；
+- [x] Nereus 当前 API/reader/materialization 的 ranged-entry gap 有具体 class/method 证据；
+- [x] F5/F9 ownership 与 coordinator-state 差异写入 roadmap/index；
+- [x] public API 变更有 source/binary compatibility 策略；
+- [x] NCP2/NTC2 byte layout、limits、golden/corruption tests 完整；
+- [x] Kafka fork 每个 stock file 的 inject point、subclass 与 fallback path 列出；
+- [x] Oxia keys、records、codec field order、CAS guards、scanner bounds 完整；
+- [x] append/leader/delete/recovery/checkpoint/retention/compaction 状态机完整；
+- [x] config default、validation、activation、shutdown、metrics、alerts 和 runbooks 完整；
+- [x] 每个 MUST invariant 映射到 scenario ID 和计划测试 class；
+- [x] 文档内部链接和状态词审计通过；
+- [x] 没有提交任何 production implementation code。
 
 勾选只代表 design gate，不代表 F9-M1 之后的能力已实现。
 
@@ -253,4 +254,5 @@ F9-M0 只有在以下条件全部满足时完成：
 3. 联合评审 `03` 和 `04`，确认 Kafka state 与 Nereus state 没有双写 truth；
 4. 评审 `05`，重点检查 internal topic、transaction、retention 与 compaction；
 5. 评审 `06` 的 activation、failure mapping 与 runbook；
-6. 用 `07`/`08` 逐项反查每个 class、transition 和 failure cut 是否有实现 owner 与 gate。
+6. 用 `07`/`08` 逐项反查每个 class、transition 和 failure cut 是否有实现 owner 与 gate；
+7. 用 `09` 查看 F9-M0 的 dated 审计结果、未实现边界与下一里程碑入口条件。

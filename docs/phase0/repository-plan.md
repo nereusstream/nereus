@@ -11,7 +11,9 @@ Phase 0 established the standalone `nereusstream/nereus` repository.
 - Use Gradle Kotlin DSL, aligned with Apache Pulsar's current build style.
 - Keep Pulsar and KoP source-tree changes in organization-owned fork repositories.
 - Keep authoritative design and code-level documents in the repository under `docs/`.
-- Build a Java 21 Gradle monorepo that can grow into the Future 1-8 plan.
+- Build a Java 21 Gradle monorepo that can grow into the original Future 1-8 plan. F9 native Kafka was appended in
+  2026 and is governed by `../phase-9-kafka-native-storage/README.md` and ADR 0005；this historical Phase 0 goal does
+  not imply that F9 is implemented.
 
 ## Non-goals
 

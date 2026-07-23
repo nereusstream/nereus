@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：Designed plan；no milestone implemented
+> 状态：Designed implementation plan；F9-M0 documentation gate complete；no executable milestone implemented
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -20,7 +20,7 @@ This repository owns：
 ### 1.2 Kafka organization fork
 
 Kafka source-tree changes belong in planned `github.com/nereusstream/kafka`，branch
-`nereus/future9-native-storage`。The fork should start from an exact Apache Kafka upstream commit；the local AutoMQ checkout
+`nereus/future9-native-kafka-storage`。The fork should start from an exact Apache Kafka upstream commit；the local AutoMQ checkout
 is a reference/source-audit input，not automatically the production fork base。Before F9-M3：
 
 ```text

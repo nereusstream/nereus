@@ -24,6 +24,11 @@ Future 5 实现必须增加明确的 payload/projection contract，使 Kafka bat
 占一个 L0 offset，或显式拒绝不兼容的 stream；不能假设当前 L0 已能直接持久化
 任意 Kafka record batch。
 
+> F5/F9 boundary：本文只约束 `Kafka client -> KoP -> Pulsar facade -> Nereus`。原生 KRaft Kafka fork 直接
+> 使用 Nereus 的路径属于独立 Future 9，见 `nereus-future9-kafka-native-storage.md` 和
+> `../phase-9-kafka-native-storage/README.md`。F9 不复用本文的 payload mapping、partition identity、group/txn
+> Oxia records 或 retention floor；两条路径若未来互读，必须先定义新的 durable migration/mapping version。
+
 ## 2. 坐标映射
 
 | Kafka 概念 | Nereus 概念 |

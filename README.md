@@ -1,14 +1,15 @@
 # Nereus
 
-Nereus is a Pulsar-native shared-storage streaming engine built around an Oxia
+Nereus is a protocol-neutral shared-storage streaming engine currently delivered through its Pulsar-native
+integration, with native KRaft Kafka integration defined as Designed Future 9. It is built around an Oxia
 metadata/coordination plane, selectable primary-WAL/object-materialization profiles,
 a shared object data plane, broker-locality without durable broker ownership, and a
 single logical `streamId + offset` coordinate.
 
 The project website and namespace authority is `nereusstream.com`; Java packages and Maven coordinates use
 `com.nereusstream`. This is the standalone product repository for `github.com/nereusstream/nereus`.
-Pulsar and KoP changes are developed in organization-owned fork repositories,
-not as patch overlays inside this repo.
+Pulsar and KoP changes are developed in organization-owned fork repositories. Future 9 adds a separately
+versioned native Kafka fork; none of these source-tree changes are maintained as patch overlays inside this repo.
 
 ## Repository Layout
 
@@ -28,6 +29,7 @@ nereus/
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
+  docs/phase-9-kafka-native-storage/     F9 native Kafka code-level target (Designed; no implementation)
   docs/phase-bk-bookkeeper-primary-wal/  final-gated F1-BK BK-M0–M6 contract and executable evidence
   docs/automq-like-stream-storage/       async materialization profile design
 ```
@@ -39,10 +41,14 @@ Expected upstream forks:
 ```text
 github.com/nereusstream/pulsar  -> fork of apache/pulsar
 github.com/nereusstream/kop     -> fork of streamnative/kop
+github.com/nereusstream/kafka   -> planned fork of apache/kafka for F9 native integration
 ```
 
 The main Nereus repository holds product-owned modules and authoritative design documents.
-Forks hold changes that must land inside upstream Pulsar or KoP trees.
+Forks hold changes that must land inside upstream Pulsar, KoP, or Kafka trees. The planned
+`nereus-kafka-adapter` module is not present yet. Its code-level target and the locked AutoMQ reference audit live in
+[`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md); this is a Designed capability,
+not a current runtime claim.
 
 ## Current Phase
 

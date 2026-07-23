@@ -319,3 +319,4 @@ publication。ACTIVE 至少冻结：
 - 配置/rollout/运维：`../phase-9-kafka-native-storage/06-runtime-configuration-rollout-and-observability.md`
 - 实施计划与 gates：`../phase-9-kafka-native-storage/07-implementation-plan-and-gates.md`
 - 场景证据矩阵：`../phase-9-kafka-native-storage/08-scenario-evidence-matrix.md`
+- F9-M0 设计评审：`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`

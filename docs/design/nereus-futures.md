@@ -36,7 +36,7 @@ protocol/table state = projection
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
-| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | Designed | F1 ranged-entry evolution + F4 generation/compaction + native Kafka fork boundary |
+| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | Designed；F9-M0 documentation gate complete | F9-M1 protocol-neutral ranged-entry API/read/format foundation |
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
@@ -340,6 +340,10 @@ Detailed design: `nereus-future8-advanced-pulsar-semantics.md`
 
 Detailed design: `nereus-future9-kafka-native-storage.md`
 Code-level target contract: `../phase-9-kafka-native-storage/README.md`
+
+F9-M0 source/design review completed on 2026-07-23；the dated evidence is
+`../phase-9-kafka-native-storage/09-f9-m0-design-review-2026-07-23.md`. This closes only the documentation gate；F9 has
+no production module、Kafka fork or executable capability yet.
 
 F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
 a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives

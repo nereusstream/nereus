@@ -666,6 +666,8 @@ delete response loss converges only after the exact unchanged root authority pro
 | SDT delivery visibility | target catalog idempotent commit |
 | Routing change | routing-ring/version CAS；does not change data truth |
 | GC | reference-validated delete protocol |
+| F9 native Kafka producer acknowledgement（Designed） | exact stable Nereus append result validated against the requested range；initial RF=1 LEO/HW advance only after this point |
+| F9 newer KRaft leader preemption（Designed） | stream-head CAS installs a strictly higher protocol-neutral append authority and invalidates the prior session before new writes are admitted |
 
 ## 17. Repair priority
 
@@ -707,7 +709,47 @@ F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publi
 - provide fault injection at every irreversible boundary；
 - keep code/docs/golden bytes updated together。
 
-## 19. References
+## 19. F9 designed append and leadership extension
+
+> Status: Designed only. These rules do not change the currently implemented append overloads or Pulsar session
+> behavior until F9-M1/M2 code and compatibility gates land.
+
+Native Kafka needs one Nereus entry to consume the complete offset range of one Kafka `RecordBatch`. F9 therefore
+extends the protocol-neutral contract instead of teaching L0 about Kafka classes：
+
+```text
+AppendEntry(base-independent payload, recordCount > 0, payloadFormat=KAFKA_RECORD_BATCH)
+AppendBatch(entries, total recordCount)
+AppendPrecondition(expectedStartOffset)
+AppendAuthority(term, ownerEpoch, ownerIdHash)
+```
+
+The exact API compatibility plan is frozen in
+`../phase-9-kafka-native-storage/02-ranged-entry-api-and-object-format.md`：existing methods keep their descriptors and
+defaults，the new overload is additive，and legacy one-record `OPAQUE_RECORD_BATCH` behavior stays byte-for-byte and
+semantically unchanged. `expectedStartOffset` participates in the same head CAS that linearizes append；checking it in
+an adapter cache is insufficient.
+
+For the initial serialized RF=1 native path：
+
+1. Kafka validates and assigns batch base offsets under the partition append lane.
+2. The adapter submits exact immutable batch bytes and the current expected start/append authority.
+3. Nereus returns success only with the exact `[startOffset,endOffset)` and total count requested.
+4. The adapter validates that result before updating native producer state、LEO or HW and before completing Produce.
+5. If completion is unknown after physical durability or head CAS may have occurred，the partition write-fences itself；
+   exact head/commit recovery classifies and replays the same range before any later append. It never allocates a new
+   offset or blind-retries a new physical attempt.
+
+A strictly higher KRaft leader term may immediately preempt a still-live prior session through the same stream-head
+authority CAS. Equal-term mismatched ownership fails closed；lower terms are fenced. Existing Pulsar writers that omit
+external authority retain their current TTL/session behavior，so F9 cannot silently weaken or reinterpret F2/F3 gates.
+
+The checkpoint (`NKC1`)、local Kafka checkpoint files、LEO/HW caches and KRaft metadata are not append truth. KRaft owns
+protocol leadership；the Nereus head/reachable commit chain owns partition bytes and committed ranges. Exact binding、
+recovery and failure mapping are in `../phase-9-kafka-native-storage/03-kafka-fork-log-and-broker-integration.md` and
+`../phase-9-kafka-native-storage/04-oxia-binding-session-checkpoint-and-lifecycle.md`.
+
+## 20. References
 
 - `nereus-overall-architecture.md`
 - `nereus-storage-object-format.md`
@@ -716,3 +758,4 @@ F4-M0 has frozen the async task/checkpoint/idempotence、higher-generation publi
 - `../phase-1-core-stream-storage/02-oxia-metadata-and-commit.md`
 - `../phase-1.5-core-storage-foundation/README.md`
 - `../phase-1-core-stream-storage/09-legacy-oxia-multi-key-commit-design.md`（Historical）
+- `../phase-9-kafka-native-storage/README.md`（F9 Designed code-level target）
