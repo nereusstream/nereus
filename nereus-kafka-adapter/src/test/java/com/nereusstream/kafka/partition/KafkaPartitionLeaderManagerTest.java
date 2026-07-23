@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.api.AppendOutcome;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
+import com.nereusstream.api.StorageProfile;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,8 +23,8 @@ class KafkaPartitionLeaderManagerTest {
         ControlledOpener opener = new ControlledOpener();
         KafkaPartitionLeaderManager manager = new KafkaPartitionLeaderManager(opener);
         KafkaLeaderAuthority authority = authority(1, 5, 9);
-        CompletableFuture<KafkaPartitionStorage> first = manager.open(authority);
-        CompletableFuture<KafkaPartitionStorage> duplicate = manager.open(authority);
+        CompletableFuture<KafkaPartitionStorage> first = manager.open(plan(authority));
+        CompletableFuture<KafkaPartitionStorage> duplicate = manager.open(plan(authority));
 
         assertThat(duplicate).isSameAs(first);
         assertThat(first.cancel(false)).isFalse();
@@ -35,7 +36,7 @@ class KafkaPartitionLeaderManagerTest {
         assertThat(first.join()).isSameAs(storage);
         assertThat(manager.current(authority.identity())).contains(storage);
         assertThat(manager.installedPartitions()).isEqualTo(1);
-        assertThat(manager.open(authority).join()).isSameAs(storage);
+        assertThat(manager.open(plan(authority)).join()).isSameAs(storage);
         assertThat(opener.openCalls()).isEqualTo(1);
     }
 
@@ -46,8 +47,8 @@ class KafkaPartitionLeaderManagerTest {
         KafkaLeaderAuthority oldAuthority = authority(1, 5, 9);
         KafkaLeaderAuthority newAuthority = authority(1, 6, 1);
 
-        CompletableFuture<KafkaPartitionStorage> oldOpen = manager.open(oldAuthority);
-        CompletableFuture<KafkaPartitionStorage> newOpen = manager.open(newAuthority);
+        CompletableFuture<KafkaPartitionStorage> oldOpen = manager.open(plan(oldAuthority));
+        CompletableFuture<KafkaPartitionStorage> newOpen = manager.open(plan(newAuthority));
         FakeStorage oldStorage = new FakeStorage(oldAuthority);
         opener.complete(oldAuthority, oldStorage);
 
@@ -67,20 +68,20 @@ class KafkaPartitionLeaderManagerTest {
         KafkaPartitionLeaderManager manager = new KafkaPartitionLeaderManager(opener);
         KafkaLeaderAuthority first = authority(2, 7, 10);
         FakeStorage firstStorage = new FakeStorage(first);
-        CompletableFuture<KafkaPartitionStorage> firstOpen = manager.open(first);
+        CompletableFuture<KafkaPartitionStorage> firstOpen = manager.open(plan(first));
         opener.complete(first, firstStorage);
         firstOpen.join();
 
         KafkaLeaderAuthority restarted = authority(2, 7, 11);
-        CompletableFuture<KafkaPartitionStorage> restartedOpen = manager.open(restarted);
+        CompletableFuture<KafkaPartitionStorage> restartedOpen = manager.open(plan(restarted));
         assertThat(firstStorage.state()).isEqualTo(KafkaPartitionState.CLOSED);
         FakeStorage restartedStorage = new FakeStorage(restarted);
         opener.complete(restarted, restartedStorage);
         restartedOpen.join();
 
         KafkaLeaderAuthority conflictingOwner = authority(3, 7, 99);
-        assertFailureCode(manager.open(conflictingOwner), ErrorCode.FENCED_APPEND);
-        assertFailureCode(manager.open(authority(2, 6, 100)), ErrorCode.FENCED_APPEND);
+        assertFailureCode(manager.open(plan(conflictingOwner)), ErrorCode.FENCED_APPEND);
+        assertFailureCode(manager.open(plan(authority(2, 6, 100))), ErrorCode.FENCED_APPEND);
         manager.resign(first).join();
         assertThat(manager.current(restarted.identity())).contains(restartedStorage);
         assertThat(restartedStorage.state()).isEqualTo(KafkaPartitionState.LEADER_WRITABLE);
@@ -95,7 +96,7 @@ class KafkaPartitionLeaderManagerTest {
         ControlledOpener opener = new ControlledOpener();
         KafkaPartitionLeaderManager manager = new KafkaPartitionLeaderManager(opener);
         KafkaLeaderAuthority authority = authority(4, 8, 12);
-        CompletableFuture<KafkaPartitionStorage> opening = manager.open(authority);
+        CompletableFuture<KafkaPartitionStorage> opening = manager.open(plan(authority));
 
         manager.shutdown().join();
         FakeStorage late = new FakeStorage(authority);
@@ -103,7 +104,7 @@ class KafkaPartitionLeaderManagerTest {
 
         assertFailureCode(opening, ErrorCode.FENCED_APPEND);
         assertThat(late.state()).isEqualTo(KafkaPartitionState.CLOSED);
-        assertFailureCode(manager.open(authority(4, 9, 13)), ErrorCode.STORAGE_CLOSED);
+        assertFailureCode(manager.open(plan(authority(4, 9, 13))), ErrorCode.STORAGE_CLOSED);
     }
 
     @Test
@@ -111,7 +112,7 @@ class KafkaPartitionLeaderManagerTest {
         ControlledOpener opener = new ControlledOpener();
         KafkaPartitionLeaderManager manager = new KafkaPartitionLeaderManager(opener);
         KafkaLeaderAuthority requested = authority(5, 10, 20);
-        CompletableFuture<KafkaPartitionStorage> opening = manager.open(requested);
+        CompletableFuture<KafkaPartitionStorage> opening = manager.open(plan(requested));
         FakeStorage invalid = new FakeStorage(authority(5, 11, 20));
 
         opener.complete(requested, invalid);
@@ -124,6 +125,10 @@ class KafkaPartitionLeaderManagerTest {
     private static KafkaLeaderAuthority authority(int leaderId, int leaderEpoch, long brokerEpoch) {
         return new KafkaLeaderAuthority(
                 KafkaPartitionStorageTestSupport.identity(), leaderId, leaderEpoch, brokerEpoch);
+    }
+
+    private static KafkaPartitionOpenPlan plan(KafkaLeaderAuthority authority) {
+        return KafkaPartitionStorageTestSupport.openPlan(authority);
     }
 
     private static void assertFailureCode(
@@ -143,10 +148,10 @@ class KafkaPartitionLeaderManagerTest {
 
         @Override
         public synchronized CompletableFuture<KafkaPartitionStorage> open(
-                KafkaLeaderAuthority authority) {
+                KafkaPartitionOpenPlan plan) {
             calls.incrementAndGet();
             CompletableFuture<KafkaPartitionStorage> result = new CompletableFuture<>();
-            if (attempts.putIfAbsent(authority, result) != null) {
+            if (attempts.putIfAbsent(plan.authority(), result) != null) {
                 throw new AssertionError("manager invoked the opener twice for one exact authority");
             }
             return result;
@@ -178,6 +183,11 @@ class KafkaPartitionLeaderManagerTest {
         @Override
         public int leaderEpoch() {
             return authority.leaderEpoch();
+        }
+
+        @Override
+        public StorageProfile storageProfile() {
+            return StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT;
         }
 
         @Override

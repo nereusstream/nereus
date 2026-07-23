@@ -13,7 +13,15 @@ import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadSourceRef;
 import com.nereusstream.api.ReadTargetIdentities;
+import com.nereusstream.api.StorageProfile;
+import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StreamName;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.kafka.metadata.KafkaPartitionBinding;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataTransitions;
+import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
+import com.nereusstream.metadata.oxia.records.KafkaPartitionOperationType;
+import com.nereusstream.metadata.oxia.records.KafkaPartitionPendingOperationRecord;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.List;
@@ -33,6 +41,43 @@ final class KafkaPartitionStorageTestSupport {
                 Base64.getUrlEncoder().withoutPadding().encodeToString(bytes.array()),
                 3,
                 "orders");
+    }
+
+    static KafkaPartitionBinding binding(StorageProfile profile) {
+        KafkaPartitionIdentity identity = identity();
+        KafkaPartitionPendingOperationRecord operation = new KafkaPartitionPendingOperationRecord(
+                KafkaPartitionOperationType.CREATE.wireId(),
+                "create-test",
+                "broker-test",
+                1,
+                20_000,
+                1,
+                10_000,
+                "");
+        var creating = KafkaPartitionMetadataTransitions.creating(
+                identity.durableId(), identity.observedTopicName(), profile.name(), 1, 10_000, operation);
+        StreamName streamName = new StreamName("kafka-partition-test-stream");
+        StreamId streamId = new StreamId("kafka-partition-test-stream-id");
+        var active = KafkaPartitionMetadataTransitions.activate(
+                creating, streamName.value(), streamId.value(), 1, 10_001);
+        return new KafkaPartitionBinding(
+                identity,
+                streamName,
+                streamId,
+                new VersionedKafkaPartitionBinding(
+                        "/test/kafka-binding",
+                        active,
+                        0,
+                        new Checksum(ChecksumType.SHA256, "a".repeat(64))));
+    }
+
+    static KafkaPartitionOpenPlan openPlan(KafkaLeaderAuthority authority) {
+        StorageProfile profile = StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT;
+        return new KafkaPartitionOpenPlan(
+                authority,
+                binding(profile),
+                KafkaStorageProfilePolicy.forProfile(profile),
+                java.time.Duration.ofSeconds(5));
     }
 
     static byte[] batch(long baseOffset, CompressionType type, long timestamp, String... values) {

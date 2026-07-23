@@ -31,7 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 /** Restart-safe deterministic binding creation and deletion; no cross-key atomicity is assumed. */
-public final class KafkaPartitionLifecycleCoordinator {
+public final class KafkaPartitionLifecycleCoordinator implements KafkaPartitionBindingLifecycle {
     private static final int MAX_RECONCILE_RETRIES = 64;
     public static final String PROTOCOL_OWNER_ATTRIBUTE = "nereus.protocol.owner";
     public static final String KAFKA_CLUSTER_ATTRIBUTE = "nereus.kafka.cluster.id";
@@ -55,6 +55,7 @@ public final class KafkaPartitionLifecycleCoordinator {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    @Override
     public CompletableFuture<KafkaPartitionBinding> ensureBinding(KafkaBindingRequest request) {
         Objects.requireNonNull(request, "request");
         return ensureBinding(request, 0);
@@ -176,6 +177,18 @@ public final class KafkaPartitionLifecycleCoordinator {
                     new NereusException(ErrorCode.STREAM_NOT_FOUND, false, "Kafka binding is absent"));
             return delete(request, root, streamTimeout, 0);
         });
+    }
+
+    @Override
+    public CompletableFuture<Void> delete(KafkaPartitionDeleteRequest request) {
+        Objects.requireNonNull(request, "request");
+        return delete(
+                request.identity(),
+                request.metadataOffset(),
+                request.operationOwnerId(),
+                request.operationOwnerEpoch(),
+                request.operationTtl(),
+                request.streamTimeout());
     }
 
     private CompletableFuture<Void> delete(

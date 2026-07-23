@@ -197,21 +197,23 @@ public record KafkaPartitionIdentity(
         String observedTopicName) { }
 
 public interface KafkaPartitionStorageManager extends AutoCloseable {
-    CompletionStage<KafkaPartitionStorage> openLeader(
-            KafkaPartitionIdentity id,
-            int leaderEpoch,
-            KafkaLogConfigSnapshot config,
-            Duration timeout);
+    CompletableFuture<KafkaPartitionStorage> openLeader(
+            KafkaPartitionLeaderOpenRequest request);
 
-    CompletionStage<Void> resign(
+    CompletableFuture<Void> resign(
             KafkaPartitionIdentity id, int observedLeaderEpoch, Duration timeout);
 
-    CompletionStage<Void> delete(
+    CompletableFuture<Void> delete(
             KafkaPartitionIdentity id, long metadataOffset, Duration timeout);
 
-    CompletionStage<KafkaMetadataReconcileReport> reconcile(...);
+    Optional<KafkaPartitionStorage> current(KafkaPartitionIdentity id);
+    CompletableFuture<Void> shutdown();
 }
 ```
+
+`KafkaPartitionLeaderOpenRequest` carries exact `identity/leaderId/leaderEpoch/brokerEpoch/storageProfile/metadataOffset/
+timeout` facts。M6 metadata-image reconciliation remains a higher-level runtime method and is not silently represented by the
+M3 manager interface。
 
 `observedTopicName` 只用于 logs/metrics；key、CAS 和 stream name 使用 topicId。
 
@@ -224,6 +226,7 @@ read-only duplicate 后传入 `ByteBuffer`。Kafka fork 仍在编译期负责证
 public interface KafkaPartitionStorage extends AutoCloseable {
     KafkaPartitionIdentity identity();
     int leaderEpoch();
+    StorageProfile storageProfile();
     KafkaPartitionState state();
     KafkaStableSnapshot stableSnapshot();
 
@@ -240,6 +243,24 @@ public interface KafkaPartitionStorage extends AutoCloseable {
 `KafkaAppendContext` 当前包含 expected start、leader epoch、request deadline、origin tags 和 required acks；required
 acks 不改变 Nereus stable boundary，只用于返回 facts/metrics。M5 增加 trim，M2 recovery/checkpoint coordinator 由
 storage manager 在 open/periodic path 组合，不把可重复 `recover()` 暴露到已经 writable 的 instance。
+
+### 4.3 Current binding-first storage manager（2026-07-23）
+
+`DefaultKafkaPartitionStorageManager` 已实现 product-owned M3 composition boundary：
+
+- `openLeader` 先用 immutable manager owner/epoch/TTL 执行 deterministic `ensureBinding`，再构造只接受 ACTIVE
+  binding、exact canonical profile 和 remaining timeout 的 `KafkaPartitionOpenPlan`；
+- `KafkaPartitionOpener.open(plan)` 是 durable authority acquire、fresh head/checkpoint recovery 和 storage construction
+  的唯一 SPI；fork 不直接拼接这些 Nereus dependencies；
+- `KafkaPartitionLeaderManager` 对同 authority + same stream/profile plan 去重；same authority 若 stream/profile 冲突
+  则 metadata-invariant fail closed；opener result 还必须匹配 identity、leader epoch、profile 和 writable state；
+- observed resign 只有 epoch >= process-current term 才能移除 desired slot；delete 必须先移除/resign local term，再进入
+  durable ACTIVE → DELETING → DELETED；shutdown 后 binding 的迟到完成不会启动 opener；
+- manager/open result 是 operation-owned future，caller cancel/complete/obtrude 不能取消或伪造底层 binding/recovery。
+
+`DefaultKafkaPartitionStorageManagerTest` 覆盖 real deterministic lifecycle-to-plan composition、exact open dedupe、profile
+mismatch、stale resign、drain-before-delete 和 shutdown-during-binding。Concrete authority/session/head source loader 仍由
+opener 实现；Kafka fork metadata callback wiring 仍未完成。
 
 ## 5. Exact batch encode/decode
 

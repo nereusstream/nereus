@@ -33,6 +33,7 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import com.nereusstream.kafka.codec.EncodedKafkaAppend;
 import com.nereusstream.kafka.codec.KafkaAppendBatchEncoder;
@@ -108,6 +109,11 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     @Override
     public int leaderEpoch() {
         return leaderEpoch;
+    }
+
+    @Override
+    public StorageProfile storageProfile() {
+        return profilePolicy.storageProfile();
     }
 
     @Override

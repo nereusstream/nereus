@@ -12,6 +12,7 @@ import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
 import com.nereusstream.kafka.fetch.KafkaFetchOperation;
@@ -351,6 +352,11 @@ class KafkaFetchOperationTest {
         @Override
         public int leaderEpoch() {
             return 1;
+        }
+
+        @Override
+        public StorageProfile storageProfile() {
+            return StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT;
         }
 
         @Override

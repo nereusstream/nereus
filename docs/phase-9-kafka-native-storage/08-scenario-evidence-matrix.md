@@ -48,8 +48,10 @@ event coalescing、deadline、one-in-flight-read、listener/read cleanup 和 cal
 evidence；`KafkaPartitionLeaderManagerTest` 为 KF-APP-014 提供 process-local higher-term takeover、late-open fencing 和
 stale-resign isolation 的 deterministic partial evidence，但不替代 durable authority/real process cut；
 `KafkaStorageProfilePolicyTest` 为 KF-APP-016 提供 exactly-five canonical profile、profile-default durability 和
-`PROFILE_DEFAULT` completion 的 deterministic policy evidence，但不替代真实 provider/KRaft profile matrix。各 row
-状态仍不标记为完整通过。
+`PROFILE_DEFAULT` completion 的 deterministic policy evidence，但不替代真实 provider/KRaft profile matrix；
+`DefaultKafkaPartitionStorageManagerTest` 为 KF-META-005/019 和 KF-APP-014 提供 binding-first open plan、profile
+mismatch、stale resign、drain-before-delete 与 late-open fencing 的 deterministic composition evidence，但不替代真实
+Oxia/KRaft process cuts。各 row 状态仍不标记为完整通过。
 
 Aggregator validates unique ID、exact class/method、executed-not-skipped status、source commits、service fixture and artifact
 hash。Markdown/JSON ID sets must match。

@@ -1,6 +1,7 @@
 /* Licensed under the Apache License, Version 2.0 */
 package com.nereusstream.kafka.partition;
 
+import com.nereusstream.api.StorageProfile;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
@@ -9,6 +10,8 @@ public interface KafkaPartitionStorage extends AutoCloseable {
     KafkaPartitionIdentity identity();
 
     int leaderEpoch();
+
+    StorageProfile storageProfile();
 
     KafkaPartitionState state();
 

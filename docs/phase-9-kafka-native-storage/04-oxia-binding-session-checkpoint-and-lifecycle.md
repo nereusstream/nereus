@@ -382,6 +382,15 @@ Open algorithm：
 
 No user append is admitted during steps 1–10。Materialization generation changes do not change head and are harmless。
 
+### 7.1 Current manager/open-plan boundary（2026-07-23）
+
+`DefaultKafkaPartitionStorageManager` now owns steps 1 and the process-local publication envelope：it completes
+`KafkaPartitionLifecycleCoordinator.ensureBinding` first，freezes the ACTIVE stream identity and exact storage-profile policy
+into `KafkaPartitionOpenPlan`，then delegates steps 2–10 to one `KafkaPartitionOpener` operation。The plan carries the remaining
+deadline；same authority may share an open only when stream ID/name and profile policy are identical。Delete/shutdown remove the
+desired local term before any late opener result can install。The concrete opener that acquires the session and composes current-
+head source validation with checkpoint recovery remains open M3 work。
+
 If no checkpoint：
 
 - `trimOffset == 0`：full replay from 0 allowed；
