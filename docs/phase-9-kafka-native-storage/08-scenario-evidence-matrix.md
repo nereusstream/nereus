@@ -62,7 +62,9 @@ ListOffsets/topic-delta chain；
 drain 和 irreversible drain/close 的 deterministic partial evidence；`DefaultNereusKafkaRuntimeTest` 与
 `KafkaRuntimeResourcesTest` 进一步为 KF-OPS-012/014 提供 protected/deduplicated startup、timeout-view isolation、
 late-start fencing、manager drain、idempotent manager-first close、owned/borrowed identity、reverse close 和 failure
-aggregation evidence。Concrete provider construction/activation、priority budgets and native-storage process cuts 仍未实现，
+aggregation evidence；`NereusKafkaRuntimeFactoryTest` additionally proves immutable assembly validation、one concrete manager、
+startup deduplication、owned reverse close、borrowed dependency preservation and duplicate-identity rejection-before-transfer。
+Concrete provider client construction/activation、priority budgets and native-storage process cuts 仍未实现，
 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
 BrokerServer stock start/drain/close compatibility；`NereusBrokerStorageRuntimeTest` additionally verifies disabled creator

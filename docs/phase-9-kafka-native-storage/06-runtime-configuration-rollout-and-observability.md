@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + default process lifecycle/resource ownership、generic BrokerServer seam and adapter-backed typed bridge implemented；provider composition/activation/observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + default process lifecycle/resource ownership + post-provider assembly、generic BrokerServer seam and adapter-backed typed bridge implemented；provider client creation/activation/observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -27,13 +27,18 @@ Adapter contract is now executable：`KafkaStorageAdmission` publishes immutable
 `beginDrain` caller wins，late provider/start callbacks cannot reopen traffic，and `requireReady` rejects before allocation/I/O
 with stable Nereus error classification。`DefaultNereusKafkaRuntime` now owns one deduplicated/protected startup operation、
 publishes readiness only after its injected startup action completes、starts manager shutdown after synchronous admission
-drain、returns a caller-local timeout view from `awaitDrained` and closes manager/resources once。Provider client creation、
-activation/capability publication and the concrete runtime factory remain open；the startup action is the explicit seam for
-those later steps rather than hidden reflection or a global singleton。
+drain、returns a caller-local timeout view from `awaitDrained` and closes manager/resources once。Provider client creation and
+activation/capability publication remain open；the startup action is the explicit seam for those later steps rather than hidden
+reflection or a global singleton。
 
-`NereusKafkaRuntimeFactory.create` accepts an immutable typed config plus explicit dependencies：Kafka broker/controller IDs、
-broker epoch supplier、KRaft metadata-view supplier、Kafka `Time`、metrics registry and scheduler。No static singleton；tests can
-run independent runtimes in one JVM。
+`NereusKafkaRuntimeFactory.create` is now executable after provider construction。Its immutable
+`NereusKafkaRuntimeConfiguration` freezes Nereus/Kafka cluster IDs、writer identity、session TTL/renewal interval and durable
+binding-operation owner/epoch/TTL。`NereusKafkaRuntimeDependencies` explicitly supplies `StreamStorage`、the Kafka binding
+store、borrowed renewal scheduler、fork-owned recovery launcher、clock、startup action and provider resources with exact
+ownership。The factory constructs one keyspace/lifecycle/opener/manager/runtime graph and one shared RecordBatch codec；it has
+no Kafka server type、reflection、service loader、global registry or duplicate provider lifecycle。Broker/controller identity、
+KRaft metadata view、Kafka `Time`/metrics and the mapping from the fork's 58-key snapshot remain inputs to the not-yet-built
+provider/activation creator。Independent runtimes can run in one JVM。
 
 Kafka fork commits `46e6703761..617451957c` supply the stock-owned `BrokerStorageRuntimeFactory` injection boundary and the exact
 create/start/metadata-lifecycle/ready/drain/close ordering。The default factory is no-op only when storage is disabled and rejects
@@ -60,7 +65,10 @@ constructs the ListOffsets/topic-delta lifecycle only at that point。Owned prov
 therefore rejected too。`close()` is idempotent，skips borrowed dependencies，attempts every owned close in reverse list
 construction order and aggregates named failures。`DefaultNereusKafkaRuntime.close()` closes the partition manager before
 this provider ledger；BrokerServer still owns the outer stop-admission → await-drain → ReplicaManager → LogManager → runtime
-ordering。The concrete factory must populate the ledger at construction time and may not infer ownership during shutdown。
+ordering。`NereusKafkaRuntimeFactory` now appends the binding store and `StreamStorage` after caller-supplied provider resources，
+so reverse close drains stream facade → binding store → underlying clients/providers。It rejects identity duplication before
+ownership transfer and never closes borrowed Kafka scheduler/clock/recovery dependencies；ownership is not inferred during
+shutdown。
 
 ## 2. Configuration namespace
 

@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + local Kafka-fork record-inspector/async-result/metadata-lifecycle slices in progress；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 concrete provider-backed native Kafka broker runtime
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + local Kafka-fork record-inspector/async-result/metadata-lifecycle slices in progress；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership/post-provider runtime assembly + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；无 concrete provider-backed native Kafka broker runtime
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -36,8 +36,11 @@ admission、ReplicaManager 前等待 drain、LogManager 后关闭 runtime；enab
 adapter 已新增 exact `NereusKafkaRuntime`、drain reason、immutable health snapshot 和 thread-safe admission gate，且保证
 drain/close 终态不能被 late readiness callback 重新打开；`DefaultNereusKafkaRuntime` 进一步提供 operation-owned
 start/drain、non-destructive timeout view、partition-manager shutdown 和 idempotent close，`KafkaRuntimeResources` 明确
-OWNED/BORROWED 身份、拒绝同一实例的重复/混合所有权，并按构造逆序 attempt-all close。concrete provider
-composition/activation creator、`UnifiedLog`/factory、
+OWNED/BORROWED 身份、拒绝同一实例的重复/混合所有权，并按构造逆序 attempt-all close。
+`NereusKafkaRuntimeFactory` 已用 immutable product config 和显式 dependencies 组装同一
+`StreamStorage`、Kafka binding store、keyspace/lifecycle、opener、partition manager 与 process runtime；provider
+resources 按构造顺序转入 ledger，Kafka scheduler/clock/recovery launcher 保持 borrowed，且 factory 不导入 Kafka
+server 类型。concrete Oxia/Object/BookKeeper client creator、activation/capability startup action、`UnifiedLog`/factory、
 checkpoint time-index candidate、五档 real-service profile matrix 与真实 KRaft
 Produce/Fetch/ListOffsets 尚未实现。fork-owned `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
 stock Kafka 4.3 `MemoryRecords` 实现；bridge/lifecycle tests、10 个 config-specific tests、完整 stock
@@ -53,8 +56,8 @@ wiring 已落地并通过 stock KRaft restart；provider-backed runtime activati
 gate 尚未闭合。
 fork `617451957c` 已把该 generic seam 接到 adapter contract：显式 typed creators 交付 runtime 与 ListOffsets limits，
 同一 product manager 只绑定一个 exact `ReplicaManager`，构造 `NereusListOffsetsLifecycle`/`NereusTopicDeltaLifecycle`，
-并在 runtime drain 时同步撤销 lookup admission；disabled build 排除全部 adapter-backed sources。provider clients、
-activation/capability 与 log factory 仍未组装。
+并在 runtime drain 时同步撤销 lookup admission；disabled build 排除全部 adapter-backed sources。fork 侧尚未把 typed
+Kafka config/context 映射到新的 product assembly，provider clients、activation/capability 与 log factory 仍未组装。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 

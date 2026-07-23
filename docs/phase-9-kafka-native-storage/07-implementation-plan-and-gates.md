@@ -494,11 +494,15 @@ Current partial implementation：`NereusKafkaRuntime`、`DrainReason`、`KafkaSt
 recovery before drain、stable pre-I/O rejection、one-winner concurrent drain and irreversible drain/close against late
 callbacks。`DefaultNereusKafkaRuntime` and `KafkaRuntimeResources` now make start/drain operation ownership、timeout-view
 isolation、late-start fencing、manager-first close、exact OWNED/BORROWED identity、reverse-order close and attempt-all failure
-aggregation executable。The local Kafka fork also has an explicitly injected generic `BrokerStorageRuntimeFactory` with
+aggregation executable。`NereusKafkaRuntimeConfiguration`、`NereusKafkaRuntimeDependencies` and
+`NereusKafkaRuntimeFactory` now make the post-provider product graph executable：one binding keyspace/lifecycle、one
+authority/recovery opener、one partition manager、one codec pair and one process runtime，with fixed/extra provider resources
+entered into the exact close ledger and Kafka scheduler/clock/recovery launcher remaining borrowed。The local Kafka fork also
+has an explicitly injected generic `BrokerStorageRuntimeFactory` with
 stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。`NereusBrokerStorageRuntimeFactory`
 and `NereusBrokerStorageRuntime` now add typed runtime/scan-limit creators、failure rollback、one exact ReplicaManager binding、
 drain-reason mapping and synchronous lookup revocation without a duplicate manager owner。This is deterministic partial evidence
-for KF-OPS-012/014/017；provider client construction/activation、priority budgets and real
+for KF-OPS-012/014/017；typed Kafka-config-to-provider construction、activation、priority budgets and real
 native-storage shutdown/process cuts remain open。
 
 ### Tasks
