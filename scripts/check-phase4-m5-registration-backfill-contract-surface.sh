@@ -37,6 +37,7 @@ report="$pulsar_main/storage/nereus/GenerationRegistrationBackfillReport.java"
 failure="$pulsar_main/storage/nereus/BackfillFailure.java"
 stage="$pulsar_main/storage/nereus/GenerationRegistrationBackfillStage.java"
 storage="$pulsar_main/storage/nereus/NereusManagedLedgerStorage.java"
+pulsar_service="$pulsar_main/PulsarService.java"
 registry="$pulsar_main/loadbalance/extensions/BrokerRegistryImpl.java"
 configuration="$pulsar_checkout/pulsar-broker-common/src/main/java/org/apache/pulsar/broker/ServiceConfiguration.java"
 backfill_test="$pulsar_test/NereusGenerationRegistrationBackfillTest.java"
@@ -54,6 +55,7 @@ for path in \
     "$failure" \
     "$stage" \
     "$storage" \
+    "$pulsar_service" \
     "$registry" \
     "$configuration" \
     "$backfill_test" \
@@ -92,7 +94,12 @@ require_literal "REGISTRATION_WRITE" "$stage"
 require_literal "resourceIdentitySha256 must be lowercase SHA-256" "$failure"
 require_literal "attachGenerationRegistrationBackfill(" "$storage"
 require_literal "runGenerationRegistrationBackfill(" "$storage"
-require_literal "pulsar.getPulsarResources().getTenantResources()" "$registry"
+require_literal "nereusStorage.capabilityCoordinator().attachLocalBroker(getBrokerId())" \
+    "$pulsar_service"
+require_literal "nereusStorage.attachGenerationRegistrationBackfill(" "$pulsar_service"
+require_literal "pulsarResources.getTenantResources()" "$pulsar_service"
+require_literal "pulsarResources.getNamespaceResources()" "$pulsar_service"
+require_literal "pulsarResources.getTopicResources()" "$pulsar_service"
 require_literal "nereusGenerationRegistrationBackfillConcurrency = 16" "$configuration"
 require_literal "nereusGenerationRegistrationBackfillTimeoutSeconds = 3600" "$configuration"
 
@@ -111,6 +118,11 @@ require_literal "Checkpoint Z" "$repo_root/docs/phase-4-compaction-generation/RE
 
 if rg -Fq -- "compareAndSetGenerationProtocolActivation" "$backfill"; then
     echo "registration-backfill traversal must not write the durable activation proof" >&2
+    exit 1
+fi
+
+if rg -Fq -- "attachGenerationRegistrationBackfill(" "$registry"; then
+    echo "registration-backfill lifecycle wiring must not depend on ExtensibleLoadManager BrokerRegistryImpl" >&2
     exit 1
 fi
 

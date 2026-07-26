@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 set -euo pipefail
 
@@ -10,11 +27,12 @@ use_sudo="${CONTAINERD_USE_SUDO:-false}"
 
 usage() {
     cat <<'EOF'
-Save or load the two Pulsar benchmark images for a containerd-backed Kubernetes cluster.
+Save or load the Apache Pulsar, Nereus Pulsar, and Nereus admin benchmark
+images for a containerd-backed Kubernetes cluster.
 
 Usage:
   containerd-transfer-pulsar-5.0.0-M1-images.sh save MANIFEST.env IMAGES.tar
-  containerd-transfer-pulsar-5.0.0-M1-images.sh load IMAGES.tar [MANIFEST.env]
+  containerd-transfer-pulsar-5.0.0-M1-images.sh load IMAGES.tar MANIFEST.env
 
 Environment:
   CONTAINERD_NAMESPACE   containerd namespace (default: k8s.io)
@@ -49,6 +67,19 @@ manifest_value() {
     local key="$2"
 
     sed -n "s/^${key}=//p" "${manifest}" | tail -n 1
+}
+
+verify_sidecar() {
+    local file="$1"
+    local sidecar="${file}.sha256"
+    local expected
+    local actual
+    [[ -f "${sidecar}" ]] || die "checksum sidecar not found: ${sidecar}"
+    expected="$(awk 'NR == 1 {print $1}' "${sidecar}")"
+    actual="$(sha256_file "${file}")"
+    [[ "${actual}" == "${expected}" ]] \
+        || die "checksum mismatch for ${file}: expected ${expected}, got ${actual}"
+    echo "verified sha256: ${actual}  ${file}"
 }
 
 run_nerdctl() {
@@ -89,6 +120,7 @@ case "${command_name}" in
         manifest_file="$1"
         archive_file="$2"
         [[ -f "${manifest_file}" ]] || die "manifest not found: ${manifest_file}"
+        verify_sidecar "${manifest_file}"
         [[ ! -e "${archive_file}" ]] || die "refusing to overwrite archive: ${archive_file}"
         [[ ! -e "${archive_file}.sha256" ]] || die "refusing to overwrite checksum: ${archive_file}.sha256"
         command -v "${nerdctl_bin}" >/dev/null 2>&1 || die "save requires nerdctl: ${nerdctl_bin}"
@@ -98,14 +130,16 @@ case "${command_name}" in
 
         apache_image="$(manifest_value "${manifest_file}" APACHE_IMAGE)"
         nereus_image="$(manifest_value "${manifest_file}" NEREUS_IMAGE)"
+        admin_image="$(manifest_value "${manifest_file}" NEREUS_ADMIN_IMAGE)"
         target_platform="$(manifest_value "${manifest_file}" TARGET_PLATFORM)"
         [[ -n "${apache_image}" ]] || die "APACHE_IMAGE is missing from ${manifest_file}"
         [[ -n "${nereus_image}" ]] || die "NEREUS_IMAGE is missing from ${manifest_file}"
+        [[ -n "${admin_image}" ]] || die "NEREUS_ADMIN_IMAGE is missing from ${manifest_file}"
         [[ -n "${target_platform}" ]] || die "TARGET_PLATFORM is missing from ${manifest_file}"
 
         mkdir -p "$(dirname "${archive_file}")"
         run_nerdctl save --platform "${target_platform}" --output "${archive_file}" \
-            "${apache_image}" "${nereus_image}"
+            "${apache_image}" "${nereus_image}" "${admin_image}"
         archive_sha256="$(sha256_file "${archive_file}")"
         printf '%s  %s\n' "${archive_sha256}" "$(basename "${archive_file}")" \
             >"${archive_file}.sha256"
@@ -113,19 +147,13 @@ case "${command_name}" in
         echo "archive sha256: ${archive_sha256}"
         ;;
     load)
-        [[ $# -ge 1 && $# -le 2 ]] || die "load requires IMAGES.tar and optional MANIFEST.env"
+        [[ $# -eq 2 ]] || die "load requires IMAGES.tar and MANIFEST.env"
         archive_file="$1"
-        manifest_file="${2:-}"
+        manifest_file="$2"
         [[ -f "${archive_file}" ]] || die "archive not found: ${archive_file}"
-        if [[ -f "${archive_file}.sha256" ]]; then
-            expected_sha256="$(awk 'NR == 1 {print $1}' "${archive_file}.sha256")"
-            actual_sha256="$(sha256_file "${archive_file}")"
-            [[ "${actual_sha256}" == "${expected_sha256}" ]] \
-                || die "archive checksum mismatch: expected ${expected_sha256}, got ${actual_sha256}"
-            echo "verified archive sha256: ${actual_sha256}"
-        else
-            echo "warning: checksum sidecar not found: ${archive_file}.sha256" >&2
-        fi
+        [[ -f "${manifest_file}" ]] || die "manifest not found: ${manifest_file}"
+        verify_sidecar "${archive_file}"
+        verify_sidecar "${manifest_file}"
         if [[ "${use_sudo}" == true ]]; then
             command -v sudo >/dev/null 2>&1 || die "sudo is required when CONTAINERD_USE_SUDO=true"
         fi
@@ -138,17 +166,20 @@ case "${command_name}" in
             die "neither nerdctl nor ctr is available"
         fi
 
-        if [[ -n "${manifest_file}" ]]; then
-            [[ -f "${manifest_file}" ]] || die "manifest not found: ${manifest_file}"
-            apache_image="$(manifest_value "${manifest_file}" APACHE_IMAGE)"
-            nereus_image="$(manifest_value "${manifest_file}" NEREUS_IMAGE)"
-            if command -v "${nerdctl_bin}" >/dev/null 2>&1; then
-                run_nerdctl images --digests --no-trunc "${apache_image}"
-                run_nerdctl images --digests --no-trunc "${nereus_image}"
-            else
-                run_ctr images list | grep -F "${apache_image}"
-                run_ctr images list | grep -F "${nereus_image}"
-            fi
+        apache_image="$(manifest_value "${manifest_file}" APACHE_IMAGE)"
+        nereus_image="$(manifest_value "${manifest_file}" NEREUS_IMAGE)"
+        admin_image="$(manifest_value "${manifest_file}" NEREUS_ADMIN_IMAGE)"
+        [[ -n "${apache_image}" ]] || die "APACHE_IMAGE is missing from ${manifest_file}"
+        [[ -n "${nereus_image}" ]] || die "NEREUS_IMAGE is missing from ${manifest_file}"
+        [[ -n "${admin_image}" ]] || die "NEREUS_ADMIN_IMAGE is missing from ${manifest_file}"
+        if command -v "${nerdctl_bin}" >/dev/null 2>&1; then
+            run_nerdctl images --digests --no-trunc "${apache_image}"
+            run_nerdctl images --digests --no-trunc "${nereus_image}"
+            run_nerdctl images --digests --no-trunc "${admin_image}"
+        else
+            run_ctr images list | grep -F "${apache_image}"
+            run_ctr images list | grep -F "${nereus_image}"
+            run_ctr images list | grep -F "${admin_image}"
         fi
         echo "loaded images into containerd namespace ${containerd_namespace}"
         ;;

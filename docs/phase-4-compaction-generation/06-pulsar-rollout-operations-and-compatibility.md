@@ -416,10 +416,12 @@ The product boundary captures an immutable
 projectionIdentitySha256)` from the exact live `OPEN`/`SEALED` projection before crossing into the broker. The
 candidate validates the strict NPR1 identity/digest and the broker re-reads storage binding after registration；
 binding generation/class drift is a failure, while deletion after the idempotent write is a counted skip. Pulsar
-attaches the traversal to `NereusManagedLedgerStorage` from `BrokerRegistryImpl`, with defaults of 16 concurrent topic
-operations and a 3600-second whole-run deadline. Canonical topic batches are folded in order, all failures contribute
-to the digest, only the first 100 redacted failures are retained, and the frozen two-topic fixture coverage SHA is
-`2f234d6b9baa3a760460090850d22734f94cd72d51fd0f27706fda272fc01d7c`.
+attaches the local broker identity and traversal to `NereusManagedLedgerStorage` from the common `PulsarService`
+startup path, after broker ID initialization and before either load manager starts. The lifecycle is therefore shared
+by `ModularLoadManagerImpl` and `ExtensibleLoadManagerImpl`, rather than owned by `BrokerRegistryImpl`. Defaults remain
+16 concurrent topic operations and a 3600-second whole-run deadline. Canonical topic batches are folded in order, all
+failures contribute to the digest, only the first 100 redacted failures are retained, and the frozen two-topic fixture
+coverage SHA is `2f234d6b9baa3a760460090850d22734f94cd72d51fd0f27706fda272fc01d7c`.
 
 ## 4. Broker Capability
 

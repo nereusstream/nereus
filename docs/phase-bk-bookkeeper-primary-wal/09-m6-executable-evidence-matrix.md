@@ -40,3 +40,9 @@ BK-96. Together these two evidence forms prove restart independence without maki
 
 BK-M6 and the complete F1-BK / BookKeeper Primary WAL Delivery are complete/final-gated on 2026-07-22. Online profile
 migration remains a separate future delivery and is not implied by this completion claim.
+
+The historical completion record above is not automatically transferable to
+the Pulsar 5.0.0-M1 campaign. That campaign is source-locked to
+`5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4`, and its aggregate
+rerun includes real two-broker coverage for both Extensible and Modular load
+managers before any campaign image may be built.

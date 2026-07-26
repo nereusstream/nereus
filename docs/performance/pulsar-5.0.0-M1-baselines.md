@@ -11,17 +11,23 @@ Image identities and containerd delivery instructions are recorded in
 | Role | Repository / branch | Source anchor | Version |
 | --- | --- | --- | --- |
 | Apache Pulsar control | `nereusstream/pulsar:5.0.0-M1` | `8dae0236c0a0d405ed7f8303081080520fe91551` (`v5.0.0-M1`) | `5.0.0-M1` |
-| Nereus Pulsar | `nereusstream/pulsar:5.0.0-M1-nereus` | `5ffc2caa0e08dac95bc8c2ea76ed3d32382dfe3e` | `5.0.0-M1` |
-| Nereus | `nereus:v0.1.0` | based on `main@7d89eea`; M1 compatibility/test tip `18cb06e` | `0.1.0-SNAPSHOT` |
+| Nereus Pulsar replay base | `nereusstream/pulsar:5.0.0-M1-nereus` | `5ffc2caa0e08dac95bc8c2ea76ed3d32382dfe3e` | `5.0.0-M1` |
+| Nereus Pulsar campaign tip | same branch | `50fc70fe4620febcf0fd31d97ff7d2be447af3d4` | `5.0.0-M1` |
+| Nereus campaign tip | `nereus:v0.1.0` | clean commit containing this source lock | `0.1.0-SNAPSHOT` |
 
-The Nereus Pulsar branch contains 55 commits after the release tag：
+The historical replay base contains 55 commits after the release tag:
 
 - 54 Nereus commits, replayed in their original order from the Nereus integration range whose parent is
   `100d3ef0ff` and whose former `master` tip was `2f9c1eb93b`；
 - one explicit M1 compatibility commit, `5ffc2caa0e`；
 - none of the 64 community commits between `v5.0.0-M1` and `100d3ef0ff`。
 
-`nereus/gradle.properties` pins `pulsarExpectedHead` to `5ffc2caa0e08dac95bc8c2ea76ed3d32382dfe3e`.
+The campaign tip additionally contains the load-manager-independent capability
+publication/readiness management plane and admin APIs required by the Helm
+gate. `nereus/gradle.properties:pulsarExpectedHead` is pinned to the full
+campaign-tip commit above. The Nereus commit cannot self-embed its own SHA;
+record its full identity from `git rev-parse HEAD` and the checksummed image
+manifest.
 
 ## 2. M1-specific backport decisions
 
@@ -34,16 +40,16 @@ The backport preserves the M1 behavior instead of importing later community APIs
 - the facade does not write `ManagedLedgerInternalStats.properties`, which is absent in M1；
 - the public-surface test is locked to the M1 `ManagedCursor` API。
 
-## 3. Independent final-gate evidence
+## 3. Historical and required final-gate evidence
 
-The final gate was rerun against the backported Pulsar checkout on 2026-07-22：
+The final gate was rerun against the historical replay base on 2026-07-22:
 
 ```bash
 ./gradlew bookKeeperPrimaryWalFinalCheck --rerun-tasks \
   -PpulsarCheckout=/Users/liusinan/apps/ideaproject/nereusstream/pulsar
 ```
 
-Result at Nereus code/test tip `18cb06e` and Pulsar tip `5ffc2caa0e`：
+Result at Nereus code/test tip `18cb06e` and Pulsar tip `5ffc2caa0e`:
 
 ```text
 BUILD SUCCESSFUL in 34m 59s
@@ -53,6 +59,12 @@ BUILD SUCCESSFUL in 34m 59s
 Two failures found before that successful run were evidence that a green gate on the former Pulsar `master` could not
 be inherited：the M1 `ManagedCursor` surface differs from post-M1, and one manifest-visibility test used a timing-only
 deadline before reaching its intended commit cut. Both are now explicit and deterministic.
+
+This historical result does not cover the post-review Nereus, Pulsar, admin, or
+Helm source. Every campaign freeze must rerun the same gate from clean commits,
+with `pulsarExpectedHead` pinned to the campaign Pulsar SHA. Archive that output
+with both exact commit identities before building benchmark images or
+deploying the release.
 
 ## 4. Comparison matrix
 

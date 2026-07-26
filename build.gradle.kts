@@ -374,7 +374,8 @@ tasks.register("phase2Check") {
 
 tasks.register<Exec>("phase2PulsarFinalCheck") {
     group = "verification"
-    description = "Run the real two-broker Oxia/LocalStack/BookKeeper Nereus recovery gate."
+    description =
+        "Run the real two-broker Oxia/LocalStack/BookKeeper recovery gate with Extensible and Modular load managers."
     dependsOn("checkPulsarSourceLock")
     dependsOn("publishPhase2DevelopmentArtifacts")
     mustRunAfter("phase2PulsarCheck", "phase3M6Check")
@@ -383,6 +384,7 @@ tasks.register<Exec>("phase2PulsarFinalCheck") {
         pulsarGradleWrapper,
         ":pulsar-broker:test",
         "--tests", "org.apache.pulsar.broker.storage.nereus.NereusMultiBrokerIntegrationTest",
+        "--tests", "org.apache.pulsar.broker.storage.nereus.NereusModularLoadManagerMultiBrokerIntegrationTest",
         "--rerun-tasks",
         "-PnereusDevelopmentRepository=${phase2DevelopmentRepository.get().asFile.absolutePath}",
         "-PtestFailFast=true",

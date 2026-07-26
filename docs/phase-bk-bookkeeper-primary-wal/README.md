@@ -173,6 +173,14 @@
 
 ## 1. Delivery identity
 
+The Pulsar 5.0.0-M1 campaign does not inherit the historical `master` final
+gate. Its source lock is
+`5.0.0-M1-nereus@50fc70fe4620febcf0fd31d97ff7d2be447af3d4`.
+`phase2PulsarFinalCheck` executes the real two-broker Oxia/LocalStack/BookKeeper
+integration with both `ExtensibleLoadManagerImpl` and
+`ModularLoadManagerImpl`; the aggregate `bookKeeperPrimaryWalFinalCheck` must
+be rerun from this clean detached worktree before campaign images are built.
+
 本交付属于 Future 1 的后续扩展，正式简称为 **F1-BK / BookKeeper Primary WAL Delivery**。它不是
 Future 5：Future 1–8 是稳定能力轨道编号，其中 F5 已固定为 KoP/Kafka。实施里程碑使用
 `BK-M0` 到 `BK-M6`，不会重排 Future 编号。
