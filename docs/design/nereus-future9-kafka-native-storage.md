@@ -1,6 +1,6 @@
 # Future 9 — Native Kafka Shared-Storage Integration
 
-> 状态：In progress；F9-M1/M2 implemented；F9-M3 append/fetch/ListOffsets/metadata-lifecycle、checkpoint-pinned paged recovery、stock-RecordBatch-derived Partition state、authoritative log shell，以及 bounded Produce / whole-request async Fetch broker handoff slices implemented；F9-M6 config/runtime-lifecycle slices implemented；CLI/KafkaRaftServer production selection and real native KRaft process gate pending
+> 状态：In progress；F9-M1/M2 implemented；F9-M3 append/fetch/ListOffsets/metadata-lifecycle、checkpoint-pinned paged recovery、stock-RecordBatch-derived Partition state、authoritative log shell，以及 bounded Produce / whole-request async Fetch broker handoff slices implemented；F9-M5 exact two-pass compaction、durable publication/no-resurrection、owned-partition scheduler 与 activated Object-WAL production composition slices implemented，Kafka fork partition-lock capture and stock cleaner oracle pending；F9-M6 config/runtime-lifecycle slices implemented；CLI/KafkaRaftServer production selection and real native KRaft process gate pending
 > 代码级合同：`../phase-9-kafka-native-storage/README.md`
 > 参考源码：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`，`3.9.0-SNAPSHOT`
 > 设计基线日期：2026-07-23

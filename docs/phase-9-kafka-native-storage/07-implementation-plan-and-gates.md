@@ -658,8 +658,14 @@ actual Parquet NTC2、local-file object storage and durable in-memory task/gener
 coverage and both task/KCP1 roots retired。`KafkaCompactionRuntime` now consumes a bounded immutable fork-owned snapshot，
 rejects duplicate durable IDs/over-limit results，orders internal topics first，rechecks process-current writable leader
 epoch before launch，bounds cross-partition concurrency，attempts all accepted work and drains it before partition-manager
-shutdown。Production fork registration/concrete partition-lock/KRaft capture、real-provider fresh-process gates and the
-cleaner differential oracle remain pending。This closes the
+shutdown。`KafkaCompactionProductionRuntimeFactory` now composes that runtime with direct-stream exact-source resolution、
+per-plan stream-bound readers、shared staging/spill、streaming NTC2 publication/full verification、activation- and
+partition-authority-fenced Generation publication、coverage activation and terminal retirement。
+`NereusKafkaObjectWalRuntimeFactory` conditionally owns this graph from
+`NereusKafkaObjectWalActivationContext.compaction`，late-binds it to the same product partition manager through
+`KafkaRuntimeBackgroundServiceFactory`，and closes staging only after accepted compaction work drains。Production fork
+registration/concrete partition-lock/KRaft/local-log capture、real-provider fresh-process gates and the cleaner differential
+oracle remain pending。This closes the
 deterministic adapter no-resurrection/write-composition boundary but does not yet claim end-to-end client compaction
 visibility。
 
@@ -668,8 +674,8 @@ The Kafka-native Generation authority slice now adds canonical projection-free F
 that is revalidated immediately before the Generation `COMMITTED` CAS。The old constructors remain
 `PROJECTION_REQUIRED`，so existing Pulsar/F4 publication and source-resolution contracts are unchanged。
 `KafkaPartitionLifecycleCoordinator` installs/verifies this registration before an ACTIVE binding is returned。
-Production Object-WAL runtime construction still has to assemble these pieces with the concrete compaction pass and the
-fork-owned partition-lock/KRaft capture provider。
+Production Object-WAL runtime construction now assembles these pieces with the concrete compaction pass；the remaining seam
+is the fork-owned partition registration and partition-lock/KRaft/local-log capture provider。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

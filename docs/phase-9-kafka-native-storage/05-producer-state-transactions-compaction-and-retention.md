@@ -1017,9 +1017,13 @@ metadata/object-boundary restart evidence，not the still-required real-provider
 read-view router described in section 11.3、exact activated-generation-set discovery and generation-constrained Object-WAL
 runtime reads are implemented。`KafkaCompactionPartitionPass` now owns the full single-partition composition；
 `KafkaCompactionRuntime` owns bounded partition enumeration、process-current leader revalidation and cross-partition
-scheduling。The remaining boundary is the production fork registration/concrete partition-lock/KRaft authority capture
-provider and the real-provider/process-restart gate，not generation discovery、durable-output re-entry、per-partition
-lifecycle routing or process-level dispatch。
+scheduling。`KafkaCompactionProductionRuntimeFactory` now supplies the production Object-WAL composition behind both：
+direct-stream COMMITTED source resolution、recovered-plan stream-bound exact readers、shared KCSR/KCRS/NTC2 staging、
+strict object verification、activation/partition-authority-fenced Generation commit、coverage activation、terminal
+retirement and the process scheduler all use the same Oxia/Object-WAL/read-pin/provider graph。The remaining boundary is the
+production fork registration/concrete partition-lock/KRaft/local-log authority capture provider and the
+real-provider/process-restart gate，not generation discovery、durable-output re-entry、per-partition lifecycle routing、
+process-level dispatch or product provider composition。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
@@ -1079,6 +1083,22 @@ launch，and skips missing、changed-epoch or non-writable leaders。It runs at 
 parallel，attempts every accepted item even when another fails，and reports failures in stable partition order。Its
 non-cancellable aggregate lets scheduler close stop new deadlines while waiting for already accepted partition work；
 borrowed scheduler/callback executors are never closed。
+
+The activated Object-WAL creator accepts an optional `NereusKafkaCompactionContext` containing one validated
+`NereusKafkaCompactionRuntimeConfiguration` and the fork-owned `OwnedPartitionSource`。The configuration rejects a relative
+staging directory、a pass bound below concurrency、a staging budget below one upload chunk、non-COMMITTED source reads and
+all individual hard-limit violations before provider work。`NereusKafkaObjectWalRuntimeFactory` creates one private
+`StagingFileManager` under that resource ledger，then defers `KafkaCompactionProductionRuntimeFactory.create` until the one
+process `KafkaPartitionStorageManager` exists。This prevents a compaction scheduler from observing another manager instance。
+`DefaultNereusKafkaRuntime.start` starts the resulting service after activation but before READY；drain closes it and waits
+accepted work before shutting the manager，and only then may provider/staging resources close。
+The Kafka runtime instance ID is hashed through the shared canonical SHA-256/base32 helper before it becomes the durable
+materialization worker `processRunId`，so the fork's UUID-shaped process identity never reaches the base32-only claim record。
+
+`KafkaCompactionBatchSource.ReaderFactory` is intentionally keyed by the recovered KCP1 `streamId`。One process-global
+composition therefore cannot accidentally capture a stream from broker startup；each pass constructs
+`DefaultExactSourceRangeReader(cluster, recoveredPlan.streamId, ...)` from the durable plan before opening either cold
+stream。The existing fixed-reader constructor is retained only for narrow tests/compatibility。
 
 ### 10.5 Record rewrite V1
 
@@ -1306,7 +1326,7 @@ per-partition serialization described above。
 | Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusTimeIndex`、`NereusLeaderEpochCache` |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
 | adapter retention | `KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、`KafkaTrimBarrier`、`KafkaRetentionDurableTrimListener` partial implementation |
-| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard implemented；production Object-WAL composition and fork capture wiring pending |
+| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition implemented；fork registration and concrete partition-lock/KRaft/local-log capture wiring pending |
 | materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence |
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |
 | object store | NTC2 writer/reader/goldens from document 02 |

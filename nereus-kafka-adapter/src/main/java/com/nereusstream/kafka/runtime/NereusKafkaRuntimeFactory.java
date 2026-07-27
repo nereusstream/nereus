@@ -4,6 +4,7 @@ package com.nereusstream.kafka.runtime;
 import com.nereusstream.kafka.codec.KafkaAppendBatchEncoder;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
+import com.nereusstream.kafka.metadata.KafkaMaterializationStreamRegistration;
 import com.nereusstream.kafka.metadata.KafkaPartitionLifecycleCoordinator;
 import com.nereusstream.kafka.partition.DefaultKafkaPartitionOpener;
 import com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManager;
@@ -41,23 +42,49 @@ public final class NereusKafkaRuntimeFactory {
             NereusKafkaRuntimeConfiguration configuration,
             NereusKafkaRuntimeDependencies dependencies,
             KafkaRuntimeStartup startup) {
+        return create(
+                configuration,
+                dependencies,
+                startup,
+                null,
+                KafkaRuntimeBackgroundServiceFactory.none());
+    }
+
+    /**
+     * Assembles the activated production graph with direct-stream registration and a manager-bound
+     * background service.
+     */
+    public static NereusKafkaRuntime create(
+            NereusKafkaRuntimeConfiguration configuration,
+            NereusKafkaRuntimeDependencies dependencies,
+            KafkaRuntimeStartup startup,
+            KafkaMaterializationStreamRegistration materializations,
+            KafkaRuntimeBackgroundServiceFactory backgroundServices) {
         NereusKafkaRuntimeConfiguration exactConfiguration =
                 Objects.requireNonNull(configuration, "configuration");
         NereusKafkaRuntimeDependencies exactDependencies =
                 Objects.requireNonNull(dependencies, "dependencies");
         KafkaRuntimeStartup exactStartup = Objects.requireNonNull(startup, "startup");
+        KafkaRuntimeBackgroundServiceFactory exactBackgroundServices =
+                Objects.requireNonNull(backgroundServices, "backgroundServices");
         KafkaRuntimeResources resources = resources(exactDependencies);
         try {
             KafkaPartitionKeyspace keyspace =
                     new KafkaPartitionKeyspace(
                             exactConfiguration.nereusCluster(),
                             exactConfiguration.kafkaClusterId());
-            KafkaPartitionLifecycleCoordinator lifecycle =
-                    new KafkaPartitionLifecycleCoordinator(
+            KafkaPartitionLifecycleCoordinator lifecycle = materializations == null
+                    ? new KafkaPartitionLifecycleCoordinator(
                             exactDependencies.partitionMetadataStore(),
                             exactDependencies.streamStorage(),
                             keyspace,
-                            exactDependencies.clock());
+                            exactDependencies.clock())
+                    : new KafkaPartitionLifecycleCoordinator(
+                            exactDependencies.partitionMetadataStore(),
+                            exactDependencies.streamStorage(),
+                            keyspace,
+                            exactDependencies.clock(),
+                            materializations);
             KafkaRecordBatchCodec codec = new KafkaRecordBatchCodec();
             DefaultKafkaPartitionOpener opener =
                     new DefaultKafkaPartitionOpener(
@@ -81,8 +108,15 @@ public final class NereusKafkaRuntimeFactory {
                             exactConfiguration.operationOwnerEpoch(),
                             exactConfiguration.operationTtl(),
                             exactConfiguration.executableProfiles());
+            KafkaRuntimeBackgroundService backgroundService = Objects.requireNonNull(
+                    exactBackgroundServices.create(manager),
+                    "Kafka background service factory returned null");
             return new DefaultNereusKafkaRuntime(
-                    new KafkaStorageAdmission(), manager, exactStartup, resources);
+                    new KafkaStorageAdmission(),
+                    manager,
+                    exactStartup,
+                    backgroundService,
+                    resources);
         } catch (RuntimeException | Error failure) {
             closeAfterFailure(resources, failure);
             throw failure;

@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；Kafka controller scheduling、CLI/KafkaRaftServer production selection、BookKeeper/async providers and observability remain target；F9-M6
+> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；Kafka compaction config/owned-partition capture 的 fork mapping、Kafka controller scheduling、CLI/KafkaRaftServer production selection、BookKeeper/async providers and observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -59,6 +59,14 @@ while ACTIVE admission does not require the cluster to remain empty。The same p
 checkpoint read pins plus the checkpoint reader/verifier/recovery coordinator and bounded COMMITTED replay source；only the
 fork-provided `KafkaRecoveryStateFactory`、Kafka scheduler and clock are borrowed。Runtime close cancels owned
 heartbeat/poll futures before closing the activation store and provider ledger。
+
+The activated context can now additionally carry `NereusKafkaCompactionContext`。When present，the same creator owns one
+private `StagingFileManager` and creates `KafkaCompactionProductionRuntimeFactory` only after the exact process
+`KafkaPartitionStorageManager` exists。The resulting background graph reuses the same L0/Generation/physical/binding/KCP1
+Oxia stores、object protection/read pins、semantic reader registry、ObjectStore、activation verifier and borrowed scheduler。
+`KafkaRuntimeBackgroundServiceFactory` is the late-binding seam that prevents a parallel manager graph。Product construction
+and lifecycle are executable；the fork still has to map the 58-key snapshot into the additional bounded compaction runtime
+settings and provide the partition-lock/KRaft/local-log-backed `OwnedPartitionSource`/`CaptureProvider`。
 
 Kafka fork commits `46e6703761..47d36a1d9f` supply the stock-owned `BrokerStorageRuntimeFactory`/optional
 `BrokerStorageAppendExecutor`/`BrokerStorageFetchExecutor` injection boundaries and the exact

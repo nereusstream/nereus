@@ -350,10 +350,15 @@ readiness and background drain precedes partition-manager shutdown。`DefaultCom
 projection-required path；`GenerationPublicationFailureInjectionTest` proves caller partition authority loss leaves the
 Generation `PREPARED` and invisible immediately before the final CAS；
 `KafkaGenerationProtocolActivationGuardTest`/`KafkaPartitionLifecycleCoordinatorTest` prove exact direct registration plus
-ACTIVE/readiness admission/revalidation before an ACTIVE Kafka binding is returned。Production Object-WAL compaction
-composition、fork registration/concrete partition-lock/KRaft capture、provider fresh-process restart and stock `LogCleaner`
-comparison remain absent，so all rows remain `PLANNED`。The durable-output and full-pass tests are deterministic local
-restart/composition evidence only；the real-provider fresh-process restart tier remains absent。
+ACTIVE/readiness admission/revalidation before an ACTIVE Kafka binding is returned。
+`KafkaCompactionProductionRuntimeFactoryTest` now proves that the complete Object-WAL compaction graph can be constructed，
+starts its bounded owned-partition source and drains cleanly；`NereusKafkaRuntimeFactoryTest` proves the background graph is
+late-bound to the exact product partition manager and is started/closed under runtime readiness/drain ownership；
+`NereusKafkaCompactionRuntimeConfigurationTest` freezes the cross-limit and private staging-path bounds，while
+`KafkaCompactionBatchSourceTest` proves recovered KCP1 `streamId` selects the exact dynamic reader。Fork registration/concrete
+partition-lock/KRaft/local-log capture、provider fresh-process restart and stock `LogCleaner` comparison remain absent，so
+end-to-end rows remain `PLANNED`。The production-graph、durable-output and full-pass tests are deterministic local
+composition/restart evidence only；the real-provider fresh-process restart tier remains absent。
 
 ## 11. Configuration, activation, controller and operations
 

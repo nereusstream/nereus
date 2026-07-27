@@ -3,7 +3,11 @@ package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.kafka.metadata.KafkaMaterializationStreamRegistration;
 import com.nereusstream.kafka.partition.DefaultKafkaPartitionStorageManager;
+import com.nereusstream.kafka.partition.KafkaPartitionStorageManager;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
+import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
@@ -15,12 +19,74 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NereusKafkaRuntimeFactoryTest {
+    @Test
+    void lateBindsAndOwnsTheBackgroundServiceAroundThePartitionManager() {
+        List<String> closes = new ArrayList<>();
+        StreamStorage streams = proxy(StreamStorage.class, "streams", closes);
+        KafkaPartitionMetadataStore metadata = proxy(
+                KafkaPartitionMetadataStore.class, "metadata", closes);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        GenerationMetadataStore generations =
+                GenerationMetadataStoreTestFactory.inMemory(Clock.systemUTC());
+        AtomicReference<KafkaPartitionStorageManager> capturedManager = new AtomicReference<>();
+        AtomicInteger backgroundStarts = new AtomicInteger();
+        AtomicInteger backgroundCloses = new AtomicInteger();
+        try {
+            KafkaMaterializationStreamRegistration materializations =
+                    new KafkaMaterializationStreamRegistration(
+                            "nereus", generations, Clock.systemUTC());
+            NereusKafkaRuntime runtime = NereusKafkaRuntimeFactory.create(
+                    configuration(),
+                    dependencies(
+                            streams,
+                            ResourceOwnership.OWNED,
+                            metadata,
+                            ResourceOwnership.OWNED,
+                            scheduler,
+                            () -> CompletableFuture.completedFuture(null),
+                            List.of()),
+                    KafkaRuntimeStartup.from(
+                            () -> CompletableFuture.completedFuture(null)),
+                    materializations,
+                    manager -> {
+                        capturedManager.set(manager);
+                        return new KafkaRuntimeBackgroundService() {
+                            @Override
+                            public CompletableFuture<Void> start() {
+                                backgroundStarts.incrementAndGet();
+                                return CompletableFuture.completedFuture(null);
+                            }
+
+                            @Override
+                            public CompletableFuture<Void> closeAsync() {
+                                backgroundCloses.incrementAndGet();
+                                return CompletableFuture.completedFuture(null);
+                            }
+                        };
+                    });
+
+            assertThat(capturedManager).hasValue(runtime.partitionStorageManager());
+            runtime.start().toCompletableFuture().join();
+            assertThat(backgroundStarts).hasValue(1);
+            assertThat(runtime.health().ready()).isTrue();
+
+            runtime.close();
+
+            assertThat(backgroundCloses).hasValue(1);
+            assertThat(closes).containsExactly("streams", "metadata");
+        } finally {
+            generations.close();
+            scheduler.shutdownNow();
+        }
+    }
+
     @Test
     void assemblesOneManagerAndClosesOwnedProviderGraphInReverseOrder() {
         List<String> closes = new ArrayList<>();

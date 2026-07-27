@@ -23,6 +23,7 @@ import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
 import com.nereusstream.api.ReadSourceRef;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.materialization.ExactSourceRangeReader;
 import com.nereusstream.materialization.ExactSourceRead;
 import com.nereusstream.materialization.ExactSourceReadSummary;
@@ -33,9 +34,29 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class KafkaCompactionBatchSourceTest {
+  @Test
+  void bindsTheExactReaderToTheRecoveredPlanStream() {
+    KafkaCompactionPlan plan = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED").plan();
+    AtomicReference<StreamId> requestedStream = new AtomicReference<>();
+    KafkaCompactionBatchSource source =
+        new KafkaCompactionBatchSource(
+            streamId -> {
+              requestedStream.set(streamId);
+              return (generation, options) ->
+                  CompletableFuture.completedFuture(exactRead(generation, new AtomicInteger()));
+            },
+            options(),
+            Runnable::run);
+
+    try (KafkaCompactionBatchSource.PassStreams ignored = source.open(plan)) {
+      assertThat(requestedStream).hasValue(plan.streamId());
+    }
+  }
+
   @Test
   void opensIndependentDecisionAndOutputStreamsFromTheRecoveredPlan() {
     KafkaCompactionPlan plan = KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED").plan();
