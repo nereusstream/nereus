@@ -236,6 +236,95 @@ public final class KafkaCompactionPublicationCoordinator {
     }
   }
 
+  /**
+   * Re-enters generation publication and coverage activation from a durable task output.
+   *
+   * <p>This is the restart path for crashes after {@code OUTPUT_READY}, during generic generation
+   * publication, or after the binding CAS response was lost. It never requires the staging file:
+   * the durable output/read target has already passed the full NTC2 verification boundary before it
+   * was frozen.
+   */
+  public CompletableFuture<PublicationResult> recoverPublication(
+      KafkaPartitionId partition,
+      VersionedMaterializationTask durableTask,
+      KafkaCompactionPlan recoveredPlan,
+      KafkaCompactionCoverageActivationMode activationMode,
+      Optional<KafkaCompactionGenerationSet> previousGenerationSet,
+      MaterializationTaskMutationGuard authority) {
+    try {
+      KafkaPartitionId exactPartition = Objects.requireNonNull(partition, "partition");
+      VersionedMaterializationTask exactDurable =
+          Objects.requireNonNull(durableTask, "durableTask");
+      KafkaCompactionPlan plan = Objects.requireNonNull(recoveredPlan, "recoveredPlan");
+      KafkaCompactionCoverageActivationMode mode =
+          Objects.requireNonNull(activationMode, "activationMode");
+      Optional<KafkaCompactionGenerationSet> previous =
+          Objects.requireNonNull(previousGenerationSet, "previousGenerationSet");
+      MaterializationTaskMutationGuard exactAuthority =
+          Objects.requireNonNull(authority, "authority");
+      MaterializationTask task = tasks.requireTask(exactDurable);
+      MaterializationOutput output =
+          tasks
+              .requireOutput(exactDurable)
+              .orElseThrow(
+                  () ->
+                      new KafkaMetadataConditionFailedException(
+                          "Kafka compaction recovery task has no durable output"));
+      validateRecoveredOutput(exactDurable, task, plan, output);
+
+      return revalidateRecoveryAuthority(
+              exactPartition, task, plan, output, Optional.empty(), exactAuthority)
+          .thenCompose(ignored -> generations.publish(task, output))
+          .thenCompose(
+              committed -> {
+                KafkaCompactionGenerationSet desired =
+                    desiredGenerationSet(mode, previous, committed);
+                return loadBinding(exactPartition)
+                    .thenCompose(
+                        current -> {
+                          validateBindingWindow(current, task, plan);
+                          if (sameDesiredCoverage(
+                              current.value().compactionCoverage(), plan, desired, task)) {
+                            return CompletableFuture.completedFuture(
+                                new PublicationResult(output, committed, desired, current, false));
+                          }
+                          validateActivationBasis(current, task, plan, mode, previous);
+                          KafkaCompactionCoverageRecord basis =
+                              current.value().compactionCoverage();
+                          return revalidateRecoveryAuthority(
+                                  exactPartition,
+                                  task,
+                                  plan,
+                                  output,
+                                  Optional.of(basis),
+                                  exactAuthority)
+                              .thenCompose(
+                                  ignored ->
+                                      activateCoverage(
+                                          exactPartition,
+                                          task,
+                                          plan,
+                                          mode,
+                                          previous,
+                                          basis,
+                                          desired,
+                                          exactAuthority,
+                                          0))
+                              .thenApply(
+                                  activated ->
+                                      new PublicationResult(
+                                          output,
+                                          committed,
+                                          desired,
+                                          activated,
+                                          !basis.equals(activated.value().compactionCoverage())));
+                        });
+              });
+    } catch (Throwable failure) {
+      return CompletableFuture.failedFuture(failure);
+    }
+  }
+
   private CompletableFuture<VersionedMaterializationTask> claim(
       VersionedMaterializationTask expected,
       String claimId,
@@ -463,8 +552,7 @@ public final class KafkaCompactionPublicationCoordinator {
     return loadBinding(partition)
         .thenCompose(
             current -> {
-              if (sameDesiredCoverage(
-                  current.value().compactionCoverage(), basisCoverage, desired, task)) {
+              if (sameDesiredCoverage(current.value().compactionCoverage(), plan, desired, task)) {
                 return CompletableFuture.completedFuture(current);
               }
               if (!current.value().compactionCoverage().equals(basisCoverage)) {
@@ -496,10 +584,7 @@ public final class KafkaCompactionPublicationCoordinator {
                             .thenCompose(
                                 reloaded -> {
                                   if (sameDesiredCoverage(
-                                      reloaded.value().compactionCoverage(),
-                                      basisCoverage,
-                                      desired,
-                                      task)) {
+                                      reloaded.value().compactionCoverage(), plan, desired, task)) {
                                     return CompletableFuture.completedFuture(reloaded);
                                   }
                                   if (reloaded.value().compactionCoverage().equals(basisCoverage)) {
@@ -551,6 +636,47 @@ public final class KafkaCompactionPublicationCoordinator {
                 throw new KafkaMetadataConditionFailedException(
                     "Kafka compaction coverage changed during object preparation");
               }
+            })
+        .thenCompose(ignored -> authority.revalidate());
+  }
+
+  private CompletableFuture<Void> revalidateRecoveryAuthority(
+      KafkaPartitionId partition,
+      MaterializationTask task,
+      KafkaCompactionPlan plan,
+      MaterializationOutput output,
+      Optional<KafkaCompactionCoverageRecord> expectedCoverage,
+      MaterializationTaskMutationGuard authority) {
+    return tasks
+        .get(task.streamId(), task.taskId())
+        .thenCompose(
+            optional -> {
+              VersionedMaterializationTask current =
+                  optional.orElseThrow(
+                      () ->
+                          new KafkaMetadataConditionFailedException(
+                              "Kafka compaction recovery task disappeared"));
+              MaterializationTask currentTask = tasks.requireTask(current);
+              Optional<MaterializationOutput> currentOutput = tasks.requireOutput(current);
+              if (!currentTask.equals(task)
+                  || !isRecoverableOutputLifecycle(current.value().lifecycle())
+                  || currentOutput.filter(output::equals).isEmpty()) {
+                return CompletableFuture.failedFuture(
+                    new KafkaMetadataConditionFailedException(
+                        "Kafka compaction recovery task/output changed"));
+              }
+              return loadBinding(partition);
+            })
+        .thenAccept(
+            binding -> {
+              validateBindingWindow(binding, task, plan);
+              expectedCoverage.ifPresent(
+                  expected -> {
+                    if (!binding.value().compactionCoverage().equals(expected)) {
+                      throw new KafkaMetadataConditionFailedException(
+                          "Kafka compaction coverage changed during publication recovery");
+                    }
+                  });
             })
         .thenCompose(ignored -> authority.revalidate());
   }
@@ -785,17 +911,45 @@ public final class KafkaCompactionPublicationCoordinator {
 
   private static boolean sameDesiredCoverage(
       KafkaCompactionCoverageRecord actual,
-      KafkaCompactionCoverageRecord basis,
+      KafkaCompactionPlan plan,
       KafkaCompactionGenerationSet desired,
       MaterializationTask task) {
     long expectedEpoch =
-        basis.coverageVersion() == 0 ? 1 : Math.addExact(basis.activationEpoch(), 1);
+        plan.candidate()
+            .previousMandatoryCoverage()
+            .map(coverage -> Math.addExact(coverage.activationEpoch(), 1))
+            .orElse(1L);
     return actual.coverageVersion() == 1
         && actual.startOffset() == desired.coverage().startOffset()
         && actual.endOffset() == desired.coverage().endOffset()
         && actual.activationEpoch() == expectedEpoch
         && Arrays.equals(actual.generationSetSha256(), desired.digestBytes())
         && Arrays.equals(actual.policySha256(), checksumBytes(task.policyDigestSha256()));
+  }
+
+  private static void validateRecoveredOutput(
+      VersionedMaterializationTask durable,
+      MaterializationTask task,
+      KafkaCompactionPlan plan,
+      MaterializationOutput output) {
+    plan.requireMaterializationTask(task);
+    if (!isRecoverableOutputLifecycle(durable.value().lifecycle())
+        || !output.taskId().equals(task.taskId())
+        || !output.streamId().equals(task.streamId())
+        || output.view() != ReadView.TOPIC_COMPACTED
+        || !output.coverage().equals(task.coverage())
+        || !output.sourceSetSha256().equals(task.sourceSetSha256())
+        || !output.physicalFormat().equals(MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT)
+        || !output.logicalFormat().equals(CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT)) {
+      throw new IllegalArgumentException(
+          "durable Kafka compaction task/output cannot enter publication recovery");
+    }
+  }
+
+  private static boolean isRecoverableOutputLifecycle(TaskLifecycle lifecycle) {
+    return lifecycle == TaskLifecycle.OUTPUT_READY
+        || lifecycle == TaskLifecycle.PUBLISHING
+        || lifecycle == TaskLifecycle.PUBLISHED;
   }
 
   private boolean sameClaimOwner(

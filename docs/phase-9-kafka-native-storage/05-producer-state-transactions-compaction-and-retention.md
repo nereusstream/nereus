@@ -999,12 +999,24 @@ change after Generation commit leaves the generation non-mandatory and fails clo
 maps physical `KAFKA_RECORD_BATCH_V1` back to the durable `KAFKA_RECORD_BATCH` payload identity without relabelling the
 read target。
 
+After the output has reached durable `OUTPUT_READY`，`recoverPublication` is the only Kafka-specific restart re-entry：
+it accepts only `OUTPUT_READY/PUBLISHING/PUBLISHED` tasks whose frozen task/output still match the recovered KCP1 and exact
+NTC2 format。It reloads the task/output and ACTIVE binding，revalidates the binding window plus caller authority，then
+re-enters the idempotent generic Generation state machine without a local staging file。If the binding already contains the
+canonical desired generation-set digest/range/policy and the activation epoch derived from the plan's previous mandatory
+coverage，recovery converges without a second coverage mutation；otherwise the exact frozen activation basis is checked
+again immediately before the bounded response-loss-safe CAS。A changed task/output、binding window、coverage basis or
+authority fails closed，and a committed but unactivated generation remains non-mandatory。
+
 `KafkaCompactionPublicationCoordinatorTest` executes a real staged Parquet NTC2 upload/read verifier and the durable task
 claim/output transition，injects both response-loss cuts，accepts a same-owner heartbeat race and proves an unrelated
-coverage activation cannot be overwritten after Generation commit。The binding-rooted read-view router described in
-section 11.3、exact activated-generation-set discovery and generation-constrained Object-WAL runtime reads are implemented。
-The remaining runtime boundary is the full per-partition pass composition and provider/restart gate，not generation
-discovery。
+coverage activation cannot be overwritten after Generation commit。It now also interrupts coverage activation after the
+durable output/Generation boundary，discards the staging context，then proves a fresh recovery call activates the exact
+coverage；a repeated recovery recognizes an already activated root without advancing its epoch。This is deterministic
+metadata/object-boundary restart evidence，not the still-required real-provider process-restart gate。The binding-rooted
+read-view router described in section 11.3、exact activated-generation-set discovery and generation-constrained Object-WAL
+runtime reads are implemented。The remaining runtime boundary is the full per-partition pass composition and
+real-provider/process-restart gate，not generation discovery or durable-output re-entry。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate

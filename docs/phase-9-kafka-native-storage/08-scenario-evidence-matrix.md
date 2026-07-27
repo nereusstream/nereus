@@ -296,8 +296,8 @@ oracle、real retention provider trim、concrete partition capture/local-log upd
 | KF-CMP-007 | all compression formats、headers、timestamps rewrite to equivalent valid records | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionRowMapperTest`（GZIP/header/timestamp/NTC2 partial）；`KafkaCompactionRewriteTest`（full matrix pending） | D,M,K | M5 |
 | KF-CMP-008 | idempotent/transactional/control/open/aborted traces match stock cleaner views | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionStrategyV1Test`（rewrite/decision partial）；`KafkaCompactionTransactionOracleTest`（stock trace pending） | M,K | M5 |
 | KF-CMP-009 | decode ratio/key/task limits abort without publication or lost source refs | product `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest` + `KafkaCompactionWinnerIndexTest` + `KafkaCompactionRowSpoolTest` + `KafkaCompactionStreamingExecutorTest`（bounded key/record/output limits plus KCSR/KCRS corruption/cancel cleanup partial）；`KafkaCompactionResourceLimitTest`（full worker pressure pending） | D,M,R | M5 |
-| KF-CMP-010 | generation commit before coverage CAS is not client-visible mandatory compaction | product `KafkaCompactionPublicationCoordinatorTest` + `KafkaActivatedGenerationSetResolverTest` + `KafkaCompactedFetchIntegrationTest`（write/read-side deterministic proof；provider restart pending） | R,C | M5 |
-| KF-CMP-011 | coverage CAS response loss reloads exact activation and never double-advances epoch | product `KafkaCompactionPublicationCoordinatorTest` + `KafkaBindingTransitionTest` | R,P,C | M5 |
+| KF-CMP-010 | generation commit before coverage CAS is not client-visible mandatory compaction | product `KafkaCompactionPublicationCoordinatorTest` + `KafkaActivatedGenerationSetResolverTest` + `KafkaCompactedFetchIntegrationTest`（write/read-side plus durable-output re-entry deterministic proof；real-provider process restart pending） | R,C | M5 |
+| KF-CMP-011 | coverage CAS response loss reloads exact activation and never double-advances epoch | product `KafkaCompactionPublicationCoordinatorTest`（fresh response-loss + repeated durable recovery） + `KafkaBindingTransitionTest` | R,P,C | M5 |
 | KF-CMP-012 | compact→delete preserves old mandatory coverage；delete→compact activates only after verified output | `KafkaCompactionPolicyTransitionTest` | R,K,C | M5 |
 | KF-CMP-013 | same-range NTC2 replacement protects readers and retires old generation after proof | `KafkaCompactionReplacementIntegrationTest` | R,C | M5 |
 | KF-CMP-014 | user and both internal compacted topics pass differential/restart/takeover suite | `KafkaNativeCompactionEndToEndTest` | P,K,C | M5/M7 |
@@ -329,7 +329,9 @@ strict verification and proves decision-pass cancellation releases KCSR；`Gener
 empty survivor can be durably published as a zero-row TOPIC_COMPACTED generation while COMMITTED remains non-empty；
 `KafkaCompactionGenerationSetTest` freezes the gap-free committed-index identity digest，and
 `KafkaCompactionPublicationCoordinatorTest` composes task claim/heartbeat、guarded local upload、full NTC2 verification、
-Generation commit and binding CAS while injecting PUT/CAS response loss plus changed-basis failure；
+Generation commit and binding CAS while injecting PUT/CAS response loss plus changed-basis failure；it additionally resumes
+from a durable output after activation interruption without a staging file and proves repeated recovery recognizes the exact
+already-activated coverage without a second coverage CAS；
 `KafkaCompactionTerminalRetirerTest` covers task-first/plan-second
 ordering、both response-loss cuts and exact-root fail-closed behavior。`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty
 tombstone bytes。`KafkaActivatedGenerationSetResolverTest`/`KafkaCompactedFetchIntegrationTest`/
@@ -338,7 +340,8 @@ mandatory-prefix/committed-tail routing；`KafkaCompactionPlanMetadataStoreContr
 cover partition-scoped plan pagination，and `KafkaCompactionPlanOrphanScannerTest` covers grace/live-task/final-authority/
 delete-response-loss cuts。`KafkaCompactionSchedulerTest` proves startup/fixed-delay、one-active/one-pending coalescing、
 caller-cancellation isolation and borrowed-resource close semantics。Full production pass/runtime wiring、provider restart
-and stock `LogCleaner` comparison remain absent，so all rows remain `PLANNED`。
+and stock `LogCleaner` comparison remain absent，so all rows remain `PLANNED`。The durable-output test is deterministic
+restart re-entry evidence only；the real-provider fresh-process restart tier remains absent。
 
 ## 11. Configuration, activation, controller and operations
 

@@ -218,8 +218,120 @@ class KafkaCompactionPublicationCoordinatorTest {
     }
   }
 
+  @Test
+  void recoversDurableOutputWhenCoverageActivationWasInterrupted() throws Exception {
+    try (Context context = context(false, false, false, true)) {
+      VersionedMaterializationTask claimed =
+          context.coordinator.claim(context.planned, CLAIM_ID, PROCESS_ID, 10_000).join();
+
+      assertThatThrownBy(
+              () ->
+                  context
+                      .coordinator
+                      .publish(
+                          context.partition,
+                          claimed,
+                          context.fixture.plan(),
+                          context.prepared(CLAIM_ID),
+                          KafkaCompactionCoverageActivationMode.INITIAL,
+                          Optional.empty(),
+                          () -> CompletableFuture.completedFuture(null))
+                      .join())
+          .isInstanceOf(CompletionException.class)
+          .hasRootCauseMessage(
+              "Kafka compaction coverage activation exhausted bounded CAS recovery");
+      assertThat(context.generationCommits).hasValue(1);
+      assertThat(
+              context
+                  .basePartitions
+                  .get(context.partition)
+                  .join()
+                  .orElseThrow()
+                  .value()
+                  .compactionCoverage()
+                  .coverageVersion())
+          .isZero();
+
+      context.rejectCoverage.set(false);
+      VersionedMaterializationTask outputReady =
+          context
+              .tasks
+              .get(context.fixture.outputTask().streamId(), context.fixture.outputTask().taskId())
+              .join()
+              .orElseThrow();
+      KafkaCompactionPublicationCoordinator.PublicationResult recovered =
+          context
+              .coordinator
+              .recoverPublication(
+                  context.partition,
+                  outputReady,
+                  context.fixture.plan(),
+                  KafkaCompactionCoverageActivationMode.INITIAL,
+                  Optional.empty(),
+                  () -> CompletableFuture.completedFuture(null))
+              .join();
+
+      assertThat(recovered.coverageActivatedByThisCall()).isTrue();
+      assertThat(recovered.binding().value().compactionCoverage().endOffset()).isEqualTo(2);
+      assertThat(context.generationCommits).hasValue(2);
+    }
+  }
+
+  @Test
+  void repeatedRecoveryRecognizesAlreadyActivatedCoverage() throws Exception {
+    try (Context context = context(false, false, false)) {
+      VersionedMaterializationTask claimed =
+          context.coordinator.claim(context.planned, CLAIM_ID, PROCESS_ID, 10_000).join();
+      KafkaCompactionPublicationCoordinator.PublicationResult published =
+          context
+              .coordinator
+              .publish(
+                  context.partition,
+                  claimed,
+                  context.fixture.plan(),
+                  context.prepared(CLAIM_ID),
+                  KafkaCompactionCoverageActivationMode.INITIAL,
+                  Optional.empty(),
+                  () -> CompletableFuture.completedFuture(null))
+              .join();
+      VersionedMaterializationTask durableOutput =
+          context
+              .tasks
+              .get(context.fixture.outputTask().streamId(), context.fixture.outputTask().taskId())
+              .join()
+              .orElseThrow();
+
+      KafkaCompactionPublicationCoordinator.PublicationResult recovered =
+          context
+              .coordinator
+              .recoverPublication(
+                  context.partition,
+                  durableOutput,
+                  context.fixture.plan(),
+                  KafkaCompactionCoverageActivationMode.INITIAL,
+                  Optional.empty(),
+                  () -> CompletableFuture.completedFuture(null))
+              .join();
+
+      assertThat(recovered.coverageActivatedByThisCall()).isFalse();
+      assertThat(recovered.generationSet()).isEqualTo(published.generationSet());
+      assertThat(recovered.binding()).isEqualTo(published.binding());
+      assertThat(context.coverageAttempts).hasValue(1);
+      assertThat(context.generationCommits).hasValue(2);
+    }
+  }
+
   private Context context(
       boolean losePutResponse, boolean loseCoverageResponse, boolean mutateCoverageAfterCommit)
+      throws Exception {
+    return context(losePutResponse, loseCoverageResponse, mutateCoverageAfterCommit, false);
+  }
+
+  private Context context(
+      boolean losePutResponse,
+      boolean loseCoverageResponse,
+      boolean mutateCoverageAfterCommit,
+      boolean rejectCoverageActivation)
       throws Exception {
     KafkaCompactionPlanCodecV1Test.Fixture fixture =
         KafkaCompactionPlanCodecV1Test.fixture("UNCOMPRESSED");
@@ -262,8 +374,10 @@ class KafkaCompactionPublicationCoordinatorTest {
     KafkaPartitionId partition = new KafkaPartitionId(KAFKA_CLUSTER, topicId(71), 0);
     createActiveBinding(basePartitions, partition, fixture.outputTask(), fixture.plan());
     AtomicInteger coverageAttempts = new AtomicInteger();
+    AtomicBoolean rejectCoverage = new AtomicBoolean(rejectCoverageActivation);
     KafkaPartitionMetadataStore partitions =
-        new ResponseLossPartitionStore(basePartitions, loseCoverageResponse, coverageAttempts);
+        new ResponseLossPartitionStore(
+            basePartitions, loseCoverageResponse, rejectCoverage, coverageAttempts);
     AtomicInteger generationCommits = new AtomicInteger();
     GenerationCommitter committer =
         (task, output) -> {
@@ -322,7 +436,8 @@ class KafkaCompactionPublicationCoordinatorTest {
         coordinator,
         putAttempts,
         coverageAttempts,
-        generationCommits);
+        generationCommits,
+        rejectCoverage);
   }
 
   private static void createActiveBinding(
@@ -509,14 +624,17 @@ class KafkaCompactionPublicationCoordinatorTest {
   private static final class ResponseLossPartitionStore implements KafkaPartitionMetadataStore {
     private final KafkaPartitionMetadataStore delegate;
     private final AtomicBoolean lose;
+    private final AtomicBoolean rejectCoverage;
     private final AtomicInteger coverageAttempts;
 
     private ResponseLossPartitionStore(
         KafkaPartitionMetadataStore delegate,
         boolean loseFirstCoverageResponse,
+        AtomicBoolean rejectCoverage,
         AtomicInteger coverageAttempts) {
       this.delegate = delegate;
       this.lose = new AtomicBoolean(loseFirstCoverageResponse);
+      this.rejectCoverage = rejectCoverage;
       this.coverageAttempts = coverageAttempts;
     }
 
@@ -538,6 +656,10 @@ class KafkaCompactionPublicationCoordinatorTest {
           !expected.value().compactionCoverage().equals(update.compactionCoverage());
       if (coverageChange) {
         coverageAttempts.incrementAndGet();
+      }
+      if (coverageChange && rejectCoverage.get()) {
+        return CompletableFuture.failedFuture(
+            new IllegalStateException("coverage activation unavailable"));
       }
       return delegate
           .compareAndSet(expected, update)
@@ -579,6 +701,7 @@ class KafkaCompactionPublicationCoordinatorTest {
     private final AtomicInteger putAttempts;
     private final AtomicInteger coverageAttempts;
     private final AtomicInteger generationCommits;
+    private final AtomicBoolean rejectCoverage;
 
     private Context(
         KafkaCompactionPlanCodecV1Test.Fixture fixture,
@@ -594,7 +717,8 @@ class KafkaCompactionPublicationCoordinatorTest {
         KafkaCompactionPublicationCoordinator coordinator,
         AtomicInteger putAttempts,
         AtomicInteger coverageAttempts,
-        AtomicInteger generationCommits) {
+        AtomicInteger generationCommits,
+        AtomicBoolean rejectCoverage) {
       this.fixture = fixture;
       this.staging = staging;
       this.objects = objects;
@@ -609,6 +733,7 @@ class KafkaCompactionPublicationCoordinatorTest {
       this.putAttempts = putAttempts;
       this.coverageAttempts = coverageAttempts;
       this.generationCommits = generationCommits;
+      this.rejectCoverage = rejectCoverage;
     }
 
     private PreparedObject prepared(String outputAttemptId) {

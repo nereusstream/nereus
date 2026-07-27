@@ -164,7 +164,10 @@ KCP1 second 的顺序收敛双根删除和 response loss。通用 F4 policy/outp
 identity、task/output format agreement 和 zero-survivor generation accounting，且不放宽 COMMITTED dense invariant。
 `KafkaCompactionPublicationCoordinator` 又按 guarded upload/HEAD/full verify/OUTPUT_READY/Generation COMMITTED/
 binding coverage CAS 的顺序闭合 write-side linearization，以 canonical gap-free generation-set digest 支持首次、
-扩展与替换，并覆盖 PUT/CAS response loss、heartbeat race 和 generation-commit 后 basis drift。
+扩展与替换，并覆盖 PUT/CAS response loss、heartbeat race 和 generation-commit 后 basis drift。它现在还可从
+durable `OUTPUT_READY/PUBLISHING/PUBLISHED` task/output 重新进入幂等 Generation publication 与 coverage
+activation，不再依赖 crash 前的本地 staging file；恢复路径会重新验证 task/output、binding window、activation
+basis 与外部 authority，并把已生效但响应丢失的目标 coverage 识别为成功。
 `KafkaCompactedFetchPlanner`/`KafkaCompactedFetchReader` 又把每次 Fetch 绑定到最新 ACTIVE root：mandatory prefix
 只发 `TOPIC_COMPACTED` 请求，稀疏/空结果按 coverage 跨洞并在 exact end 切到剩余预算的 COMMITTED tail；强制对象
 失败不做 cross-view retry。`KafkaActivatedGenerationSetResolver` 对 binding digest 做 bounded、unique、gap-free

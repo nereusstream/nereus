@@ -637,7 +637,10 @@ cuts。The F4 policy/output/index boundary now carries a distinct NTC2 policy id
 agreement and preserves valid zero-survivor generations while keeping COMMITTED generations non-empty。
 `KafkaCompactionPublicationCoordinator` then performs guarded if-absent upload、HEAD/full NTC2 verification、durable
 OUTPUT_READY、generic Generation commit and canonical generation-set coverage CAS in that order；bounded exact reload
-handles PUT/CAS response loss，while a changed coverage basis leaves the committed generation non-mandatory。
+handles PUT/CAS response loss，while a changed coverage basis leaves the committed generation non-mandatory。Its
+durable-output recovery entry accepts only exact `OUTPUT_READY/PUBLISHING/PUBLISHED` task/output/KCP1 tuples，revalidates
+binding/authority and resumes idempotent Generation publication plus activation without a staging file；an already activated
+canonical digest/range/policy/epoch converges without another coverage CAS。
 `KafkaActivatedGenerationSetResolver` now discovers the unique bounded gap-free path matching the ACTIVE binding digest and
 passes exact generation/index identities to generation-constrained core reads；the Object-WAL runtime wires the corresponding
 NTC2 reader。The product runtime therefore reloads binding coverage per Fetch and executes a sparse `TOPIC_COMPACTED`
@@ -647,7 +650,7 @@ prefix followed by a `COMMITTED` tail；mandatory-view failure has no cross-view
 including exact-absence response-loss recovery。`KafkaCompactionScheduler` provides a borrowed-resource、non-overlapping
 startup/fixed-delay owner with at most one active and one coalesced pending pass，trigger priority aggregation and
 cancellation-isolated callers。Full per-partition planner→source→executor→publisher→retirer composition、runtime registration、
-provider/restart gates and the cleaner differential oracle remain pending。This closes the deterministic adapter
+real-provider/process-restart gates and the cleaner differential oracle remain pending。This closes the deterministic adapter
 no-resurrection boundary but does not yet claim end-to-end client compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
