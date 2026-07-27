@@ -23,6 +23,8 @@ import com.nereusstream.kafka.compaction.KafkaCompactionPlanCodecV1Test.Fixture;
 import com.nereusstream.materialization.KafkaCompactionTaskTestSupport;
 import com.nereusstream.materialization.MaterializationTask;
 import com.nereusstream.metadata.oxia.KafkaCompactionPlanMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaCompactionPlanScanPage;
+import com.nereusstream.metadata.oxia.KafkaCompactionPlanScanToken;
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
 import com.nereusstream.metadata.oxia.VersionedKafkaCompactionPlan;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
@@ -278,6 +280,12 @@ class KafkaCompactionTerminalRetirerTest {
     @Override
     public CompletableFuture<VersionedKafkaCompactionPlan> putCompactionPlanIfAbsent(
         KafkaCompactionPlanRecord value) {
+      return CompletableFuture.failedFuture(new UnsupportedOperationException());
+    }
+
+    @Override
+    public CompletableFuture<KafkaCompactionPlanScanPage> scanCompactionPlans(
+        KafkaPartitionId id, Optional<KafkaCompactionPlanScanToken> continuation, int limit) {
       return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 

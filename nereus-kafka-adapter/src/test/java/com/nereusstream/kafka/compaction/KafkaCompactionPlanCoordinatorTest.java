@@ -21,6 +21,8 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.kafka.compaction.KafkaCompactionPlanCodecV1Test.Fixture;
 import com.nereusstream.metadata.oxia.KafkaCompactionPlanMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaCompactionPlanScanPage;
+import com.nereusstream.metadata.oxia.KafkaCompactionPlanScanToken;
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
 import com.nereusstream.metadata.oxia.VersionedKafkaCompactionPlan;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
@@ -159,6 +161,12 @@ class KafkaCompactionPlanCoordinatorTest {
         return CompletableFuture.failedFuture(new IllegalStateException("conflicting plan"));
       }
       return CompletableFuture.completedFuture(current);
+    }
+
+    @Override
+    public CompletableFuture<KafkaCompactionPlanScanPage> scanCompactionPlans(
+        KafkaPartitionId id, Optional<KafkaCompactionPlanScanToken> continuation, int limit) {
+      return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
     @Override

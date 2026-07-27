@@ -584,8 +584,8 @@ letting one caller cancel shared work。The services adapter composes exact-refe
 publication/root reload，with a canonical seven-section local-file object-store round trip；the durable listener performs
 response-loss-safe binding observed-logStart CAS before calling the exact local updater。This task deliberately does not
 use the `phase9M5Check` completion name：concrete partition capture、
-local-log updater、periodic scheduling、Kafka-fork DeleteRecords invocation、
-compaction scheduler、activated-set discovery、stock oracle and real-provider/restart gates remain required。
+local-log updater、retention periodic scheduling、Kafka-fork DeleteRecords invocation、
+full compaction pass/runtime composition、stock oracle and real-provider/restart gates remain required。
 
 The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
 the frozen HW，returns the current durable low watermark without I/O for already-deleted requests，and otherwise routes the
@@ -637,11 +637,18 @@ cuts。The F4 policy/output/index boundary now carries a distinct NTC2 policy id
 agreement and preserves valid zero-survivor generations while keeping COMMITTED generations non-empty。
 `KafkaCompactionPublicationCoordinator` then performs guarded if-absent upload、HEAD/full NTC2 verification、durable
 OUTPUT_READY、generic Generation commit and canonical generation-set coverage CAS in that order；bounded exact reload
-handles PUT/CAS response loss，while a changed coverage basis leaves the committed generation non-mandatory。Plan-only
-orphan scan、runtime cleaner scheduling、activated-generation-set discovery and the cleaner differential oracle remain
-pending。The product runtime now reloads binding coverage per Fetch and executes a sparse `TOPIC_COMPACTED` prefix followed
-by a `COMMITTED` tail；mandatory-view failure has no cross-view fallback。This closes the deterministic adapter
-no-resurrection boundary but does not yet claim provider/restart or end-to-end client compaction visibility。
+handles PUT/CAS response loss，while a changed coverage basis leaves the committed generation non-mandatory。
+`KafkaActivatedGenerationSetResolver` now discovers the unique bounded gap-free path matching the ACTIVE binding digest and
+passes exact generation/index identities to generation-constrained core reads；the Object-WAL runtime wires the corresponding
+NTC2 reader。The product runtime therefore reloads binding coverage per Fetch and executes a sparse `TOPIC_COMPACTED`
+prefix followed by a `COMMITTED` tail；mandatory-view failure has no cross-view fallback。
+`KafkaCompactionPlanMetadataStore` additionally exposes partition-scoped bounded continuation，and
+`KafkaCompactionPlanOrphanScanner` retires only grace-expired task-absent exact plans under a stable no-admission guard，
+including exact-absence response-loss recovery。`KafkaCompactionScheduler` provides a borrowed-resource、non-overlapping
+startup/fixed-delay owner with at most one active and one coalesced pending pass，trigger priority aggregation and
+cancellation-isolated callers。Full per-partition planner→source→executor→publisher→retirer composition、runtime registration、
+provider/restart gates and the cleaner differential oracle remain pending。This closes the deterministic adapter
+no-resurrection boundary but does not yet claim end-to-end client compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

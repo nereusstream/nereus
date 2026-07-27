@@ -13,5 +13,10 @@ public interface KafkaCompactionPlanMetadataStore {
     CompletableFuture<VersionedKafkaCompactionPlan> putCompactionPlanIfAbsent(
             KafkaCompactionPlanRecord value);
 
+    CompletableFuture<KafkaCompactionPlanScanPage> scanCompactionPlans(
+            KafkaPartitionId id,
+            Optional<KafkaCompactionPlanScanToken> continuation,
+            int limit);
+
     CompletableFuture<Void> deleteCompactionPlan(VersionedKafkaCompactionPlan expected);
 }

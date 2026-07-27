@@ -96,6 +96,38 @@ public final class OxiaJavaKafkaPartitionMetadataStore
     }
 
     @Override
+    public CompletableFuture<KafkaCompactionPlanScanPage> scanCompactionPlans(
+            KafkaPartitionId id,
+            Optional<KafkaCompactionPlanScanToken> continuation,
+            int limit) {
+        ensureOpen();
+        KafkaPartitionId exact = Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(continuation, "continuation");
+        F4MetadataStoreSupport.requirePageLimit(limit);
+        String prefix = keys.compactionPlanPrefix(exact) + "/";
+        KafkaCompactionPlanScanToken token = continuation.orElse(null);
+        if (token != null
+                && (!token.partition().equals(exact) || !token.scanPrefix().equals(prefix))) {
+            throw new IllegalArgumentException(
+                    "Kafka compaction plan continuation belongs to another partition");
+        }
+        String from = token == null ? prefix : token.resumeFromInclusive();
+        String to = keys.compactionPlanPrefix(exact) + "/~";
+        return client.rangeScan(from, to, limit, keys.bindingPartitionKey(exact))
+                .thenApply(stored -> {
+                    List<VersionedKafkaCompactionPlan> values = stored.stream()
+                            .map(value -> compactionPlan(
+                                    value, exact, keys.parseCompactionPlanKey(exact, value.key())))
+                            .toList();
+                    Optional<KafkaCompactionPlanScanToken> next = stored.size() == limit
+                            ? Optional.of(new KafkaCompactionPlanScanToken(
+                                    exact, prefix, stored.get(stored.size() - 1).key()))
+                            : Optional.empty();
+                    return new KafkaCompactionPlanScanPage(values, next);
+                });
+    }
+
+    @Override
     public CompletableFuture<Void> deleteCompactionPlan(VersionedKafkaCompactionPlan expected) {
         ensureOpen();
         VersionedKafkaCompactionPlan exact = Objects.requireNonNull(expected, "expected");

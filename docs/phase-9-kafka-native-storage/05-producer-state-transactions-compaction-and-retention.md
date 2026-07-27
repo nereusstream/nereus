@@ -1001,17 +1001,22 @@ read target。
 
 `KafkaCompactionPublicationCoordinatorTest` executes a real staged Parquet NTC2 upload/read verifier and the durable task
 claim/output transition，injects both response-loss cuts，accepts a same-owner heartbeat race and proves an unrelated
-coverage activation cannot be overwritten after Generation commit。Runtime cleaner scheduling、plan-orphan scan、activated
-generation-set discovery and provider-backed restart gates remain pending；the binding-rooted read-view router described in
-section 11.3 is implemented。
+coverage activation cannot be overwritten after Generation commit。The binding-rooted read-view router described in
+section 11.3、exact activated-generation-set discovery and generation-constrained Object-WAL runtime reads are implemented。
+The remaining runtime boundary is the full per-partition pass composition and provider/restart gate，not generation
+discovery。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
 authority and reread the exact task-addressed KCP1 immediately before task admission。A crash before task creation can leave
 only a harmless plan orphan；a visible task cannot be created after its plan disappears or changes。Restart recovery resolves
 the child directly by `materializationTaskId` and cross-validates every task identity/source/policy fact before returning the
-frozen decision horizon。Exact terminal task-first/KCP1-second retirement is now implemented as described in `04`；bounded
-plan-only orphan prefix scanning is still production-worker work。
+frozen decision horizon。Exact terminal task-first/KCP1-second retirement is now implemented as described in `04`。
+`KafkaCompactionPlanMetadataStore.scanCompactionPlans` now adds partition-scoped opaque continuation and a strict
+`[1,1000]` page bound。`KafkaCompactionPlanOrphanScanner` freezes one scan time，caps both page and total plans，skips the
+grace window/live tasks，and deletes an old plan only after stable no-admission authority、exact plan reload and a second
+task-absence proof。An uncertain exact-version delete reloads the same task-addressed key；only exact absence is accepted
+as applied。
 
 `KafkaCompactionBatchSource.open(recoveredPlan)` now turns that recovered KCP1 into two independent cold
 `ExactSourceSetBatchPublisher` instances：one for the full decision horizon and one for the output prefix。Each stream opens
@@ -1020,9 +1025,16 @@ propagates one downstream request at a time and owns cancel/close。Every emitte
 commitVersion、target bytes/identity、payload/schema/projection and per-source final accounting；no generation resolver or
 fallback is invoked between passes。The streams accept ranged Kafka batches，not the old one-entry/one-record assumption。
 Completion is signalled after the last source summary even when the last batch consumes the exact remaining demand；it never
-requires a protocol-invalid extra request。The durable streams、checksummed winner spill、KCRS replay and streaming NTC2
-writer preparation now form one production executor path；object upload/generation publication remains the next worker
-slice。
+requires a protocol-invalid extra request。The durable streams、checksummed winner spill、KCRS replay、streaming NTC2
+writer、upload/generation publication、coverage activation and exact terminal retirement now form executable product
+components；their one per-partition production pass composition remains runtime work。
+
+`KafkaCompactionScheduler` is the process-level non-overlap owner for that future pass composition。It schedules an
+immediate startup pass and fixed delay only after completion，keeps at most one active and one coalesced pending pass，and
+freezes all pending reasons with the highest operational priority。A trigger received during the active pass completes only
+after the next pass consumes it；caller cancellation cannot cancel shared work。Close cancels the scheduler-owned deadline
+and active source but never closes the borrowed scheduler or callback executor。The `PassExecutor` remains the explicit seam
+where runtime wiring must scan owned partitions and invoke the complete worker。
 
 ### 10.5 Record rewrite V1
 
@@ -1186,9 +1198,13 @@ every Fetch，issues only `TOPIC_COMPACTED` calls below mandatory end，advances
 `sourceCoverageEndOffset` and then issues a new `COMMITTED` call at the exact boundary with the remaining record/byte/deadline
 budget。All mandatory failures propagate directly；there is no adapter path that retries the same offset through COMMITTED。
 The production runtime now passes its borrowed partition metadata store into every opened storage instance；the legacy
-constructor remains committed-only for isolated compatibility tests。A runtime whose `StreamStorage` has no F4
-generation-aware reader therefore fails closed after coverage activation rather than exposing WAL/NCP2。Exact activated-set
-discovery/protection wiring and real-provider/restart evidence remain part of the remaining M5 gate。
+constructor remains committed-only for isolated compatibility tests。`KafkaActivatedGenerationSetResolver` scans a bounded
+set of TOPIC_COMPACTED indexes，requires the unique gap-free path whose canonical identity digest matches the binding，and
+builds a `GenerationReadConstraint` containing every range/generation/publication/index key/version/SHA。The core resolver
+filters to those exact identities before decode/pin，so a newer unactivated unsupported or corrupt generation cannot mask the
+activated set。The Object-WAL runtime registers the NTC2 reader and constrained semantic reader；a runtime without those
+capabilities fails closed after coverage activation rather than exposing WAL/NCP2。Real-provider restart evidence remains
+part of the remaining M5 gate。
 
 ## 12. Compaction and lossless materialization coexistence
 
@@ -1217,6 +1233,11 @@ Scheduling：
 - policy change invalidates unclaimed task or prevents final activation after revalidation；
 - compact disable stops new tasks but preserves mandatory coverage。
 
+Current scheduler-owner implementation freezes these triggers as `STARTUP`、`PERIODIC`、`DIRTY_BYTES`、`ADMIN`、
+`MAX_LAG`、`POLICY_CHANGE` and `LEADERSHIP_CHANGE`，with the last reason highest priority。It bounds resident work to one
+active and one coalesced pending pass；the pass callback still owns partition enumeration、internal-topic quota and
+per-partition serialization described above。
+
 ## 14. Failure/repair cases
 
 | Failure | Result |
@@ -1241,9 +1262,9 @@ Scheduling：
 | Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusTimeIndex`、`NereusLeaderEpochCache` |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
 | adapter retention | `KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、`KafkaTrimBarrier`、`KafkaRetentionDurableTrimListener` partial implementation |
-| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch classes listed above |
+| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner implemented；full runtime pass composition pending |
 | materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier |
-| metadata | binding compaction coverage nested record/codec/transition validators |
+| metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |
 | object store | NTC2 writer/reader/goldens from document 02 |
 
 ## 16. Test plan

@@ -81,6 +81,8 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
             assertThat(store.getCompactionPlan(
                             id, compactionPlan.value().materializationTaskId()).join())
                     .contains(compactionPlan);
+            assertThat(store.scanCompactionPlans(id, Optional.empty(), 1).join().plans())
+                    .containsExactly(compactionPlan);
             store.deleteCompactionPlan(compactionPlan).join();
             assertThat(store.getCompactionPlan(
                             id, compactionPlan.value().materializationTaskId()).join())

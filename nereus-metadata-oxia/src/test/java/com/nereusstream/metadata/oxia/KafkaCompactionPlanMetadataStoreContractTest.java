@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class KafkaCompactionPlanMetadataStoreContractTest {
@@ -68,7 +69,54 @@ class KafkaCompactionPlanMetadataStoreContractTest {
                         "existing Kafka compaction plan conflicts with canonical bytes");
     }
 
+    @Test
+    void scanIsBoundedOrderedAndContinuationIsPartitionScoped() {
+        InMemoryPartitionedOxiaBackend backend = new InMemoryPartitionedOxiaBackend();
+        OxiaJavaKafkaPartitionMetadataStore store =
+                new OxiaJavaKafkaPartitionMetadataStore(
+                        new PartitionedOxiaClient(backend),
+                        new KafkaPartitionKeyspace("nereus", "kraft"));
+        KafkaCompactionPlanRecord first = plan('a', 'b', 1_000);
+        KafkaCompactionPlanRecord second = plan('c', 'd', 2_000);
+        store.putCompactionPlanIfAbsent(second).join();
+        store.putCompactionPlanIfAbsent(first).join();
+
+        KafkaCompactionPlanScanPage firstPage =
+                store.scanCompactionPlans(first.identity(), Optional.empty(), 1).join();
+        KafkaCompactionPlanScanPage secondPage =
+                store.scanCompactionPlans(
+                                first.identity(), firstPage.continuation(), 1)
+                        .join();
+        KafkaCompactionPlanScanPage terminal =
+                store.scanCompactionPlans(
+                                first.identity(), secondPage.continuation(), 1)
+                        .join();
+
+        assertThat(firstPage.plans())
+                .extracting(value -> value.value().materializationTaskId())
+                .containsExactly(first.materializationTaskId());
+        assertThat(secondPage.plans())
+                .extracting(value -> value.value().materializationTaskId())
+                .containsExactly(second.materializationTaskId());
+        assertThat(terminal.plans()).isEmpty();
+        assertThat(terminal.continuation()).isEmpty();
+        KafkaPartitionId another =
+                new KafkaPartitionId(
+                        first.kafkaClusterId(), KafkaPartitionKeyspaceTest.topicId(20), 4);
+        assertThatThrownBy(
+                        () ->
+                                store.scanCompactionPlans(
+                                        another, firstPage.continuation(), 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("another partition");
+    }
+
     private static KafkaCompactionPlanRecord plan() {
+        return plan('a', 'b', 1_000);
+    }
+
+    private static KafkaCompactionPlanRecord plan(
+            char planCharacter, char taskCharacter, long createdAtMillis) {
         byte[] bytes = "canonical-kcp1".getBytes(StandardCharsets.UTF_8);
         return new KafkaCompactionPlanRecord(
                 1,
@@ -76,14 +124,14 @@ class KafkaCompactionPlanMetadataStoreContractTest {
                 KafkaPartitionKeyspaceTest.topicId(19),
                 4,
                 "stream-19",
-                "kcp1-" + "a".repeat(52),
-                "mat1-" + "b".repeat(52),
+                "kcp1-" + Character.toString(planCharacter).repeat(52),
+                "mat1-" + Character.toString(taskCharacter).repeat(52),
                 0,
                 10,
                 12,
                 sha256(bytes),
                 bytes,
-                1_000,
+                createdAtMillis,
                 0);
     }
 
