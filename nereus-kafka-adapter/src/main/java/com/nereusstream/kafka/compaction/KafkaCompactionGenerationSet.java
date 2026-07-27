@@ -72,6 +72,20 @@ public record KafkaCompactionGenerationSet(
     return create(exact.streamId(), exact.coverage(), List.of(exact));
   }
 
+  public static KafkaCompactionGenerationSet of(List<GenerationCommitResult> generations) {
+    List<GenerationCommitResult> exact =
+        List.copyOf(Objects.requireNonNull(generations, "generations"));
+    if (exact.isEmpty()) {
+      throw new IllegalArgumentException("Kafka compaction generation set cannot be empty");
+    }
+    GenerationCommitResult first = requireTopicCompacted(exact.getFirst());
+    GenerationCommitResult last = requireTopicCompacted(exact.getLast());
+    return create(
+        first.streamId(),
+        new OffsetRange(first.coverage().startOffset(), last.coverage().endOffset()),
+        exact);
+  }
+
   public KafkaCompactionGenerationSet extend(GenerationCommitResult generation) {
     GenerationCommitResult exact = requireTopicCompacted(generation);
     if (!exact.streamId().equals(streamId)

@@ -27,6 +27,8 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.core.read.ConstrainedSemanticStreamReader;
+import com.nereusstream.core.read.GenerationReadConstraint;
 import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
 import com.nereusstream.kafka.partition.KafkaStableSnapshot;
 import com.nereusstream.kafka.partition.KafkaStorageReadRequest;
@@ -53,6 +55,7 @@ public final class KafkaCompactedFetchReader {
   private final StreamId streamId;
   private final StreamStorage streams;
   private final Optional<KafkaPartitionMetadataStore> bindings;
+  private final Optional<KafkaActivatedGenerationAuthority> activatedGenerations;
   private final KafkaCompactedFetchPlanner planner;
 
   public KafkaCompactedFetchReader(
@@ -60,18 +63,33 @@ public final class KafkaCompactedFetchReader {
       StreamId streamId,
       StreamStorage streams,
       KafkaPartitionMetadataStore bindings) {
+    this(identity, streamId, streams, bindings, KafkaActivatedGenerationAuthority.unavailable());
+  }
+
+  public KafkaCompactedFetchReader(
+      KafkaPartitionIdentity identity,
+      StreamId streamId,
+      StreamStorage streams,
+      KafkaPartitionMetadataStore bindings,
+      KafkaActivatedGenerationAuthority activatedGenerations) {
     this(
         identity,
         streamId,
         streams,
         Optional.of(Objects.requireNonNull(bindings, "bindings")),
+        Optional.of(Objects.requireNonNull(activatedGenerations, "activatedGenerations")),
         new KafkaCompactedFetchPlanner());
   }
 
   public static KafkaCompactedFetchReader committedOnly(
       KafkaPartitionIdentity identity, StreamId streamId, StreamStorage streams) {
     return new KafkaCompactedFetchReader(
-        identity, streamId, streams, Optional.empty(), new KafkaCompactedFetchPlanner());
+        identity,
+        streamId,
+        streams,
+        Optional.empty(),
+        Optional.empty(),
+        new KafkaCompactedFetchPlanner());
   }
 
   KafkaCompactedFetchReader(
@@ -79,11 +97,14 @@ public final class KafkaCompactedFetchReader {
       StreamId streamId,
       StreamStorage streams,
       Optional<KafkaPartitionMetadataStore> bindings,
+      Optional<KafkaActivatedGenerationAuthority> activatedGenerations,
       KafkaCompactedFetchPlanner planner) {
     this.identity = Objects.requireNonNull(identity, "identity");
     this.streamId = Objects.requireNonNull(streamId, "streamId");
     this.streams = Objects.requireNonNull(streams, "streams");
     this.bindings = Objects.requireNonNull(bindings, "bindings");
+    this.activatedGenerations =
+        Objects.requireNonNull(activatedGenerations, "activatedGenerations");
     this.planner = Objects.requireNonNull(planner, "planner");
   }
 
@@ -116,17 +137,56 @@ public final class KafkaCompactedFetchReader {
                 () ->
                     CompletableFuture.completedFuture(
                         planner.committedOnly(stableSnapshot, request)));
-    return planned.thenCompose(
-        plan -> {
-          Accumulator accumulator = new Accumulator(request.startOffset());
-          return readSegment(request, plan, 0, request.startOffset(), startedNanos, accumulator, 0)
-              .thenApply(ignored -> finish(request, plan, accumulator));
-        });
+    return planned
+        .thenCompose(this::constraintFor)
+        .thenCompose(
+            constrained -> {
+              KafkaCompactedFetchPlanner.Plan plan = constrained.plan();
+              Accumulator accumulator = new Accumulator(request.startOffset());
+              return readSegment(
+                      request,
+                      plan,
+                      constrained.constraint(),
+                      0,
+                      request.startOffset(),
+                      startedNanos,
+                      accumulator,
+                      0)
+                  .thenApply(ignored -> finish(request, plan, accumulator));
+            });
+  }
+
+  private CompletableFuture<ConstrainedPlan> constraintFor(KafkaCompactedFetchPlanner.Plan plan) {
+    if (!plan.hasMandatoryCompactedPrefix()) {
+      return CompletableFuture.completedFuture(new ConstrainedPlan(plan, Optional.empty()));
+    }
+    KafkaActivatedGenerationAuthority authority =
+        activatedGenerations.orElseThrow(
+            () ->
+                new NereusException(
+                    ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                    false,
+                    "mandatory compacted Fetch requires activated generation discovery"));
+    var coverage = plan.binding().value().compactionCoverage();
+    return authority
+        .resolve(streamId, coverage)
+        .thenApply(
+            constraint -> {
+              if (!constraint.streamId().equals(streamId)
+                  || constraint.view() != ReadView.TOPIC_COMPACTED
+                  || constraint.coverage().startOffset() != coverage.startOffset()
+                  || constraint.coverage().endOffset() != coverage.endOffset()) {
+                throw invariant(
+                    "activated generation authority returned another stream/view/coverage");
+              }
+              return new ConstrainedPlan(plan, Optional.of(constraint));
+            });
   }
 
   private CompletableFuture<Void> readSegment(
       KafkaStorageReadRequest request,
       KafkaCompactedFetchPlanner.Plan plan,
+      Optional<GenerationReadConstraint> constraint,
       int segmentIndex,
       long cursor,
       long startedNanos,
@@ -144,7 +204,14 @@ public final class KafkaCompactedFetchReader {
     KafkaCompactedFetchPlanner.Segment segment = plan.segments().get(segmentIndex);
     if (cursor >= segment.range().endOffset()) {
       return readSegment(
-          request, plan, segmentIndex + 1, cursor, startedNanos, accumulator, readCalls);
+          request,
+          plan,
+          constraint,
+          segmentIndex + 1,
+          cursor,
+          startedNanos,
+          accumulator,
+          readCalls);
     }
 
     Duration remaining;
@@ -166,44 +233,61 @@ public final class KafkaCompactedFetchReader {
                 ? FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW
                 : FirstEntryPolicy.LEGACY_STRICT_LIMIT,
             new ReadOptions(remainingRecords, remainingBytes, ReadIsolation.COMMITTED, remaining));
-    return streams
-        .read(streamId, sourceRequest)
-        .thenCompose(
-            source -> {
-              long nextCursor;
-              try {
-                nextCursor = accept(request, segment, cursor, source, accumulator);
-              } catch (Throwable failure) {
-                return CompletableFuture.failedFuture(failure);
-              }
-              if (accumulator.limitReached(request)) {
-                return CompletableFuture.completedFuture(null);
-              }
-              if (nextCursor >= segment.range().endOffset()) {
-                return readSegment(
-                    request,
-                    plan,
-                    segmentIndex + 1,
-                    nextCursor,
-                    startedNanos,
-                    accumulator,
-                    readCalls + 1);
-              }
-              if (nextCursor <= cursor) {
-                return failed(
-                    ErrorCode.READ_RESOLUTION_FAILED,
-                    true,
-                    "Kafka semantic-view read made no source-coverage progress");
-              }
-              return readSegment(
-                  request,
-                  plan,
-                  segmentIndex,
-                  nextCursor,
-                  startedNanos,
-                  accumulator,
-                  readCalls + 1);
-            });
+    CompletableFuture<SemanticReadResult> sourceRead;
+    if (segment.view() == ReadView.TOPIC_COMPACTED) {
+      if (!(streams instanceof ConstrainedSemanticStreamReader constrained)) {
+        return failed(
+            ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+            false,
+            "mandatory compacted Fetch requires a constrained semantic reader");
+      }
+      sourceRead =
+          constrained.read(
+              streamId,
+              sourceRequest,
+              constraint.orElseThrow(
+                  () -> invariant("mandatory compacted Fetch lost its generation constraint")));
+    } else {
+      sourceRead = streams.read(streamId, sourceRequest);
+    }
+    return sourceRead.thenCompose(
+        source -> {
+          long nextCursor;
+          try {
+            nextCursor = accept(request, segment, cursor, source, accumulator);
+          } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(failure);
+          }
+          if (accumulator.limitReached(request)) {
+            return CompletableFuture.completedFuture(null);
+          }
+          if (nextCursor >= segment.range().endOffset()) {
+            return readSegment(
+                request,
+                plan,
+                constraint,
+                segmentIndex + 1,
+                nextCursor,
+                startedNanos,
+                accumulator,
+                readCalls + 1);
+          }
+          if (nextCursor <= cursor) {
+            return failed(
+                ErrorCode.READ_RESOLUTION_FAILED,
+                true,
+                "Kafka semantic-view read made no source-coverage progress");
+          }
+          return readSegment(
+              request,
+              plan,
+              constraint,
+              segmentIndex,
+              nextCursor,
+              startedNanos,
+              accumulator,
+              readCalls + 1);
+        });
   }
 
   private long accept(
@@ -302,6 +386,18 @@ public final class KafkaCompactedFetchReader {
       if (firstEntryOverflow && semanticRead.result().batches().size() != 1) {
         throw new IllegalArgumentException(
             "Kafka first-entry overflow requires exactly one returned batch");
+      }
+    }
+  }
+
+  private record ConstrainedPlan(
+      KafkaCompactedFetchPlanner.Plan plan, Optional<GenerationReadConstraint> constraint) {
+    private ConstrainedPlan {
+      Objects.requireNonNull(plan, "plan");
+      constraint = Objects.requireNonNull(constraint, "constraint");
+      if (plan.hasMandatoryCompactedPrefix() != constraint.isPresent()) {
+        throw new IllegalArgumentException(
+            "Kafka compacted Fetch plan and generation constraint disagree");
       }
     }
   }

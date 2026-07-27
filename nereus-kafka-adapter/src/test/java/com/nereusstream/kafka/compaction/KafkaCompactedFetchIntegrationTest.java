@@ -25,6 +25,7 @@ import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
+import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadBatch;
 import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
@@ -34,6 +35,7 @@ import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
+import com.nereusstream.core.read.GenerationReadConstraint;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaFetchAssembly;
 import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
@@ -80,7 +82,11 @@ class KafkaCompactedFetchIntegrationTest {
         });
     KafkaCompactedFetchReader reader =
         new KafkaCompactedFetchReader(
-            KafkaCompactedFetchPlannerTest.identity(), STREAM, streams, bindingStore(binding));
+            KafkaCompactedFetchPlannerTest.identity(),
+            STREAM,
+            streams,
+            bindingStore(binding),
+            authority(binding));
 
     KafkaCompactedFetchReader.Result read =
         reader
@@ -119,7 +125,11 @@ class KafkaCompactedFetchIntegrationTest {
         });
     KafkaCompactedFetchReader reader =
         new KafkaCompactedFetchReader(
-            KafkaCompactedFetchPlannerTest.identity(), STREAM, streams, bindingStore(binding));
+            KafkaCompactedFetchPlannerTest.identity(),
+            STREAM,
+            streams,
+            bindingStore(binding),
+            authority(binding));
 
     KafkaCompactedFetchReader.Result read =
         reader
@@ -221,5 +231,27 @@ class KafkaCompactedFetchIntegrationTest {
                   case "equals" -> proxy == arguments[0];
                   default -> throw new UnsupportedOperationException(method.getName());
                 });
+  }
+
+  static KafkaActivatedGenerationAuthority authority(VersionedKafkaPartitionBinding binding) {
+    var coverage = binding.value().compactionCoverage();
+    return (streamId, actual) -> {
+      assertThat(actual).isEqualTo(coverage);
+      OffsetRange range = new OffsetRange(coverage.startOffset(), coverage.endOffset());
+      GenerationReadConstraint constraint =
+          new GenerationReadConstraint(
+              streamId,
+              ReadView.TOPIC_COMPACTED,
+              range,
+              List.of(
+                  new GenerationReadConstraint.Identity(
+                      range,
+                      2,
+                      new PublicationId("a".repeat(26)),
+                      "/activated/test-generation",
+                      3,
+                      new Checksum(ChecksumType.SHA256, "a".repeat(64)))));
+      return CompletableFuture.completedFuture(constraint);
+    };
   }
 }

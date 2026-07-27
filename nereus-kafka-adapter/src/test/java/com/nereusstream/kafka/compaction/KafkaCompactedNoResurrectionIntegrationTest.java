@@ -62,7 +62,8 @@ class KafkaCompactedNoResurrectionIntegrationTest {
             KafkaCompactedFetchPlannerTest.identity(),
             STREAM,
             streams,
-            KafkaCompactedFetchIntegrationTest.bindingStore(binding));
+            KafkaCompactedFetchIntegrationTest.bindingStore(binding),
+            KafkaCompactedFetchIntegrationTest.authority(binding));
 
     KafkaCompactedFetchReader.Result result =
         reader
@@ -103,7 +104,8 @@ class KafkaCompactedNoResurrectionIntegrationTest {
             KafkaCompactedFetchPlannerTest.identity(),
             STREAM,
             streams,
-            KafkaCompactedFetchIntegrationTest.bindingStore(binding));
+            KafkaCompactedFetchIntegrationTest.bindingStore(binding),
+            KafkaCompactedFetchIntegrationTest.authority(binding));
 
     assertThatThrownBy(
             () ->
@@ -141,7 +143,8 @@ class KafkaCompactedNoResurrectionIntegrationTest {
             KafkaCompactedFetchPlannerTest.identity(),
             STREAM,
             streams,
-            KafkaCompactedFetchIntegrationTest.bindingStore(binding));
+            KafkaCompactedFetchIntegrationTest.bindingStore(binding),
+            KafkaCompactedFetchIntegrationTest.authority(binding));
 
     assertThatThrownBy(
             () ->

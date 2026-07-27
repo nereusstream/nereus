@@ -24,13 +24,16 @@ import com.nereusstream.api.StreamName;
 import com.nereusstream.api.StreamState;
 import com.nereusstream.api.StreamStorage;
 import com.nereusstream.api.TrimOptions;
+import com.nereusstream.core.read.ConstrainedSemanticStreamReader;
+import com.nereusstream.core.read.GenerationReadConstraint;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 
 /** In-memory stream lifecycle fake for adapter state-machine tests. */
-public final class TestStreamStorage implements StreamStorage {
+public final class TestStreamStorage
+        implements StreamStorage, ConstrainedSemanticStreamReader {
     private final Map<StreamName, StreamMetadata> byName = new LinkedHashMap<>();
     private final Map<StreamId, StreamMetadata> byId = new LinkedHashMap<>();
     private int creates;
@@ -135,6 +138,15 @@ public final class TestStreamStorage implements StreamStorage {
         return semanticReader == null
                 ? unsupported()
                 : semanticReader.apply(streamId, request);
+    }
+
+    @Override
+    public synchronized CompletableFuture<SemanticReadResult> read(
+            StreamId streamId,
+            ReadRequest request,
+            GenerationReadConstraint constraint) {
+        java.util.Objects.requireNonNull(constraint, "constraint");
+        return read(streamId, request);
     }
 
     @Override
