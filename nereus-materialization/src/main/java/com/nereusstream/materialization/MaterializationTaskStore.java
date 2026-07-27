@@ -108,6 +108,63 @@ public final class MaterializationTaskStore {
                 expectedVersion));
     }
 
+    public CompletableFuture<VersionedMaterializationTask> claim(
+            VersionedMaterializationTask expected,
+            String claimId,
+            String processRunId,
+            long expiresAtMillis) {
+        return async(() -> {
+            VersionedMaterializationTask exact =
+                    Objects.requireNonNull(expected, "expected");
+            requireTask(exact);
+            MaterializationTaskRecord claimed = MaterializationRecordMapper.claimed(
+                    exact.value(),
+                    requireText(claimId, "claimId"),
+                    requireText(processRunId, "processRunId"),
+                    clock.millis(),
+                    expiresAtMillis);
+            return generations.compareAndSetTask(
+                    cluster, claimed, exact.metadataVersion());
+        });
+    }
+
+    public CompletableFuture<VersionedMaterializationTask> outputReady(
+            VersionedMaterializationTask expected,
+            MaterializationOutput output) {
+        return async(() -> {
+            VersionedMaterializationTask exact =
+                    Objects.requireNonNull(expected, "expected");
+            MaterializationTask task = requireTask(exact);
+            MaterializationOutput exactOutput =
+                    Objects.requireNonNull(output, "output");
+            if (!task.taskId().equals(exactOutput.taskId())
+                    || !task.streamId().equals(exactOutput.streamId())
+                    || task.view() != exactOutput.view()
+                    || !task.coverage().equals(exactOutput.coverage())) {
+                throw new IllegalArgumentException(
+                        "materialization task/output identity does not agree");
+            }
+            MaterializationTaskRecord ready = MaterializationRecordMapper.outputReady(
+                    exact.value(), exactOutput, clock.millis());
+            return generations.compareAndSetTask(
+                    cluster, ready, exact.metadataVersion());
+        });
+    }
+
+    public CompletableFuture<VersionedMaterializationTask> heartbeat(
+            VersionedMaterializationTask expected,
+            long expiresAtMillis) {
+        return async(() -> {
+            VersionedMaterializationTask exact =
+                    Objects.requireNonNull(expected, "expected");
+            requireTask(exact);
+            MaterializationTaskRecord heartbeat = MaterializationRecordMapper.heartbeat(
+                    exact.value(), expiresAtMillis, clock.millis());
+            return generations.compareAndSetTask(
+                    cluster, heartbeat, exact.metadataVersion());
+        });
+    }
+
     /**
      * Deletes the exact durable task root represented by {@code expected}.
      *
@@ -136,6 +193,15 @@ public final class MaterializationTaskStore {
             VersionedMaterializationTask durable,
             MaterializationPolicy policy) {
         return MaterializationRecordMapper.domainTask(durable, policy);
+    }
+
+    public Optional<MaterializationOutput> requireOutput(
+            VersionedMaterializationTask durable) {
+        VersionedMaterializationTask exact =
+                Objects.requireNonNull(durable, "durable");
+        MaterializationTask task = requireTask(exact);
+        return exact.value().output().map(value ->
+                MaterializationRecordMapper.domainOutput(task, value));
     }
 
     private static void requireExactSource(

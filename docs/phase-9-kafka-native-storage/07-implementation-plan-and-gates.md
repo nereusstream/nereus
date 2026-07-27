@@ -634,9 +634,12 @@ upload plus strict NTC2 verification and prove cancellation releases an existing
 `KafkaCompactionTerminalRetirer` additionally requires exact terminal task/plan roots and a stable no-admission authority
 guard，then conditionally deletes task first and KCP1 second with bounded exact-reload convergence for both response-loss
 cuts。The F4 policy/output/index boundary now carries a distinct NTC2 policy identity、requires task/output physical-format
-agreement and preserves valid zero-survivor generations while keeping COMMITTED generations non-empty。Plan-only orphan
-scan、production object upload/generation publication、coverage activation and the cleaner
-differential oracle remain pending；this gate does not claim compaction visibility。
+agreement and preserves valid zero-survivor generations while keeping COMMITTED generations non-empty。
+`KafkaCompactionPublicationCoordinator` then performs guarded if-absent upload、HEAD/full NTC2 verification、durable
+OUTPUT_READY、generic Generation commit and canonical generation-set coverage CAS in that order；bounded exact reload
+handles PUT/CAS response loss，while a changed coverage basis leaves the committed generation non-mandatory。Plan-only
+orphan scan、runtime cleaner scheduling/read integration and the cleaner differential oracle remain pending；the write-side
+linearization exists but this gate still does not claim end-to-end client compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

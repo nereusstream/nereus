@@ -988,7 +988,21 @@ publication additionally requires the output physical format to equal the frozen
 published under an NTC1 policy digest。`GenerationIndexPublicationTest` proves a fully superseded NTC2 output reaches a
 zero-row `COMMITTED` generation without weakening COMMITTED-view accounting。
 
-Production worker upload/generation publication and coverage activation remain pending。
+`KafkaCompactionPublicationCoordinator` now owns the next production boundary。It claims/heartbeats the exact durable task，
+uploads the sealed NTC2 with per-attempt task/binding/config authority revalidation，reconciles uncertain PUT by exact HEAD，
+then performs full-file SHA/CRC/closed-schema/row verification before freezing `OUTPUT_READY`。The generic
+`GenerationCommitter` is invoked only after that durable output exists；its returned COMMITTED index identity is encoded
+into a canonical、gap-free `KafkaCompactionGenerationSet` digest。Only the final exact binding CAS makes the set mandatory。
+Initial、same-policy extension and verified replacement use explicit transition modes and increment `activationEpoch`
+exactly once。PUT response loss and coverage-CAS response loss reload exact state；a concurrent coverage/config/trim
+change after Generation commit leaves the generation non-mandatory and fails closed。The NTC2-specific F4 verifier also
+maps physical `KAFKA_RECORD_BATCH_V1` back to the durable `KAFKA_RECORD_BATCH` payload identity without relabelling the
+read target。
+
+`KafkaCompactionPublicationCoordinatorTest` executes a real staged Parquet NTC2 upload/read verifier and the durable task
+claim/output transition，injects both response-loss cuts，accepts a same-owner heartbeat race and proves an unrelated
+coverage activation cannot be overwritten after Generation commit。Runtime cleaner scheduling、plan-orphan scan and the
+read-side no-resurrection resolver remain pending。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
@@ -1137,6 +1151,15 @@ digest at same/end-greater coverage with activation epoch +1。
 
 Response loss reloads binding。Generation committed without root CAS may be retried or retired and does not change client
 visibility。
+
+The implemented CAS accepts only one of three shapes：
+
+- `INITIAL`：old coverage is EMPTY and the new set begins at current authoritative logStart；
+- `EXTEND`：old generation-set digest is supplied and re-proved，start/policy stay fixed and end advances；
+- `REPLACE`：old digest is supplied and re-proved，new set covers every untrimmed mandatory offset and epoch advances。
+
+The binding transition itself rechecks ACTIVE lifecycle、stable end、trimmed-gap safety、policy/generation SHA length and
+monotonic timestamp/epoch，so a caller cannot bypass these rules with a hand-built binding copy。
 
 ### 11.3 Read rules
 

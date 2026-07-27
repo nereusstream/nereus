@@ -135,10 +135,12 @@ tasks.register<Test>("f9CompactionPropertyTest") {
     useJUnitPlatform()
     filter {
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionBatchSourceTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionGenerationSetTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPassOneCollectorTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCodecV1Test")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCoordinatorTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlannerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPublicationCoordinatorTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowMapperTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowSpoolTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionSourceResolverTest")

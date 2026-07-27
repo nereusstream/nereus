@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.metadata.oxia.codec.KafkaMetadataCodecTest;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionCoverageRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionOperationType;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionPendingOperationRecord;
@@ -85,6 +86,111 @@ class KafkaBindingTransitionTest {
         assertThatThrownBy(() -> KafkaPartitionMetadataTransitions.claimOperation(current, contender, 1_500))
                 .isInstanceOf(KafkaMetadataConditionFailedException.class)
                 .hasMessageContaining("another worker");
+    }
+
+    @Test
+    void compactionCoverageInitialExtensionAndReplacementAreIrreversible() {
+        KafkaPartitionBindingRecord empty = activeBinding(5, 20);
+        KafkaPartitionBindingRecord initial =
+                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                        empty,
+                        KafkaCompactionCoverageActivationMode.INITIAL,
+                        5,
+                        10,
+                        KafkaMetadataCodecTest.bytes(1),
+                        KafkaMetadataCodecTest.bytes(2),
+                        2_100);
+        assertThat(initial.compactionCoverage().activationEpoch()).isEqualTo(1);
+
+        KafkaPartitionBindingRecord trimmed = KafkaPartitionMetadataTransitions.observe(
+                initial,
+                initial.observedTopicName(),
+                initial.lastAppliedMetadataOffset(),
+                initial.observedLeaderId(),
+                initial.observedLeaderEpoch(),
+                initial.observedBrokerEpoch(),
+                7,
+                20,
+                2_150);
+        KafkaPartitionBindingRecord extended =
+                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                        trimmed,
+                        KafkaCompactionCoverageActivationMode.EXTEND,
+                        5,
+                        15,
+                        KafkaMetadataCodecTest.bytes(3),
+                        KafkaMetadataCodecTest.bytes(2),
+                        2_200);
+        assertThat(extended.compactionCoverage().endOffset()).isEqualTo(15);
+        assertThat(extended.compactionCoverage().activationEpoch()).isEqualTo(2);
+
+        KafkaPartitionBindingRecord replaced =
+                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                        extended,
+                        KafkaCompactionCoverageActivationMode.REPLACE,
+                        5,
+                        15,
+                        KafkaMetadataCodecTest.bytes(4),
+                        KafkaMetadataCodecTest.bytes(5),
+                        2_300);
+        assertThat(replaced.compactionCoverage().activationEpoch()).isEqualTo(3);
+        assertThat(replaced.compactionCoverage().policySha256())
+                .containsExactly(KafkaMetadataCodecTest.bytes(5));
+
+        assertThatThrownBy(
+                        () ->
+                                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                                        replaced,
+                                        KafkaCompactionCoverageActivationMode.EXTEND,
+                                        5,
+                                        16,
+                                        KafkaMetadataCodecTest.bytes(6),
+                                        KafkaMetadataCodecTest.bytes(7),
+                                        2_400))
+                .isInstanceOf(KafkaMetadataConditionFailedException.class)
+                .hasMessageContaining("preserve");
+        assertThatThrownBy(
+                        () ->
+                                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                                        replaced,
+                                        KafkaCompactionCoverageActivationMode.REPLACE,
+                                        8,
+                                        15,
+                                        KafkaMetadataCodecTest.bytes(6),
+                                        KafkaMetadataCodecTest.bytes(7),
+                                        2_400))
+                .isInstanceOf(KafkaMetadataConditionFailedException.class)
+                .hasMessageContaining("gap");
+    }
+
+    private static KafkaPartitionBindingRecord activeBinding(long logStart, long stableEnd) {
+        KafkaPartitionBindingRecord current = KafkaMetadataCodecTest.fullBinding();
+        return new KafkaPartitionBindingRecord(
+                current.formatVersion(),
+                current.kafkaClusterId(),
+                current.topicId(),
+                current.partitionId(),
+                current.observedTopicName(),
+                current.incarnation(),
+                current.streamName(),
+                current.streamId(),
+                current.payloadMappingId(),
+                current.storageProfile(),
+                current.lifecycleId(),
+                current.bindingEpoch(),
+                current.createdMetadataOffset(),
+                current.lastAppliedMetadataOffset(),
+                current.observedLeaderId(),
+                current.observedLeaderEpoch(),
+                current.observedBrokerEpoch(),
+                logStart,
+                stableEnd,
+                KafkaCompactionCoverageRecord.EMPTY,
+                current.checkpointReferences(),
+                current.pendingOperation(),
+                current.createdAtMillis(),
+                current.updatedAtMillis(),
+                0);
     }
 
     private static KafkaPartitionPendingOperationRecord operation(

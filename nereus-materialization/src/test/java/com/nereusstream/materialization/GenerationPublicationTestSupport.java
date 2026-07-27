@@ -229,7 +229,10 @@ final class GenerationPublicationTestSupport {
                 "objects/publication/output-object",
                 "output-slice",
                 "22222222",
-                outputPhysicalFormat);
+                outputPhysicalFormat,
+                emptyKafkaOutput
+                        ? "KAFKA_RECORD_BATCH_V1"
+                        : PayloadFormat.PULSAR_ENTRY_BATCH.name());
         MaterializationOutput output = new MaterializationOutput(
                 task.taskId(),
                 STREAM,
@@ -561,6 +564,22 @@ final class GenerationPublicationTestSupport {
             String sliceId,
             String checksum,
             String physicalFormat) {
+        return target(
+                objectId,
+                objectKey,
+                sliceId,
+                checksum,
+                physicalFormat,
+                PayloadFormat.PULSAR_ENTRY_BATCH.name());
+    }
+
+    private static ObjectSliceReadTarget target(
+            String objectId,
+            String objectKey,
+            String sliceId,
+            String checksum,
+            String physicalFormat,
+            String logicalFormat) {
         ObjectId id = new ObjectId(objectId);
         ObjectKey key = new ObjectKey(objectKey);
         EntryIndexRef index = new EntryIndexRef(
@@ -577,7 +596,7 @@ final class GenerationPublicationTestSupport {
                 key,
                 ObjectType.STREAM_COMPACTED_OBJECT,
                 physicalFormat,
-                PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                logicalFormat,
                 sliceId,
                 0,
                 128,

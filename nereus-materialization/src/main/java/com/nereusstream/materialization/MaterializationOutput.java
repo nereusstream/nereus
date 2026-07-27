@@ -71,9 +71,10 @@ public record MaterializationOutput(
         physicalFormat = requireText(physicalFormat, "physicalFormat");
         logicalFormat = requireText(logicalFormat, "logicalFormat");
         try {
-            PayloadFormat.valueOf(logicalFormat);
+            payloadFormat(logicalFormat);
         } catch (IllegalArgumentException failure) {
-            throw new IllegalArgumentException("logicalFormat must identify a PayloadFormat", failure);
+            throw new IllegalArgumentException(
+                    "logicalFormat must identify a supported PayloadFormat mapping", failure);
         }
         Objects.requireNonNull(readTarget, "readTarget");
         requireChecksum(targetIdentitySha256, ChecksumType.SHA256, "targetIdentitySha256");
@@ -117,6 +118,16 @@ public record MaterializationOutput(
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         requireChecksum(sourceSetSha256, ChecksumType.SHA256, "sourceSetSha256");
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
+    }
+
+    public PayloadFormat payloadFormat() {
+        return payloadFormat(logicalFormat);
+    }
+
+    private static PayloadFormat payloadFormat(String logicalFormat) {
+        return logicalFormat.equals("KAFKA_RECORD_BATCH_V1")
+                ? PayloadFormat.KAFKA_RECORD_BATCH
+                : PayloadFormat.valueOf(logicalFormat);
     }
 
     private static void requireChecksum(

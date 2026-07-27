@@ -290,8 +290,8 @@ oracle、real retention provider trim、concrete partition capture/local-log upd
 | KF-CMP-007 | all compression formats、headers、timestamps rewrite to equivalent valid records | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionRowMapperTest`（GZIP/header/timestamp/NTC2 partial）；`KafkaCompactionRewriteTest`（full matrix pending） | D,M,K | M5 |
 | KF-CMP-008 | idempotent/transactional/control/open/aborted traces match stock cleaner views | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionStrategyV1Test`（rewrite/decision partial）；`KafkaCompactionTransactionOracleTest`（stock trace pending） | M,K | M5 |
 | KF-CMP-009 | decode ratio/key/task limits abort without publication or lost source refs | product `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest` + `KafkaCompactionWinnerIndexTest` + `KafkaCompactionRowSpoolTest` + `KafkaCompactionStreamingExecutorTest`（bounded key/record/output limits plus KCSR/KCRS corruption/cancel cleanup partial）；`KafkaCompactionResourceLimitTest`（full worker pressure pending） | D,M,R | M5 |
-| KF-CMP-010 | generation commit before coverage CAS is not client-visible mandatory compaction | `KafkaCompactionActivationCutTest` | R,C | M5 |
-| KF-CMP-011 | coverage CAS response loss reloads exact activation and never double-advances epoch | `KafkaCompactionActivationCutTest` | R,P,C | M5 |
+| KF-CMP-010 | generation commit before coverage CAS is not client-visible mandatory compaction | product `KafkaCompactionPublicationCoordinatorTest`（changed-basis/non-mandatory write-side proof；reader proof pending） | R,C | M5 |
+| KF-CMP-011 | coverage CAS response loss reloads exact activation and never double-advances epoch | product `KafkaCompactionPublicationCoordinatorTest` + `KafkaBindingTransitionTest` | R,P,C | M5 |
 | KF-CMP-012 | compact→delete preserves old mandatory coverage；delete→compact activates only after verified output | `KafkaCompactionPolicyTransitionTest` | R,K,C | M5 |
 | KF-CMP-013 | same-range NTC2 replacement protects readers and retires old generation after proof | `KafkaCompactionReplacementIntegrationTest` | R,C | M5 |
 | KF-CMP-014 | user and both internal compacted topics pass differential/restart/takeover suite | `KafkaNativeCompactionEndToEndTest` | P,K,C | M5/M7 |
@@ -321,6 +321,9 @@ cleanup；`KafkaCompactionRowSpoolTest` freezes KCRS single-demand/EOF-accountin
 `KafkaCompactionStreamingExecutorTest` compares reference and streamed NTC2 SHA，runs non-empty/empty local upload plus
 strict verification and proves decision-pass cancellation releases KCSR；`GenerationIndexPublicationTest` also proves the
 empty survivor can be durably published as a zero-row TOPIC_COMPACTED generation while COMMITTED remains non-empty；
+`KafkaCompactionGenerationSetTest` freezes the gap-free committed-index identity digest，and
+`KafkaCompactionPublicationCoordinatorTest` composes task claim/heartbeat、guarded local upload、full NTC2 verification、
+Generation commit and binding CAS while injecting PUT/CAS response loss plus changed-basis failure；
 `KafkaCompactionTerminalRetirerTest` covers task-first/plan-second
 ordering、both response-loss cuts and exact-root fail-closed behavior。`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty
 tombstone bytes。Plan-only orphan scan、production upload/generation publication、coverage activation and stock

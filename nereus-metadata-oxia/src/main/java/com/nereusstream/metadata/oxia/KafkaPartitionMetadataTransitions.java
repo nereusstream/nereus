@@ -226,6 +226,83 @@ public final class KafkaPartitionMetadataTransitions {
         return update;
     }
 
+    public static KafkaPartitionBindingRecord activateCompactionCoverage(
+            KafkaPartitionBindingRecord current,
+            KafkaCompactionCoverageActivationMode mode,
+            long startOffset,
+            long endOffset,
+            byte[] generationSetSha256,
+            byte[] policySha256,
+            long nowMillis) {
+        requireLifecycle(current, KafkaPartitionLifecycle.ACTIVE);
+        Objects.requireNonNull(mode, "mode");
+        KafkaCompactionCoverageRecord before = current.compactionCoverage();
+        if (endOffset <= startOffset
+                || endOffset > current.observedStableEndOffset()
+                || nowMillis < current.updatedAtMillis()) {
+            throw new IllegalArgumentException(
+                    "compaction activation is outside the authoritative partition window");
+        }
+        switch (mode) {
+            case INITIAL -> {
+                if (before.coverageVersion() != 0
+                        || startOffset != current.observedLogStartOffset()) {
+                    throw new KafkaMetadataConditionFailedException(
+                            "initial compaction activation requires empty coverage at log start");
+                }
+            }
+            case EXTEND -> {
+                if (before.coverageVersion() == 0
+                        || startOffset != before.startOffset()
+                        || endOffset <= before.endOffset()
+                        || !java.util.Arrays.equals(policySha256, before.policySha256())) {
+                    throw new KafkaMetadataConditionFailedException(
+                            "compaction extension must preserve start/policy and advance the end");
+                }
+            }
+            case REPLACE -> {
+                if (before.coverageVersion() == 0
+                        || startOffset < before.startOffset()
+                        || endOffset < before.endOffset()
+                        || (startOffset > before.startOffset()
+                                && startOffset > current.observedLogStartOffset())
+                        || (startOffset > before.endOffset()
+                                && startOffset != current.observedLogStartOffset())) {
+                    throw new KafkaMetadataConditionFailedException(
+                            "compaction replacement cannot leave an untrimmed mandatory gap");
+                }
+            }
+        }
+        long activationEpoch = before.coverageVersion() == 0
+                ? 1
+                : Math.addExact(before.activationEpoch(), 1);
+        KafkaCompactionCoverageRecord coverage = new KafkaCompactionCoverageRecord(
+                1,
+                startOffset,
+                endOffset,
+                activationEpoch,
+                generationSetSha256,
+                policySha256,
+                nowMillis);
+        KafkaPartitionBindingRecord update = copy(
+                current,
+                current.streamName(),
+                current.streamId(),
+                current.lifecycle(),
+                current.lastAppliedMetadataOffset(),
+                current.observedLeaderId(),
+                current.observedLeaderEpoch(),
+                current.observedBrokerEpoch(),
+                current.observedLogStartOffset(),
+                current.observedStableEndOffset(),
+                coverage,
+                current.checkpointReferences(),
+                current.pendingOperation(),
+                nowMillis);
+        validate(current, update);
+        return update;
+    }
+
     public static void validate(
             KafkaPartitionBindingRecord current, KafkaPartitionBindingRecord update) {
         Objects.requireNonNull(current, "current");
@@ -251,10 +328,25 @@ public final class KafkaPartitionMetadataTransitions {
         }
         KafkaCompactionCoverageRecord before = current.compactionCoverage();
         KafkaCompactionCoverageRecord after = update.compactionCoverage();
-        if (before.coverageVersion() != 0
-                && (after.coverageVersion() == 0 || after.endOffset() < before.endOffset()
-                    || after.activationEpoch() < before.activationEpoch())) {
-            throw invariant("Kafka compaction coverage cannot regress");
+        if (before.equals(after)) {
+            return;
+        }
+        if (after.coverageVersion() == 0
+                || after.endOffset() > update.observedStableEndOffset()
+                || after.startOffset() < before.startOffset()
+                || (before.coverageVersion() != 0
+                        && after.startOffset() > before.startOffset()
+                        && after.startOffset() > update.observedLogStartOffset())
+                || (before.coverageVersion() == 0
+                        && (after.startOffset() != update.observedLogStartOffset()
+                                || after.activationEpoch() != 1))
+                || (before.coverageVersion() != 0
+                        && (after.endOffset() < before.endOffset()
+                                || after.activationEpoch()
+                                        != Math.addExact(before.activationEpoch(), 1)
+                                || after.activatedAtMillis() < before.activatedAtMillis()))
+                || after.activatedAtMillis() < current.updatedAtMillis()) {
+            throw invariant("Kafka compaction coverage activation is not monotonic");
         }
     }
 

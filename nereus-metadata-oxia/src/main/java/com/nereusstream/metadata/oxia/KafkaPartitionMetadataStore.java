@@ -34,6 +34,26 @@ public interface KafkaPartitionMetadataStore extends AutoCloseable {
                 KafkaPartitionMetadataTransitions.clearOperation(expected.value(), attemptId, updatedAtMillis));
     }
 
+    default CompletableFuture<VersionedKafkaPartitionBinding> activateCompactionCoverage(
+            VersionedKafkaPartitionBinding expected,
+            KafkaCompactionCoverageActivationMode mode,
+            long startOffset,
+            long endOffset,
+            byte[] generationSetSha256,
+            byte[] policySha256,
+            long activatedAtMillis) {
+        return compareAndSet(
+                expected,
+                KafkaPartitionMetadataTransitions.activateCompactionCoverage(
+                        expected.value(),
+                        mode,
+                        startOffset,
+                        endOffset,
+                        generationSetSha256,
+                        policySha256,
+                        activatedAtMillis));
+    }
+
     CompletableFuture<Void> putRegistryHint(KafkaPartitionRegistryRecord value);
 
     CompletableFuture<KafkaPartitionScanPage> scanRegistry(

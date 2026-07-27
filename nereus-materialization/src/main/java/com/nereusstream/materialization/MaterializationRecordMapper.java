@@ -426,7 +426,7 @@ final class MaterializationRecordMapper {
                 ReadTargetCodecRegistry.phase15().encode(output.readTarget()),
                 output.targetIdentitySha256().value(),
                 task.policyDigestSha256().value(),
-                PayloadFormat.valueOf(output.logicalFormat()).name(),
+                output.payloadFormat().name(),
                 output.sourceRecordCount(),
                 output.outputRecordCount(),
                 output.entryCount(),
