@@ -125,6 +125,7 @@ tasks.register<Test>("f9RetentionTest") {
         includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionDurableTrimListenerTest")
         includeTestsMatching("com.nereusstream.kafka.retention.KafkaDeleteRecordsCoordinatorTest")
         includeTestsMatching("com.nereusstream.kafka.retention.DefaultKafkaPartitionMaintenanceTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaPartitionMaintenanceRuntimeTest")
         includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationRecoveryIntegrationTest")
         includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaMaintenanceConfigurationTest")
     }

@@ -14,7 +14,7 @@ public record NereusKafkaObjectWalActivationContext(
         Duration activationWaitTimeout,
         Duration activationPollInterval,
         Optional<NereusKafkaCompactionContext> compaction,
-        Optional<NereusKafkaMaintenanceConfiguration> maintenance) {
+        Optional<NereusKafkaMaintenanceContext> maintenance) {
     public NereusKafkaObjectWalActivationContext(
             KafkaBrokerCapabilitySpecification capability,
             KafkaStorageClusterSnapshotProvider clusterSnapshots,

@@ -65,6 +65,9 @@ class NereusKafkaMaintenanceConfigurationTest {
                                 Duration.ofSeconds(30),
                                 Duration.ofSeconds(30),
                                 Duration.ofMinutes(5),
+                                Duration.ofMinutes(5),
+                                4,
+                                1_024,
                                 new Checksum(ChecksumType.CRC32C, "00000000"),
                                 "nereus-test"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -82,6 +85,9 @@ class NereusKafkaMaintenanceConfigurationTest {
                 Duration.ofSeconds(30),
                 Duration.ofSeconds(30),
                 Duration.ofMinutes(5),
+                Duration.ofMinutes(5),
+                4,
+                1_024,
                 new Checksum(ChecksumType.SHA256, "11".repeat(32)),
                 "nereus-test");
     }

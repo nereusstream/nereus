@@ -30,6 +30,7 @@ import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryCoordinator;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
 import com.nereusstream.kafka.retention.DefaultKafkaPartitionMaintenance;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceFactory;
+import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceRuntime;
 import com.nereusstream.metadata.oxia.GenerationIndexValidator;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
@@ -112,8 +113,8 @@ public final class NereusKafkaObjectWalRuntimeFactory {
         KafkaActivatedGenerationAuthority activatedGenerations;
         KafkaMaterializationStreamRegistration materializations = null;
         KafkaStorageActivationVerifier activationVerifier = null;
-        KafkaRuntimeBackgroundServiceFactory backgroundServices =
-                KafkaRuntimeBackgroundServiceFactory.none();
+        List<KafkaRuntimeBackgroundServiceFactory> backgroundServiceFactories =
+                new ArrayList<>();
         Optional<KafkaPartitionMaintenanceFactory> maintenanceFactory = Optional.empty();
         KafkaRuntimeStartup startup = KafkaRuntimeStartup.from(exactContext.startupAction());
         try {
@@ -291,8 +292,10 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     callbackExecutor,
                     exactContext.clock());
             if (activationContext != null && activationContext.maintenance().isPresent()) {
-                NereusKafkaMaintenanceConfiguration maintenance =
+                NereusKafkaMaintenanceContext maintenanceContext =
                         activationContext.maintenance().orElseThrow();
+                NereusKafkaMaintenanceConfiguration maintenance =
+                        maintenanceContext.configuration();
                 StagingFileManager checkpointStaging = new StagingFileManager(
                         maintenance.stagingDirectory(),
                         maintenance.maxStagingBytes(),
@@ -340,6 +343,16 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                                         maintenance.checkpointVerificationTimeout(),
                                         maintenance.trimTimeout(),
                                         exactContext.clock()));
+                backgroundServiceFactories.add(
+                        partitions ->
+                                new KafkaPartitionMaintenanceRuntime(
+                                        partitions,
+                                        maintenanceContext.ownedPartitions(),
+                                        maintenance.retentionInterval(),
+                                        maintenance.maxConcurrentPartitions(),
+                                        maintenance.maxPartitionsPerPass(),
+                                        exactContext.renewalScheduler(),
+                                        callbackExecutor));
             }
             if (activationContext != null && activationContext.compaction().isPresent()) {
                 NereusKafkaCompactionContext compaction =
@@ -358,25 +371,26 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                         constructedResources,
                         "kafka-compaction-staging-files",
                         stagingFiles));
-                backgroundServices = partitions -> KafkaCompactionProductionRuntimeFactory.create(
-                        compaction,
-                        exactConfiguration.runtime().nereusCluster(),
-                        exactConfiguration.streamStorage().processRunId(),
-                        partitions,
-                        l0MetadataStore,
-                        generationMetadataStore,
-                        physicalMetadataStore,
-                        partitionMetadataStore,
-                        partitionMetadataStore,
-                        protections,
-                        readPins,
-                        readers,
-                        objectStore,
-                        stagingFiles,
-                        exactActivationVerifier,
-                        exactContext.renewalScheduler(),
-                        callbackExecutor,
-                        exactContext.clock());
+                backgroundServiceFactories.add(
+                        partitions -> KafkaCompactionProductionRuntimeFactory.create(
+                                compaction,
+                                exactConfiguration.runtime().nereusCluster(),
+                                exactConfiguration.streamStorage().processRunId(),
+                                partitions,
+                                l0MetadataStore,
+                                generationMetadataStore,
+                                physicalMetadataStore,
+                                partitionMetadataStore,
+                                partitionMetadataStore,
+                                protections,
+                                readPins,
+                                readers,
+                                objectStore,
+                                stagingFiles,
+                                exactActivationVerifier,
+                                exactContext.renewalScheduler(),
+                                callbackExecutor,
+                                exactContext.clock()));
             }
         } catch (Throwable failure) {
             closeAfterFailure(constructedResources, failure);
@@ -394,6 +408,14 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 exactContext.clock(),
                 exactContext.startupAction(),
                 providerResources);
+        List<KafkaRuntimeBackgroundServiceFactory> exactBackgroundFactories =
+                List.copyOf(backgroundServiceFactories);
+        KafkaRuntimeBackgroundServiceFactory backgroundServices =
+                partitions ->
+                        KafkaRuntimeBackgroundService.composite(
+                                exactBackgroundFactories.stream()
+                                        .map(factory -> factory.create(partitions))
+                                        .toList());
         return NereusKafkaRuntimeFactory.create(
                 exactConfiguration.runtime(),
                 dependencies,

@@ -23,16 +23,19 @@ import java.util.Objects;
 
 /** Production checkpoint and durable-trim settings shared by retention and DeleteRecords. */
 public record NereusKafkaMaintenanceConfiguration(
-        Path stagingDirectory,
-        long maxStagingBytes,
-        int uploadChunkBytes,
-        Duration stagingOrphanGrace,
-        Duration checkpointObjectTimeout,
-        Duration checkpointVerificationTimeout,
-        Duration trimTimeout,
-        Duration pendingProtectionTtl,
-        Checksum contentPolicySha256,
-        String writerBuild) {
+    Path stagingDirectory,
+    long maxStagingBytes,
+    int uploadChunkBytes,
+    Duration stagingOrphanGrace,
+    Duration checkpointObjectTimeout,
+    Duration checkpointVerificationTimeout,
+    Duration trimTimeout,
+    Duration pendingProtectionTtl,
+    Duration retentionInterval,
+    int maxConcurrentPartitions,
+    int maxPartitionsPerPass,
+    Checksum contentPolicySha256,
+    String writerBuild) {
 
     public NereusKafkaMaintenanceConfiguration {
         stagingDirectory = Objects.requireNonNull(stagingDirectory, "stagingDirectory").normalize();
@@ -51,18 +54,25 @@ public record NereusKafkaMaintenanceConfiguration(
         }
         stagingOrphanGrace = positive(stagingOrphanGrace, "stagingOrphanGrace");
         checkpointObjectTimeout = positive(checkpointObjectTimeout, "checkpointObjectTimeout");
-        checkpointVerificationTimeout =
-                positive(checkpointVerificationTimeout, "checkpointVerificationTimeout");
-        trimTimeout = positive(trimTimeout, "trimTimeout");
-        pendingProtectionTtl = positive(pendingProtectionTtl, "pendingProtectionTtl");
-        contentPolicySha256 = Objects.requireNonNull(contentPolicySha256, "contentPolicySha256");
+    checkpointVerificationTimeout =
+        positive(checkpointVerificationTimeout, "checkpointVerificationTimeout");
+    trimTimeout = positive(trimTimeout, "trimTimeout");
+    pendingProtectionTtl = positive(pendingProtectionTtl, "pendingProtectionTtl");
+    retentionInterval = positive(retentionInterval, "retentionInterval");
+    bounded(maxConcurrentPartitions, 1, 256, "maxConcurrentPartitions");
+    bounded(maxPartitionsPerPass, 1, 100_000, "maxPartitionsPerPass");
+    if (maxPartitionsPerPass < maxConcurrentPartitions) {
+      throw new IllegalArgumentException(
+          "maxPartitionsPerPass must be at least maxConcurrentPartitions");
+    }
+    contentPolicySha256 = Objects.requireNonNull(contentPolicySha256, "contentPolicySha256");
         if (contentPolicySha256.type() != ChecksumType.SHA256) {
             throw new IllegalArgumentException("contentPolicySha256 must use SHA256");
         }
         writerBuild = text(writerBuild, "writerBuild");
     }
 
-    private static Duration positive(Duration value, String field) {
+  private static Duration positive(Duration value, String field) {
         Duration exact = Objects.requireNonNull(value, field);
         if (exact.isZero() || exact.isNegative() || exact.toMillis() <= 0) {
             throw new IllegalArgumentException(
@@ -76,6 +86,13 @@ public record NereusKafkaMaintenanceConfiguration(
         if (exact.isBlank()) {
             throw new IllegalArgumentException(field + " must be nonblank");
         }
-        return exact;
+    return exact;
+  }
+
+  private static void bounded(int value, int minimum, int maximum, String field) {
+    if (value < minimum || value > maximum) {
+      throw new IllegalArgumentException(
+          field + " must be in [" + minimum + ", " + maximum + "]");
     }
+  }
 }
