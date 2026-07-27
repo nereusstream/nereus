@@ -22,6 +22,7 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
     private final ReadOptions options;
     private final SerialExecutor serial;
     private final boolean rangedEntries;
+    private final boolean verifySourceIdentity;
     private final AtomicBoolean subscribed = new AtomicBoolean();
     private final AtomicBoolean closeRequested = new AtomicBoolean();
 
@@ -55,7 +56,25 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
         this.options = Objects.requireNonNull(options, "options");
         this.serial = new SerialExecutor(Objects.requireNonNull(callbackExecutor, "callbackExecutor"));
         this.rangedEntries = rangedEntries;
+        this.verifySourceIdentity = false;
         this.expectedOffset = exactTask.coverage().startOffset();
+    }
+
+    ExactSourceBatchPublisher(
+            ExactSourceSet sourceSet,
+            ExactSourceRangeReader reader,
+            ReadOptions options,
+            Executor callbackExecutor,
+            boolean rangedEntries) {
+        ExactSourceSet exactSources = Objects.requireNonNull(sourceSet, "sourceSet");
+        this.sources = exactSources.sources();
+        this.reader = Objects.requireNonNull(reader, "reader");
+        this.options = Objects.requireNonNull(options, "options");
+        this.serial = new SerialExecutor(
+                Objects.requireNonNull(callbackExecutor, "callbackExecutor"));
+        this.rangedEntries = rangedEntries;
+        this.verifySourceIdentity = true;
+        this.expectedOffset = exactSources.coverage().startOffset();
     }
 
     @Override
@@ -118,15 +137,18 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
                     ErrorCode.CANCELLED, false, "exact source batch publisher closed"), false);
             return;
         }
-        if (terminal || demand == 0 || opening != null) {
+        if (terminal || opening != null) {
+            return;
+        }
+        if (current == null && sourceIndex == sources.size()) {
+            complete();
+            return;
+        }
+        if (demand == 0) {
             return;
         }
         if (current == null) {
-            if (sourceIndex == sources.size()) {
-                complete();
-            } else {
-                openSource();
-            }
+            openSource();
             return;
         }
         requestUpstream();
@@ -195,6 +217,14 @@ final class ExactSourceBatchPublisher implements Flow.Publisher<ReadBatch>, Auto
                     || exact.range().startOffset() != expectedOffset
                     || !source.range().contains(expectedOffset)
                     || exact.range().endOffset() > source.range().endOffset()
+                    || (verifySourceIdentity
+                            && (!exact.source().resolvedRange().equals(source.range())
+                                    || exact.source().generation() != source.generation()
+                                    || exact.source().commitVersion() != source.commitVersion()
+                                    || !exact.source().target().equals(source.readTarget())
+                                    || !exact.source()
+                                            .targetIdentity()
+                                            .equals(source.targetIdentitySha256())))
                     || exact.payloadFormat() != source.payloadFormat()
                     || !exact.schemaRefs().equals(source.schemaRefs())
                     || !exact.projectionRef().equals(source.projectionRef())) {

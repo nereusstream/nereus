@@ -313,9 +313,10 @@ rows and proves the task/result coverage plus NTC2 writer-metadata binding，whi
 `KafkaCompactionPlanCoordinatorTest` proves plan-first publication、pre-task exact KCP1 reread、missing-plan rejection and
 task-ID restart recovery；`DefaultCommittedSourceSetResolverTest`/`KafkaCompactionSourceResolverTest` add bounded exact
 COMMITTED index tiling、per-generation reread、append-safe/trim-unsafe authority revalidation and deterministic output-task
-derivation；`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty tombstone bytes。Durable source-batch streaming、
-orphan/terminal recovery、sorted spill/restart、Parquet publication/coverage activation and stock `LogCleaner` comparison
-remain absent，so all rows remain `PLANNED`。
+derivation；`ExactSourceSetBatchPublisherTest`/`KafkaCompactionBatchSourceTest` add exact-identity backpressure streams for
+both recovered KCP1 passes，including demand-exhausted completion and substituted-generation rejection；
+`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty tombstone bytes。Orphan/terminal recovery、sorted spill/restart、Parquet
+publication/coverage activation and stock `LogCleaner` comparison remain absent，so all rows remain `PLANNED`。
 
 ## 11. Configuration, activation, controller and operations
 

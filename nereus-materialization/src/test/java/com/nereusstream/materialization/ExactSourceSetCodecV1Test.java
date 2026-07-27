@@ -60,7 +60,7 @@ class ExactSourceSetCodecV1Test {
                 .hasMessageContaining("trailing bytes");
     }
 
-    private static ExactSourceSet sourceSet() {
+    static ExactSourceSet sourceSet() {
         SourceGeneration first = source(0, 2, 0, 1, Optional.empty());
         SourceGeneration second =
                 source(

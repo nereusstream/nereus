@@ -885,6 +885,16 @@ only a harmless plan orphan；a visible task cannot be created after its plan di
 the child directly by `materializationTaskId` and cross-validates every task identity/source/policy fact before returning the
 frozen decision horizon。Orphan scanning and terminal dual-root retirement are still production-worker work。
 
+`KafkaCompactionBatchSource.open(recoveredPlan)` now turns that recovered KCP1 into two independent cold
+`ExactSourceSetBatchPublisher` instances：one for the full decision horizon and one for the output prefix。Each stream opens
+the frozen generations sequentially through `ExactSourceRangeReader`，holds the existing object pin for the active source，
+propagates one downstream request at a time and owns cancel/close。Every emitted batch must match range、generation、
+commitVersion、target bytes/identity、payload/schema/projection and per-source final accounting；no generation resolver or
+fallback is invoked between passes。The streams accept ranged Kafka batches，not the old one-entry/one-record assumption。
+Completion is signalled after the last source summary even when the last batch consumes the exact remaining demand；it never
+requires a protocol-invalid extra request。The durable streams are now available to the production executor；checksummed
+winner spill and streaming NTC2 writer consumption remain separate next slices。
+
 ### 10.5 Record rewrite V1
 
 For a normal survivor：

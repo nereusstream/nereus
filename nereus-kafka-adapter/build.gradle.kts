@@ -134,6 +134,7 @@ tasks.register<Test>("f9CompactionPropertyTest") {
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
     filter {
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionBatchSourceTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPassOneCollectorTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCodecV1Test")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCoordinatorTest")
