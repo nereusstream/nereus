@@ -35,6 +35,7 @@ import com.nereusstream.kafka.codec.KafkaAppendResultValidator;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaFetchAssembly;
 import com.nereusstream.kafka.compaction.KafkaCompactedFetchReader;
+import com.nereusstream.kafka.compaction.KafkaActivatedGenerationAuthority;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 
 import java.nio.ByteBuffer;
@@ -108,6 +109,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 appendEncoder,
                 fetchAssembler,
                 Optional.empty(),
+                Optional.empty(),
                 null,
                 null,
                 0);
@@ -134,6 +136,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 profilePolicy,
                 appendEncoder,
                 fetchAssembler,
+                Optional.empty(),
                 Optional.empty(),
                 Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
                 positive(sessionTtl, "sessionTtl"),
@@ -168,6 +171,43 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 fetchAssembler,
                 Optional.of(
                         Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.empty(),
+                Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
+                positive(sessionTtl, "sessionTtl"),
+                positive(renewalInterval, "renewalInterval").toMillis());
+        if (renewalInterval.compareTo(sessionTtl) >= 0) {
+            throw new IllegalArgumentException("renewalInterval must be shorter than sessionTtl");
+        }
+        scheduleRenewal(true);
+    }
+
+    public DefaultKafkaPartitionStorage(
+            KafkaPartitionIdentity identity,
+            StreamStorage streams,
+            StreamId streamId,
+            AcquiredAppendSession acquiredSession,
+            KafkaCheckpointSourceState recoveredSource,
+            KafkaStorageProfilePolicy profilePolicy,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            KafkaPartitionMetadataStore partitionMetadataStore,
+            KafkaActivatedGenerationAuthority activatedGenerations,
+            ScheduledExecutorService renewalScheduler,
+            Duration sessionTtl,
+            Duration renewalInterval) {
+        this(
+                identity,
+                streams,
+                streamId,
+                acquiredSession,
+                recoveredSource,
+                profilePolicy,
+                appendEncoder,
+                fetchAssembler,
+                Optional.of(
+                        Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.of(
+                        Objects.requireNonNull(activatedGenerations, "activatedGenerations")),
                 Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
                 positive(sessionTtl, "sessionTtl"),
                 positive(renewalInterval, "renewalInterval").toMillis());
@@ -187,6 +227,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             KafkaAppendBatchEncoder appendEncoder,
             KafkaFetchAssembler fetchAssembler,
             Optional<KafkaPartitionMetadataStore> partitionMetadataStore,
+            Optional<KafkaActivatedGenerationAuthority> activatedGenerations,
             ScheduledExecutorService renewalScheduler,
             Duration sessionTtl,
             long renewalIntervalMillis) {
@@ -198,12 +239,24 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         this.profilePolicy = Objects.requireNonNull(profilePolicy, "profilePolicy");
         this.appendEncoder = Objects.requireNonNull(appendEncoder, "appendEncoder");
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
+        Optional<KafkaActivatedGenerationAuthority> generationAuthority =
+                Objects.requireNonNull(activatedGenerations, "activatedGenerations");
+        if (generationAuthority.isPresent() && partitionMetadataStore.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "activated generations require Kafka partition metadata");
+        }
         this.fetchReader =
                 Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")
                         .<KafkaCompactedFetchReader>map(
                                 store ->
                                         new KafkaCompactedFetchReader(
-                                                this.identity, this.streamId, this.streams, store))
+                                                this.identity,
+                                                this.streamId,
+                                                this.streams,
+                                                store,
+                                                generationAuthority.orElse(
+                                                        KafkaActivatedGenerationAuthority
+                                                                .unavailable())))
                         .orElseGet(
                                 () ->
                                         KafkaCompactedFetchReader.committedOnly(

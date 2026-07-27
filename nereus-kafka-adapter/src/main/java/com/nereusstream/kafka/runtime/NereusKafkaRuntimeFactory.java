@@ -70,6 +70,7 @@ public final class NereusKafkaRuntimeFactory {
                             new KafkaAppendBatchEncoder(codec),
                             new KafkaFetchAssembler(codec),
                             exactDependencies.partitionMetadataStore(),
+                            exactDependencies.activatedGenerations(),
                             exactDependencies.clock());
             DefaultKafkaPartitionStorageManager manager =
                     new DefaultKafkaPartitionStorageManager(

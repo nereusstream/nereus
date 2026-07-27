@@ -11,6 +11,7 @@ import com.nereusstream.kafka.checkpoint.DefaultKafkaCheckpointSourceValidator;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import com.nereusstream.kafka.codec.KafkaAppendBatchEncoder;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
+import com.nereusstream.kafka.compaction.KafkaActivatedGenerationAuthority;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
@@ -38,6 +39,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
     private final Optional<KafkaPartitionMetadataStore> partitionMetadataStore;
+    private final Optional<KafkaActivatedGenerationAuthority> activatedGenerations;
     private final Clock clock;
 
     public DefaultKafkaPartitionOpener(
@@ -59,6 +61,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 recoveryLauncher,
                 appendEncoder,
                 fetchAssembler,
+                Optional.empty(),
                 Optional.empty(),
                 clock);
     }
@@ -85,6 +88,35 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 fetchAssembler,
                 Optional.of(
                         Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.empty(),
+                clock);
+    }
+
+    public DefaultKafkaPartitionOpener(
+            StreamStorage streams,
+            String writerId,
+            Duration sessionTtl,
+            Duration renewalInterval,
+            ScheduledExecutorService renewalScheduler,
+            KafkaPartitionRecoveryLauncher recoveryLauncher,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            KafkaPartitionMetadataStore partitionMetadataStore,
+            KafkaActivatedGenerationAuthority activatedGenerations,
+            Clock clock) {
+        this(
+                streams,
+                writerId,
+                sessionTtl,
+                renewalInterval,
+                renewalScheduler,
+                recoveryLauncher,
+                appendEncoder,
+                fetchAssembler,
+                Optional.of(
+                        Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.of(
+                        Objects.requireNonNull(activatedGenerations, "activatedGenerations")),
                 clock);
     }
 
@@ -98,6 +130,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
             KafkaAppendBatchEncoder appendEncoder,
             KafkaFetchAssembler fetchAssembler,
             Optional<KafkaPartitionMetadataStore> partitionMetadataStore,
+            Optional<KafkaActivatedGenerationAuthority> activatedGenerations,
             Clock clock) {
         this.streams = Objects.requireNonNull(streams, "streams");
         this.writerId = requireText(writerId, "writerId");
@@ -112,6 +145,12 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
         this.partitionMetadataStore =
                 Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore");
+        this.activatedGenerations =
+                Objects.requireNonNull(activatedGenerations, "activatedGenerations");
+        if (this.activatedGenerations.isPresent() && this.partitionMetadataStore.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "activated generations require Kafka partition metadata");
+        }
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -187,6 +226,8 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                                         appendEncoder,
                                         fetchAssembler,
                                         store,
+                                        activatedGenerations.orElse(
+                                                KafkaActivatedGenerationAuthority.unavailable()),
                                         renewalScheduler,
                                         sessionTtl,
                                         renewalInterval))

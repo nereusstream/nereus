@@ -9,14 +9,26 @@ import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectReadPinManager;
 import com.nereusstream.core.physical.ObjectProtectionManager;
+import com.nereusstream.core.read.GenerationReadResolver;
+import com.nereusstream.core.read.MetadataGenerationReadFailureHandler;
+import com.nereusstream.core.read.MetadataPhysicalObjectIdentityResolver;
+import com.nereusstream.core.read.ParquetV2CompactedTargetReader;
+import com.nereusstream.core.read.Phase4ReadComponents;
+import com.nereusstream.core.read.ReadTargetReaderRegistry;
+import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
 import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
 import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
+import com.nereusstream.kafka.compaction.KafkaActivatedGenerationAuthority;
+import com.nereusstream.kafka.compaction.KafkaActivatedGenerationSetResolver;
 import com.nereusstream.kafka.recovery.DefaultKafkaPartitionRecoveryLauncher;
 import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryCoordinator;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
+import com.nereusstream.metadata.oxia.GenerationIndexValidator;
+import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaClientMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaPhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaMetadataStore;
@@ -24,6 +36,8 @@ import com.nereusstream.metadata.oxia.PhysicalObjectMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreProvider;
+import com.nereusstream.objectstore.compacted.ParquetKafkaTopicCompactedReader;
+import com.nereusstream.objectstore.compacted.ParquetRangedCompactedObjectReader;
 import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointCodecV1;
 import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointReader;
 import com.nereusstream.objectstore.kafka.checkpoint.KafkaCheckpointVerifier;
@@ -85,6 +99,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
         KafkaPartitionMetadataStore partitionMetadataStore;
         StreamStorage streamStorage;
         KafkaPartitionRecoveryLauncher recoveryLauncher;
+        KafkaActivatedGenerationAuthority activatedGenerations;
         KafkaRuntimeStartup startup = KafkaRuntimeStartup.from(exactContext.startupAction());
         try {
             providerResources.add(registerOwned(
@@ -101,6 +116,13 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
             providerResources.add(registerOwned(
                     constructedResources, "l0-metadata-store", l0MetadataStore));
+            GenerationMetadataStore generationMetadataStore =
+                    OxiaJavaGenerationMetadataStore.usingSharedRuntime(
+                            exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
+            providerResources.add(registerOwned(
+                    constructedResources,
+                    "generation-metadata-store",
+                    generationMetadataStore));
             PhysicalObjectMetadataStore physicalMetadataStore =
                     OxiaJavaPhysicalObjectMetadataStore.usingSharedRuntime(
                             exactConfiguration.oxia(), oxiaRuntime, exactContext.clock());
@@ -163,15 +185,6 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             l0MetadataStore,
                             physicalMetadataStore,
                             protections);
-            streamStorage = new DefaultStreamStorage(
-                    exactConfiguration.streamStorage(),
-                    l0MetadataStore,
-                    new DefaultWalObjectWriter(objectStore, WRITER_VERSION, exactContext.clock()),
-                    new DefaultWalObjectReader(objectStore),
-                    physicalReferences,
-                    exactContext.clock(),
-                    callbackExecutor);
-            registerOwned(constructedResources, "stream-storage", streamStorage);
             ObjectReadPinManager readPins = new DefaultObjectReadPinManager(
                     exactConfiguration.runtime().nereusCluster(),
                     exactConfiguration.streamStorage().processRunId(),
@@ -182,6 +195,53 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                     exactContext.clock());
             providerResources.add(registerOwned(
                     constructedResources, "kafka-checkpoint-read-pins", readPins));
+            DefaultWalObjectReader walObjectReader = new DefaultWalObjectReader(objectStore);
+            ReadTargetReaderRegistry readers = new ReadTargetReaderRegistry(List.of(
+                    new ObjectWalReaderAdapter(walObjectReader),
+                    new ParquetV2CompactedTargetReader(
+                            new ParquetRangedCompactedObjectReader(
+                                    objectStore, callbackExecutor),
+                            new ParquetKafkaTopicCompactedReader(
+                                    objectStore, callbackExecutor))));
+            MetadataPhysicalObjectIdentityResolver identities =
+                    new MetadataPhysicalObjectIdentityResolver(
+                            exactConfiguration.runtime().nereusCluster(),
+                            l0MetadataStore,
+                            physicalMetadataStore);
+            GenerationReadResolver generationResolver = new GenerationReadResolver(
+                    exactConfiguration.runtime().nereusCluster(),
+                    l0MetadataStore,
+                    generationMetadataStore,
+                    GenerationIndexValidator.phase15Targets(),
+                    readers,
+                    identities,
+                    readPins,
+                    exactConfiguration
+                            .streamStorage()
+                            .maxDerivedIndexRepairCommitsPerCall(),
+                    exactContext.clock(),
+                    callbackExecutor);
+            Phase4ReadComponents readComponents = new Phase4ReadComponents(
+                    generationResolver,
+                    readers,
+                    new MetadataGenerationReadFailureHandler(
+                            exactConfiguration.runtime().nereusCluster(),
+                            generationMetadataStore,
+                            physicalMetadataStore,
+                            exactContext.clock()));
+            streamStorage = new DefaultStreamStorage(
+                    exactConfiguration.streamStorage(),
+                    l0MetadataStore,
+                    new DefaultWalObjectWriter(objectStore, WRITER_VERSION, exactContext.clock()),
+                    walObjectReader,
+                    physicalReferences,
+                    readComponents,
+                    exactContext.clock(),
+                    callbackExecutor);
+            registerOwned(constructedResources, "stream-storage", streamStorage);
+            activatedGenerations = new KafkaActivatedGenerationSetResolver(
+                    exactConfiguration.runtime().nereusCluster(),
+                    generationMetadataStore);
             KafkaCheckpointRecoveryCoordinator checkpoints =
                     new KafkaCheckpointRecoveryCoordinator(
                             exactConfiguration.runtime().nereusCluster(),
@@ -211,6 +271,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 ResourceOwnership.OWNED,
                 partitionMetadataStore,
                 ResourceOwnership.OWNED,
+                activatedGenerations,
                 exactContext.renewalScheduler(),
                 recoveryLauncher,
                 exactContext.clock(),

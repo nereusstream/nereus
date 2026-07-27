@@ -2,6 +2,7 @@
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.kafka.compaction.KafkaActivatedGenerationAuthority;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import java.time.Clock;
@@ -17,6 +18,7 @@ public record NereusKafkaRuntimeDependencies(
         ResourceOwnership streamStorageOwnership,
         KafkaPartitionMetadataStore partitionMetadataStore,
         ResourceOwnership partitionMetadataStoreOwnership,
+        KafkaActivatedGenerationAuthority activatedGenerations,
         ScheduledExecutorService renewalScheduler,
         KafkaPartitionRecoveryLauncher recoveryLauncher,
         Clock clock,
@@ -27,10 +29,34 @@ public record NereusKafkaRuntimeDependencies(
         Objects.requireNonNull(streamStorageOwnership, "streamStorageOwnership");
         Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore");
         Objects.requireNonNull(partitionMetadataStoreOwnership, "partitionMetadataStoreOwnership");
+        Objects.requireNonNull(activatedGenerations, "activatedGenerations");
         Objects.requireNonNull(renewalScheduler, "renewalScheduler");
         Objects.requireNonNull(recoveryLauncher, "recoveryLauncher");
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(startupAction, "startupAction");
         providerResources = List.copyOf(Objects.requireNonNull(providerResources, "providerResources"));
+    }
+
+    public NereusKafkaRuntimeDependencies(
+            StreamStorage streamStorage,
+            ResourceOwnership streamStorageOwnership,
+            KafkaPartitionMetadataStore partitionMetadataStore,
+            ResourceOwnership partitionMetadataStoreOwnership,
+            ScheduledExecutorService renewalScheduler,
+            KafkaPartitionRecoveryLauncher recoveryLauncher,
+            Clock clock,
+            Supplier<? extends CompletionStage<Void>> startupAction,
+            List<KafkaRuntimeResources.Resource> providerResources) {
+        this(
+                streamStorage,
+                streamStorageOwnership,
+                partitionMetadataStore,
+                partitionMetadataStoreOwnership,
+                KafkaActivatedGenerationAuthority.unavailable(),
+                renewalScheduler,
+                recoveryLauncher,
+                clock,
+                startupAction,
+                providerResources);
     }
 }

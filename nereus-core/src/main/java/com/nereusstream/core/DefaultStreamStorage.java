@@ -326,6 +326,31 @@ public final class DefaultStreamStorage implements StreamStorage, ConstrainedSem
             WalObjectWriter walObjectWriter,
             WalObjectReader walObjectReader,
             GenerationZeroPhysicalReferencePublisher physicalReferences,
+            Phase4ReadComponents readComponents,
+            Clock clock,
+            Executor callbackExecutor) {
+        this(
+                config,
+                metadataStore,
+                walObjectWriter,
+                walObjectReader,
+                physicalReferences,
+                new MetadataAppendRecoverySearcher(config.cluster(), metadataStore),
+                new Phase15StorageProfileResolver(),
+                AppendAdmissionGuard.noOp(),
+                readComponents,
+                clock,
+                callbackExecutor,
+                ReadMetricsObserver.noop(),
+                TrimMetricsObserver.noop());
+    }
+
+    public DefaultStreamStorage(
+            StreamStorageConfig config,
+            OxiaMetadataStore metadataStore,
+            WalObjectWriter walObjectWriter,
+            WalObjectReader walObjectReader,
+            GenerationZeroPhysicalReferencePublisher physicalReferences,
             Clock clock,
             Executor callbackExecutor,
             ReadMetricsObserver readMetricsObserver,
