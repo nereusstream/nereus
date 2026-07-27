@@ -12,8 +12,10 @@ independent backpressured decision/output replays，reduces checksum-verified KC
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
 publication、binding coverage activation、generation-constrained no-resurrection reads and task-first terminal retirement。
 `KafkaCompactionPartitionPass` now recovers or admits one partition's durable workflow and composes claim heartbeat、two-pass
-execution、restart publication and dual-root retirement；owned-partition runtime registration、the concrete authority capture
-provider、real-provider process restart and the stock cleaner oracle remain pending。The Kafka fork now has
+execution、restart publication and dual-root retirement。`KafkaCompactionRuntime` now performs bounded fork-owned partition
+enumeration、internal-topic-first scheduling、process-current leader revalidation、cross-partition concurrency and
+drain-safe scheduler integration；the production fork registration/capture provider、real-provider process restart and the
+stock cleaner oracle remain pending。The Kafka fork now has
 local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
 leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation

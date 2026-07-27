@@ -145,6 +145,7 @@ tasks.register<Test>("f9CompactionPropertyTest") {
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPublicationCoordinatorTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowMapperTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowSpoolTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRuntimeTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionSchedulerTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionSourceResolverTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionStreamingExecutorTest")

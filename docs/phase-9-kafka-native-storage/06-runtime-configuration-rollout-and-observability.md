@@ -92,9 +92,12 @@ log selection remain open。
 `KafkaRuntimeResources` implements this ledger now。Every entry has a nonblank name、exact `AutoCloseable` identity and
 `OWNED` or `BORROWED` flag。Duplicate identity is rejected even when both declarations use the same flag；mixed ownership is
 therefore rejected too。`close()` is idempotent，skips borrowed dependencies，attempts every owned close in reverse list
-construction order and aggregates named failures。`DefaultNereusKafkaRuntime.close()` closes the partition manager before
-this provider ledger；BrokerServer still owns the outer stop-admission → await-drain → ReplicaManager → LogManager → runtime
-ordering。`NereusKafkaRuntimeFactory` now appends the binding store and `StreamStorage` after caller-supplied provider resources，
+construction order and aggregates named failures。`DefaultNereusKafkaRuntime` now starts its injected
+`KafkaRuntimeBackgroundService` after activation startup but before admission becomes READY；drain closes that service and
+waits its accepted work before partition-manager shutdown，then `close()` closes the manager before this provider ledger。
+Startup/drain races cannot start a service after the irreversible drain cut，and background/manager failures are aggregated
+while both closes are attempted。BrokerServer still owns the outer stop-admission → await-drain → ReplicaManager →
+LogManager → runtime ordering。`NereusKafkaRuntimeFactory` now appends the binding store and `StreamStorage` after caller-supplied provider resources，
 so reverse close drains stream facade → binding store → underlying clients/providers。It rejects identity duplication before
 ownership transfer and never closes borrowed Kafka scheduler/clock/recovery dependencies；ownership is not inferred during
 shutdown。
@@ -562,8 +565,8 @@ admission RUNNING -> DRAINING
   -> stop Fetch admission and let accepted operations reach event/deadline/error terminal
   -> wait append/fetch executor termination plus product runtime drain under caller timeout
   -> checkpoint eligible stable partitions within checkpoint timeout
-  -> close partition logs/sessions
   -> stop retention/compaction planning and drain workers
+  -> close partition logs/sessions
   -> stop registry/checkpoint/renew schedulers
   -> close StreamStorage
   -> close BookKeeper/Object/Oxia owned clients

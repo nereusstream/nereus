@@ -1015,9 +1015,11 @@ durable output/Generation boundary，discards the staging context，then proves 
 coverage；a repeated recovery recognizes an already activated root without advancing its epoch。This is deterministic
 metadata/object-boundary restart evidence，not the still-required real-provider process-restart gate。The binding-rooted
 read-view router described in section 11.3、exact activated-generation-set discovery and generation-constrained Object-WAL
-runtime reads are implemented。`KafkaCompactionPartitionPass` now owns the full single-partition composition；the
-remaining boundary is runtime owned-partition registration、a concrete partition-lock/KRaft authority capture provider and
-the real-provider/process-restart gate，not generation discovery、durable-output re-entry or per-partition lifecycle routing。
+runtime reads are implemented。`KafkaCompactionPartitionPass` now owns the full single-partition composition；
+`KafkaCompactionRuntime` owns bounded partition enumeration、process-current leader revalidation and cross-partition
+scheduling。The remaining boundary is the production fork registration/concrete partition-lock/KRaft authority capture
+provider and the real-provider/process-restart gate，not generation discovery、durable-output re-entry、per-partition
+lifecycle routing or process-level dispatch。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
@@ -1069,7 +1071,14 @@ freezes all pending reasons with the highest operational priority。A trigger re
 after the next pass consumes it；caller cancellation cannot cancel shared work。Close cancels the scheduler-owned deadline
 and active source but never closes the borrowed scheduler or callback executor。The `PassExecutor` remains the explicit seam
 where runtime wiring must enumerate currently owned partitions、construct their concrete capture provider and invoke
-`KafkaCompactionPartitionPass`。
+`KafkaCompactionPartitionPass`。`KafkaCompactionRuntime` now implements that product-side callback：the fork supplies one
+bounded immutable `OwnedPartition` snapshot containing canonical identity、observed leader epoch、INTERNAL/USER work class
+and the partition-lock-backed `CaptureProvider`。The runtime rejects duplicate durable partition IDs and over-limit
+snapshots，sorts INTERNAL before USER，rechecks each item against `KafkaPartitionStorageManager.current` immediately before
+launch，and skips missing、changed-epoch or non-writable leaders。It runs at most the configured number of partitions in
+parallel，attempts every accepted item even when another fails，and reports failures in stable partition order。Its
+non-cancellable aggregate lets scheduler close stop new deadlines while waiting for already accepted partition work；
+borrowed scheduler/callback executors are never closed。
 
 ### 10.5 Record rewrite V1
 
@@ -1297,7 +1306,7 @@ per-partition serialization described above。
 | Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusTimeIndex`、`NereusLeaderEpochCache` |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
 | adapter retention | `KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、`KafkaTrimBarrier`、`KafkaRetentionDurableTrimListener` partial implementation |
-| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner implemented；full runtime pass composition pending |
+| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge implemented；production fork capture wiring pending |
 | materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier |
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |
 | object store | NTC2 writer/reader/goldens from document 02 |

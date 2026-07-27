@@ -22,8 +22,10 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
     private final KafkaStorageAdmission admission;
     private final KafkaPartitionStorageManager partitionStorageManager;
     private final KafkaRuntimeStartup startup;
+    private final KafkaRuntimeBackgroundService backgroundService;
     private final KafkaRuntimeResources resources;
     private CompletableFuture<Void> startOperation;
+    private CompletableFuture<Void> backgroundStartOperation;
     private CompletableFuture<Void> drainOperation;
     private boolean closed;
 
@@ -32,7 +34,12 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
             KafkaPartitionStorageManager partitionStorageManager,
             Supplier<? extends CompletionStage<Void>> startupAction,
             KafkaRuntimeResources resources) {
-        this(admission, partitionStorageManager, KafkaRuntimeStartup.from(startupAction), resources);
+        this(
+                admission,
+                partitionStorageManager,
+                KafkaRuntimeStartup.from(startupAction),
+                KafkaRuntimeBackgroundService.none(),
+                resources);
     }
 
     public DefaultNereusKafkaRuntime(
@@ -40,10 +47,25 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
             KafkaPartitionStorageManager partitionStorageManager,
             KafkaRuntimeStartup startup,
             KafkaRuntimeResources resources) {
+        this(
+                admission,
+                partitionStorageManager,
+                startup,
+                KafkaRuntimeBackgroundService.none(),
+                resources);
+    }
+
+    public DefaultNereusKafkaRuntime(
+            KafkaStorageAdmission admission,
+            KafkaPartitionStorageManager partitionStorageManager,
+            KafkaRuntimeStartup startup,
+            KafkaRuntimeBackgroundService backgroundService,
+            KafkaRuntimeResources resources) {
         this.admission = Objects.requireNonNull(admission, "admission");
         this.partitionStorageManager = Objects.requireNonNull(
                 partitionStorageManager, "partitionStorageManager");
         this.startup = Objects.requireNonNull(startup, "startup");
+        this.backgroundService = Objects.requireNonNull(backgroundService, "backgroundService");
         this.resources = Objects.requireNonNull(resources, "resources");
         if (admission.state() != KafkaStorageAdmissionState.STARTING) {
             throw new IllegalArgumentException("Kafka runtime admission must begin in STARTING state");
@@ -72,7 +94,13 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
             completeStartup(operation, failure);
             return protectedView(operation);
         }
-        startup.whenComplete((ignored, failure) -> completeStartup(operation, failure));
+        startup.whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                completeStartup(operation, failure);
+            } else {
+                startBackground(operation);
+            }
+        });
         return protectedView(operation);
     }
 
@@ -103,20 +131,9 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
             drainOperation = new CompletableFuture<>();
             operation = drainOperation;
         }
-        CompletableFuture<Void> managerDrain;
-        try {
-            managerDrain = Objects.requireNonNull(
-                    partitionStorageManager.shutdown(), "Kafka partition manager shutdown future");
-        } catch (Throwable failure) {
-            operation.completeExceptionally(unwrap(failure));
-            return protectedView(operation);
-        }
-        managerDrain.whenComplete((ignored, failure) -> {
-            if (failure == null) {
-                operation.complete(null);
-            } else {
-                operation.completeExceptionally(unwrap(failure));
-            }
+        stopBackgroundThenManager().whenComplete((ignored, failure) -> {
+            if (failure == null) operation.complete(null);
+            else operation.completeExceptionally(unwrap(failure));
         });
         return protectedView(operation);
     }
@@ -143,27 +160,101 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
             }
             closed = true;
         }
-        beginDrain(DrainReason.OPERATOR_REQUEST);
+        CompletableFuture<Void> drain = beginDrain(DrainReason.OPERATOR_REQUEST).toCompletableFuture();
         admission.close();
-        Throwable managerFailure = null;
+        Throwable failure = null;
+        try {
+            drain.join();
+        } catch (Throwable drainFailure) {
+            failure = unwrap(drainFailure);
+        }
         try {
             partitionStorageManager.close();
-        } catch (Throwable failure) {
-            managerFailure = failure;
+        } catch (Throwable managerFailure) {
+            failure = combine(failure, managerFailure);
         }
         try {
             resources.close();
         } catch (Throwable resourceFailure) {
-            if (managerFailure != null) {
-                resourceFailure.addSuppressed(managerFailure);
-            }
-            throw resourceFailure;
+            failure = combine(failure, resourceFailure);
         }
-        if (managerFailure != null) {
-            if (managerFailure instanceof RuntimeException runtimeFailure) {
+        if (failure != null) {
+            if (failure instanceof RuntimeException runtimeFailure) {
                 throw runtimeFailure;
             }
-            throw new IllegalStateException("Failed to close Kafka partition storage manager", managerFailure);
+            throw new IllegalStateException("Failed to close Kafka runtime", failure);
+        }
+    }
+
+    private void startBackground(CompletableFuture<Void> operation) {
+        CompletableFuture<Void> backgroundOperation;
+        synchronized (guard) {
+            if (closed || admission.state() != KafkaStorageAdmissionState.STARTING) {
+                completeStartup(operation, new NereusException(
+                        ErrorCode.STORAGE_CLOSED,
+                        false,
+                        "Kafka runtime startup completed after drain or close"));
+                return;
+            }
+            backgroundStartOperation = new CompletableFuture<>();
+            backgroundOperation = backgroundStartOperation;
+        }
+        CompletionStage<Void> backgroundStart;
+        try {
+            backgroundStart = Objects.requireNonNull(
+                    backgroundService.start(), "Kafka runtime background-service start future");
+        } catch (Throwable failure) {
+            backgroundOperation.completeExceptionally(unwrap(failure));
+            completeStartup(operation, failure);
+            return;
+        }
+        backgroundStart.whenComplete((ignored, failure) -> {
+            if (failure == null) backgroundOperation.complete(null);
+            else backgroundOperation.completeExceptionally(unwrap(failure));
+            completeStartup(operation, failure);
+        });
+    }
+
+    private CompletableFuture<Void> stopBackgroundThenManager() {
+        CompletableFuture<Void> backgroundStart;
+        synchronized (guard) {
+            backgroundStart = backgroundStartOperation;
+        }
+        CompletionStage<Void> readyToStop = backgroundStart == null
+                ? CompletableFuture.completedFuture(null)
+                : backgroundStart.handle((ignored, failure) -> null);
+        CompletableFuture<Void> result = new CompletableFuture<>();
+        readyToStop
+                .thenCompose(ignored -> stopBackground())
+                .handle((ignored, backgroundFailure) -> unwrapNullable(backgroundFailure))
+                .thenCompose(backgroundFailure -> stopManager()
+                        .handle((ignored, managerFailure) -> combine(
+                                backgroundFailure, unwrapNullable(managerFailure))))
+                .whenComplete((failure, chainFailure) -> {
+                    Throwable cause = combine(failure, unwrapNullable(chainFailure));
+                    if (cause == null) result.complete(null);
+                    else result.completeExceptionally(cause);
+                });
+        return result;
+    }
+
+    private CompletionStage<Void> stopBackground() {
+        try {
+            return Objects.requireNonNull(
+                    backgroundService.closeAsync(),
+                    "Kafka runtime background-service close future");
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(unwrap(failure));
+        }
+    }
+
+    private CompletionStage<Void> stopManager() {
+        try {
+            return Objects.requireNonNull(
+                    partitionStorageManager.shutdown(),
+                    "Kafka partition manager shutdown future");
+        } catch (Throwable failure) {
+            return CompletableFuture.failedFuture(unwrap(failure));
         }
     }
 
@@ -205,5 +296,15 @@ public final class DefaultNereusKafkaRuntime implements NereusKafkaRuntime {
             current = current.getCause();
         }
         return current;
+    }
+
+    private static Throwable unwrapNullable(Throwable failure) {
+        return failure == null ? null : unwrap(failure);
+    }
+
+    private static Throwable combine(Throwable primary, Throwable additional) {
+        if (primary == null) return additional;
+        if (additional != null && additional != primary) primary.addSuppressed(additional);
+        return primary;
     }
 }

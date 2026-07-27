@@ -342,9 +342,11 @@ delete-response-loss cuts。`KafkaCompactionSchedulerTest` proves startup/fixed-
 caller-cancellation isolation and borrowed-resource close semantics。`KafkaCompactionPartitionPassTest` now composes a durable
 PLANNED task/KCP1、exact two-pass streams、actual Parquet NTC2 writer/reader、local-file object upload、Generation publication、
 binding coverage CAS and task-first/KCP1-second retirement；the pass itself also owns bounded existing-work recovery、
-claim heartbeat、typed failure persistence and activation-set reconstruction。Runtime owned-partition registration、the
-concrete partition-lock/KRaft capture provider、provider fresh-process restart and stock `LogCleaner` comparison remain
-absent，so all rows remain `PLANNED`。The durable-output and full-pass tests are deterministic local restart/composition
+claim heartbeat、typed failure persistence and activation-set reconstruction。`KafkaCompactionRuntimeTest` adds deterministic
+bounded owned-partition enumeration、internal-first ordering、stale-epoch skip、cross-partition concurrency、attempt-all
+failure aggregation and drain-waits-accepted-work evidence；`DefaultNereusKafkaRuntimeTest` proves background start gates
+readiness and background drain precedes partition-manager shutdown。Production fork registration/concrete partition-lock/KRaft
+capture、provider fresh-process restart and stock `LogCleaner` comparison remain absent，so all rows remain `PLANNED`。The durable-output and full-pass tests are deterministic local restart/composition
 evidence only；the real-provider fresh-process restart tier remains absent。
 
 ## 11. Configuration, activation, controller and operations

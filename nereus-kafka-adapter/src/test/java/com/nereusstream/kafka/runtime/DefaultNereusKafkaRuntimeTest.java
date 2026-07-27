@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -105,6 +106,93 @@ class DefaultNereusKafkaRuntimeTest {
         assertThat(failedManager.shutdowns).hasValue(0);
     }
 
+    @Test
+    void readinessWaitsForBackgroundStartAndDrainStopsItBeforePartitionManager() {
+        CompletableFuture<Void> backgroundStart = new CompletableFuture<>();
+        CompletableFuture<Void> backgroundStop = new CompletableFuture<>();
+        CompletableFuture<Void> managerDrain = new CompletableFuture<>();
+        List<String> events = new java.util.ArrayList<>();
+        FakeManager manager = new FakeManager(managerDrain, events);
+        KafkaRuntimeBackgroundService background = new KafkaRuntimeBackgroundService() {
+            @Override
+            public CompletionStage<Void> start() {
+                events.add("background-start");
+                return backgroundStart;
+            }
+
+            @Override
+            public CompletionStage<Void> closeAsync() {
+                events.add("background-stop");
+                return backgroundStop;
+            }
+        };
+        DefaultNereusKafkaRuntime runtime = new DefaultNereusKafkaRuntime(
+                new KafkaStorageAdmission(),
+                manager,
+                ignored -> CompletableFuture.completedFuture(null),
+                background,
+                new KafkaRuntimeResources(List.of()));
+
+        CompletableFuture<Void> start = runtime.start().toCompletableFuture();
+        assertThat(start).isNotDone();
+        assertThat(runtime.health().state()).isEqualTo(KafkaStorageAdmissionState.STARTING);
+        backgroundStart.complete(null);
+        assertThat(start).isCompletedWithValue(null);
+        assertThat(runtime.health().state()).isEqualTo(KafkaStorageAdmissionState.READY);
+
+        CompletableFuture<Void> drain =
+                runtime.beginDrain(DrainReason.BROKER_SHUTDOWN).toCompletableFuture();
+        assertThat(events).containsExactly("background-start", "background-stop");
+        assertThat(manager.shutdowns).hasValue(0);
+        assertThat(drain).isNotDone();
+
+        backgroundStop.complete(null);
+        assertThat(manager.shutdowns).hasValue(1);
+        assertThat(events)
+                .containsExactly("background-start", "background-stop", "manager-shutdown");
+        assertThat(drain).isNotDone();
+        managerDrain.complete(null);
+        assertThat(drain).isCompletedWithValue(null);
+
+        runtime.close();
+    }
+
+    @Test
+    void drainAttemptsManagerAfterBackgroundFailureAndAggregatesBothFailures() {
+        RuntimeException backgroundFailure = new RuntimeException("background failed");
+        RuntimeException managerFailure = new RuntimeException("manager failed");
+        FakeManager manager = new FakeManager(CompletableFuture.failedFuture(managerFailure));
+        KafkaRuntimeBackgroundService background = new KafkaRuntimeBackgroundService() {
+            @Override
+            public CompletionStage<Void> start() {
+                return CompletableFuture.completedFuture(null);
+            }
+
+            @Override
+            public CompletionStage<Void> closeAsync() {
+                return CompletableFuture.failedFuture(backgroundFailure);
+            }
+        };
+        DefaultNereusKafkaRuntime runtime = new DefaultNereusKafkaRuntime(
+                new KafkaStorageAdmission(),
+                manager,
+                ignored -> CompletableFuture.completedFuture(null),
+                background,
+                new KafkaRuntimeResources(List.of()));
+        runtime.start().toCompletableFuture().join();
+
+        assertThatThrownBy(() -> runtime
+                        .beginDrain(DrainReason.BROKER_SHUTDOWN)
+                        .toCompletableFuture()
+                        .join())
+                .isInstanceOf(CompletionException.class)
+                .cause()
+                .isSameAs(backgroundFailure)
+                .satisfies(failure ->
+                        assertThat(failure.getSuppressed()).containsExactly(managerFailure));
+        assertThat(manager.shutdowns).hasValue(1);
+    }
+
     private static DefaultNereusKafkaRuntime runtime(
             KafkaPartitionStorageManager manager,
             java.util.function.Supplier<CompletableFuture<Void>> startup,
@@ -126,11 +214,17 @@ class DefaultNereusKafkaRuntimeTest {
 
     private static final class FakeManager implements KafkaPartitionStorageManager {
         private final CompletableFuture<Void> drain;
+        private final List<String> events;
         private final AtomicInteger shutdowns = new AtomicInteger();
         private final AtomicInteger closes = new AtomicInteger();
 
         private FakeManager(CompletableFuture<Void> drain) {
+            this(drain, null);
+        }
+
+        private FakeManager(CompletableFuture<Void> drain, List<String> events) {
             this.drain = drain;
+            this.events = events;
         }
 
         @Override
@@ -162,6 +256,7 @@ class DefaultNereusKafkaRuntimeTest {
         @Override
         public CompletableFuture<Void> shutdown() {
             shutdowns.incrementAndGet();
+            if (events != null) events.add("manager-shutdown");
             return drain;
         }
 

@@ -585,7 +585,7 @@ publication/root reload，with a canonical seven-section local-file object-store
 response-loss-safe binding observed-logStart CAS before calling the exact local updater。This task deliberately does not
 use the `phase9M5Check` completion name：concrete partition capture、
 local-log updater、retention periodic scheduling、Kafka-fork DeleteRecords invocation、
-compaction owned-partition runtime registration/concrete authority capture、stock oracle and real-provider/restart gates
+compaction production fork registration/concrete authority capture、stock oracle and real-provider/restart gates
 remain required。
 
 The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
@@ -655,8 +655,11 @@ planner→source→KCP1/task→claim/heartbeat→executor→publisher→coverage
 fresh admission，routes every durable lifecycle，requeues skew-safe expired claims by exact CAS，reconstructs previous
 activation from the frozen plan and coalesces concurrent callers。`KafkaCompactionPartitionPassTest` runs that workflow through
 actual Parquet NTC2、local-file object storage and durable in-memory task/generation/binding roots，ending with activated
-coverage and both task/KCP1 roots retired。Runtime owned-partition enumeration/registration、the concrete partition-lock/KRaft
-capture provider、real-provider fresh-process gates and the cleaner differential oracle remain pending。This closes the
+coverage and both task/KCP1 roots retired。`KafkaCompactionRuntime` now consumes a bounded immutable fork-owned snapshot，
+rejects duplicate durable IDs/over-limit results，orders internal topics first，rechecks process-current writable leader
+epoch before launch，bounds cross-partition concurrency，attempts all accepted work and drains it before partition-manager
+shutdown。Production fork registration/concrete partition-lock/KRaft capture、real-provider fresh-process gates and the
+cleaner differential oracle remain pending。This closes the
 deterministic adapter no-resurrection/write-composition boundary but does not yet claim end-to-end client compaction
 visibility。
 
