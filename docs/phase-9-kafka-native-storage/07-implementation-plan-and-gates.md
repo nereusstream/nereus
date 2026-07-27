@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition partial slice implemented；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented；M2 ordinary/direct real-service gates pass；M4 process/internal-topic gates and inherited final gate remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -453,11 +453,12 @@ coordinator/transaction/compaction remain M4/M5。
   `KafkaConfigTest` pass with server/core checkstyle and SpotBugs。This is deterministic partial evidence for KF-SRC-007、
   KF-SRC-008 and KF-OPS-001/002；runtime creation、activation/cluster ID、controller create-topic enforcement、secret
   redaction and real-process cuts remain open；
-- M3 rejects idempotent/transaction/control input until M4 owns producer/transaction state；
-- this is not M3 completion：the organization fork exists and local branch
-  `nereus/future9-native-kafka-storage@47d36a1d9f` contains nineteen reviewed commits and the seventy-three-file
-  log-IO/bridge/request/recovery/metadata-lifecycle/configuration/runtime-composition seam，but the current GitHub credential has
-  read-only permission，so the branch is not pushed and KF-SRC-004 remains incomplete。Produce hands off exact owned bytes
+- the M3 head rejects idempotent/transaction/control input until M4 owns producer/transaction state；isolated M4 commit
+  `ec7f0db991` now owns stock import/replay and transactional shell semantics but is not part of the clean M3 aggregate lock；
+- the organization fork exists and the isolated local branch
+  `nereus/future9-native-kafka-storage@ec7f0db991` contains the nineteen reviewed M3 commits plus one M4
+  producer/transaction commit，but push to `nereusstream/kafka` is rejected with GitHub 403，so KF-SRC-004 remains
+  incomplete。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection and the real KRaft final gate remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
@@ -536,10 +537,16 @@ checkpoint/stable-end、virtual/logical-byte sets、logical bytes、time/sample 
 `KafkaCanonicalCheckpointPublicationFactoryTest` further proves the exact ACTIVE binding/source/leader capture produces
 the matching header and all seven sections，while append-in-flight、state-map/end and leader-epoch mismatches fail before
 object I/O。
-The task deliberately does not use the `phase9M4Check` completion name；stock
-`ProducerStateManager` import/replay、idempotent/transaction request paths、LSO/aborted filtering and internal-topic
-coordinator ordering、publication snapshot/object round trip and restart/takeover index recovery are still required before
-M4 completion。
+Isolated Kafka fork commit `ec7f0db991` adds stock `ProducerStateEntry.fromBatchMetadata`、in-memory
+`NereusProducerStateManager`/`NereusTransactionIndex`、complete seven-section checkpoint hydration、exact COMMITTED-tail
+replay and exact manager publication into `NereusUnifiedLog`。The shell test exercises stock verification guard、
+transactional CLIENT append、COORDINATOR abort marker、durable-end-to-HW advancement、open-transaction LSO、
+READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/shell plus stock restore regression total
+10 passing focused tests，with Checkstyle and SpotBugs。The commit remains local because push to the organization fork was
+rejected with GitHub 403。
+The task deliberately does not use the `phase9M4Check` completion name；transaction request/executor handoff、
+internal-topic coordinator ordering、publication snapshot/object round trip、fresh process restart/takeover index recovery、
+upstream focused suites and real two-broker evidence are still required before M4 completion。
 
 ## 9. F9-M5 — Retention and compaction
 

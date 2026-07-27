@@ -1,10 +1,10 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition 以及 idempotent/transaction/control exact append encoding partial slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + product-side exact DeleteRecords + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill/KCRS-to-NTC2 preparation + object upload/Generation publication/coverage-CAS linearization + exact activated-generation discovery/generation-constrained runtime reads + binding-rooted compacted-prefix/committed-tail no-resurrection routing + recoverable single-partition pass + terminal dual-root retirement + bounded orphan scan/non-overlapping scheduler-owner + owned-partition runtime bridge + projection-free direct-stream registration/Generation authority fence + activated Object-WAL production composition deterministic slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；exact recovery state/storage publication、同步 UnifiedLog correctness bridge，以及有界 ReplicaManager Produce 和 whole-request multi-partition async Fetch handoff 已实现，但 M4 Kafka fork import/replay、transaction request semantics、internal-topic coordinator ordering、M5 concrete partition retention/DeleteRecords runtime wiring、compaction fork registration/partition-lock authority capture、stock `LogCleaner` differential oracle、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition、idempotent/transaction/control exact append encoding，以及 Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index deterministic slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + product-side exact DeleteRecords + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill/KCRS-to-NTC2 preparation + object upload/Generation publication/coverage-CAS linearization + exact activated-generation discovery/generation-constrained runtime reads + binding-rooted compacted-prefix/committed-tail no-resurrection routing + recoverable single-partition pass + terminal dual-root retirement + bounded orphan scan/non-overlapping scheduler-owner + owned-partition runtime bridge + projection-free direct-stream registration/Generation authority fence + activated Object-WAL production composition deterministic slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；transaction request/executor handoff、internal-topic coordinator ordering、M4 publication/process-restart/takeover gates、M5 concrete partition retention/DeleteRecords runtime wiring、compaction fork registration/partition-lock authority capture、stock `LogCleaner` differential oracle、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development lock：local `nereus/future9-native-kafka-storage@47d36a1d9fd3ae670e6b799b90df42fb86502e41` from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`（remote push pending）
+> Kafka fork development lock：isolated local `nereus/future9-native-kafka-storage@ec7f0db9914bbc6410fc7d37840f9a4f8bb885b6`（M4，parent `47d36a1d9fd3ae670e6b799b90df42fb86502e41`）from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；push to `nereusstream/kafka` blocked by GitHub 403
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -91,8 +91,15 @@ transaction marker offset 单调性及允许 LSO 低于 marker 的 stock 语义�
 decode/re-encode byte exact。当前只允许 normal checkpoint barrier；completed-but-not-finalized open transaction
 在没有显式 section flag 前 fail closed。产品侧 `KafkaAppendBatchEncoder` 已解除 M3 数据类型闸门，接受 codec
 严格校验后的 idempotent、transactional 与 control magic-v2 batch，并继续逐 batch 保存 exact bytes 与 logical
-offset span；该改变不绕过 fork 的 stock producer/transaction validation。当前锁定 fork 尚未提交
-`ProducerStateManager` import/replay 和事务 request path，因此不能据此声明 M4 完成。
+offset span；该改变不绕过 fork 的 stock producer/transaction validation。隔离 Kafka fork commit
+`ec7f0db991` 现新增 `NereusProducerStateManager`、`NereusTransactionIndex` 和 stock
+`ProducerStateEntry.fromBatchMetadata` restore seam：完整 seven-section NKC1 image 先恢复 producer/transaction、
+leader-epoch、virtual-byte/timestamp state，再从 checkpoint offset replay exact COMMITTED tail；五批 duplicate
+window 与 marker-updated `lastTimestamp` 独立保留。`NereusUnifiedLog` 继续先走 stock producer/transaction
+validation/verification guard，stable append 后把 stock HW 推到 durable end，再发布 exact HW/LSO；abort index 和
+READ_COMMITTED 元数据按实际返回页上界裁剪。codec/replay/factory/shell 的 10 个聚合焦点测试已通过。该 commit
+尚未推送，transaction executor handoff、internal-topic ordering、真实 checkpoint object/restart/takeover gate
+仍未完成，因此不能声明 M4 完成。
 Section 3 现由 Kafka-artifact-neutral `KafkaLeaderEpochState` 与 `KafkaLeaderEpochStateCodecV1` 实现：
 leader epoch/start offset 双严格递增，只有首条可低于 logStart 作为 carried-forward range，所有 start 均不超过
 stable end，末条可等于 stable end 表达当前空 epoch；required/version/flags、unsigned count、truncation、
@@ -111,7 +118,8 @@ virtual segment。Section 4 与 full composition 分别有 frozen digest、corru
 已完整。`KafkaCanonicalCheckpointPublicationFactory` 已把 partition-lock-frozen canonical image、exact source
 head/session 和 ACTIVE binding 组装为 header + seven-section write/publication request，并在 object I/O 前拒绝
 in-flight append、state-map/end、leader authority 和 bounds mismatch；production runtime 的 staging/writer
-ownership、periodic trigger 和 Kafka fork import/replay 仍未接入。
+ownership、periodic trigger 和 fork checkpoint capture/export handoff 仍未接入；fork import/replay 已由
+`ec7f0db991` 接入 recovery path。
 M5 的首个 product slice 已新增 `KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、
 `KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaTrimBarrier` 和
 `KafkaRetentionDurableTrimListener`。Planner 直接消费 section-4 virtual
@@ -201,7 +209,8 @@ gate，以及 stock cleaner oracle。
 stable append 先推进 exact end/commit version 并保留旧 HW/LSO；fork 必须在 stock producer/transaction 更新成功后
 调用 `publishDerivedOffsets(exactEnd, HW, LSO)`，随后才发布 `STABLE_APPEND` 并 dispatch 同 partition 下一次
 append。该边界已覆盖 exact-end mismatch、offset 越界、initialized offset 回退、queued append、resign 和 renewal
-failure；fork wiring 仍在下一切片。
+failure；fork `ec7f0db991` 已完成该调用顺序并用 open/abort transaction、LSO 和 bounded
+READ_COMMITTED/aborted metadata 测试锁定，真实 provider/process gate 仍待完成。
 product 侧 whole-request `KafkaFetchWaveOperation` 把 stock read-wave 保持为 opaque payload，只负责
 subscribe-before-read、事件合并、single in-flight wave、独立 callback、显式 cancel/cleanup，以及不受 event-reread
 预算影响的 deadline final read。`bba3ef0121` 已将其接入 stock-owned `BrokerStorageFetchExecutor`：
@@ -235,8 +244,9 @@ S3/Object-WAL activation runtime；Kafka scheduler/Time 被借入，single-image
 只在 exact ReplicaManager 出现后 one-time bind；fork 的 `NereusKafkaRecoveryStateFactory` 为每次 open 创建
 stock `MemoryRecords`/`RecordBatch` 驱动的新鲜 M3 状态，校验 CRC、单 entry/单 batch、稠密 offset、压缩 record、
 timestamp 与 leader-epoch ranges，并在 exact current `Partition` 上短临界区 provisional 发布。final source
-revalidation 失败会撤销该 epoch 的 provisional state。M3 对 idempotent/transaction/control batch 和 NKC1 派生 section
-继续 `UNSUPPORTED_FORMAT` fail closed，交给 M4。fork `cfcdd55fbc` 新增 per-broker `UnifiedLogFactory` seam、
+revalidation 失败会撤销该 epoch 的 provisional state。该 M3 head 对 idempotent/transaction/control batch 和
+NKC1 派生 section 使用 `UNSUPPORTED_FORMAT` fail closed；后续 `ec7f0db991` 已替换为 M4 stock-state
+hydration/replay。fork `cfcdd55fbc` 新增 per-broker `UnifiedLogFactory` seam、
 cache-root-only `NereusUnifiedLogFactory` 和 `NereusUnifiedLog`/`NereusLocalLog` ephemeral state-machine shell；
 `LogManager` 在 Nereus mode 不扫描旧 local logs，也不运行 cleaner/retention/flusher/checkpoint/clean-shutdown local truth。
 `BrokerServer` 从 exact runtime 注入 factory；恢复 state、storage、ListOffsets lookup 按顺序发布，shell 只有前两者匹配

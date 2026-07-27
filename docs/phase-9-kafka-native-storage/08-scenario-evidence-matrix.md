@@ -24,6 +24,14 @@ Current deterministic M5 read-side evidence（2026-07-27）：`KafkaCompactedFet
 mandatory source never produces a COMMITTED retry。The manifest rows remain `PLANNED` because their required real-service、
 restart/Kafka-fork and process/chaos tiers are not yet satisfied。
 
+Current deterministic M4 fork evidence（local `ec7f0db991`）：`NereusProducerStateManagerTest`、
+`NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
+KF-TXN-002/003/005/006/007 and KF-FET-006/007：five-batch/sequence-wrap checkpoint equality、full seven-section hydration
+plus committed tail、open/abort LSO、stock transaction verification、HW publication、READ_COMMITTED bounds and
+actual-page aborted filtering。The stock `ProducerStateManagerTest` also locks marker-updated timestamp restore。Rows stay
+`PLANNED` because required real-service、process/restart、takeover and aggregate tiers have not run，and the fork commit is
+not yet remotely published。
+
 ## 2. Machine-readable manifest target
 
 F9-M1 implementation start 已创建 `docs/phase-9-kafka-native-storage/f9-scenarios.json`，每个 Markdown row 对应
@@ -210,8 +218,8 @@ hash。Markdown/JSON ID sets must match。
 | KF-FET-003 | first batch greater than max bytes progresses only when Kafka minOneMessage allows | `KafkaNativeFetchLimitTest` | D,R,K | M3 |
 | KF-FET-004 | minBytes waits on actual bytes，stable append wakes，maxWait returns once | fork `NereusFetchOperationTest` | D,R,M | M3 |
 | KF-FET-005 | multi-partition fetch coalesces events，has at most one read in flight and callback once | fork `NereusFetchOperationTest` | D,M,R | M3 |
-| KF-FET-006 | READ_UNCOMMITTED upper bound HW and READ_COMMITTED upper bound LSO | `KafkaNativeIsolationIntegrationTest` | R,K | M4 |
-| KF-FET-007 | aborted transaction list/filter matches Kafka baseline | `KafkaNativeIsolationIntegrationTest` | R,K | M4 |
+| KF-FET-006 | READ_UNCOMMITTED upper bound HW and READ_COMMITTED upper bound LSO | fork `NereusUnifiedLogFactoryTest`（D/K partial）；`KafkaNativeIsolationIntegrationTest`（R pending） | R,K | M4 |
+| KF-FET-007 | aborted transaction list/filter matches Kafka baseline | fork `NereusUnifiedLogFactoryTest` bounded two-abort page（D/K partial）；`KafkaNativeIsolationIntegrationTest`（R pending） | R,K | M4 |
 | KF-FET-008 | request below durable logStart is out-of-range；mid-batch trim hides prefix | `KafkaNativeDeleteRecordsIntegrationTest` | R,K | M5 |
 | KF-FET-009 | ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline | product `KafkaDerivedIndexStateCodecV1Test`（section 5/6 canonical bytes partial）；`KafkaNativeListOffsetsIntegrationTest`（index lookup/restart pending） | R,K | M3/M4 |
 | KF-FET-010 | leader-epoch end-offset lookup survives checkpoint/restart/takeover | product `KafkaLeaderEpochStateCodecV1Test`（canonical bytes partial）；`KafkaNativeLeaderEpochIntegrationTest`（restart/takeover pending） | R,P,K | M4 |
@@ -227,12 +235,12 @@ hash。Markdown/JSON ID sets must match。
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
 | --- | --- | --- | --- | --- |
 | KF-TXN-001 | producer epoch/sequence validation matches selected Kafka baseline | fork `NereusProducerStateCompatibilityTest` | M,K | M4 |
-| KF-TXN-002 | sequence wrap and retained duplicate-batch window survive checkpoint/replay | `KafkaProducerStatePropertyTest` | M,R,K | M4 |
-| KF-TXN-003 | canonical producer snapshot encode/decode/replay equals full replay state | `KafkaProducerStatePropertyTest` | D,M | M4 |
+| KF-TXN-002 | sequence wrap and retained duplicate-batch window survive checkpoint/replay | product `KafkaProducerStatePropertyTest` + fork `NereusProducerStateManagerTest`（R pending） | M,R,K | M4 |
+| KF-TXN-003 | canonical producer snapshot encode/decode/replay equals full replay state | product `KafkaProducerStatePropertyTest` + fork `NereusProducerStateManagerTest`/`NereusKafkaRecoveryStateCodecTest` | D,M | M4 |
 | KF-TXN-004 | producer expiration and checkpoint-before-trim preserve subsequent validation | `KafkaProducerTrimIntegrationTest` | R,K | M4/M5 |
-| KF-TXN-005 | open transaction crossing checkpoint restores first unstable offset/LSO | `KafkaTransactionRecoveryIntegrationTest` | R,P | M4 |
-| KF-TXN-006 | commit marker stable append advances LSO in stock order | `KafkaTransactionRecoveryIntegrationTest` | R,K | M4 |
-| KF-TXN-007 | abort marker builds exact aborted index and read-committed filtering | `KafkaTransactionRecoveryIntegrationTest` | R,K | M4 |
+| KF-TXN-005 | open transaction crossing checkpoint restores first unstable offset/LSO | fork `NereusProducerStateManagerTest`/`NereusKafkaRecoveryStateCodecTest`（D partial）；`KafkaTransactionRecoveryIntegrationTest`（R/P pending） | R,P | M4 |
+| KF-TXN-006 | commit marker stable append advances LSO in stock order | fork `NereusUnifiedLogFactoryTest`（abort-marker stock order D/K partial）；`KafkaTransactionRecoveryIntegrationTest`（R pending） | R,K | M4 |
+| KF-TXN-007 | abort marker builds exact aborted index and read-committed filtering | fork `NereusProducerStateManagerTest`/`NereusUnifiedLogFactoryTest`（D/K partial）；`KafkaTransactionRecoveryIntegrationTest`（R pending） | R,K | M4 |
 | KF-TXN-008 | crash after transactional data/marker commit before derived update replays correctly | `KafkaTransactionProcessCutIntegrationTest` | P,C | M4 |
 | KF-TXN-009 | transaction spanning virtual segments/checkpoint/takeover remains atomic to consumers | `KafkaTransactionProcessCutIntegrationTest` | P,K | M4 |
 | KF-TXN-010 | transaction verification guard survives async executor handoff without request-thread local use | fork `NereusTransactionVerificationTest` | D,R,K | M4 |

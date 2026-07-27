@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding partial slices implemented；Kafka import/replay and request semantics remain in progress；F9-M5 designed target
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication and READ_COMMITTED/aborted-index deterministic shell slice implemented locally；request executor/internal-topic/process gates remain in progress；F9-M5 designed target
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -66,13 +66,13 @@ the selected Apache Kafka baseline and records explicit patches separately。
 ```java
 // target shape
 final class NereusProducerStateManager extends ProducerStateManager {
-    ProducerStateSnapshot exportCanonical(long expectedMapEndOffset);
-    void importCanonical(ProducerStateSnapshot snapshot);
-    void resetForReplay(long logStartOffset);
-    void applyRecoveredBatch(RecordBatch batch, AppendOrigin origin);
-    void verifyMapEndOffset(long stableEndOffset);
+    KafkaProducerTransactionState exportCanonical(long expectedMapEndOffset);
+    void restoreCanonical(KafkaProducerTransactionState state);
+    void resetForRecovery(long logStartOffset);
+    void replayBatch(RecordBatch batch);
+    KafkaProducerTransactionState freezeCanonical(long stableEndOffset);
 
-    @Override Optional<File> takeSnapshot(boolean sync); // schedules NKC1 checkpoint; no truth-bearing file
+    @Override Optional<File> takeSnapshot(boolean sync); // empty；no truth-bearing file
 }
 ```
 
@@ -81,18 +81,18 @@ cannot represent a marker-updated `lastTimestamp` independently from the retaine
 
 ```java
 // org.apache.kafka.storage.internals.log.ProducerStateEntry
-public static ProducerStateEntry fromSnapshot(
+public static ProducerStateEntry fromBatchMetadata(
     long producerId,
     short producerEpoch,
     int coordinatorEpoch,
     long lastTimestamp,
     OptionalLong currentTxnFirstOffset,
-    Collection<BatchMetadata> batchesOldestToNewest);
+    List<BatchMetadata> batchesOldestToNewest);
 ```
 
 The factory requires at most `NUM_BATCHES_TO_RETAIN` non-null entries and copies them in supplied order without calling
 `addBatch`，so it never overwrites the separately supplied `lastTimestamp`。It is storage-neutral and unused by the stock
-path。`NereusProducerStateManager.importCanonical` converts each canonical batch directly to stock `BatchMetadata` and loads
+path。`NereusProducerStateManager.restoreCanonical` converts each canonical batch directly to stock `BatchMetadata` and loads
 this exact entry into a fresh manager；replaying synthetic data batches merely to populate the queue is forbidden because a
 later transaction marker legitimately changes the producer timestamp without entering the duplicate window。Import must
 still export byte-for-byte equal canonical state before publication。
@@ -138,10 +138,12 @@ Current implementation（2026-07-27）：product side now owns the Kafka-artifac
 `f9ProducerStatePropertyTest` gate。The model preserves at most five batches in oldest-to-newest order，uses Kafka
 sequence wrap arithmetic，requires producer IDs to be strictly sorted and requires `mapEndOffset` to equal the outer
 checkpoint offset。The codec is strict big-endian and rejects count/length/flag/version/trailing-byte ambiguity before a
-fork can import it。The local Kafka worktree contains `NereusProducerStateManager`/`NereusTransactionIndex` import/export
-and replay scaffolding，but its current `ProducerAppendInfo`-based hydration cannot preserve an independent marker-updated
-`lastTimestamp`；the `ProducerStateEntry.fromSnapshot` seam and exact restore regression above remain required before that
-work can be committed or counted as stock import/replay evidence。
+fork can import it。Isolated fork commit `ec7f0db991` implements `NereusProducerStateManager` import/export and exact
+COMMITTED-batch replay。Stock `ProducerStateEntry.fromBatchMetadata` reconstructs the retained five-batch deque without
+calling the scalar-mutating add path，so a later marker-updated `lastTimestamp` remains independent。Import is accepted only
+into a fresh manager and immediately re-exported for exact canonical equality；ordinary local snapshot IO remains disabled。
+Deterministic tests cover sequence wrap、five-batch retention、marker timestamp preservation、checkpoint encode/decode and
+replay equality。The commit is local because `nereusstream/kafka` rejected the current GitHub credential with 403。
 
 ## 4. Transaction state and indexes
 
@@ -186,8 +188,9 @@ Fields match Kafka `AbortedTxn` semantics，not its Java buffer layout。Entries
 history，and monotonic for search。`lastStableOffset` is non-negative and may be lower than `lastOffset` when another earlier
 transaction remains unstable；it must not be validated as the marker's successor。Entries with
 `lastOffset < current logStartOffset` may be pruned at checkpoint creation。The current product codec implements this
-canonical payload and requires strictly increasing marker offsets，matching stock `TransactionIndex.append`；the fork-side
-`TransactionIndex` import/filter bridge remains open。
+canonical payload and requires strictly increasing marker offsets，matching stock `TransactionIndex.append`。Fork
+`NereusTransactionIndex` now owns an ordered in-memory `AbortedTxn` list，implements append/import/truncate/filter/all/reset
+without a truth-bearing local file，and is populated both by NKC1 import and exact committed-tail replay。
 
 ### 4.4 `NereusTransactionIndex`
 
@@ -219,6 +222,16 @@ For every COMMITTED Kafka batch from checkpoint to stable end：
 
 At completion：producer map end、local LEO、stable head end equal；LSO `<= HW`；all open transaction offsets are within
 `[logStart,stableEnd)` or explicitly preserved by checkpoint semantics。Any mismatch is CORRUPT_OFFLINE。
+
+Current fork implementation first decodes the complete seven-section `KafkaCanonicalCheckpointStateCodecV1` image。
+It restores producer/open/aborted state、leader-epoch ranges、virtual logical bytes and timestamp maxima before replaying
+the bounded committed tail。`NereusUnifiedLog.installRecoveredState` installs the same exact producer manager and repopulates
+the stock leader-epoch cache before publishing storage。On append，stock validation and verification run first；after the
+durable callback returns，the shell advances stock HW to the exact durable end、derives LSO and calls
+`publishDerivedOffsets`。Open transactions therefore hold LSO at their first offset，abort markers advance it only after
+stock state/index completion，and READ_COMMITTED emits aborted metadata only for the actual returned byte page。Focused
+fork tests cover non-zero checkpoint + tail hydration、overlapping open/abort restore、verification guard、two aborted
+transactions with a bounded page and no truth-bearing snapshot/transaction-index files。
 
 ## 5. Native coordinator internal topics
 
@@ -1324,7 +1337,7 @@ per-partition serialization described above。
 
 | Owner | Class |
 | --- | --- |
-| Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusTimeIndex`、`NereusLeaderEpochCache` |
+| Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` facades still pending |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
 | adapter retention | `KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、`KafkaTrimBarrier`、`KafkaRetentionDurableTrimListener` partial implementation |
 | adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition implemented；fork registration and concrete partition-lock/KRaft/local-log capture wiring pending |

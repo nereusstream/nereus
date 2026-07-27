@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；KafkaRaftServer production selection and real KRaft process gate remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index deterministic shell slice implemented locally；KafkaRaftServer production selection、internal-topic ordering and real KRaft process gate remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -54,7 +54,7 @@ Request handler
 | `kafka.log.nereus.NereusLogSegment` | extends `LogSegment` | virtual roll/size/index facade；no durable file |
 | `kafka.log.nereus.NereusLogRecords` | records facade | exact MemoryRecords encode/read and owned buffers |
 | `kafka.log.nereus.NereusProducerStateManager` | extends `ProducerStateManager` | in-memory stock semantics + checkpoint bridge |
-| `org.apache.kafka.storage.internals.log.ProducerStateEntry.fromSnapshot` | stock inert factory seam | exact five-batch queue import without overwriting marker-updated lastTimestamp |
+| `org.apache.kafka.storage.internals.log.ProducerStateEntry.fromBatchMetadata` | stock inert factory seam | exact five-batch queue import without overwriting marker-updated lastTimestamp |
 | `kafka.log.nereus.NereusTimeIndex` | Kafka `TimeIndex` facade | derived timestamp lookup/checkpoint state |
 | `kafka.log.nereus.NereusTransactionIndex` | Kafka `TransactionIndex` facade | derived aborted-txn lookup/checkpoint state |
 | `kafka.log.nereus.NereusLeaderEpochCache` | epoch cache facade/adapter | derived epoch ranges；no local checkpoint truth |
@@ -63,8 +63,8 @@ Request handler
 | `kafka.server.storage.BrokerStorageFetchExecutor` | implemented optional stock-owned seam | immutable whole-request submit、opaque stock read closure and drain without Nereus types |
 | `kafka.server.nereus.NereusBrokerStorageFetchExecutor` | implemented product-backed implementation | bounded logical admission、partition events、stock wave validation、Kafka error mapping |
 | `kafka.log.nereus.NereusKafkaExceptionMapper` | mapper | Nereus error/outcome → Kafka exception |
-| `kafka.log.nereus.NereusKafkaRecoveredState` | fresh M3 derived state | validate/rebuild exact stock RecordBatch offsets/timestamps/leader epochs |
-| `kafka.log.nereus.NereusKafkaRecoveryStateCodec` | adapter recovery codec | one fresh state per leader open；M4 sections fail closed |
+| `kafka.log.nereus.NereusKafkaRecoveredState` | fresh derived state | hydrate full canonical checkpoint；replay exact stock RecordBatch producer/transaction/offset/index state |
+| `kafka.log.nereus.NereusKafkaRecoveryStateCodec` | adapter recovery codec | one fresh state per leader open；all seven NKC1 sections hydrate before exact committed-tail replay |
 | `kafka.server.nereus.NereusKafkaRecoveryStateFactory` | exact Partition publisher | validate topicId/name/partition/leader epoch and install frozen provisional state |
 | `org.apache.kafka.storage.internals.log.LeaderEpochAwareRecoveryState` | stock inert seam | keep `Partition` compilable without unpublished Nereus artifacts |
 | `kafka.server.nereus.NereusBrokerStorageRuntime` | runtime bridge | exact ReplicaManager binding、boot/readiness/drain/shutdown delegation |
@@ -296,11 +296,14 @@ KafkaApis.handleFetchRequest
 步骤失败也 resign，阻止 successor append。LEO 只在 callback 成功返回后推进，synthetic local log size 保持 `0`。
 M4 产品 encoder 已接受通过严格 magic-v2/CRC/producer-fact 校验的 idempotent、transaction 与 control batch；
 是否可写仍由 fork 的 stock `UnifiedLog` producer/transaction validation 决定，adapter 不复制该状态机。
-当前锁定 fork head 仍保留 M3 request-path 闸门，直至 M4 bridge 独立提交；follower append 永远拒绝。
+隔离 fork commit `ec7f0db991` 已允许 `CLIENT` transactional data 与 `COORDINATOR` marker 通过同一 stable
+append bridge，verification guard、epoch/sequence/marker 校验仍由 stock path 执行；follower append 永远拒绝。
 
-Fetch 当前只支持 M3 非事务数据；result 必须不含 aborted transaction。它复用 adapter containing-entry/first-entry
-overflow 语义并受 partition bytes、hard response bytes、stable upper bound 与 typed timeout 约束；返回前复核仍是
-同一份 `LEADER_WRITABLE` storage。virtual segment base/relative position 目前由 request 传 `0/0`，完整 virtual index
+Fetch 已按 stock isolation 选择 LOG_END/HW/LSO 上界。READ_COMMITTED 的 aborted transaction list 来自
+checkpoint/replay 恢复的 in-memory `NereusTransactionIndex`，并按本次实际返回页的 next logical offset 裁剪，
+不会把后续页的 abort 暴露到较小的 Fetch。它复用 adapter containing-entry/first-entry overflow 语义并受
+partition bytes、hard response bytes、stable upper bound 与 typed timeout 约束；返回前复核仍是同一份
+`LEADER_WRITABLE` storage。virtual segment base/relative position 目前由 request 传 `0/0`，完整 virtual index
 仍是后续切片。
 
 `NereusUnifiedLog` 仍同步等待 future，因为 stock validation/LEO/producer-state ordering 必须看到 stable terminal；
@@ -546,9 +549,11 @@ storage manager 在 open/periodic path 组合，不把可重复 `recover()` 暴�
 
 M4 将 stable append 与 Kafka-derived visibility publication 分成两个明确阶段：`append` 的 durable result 只推进
 `stableEndOffset`/commit version，保留前一版 HW/LSO；fork 在 stock `ProducerStateManager`、transaction index 和
-first-unstable state 更新成功后调用 `publishDerivedOffsets(exactEnd, HW, LSO)`。在 exact end 确认前，同 partition
-下一次 storage append 不 dispatch，`STABLE_APPEND` 事件也不发布。expected end 不匹配、offset 越界或 initialized
-HW/LSO 回退均 fail closed；post-stable publication failure 进入 write-fence/replay。
+first-unstable state 更新成功后调用 `publishDerivedOffsets(exactEnd, HW, LSO)`。隔离 commit `ec7f0db991`
+已在 `NereusUnifiedLog.appendAsLeader` 接入此顺序：stable terminal 后推进 stock HW 到 exact durable end，
+重新计算 LSO，再发布 derived snapshot；任一步失败都 fence 已知稳定 append。在 exact end 确认前，同
+partition 下一次 storage append 不 dispatch，`STABLE_APPEND` 事件也不发布。expected end 不匹配、offset
+越界或 initialized HW/LSO 回退均 fail closed；post-stable publication failure 进入 write-fence/replay。
 
 ### 4.3 Current binding-first storage manager（2026-07-23）
 
@@ -705,9 +710,11 @@ inject marker；第十六个 `dc8c66388a` 增加 optional `RequiredAcksAwareAppe
 Produce aggregation 和 drain composition；第十八个 `bba3ef0121` 增加 stock `BrokerStorageFetchExecutor`、
 product-backed whole-request wave executor、ReplicaManager async Fetch completion 和 combined drain composition；
 第十九个 `47d36a1d9f` 保证内部 control queue 能保留每个已接纳 operation 的一个 runner，修复同时 wakeup 时把已接纳
-Fetch 错误降级为 backpressure 的竞态，但不扩大 `threads + queueCapacity` logical admission。
+Fetch 错误降级为 backpressure 的竞态，但不扩大 `threads + queueCapacity` logical admission。第二十个隔离本地
+commit `ec7f0db991` 增加 stock producer-entry exact restore seam、in-memory producer/transaction state、
+full NKC1 hydration + committed-tail replay、stable-end-to-HW/LSO publication 和 READ_COMMITTED aborted filtering。
 Controller scheduling、CLI/KafkaRaftServer production selection 和 real KRaft process gate 尚未实现。当前 branch
-尚未推送，因而仍未满足 M3 production fork source-lock entry；bounded Produce/Fetch 单元与组合证据也不构成真实
+尚未推送，因而仍未满足 production fork source-lock entry；bounded Produce/Fetch/M4 transaction 单元与组合证据也不构成真实
 KRaft runtime claim。
 
 ## 6. Produce execution and threading

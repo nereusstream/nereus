@@ -672,7 +672,8 @@ segment bounds 和 max timestamp。encode→decode→encode 由 frozen digests �
 该切片只接受 normal checkpoint
 barrier；section 7 的 completed-but-not-finalized entry 在定义并实现显式 section flag 前必须 fail closed。
 Full canonical composition 与 publication-request factory 已实现；publication coordinator 的 runtime-owned
-object round trip 以及 Kafka fork import/replay 仍是后续切片。Product
+object round trip 以及 fork checkpoint capture/export handoff 仍是后续切片；fork import/replay 已在 local
+`ec7f0db991` 接入。Product
 `KafkaCanonicalCheckpointPublicationFactory` 已完成前半段：
 它只接受同一 capture 中 `checkpointOffset=stableEnd=source.end`、`logStart=source.trim`、无 in-flight append、
 state-map end exact、ACTIVE binding 和 exact leader authority 的 canonical image，然后产生 header、type 1–7
