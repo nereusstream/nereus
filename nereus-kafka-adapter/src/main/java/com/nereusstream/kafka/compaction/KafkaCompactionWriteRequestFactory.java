@@ -31,7 +31,39 @@ public final class KafkaCompactionWriteRequestFactory {
       Input input, KafkaCompactionTwoPassExecutor.Result result) {
     Objects.requireNonNull(input, "input");
     Objects.requireNonNull(result, "result");
-    if (!input.outputCoverage().equals(result.outputCoverage())) {
+    return create(
+        input,
+        result.outputCoverage(),
+        result.outputSourceSetSha256(),
+        result.outputRecordCount(),
+        result.outputBatchCount(),
+        result.logicalBytes(),
+        result.outputSourceBatchCount());
+  }
+
+  public KafkaTopicCompactedObjectWriteRequest create(
+      Input input, KafkaCompactionStreamingExecutor.StreamingResult result) {
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(result, "result");
+    return create(
+        input,
+        result.outputCoverage(),
+        result.outputSourceSetSha256(),
+        result.outputRecordCount(),
+        result.outputBatchCount(),
+        result.logicalBytes(),
+        result.outputSourceBatchCount());
+  }
+
+  private KafkaTopicCompactedObjectWriteRequest create(
+      Input input,
+      OffsetRange outputCoverage,
+      Checksum outputSourceSetSha256,
+      long outputRecordCount,
+      int outputBatchCount,
+      long logicalBytes,
+      long outputSourceBatchCount) {
+    if (!input.outputCoverage().equals(outputCoverage)) {
       throw new IllegalArgumentException(
           "Kafka NTC2 write coverage does not match the verified two-pass result");
     }
@@ -40,11 +72,11 @@ public final class KafkaCompactionWriteRequestFactory {
         input.streamId(),
         input.outputCoverage(),
         input.outputAttemptId(),
-        result.outputSourceSetSha256(),
+        outputSourceSetSha256,
         input.policySha256(),
-        result.outputRecordCount(),
-        result.outputBatchCount(),
-        result.logicalBytes(),
+        outputRecordCount,
+        outputBatchCount,
+        logicalBytes,
         input.cumulativeSizeAtEnd(),
         input.targetRowGroupRecords(),
         input.compression(),
@@ -55,8 +87,8 @@ public final class KafkaCompactionWriteRequestFactory {
             KafkaCompactionKeyEncodingV2.ID,
             CompactedObjectFormatV2.KAFKA_REWRITE_CODEC,
             KafkaTopicCompactionCodecV1.MESSAGE_FORMAT_SHA256,
-            result.outputSourceBatchCount(),
-            result.outputBatchCount()));
+            outputSourceBatchCount,
+            outputBatchCount));
   }
 
   public record Input(

@@ -626,9 +626,15 @@ shared `StagingFileManager` budget。Runs are KCK2-key ordered、whole-file SHA-
 an output-coverage `BitSet`；success、corruption、decode failure and cancellation close/delete all runs and release permits。
 Restart deliberately discards scratch runs and deterministically recomputes them from recovered KCP1 exact sources。
 `KafkaCompactionWinnerIndexTest` covers spill/no-spill and two-run restart equivalence、newer decision-tail suppression、
-same-length sealed-file corruption and cancellation cleanup。Orphan scan/terminal dual-root retirement、streaming Parquet
-upload/full verification、coverage activation and the cleaner differential oracle remain pending；this gate does not claim
-compaction visibility。
+same-length sealed-file corruption and cancellation cleanup。`KafkaCompactionStreamingExecutor` now runs both recovered
+streams under one-batch demand，reproves pass-one/output facts and writes survivors to a whole-file-SHA-verified KCRS V1
+spool；`KafkaCompactionParquetPublisher` demand-replays that single-use spool into a staged NTC2 object only after exact
+terminal accounting is known。Product tests compare the staged content SHA with the reference executor，perform local
+upload plus strict NTC2 verification and prove cancellation releases an existing KCSR run/KCRS permits。
+`KafkaCompactionTerminalRetirer` additionally requires exact terminal task/plan roots and a stable no-admission authority
+guard，then conditionally deletes task first and KCP1 second with bounded exact-reload convergence for both response-loss
+cuts。Plan-only orphan scan、production object upload/generation publication、coverage activation and the cleaner
+differential oracle remain pending；this gate does not claim compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

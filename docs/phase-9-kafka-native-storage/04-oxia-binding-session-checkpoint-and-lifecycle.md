@@ -252,8 +252,53 @@ Worker restart starts from the already loaded durable `MaterializationTask` and 
 `recover(partition, outputTask)`。The coordinator performs a direct child lookup by `outputTask.taskId()`，decodes the
 SHA-verified KCP1 and runs `plan.requireMaterializationTask(outputTask)` before returning any frozen transaction/source
 facts。A task without its KCP1 attachment fails closed with retryable `METADATA_CONDITION_FAILED`；execution never rebuilds
-the decision horizon from the current log。Terminal task/plan retirement ordering and orphan-plan scanning remain part of
-the production worker/recovery slice。
+the decision horizon from the current log。
+
+`KafkaCompactionTerminalRetirer` now owns terminal task/KCP1 dual-root deletion。Its production entry point requires the
+exact `VersionedMaterializationTask` and exact `VersionedKafkaCompactionPlan` already observed by recovery；passing only a
+logical task ID is insufficient。The accepted task lifecycle set is closed to
+`PUBLISHED/CANCELLED/TERMINAL_FAILED`。Before metadata IO it decodes the task snapshot、decodes KCP1、checks
+partition/metadata-version consistency and runs `plan.requireMaterializationTask(task)`。The deletion protocol is：
+
+```text
+retire(partition, expectedTerminalTask, expectedPlan, stableAuthorityGuard):
+  require expectedTerminalTask.lifecycle is terminal
+  require decode(expectedPlan).materializationTask == decode(expectedTerminalTask)
+  stableAuthorityGuard.revalidate()
+  currentPlan = plans.get(partition, taskId)
+  if currentPlan is absent:
+    require tasks.get(stream, taskId) is absent
+    return idempotent success
+  require currentPlan == expectedPlan
+
+  currentTask = tasks.get(stream, taskId)
+  if currentTask is present:
+    require currentTask == expectedTerminalTask
+    tasks.delete(currentTask)                 # exact stream/id/version delete
+    on any uncertain response:
+      reload exact task
+      absent          -> deletion applied
+      equal           -> retry, maximum 8 attempts
+      changed         -> invariant failure
+
+  stableAuthorityGuard.revalidate()
+  require tasks.get(stream, taskId) is absent
+  require plans.get(partition, taskId) == expectedPlan
+  plans.delete(expectedPlan)                  # exact KCP1 version delete
+  on any uncertain response:
+    reload exact plan
+    absent          -> deletion applied
+    equal           -> retry, maximum 8 attempts
+    changed         -> invariant failure
+```
+
+Task-first ordering exposes at worst a harmless plan-only orphan and never deliberately exposes a visible task without its
+restart image。`MaterializationTaskStore.delete(expected)` is deliberately proof-free：it only preserves exact
+stream/task/version identity，while lifecycle/reference/authority proofs remain with the retirer。The guard contract is a
+stable partition authority fence and must also reject concurrent task admission；a transient “check only” callback is not
+sufficient to prevent recreation between the two non-atomic roots。`KafkaCompactionTerminalRetirerTest` covers normal
+ordering、both delete-response-loss cuts、non-terminal rejection、pre-delete root change and a root change after an uncertain
+delete。Plan-only orphan prefix scanning after a process crash remains a separate bounded scanner slice。
 
 ## 4. Deterministic identity
 

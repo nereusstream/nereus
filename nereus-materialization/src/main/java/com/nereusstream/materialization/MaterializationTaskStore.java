@@ -108,6 +108,25 @@ public final class MaterializationTaskStore {
                 expectedVersion));
     }
 
+    /**
+     * Deletes the exact durable task root represented by {@code expected}.
+     *
+     * <p>The caller owns all lifecycle and reference proofs. This facade only preserves the task's
+     * stream/id/version identity so an uncertain or stale cleanup cannot remove a replacement root.
+     */
+    public CompletableFuture<Void> delete(VersionedMaterializationTask expected) {
+        return async(() -> {
+            VersionedMaterializationTask exact =
+                    Objects.requireNonNull(expected, "expected");
+            MaterializationTask task = requireTask(exact);
+            return generations.deleteTask(
+                    cluster,
+                    task.streamId(),
+                    task.taskId(),
+                    exact.metadataVersion());
+        });
+    }
+
     public MaterializationTask requireTask(
             VersionedMaterializationTask durable) {
         return MaterializationRecordMapper.domainTask(durable);

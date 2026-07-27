@@ -925,14 +925,68 @@ private file and release the shared staging permit。Spill bytes are deliberatel
 orphan-grace scanner may remove them，while task recovery reloads KCP1 and deterministically replays the same exact
 decision/output sources。`KafkaCompactionWinnerIndexTest` proves spill/no-spill winner equivalence including a newer
 decision-tail key，two independent restart recomputations、same-length sealed-run corruption rejection and cancellation
-cleanup。Streaming Parquet upload/full verification、terminal task/plan retirement and coverage activation remain pending。
+cleanup。
+
+`KafkaCompactionStreamingExecutor` is now the production composition of those exact inputs。Its decision stage subscribes
+to the full-horizon cold stream one batch at a time，runs `ExactSourceSetVerifier` before decode and finishes the spilling
+collector。Its output stage independently subscribes to the output-prefix stream，reproduces the pass-one output fact SHA，
+applies strategy/rewrite/row mapping and writes only survivors to an execution-local KCRS spool。Both stages enforce
+`Limits.maxSourceBatches`；the spool enforces `maxOutputBatches/maxOutputBytes`。Cancellation atomically cancels the active
+stage future、closes both exact streams and closes the collector/spool，including a decision-pass cut after KCSR has already
+reserved staging bytes。
+
+The extra spool is required because the closed NTC2 request/footer needs exact survivor rows、records and logical bytes
+before the Parquet writer starts，while KCP1 permits exactly two authoritative source passes and payloads cannot be retained
+in heap。KCRS V1 is not durable task state：
+
+```text
+KCRS row spool V1
+  magic:int32                       = 0x4b435253
+  version:int32                     = 1
+  repeated:
+    absoluteOffset:int64            strictly increasing, inside outputCoverage
+    recordCount:int32
+    dispositionWireId:int32
+    encodedKck2Length:int32
+    encodedKck2:bytes
+    exactPayloadLength:int32
+    exactKafkaBatch:bytes
+    payloadCrc32c:int32
+    sourceBatchBaseOffset:int64
+    sourceRecordIndex:int32
+    sourceBatchSha256:bytes[32]
+    hasEventTime:boolean
+    eventTimeMillis:int64           iff hasEventTime
+  terminalOffset:int64              = -1
+  outputRows:int32
+  outputRecords:int64
+  logicalBytes:int64
+```
+
+The file is an owner-only `PrivateStagingSpillFile`，therefore seal freezes inode/length/whole-file SHA-256 and replay must
+consume verified EOF。The single subscriber receives rows only under positive demand；header/version、lengths、offset order、
+coverage、row constructors、running/terminal accounting、trailing bytes and whole-file SHA all fail closed。Verified EOF、
+cancel、explicit close、executor rejection and corruption all close/delete the file and release the shared staging permit。
+Empty survivor output is valid and is encoded by the terminal tuple `0/0/0` without fabricating a row。
+
+`KafkaCompactionWriteRequestFactory.create(input, StreamingResult)` derives immutable NTC2 metadata only after both passes
+finish。`KafkaCompactionParquetPublisher.prepare` then consumes KCRS exactly once through
+`KafkaTopicCompactedObjectWriter` and returns an owned staged `PreparedObject` plus decision/output source SHA、fact SHA and
+spill metrics。The prepared object is not yet a committed generation：caller close owns its staged file until later upload、
+strict verification and publication. `KafkaCompactionStreamingExecutorTest` compares its content SHA with the dense
+reference executor，uploads the staged file to `LocalFileObjectStore` and passes the strict ranged NTC2 verifier；it also
+proves empty-survivor NTC2 is strictly readable and cancellation during pass one releases an already-created KCSR run。
+`KafkaCompactionRowSpoolTest` covers one-row demand、the empty terminal tuple、same-length corruption detected only at
+verified EOF、pre-subscribe close and invalid replay-executor cleanup。
+Production worker upload/generation publication and coverage activation remain pending。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
 authority and reread the exact task-addressed KCP1 immediately before task admission。A crash before task creation can leave
 only a harmless plan orphan；a visible task cannot be created after its plan disappears or changes。Restart recovery resolves
 the child directly by `materializationTaskId` and cross-validates every task identity/source/policy fact before returning the
-frozen decision horizon。Orphan scanning and terminal dual-root retirement are still production-worker work。
+frozen decision horizon。Exact terminal task-first/KCP1-second retirement is now implemented as described in `04`；bounded
+plan-only orphan prefix scanning is still production-worker work。
 
 `KafkaCompactionBatchSource.open(recoveredPlan)` now turns that recovered KCP1 into two independent cold
 `ExactSourceSetBatchPublisher` instances：one for the full decision horizon and one for the output prefix。Each stream opens
@@ -941,8 +995,9 @@ propagates one downstream request at a time and owns cancel/close。Every emitte
 commitVersion、target bytes/identity、payload/schema/projection and per-source final accounting；no generation resolver or
 fallback is invoked between passes。The streams accept ranged Kafka batches，not the old one-entry/one-record assumption。
 Completion is signalled after the last source summary even when the last batch consumes the exact remaining demand；it never
-requires a protocol-invalid extra request。The durable streams and checksummed winner spill are now available to the
-production executor；streaming NTC2 writer consumption remains the next slice。
+requires a protocol-invalid extra request。The durable streams、checksummed winner spill、KCRS replay and streaming NTC2
+writer preparation now form one production executor path；object upload/generation publication remains the next worker
+slice。
 
 ### 10.5 Record rewrite V1
 

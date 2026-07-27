@@ -49,6 +49,11 @@ class MaterializationTaskStoreTest {
         assertThat(created.value().createdAtMillis()).isEqualTo(2_000);
         assertThat(first.requireTask(created, policy)).isEqualTo(task);
         assertThat(first.get(STREAM, task.taskId()).join()).contains(created);
+        first.delete(created).join();
+        assertThat(first.get(STREAM, task.taskId()).join()).isEmpty();
+        assertThatThrownBy(() -> first.delete(created).join())
+                .hasRootCauseInstanceOf(
+                        com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
     }
 
     @Test
