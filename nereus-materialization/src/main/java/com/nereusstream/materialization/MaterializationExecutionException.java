@@ -7,7 +7,8 @@ import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import java.util.Objects;
 
 /** Typed worker failure whose durable transition never depends on parsing an exception message. */
-final class MaterializationExecutionException extends NereusException {
+final class MaterializationExecutionException extends NereusException
+        implements MaterializationFailure {
     private final TaskFailureClass failureClass;
 
     MaterializationExecutionException(
@@ -31,7 +32,8 @@ final class MaterializationExecutionException extends NereusException {
         }
     }
 
-    TaskFailureClass failureClass() {
+    @Override
+    public TaskFailureClass failureClass() {
         return failureClass;
     }
 }

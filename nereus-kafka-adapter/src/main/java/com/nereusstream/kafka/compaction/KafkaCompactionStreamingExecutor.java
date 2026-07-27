@@ -69,10 +69,13 @@ public final class KafkaCompactionStreamingExecutor {
       KafkaCompactionPlan recoveredPlan,
       KafkaCompactionBatchSource.PassStreams streams,
       boolean allowUncompressedFallback) {
+    KafkaCompactionBatchSource.PassStreams ownedStreams = null;
+    boolean resultOwnsStreams = false;
     try {
       KafkaCompactionPlan plan = Objects.requireNonNull(recoveredPlan, "recoveredPlan");
       KafkaCompactionBatchSource.PassStreams exactStreams =
           Objects.requireNonNull(streams, "streams");
+      ownedStreams = exactStreams;
       DecisionStage decision =
           new DecisionStage(
               plan.decisionSources(), plan.passOneSnapshot(), exactStreams.decisionHorizon());
@@ -88,6 +91,7 @@ public final class KafkaCompactionStreamingExecutor {
             }
             exactStreams.close();
           });
+      resultOwnsStreams = true;
       CompletableFuture<PreparedFacts> deciding = decision.start();
       active.set(deciding);
       deciding.whenComplete(
@@ -138,6 +142,9 @@ public final class KafkaCompactionStreamingExecutor {
           });
       return result;
     } catch (Throwable failure) {
+      if (!resultOwnsStreams && ownedStreams != null) {
+        ownedStreams.close();
+      }
       return CompletableFuture.failedFuture(failure);
     }
   }

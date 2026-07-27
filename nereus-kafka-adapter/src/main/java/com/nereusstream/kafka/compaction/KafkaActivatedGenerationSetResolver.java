@@ -72,6 +72,19 @@ public final class KafkaActivatedGenerationSetResolver
   @Override
   public CompletableFuture<GenerationReadConstraint> resolve(
       StreamId streamId, KafkaCompactionCoverageRecord coverage) {
+    return resolveGenerationSet(streamId, coverage)
+        .thenApply(KafkaActivatedGenerationSetResolver::readConstraint);
+  }
+
+  /**
+   * Returns the canonical generation set named by one activated coverage root.
+   *
+   * <p>The read path normally consumes {@link GenerationReadConstraint}; compaction publication
+   * recovery additionally needs the exact previous set so it can reproduce EXTEND/REPLACE
+   * activation deterministically after a process restart.
+   */
+  public CompletableFuture<KafkaCompactionGenerationSet> resolveGenerationSet(
+      StreamId streamId, KafkaCompactionCoverageRecord coverage) {
     StreamId exactStream = Objects.requireNonNull(streamId, "streamId");
     KafkaCompactionCoverageRecord exactCoverage = Objects.requireNonNull(coverage, "coverage");
     if (exactCoverage.coverageVersion() != 1) {
@@ -139,7 +152,7 @@ public final class KafkaActivatedGenerationSetResolver
     return scan(streamId, minimumEnd, maximumEnd, page.continuation(), accumulated);
   }
 
-  private GenerationReadConstraint select(
+  private KafkaCompactionGenerationSet select(
       StreamId streamId,
       OffsetRange coverage,
       Checksum expectedSetSha256,
@@ -168,7 +181,10 @@ public final class KafkaActivatedGenerationSetResolver
       throw invariant(
           "Kafka binding generation-set digest resolves to multiple committed NTC2 paths");
     }
-    KafkaCompactionGenerationSet selected = search.matches.getFirst();
+    return search.matches.get(0);
+  }
+
+  private static GenerationReadConstraint readConstraint(KafkaCompactionGenerationSet selected) {
     List<GenerationReadConstraint.Identity> identities =
         selected.generations().stream()
             .map(
@@ -181,7 +197,8 @@ public final class KafkaActivatedGenerationSetResolver
                         value.indexMetadataVersion(),
                         value.indexRecordSha256()))
             .toList();
-    return new GenerationReadConstraint(streamId, ReadView.TOPIC_COMPACTED, coverage, identities);
+    return new GenerationReadConstraint(
+        selected.streamId(), ReadView.TOPIC_COMPACTED, selected.coverage(), identities);
   }
 
   private Optional<GenerationCommitResult> admit(
@@ -253,7 +270,7 @@ public final class KafkaActivatedGenerationSetResolver
     for (GenerationCommitResult candidate : byStart.getOrDefault(cursor, List.of())) {
       path.add(candidate);
       search(streamId, coverage, byStart, candidate.coverage().endOffset(), path, search);
-      path.removeLast();
+      path.remove(path.size() - 1);
     }
   }
 

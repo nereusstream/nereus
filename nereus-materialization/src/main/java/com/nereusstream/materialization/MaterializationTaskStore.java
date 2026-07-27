@@ -11,6 +11,8 @@ import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.codec.F4MetadataCodecs;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
+import com.nereusstream.metadata.oxia.records.TaskFailureClass;
+import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -162,6 +164,36 @@ public final class MaterializationTaskStore {
                     exact.value(), expiresAtMillis, clock.millis());
             return generations.compareAndSetTask(
                     cluster, heartbeat, exact.metadataVersion());
+        });
+    }
+
+    /**
+     * Persists the exact durable outcome of a claimed worker attempt.
+     *
+     * <p>This is intentionally narrower than arbitrary task CAS: callers may only move the exact
+     * claimed version to retry, cancelled, or terminal-failed. The failure class, message, and
+     * retry deadline are durable protocol facts and must not be inferred from exception text during
+     * recovery.
+     */
+    public CompletableFuture<VersionedMaterializationTask> failClaim(
+            VersionedMaterializationTask expected,
+            TaskLifecycle lifecycle,
+            TaskFailureClass failureClass,
+            String failureMessage,
+            long retryNotBeforeMillis) {
+        return async(() -> {
+            VersionedMaterializationTask exact =
+                    Objects.requireNonNull(expected, "expected");
+            requireTask(exact);
+            MaterializationTaskRecord failed = MaterializationRecordMapper.failedClaim(
+                    exact.value(),
+                    Objects.requireNonNull(lifecycle, "lifecycle"),
+                    Objects.requireNonNull(failureClass, "failureClass"),
+                    requireText(failureMessage, "failureMessage"),
+                    retryNotBeforeMillis,
+                    clock.millis());
+            return generations.compareAndSetTask(
+                    cluster, failed, exact.metadataVersion());
         });
     }
 

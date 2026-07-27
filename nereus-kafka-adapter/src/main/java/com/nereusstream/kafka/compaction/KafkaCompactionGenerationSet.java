@@ -78,8 +78,8 @@ public record KafkaCompactionGenerationSet(
     if (exact.isEmpty()) {
       throw new IllegalArgumentException("Kafka compaction generation set cannot be empty");
     }
-    GenerationCommitResult first = requireTopicCompacted(exact.getFirst());
-    GenerationCommitResult last = requireTopicCompacted(exact.getLast());
+    GenerationCommitResult first = requireTopicCompacted(exact.get(0));
+    GenerationCommitResult last = requireTopicCompacted(exact.get(exact.size() - 1));
     return create(
         first.streamId(),
         new OffsetRange(first.coverage().startOffset(), last.coverage().endOffset()),

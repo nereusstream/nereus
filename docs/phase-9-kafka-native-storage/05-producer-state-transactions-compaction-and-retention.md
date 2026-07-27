@@ -1015,8 +1015,9 @@ durable output/Generation boundary，discards the staging context，then proves 
 coverage；a repeated recovery recognizes an already activated root without advancing its epoch。This is deterministic
 metadata/object-boundary restart evidence，not the still-required real-provider process-restart gate。The binding-rooted
 read-view router described in section 11.3、exact activated-generation-set discovery and generation-constrained Object-WAL
-runtime reads are implemented。The remaining runtime boundary is the full per-partition pass composition and
-real-provider/process-restart gate，not generation discovery or durable-output re-entry。
+runtime reads are implemented。`KafkaCompactionPartitionPass` now owns the full single-partition composition；the
+remaining boundary is runtime owned-partition registration、a concrete partition-lock/KRaft authority capture provider and
+the real-provider/process-restart gate，not generation discovery、durable-output re-entry or per-partition lifecycle routing。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
@@ -1039,14 +1040,36 @@ fallback is invoked between passes。The streams accept ranged Kafka batches，n
 Completion is signalled after the last source summary even when the last batch consumes the exact remaining demand；it never
 requires a protocol-invalid extra request。The durable streams、checksummed winner spill、KCRS replay、streaming NTC2
 writer、upload/generation publication、coverage activation and exact terminal retirement now form executable product
-components；their one per-partition production pass composition remains runtime work。
+components。`KafkaCompactionPartitionPass` composes them into one recoverable per-partition execution：
 
-`KafkaCompactionScheduler` is the process-level non-overlap owner for that future pass composition。It schedules an
+1. capture one exact ACTIVE binding、planner image、output policy、pass-one transaction/marker/resource facts、writer
+   settings and a stable authority guard；
+2. scan KCP1 children with explicit page/total bounds，resume the unique task-rooted plan before admitting fresh work and
+   leave task-absent plan-only roots to the orphan scanner；
+3. route every durable task lifecycle explicitly，including retry deferral、live-claim observation、clock-skew-safe expired
+   claim requeue、durable-output publication re-entry and terminal retirement；
+4. for fresh work only，run planner → exact source resolution → plan-first KCP1/task convergence，then claim with a secure
+   process-scoped identity；
+5. heartbeat while KCSR/KCRS/NTC2 preparation runs，perform one final renewal before publication owns the claim，and close
+   exact streams/staging on synchronous、asynchronous、cancellation and heartbeat failure cuts；
+6. persist a typed `TaskFailureClass` plus retry deadline by exact task-version CAS；`SOURCE_CHANGED/SOURCE_RETIRED/CLOSED`
+   cancel，resource/metadata/object failures retry within the attempt bound，and corruption/unsupported/invariant failures
+   become terminal；
+7. reconstruct INITIAL/EXTEND/REPLACE and the exact previous generation set from KCP1's frozen previous mandatory coverage，
+   never from a newer mutable binding snapshot；
+8. after publication，reload exact PUBLISHED task/KCP1 roots and retire task first、plan second under the same authority。
+
+Concurrent `runOnce` callers receive cancellation-isolated views of one in-flight pass。The deterministic integration test
+uses actual Parquet NTC2 write/read verification、local-file object storage、in-memory Generation/binding metadata and exact
+source streams to prove `PLANNED → CLAIMED → OUTPUT_READY/PUBLISHING/PUBLISHED → coverage CAS → dual-root retirement`。
+
+`KafkaCompactionScheduler` is the process-level non-overlap owner for invoking partition passes。It schedules an
 immediate startup pass and fixed delay only after completion，keeps at most one active and one coalesced pending pass，and
 freezes all pending reasons with the highest operational priority。A trigger received during the active pass completes only
 after the next pass consumes it；caller cancellation cannot cancel shared work。Close cancels the scheduler-owned deadline
 and active source but never closes the borrowed scheduler or callback executor。The `PassExecutor` remains the explicit seam
-where runtime wiring must scan owned partitions and invoke the complete worker。
+where runtime wiring must enumerate currently owned partitions、construct their concrete capture provider and invoke
+`KafkaCompactionPartitionPass`。
 
 ### 10.5 Record rewrite V1
 

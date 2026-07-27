@@ -585,7 +585,8 @@ publication/root reload，with a canonical seven-section local-file object-store
 response-loss-safe binding observed-logStart CAS before calling the exact local updater。This task deliberately does not
 use the `phase9M5Check` completion name：concrete partition capture、
 local-log updater、retention periodic scheduling、Kafka-fork DeleteRecords invocation、
-full compaction pass/runtime composition、stock oracle and real-provider/restart gates remain required。
+compaction owned-partition runtime registration/concrete authority capture、stock oracle and real-provider/restart gates
+remain required。
 
 The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
 the frozen HW，returns the current durable low watermark without I/O for already-deleted requests，and otherwise routes the
@@ -649,9 +650,15 @@ prefix followed by a `COMMITTED` tail；mandatory-view failure has no cross-view
 `KafkaCompactionPlanOrphanScanner` retires only grace-expired task-absent exact plans under a stable no-admission guard，
 including exact-absence response-loss recovery。`KafkaCompactionScheduler` provides a borrowed-resource、non-overlapping
 startup/fixed-delay owner with at most one active and one coalesced pending pass，trigger priority aggregation and
-cancellation-isolated callers。Full per-partition planner→source→executor→publisher→retirer composition、runtime registration、
-real-provider/process-restart gates and the cleaner differential oracle remain pending。This closes the deterministic adapter
-no-resurrection boundary but does not yet claim end-to-end client compaction visibility。
+cancellation-isolated callers。`KafkaCompactionPartitionPass` now supplies the complete single-partition
+planner→source→KCP1/task→claim/heartbeat→executor→publisher→coverage→retirer composition。It recovers task-rooted KCP1 before
+fresh admission，routes every durable lifecycle，requeues skew-safe expired claims by exact CAS，reconstructs previous
+activation from the frozen plan and coalesces concurrent callers。`KafkaCompactionPartitionPassTest` runs that workflow through
+actual Parquet NTC2、local-file object storage and durable in-memory task/generation/binding roots，ending with activated
+coverage and both task/KCP1 roots retired。Runtime owned-partition enumeration/registration、the concrete partition-lock/KRaft
+capture provider、real-provider fresh-process gates and the cleaner differential oracle remain pending。This closes the
+deterministic adapter no-resurrection/write-composition boundary but does not yet claim end-to-end client compaction
+visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

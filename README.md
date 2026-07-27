@@ -8,9 +8,12 @@ checkpoint-pinned paged COMMITTED replay and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the adapter now also has the process admission/runtime lifecycle and an explicit owned/borrowed resource
 ledger with reverse-order close。The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
-independent backpressured decision/output replays and reduces checksum-verified KCK2 sorted spill runs to a bounded winner
-bitmap，then streams a whole-file-verified KCRS survivor spool into staged NTC2 and retires terminal task/KCP1 roots in
-task-first order；production upload/generation publication、coverage activation and no-resurrection gates remain pending。The Kafka fork now has
+independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
+bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
+publication、binding coverage activation、generation-constrained no-resurrection reads and task-first terminal retirement。
+`KafkaCompactionPartitionPass` now recovers or admits one partition's durable workflow and composes claim heartbeat、two-pass
+execution、restart publication and dual-root retirement；owned-partition runtime registration、the concrete authority capture
+provider、real-provider process restart and the stock cleaner oracle remain pending。The Kafka fork now has
 local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
 leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation

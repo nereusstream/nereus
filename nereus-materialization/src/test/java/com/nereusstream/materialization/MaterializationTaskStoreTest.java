@@ -11,6 +11,8 @@ import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.GenerationMetadataStoreTestFactory;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
+import com.nereusstream.metadata.oxia.records.TaskFailureClass;
+import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -80,5 +82,52 @@ class MaterializationTaskStoreTest {
                 .rootCause()
                 .extracting("code")
                 .isEqualTo(com.nereusstream.api.ErrorCode.METADATA_CONDITION_FAILED);
+    }
+
+    @Test
+    void persistsOnlyAnExactClaimFailureTransition() {
+        List<VersionedGenerationCandidate> candidates = List.of(
+                MaterializationPlannerTestSupport.zero("/index/z-2", 0, 2, 0, 100, 2),
+                MaterializationPlannerTestSupport.zero("/index/z-4", 2, 4, 100, 100, 4));
+        MaterializationPolicy policy = MaterializationPlannerTestSupport.policy();
+        MaterializationTask task = MaterializationPlannerTestSupport.planner(
+                        candidates, List.of(), 0, 4)
+                .plan(STREAM, new OffsetRange(0, 4), policy, 1)
+                .join()
+                .get(0);
+        Clock clock = Clock.fixed(Instant.ofEpochMilli(2_000), ZoneOffset.UTC);
+        GenerationMetadataStore durable = GenerationMetadataStoreTestFactory.inMemory(clock);
+        MaterializationTaskStore store = new MaterializationTaskStore(
+                CLUSTER,
+                MaterializationPlannerTestSupport.generationStore(
+                        candidates, List.of(), durable),
+                clock);
+        VersionedMaterializationTask planned = store.create(task).join();
+        VersionedMaterializationTask claimed =
+                store.claim(planned, "a".repeat(26), "b".repeat(26), 10_000).join();
+
+        VersionedMaterializationTask retry = store.failClaim(
+                        claimed,
+                        TaskLifecycle.RETRY_WAIT,
+                        TaskFailureClass.RETRYABLE_METADATA,
+                        "metadata unavailable",
+                        3_000)
+                .join();
+
+        assertThat(retry.value().lifecycle()).isEqualTo(TaskLifecycle.RETRY_WAIT);
+        assertThat(retry.value().workerClaim()).isEmpty();
+        assertThat(retry.value().failureClassId())
+                .isEqualTo(TaskFailureClass.RETRYABLE_METADATA.wireId());
+        assertThat(retry.value().failureMessage()).isEqualTo("metadata unavailable");
+        assertThat(retry.value().retryNotBeforeMillis()).isEqualTo(3_000);
+        assertThatThrownBy(() -> store.failClaim(
+                                claimed,
+                                TaskLifecycle.TERMINAL_FAILED,
+                                TaskFailureClass.OUTPUT_INVARIANT,
+                                "stale",
+                                0)
+                        .join())
+                .hasRootCauseInstanceOf(
+                        com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
     }
 }

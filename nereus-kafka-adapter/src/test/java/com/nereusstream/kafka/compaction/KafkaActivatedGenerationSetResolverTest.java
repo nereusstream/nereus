@@ -62,7 +62,10 @@ class KafkaActivatedGenerationSetResolverTest {
 
     GenerationReadConstraint constraint =
         resolver.resolve(STREAM, coverage(activated, POLICY)).join();
+    KafkaCompactionGenerationSet recovered =
+        resolver.resolveGenerationSet(STREAM, coverage(activated, POLICY)).join();
 
+    assertThat(recovered).isEqualTo(activated);
     assertThat(constraint.coverage()).isEqualTo(new OffsetRange(0, 20));
     assertThat(constraint.identities())
         .extracting(GenerationReadConstraint.Identity::generation)

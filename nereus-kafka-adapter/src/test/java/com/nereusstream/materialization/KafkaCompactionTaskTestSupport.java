@@ -16,12 +16,14 @@ package com.nereusstream.materialization;
 
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.PublicationId;
 import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 
 /** Test-only access to the package-private durable materialization mapper. */
 public final class KafkaCompactionTaskTestSupport {
@@ -66,6 +68,80 @@ public final class KafkaCompactionTaskTestSupport {
             200,
             metadataVersion);
     return versioned(value);
+  }
+
+  /**
+   * Test-only idempotent publication state transition for adapter integration tests that do not
+   * need the full physical-protection/index protocol.
+   */
+  public static CompletableFuture<Void> publish(
+      MaterializationTaskStore tasks,
+      MaterializationTask task,
+      long generation,
+      PublicationId publicationId) {
+    if (generation <= 0) {
+      return CompletableFuture.failedFuture(
+          new IllegalArgumentException("generation must be positive"));
+    }
+    return tasks
+        .get(task.streamId(), task.taskId())
+        .thenCompose(
+            optional ->
+                advancePublication(tasks, task, optional.orElseThrow(), generation, publicationId));
+  }
+
+  private static CompletableFuture<Void> advancePublication(
+      MaterializationTaskStore tasks,
+      MaterializationTask task,
+      VersionedMaterializationTask current,
+      long generation,
+      PublicationId publicationId) {
+    if (!tasks.requireTask(current).equals(task)) {
+      return CompletableFuture.failedFuture(
+          new IllegalArgumentException("publication task identity changed"));
+    }
+    MaterializationTaskRecord replacement;
+    switch (current.value().lifecycle()) {
+      case OUTPUT_READY ->
+          replacement =
+              MaterializationRecordMapper.publishing(
+                  current.value(), publicationId, current.value().updatedAtMillis() + 1);
+      case PUBLISHING -> {
+        if (!current.value().publicationId().equals(publicationId.value())) {
+          return CompletableFuture.failedFuture(
+              new IllegalArgumentException("publication identity changed"));
+        }
+        if (current.value().allocatedGeneration().isPresent()) {
+          if (current.value().allocatedGeneration().orElseThrow() != generation) {
+            return CompletableFuture.failedFuture(
+                new IllegalArgumentException("publication generation changed"));
+          }
+          replacement =
+              MaterializationRecordMapper.published(
+                  current.value(), current.value().updatedAtMillis() + 1);
+        } else {
+          replacement =
+              MaterializationRecordMapper.attachGeneration(
+                  current.value(), generation, current.value().updatedAtMillis() + 1);
+        }
+      }
+      case PUBLISHED -> {
+        if (!current.value().publicationId().equals(publicationId.value())
+            || current.value().allocatedGeneration().orElseThrow() != generation) {
+          return CompletableFuture.failedFuture(
+              new IllegalArgumentException("published generation identity changed"));
+        }
+        return CompletableFuture.completedFuture(null);
+      }
+      default -> {
+        return CompletableFuture.failedFuture(
+            new IllegalArgumentException("task is not publishable"));
+      }
+    }
+    return tasks
+        .compareAndSet(replacement, current.metadataVersion())
+        .thenCompose(
+            updated -> advancePublication(tasks, task, updated, generation, publicationId));
   }
 
   private static VersionedMaterializationTask versioned(MaterializationTaskRecord value) {
