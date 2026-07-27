@@ -16,6 +16,8 @@ import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaRecoveredPartition;
+import com.nereusstream.kafka.retention.KafkaPartitionMaintenance;
+import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceFactory;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 
 import java.time.Clock;
@@ -40,6 +42,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     private final KafkaFetchAssembler fetchAssembler;
     private final Optional<KafkaPartitionMetadataStore> partitionMetadataStore;
     private final Optional<KafkaActivatedGenerationAuthority> activatedGenerations;
+    private final Optional<KafkaPartitionMaintenanceFactory> maintenanceFactory;
     private final Clock clock;
 
     public DefaultKafkaPartitionOpener(
@@ -61,6 +64,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 recoveryLauncher,
                 appendEncoder,
                 fetchAssembler,
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 clock);
@@ -88,6 +92,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 fetchAssembler,
                 Optional.of(
                         Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.empty(),
                 Optional.empty(),
                 clock);
     }
@@ -117,6 +122,38 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                         Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
                 Optional.of(
                         Objects.requireNonNull(activatedGenerations, "activatedGenerations")),
+                Optional.empty(),
+                clock);
+    }
+
+    public DefaultKafkaPartitionOpener(
+            StreamStorage streams,
+            String writerId,
+            Duration sessionTtl,
+            Duration renewalInterval,
+            ScheduledExecutorService renewalScheduler,
+            KafkaPartitionRecoveryLauncher recoveryLauncher,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            KafkaPartitionMetadataStore partitionMetadataStore,
+            KafkaActivatedGenerationAuthority activatedGenerations,
+            KafkaPartitionMaintenanceFactory maintenanceFactory,
+            Clock clock) {
+        this(
+                streams,
+                writerId,
+                sessionTtl,
+                renewalInterval,
+                renewalScheduler,
+                recoveryLauncher,
+                appendEncoder,
+                fetchAssembler,
+                Optional.of(
+                        Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.of(
+                        Objects.requireNonNull(activatedGenerations, "activatedGenerations")),
+                Optional.of(
+                        Objects.requireNonNull(maintenanceFactory, "maintenanceFactory")),
                 clock);
     }
 
@@ -131,6 +168,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
             KafkaFetchAssembler fetchAssembler,
             Optional<KafkaPartitionMetadataStore> partitionMetadataStore,
             Optional<KafkaActivatedGenerationAuthority> activatedGenerations,
+            Optional<KafkaPartitionMaintenanceFactory> maintenanceFactory,
             Clock clock) {
         this.streams = Objects.requireNonNull(streams, "streams");
         this.writerId = requireText(writerId, "writerId");
@@ -147,6 +185,8 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore");
         this.activatedGenerations =
                 Objects.requireNonNull(activatedGenerations, "activatedGenerations");
+        this.maintenanceFactory =
+                Objects.requireNonNull(maintenanceFactory, "maintenanceFactory");
         if (this.activatedGenerations.isPresent() && this.partitionMetadataStore.isEmpty()) {
             throw new IllegalArgumentException(
                     "activated generations require Kafka partition metadata");
@@ -207,30 +247,67 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                                     .thenApply(
                                             recovered ->
                                                     validateRecovered(
-                                                            plan, acquired, source, recovered,
+                                                            plan,
+                                                            acquired,
+                                                            source,
+                                                            recovered,
+                                                            validator,
                                                             deadline));
                         });
     }
 
     private KafkaPartitionStorage storage(KafkaPartitionOpenPlan plan, RecoveredOpen recovered) {
+        Optional<KafkaPartitionMaintenance> maintenance =
+                maintenanceFactory.map(
+                        factory ->
+                                Objects.requireNonNull(
+                                        factory.create(
+                                                plan.authority().identity(),
+                                                plan.authority().leaderEpoch(),
+                                                plan.binding().streamId(),
+                                                recovered.sourceValidator()),
+                                        "Kafka maintenance factory returned null"));
         return partitionMetadataStore
                 .<KafkaPartitionStorage>map(
                         store ->
-                                new DefaultKafkaPartitionStorage(
-                                        plan.authority().identity(),
-                                        streams,
-                                        plan.binding().streamId(),
-                                        recovered.acquiredSession(),
-                                        recovered.recovered().frozenSource(),
-                                        plan.profilePolicy(),
-                                        appendEncoder,
-                                        fetchAssembler,
-                                        store,
-                                        activatedGenerations.orElse(
-                                                KafkaActivatedGenerationAuthority.unavailable()),
-                                        renewalScheduler,
-                                        sessionTtl,
-                                        renewalInterval))
+                                maintenance
+                                        .<KafkaPartitionStorage>map(
+                                                exact ->
+                                                        new DefaultKafkaPartitionStorage(
+                                                                plan.authority().identity(),
+                                                                streams,
+                                                                plan.binding().streamId(),
+                                                                recovered.acquiredSession(),
+                                                                recovered.recovered().frozenSource(),
+                                                                plan.profilePolicy(),
+                                                                appendEncoder,
+                                                                fetchAssembler,
+                                                                store,
+                                                                activatedGenerations.orElse(
+                                                                        KafkaActivatedGenerationAuthority
+                                                                                .unavailable()),
+                                                                exact,
+                                                                renewalScheduler,
+                                                                sessionTtl,
+                                                                renewalInterval))
+                                        .orElseGet(
+                                                () ->
+                                                        new DefaultKafkaPartitionStorage(
+                                                                plan.authority().identity(),
+                                                                streams,
+                                                                plan.binding().streamId(),
+                                                                recovered.acquiredSession(),
+                                                                recovered.recovered().frozenSource(),
+                                                                plan.profilePolicy(),
+                                                                appendEncoder,
+                                                                fetchAssembler,
+                                                                store,
+                                                                activatedGenerations.orElse(
+                                                                        KafkaActivatedGenerationAuthority
+                                                                                .unavailable()),
+                                                                renewalScheduler,
+                                                                sessionTtl,
+                                                                renewalInterval)))
                 .orElseGet(
                         () ->
                                 new DefaultKafkaPartitionStorage(
@@ -252,6 +329,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
             AcquiredAppendSession acquired,
             KafkaCheckpointSourceState source,
             KafkaRecoveredPartition<?> recovered,
+            DefaultKafkaCheckpointSourceValidator sourceValidator,
             long deadline) {
         Objects.requireNonNull(recovered, "recovered");
         remaining(deadline);
@@ -262,7 +340,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
                 || source.authority().authorityEpoch() != plan.authority().leaderEpoch()) {
             throw invariant("Kafka recovery result does not match the exact frozen open source");
         }
-        return new RecoveredOpen(acquired, recovered);
+        return new RecoveredOpen(acquired, recovered, sourceValidator);
     }
 
     private static void requireExactAuthority(
@@ -306,10 +384,13 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     }
 
     private record RecoveredOpen(
-            AcquiredAppendSession acquiredSession, KafkaRecoveredPartition<?> recovered) {
+            AcquiredAppendSession acquiredSession,
+            KafkaRecoveredPartition<?> recovered,
+            DefaultKafkaCheckpointSourceValidator sourceValidator) {
         private RecoveredOpen {
             Objects.requireNonNull(acquiredSession, "acquiredSession");
             Objects.requireNonNull(recovered, "recovered");
+            Objects.requireNonNull(sourceValidator, "sourceValidator");
         }
     }
 }

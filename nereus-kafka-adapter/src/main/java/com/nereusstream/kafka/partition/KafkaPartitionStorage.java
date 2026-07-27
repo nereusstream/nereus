@@ -2,7 +2,9 @@
 package com.nereusstream.kafka.partition;
 
 import com.nereusstream.api.StorageProfile;
+import com.nereusstream.kafka.retention.KafkaPartitionMaintenance;
 import java.nio.ByteBuffer;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /** Nereus-side partition log boundary consumed by the Kafka fork. */
@@ -16,6 +18,11 @@ public interface KafkaPartitionStorage extends AutoCloseable {
     KafkaPartitionState state();
 
     KafkaStableSnapshot stableSnapshot();
+
+    /** Optional checkpoint-before-trim maintenance state machine for production native Kafka storage. */
+    default Optional<KafkaPartitionMaintenance> maintenance() {
+        return Optional.empty();
+    }
 
     /**
      * Publish Kafka-derived HW/LSO after the stock state machine has consumed the exact stable append.

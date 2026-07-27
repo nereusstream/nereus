@@ -13,7 +13,8 @@ public record NereusKafkaObjectWalActivationContext(
         KafkaStorageClusterSnapshotProvider clusterSnapshots,
         Duration activationWaitTimeout,
         Duration activationPollInterval,
-        Optional<NereusKafkaCompactionContext> compaction) {
+        Optional<NereusKafkaCompactionContext> compaction,
+        Optional<NereusKafkaMaintenanceConfiguration> maintenance) {
     public NereusKafkaObjectWalActivationContext(
             KafkaBrokerCapabilitySpecification capability,
             KafkaStorageClusterSnapshotProvider clusterSnapshots,
@@ -24,6 +25,22 @@ public record NereusKafkaObjectWalActivationContext(
                 clusterSnapshots,
                 activationWaitTimeout,
                 activationPollInterval,
+                Optional.empty(),
+                Optional.empty());
+    }
+
+    public NereusKafkaObjectWalActivationContext(
+            KafkaBrokerCapabilitySpecification capability,
+            KafkaStorageClusterSnapshotProvider clusterSnapshots,
+            Duration activationWaitTimeout,
+            Duration activationPollInterval,
+            Optional<NereusKafkaCompactionContext> compaction) {
+        this(
+                capability,
+                clusterSnapshots,
+                activationWaitTimeout,
+                activationPollInterval,
+                compaction,
                 Optional.empty());
     }
 
@@ -33,6 +50,7 @@ public record NereusKafkaObjectWalActivationContext(
         activationWaitTimeout = positive(activationWaitTimeout, "activationWaitTimeout");
         activationPollInterval = positive(activationPollInterval, "activationPollInterval");
         compaction = Objects.requireNonNull(compaction, "compaction");
+        maintenance = Objects.requireNonNull(maintenance, "maintenance");
         if (activationPollInterval.compareTo(activationWaitTimeout) > 0) {
             throw new IllegalArgumentException("activationPollInterval cannot exceed activationWaitTimeout");
         }

@@ -36,6 +36,7 @@ import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaFetchAssembly;
 import com.nereusstream.kafka.compaction.KafkaCompactedFetchReader;
 import com.nereusstream.kafka.compaction.KafkaActivatedGenerationAuthority;
+import com.nereusstream.kafka.retention.KafkaPartitionMaintenance;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 
 import java.nio.ByteBuffer;
@@ -72,6 +73,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
     private final KafkaCompactedFetchReader fetchReader;
+    private final Optional<KafkaPartitionMaintenance> maintenance;
     private final ScheduledExecutorService renewalScheduler;
     private final Duration sessionTtl;
     private final long renewalIntervalMillis;
@@ -110,6 +112,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 fetchAssembler,
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 null,
                 null,
                 0);
@@ -136,6 +139,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 profilePolicy,
                 appendEncoder,
                 fetchAssembler,
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
@@ -171,6 +175,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 fetchAssembler,
                 Optional.of(
                         Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.empty(),
                 Optional.empty(),
                 Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
                 positive(sessionTtl, "sessionTtl"),
@@ -208,6 +213,45 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                         Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
                 Optional.of(
                         Objects.requireNonNull(activatedGenerations, "activatedGenerations")),
+                Optional.empty(),
+                Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
+                positive(sessionTtl, "sessionTtl"),
+                positive(renewalInterval, "renewalInterval").toMillis());
+        if (renewalInterval.compareTo(sessionTtl) >= 0) {
+            throw new IllegalArgumentException("renewalInterval must be shorter than sessionTtl");
+        }
+        scheduleRenewal(true);
+    }
+
+    public DefaultKafkaPartitionStorage(
+            KafkaPartitionIdentity identity,
+            StreamStorage streams,
+            StreamId streamId,
+            AcquiredAppendSession acquiredSession,
+            KafkaCheckpointSourceState recoveredSource,
+            KafkaStorageProfilePolicy profilePolicy,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            KafkaPartitionMetadataStore partitionMetadataStore,
+            KafkaActivatedGenerationAuthority activatedGenerations,
+            KafkaPartitionMaintenance maintenance,
+            ScheduledExecutorService renewalScheduler,
+            Duration sessionTtl,
+            Duration renewalInterval) {
+        this(
+                identity,
+                streams,
+                streamId,
+                acquiredSession,
+                recoveredSource,
+                profilePolicy,
+                appendEncoder,
+                fetchAssembler,
+                Optional.of(
+                        Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                Optional.of(
+                        Objects.requireNonNull(activatedGenerations, "activatedGenerations")),
+                Optional.of(Objects.requireNonNull(maintenance, "maintenance")),
                 Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
                 positive(sessionTtl, "sessionTtl"),
                 positive(renewalInterval, "renewalInterval").toMillis());
@@ -228,6 +272,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             KafkaFetchAssembler fetchAssembler,
             Optional<KafkaPartitionMetadataStore> partitionMetadataStore,
             Optional<KafkaActivatedGenerationAuthority> activatedGenerations,
+            Optional<KafkaPartitionMaintenance> maintenance,
             ScheduledExecutorService renewalScheduler,
             Duration sessionTtl,
             long renewalIntervalMillis) {
@@ -239,6 +284,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         this.profilePolicy = Objects.requireNonNull(profilePolicy, "profilePolicy");
         this.appendEncoder = Objects.requireNonNull(appendEncoder, "appendEncoder");
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
+        this.maintenance = Objects.requireNonNull(maintenance, "maintenance");
         Optional<KafkaActivatedGenerationAuthority> generationAuthority =
                 Objects.requireNonNull(activatedGenerations, "activatedGenerations");
         if (generationAuthority.isPresent() && partitionMetadataStore.isEmpty()) {
@@ -302,6 +348,11 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         synchronized (guard) {
             return stableSnapshot;
         }
+    }
+
+    @Override
+    public Optional<KafkaPartitionMaintenance> maintenance() {
+        return maintenance;
     }
 
     @Override
