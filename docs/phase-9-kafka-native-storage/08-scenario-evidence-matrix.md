@@ -2,7 +2,7 @@
 
 > 状态：Active scenario contract；146-row JSON manifest synchronized；rows remain `PLANNED` until owning milestone evidence
 > 规则：一个 requirement 至少一个稳定 ID；release report 必须给每个 ID 一个实际执行结果
-> 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch request-path rows have deterministic partial evidence；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
+> 当前 F9-M1/M2 implementation 与 direct real-service gates 已通过；F9-M3 codec、bounded Produce 与 whole-request async Fetch、M4 transaction、M5 virtual-log/DeleteRecords/periodic-retention rows have deterministic partial evidence；inherited final gate 因本地 Pulsar checkout 偏离锁定提交而未通过，因此 milestone rows 暂不升级为 final-gated
 
 ## 1. Evidence tiers
 
@@ -34,6 +34,14 @@ and TV2 marker through the configured storage executor。`BrokerMetadataPublishe
 `NereusTopicDeltaLifecycleTest` cover the deterministic ordering part of KF-TXN-011/012：both elections wait for ready，
 and transaction-state ready waits for exact recovered storage installation。Rows stay `PLANNED` because required
 real-service、process/restart、takeover and aggregate tiers have not run，and the fork commits are not remotely published。
+
+Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
+`3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
+the fork exposes bounded owned writable partitions and the same `NereusUnifiedLog` local updater；the product schedules
+non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
+committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
+remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing，and the Kafka
+fork commits are not remotely published。
 
 ## 2. Machine-readable manifest target
 
@@ -223,8 +231,8 @@ hash。Markdown/JSON ID sets must match。
 | KF-FET-005 | multi-partition fetch coalesces events，has at most one read in flight and callback once | fork `NereusFetchOperationTest` | D,M,R | M3 |
 | KF-FET-006 | READ_UNCOMMITTED upper bound HW and READ_COMMITTED upper bound LSO | fork `NereusUnifiedLogFactoryTest`（D/K partial）；`KafkaNativeIsolationIntegrationTest`（R pending） | R,K | M4 |
 | KF-FET-007 | aborted transaction list/filter matches Kafka baseline | fork `NereusUnifiedLogFactoryTest` bounded two-abort page（D/K partial）；`KafkaNativeIsolationIntegrationTest`（R pending） | R,K | M4 |
-| KF-FET-008 | request below durable logStart is out-of-range；mid-batch trim hides prefix | `KafkaNativeDeleteRecordsIntegrationTest` | R,K | M5 |
-| KF-FET-009 | ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline | product `KafkaDerivedIndexStateCodecV1Test`（section 5/6 canonical bytes partial）；`KafkaNativeListOffsetsIntegrationTest`（index lookup/restart pending） | R,K | M3/M4 |
+| KF-FET-008 | request below durable logStart is out-of-range；mid-batch trim hides prefix | product `KafkaDeleteRecordsCoordinatorTest` + fork `PartitionTest`/`NereusUnifiedLogFactoryTest`（D/K partial）；`KafkaNativeDeleteRecordsIntegrationTest`（R pending） | R,K | M5 |
+| KF-FET-009 | ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline | product `KafkaDerivedIndexStateCodecV1Test` + fork `NereusCanonicalLogStateTest`/`NereusUnifiedLogFactoryTest`（derived index/real position/bounded payload lookup D/K partial）；`KafkaNativeListOffsetsIntegrationTest`（restart/R pending） | R,K | M3/M4 |
 | KF-FET-010 | leader-epoch end-offset lookup survives checkpoint/restart/takeover | product `KafkaLeaderEpochStateCodecV1Test`（canonical bytes partial）；`KafkaNativeLeaderEpochIntegrationTest`（restart/takeover pending） | R,P,K | M4 |
 | KF-FET-011 | compacted sparse holes advance by source coverage without loop/phantom row | `KafkaCompactedFetchIntegrationTest` | D,R | M5 |
 | KF-FET-012 | mandatory compacted prefix switches exactly once to committed tail at coverage end | `KafkaCompactedFetchIntegrationTest` | D,R,K | M5 |
@@ -263,12 +271,12 @@ full replay；no request-path or recovery claim is inferred from codec-only evid
 
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
 | --- | --- | --- | --- | --- |
-| KF-RET-001 | time retention over virtual closed segments matches stock predicate | product `KafkaRetentionPlannerTest`（deterministic strict predicate partial）；fork `KafkaRetentionOracleTest`（stock differential pending） | D,M,K | M5 |
-| KF-RET-002 | size retention uses exact Kafka logical bytes and matches stock predicate | product `KafkaRetentionPlannerTest`（deterministic logical-byte prefix partial）；fork `KafkaRetentionOracleTest`（stock differential pending） | D,M,K | M5 |
-| KF-RET-003 | combined policies choose monotonic next-segment boundary，never active segment | product `KafkaRetentionPlannerTest`（deterministic partial）；fork `KafkaRetentionOracleTest`（pending） | D,M | M5 |
+| KF-RET-001 | time retention over virtual closed segments matches stock predicate | product `KafkaRetentionPlannerTest` + `KafkaPartitionMaintenanceRuntimeTest` + fork `NereusCanonicalLogStateTest`（deterministic strict predicate/runtime partial）；fork `KafkaRetentionOracleTest`（stock differential pending） | D,M,K | M5 |
+| KF-RET-002 | size retention uses exact Kafka logical bytes and matches stock predicate | product `KafkaRetentionPlannerTest` + fork `NereusCanonicalLogStateTest`/`NereusUnifiedLogFactoryTest`（deterministic logical-byte prefix/facade partial）；fork `KafkaRetentionOracleTest`（stock differential pending） | D,M,K | M5 |
+| KF-RET-003 | combined policies choose monotonic next-segment boundary，never active segment | product `KafkaRetentionPlannerTest` + `KafkaPartitionMaintenanceRuntimeTest`（deterministic planner/scheduler partial）；fork `KafkaRetentionOracleTest`（pending） | D,M | M5 |
 | KF-RET-004 | insufficient checkpoint blocks trim；new checkpoint then permits exact candidate | product `KafkaTrimBarrierTest`（port-level partial）；`KafkaRetentionBarrierIntegrationTest`（real publication pending） | R,C | M5 |
 | KF-RET-005 | trim response loss reloads durable head and completes idempotently | product `KafkaTrimBarrierTest`（port-level partial）；`KafkaRetentionBarrierIntegrationTest`（real provider pending） | R,P,C | M5 |
-| KF-RET-006 | DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly | product `KafkaDeleteRecordsCoordinatorTest`（exact logical target/barrier partial）；fork `KafkaNativeDeleteRecordsIntegrationTest`（pending） | R,K | M5 |
+| KF-RET-006 | DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly | product `KafkaDeleteRecordsCoordinatorTest` + fork `PartitionTest`/`NereusUnifiedLogFactoryTest`（exact target/HW/local publication D/K partial）；`KafkaNativeDeleteRecordsIntegrationTest`（real-provider matrix pending） | R,K | M5 |
 | KF-RET-007 | retention/config/new-append races revalidate and never over-trim | `KafkaRetentionRacePropertyTest` | M,R,C | M5 |
 | KF-RET-008 | compact+delete preserves compacted visibility until logical trim passes range | `KafkaCompactionRetentionIntegrationTest` | R,K | M5 |
 | KF-RET-009 | logical trim success is independent of delayed protected physical GC | `KafkaRetentionPhysicalGcIntegrationTest` | R,C | M5 |
@@ -290,9 +298,12 @@ publication/recovery integration gate now also verifies one exact rooted referen
 I/O boundary consumed by `KafkaRetentionCheckpointServices`，and performs a canonical seven-section publish→root
 reload→exact verify round trip against the local-file object store。`KafkaDeleteRecordsCoordinatorTest` adds product-side
 partial KF-RET-006 evidence for exact mid-segment and normalized-HW targets，already-deleted idempotence，policy/range
-rejection and a KRaft config race before mutation；Kafka `Partition`/`UnifiedLog`/Fetch wake-up integration is still pending。
+rejection and a KRaft config race before mutation。Fork `PartitionTest`/`NereusUnifiedLogFactoryTest` now cover stock
+normalization/invocation and exact local publication；`NereusCanonicalLogStateTest` covers stable-only rolls、config roll、
+derived indexes and trim pruning；`KafkaPartitionMaintenanceRuntimeTest` covers bounded periodic enumeration、
+internal-topic priority、overlap coalescing and drain。Real provider/Fetch wake-up/restart evidence is still pending。
 Rows remain `PLANNED` until the stock differential
-oracle、real retention provider trim、concrete partition capture/local-log update and restart/takeover gates pass。
+oracle、real retention provider trim and restart/takeover gates pass。
 
 ## 10. Kafka compaction
 

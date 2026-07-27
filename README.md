@@ -7,7 +7,11 @@ Fetch-operation、binding-first leader manager、exact stable-head/commit-reacha
 checkpoint-pinned paged COMMITTED replay and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the adapter now also has the process admission/runtime lifecycle and an explicit owned/borrowed resource
-ledger with reverse-order close。The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
+ledger with reverse-order close。The local Kafka fork now also maintains checkpoint-restorable virtual segments、exact
+KRaft config history、logical/time indexes and real offset metadata，routes stock DeleteRecords through the shared
+checkpoint-before-trim barrier，and supplies bounded owned-partition capture to the product's periodic retention runtime。
+These are deterministic partial M5 results；real-provider restart/takeover and stock retention-oracle gates remain open。
+The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
 publication、binding coverage activation、generation-constrained no-resurrection reads and task-first terminal retirement。

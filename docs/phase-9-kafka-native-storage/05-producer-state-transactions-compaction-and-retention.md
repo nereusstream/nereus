@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；real checkpoint/process/coordinator gates remain in progress；F9-M5 designed target
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；F9-M5 virtual segment/config history/derived index、checkpoint-before-DeleteRecords and periodic retention runtime deterministic slices implemented locally；real checkpoint/process/coordinator/retention gates and compaction fork capture remain in progress
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -371,7 +371,12 @@ Current implementation（2026-07-27）：`KafkaVirtualSegmentState` validates de
 base/roll/time order、exact ACTIVE/CLOSED lifecycle、timestamp bounds、config-digest references and jitter bounds。
 `KafkaVirtualSegmentStateCodecV1` rejects bad required/version/flags、unsigned counts、truncation、trailing bytes、
 unknown reason/state IDs and non-canonical config digests before publication。A frozen section digest、targeted
-corruption/invariant cases and 200 deterministic randomized round trips are in the partial M4 gate。
+corruption/invariant cases and 200 deterministic randomized round trips are in the partial M4 gate。Kafka-fork
+`NereusCanonicalLogState` now owns the live realization：only stable append finalizes size/time/index facts，an in-flight
+roll is reusable until that append becomes stable，SIZE/TIME/RELATIVE/INDEX_FULL/CONFIG/MANUAL reasons are explicit，
+deterministic roll jitter is frozen，and exact KRaft metadata offsets enter config history through
+`DynamicConfigPublisher -> TopicConfigHandler -> LogManager`。Recovery hydrates the canonical checkpoint and then replays
+the committed tail before rebuilding every cache-only `NereusLogSegment` shell；the active shell is never durable truth。
 
 ## 8. Time and logical-byte indexes
 
@@ -430,7 +435,11 @@ M4 gate includes a frozen combined digest、targeted corruption/cross-section te
 decode/re-encode round trips。`KafkaCanonicalCheckpointState` additionally requires section 4/6 segment sets and logical
 bytes to match exactly，and prevents section 5/6 entries from crossing their virtual segment；its composition codec emits
 all seven required sections in wire-ID order with a frozen combined digest。Canonical publication request construction is
-implemented；runtime index construction、staging/trigger composition and restart/takeover behavior remain pending。
+implemented。Kafka-fork `NereusCanonicalLogState` now constructs sparse time/logical samples from exact stable batches，
+preserves exact in-memory batch positions，restores them from checkpoint plus bounded committed-tail replay，and projects
+real `LogOffsetMetadata` through `NereusUnifiedLog.maybeConvertToOffsetMetadata`。Timestamp ListOffsets uses the time
+index only as a scan candidate and verifies the first qualifying timestamp against exact COMMITTED payload under the hard
+read bound。Fresh-process provider restart/takeover and differential stock evidence remain pending。
 
 ## 9. Retention semantics
 
@@ -573,9 +582,13 @@ binding-root reload。Its `CaptureProvider` remains the partition-lock seam that
 The existing local-file object-store integration test now publishes a canonical seven-section object through these services，
 reloads its authoritative root and verifies the exact reference through a released reader pin。
 `KafkaRetentionDurableTrimListener` publishes monotonic observed logStart through binding CAS before invoking the exact
-local leader updater，recovers applied-but-response-lost CAS by reload and refuses changed leader terms。Periodic process
-scheduling、the concrete partition capture/local-log updater and Kafka-fork invocation remain pending，so this is
-deterministic partial M5 evidence rather than an end-to-end retention claim。
+local leader updater，recovers applied-but-response-lost CAS by reload and refuses changed leader terms。Product commits
+`3eb6b63` and `57dcf35` now add `DefaultKafkaPartitionMaintenance`、`KafkaPartitionMaintenanceRuntime` and
+`CompositeKafkaRuntimeBackgroundService`。Fork commit `feabf6c686` enumerates the exact process-owned writable
+partitions，captures each snapshot under the stock partition lock，uses the same `NereusUnifiedLog` for local log-start
+publication，and starts a bounded non-overlapping periodic retention pass only after runtime readiness。The complete
+`f9RetentionTest` passes。Real provider trim、fresh-process restart/takeover and multi-broker race evidence remain
+pending，so this is still deterministic partial M5 evidence rather than an end-to-end retention claim。
 
 ### 9.4 DeleteRecords
 
@@ -634,8 +647,11 @@ durable trim as RF1 low watermark，so a concurrent farther trim is reported mon
 Current implementation（2026-07-27）：`KafkaDeleteRecordsCoordinator` and the shared barrier path implement the product
 contract above。Deterministic tests cover an exact mid-segment target、normalized HW、already-deleted idempotence、
 negative/unconverted and above-HW rejection、compact-only policy rejection and config-race abort before mutation。
-Kafka-fork `Partition` capture/invocation、exact local log-start update/fetch wake-up and stock batch-start/middle/end/HW
-integration remain required before KF-RET-006 is complete。
+Kafka-fork commit `4c060aec89` now keeps the stock `Partition.deleteRecordsOnLeader` validation and `-1 -> HW`
+normalization，captures the product snapshot under the partition lock，waits on the storage worker and advances the same
+`NereusUnifiedLog` only after durable trim。Focused `PartitionTest` and `NereusUnifiedLogFactoryTest` cover normalized
+HW、exact mid-batch target and local log-start publication。Real provider batch-start/middle/end/HW、Fetch wake-up and
+process-restart evidence remain required before KF-RET-006 is complete。
 
 ### 9.5 Trim vs materialization
 
@@ -1343,9 +1359,9 @@ per-partition serialization described above。
 
 | Owner | Class |
 | --- | --- |
-| Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` facades still pending |
+| Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusCanonicalLogState`、`NereusLogSegment` implemented locally；dedicated `NereusTimeIndex`/`NereusLeaderEpochCache` subclasses are unnecessary unless a later stock caller cannot consume the canonical facade |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
-| adapter retention | `KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、`KafkaTrimBarrier`、`KafkaRetentionDurableTrimListener` partial implementation |
+| adapter retention | planner/checkpoint/barrier/DeleteRecords/durable listener + per-partition maintenance + bounded periodic owned-partition runtime implemented；real provider/restart gates pending |
 | adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard + activated Object-WAL production composition implemented；fork registration and concrete partition-lock/KRaft/local-log capture wiring pending |
 | materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence |
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |

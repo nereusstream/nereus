@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；KafkaRaftServer production selection、真实 internal-topic coordinator recovery and real KRaft process gate remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；M5 checkpoint-before-DeleteRecords、周期性 owned-partition retention、virtual segment/config history/derived index 与 timestamp lookup deterministic slices implemented locally；KafkaRaftServer production selection、真实 internal-topic coordinator recovery、compaction fork capture and real KRaft process gate remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -29,7 +29,8 @@ Kafka stock protocol/controller/coordinators
 
 Ephemeral cache-only stock state machine
   -> NereusLocalLog
-  -> one or more empty synthetic local segments
+  -> one or more synthetic virtual-segment shells with logical size/index facts
+  -> local segment files remain byte-empty
   -> never durable truth, never restart recovery input
 
 Request handler
@@ -52,6 +53,7 @@ Request handler
 | `kafka.log.nereus.NereusLocalLog` | extends `LocalLog` | stable-append callback + ephemeral LEO/segment state；never writes record bytes |
 | `org.apache.kafka.storage.internals.log.RequiredAcksAwareAppend` | optional stock inert seam | preserve exact protocol required-acks without changing ordinary UnifiedLog |
 | `kafka.log.nereus.NereusLogSegment` | extends `LogSegment` | virtual roll/size/index facade；no durable file |
+| `kafka.log.nereus.NereusCanonicalLogState` | partition-lock-owned state | stable-only virtual roll/config history/time-index/logical-position state；checkpoint + committed-tail rebuild |
 | `kafka.log.nereus.NereusLogRecords` | records facade | exact MemoryRecords encode/read and owned buffers |
 | `kafka.log.nereus.NereusProducerStateManager` | extends `ProducerStateManager` | in-memory stock semantics + checkpoint bridge |
 | `org.apache.kafka.storage.internals.log.ProducerStateEntry.fromBatchMetadata` | stock inert factory seam | exact five-batch queue import without overwriting marker-updated lastTimestamp |
@@ -293,7 +295,9 @@ KafkaApis.handleFetchRequest
 `requiredAcks` 只接受 `-1/0/1` 并原样进入 `KafkaAppendContext`；普通 stock `UnifiedLog` 不实现 optional interface，
 继续走原调用。stable result 必须回显 exact acks、assigned range、encoded byte count 和当前 stable snapshot，
 否则立即 resign。append timeout/interrupt 是 `MAY_HAVE_COMMITTED` 并 resign；stable commit 后任何 stock shell
-步骤失败也 resign，阻止 successor append。LEO 只在 callback 成功返回后推进，synthetic local log size 保持 `0`。
+步骤失败也 resign，阻止 successor append。LEO 只在 callback 成功返回后推进。synthetic segment file bytes 保持
+`0`，但 `NereusLogSegment.size()`、`UnifiedLog.size` 和 `LogOffsetMetadata` 使用 canonical state 中的 exact Kafka
+logical bytes/relative position；不能把 cache-file size 当成 retention 或 protocol-visible size。
 M4 产品 encoder 已接受通过严格 magic-v2/CRC/producer-fact 校验的 idempotent、transaction 与 control batch；
 是否可写仍由 fork 的 stock `UnifiedLog` producer/transaction validation 决定，adapter 不复制该状态机。
 隔离 fork commit `ec7f0db991` 已允许 `CLIENT` transactional data 与 `COORDINATOR` marker 通过同一 stable
@@ -307,8 +311,9 @@ Fetch 已按 stock isolation 选择 LOG_END/HW/LSO 上界。READ_COMMITTED 的 a
 checkpoint/replay 恢复的 in-memory `NereusTransactionIndex`，并按本次实际返回页的 next logical offset 裁剪，
 不会把后续页的 abort 暴露到较小的 Fetch。它复用 adapter containing-entry/first-entry overflow 语义并受
 partition bytes、hard response bytes、stable upper bound 与 typed timeout 约束；返回前复核仍是同一份
-`LEADER_WRITABLE` storage。virtual segment base/relative position 目前由 request 传 `0/0`，完整 virtual index
-仍是后续切片。
+`LEADER_WRITABLE` storage。`NereusCanonicalLogState` 根据 stable append、checkpoint 与 committed-tail replay
+维护 virtual segment base、exact batch position、sparse time/logical samples；Fetch 返回真实
+`LogOffsetMetadata`，ListOffsets 先用 time-index 缩小范围，再对 bounded exact COMMITTED payload 做最终验证。
 
 `NereusUnifiedLog` 仍同步等待 future，因为 stock validation/LEO/producer-state ordering 必须看到 stable terminal；
 现在 Produce 与 Fetch 的 caller 都是 runtime-owned bounded worker，不再是 Kafka request handler。每个 worker wave 完成后在
@@ -723,7 +728,15 @@ commit `ec7f0db991` 增加 stock producer-entry exact restore seam、in-memory p
 full NKC1 hydration + committed-tail replay、stable-end-to-HW/LSO publication 和 READ_COMMITTED aborted filtering。
 第二十一个隔离本地 commit `032974067c` 增加 stock ReplicaManager transactional guard/TV2 marker-version executor
 handoff，以及 group/transaction internal-topic recovered-storage-before-election 回归。
-Controller scheduling、CLI/KafkaRaftServer production selection 和 real KRaft process gate 尚未实现。当前 branch
+第二十二个 `4c060aec89` 把 stock `Partition.deleteRecordsOnLeader` 的 policy/leader/HW normalization 接到
+checkpoint-before-trim barrier，并在 durable trim 后推进 `UnifiedLog.logStartOffset`。第二十三个
+`feabf6c686` 增加 fork-owned writable partition 枚举、partition-lock capture/local-log updater 和周期性 retention
+runtime bridge；对应 product commits `3eb6b63`、`57dcf35` 组合 checkpointed maintenance 与 bounded scheduler。
+第二十四个 `378e9f8967` 增加 `NereusCanonicalLogState`、多 virtual-segment shell、stable-only roll、exact KRaft
+config metadata offset history、checkpoint + committed-tail 恢复、logical/time indexes、真实 offset metadata 和
+bounded timestamp lookup。focused UnifiedLog/recovery/config regression、Checkstyle 与 SpotBugs 均通过。
+Controller activation scheduling、compaction fork capture、CLI/KafkaRaftServer production selection 和 real KRaft
+process gate 尚未实现。当前 branch
 尚未推送，因而仍未满足 production fork source-lock entry；bounded Produce/Fetch/M4 transaction 单元与组合证据也不构成真实
 KRaft runtime claim。
 

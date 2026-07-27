@@ -457,8 +457,9 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the isolated local branch
-  `nereus/future9-native-kafka-storage@032974067c` contains the nineteen reviewed M3 commits plus two M4
-  producer/transaction and ordering-test commits，but push to `nereusstream/kafka` is rejected with GitHub 403，so KF-SRC-004 remains
+  `nereus/future9-native-kafka-storage@378e9f8967` contains the nineteen reviewed M3 commits、two M4
+  producer/transaction and ordering-test commits and three M5 DeleteRecords/retention/virtual-log commits，but push to
+  `nereusstream/kafka` is rejected with GitHub 403，so KF-SRC-004 remains
   incomplete。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection and the real KRaft final gate remain open；
@@ -583,8 +584,9 @@ phase9M5FinalCheck --rerun-tasks
 
 Current partial gate（2026-07-27）：`:nereus-kafka-adapter:f9RetentionTest` and
 `phase9M5RetentionCheck` cover the Kafka-artifact-neutral `KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、
-`KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaTrimBarrier` and
-`KafkaRetentionDurableTrimListener`。The planner freezes
+`KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaTrimBarrier`、
+`KafkaRetentionDurableTrimListener`、`DefaultKafkaPartitionMaintenance` and
+`KafkaPartitionMaintenanceRuntime`。The planner freezes
 the current section-4 config offset/digest，implements stock strict time and logical-segment-size prefix predicates，unions
 them at the farthest HW-bounded closed-segment boundary and never selects the active segment。The barrier requires an
 object-SHA-verified rooted NKC1 reference sufficient through the candidate，revalidates ACTIVE binding/leader/authority/config
@@ -593,18 +595,22 @@ trim with a lost response converges idempotently。The checkpoint gate selects n
 fallback allowlist and requires new publication at stable end；the coordinator coalesces concurrent triggers without
 letting one caller cancel shared work。The services adapter composes exact-reference pinned recovery and canonical
 publication/root reload，with a canonical seven-section local-file object-store round trip；the durable listener performs
-response-loss-safe binding observed-logStart CAS before calling the exact local updater。This task deliberately does not
-use the `phase9M5Check` completion name：concrete partition capture、
-local-log updater、retention periodic scheduling、Kafka-fork DeleteRecords invocation、
-compaction production fork registration/concrete authority capture、stock oracle and real-provider/restart gates
-remain required。
+response-loss-safe binding observed-logStart CAS before calling the exact local updater。Product commits `3eb6b63` and
+`57dcf35` compose checkpointed per-partition maintenance with a bounded、non-overlapping、internal-topic-first periodic
+owner and drain it through the runtime background-service lifecycle。Kafka fork commits `4c060aec89` and `feabf6c686`
+provide stock DeleteRecords invocation、partition-lock capture、same-log local updater and owned writable-partition
+enumeration；`378e9f8967` supplies the live virtual segment/config/index facts consumed by the planner。The focused
+retention suite and fork UnifiedLog/Partition/config regressions pass。This task deliberately does not use the
+`phase9M5Check` completion name：real-provider/fresh-process retention、restart/takeover/chaos evidence、compaction
+production fork registration/concrete authority capture、stock oracle and aggregate gates remain required。
 
 The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
 the frozen HW，returns the current durable low watermark without I/O for already-deleted requests，and otherwise routes the
 exact (including mid-batch) logical offset through the same rooted-checkpoint/revalidation/durable-response-loss barrier。
 Its revalidation freezes KRaft config/leader authority but deliberately does not round or recompute a retention segment
-candidate。The fork still owns stock policy/leader/range validation、`-1 -> HW` conversion、partition-lock capture、
-`UnifiedLog` publication and Fetch wake-up，so slice 3 is only product-partial。
+candidate。Fork commit `4c060aec89` now supplies stock policy/leader/range validation、`-1 -> HW` conversion、
+partition-lock capture and durable-result publication into the same `NereusUnifiedLog`。This closes the deterministic
+fork boundary for slice 3；real provider batch-boundary/response-loss/restart and delayed-Fetch wake-up gates remain open。
 
 `:nereus-kafka-adapter:f9CompactionPropertyTest` and `phase9M5CompactionCoreCheck` now add the first slice-4 partial
 gate。`nereus-materialization` owns immutable ranged decode/rewrite records rather than reusing the F4 one-entry/one-record
