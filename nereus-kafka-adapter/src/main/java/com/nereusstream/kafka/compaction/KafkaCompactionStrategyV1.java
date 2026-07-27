@@ -45,7 +45,7 @@ public final class KafkaCompactionStrategyV1 {
     if (record.keyKind() == KeyKind.UNKEYED) {
       return Decision.RETAIN_UNKEYED;
     }
-    if (record.absoluteOffset() < context.greatestOffsetForKey()) {
+    if (!context.latestForKey()) {
       return Decision.DROP_SUPERSEDED;
     }
     if (!record.tombstone()) {
@@ -74,7 +74,7 @@ public final class KafkaCompactionStrategyV1 {
   private static void validatePair(DecodedCompactionRecord record, RecordContext context) {
     if (record.keyKind() == KeyKind.CONTROL) {
       if (context.markerStatus() == MarkerStatus.NOT_CONTROL
-          || context.greatestOffsetForKey() != record.absoluteOffset()
+          || !context.latestForKey()
           || context.transactionStatus() != TransactionStatus.DECIDED) {
         throw new IllegalArgumentException("invalid Kafka control-marker compaction facts");
       }
@@ -85,13 +85,9 @@ public final class KafkaCompactionStrategyV1 {
     }
     validateDataTransactionFacts(record, context);
     if (record.keyKind() == KeyKind.UNKEYED) {
-      if (context.greatestOffsetForKey() != record.absoluteOffset()) {
+      if (!context.latestForKey()) {
         throw new IllegalArgumentException("invalid unkeyed Kafka compaction facts");
       }
-      return;
-    }
-    if (context.greatestOffsetForKey() < record.absoluteOffset()) {
-      throw new IllegalArgumentException("Kafka key winner offset precedes the candidate record");
     }
   }
 
@@ -111,7 +107,7 @@ public final class KafkaCompactionStrategyV1 {
   }
 
   public record RecordContext(
-      long greatestOffsetForKey,
+      boolean latestForKey,
       TransactionStatus transactionStatus,
       MarkerStatus markerStatus,
       OptionalLong deleteHorizonMillis,
@@ -122,8 +118,7 @@ public final class KafkaCompactionStrategyV1 {
       Objects.requireNonNull(transactionStatus, "transactionStatus");
       Objects.requireNonNull(markerStatus, "markerStatus");
       deleteHorizonMillis = Objects.requireNonNull(deleteHorizonMillis, "deleteHorizonMillis");
-      if (greatestOffsetForKey < 0
-          || nowMillis < 0
+      if (nowMillis < 0
           || (deleteHorizonMillis.isPresent() && deleteHorizonMillis.getAsLong() < 0)) {
         throw new IllegalArgumentException("invalid Kafka compaction decision context");
       }

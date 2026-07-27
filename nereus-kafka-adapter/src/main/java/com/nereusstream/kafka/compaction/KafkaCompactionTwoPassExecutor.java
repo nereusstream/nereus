@@ -27,6 +27,7 @@ import com.nereusstream.materialization.ExactSourceSet;
 import com.nereusstream.materialization.ExactSourceSetVerifier;
 import com.nereusstream.materialization.RewrittenCompactionRecord;
 import com.nereusstream.objectstore.compacted.KafkaTopicCompactedObjectRow;
+import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -36,24 +37,35 @@ import org.apache.kafka.common.record.RecordBatch;
  * Deterministic in-memory composition of the F9 Kafka pass-one, pass-two, rewrite, and NTC2-row
  * boundaries.
  *
- * <p>This is a bounded reference executor. Durable exact-source replay, sorted spill, streaming
- * NTC2 upload, and coverage activation remain workflow responsibilities.
+ * <p>The production constructor composes durable exact-source replay with checksum-verified sorted
+ * spill. Streaming NTC2 upload and coverage activation remain workflow responsibilities.
  */
 public final class KafkaCompactionTwoPassExecutor {
   private final KafkaTopicCompactionCodecV1 codec;
   private final KafkaCompactionStrategyV1 strategy;
   private final KafkaCompactionRowMapper rowMapper;
   private final Limits limits;
+  private final StagingFileManager stagingFiles;
 
   public KafkaCompactionTwoPassExecutor(
       KafkaTopicCompactionCodecV1 codec,
       KafkaCompactionStrategyV1 strategy,
       KafkaCompactionRowMapper rowMapper,
       Limits limits) {
+    this(codec, strategy, rowMapper, limits, null);
+  }
+
+  public KafkaCompactionTwoPassExecutor(
+      KafkaTopicCompactionCodecV1 codec,
+      KafkaCompactionStrategyV1 strategy,
+      KafkaCompactionRowMapper rowMapper,
+      Limits limits,
+      StagingFileManager stagingFiles) {
     this.codec = Objects.requireNonNull(codec, "codec");
     this.strategy = Objects.requireNonNull(strategy, "strategy");
     this.rowMapper = Objects.requireNonNull(rowMapper, "rowMapper");
     this.limits = Objects.requireNonNull(limits, "limits");
+    this.stagingFiles = stagingFiles;
   }
 
   public Prepared prepare(
@@ -69,20 +81,24 @@ public final class KafkaCompactionTwoPassExecutor {
     }
     requireKafkaCommitted(decisionHorizonSources);
     ExactSourceSetVerifier sourceVerifier = new ExactSourceSetVerifier(decisionHorizonSources);
-    KafkaCompactionPassOneCollector collector = new KafkaCompactionPassOneCollector(snapshot);
-    long sourceBatches = 0;
-    for (ReadBatch batch : decisionHorizonBatches) {
-      sourceBatches = Math.addExact(sourceBatches, 1);
-      if (sourceBatches > limits.maxSourceBatches()) {
-        throw new IllegalArgumentException(
-            "Kafka compaction decision horizon exceeded its source-batch limit");
+    try (KafkaCompactionPassOneCollector collector =
+        stagingFiles == null
+            ? new KafkaCompactionPassOneCollector(snapshot)
+            : new KafkaCompactionPassOneCollector(snapshot, stagingFiles)) {
+      long sourceBatches = 0;
+      for (ReadBatch batch : decisionHorizonBatches) {
+        sourceBatches = Math.addExact(sourceBatches, 1);
+        if (sourceBatches > limits.maxSourceBatches()) {
+          throw new IllegalArgumentException(
+              "Kafka compaction decision horizon exceeded its source-batch limit");
+        }
+        ReadBatch exact = Objects.requireNonNull(batch, "decisionHorizonBatch");
+        sourceVerifier.accept(exact);
+        codec.decode(exact, collector::accept);
       }
-      ReadBatch exact = Objects.requireNonNull(batch, "decisionHorizonBatch");
-      sourceVerifier.accept(exact);
-      codec.decode(exact, collector::accept);
+      sourceVerifier.finish();
+      return new Prepared(collector.finish(), decisionHorizonSources, sourceBatches);
     }
-    sourceVerifier.finish();
-    return new Prepared(collector.finish(), decisionHorizonSources, sourceBatches);
   }
 
   public final class Prepared {

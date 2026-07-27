@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition 以及 idempotent/transaction/control exact append encoding partial slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + product-side exact DeleteRecords + ranged Kafka compaction decode/rewrite deterministic partial slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；exact recovery state/storage publication、同步 UnifiedLog correctness bridge，以及有界 ReplicaManager Produce 和 whole-request multi-partition async Fetch handoff 已实现，但 M4 Kafka fork import/replay、transaction request semantics、internal-topic coordinator ordering、M5 concrete partition retention/DeleteRecords wiring/compaction engine+activation、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition 以及 idempotent/transaction/control exact append encoding partial slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + product-side exact DeleteRecords + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill deterministic partial slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；exact recovery state/storage publication、同步 UnifiedLog correctness bridge，以及有界 ReplicaManager Produce 和 whole-request multi-partition async Fetch handoff 已实现，但 M4 Kafka fork import/replay、transaction request semantics、internal-topic coordinator ordering、M5 concrete partition retention/DeleteRecords wiring/streaming compaction publication+activation、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -152,8 +152,13 @@ gap-free exact decision path，逐 generation 回读并验证 stream/registratio
 prefix/task 及其 mutation guard。
 `KafkaCompactionBatchSource` 又从 recovered KCP1 打开相互独立、backpressured、exact-identity-verified 的 decision/output
 cold streams，且最后一个 batch 耗尽 demand 时仍能正常完成。
-当前形成 `phase9M5CompactionCoreCheck`；orphan/terminal recovery、sorted spill/streaming Parquet publication、
-coverage CAS 与 stock cleaner oracle 仍待实现。
+`KafkaCompactionWinnerIndex` 已把 production pass-one key map 替换为 shared staging budget 上的 owner-only KCSR V1
+sorted runs：每个 run 严格 KCK2-key ordered、whole-file SHA-256 verified，最多 fan-in 16 多路归并，最终只保留
+output coverage winner bitmap；成功、损坏、decode failure 和 cancellation 都删除 run 并归还 permit。restart 不复用
+scratch bytes，而是从 recovered KCP1 exact sources 确定性重算；product test 已覆盖 spill/no-spill、decision-tail、
+restart recomputation、same-length corruption 和 cancel cleanup。
+当前形成 `phase9M5CompactionCoreCheck`；orphan/terminal recovery、streaming Parquet publication、coverage CAS 与
+stock cleaner oracle 仍待实现。
 为接入 stock transaction state，product partition boundary 已把 durable end 与 derived visibility 拆开：
 stable append 先推进 exact end/commit version 并保留旧 HW/LSO；fork 必须在 stock producer/transaction 更新成功后
 调用 `publishDerivedOffsets(exactEnd, HW, LSO)`，随后才发布 `STABLE_APPEND` 并 dispatch 同 partition 下一次

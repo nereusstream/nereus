@@ -19,11 +19,14 @@ import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.materialization.DecodedCompactionRecord;
 import com.nereusstream.materialization.DecodedCompactionRecord.KeyKind;
+import com.nereusstream.objectstore.compacted.KafkaCompactionKeyEncodingV2;
+import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -35,13 +38,13 @@ import java.util.OptionalLong;
 import java.util.Set;
 
 /**
- * In-memory reference pass-one collector for the frozen Kafka decision horizon.
+ * Pass-one collector for the frozen Kafka decision horizon.
  *
- * <p>The durable worker will replace the winner map with bounded sorted spill, but this class
- * already freezes the transaction, marker, horizon, dense-scan, and pass-two verification
- * semantics.
+ * <p>The production constructor uses checksum-verified sorted spill and reduces it to a bounded
+ * winner bitmap. The one-argument constructor is retained only as a strict-budget in-memory
+ * reference for strategy tests.
  */
-public final class KafkaCompactionPassOneCollector {
+public final class KafkaCompactionPassOneCollector implements AutoCloseable {
   public static final int MAX_TRANSACTION_FACTS = 65_536;
 
   private static final byte[] FULL_DIGEST_DOMAIN =
@@ -50,7 +53,7 @@ public final class KafkaCompactionPassOneCollector {
       "NEREUS_KAFKA_COMPACTION_PASS1_OUTPUT_V1\0".getBytes(StandardCharsets.UTF_8);
 
   private final Snapshot snapshot;
-  private final Map<ByteKey, Long> greatestEligibleOffsets = new HashMap<>();
+  private final WinnerAccumulator winnerAccumulator;
   private final Map<Long, KafkaCompactionStrategyV1.MarkerStatus> markerStatuses;
   private final Set<Long> observedMarkers = new HashSet<>();
   private final RecordFactDigest fullDigest = new RecordFactDigest(FULL_DIGEST_DOMAIN);
@@ -58,11 +61,27 @@ public final class KafkaCompactionPassOneCollector {
   private long nextOffset;
   private long scannedRecords;
   private long outputRecords;
-  private long inMemoryKeyBytes;
   private boolean finished;
 
   public KafkaCompactionPassOneCollector(Snapshot snapshot) {
     this.snapshot = Objects.requireNonNull(snapshot, "snapshot");
+    this.winnerAccumulator = new InMemoryWinnerAccumulator(snapshot);
+    this.nextOffset = snapshot.decisionHorizon().startOffset();
+    this.markerStatuses = markerStatusMap(snapshot.markerDecisions());
+  }
+
+  public KafkaCompactionPassOneCollector(Snapshot snapshot, StagingFileManager stagingFiles) {
+    this.snapshot = Objects.requireNonNull(snapshot, "snapshot");
+    KafkaCompactionWinnerIndex index =
+        new KafkaCompactionWinnerIndex(
+            Objects.requireNonNull(stagingFiles, "stagingFiles"),
+            snapshot.outputCoverage(),
+            snapshot.decisionHorizon(),
+            snapshot.maxInMemoryKeyBytes(),
+            snapshot.maxKeyBytes(),
+            KafkaCompactionWinnerIndex.DEFAULT_MERGE_FAN_IN,
+            snapshot.maxDecodedRecords());
+    this.winnerAccumulator = new SpillingWinnerAccumulator(index);
     this.nextOffset = snapshot.decisionHorizon().startOffset();
     this.markerStatuses = markerStatusMap(snapshot.markerDecisions());
   }
@@ -100,18 +119,7 @@ public final class KafkaCompactionPassOneCollector {
     if (record.keyKind() == KeyKind.KEYED
         && transactionStatus != KafkaCompactionStrategyV1.TransactionStatus.ABORTED
         && transactionStatus != KafkaCompactionStrategyV1.TransactionStatus.OPEN) {
-      ByteKey key = new ByteKey(bytes(record.taggedCompactionKey()));
-      Long previous = greatestEligibleOffsets.get(key);
-      if (previous == null) {
-        inMemoryKeyBytes = Math.addExact(inMemoryKeyBytes, Math.addExact(key.length(), 64L));
-        if (inMemoryKeyBytes > snapshot.maxInMemoryKeyBytes()) {
-          throw new IllegalArgumentException(
-              "Kafka compaction pass one exceeded its in-memory key budget");
-        }
-        greatestEligibleOffsets.put(key, record.absoluteOffset());
-      } else if (record.absoluteOffset() > previous) {
-        greatestEligibleOffsets.put(key, record.absoluteOffset());
-      }
+      winnerAccumulator.add(bytes(record.taggedCompactionKey()), record.absoluteOffset());
     }
     if (record.keyKind() == KeyKind.CONTROL) {
       if (!markerStatuses.containsKey(record.absoluteOffset())) {
@@ -126,26 +134,42 @@ public final class KafkaCompactionPassOneCollector {
       throw new IllegalStateException("Kafka compaction pass one is already finished");
     }
     finished = true;
-    if (nextOffset != snapshot.decisionHorizon().endOffset()) {
-      throw new IllegalArgumentException(
-          "Kafka compaction pass one ended before the frozen decision horizon");
+    try {
+      if (nextOffset != snapshot.decisionHorizon().endOffset()) {
+        throw new IllegalArgumentException(
+            "Kafka compaction pass one ended before the frozen decision horizon");
+      }
+      if (!observedMarkers.equals(markerStatuses.keySet())) {
+        throw new IllegalArgumentException(
+            "Kafka compaction marker decisions do not equal the scanned control markers");
+      }
+      if (scannedRecords != snapshot.decisionHorizon().recordCount()
+          || outputRecords != snapshot.outputCoverage().recordCount()) {
+        throw new IllegalStateException("Kafka compaction pass-one record accounting changed");
+      }
+      WinnerFacts winners = winnerAccumulator.finish();
+      return new Facts(
+          snapshot,
+          winners.latestOffsets(),
+          fullDigest.finish(),
+          outputDigest.finish(),
+          scannedRecords,
+          outputRecords,
+          markerStatuses,
+          winners.spillRunCount(),
+          winners.peakInMemoryKeyBytes());
+    } finally {
+      winnerAccumulator.close();
     }
-    if (!observedMarkers.equals(markerStatuses.keySet())) {
-      throw new IllegalArgumentException(
-          "Kafka compaction marker decisions do not equal the scanned control markers");
+  }
+
+  @Override
+  public void close() {
+    if (finished) {
+      return;
     }
-    if (scannedRecords != snapshot.decisionHorizon().recordCount()
-        || outputRecords != snapshot.outputCoverage().recordCount()) {
-      throw new IllegalStateException("Kafka compaction pass-one record accounting changed");
-    }
-    return new Facts(
-        snapshot,
-        greatestEligibleOffsets,
-        fullDigest.finish(),
-        outputDigest.finish(),
-        scannedRecords,
-        outputRecords,
-        markerStatuses);
+    finished = true;
+    winnerAccumulator.close();
   }
 
   public record Snapshot(
@@ -176,7 +200,10 @@ public final class KafkaCompactionPassOneCollector {
           || deleteRetentionMs < 0
           || maxDecodedRecords <= 0
           || maxKeyBytes <= 0
+          || maxKeyBytes > KafkaCompactionKeyEncodingV2.MAX_ENCODED_KEY_BYTES
           || maxInMemoryKeyBytes <= 0
+          || decisionHorizon.recordCount() > Integer.MAX_VALUE
+          || decisionHorizon.recordCount() > maxDecodedRecords
           || abortedTransactions.size() > MAX_TRANSACTION_FACTS
           || openTransactions.size() > MAX_TRANSACTION_FACTS
           || markerDecisions.size() > MAX_TRANSACTION_FACTS
@@ -223,29 +250,37 @@ public final class KafkaCompactionPassOneCollector {
 
   public static final class Facts {
     private final Snapshot snapshot;
-    private final Map<ByteKey, Long> greatestEligibleOffsets;
+    private final BitSet latestOffsets;
     private final Checksum fullFactSha256;
     private final Checksum outputFactSha256;
     private final long scannedRecordCount;
     private final long outputRecordCount;
     private final Map<Long, KafkaCompactionStrategyV1.MarkerStatus> markerStatuses;
+    private final long spillRunCount;
+    private final long peakInMemoryKeyBytes;
 
     private Facts(
         Snapshot snapshot,
-        Map<ByteKey, Long> greatestEligibleOffsets,
+        BitSet latestOffsets,
         Checksum fullFactSha256,
         Checksum outputFactSha256,
         long scannedRecordCount,
         long outputRecordCount,
-        Map<Long, KafkaCompactionStrategyV1.MarkerStatus> markerStatuses) {
+        Map<Long, KafkaCompactionStrategyV1.MarkerStatus> markerStatuses,
+        long spillRunCount,
+        long peakInMemoryKeyBytes) {
       this.snapshot = snapshot;
-      this.greatestEligibleOffsets =
-          Map.copyOf(Objects.requireNonNull(greatestEligibleOffsets, "greatestEligibleOffsets"));
+      this.latestOffsets = (BitSet) Objects.requireNonNull(latestOffsets, "latestOffsets").clone();
       this.fullFactSha256 = Objects.requireNonNull(fullFactSha256, "fullFactSha256");
       this.outputFactSha256 = Objects.requireNonNull(outputFactSha256, "outputFactSha256");
       this.scannedRecordCount = scannedRecordCount;
       this.outputRecordCount = outputRecordCount;
       this.markerStatuses = Map.copyOf(markerStatuses);
+      if (spillRunCount < 0 || peakInMemoryKeyBytes < 0) {
+        throw new IllegalArgumentException("invalid Kafka compaction winner metrics");
+      }
+      this.spillRunCount = spillRunCount;
+      this.peakInMemoryKeyBytes = peakInMemoryKeyBytes;
     }
 
     public KafkaCompactionStrategyV1.RecordContext contextFor(DecodedCompactionRecord record) {
@@ -256,21 +291,15 @@ public final class KafkaCompactionPassOneCollector {
       }
       KafkaCompactionStrategyV1.TransactionStatus transactionStatus =
           transactionStatus(record, snapshot);
-      long greatestOffset =
+      boolean latestForKey =
           switch (record.keyKind()) {
-            case UNKEYED, CONTROL -> record.absoluteOffset();
+            case UNKEYED, CONTROL -> true;
             case KEYED -> {
               if (transactionStatus == KafkaCompactionStrategyV1.TransactionStatus.ABORTED
                   || transactionStatus == KafkaCompactionStrategyV1.TransactionStatus.OPEN) {
-                yield record.absoluteOffset();
+                yield true;
               }
-              Long value =
-                  greatestEligibleOffsets.get(new ByteKey(bytes(record.taggedCompactionKey())));
-              if (value == null) {
-                throw new IllegalArgumentException(
-                    "Kafka keyed record has no pass-one winner fact");
-              }
-              yield value;
+              yield latestOffsets.get(relativeOutputOffset(record.absoluteOffset(), snapshot));
             }
           };
       KafkaCompactionStrategyV1.MarkerStatus markerStatus =
@@ -282,7 +311,7 @@ public final class KafkaCompactionPassOneCollector {
       }
       OptionalLong deleteHorizon = effectiveDeleteHorizon(record, snapshot);
       return new KafkaCompactionStrategyV1.RecordContext(
-          greatestOffset,
+          latestForKey,
           transactionStatus,
           markerStatus,
           deleteHorizon,
@@ -326,6 +355,14 @@ public final class KafkaCompactionPassOneCollector {
 
     public OffsetRange decisionHorizon() {
       return snapshot.decisionHorizon();
+    }
+
+    public long spillRunCount() {
+      return spillRunCount;
+    }
+
+    public long peakInMemoryKeyBytes() {
+      return peakInMemoryKeyBytes;
     }
   }
 
@@ -478,6 +515,128 @@ public final class KafkaCompactionPassOneCollector {
     byte[] bytes = new byte[exact.remaining()];
     exact.get(bytes);
     return bytes;
+  }
+
+  private static int relativeOutputOffset(long absoluteOffset, Snapshot snapshot) {
+    if (!snapshot.outputCoverage().contains(absoluteOffset)) {
+      throw new IllegalArgumentException(
+          "Kafka compaction winner lookup is outside output coverage");
+    }
+    return Math.toIntExact(
+        Math.subtractExact(absoluteOffset, snapshot.outputCoverage().startOffset()));
+  }
+
+  private interface WinnerAccumulator extends AutoCloseable {
+    void add(byte[] encodedKey, long absoluteOffset);
+
+    WinnerFacts finish();
+
+    @Override
+    void close();
+  }
+
+  private static final class InMemoryWinnerAccumulator implements WinnerAccumulator {
+    private static final long KEY_ENTRY_OVERHEAD = 64;
+
+    private final Snapshot snapshot;
+    private final Map<ByteKey, Long> greatestEligibleOffsets = new HashMap<>();
+    private long inMemoryKeyBytes;
+    private long peakInMemoryKeyBytes;
+    private boolean finished;
+
+    private InMemoryWinnerAccumulator(Snapshot snapshot) {
+      this.snapshot = snapshot;
+    }
+
+    @Override
+    public void add(byte[] encodedKey, long absoluteOffset) {
+      if (finished) {
+        throw new IllegalStateException("Kafka in-memory winner index is already finished");
+      }
+      if (encodedKey.length <= 0
+          || encodedKey.length > snapshot.maxKeyBytes()
+          || encodedKey[0] != KafkaCompactionKeyEncodingV2.KEYED_TAG) {
+        throw new IllegalArgumentException("Kafka compaction winner requires a canonical KCK2 key");
+      }
+      ByteKey key = new ByteKey(encodedKey);
+      Long previous = greatestEligibleOffsets.get(key);
+      if (previous == null) {
+        inMemoryKeyBytes =
+            Math.addExact(inMemoryKeyBytes, Math.addExact(key.length(), KEY_ENTRY_OVERHEAD));
+        if (inMemoryKeyBytes > snapshot.maxInMemoryKeyBytes()) {
+          throw new IllegalArgumentException(
+              "Kafka compaction pass one exceeded its in-memory key budget");
+        }
+        peakInMemoryKeyBytes = Math.max(peakInMemoryKeyBytes, inMemoryKeyBytes);
+        greatestEligibleOffsets.put(key, absoluteOffset);
+      } else if (absoluteOffset > previous) {
+        greatestEligibleOffsets.put(key, absoluteOffset);
+      }
+    }
+
+    @Override
+    public WinnerFacts finish() {
+      if (finished) {
+        throw new IllegalStateException("Kafka in-memory winner index is already finished");
+      }
+      finished = true;
+      BitSet latest = new BitSet(Math.toIntExact(snapshot.outputCoverage().recordCount()));
+      greatestEligibleOffsets
+          .values()
+          .forEach(
+              offset -> {
+                if (snapshot.outputCoverage().contains(offset)) {
+                  latest.set(relativeOutputOffset(offset, snapshot));
+                }
+              });
+      return new WinnerFacts(latest, 0, peakInMemoryKeyBytes);
+    }
+
+    @Override
+    public void close() {
+      finished = true;
+      greatestEligibleOffsets.clear();
+      inMemoryKeyBytes = 0;
+    }
+  }
+
+  private static final class SpillingWinnerAccumulator implements WinnerAccumulator {
+    private final KafkaCompactionWinnerIndex index;
+
+    private SpillingWinnerAccumulator(KafkaCompactionWinnerIndex index) {
+      this.index = index;
+    }
+
+    @Override
+    public void add(byte[] encodedKey, long absoluteOffset) {
+      index.add(encodedKey, absoluteOffset);
+    }
+
+    @Override
+    public WinnerFacts finish() {
+      KafkaCompactionWinnerIndex.Result result = index.finish();
+      return new WinnerFacts(
+          result.latestOffsets(), result.spillRunCount(), result.peakInMemoryKeyBytes());
+    }
+
+    @Override
+    public void close() {
+      index.close();
+    }
+  }
+
+  private record WinnerFacts(BitSet latestOffsets, long spillRunCount, long peakInMemoryKeyBytes) {
+    private WinnerFacts {
+      latestOffsets = (BitSet) Objects.requireNonNull(latestOffsets, "latestOffsets").clone();
+      if (spillRunCount < 0 || peakInMemoryKeyBytes < 0) {
+        throw new IllegalArgumentException("invalid Kafka compaction winner facts");
+      }
+    }
+
+    @Override
+    public BitSet latestOffsets() {
+      return (BitSet) latestOffsets.clone();
+    }
   }
 
   private static final class ByteKey {

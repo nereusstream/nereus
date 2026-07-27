@@ -35,7 +35,12 @@ import com.nereusstream.materialization.ExactSourceSet;
 import com.nereusstream.materialization.SourceGeneration;
 import com.nereusstream.objectstore.compacted.KafkaCompactionDispositionV2;
 import com.nereusstream.objectstore.compacted.KafkaTopicCompactedObjectWriteRequest;
+import com.nereusstream.objectstore.staging.StagingFileManager;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -46,8 +51,10 @@ import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.SimpleRecord;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class KafkaCompactionTwoPassExecutorTest {
+  @TempDir Path temporaryDirectory;
 
   @Test
   void composesFullHorizonWinnerSelectionWithVerifiedSparseNtc2Rows() {
@@ -134,6 +141,54 @@ class KafkaCompactionTwoPassExecutorTest {
                         result))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("coverage");
+  }
+
+  @Test
+  void productionExecutorUsesTheSharedChecksummedWinnerSpill() throws Exception {
+    ReadBatch old =
+        batch(
+            0,
+            1,
+            "old",
+            MemoryRecords.withRecords(
+                0, Compression.NONE, new SimpleRecord(1_000, utf8("k"), utf8("old"))));
+    ReadBatch latest =
+        batch(
+            1,
+            2,
+            "latest",
+            MemoryRecords.withRecords(
+                1, Compression.NONE, new SimpleRecord(1_001, utf8("k"), utf8("latest"))));
+    Path stagingPath = Files.createDirectory(temporaryDirectory.resolve("winner-spill"));
+    Files.setPosixFilePermissions(stagingPath, PosixFilePermissions.fromString("rwx------"));
+    try (StagingFileManager staging =
+        new StagingFileManager(
+            stagingPath,
+            32L << 20,
+            StagingFileManager.MIN_UPLOAD_CHUNK_BYTES,
+            Duration.ofHours(1),
+            Runnable::run)) {
+      KafkaCompactionTwoPassExecutor executor =
+          new KafkaCompactionTwoPassExecutor(
+              new KafkaTopicCompactionCodecV1(),
+              new KafkaCompactionStrategyV1(),
+              new KafkaCompactionRowMapper(),
+              new Limits(10, 10, 1 << 20),
+              staging);
+
+      KafkaCompactionTwoPassExecutor.Prepared prepared =
+          executor.prepare(
+              snapshot(0, 2, 2, List.of(), 1),
+              sourceSet(List.of(old, latest)),
+              List.of(old, latest));
+
+      assertThat(prepared.facts().spillRunCount()).isPositive();
+      assertThat(staging.reservedBytes()).isZero();
+      assertThat(
+              prepared.rewrite(sourceSet(List.of(old, latest)), List.of(old, latest), false).rows())
+          .extracting(row -> row.streamOffsetStart())
+          .containsExactly(1L);
+    }
   }
 
   @Test
@@ -253,6 +308,15 @@ class KafkaCompactionTwoPassExecutorTest {
 
   private static Snapshot snapshot(
       long start, long outputEnd, long horizonEnd, List<MarkerDecision> markers) {
+    return snapshot(start, outputEnd, horizonEnd, markers, 1 << 20);
+  }
+
+  private static Snapshot snapshot(
+      long start,
+      long outputEnd,
+      long horizonEnd,
+      List<MarkerDecision> markers,
+      long maxInMemoryKeyBytes) {
     return new Snapshot(
         new OffsetRange(start, outputEnd),
         new OffsetRange(start, horizonEnd),
@@ -261,7 +325,7 @@ class KafkaCompactionTwoPassExecutorTest {
         1_000,
         100,
         1 << 20,
-        1 << 20,
+        maxInMemoryKeyBytes,
         List.of(),
         List.of(),
         markers);

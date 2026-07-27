@@ -837,12 +837,21 @@ Pass 2 over output coverage：
 Spill files private、bounded、checksummed and deleted on terminal path。Worker restart uses durable task identity，not partial
 spill data。
 
-The current bounded reference composition has these executable boundaries：
+The current bounded production composition has these executable boundaries：
 
 ```java
-KafkaCompactionPassOneCollector(Snapshot snapshot);
+KafkaCompactionPassOneCollector(
+    Snapshot snapshot,
+    StagingFileManager stagingFiles);
 void accept(DecodedCompactionRecord record);
 Facts finish();
+
+KafkaCompactionTwoPassExecutor(
+    KafkaTopicCompactionCodecV1 codec,
+    KafkaCompactionStrategyV1 strategy,
+    KafkaCompactionRowMapper rowMapper,
+    Limits limits,
+    StagingFileManager stagingFiles);
 
 Prepared KafkaCompactionTwoPassExecutor.prepare(
     Snapshot snapshot,
@@ -861,10 +870,10 @@ KafkaTopicCompactedObjectWriteRequest KafkaCompactionWriteRequestFactory.create(
 
 `Snapshot` freezes output/decision ranges、transaction-state end、planning time、delete retention、complete aborted/open
 transaction ranges、one decision for every scanned control marker and record/key/in-memory budgets。Pass 1 requires a dense
-logical-offset scan，excludes ABORTED and OPEN data from the winner map，fails if OPEN crosses output coverage，and produces
-domain-separated SHA-256 digests for the full horizon and output prefix。This matches stock `Cleaner.buildOffsetMap` on the
-important rule that an aborted newer key cannot shadow an older committed value。Marker decisions remain an explicit
-upstream transaction-proof input；the collector does not guess them from a local key scan。
+logical-offset scan，excludes ABORTED and OPEN data from the winner index，fails if OPEN crosses output coverage，and
+produces domain-separated SHA-256 digests for the full horizon and output prefix。This matches stock
+`Cleaner.buildOffsetMap` on the important rule that an aborted newer key cannot shadow an older committed value。Marker
+decisions remain an explicit upstream transaction-proof input；the collector does not guess them from a local key scan。
 
 Pass 2 must replay the output prefix densely and reproduce the exact pass-1 output digest before any `Result` is returned。
 For every retained decision，the executor uses the frozen effective delete horizon、rewrites one valid batch and maps it
@@ -874,9 +883,49 @@ source/output batch counts and full/output fact digests。`KafkaCompactionWriteR
 mismatch and derives the closed NTC2 request metadata from those verified facts：output source-set SHA、record/batch/logical
 byte counts、`kafka-log-cleaner-v1/1`、`KCK2`、`KAFKA_RECORD_REWRITE_V1` and the codec message-format digest。The caller only
 supplies task-owned cluster/stream/attempt/policy/cumulative-size/Parquet-writer facts；it cannot substitute row accounting
-or compatibility identities。This in-memory executor is an executable semantic oracle, not yet the production worker：
-private checksummed sorted spill、streaming Parquet upload/full verification、terminal task/plan retirement、task execution
-restart and coverage activation remain pending。
+or compatibility identities。
+
+`KafkaCompactionWinnerIndex` is now the production pass-one key index。It owns a `TreeMap<KCK2,long>` whose accounting is
+`encodedKey.length + 64` per distinct resident key。Before adding a new key that would cross
+`Snapshot.maxInMemoryKeyBytes`，it flushes the current map；one single entry may temporarily exceed that budget by at most
+`maxKeyBytes + 64` so progress does not depend on the budget exceeding the largest admitted key。A resident duplicate only
+updates its greatest eligible offset。The one-argument collector and four-argument executor constructors remain
+strict-budget in-memory semantic-test paths；production construction supplies the shared `StagingFileManager` explicitly。
+
+Every flushed run is an owner-only `PrivateStagingSpillFile` charged to the process-global staging-byte permit：
+
+```text
+KCSR run V1
+  magic:int32             = 0x4b435352
+  version:int32           = 1
+  repeated:
+    encodedKeyLength:int32
+    encodedKck2Key:bytes  # first tag must be KEYED_TAG
+    greatestOffset:int64  # inside frozen decisionHorizon
+  end:int32               = -1
+  entryCount:int64
+```
+
+Run keys are strictly increasing under unsigned lexicographic byte order and therefore unique inside one run。
+`PrivateStagingSpillFile.seal()` freezes file identity、length and whole-file SHA-256；every merge opens
+`openVerifiedInputStream()` and must consume through EOF，so a same-inode/same-length byte mutation still fails checksum
+verification。The merge queue holds at most `DEFAULT_MERGE_FAN_IN=16` readers，selects the greatest offset for equal keys and
+recursively emits another checked run when the fan-in bound is reached。Key length/tag、header/version、strict order、
+offset range、entry count、trailing bytes and checksum all fail closed。
+
+The final merge does **not** retain another key map。It sets one `BitSet` position only when the greatest eligible offset is
+inside output coverage；the index is `absoluteOffset - outputCoverage.startOffset` and the bitmap is bounded by the frozen
+output record count。`Facts.contextFor` consequently passes `latestForKey:boolean` rather than materializing the greatest
+offset again。A keyed output record whose bit is false is superseded；unkeyed/control and ABORTED/OPEN validation contexts
+carry `true` because they are not winner-index lookups。`Facts.spillRunCount` and `peakInMemoryKeyBytes` expose bounded
+execution evidence without becoming durable decision inputs。
+
+Success、parse/checksum failure、upstream decode failure、cancellation and explicit close all close every run，delete its
+private file and release the shared staging permit。Spill bytes are deliberately not durable state：after a process crash the
+orphan-grace scanner may remove them，while task recovery reloads KCP1 and deterministically replays the same exact
+decision/output sources。`KafkaCompactionWinnerIndexTest` proves spill/no-spill winner equivalence including a newer
+decision-tail key，two independent restart recomputations、same-length sealed-run corruption rejection and cancellation
+cleanup。Streaming Parquet upload/full verification、terminal task/plan retirement and coverage activation remain pending。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
@@ -892,8 +941,8 @@ propagates one downstream request at a time and owns cancel/close。Every emitte
 commitVersion、target bytes/identity、payload/schema/projection and per-source final accounting；no generation resolver or
 fallback is invoked between passes。The streams accept ranged Kafka batches，not the old one-entry/one-record assumption。
 Completion is signalled after the last source summary even when the last batch consumes the exact remaining demand；it never
-requires a protocol-invalid extra request。The durable streams are now available to the production executor；checksummed
-winner spill and streaming NTC2 writer consumption remain separate next slices。
+requires a protocol-invalid extra request。The durable streams and checksummed winner spill are now available to the
+production executor；streaming NTC2 writer consumption remains the next slice。
 
 ### 10.5 Record rewrite V1
 
@@ -941,7 +990,7 @@ The implemented decision core is deliberately independent from I/O：
 Decision decide(DecodedCompactionRecord record, RecordContext context);
 
 record RecordContext(
-    long greatestOffsetForKey,
+    boolean latestForKey,
     TransactionStatus transactionStatus,
     MarkerStatus markerStatus,
     OptionalLong deleteHorizonMillis,
@@ -959,7 +1008,8 @@ enum MarkerStatus {
 ```
 
 Pass 1 must provide these facts from the **entire frozen decision horizon**；callers cannot infer them while writing pass 2。
-For keyed data，only `absoluteOffset == greatestOffsetForKey` is a survivor candidate；an older occurrence is superseded。
+For keyed data，only the offset marked by the final winner bitmap receives `latestForKey=true`；an older occurrence is
+superseded。
 ABORTED transactional data is dropped and OPEN fails closed。A non-transactional record cannot carry transactional facts，
 and a transactional data record cannot carry `NON_TRANSACTIONAL` or marker-only `DECIDED` facts。Control records require
 `DECIDED` plus an exact own-offset identity and one explicit marker decision。
@@ -980,7 +1030,8 @@ Current tests prove latest/older keyed decisions、unique null-key retention、c
 tombstone and marker equality boundaries、first-pass horizon retention、missing full-scan proof fail-safe retention and
 fact-pair rejection。`KafkaCompactionPassOneCollectorTest` now supplies/proves these facts over a dense frozen horizon and
 re-proves the output prefix；`KafkaCompactionTwoPassExecutorTest` composes real Kafka decode、strategy、rewrite and NTC2
-mapping。The production sorted spill and stock-cleaner differential oracle are still required before activation。
+mapping；`KafkaCompactionWinnerIndexTest` covers the production sorted spill and restart recomputation。The stock-cleaner
+differential oracle is still required before activation。
 
 Mandatory differential tests run the same bounded log/config through stock Kafka cleaner and F9 engine，then compare visible
 logical records for READ_UNCOMMITTED and READ_COMMITTED plus transaction metadata。Any deliberate difference requires a

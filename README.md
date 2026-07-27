@@ -7,7 +7,10 @@ Fetch-operation、binding-first leader manager、exact stable-head/commit-reacha
 checkpoint-pinned paged COMMITTED replay and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the adapter now also has the process admission/runtime lifecycle and an explicit owned/borrowed resource
-ledger with reverse-order close；the Kafka fork now has local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
+ledger with reverse-order close。The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
+independent backpressured decision/output replays and reduces checksum-verified KCK2 sorted spill runs to a bounded winner
+bitmap；streaming NTC2 publication、coverage activation and no-resurrection gates remain pending。The Kafka fork now has
+local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
 leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation
 plus provisional exact-`Partition` state publication/rollback and exhaustive Nereus-to-Kafka error mapping against the locked 4.3 baseline，
@@ -40,7 +43,7 @@ nereus/
   docs/phase-2-managed-ledger-facade/   F2 code-level contracts, API spike and milestones
   docs/phase-3-cursor-subscription/      implemented/final-gated F3 code-level contract
   docs/phase-4-compaction-generation/    F4 code-level contract and implementation gates
-  docs/phase-9-kafka-native-storage/     F9 native Kafka code-level target and M1/M2/partial-M3 evidence
+  docs/phase-9-kafka-native-storage/     F9 native Kafka code-level target and in-progress M1-M5 evidence
   docs/phase-bk-bookkeeper-primary-wal/  final-gated F1-BK BK-M0–M6 contract and executable evidence
   docs/automq-like-stream-storage/       async materialization profile design
 ```

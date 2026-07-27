@@ -284,12 +284,12 @@ oracle、real retention provider trim、concrete partition capture/local-log upd
 | KF-CMP-001 | latest keyed value survives；older values removed at same offsets as oracle | product `KafkaCompactionStrategyV1Test` + `KafkaCompactionTwoPassExecutorTest`（engine partial）；`KafkaCompactionOraclePropertyTest`（oracle pending） | M,K | M5 |
 | KF-CMP-002 | empty key is keyed；null key is uniquely retained；encodings cannot collide | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionStrategyV1Test`（decode/decision partial）；`KafkaCompactionKeyEncodingTest`（engine pending） | D,M | M5 |
 | KF-CMP-003 | tombstone retention/drop boundary matches Kafka delete-retention oracle | product `KafkaCompactionStrategyV1Test` + `KafkaCompactionPassOneCollectorTest`（first/later horizon partial）；`KafkaCompactionOraclePropertyTest`（oracle pending） | M,K | M5 |
-| KF-CMP-004 | newer key in decision-horizon tail removes eligible older output record | product `DefaultCommittedSourceSetResolverTest` + `KafkaCompactionSourceResolverTest` + `KafkaCompactionPlannerTest` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest`（authoritative source identity + in-memory execution partial）；`KafkaCompactionHorizonTest`（durable batch read pending） | D,M | M5 |
+| KF-CMP-004 | newer key in decision-horizon tail removes eligible older output record | product `DefaultCommittedSourceSetResolverTest` + `KafkaCompactionSourceResolverTest` + `KafkaCompactionBatchSourceTest` + `KafkaCompactionPlannerTest` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest` + `KafkaCompactionWinnerIndexTest`（authoritative exact-source stream + spill winner partial）；`KafkaCompactionHorizonTest`（end-to-end worker pending） | D,M | M5 |
 | KF-CMP-005 | append after frozen horizon can leave extra old record but never drops newest incorrectly | `KafkaCompactionHorizonTest` | D,M,C | M5 |
-| KF-CMP-006 | spill/no-spill/restart produce deterministic same NTC2 SHA/rows | `KafkaCompactionSpillPropertyTest` | M,R,C | M5 |
+| KF-CMP-006 | spill/no-spill/restart produce deterministic same NTC2 SHA/rows | product `KafkaCompactionWinnerIndexTest`（winner/fact SHA and restart-recompute partial）；`KafkaCompactionSpillPropertyTest`（streaming NTC2 SHA/rows pending） | M,R,C | M5 |
 | KF-CMP-007 | all compression formats、headers、timestamps rewrite to equivalent valid records | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionRowMapperTest`（GZIP/header/timestamp/NTC2 partial）；`KafkaCompactionRewriteTest`（full matrix pending） | D,M,K | M5 |
 | KF-CMP-008 | idempotent/transactional/control/open/aborted traces match stock cleaner views | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionStrategyV1Test`（rewrite/decision partial）；`KafkaCompactionTransactionOracleTest`（stock trace pending） | M,K | M5 |
-| KF-CMP-009 | decode ratio/key/task limits abort without publication or lost source refs | product `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest`（bounded in-memory partial）；`KafkaCompactionResourceLimitTest`（spill/restart pending） | D,M,R | M5 |
+| KF-CMP-009 | decode ratio/key/task limits abort without publication or lost source refs | product `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest` + `KafkaCompactionWinnerIndexTest`（bounded key/record/output limits plus spill corruption/cancel cleanup partial）；`KafkaCompactionResourceLimitTest`（full worker pressure pending） | D,M,R | M5 |
 | KF-CMP-010 | generation commit before coverage CAS is not client-visible mandatory compaction | `KafkaCompactionActivationCutTest` | R,C | M5 |
 | KF-CMP-011 | coverage CAS response loss reloads exact activation and never double-advances epoch | `KafkaCompactionActivationCutTest` | R,P,C | M5 |
 | KF-CMP-012 | compact→delete preserves old mandatory coverage；delete→compact activates only after verified output | `KafkaCompactionPolicyTransitionTest` | R,K,C | M5 |
@@ -315,7 +315,9 @@ task-ID restart recovery；`DefaultCommittedSourceSetResolverTest`/`KafkaCompact
 COMMITTED index tiling、per-generation reread、append-safe/trim-unsafe authority revalidation and deterministic output-task
 derivation；`ExactSourceSetBatchPublisherTest`/`KafkaCompactionBatchSourceTest` add exact-identity backpressure streams for
 both recovered KCP1 passes，including demand-exhausted completion and substituted-generation rejection；
-`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty tombstone bytes。Orphan/terminal recovery、sorted spill/restart、Parquet
+`KafkaCompactionWinnerIndexTest` adds KCSR sorted-spill/no-spill winner equivalence、two independent restart
+recomputations、newer decision-tail suppression、same-length sealed-run corruption detection and cancellation permit/file
+cleanup；`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty tombstone bytes。Orphan/terminal recovery、streaming Parquet
 publication/coverage activation and stock `LogCleaner` comparison remain absent，so all rows remain `PLANNED`。
 
 ## 11. Configuration, activation, controller and operations

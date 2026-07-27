@@ -50,8 +50,8 @@ class KafkaCompactionStrategyV1Test {
     DecodedCompactionRecord old = record(10, KeyKind.KEYED, false, false);
     DecodedCompactionRecord latest = record(12, KeyKind.KEYED, false, false);
 
-    assertThat(strategy.decide(old, context(12, NON_TRANSACTIONAL))).isEqualTo(DROP_SUPERSEDED);
-    assertThat(strategy.decide(latest, context(12, NON_TRANSACTIONAL)))
+    assertThat(strategy.decide(old, context(false, NON_TRANSACTIONAL))).isEqualTo(DROP_SUPERSEDED);
+    assertThat(strategy.decide(latest, context(true, NON_TRANSACTIONAL)))
         .isEqualTo(RETAIN_LATEST_VALUE);
   }
 
@@ -59,18 +59,19 @@ class KafkaCompactionStrategyV1Test {
   void retainsEveryUnkeyedRecordAsItsOwnDeterministicIdentity() {
     DecodedCompactionRecord unkeyed = record(20, KeyKind.UNKEYED, false, false);
 
-    assertThat(strategy.decide(unkeyed, context(20, NON_TRANSACTIONAL))).isEqualTo(RETAIN_UNKEYED);
+    assertThat(strategy.decide(unkeyed, context(true, NON_TRANSACTIONAL)))
+        .isEqualTo(RETAIN_UNKEYED);
   }
 
   @Test
   void dropsAbortedTransactionalDataAndRejectsAnOpenTransactionCrossingCoverage() {
     DecodedCompactionRecord transactional = record(30, KeyKind.KEYED, false, true);
 
-    assertThat(strategy.decide(transactional, context(30, ABORTED))).isEqualTo(DROP_ABORTED);
-    assertThatThrownBy(() -> strategy.decide(transactional, context(30, OPEN)))
+    assertThat(strategy.decide(transactional, context(true, ABORTED))).isEqualTo(DROP_ABORTED);
+    assertThatThrownBy(() -> strategy.decide(transactional, context(true, OPEN)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("open Kafka transaction");
-    assertThat(strategy.decide(transactional, context(30, COMMITTED)))
+    assertThat(strategy.decide(transactional, context(true, COMMITTED)))
         .isEqualTo(RETAIN_LATEST_VALUE);
   }
 
@@ -78,15 +79,15 @@ class KafkaCompactionStrategyV1Test {
   void expiresATombstoneAtTheExactDeleteHorizonOnlyAfterAFullScanProof() {
     DecodedCompactionRecord tombstone = record(40, KeyKind.KEYED, true, false);
 
-    assertThat(strategy.decide(tombstone, context(40, NON_TRANSACTIONAL, 100, true, 99)))
+    assertThat(strategy.decide(tombstone, context(true, NON_TRANSACTIONAL, 100, true, 99)))
         .isEqualTo(RETAIN_TOMBSTONE);
-    assertThat(strategy.decide(tombstone, context(40, NON_TRANSACTIONAL, 100, true, 100)))
+    assertThat(strategy.decide(tombstone, context(true, NON_TRANSACTIONAL, 100, true, 100)))
         .isEqualTo(DROP_EXPIRED_TOMBSTONE);
-    assertThat(strategy.decide(tombstone, context(40, NON_TRANSACTIONAL, 100, true, false, 100)))
+    assertThat(strategy.decide(tombstone, context(true, NON_TRANSACTIONAL, 100, true, false, 100)))
         .isEqualTo(RETAIN_TOMBSTONE);
-    assertThat(strategy.decide(tombstone, context(40, NON_TRANSACTIONAL, 100, false, 1_000)))
+    assertThat(strategy.decide(tombstone, context(true, NON_TRANSACTIONAL, 100, false, 1_000)))
         .isEqualTo(RETAIN_TOMBSTONE);
-    assertThat(strategy.decide(tombstone, context(40, NON_TRANSACTIONAL)))
+    assertThat(strategy.decide(tombstone, context(true, NON_TRANSACTIONAL)))
         .isEqualTo(RETAIN_TOMBSTONE);
   }
 
@@ -94,13 +95,13 @@ class KafkaCompactionStrategyV1Test {
   void appliesTheSameFullScanAndHorizonRuleToDecidedControlMarkers() {
     DecodedCompactionRecord control = record(50, KeyKind.CONTROL, false, true);
 
-    assertThat(strategy.decide(control, markerContext(50, RETAIN_REQUIRED, 100, true, 1_000)))
+    assertThat(strategy.decide(control, markerContext(RETAIN_REQUIRED, 100, true, 1_000)))
         .isEqualTo(RETAIN_CONTROL);
-    assertThat(strategy.decide(control, markerContext(50, DELETE_ELIGIBLE, 100, true, 99)))
+    assertThat(strategy.decide(control, markerContext(DELETE_ELIGIBLE, 100, true, 99)))
         .isEqualTo(RETAIN_CONTROL);
-    assertThat(strategy.decide(control, markerContext(50, DELETE_ELIGIBLE, 100, true, 100)))
+    assertThat(strategy.decide(control, markerContext(DELETE_ELIGIBLE, 100, true, 100)))
         .isEqualTo(DROP_EXPIRED_CONTROL);
-    assertThat(strategy.decide(control, markerContext(50, DELETE_ELIGIBLE, 100, false, 1_000)))
+    assertThat(strategy.decide(control, markerContext(DELETE_ELIGIBLE, 100, false, 1_000)))
         .isEqualTo(RETAIN_CONTROL);
   }
 
@@ -110,46 +111,45 @@ class KafkaCompactionStrategyV1Test {
     DecodedCompactionRecord transactional = record(61, KeyKind.KEYED, false, true);
     DecodedCompactionRecord control = record(62, KeyKind.CONTROL, false, true);
 
-    assertThatThrownBy(() -> strategy.decide(keyed, context(60, COMMITTED)))
+    assertThatThrownBy(() -> strategy.decide(keyed, context(true, COMMITTED)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("non-transactional");
-    assertThatThrownBy(() -> strategy.decide(transactional, context(61, NON_TRANSACTIONAL)))
+    assertThatThrownBy(() -> strategy.decide(transactional, context(true, NON_TRANSACTIONAL)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("lacks transaction");
-    assertThatThrownBy(
-            () -> strategy.decide(keyed, markerContext(60, RETAIN_REQUIRED, 100, true, 100)))
+    assertThatThrownBy(() -> strategy.decide(keyed, markerContext(RETAIN_REQUIRED, 100, true, 100)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("non-control");
-    assertThatThrownBy(() -> strategy.decide(control, context(62, COMMITTED)))
+    assertThatThrownBy(() -> strategy.decide(control, context(true, COMMITTED)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("control-marker");
   }
 
   private static KafkaCompactionStrategyV1.RecordContext context(
-      long greatestOffset, KafkaCompactionStrategyV1.TransactionStatus transactionStatus) {
+      boolean latestForKey, KafkaCompactionStrategyV1.TransactionStatus transactionStatus) {
     return new KafkaCompactionStrategyV1.RecordContext(
-        greatestOffset, transactionStatus, NOT_CONTROL, OptionalLong.empty(), false, false, 0);
+        latestForKey, transactionStatus, NOT_CONTROL, OptionalLong.empty(), false, false, 0);
   }
 
   private static KafkaCompactionStrategyV1.RecordContext context(
-      long greatestOffset,
+      boolean latestForKey,
       KafkaCompactionStrategyV1.TransactionStatus transactionStatus,
       long deleteHorizon,
       boolean fullScanHorizonProven,
       long now) {
     return context(
-        greatestOffset, transactionStatus, deleteHorizon, fullScanHorizonProven, true, now);
+        latestForKey, transactionStatus, deleteHorizon, fullScanHorizonProven, true, now);
   }
 
   private static KafkaCompactionStrategyV1.RecordContext context(
-      long greatestOffset,
+      boolean latestForKey,
       KafkaCompactionStrategyV1.TransactionStatus transactionStatus,
       long deleteHorizon,
       boolean fullScanHorizonProven,
       boolean deleteHorizonPreexisting,
       long now) {
     return new KafkaCompactionStrategyV1.RecordContext(
-        greatestOffset,
+        latestForKey,
         transactionStatus,
         NOT_CONTROL,
         OptionalLong.of(deleteHorizon),
@@ -159,13 +159,12 @@ class KafkaCompactionStrategyV1Test {
   }
 
   private static KafkaCompactionStrategyV1.RecordContext markerContext(
-      long offset,
       KafkaCompactionStrategyV1.MarkerStatus markerStatus,
       long deleteHorizon,
       boolean fullScanHorizonProven,
       long now) {
     return new KafkaCompactionStrategyV1.RecordContext(
-        offset,
+        true,
         DECIDED,
         markerStatus,
         OptionalLong.of(deleteHorizon),

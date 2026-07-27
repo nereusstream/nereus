@@ -620,9 +620,15 @@ recovers KCP1 by materialization task ID and cross-validates the full task。`De
 tiles the current COMMITTED generation index，rereads every selected generation identity and rechecks retained
 stream/registration authority；`KafkaCompactionSourceResolver` derives the exact output prefix/task and composes that proof
 into the task mutation guard。`KafkaCompactionBatchSource` now opens independent backpressured decision/output streams from
-the recovered KCP1 and verifies the complete frozen source identity/accounting without fallback。Orphan scan/terminal
-dual-root retirement、sorted spill、streaming Parquet upload/full verification、coverage activation and the cleaner
-differential oracle remain pending；this gate does not claim compaction visibility。
+the recovered KCP1 and verifies the complete frozen source identity/accounting without fallback。
+`KafkaCompactionWinnerIndex` now replaces the production pass-one winner map with owner-only KCSR V1 sorted runs on the
+shared `StagingFileManager` budget。Runs are KCK2-key ordered、whole-file SHA-256 verified、fan-in-16 merged and reduced to
+an output-coverage `BitSet`；success、corruption、decode failure and cancellation close/delete all runs and release permits。
+Restart deliberately discards scratch runs and deterministically recomputes them from recovered KCP1 exact sources。
+`KafkaCompactionWinnerIndexTest` covers spill/no-spill and two-run restart equivalence、newer decision-tail suppression、
+same-length sealed-file corruption and cancellation cleanup。Orphan scan/terminal dual-root retirement、streaming Parquet
+upload/full verification、coverage activation and the cleaner differential oracle remain pending；this gate does not claim
+compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 
