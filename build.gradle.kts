@@ -3036,7 +3036,7 @@ tasks.register("phase9M5RetentionCheck") {
 
 tasks.register("phase9M5CompactionCoreCheck") {
     group = "verification"
-    description = "Run the partial F9-M5 Kafka compaction planner, bounded two-pass core, and NTC2 gate."
+    description = "Run the partial F9-M5 authoritative-source, Kafka compaction, and NTC2 gate."
     dependsOn("phase9M5RetentionCheck")
     dependsOn(":nereus-materialization:f9ExactSourceSetTest")
     dependsOn(":nereus-kafka-adapter:f9CompactionPropertyTest")

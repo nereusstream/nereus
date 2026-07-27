@@ -779,9 +779,39 @@ all strategy/key/rewrite/message-format identities in a deterministic `kcp1-*` i
 target、enum、length、trailing-byte or task-link drift fails closed，and both durable images are capped at 64 KiB before any
 metadata write。`KafkaCompactionPlanRecordMapper` wraps at most 60 KiB of KCP1 in a SHA-verified
 `KafkaCompactionPlanRecord`；`KafkaCompactionPlanMetadataStore` persists it under the partition keyspace with immutable
-create/idempotent reread/exact-version delete semantics，and rejects a same-ID byte conflict。Resolving these sets from the
-current COMMITTED generation index and atomically converging the separate materialization task + KCP1 roots remain the next
-workflow stage；a `Candidate` alone is not authorization to publish。
+create/idempotent reread/exact-version delete semantics，and rejects a same-ID byte conflict。
+
+`DefaultCommittedSourceSetResolver` now resolves the decision range from the authoritative COMMITTED generation index：
+
+```java
+CompletableFuture<CommittedSourceSetResolution> resolve(
+    StreamId streamId,
+    OffsetRange exactCoverage);
+
+CompletableFuture<Void> revalidate(
+    CommittedSourceSetResolution expected);
+
+CompletableFuture<KafkaCompactionSourceResolver.ResolvedSources> resolve(
+    StreamId streamId,
+    KafkaCompactionPlanner.Candidate candidate,
+    MaterializationPolicy outputPolicy);
+```
+
+The generic resolver scans at most 4096 candidate edges in pages of at most 1000，maps only COMMITTED candidates below the
+current head and searches a bounded 4096-state DAG for one deterministic exact path。Edges must start/end on the requested
+boundaries，remain gap-free，preserve cumulative-byte continuity and have non-decreasing commit versions；a trim-straddling
+source is never clipped。For equivalent complete paths the stable order is fewer physical sources，then higher generation、
+farther edge end and canonical UTF-8 index key。
+
+The paginated scan is deliberately not called a snapshot transaction。After selection，every source is reread by
+`(stream, COMMITTED, offsetEnd, generation)` and compared byte-for-byte with its index version/SHA/physical target/accounting。
+The resolver reloads stream and registration authority，requires ACTIVE/SEALED object-materialization profile、matching
+projection and retained bounds，and allows only append-only head/hint progress that cannot change the frozen range。Source
+removal、profile/policy/projection drift or trim entering coverage fails closed。`KafkaCompactionSourceResolver` additionally
+requires KAFKA_RECORD_BATCH sources，derives the output set as an exact prefix ending at `outputCoverage.endOffset` and creates
+the deterministic `TOPIC_KEY_COMPACTION` task。Its mutation guard revalidates this source/head proof before the caller's
+binding/leader guard；`MaterializationTaskStore` then performs its own exact per-generation checks immediately before task
+mutation。A range-only `Candidate` is therefore still not publication authorization。
 
 ### 10.4 Two-pass algorithm
 
@@ -845,8 +875,8 @@ mismatch and derives the closed NTC2 request metadata from those verified facts�
 byte counts、`kafka-log-cleaner-v1/1`、`KCK2`、`KAFKA_RECORD_REWRITE_V1` and the codec message-format digest。The caller only
 supplies task-owned cluster/stream/attempt/policy/cumulative-size/Parquet-writer facts；it cannot substitute row accounting
 or compatibility identities。This in-memory executor is an executable semantic oracle, not yet the production worker：
-authoritative COMMITTED source resolution、private checksummed sorted spill、streaming Parquet upload/full verification、
-terminal task/plan retirement、task execution restart and coverage activation remain pending。
+private checksummed sorted spill、streaming Parquet upload/full verification、terminal task/plan retirement、task execution
+restart and coverage activation remain pending。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate

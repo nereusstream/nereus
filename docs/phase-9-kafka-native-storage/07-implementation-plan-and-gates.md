@@ -616,9 +616,12 @@ byte-stable EXS1/KCP1 restart image and reject corrupt target/task/transaction/c
 immutable partition child；in-memory and real-Oxia contracts cover idempotent create、restart read and exact-version delete。
 `KafkaCompactionPlanCoordinator` now closes the non-atomic KCP1/task workflow：authority is checked before plan create and
 again inside `MaterializationTaskStore` immediately before task mutation，after an exact task-addressed KCP1 reread；restart
-recovers KCP1 by materialization task ID and cross-validates the full task。Authoritative COMMITTED source resolution、orphan
-scan/terminal dual-root retirement、sorted spill、streaming Parquet upload/full verification、coverage activation and the
-cleaner differential oracle remain pending；this gate does not claim compaction visibility。
+recovers KCP1 by materialization task ID and cross-validates the full task。`DefaultCommittedSourceSetResolver` now bounds and
+tiles the current COMMITTED generation index，rereads every selected generation identity and rechecks retained
+stream/registration authority；`KafkaCompactionSourceResolver` derives the exact output prefix/task and composes that proof
+into the task mutation guard。Orphan scan/terminal dual-root retirement、sorted spill、streaming Parquet upload/full
+verification、coverage activation and the cleaner differential oracle remain pending；this gate does not claim compaction
+visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

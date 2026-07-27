@@ -147,8 +147,11 @@ config/coverage、transaction marker facts 与兼容性元组冻结为 byte-stab
 做 immutable create、restart read 与 exact-version delete。
 `KafkaCompactionPlanCoordinator` 再以 plan-first 顺序处理非原子的 KCP1/task roots：task admission 前会再次验证
 authority 并按 materialization task ID 精确回读 KCP1，restart 也从该 ID 恢复并校验完整 task。
-当前形成 `phase9M5CompactionCoreCheck`；authoritative source resolution、orphan/terminal recovery、
-sorted spill/streaming Parquet publication、coverage CAS 与 stock cleaner oracle 仍待实现。
+`DefaultCommittedSourceSetResolver`/`KafkaCompactionSourceResolver` 又从当前 COMMITTED generation index 选择 bounded、
+gap-free exact decision path，逐 generation 回读并验证 stream/registration retained authority，再生成 exact output
+prefix/task 及其 mutation guard。
+当前形成 `phase9M5CompactionCoreCheck`；durable source-batch streaming、orphan/terminal recovery、sorted spill/streaming
+Parquet publication、coverage CAS 与 stock cleaner oracle 仍待实现。
 为接入 stock transaction state，product partition boundary 已把 durable end 与 derived visibility 拆开：
 stable append 先推进 exact end/commit version 并保留旧 HW/LSO；fork 必须在 stock producer/transaction 更新成功后
 调用 `publishDerivedOffsets(exactEnd, HW, LSO)`，随后才发布 `STABLE_APPEND` 并 dispatch 同 partition 下一次
