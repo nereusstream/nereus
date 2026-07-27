@@ -195,7 +195,9 @@ public final class KafkaCompactionPublicationCoordinator {
                                                 output,
                                                 exactAuthority,
                                                 0))
-                                    .thenCompose(ignored -> generations.publish(task, output))
+                                    .thenCompose(
+                                        ignored ->
+                                            generations.publish(task, output, exactAuthority))
                                     .thenCompose(
                                         committed -> {
                                           KafkaCompactionGenerationSet desired =
@@ -266,15 +268,15 @@ public final class KafkaCompactionPublicationCoordinator {
       MaterializationOutput output =
           tasks
               .requireOutput(exactDurable)
-              .orElseThrow(
-                  () ->
-                      new KafkaMetadataConditionFailedException(
+                  .orElseThrow(
+                      () ->
+                          new KafkaMetadataConditionFailedException(
                           "Kafka compaction recovery task has no durable output"));
       validateRecoveredOutput(exactDurable, task, plan, output);
 
       return revalidateRecoveryAuthority(
               exactPartition, task, plan, output, Optional.empty(), exactAuthority)
-          .thenCompose(ignored -> generations.publish(task, output))
+          .thenCompose(ignored -> generations.publish(task, output, exactAuthority))
           .thenCompose(
               committed -> {
                 KafkaCompactionGenerationSet desired =
@@ -404,7 +406,8 @@ public final class KafkaCompactionPublicationCoordinator {
                   (key, attempt) -> {
                     if (!key.equals(written.objectKey()) || attempt <= 0) {
                       return CompletableFuture.failedFuture(
-                          new IllegalStateException("guarded NTC2 upload identity is invalid"));
+                          new IllegalStateException(
+                              "guarded NTC2 upload identity is invalid"));
                     }
                     return revalidatePublicationAuthority(
                         partition,

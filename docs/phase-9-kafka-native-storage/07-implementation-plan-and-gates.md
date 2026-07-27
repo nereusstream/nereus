@@ -663,6 +663,14 @@ cleaner differential oracle remain pending。This closes the
 deterministic adapter no-resurrection/write-composition boundary but does not yet claim end-to-end client compaction
 visibility。
 
+The Kafka-native Generation authority slice now adds canonical projection-free F4 stream registration、a distinct
+`LiveStreamSubject` proof、an ACTIVE/readiness-backed Kafka activation guard and a caller-supplied partition-authority fence
+that is revalidated immediately before the Generation `COMMITTED` CAS。The old constructors remain
+`PROJECTION_REQUIRED`，so existing Pulsar/F4 publication and source-resolution contracts are unchanged。
+`KafkaPartitionLifecycleCoordinator` installs/verifies this registration before an ACTIVE binding is returned。
+Production Object-WAL runtime construction still has to assemble these pieces with the concrete compaction pass and the
+fork-owned partition-lock/KRaft capture provider。
+
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 
 ## 10. F9-M6 — Activation/controller/operations

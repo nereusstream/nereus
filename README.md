@@ -14,8 +14,10 @@ publication、binding coverage activation、generation-constrained no-resurrecti
 `KafkaCompactionPartitionPass` now recovers or admits one partition's durable workflow and composes claim heartbeat、two-pass
 execution、restart publication and dual-root retirement。`KafkaCompactionRuntime` now performs bounded fork-owned partition
 enumeration、internal-topic-first scheduling、process-current leader revalidation、cross-partition concurrency and
-drain-safe scheduler integration；the production fork registration/capture provider、real-provider process restart and the
-stock cleaner oracle remain pending。The Kafka fork now has
+drain-safe scheduler integration。Kafka native streams now install a canonical projection-free materialization registration，
+and Generation admission/final commit revalidate both cluster ACTIVE/readiness and caller-owned partition authority without
+relaxing the existing projection-required path；production Object-WAL compaction composition、fork registration/capture
+provider、real-provider process restart and the stock cleaner oracle remain pending。The Kafka fork now has
 local stock-`MemoryRecords` timestamp inspection/recovery-state rebuild、Kafka
 sentinel/request mapping、
 leader-epoch-fenced `Partition` lookup installation、`ReplicaManager` delayed-operation wakeup、async completion/cancellation

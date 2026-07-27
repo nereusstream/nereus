@@ -3,6 +3,7 @@ package com.nereusstream.materialization;
 
 import static com.nereusstream.materialization.GenerationPublicationTestSupport.CLUSTER;
 import static com.nereusstream.materialization.GenerationPublicationTestSupport.STREAM;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -10,7 +11,11 @@ import com.nereusstream.metadata.oxia.GenerationIndexIdentity;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
+
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class GenerationPublicationFailureInjectionTest {
     @Test
@@ -20,18 +25,25 @@ class GenerationPublicationFailureInjectionTest {
             GenerationMetadataStore lossy =
                     GenerationPublicationTestSupport.loseFirstCommittedIndexResponse(
                             context.generations());
-            GenerationCommitResult result = context.committer(
-                            lossy, GenerationPublicationTestSupport.successfulGuard())
-                    .publish(context.task(), context.output()).join();
+            GenerationCommitResult result =
+                    context.committer(lossy, GenerationPublicationTestSupport.successfulGuard())
+                            .publish(context.task(), context.output())
+                            .join();
 
             assertThat(result.committedByThisCall()).isFalse();
-            assertThat(context.generations().getIndex(
-                            CLUSTER,
-                            new GenerationIndexIdentity(
-                                    STREAM,
-                                    result.view(),
-                                    result.coverage().endOffset(),
-                                    result.generation().value())).join().orElseThrow().value().lifecycle())
+            assertThat(
+                            context.generations()
+                                    .getIndex(
+                                            CLUSTER,
+                                            new GenerationIndexIdentity(
+                                                    STREAM,
+                                                    result.view(),
+                                                    result.coverage().endOffset(),
+                                                    result.generation().value()))
+                                    .join()
+                                    .orElseThrow()
+                                    .value()
+                                    .lifecycle())
                     .isEqualTo(GenerationLifecycle.COMMITTED);
         }
     }
@@ -43,13 +55,19 @@ class GenerationPublicationFailureInjectionTest {
             GenerationMetadataStore lossy =
                     GenerationPublicationTestSupport.loseFirstGenerationAttachmentResponse(
                             context.generations());
-            GenerationCommitResult result = context.committer(
-                            lossy, GenerationPublicationTestSupport.successfulGuard())
-                    .publish(context.task(), context.output()).join();
+            GenerationCommitResult result =
+                    context.committer(lossy, GenerationPublicationTestSupport.successfulGuard())
+                            .publish(context.task(), context.output())
+                            .join();
 
             assertThat(result.generation().value()).isEqualTo(2);
-            assertThat(context.generations().getSequence(
-                            CLUSTER, STREAM, result.view()).join().orElseThrow().value().lastAllocatedGeneration())
+            assertThat(
+                            context.generations()
+                                    .getSequence(CLUSTER, STREAM, result.view())
+                                    .join()
+                                    .orElseThrow()
+                                    .value()
+                                    .lastAllocatedGeneration())
                     .isEqualTo(2);
         }
     }
@@ -58,38 +76,58 @@ class GenerationPublicationFailureInjectionTest {
     void leavesPreparedInvisibleWhenActivationChangesThenRestartCompletesSamePublication() {
         try (GenerationPublicationTestSupport.Context context =
                 GenerationPublicationTestSupport.context()) {
-            DefaultGenerationCommitter failing = context.committer(
-                    context.generations(),
-                    GenerationPublicationTestSupport.failFirstRevalidation());
-            assertThatThrownBy(() -> failing.publish(
-                            context.task(), context.output()).join())
+            DefaultGenerationCommitter failing =
+                    context.committer(
+                            context.generations(),
+                            GenerationPublicationTestSupport.failFirstRevalidation());
+            assertThatThrownBy(() -> failing.publish(context.task(), context.output()).join())
                     .hasRootCauseInstanceOf(
-                            com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
+                            com.nereusstream.metadata.oxia.F4MetadataConditionFailedException
+                                    .class);
 
-            var publishingTask = context.generations().getTask(
-                    CLUSTER, STREAM, context.task().taskId()).join().orElseThrow();
+            var publishingTask =
+                    context.generations()
+                            .getTask(CLUSTER, STREAM, context.task().taskId())
+                            .join()
+                            .orElseThrow();
             assertThat(publishingTask.value().lifecycle()).isEqualTo(TaskLifecycle.PUBLISHING);
             long generation = publishingTask.value().allocatedGeneration().orElseThrow();
-            var prepared = context.generations().getIndex(
-                    CLUSTER,
-                    new GenerationIndexIdentity(
-                            STREAM, context.task().view(), context.task().coverage().endOffset(), generation))
-                    .join().orElseThrow();
+            var prepared =
+                    context.generations()
+                            .getIndex(
+                                    CLUSTER,
+                                    new GenerationIndexIdentity(
+                                            STREAM,
+                                            context.task().view(),
+                                            context.task().coverage().endOffset(),
+                                            generation))
+                            .join()
+                            .orElseThrow();
             assertThat(prepared.value().lifecycle()).isEqualTo(GenerationLifecycle.PREPARED);
 
-            GenerationCommitResult recovered = new GenerationPublicationReconciler(context.committer(
-                            context.generations(), GenerationPublicationTestSupport.successfulGuard()))
-                    .reconcile(context.task(), context.output()).join();
+            GenerationCommitResult recovered =
+                    new GenerationPublicationReconciler(
+                                    context.committer(
+                                            context.generations(),
+                                            GenerationPublicationTestSupport.successfulGuard()))
+                            .reconcile(context.task(), context.output())
+                            .join();
             assertThat(recovered.generation().value()).isEqualTo(generation);
             assertThat(recovered.publicationId().value())
                     .isEqualTo(publishingTask.value().publicationId());
-            assertThat(context.generations().getIndex(
-                            CLUSTER,
-                            new GenerationIndexIdentity(
-                                    STREAM,
-                                    context.task().view(),
-                                    context.task().coverage().endOffset(),
-                                    generation)).join().orElseThrow().value().lifecycle())
+            assertThat(
+                            context.generations()
+                                    .getIndex(
+                                            CLUSTER,
+                                            new GenerationIndexIdentity(
+                                                    STREAM,
+                                                    context.task().view(),
+                                                    context.task().coverage().endOffset(),
+                                                    generation))
+                                    .join()
+                                    .orElseThrow()
+                                    .value()
+                                    .lifecycle())
                     .isEqualTo(GenerationLifecycle.COMMITTED);
         }
     }
@@ -100,23 +138,94 @@ class GenerationPublicationFailureInjectionTest {
                 GenerationPublicationTestSupport.context()) {
             GenerationMetadataStore hiddenSources =
                     GenerationPublicationTestSupport.hideSources(context.generations());
-            assertThatThrownBy(() -> context.committer(
-                            hiddenSources, GenerationPublicationTestSupport.successfulGuard())
-                    .publish(context.task(), context.output()).join())
+            assertThatThrownBy(
+                            () ->
+                                    context.committer(
+                                                    hiddenSources,
+                                                    GenerationPublicationTestSupport
+                                                            .successfulGuard())
+                                            .publish(context.task(), context.output())
+                                            .join())
                     .hasRootCauseInstanceOf(
-                            com.nereusstream.metadata.oxia.F4MetadataConditionFailedException.class);
+                            com.nereusstream.metadata.oxia.F4MetadataConditionFailedException
+                                    .class);
 
-            var publishingTask = context.generations().getTask(
-                    CLUSTER, STREAM, context.task().taskId()).join().orElseThrow();
+            var publishingTask =
+                    context.generations()
+                            .getTask(CLUSTER, STREAM, context.task().taskId())
+                            .join()
+                            .orElseThrow();
             assertThat(publishingTask.value().allocatedGeneration()).isPresent();
-            assertThat(context.generations().getIndex(
-                    CLUSTER,
-                    new GenerationIndexIdentity(
-                            STREAM,
-                            context.task().view(),
-                            context.task().coverage().endOffset(),
-                            publishingTask.value().allocatedGeneration().orElseThrow()))
-                    .join()).isEmpty();
+            assertThat(
+                            context.generations()
+                                    .getIndex(
+                                            CLUSTER,
+                                            new GenerationIndexIdentity(
+                                                    STREAM,
+                                                    context.task().view(),
+                                                    context.task().coverage().endOffset(),
+                                                    publishingTask
+                                                            .value()
+                                                            .allocatedGeneration()
+                                                            .orElseThrow()))
+                                    .join())
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    void callerAuthorityLossLeavesThePreparedGenerationInvisible() {
+        try (GenerationPublicationTestSupport.Context context =
+                GenerationPublicationTestSupport.context()) {
+            AtomicInteger revalidations = new AtomicInteger();
+            MaterializationTaskMutationGuard callerAuthority =
+                    () -> {
+                        if (revalidations.incrementAndGet() == 2) {
+                            return CompletableFuture.failedFuture(
+                                    new com.nereusstream.metadata.oxia
+                                            .F4MetadataConditionFailedException(
+                                            "partition authority changed before generation"
+                                                + " commit"));
+                        }
+                        return CompletableFuture.completedFuture(null);
+                    };
+            DefaultGenerationCommitter committer =
+                    context.committer(
+                            context.generations(),
+                            GenerationPublicationTestSupport.successfulGuard());
+
+            assertThatThrownBy(
+                            () ->
+                                    committer
+                                            .publish(
+                                                    context.task(),
+                                                    context.output(),
+                                                    callerAuthority)
+                                            .join())
+                    .hasRootCauseMessage("partition authority changed before generation commit");
+
+            assertThat(revalidations).hasValue(2);
+            var publishingTask =
+                    context.generations()
+                            .getTask(CLUSTER, STREAM, context.task().taskId())
+                            .join()
+                            .orElseThrow();
+            assertThat(publishingTask.value().lifecycle()).isEqualTo(TaskLifecycle.PUBLISHING);
+            long generation = publishingTask.value().allocatedGeneration().orElseThrow();
+            assertThat(
+                            context.generations()
+                                    .getIndex(
+                                            CLUSTER,
+                                            new GenerationIndexIdentity(
+                                                    STREAM,
+                                                    context.task().view(),
+                                                    context.task().coverage().endOffset(),
+                                                    generation))
+                                    .join()
+                                    .orElseThrow()
+                                    .value()
+                                    .lifecycle())
+                    .isEqualTo(GenerationLifecycle.PREPARED);
         }
     }
 }

@@ -3,5 +3,4 @@ package com.nereusstream.core.capability;
 
 /** Ephemeral authoritative subject revalidated at every F4 mutation boundary. */
 public sealed interface GenerationActivationSubject
-        permits LiveProjectionSubject, DomainValidatedDeletionSubject {
-}
+        permits LiveProjectionSubject, LiveStreamSubject, DomainValidatedDeletionSubject {}

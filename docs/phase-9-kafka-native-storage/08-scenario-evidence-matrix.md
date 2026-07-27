@@ -345,9 +345,15 @@ binding coverage CAS and task-first/KCP1-second retirement；the pass itself als
 claim heartbeat、typed failure persistence and activation-set reconstruction。`KafkaCompactionRuntimeTest` adds deterministic
 bounded owned-partition enumeration、internal-first ordering、stale-epoch skip、cross-partition concurrency、attempt-all
 failure aggregation and drain-waits-accepted-work evidence；`DefaultNereusKafkaRuntimeTest` proves background start gates
-readiness and background drain precedes partition-manager shutdown。Production fork registration/concrete partition-lock/KRaft
-capture、provider fresh-process restart and stock `LogCleaner` comparison remain absent，so all rows remain `PLANNED`。The durable-output and full-pass tests are deterministic local restart/composition
-evidence only；the real-provider fresh-process restart tier remains absent。
+readiness and background drain precedes partition-manager shutdown。`DefaultCommittedSourceSetResolverTest` and
+`GenerationIndexPublicationTest` now prove canonical projection-free direct-stream authority while preserving the default
+projection-required path；`GenerationPublicationFailureInjectionTest` proves caller partition authority loss leaves the
+Generation `PREPARED` and invisible immediately before the final CAS；
+`KafkaGenerationProtocolActivationGuardTest`/`KafkaPartitionLifecycleCoordinatorTest` prove exact direct registration plus
+ACTIVE/readiness admission/revalidation before an ACTIVE Kafka binding is returned。Production Object-WAL compaction
+composition、fork registration/concrete partition-lock/KRaft capture、provider fresh-process restart and stock `LogCleaner`
+comparison remain absent，so all rows remain `PLANNED`。The durable-output and full-pass tests are deterministic local
+restart/composition evidence only；the real-provider fresh-process restart tier remains absent。
 
 ## 11. Configuration, activation, controller and operations
 

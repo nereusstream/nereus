@@ -1306,8 +1306,8 @@ per-partition serialization described above。
 | Kafka fork | `NereusProducerStateManager`、`NereusTransactionIndex`、`NereusTimeIndex`、`NereusLeaderEpochCache` |
 | adapter checkpoint | producer/txn/epoch/segment/time/byte section codecs V1 + full composition implemented |
 | adapter retention | `KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、`KafkaTrimBarrier`、`KafkaRetentionDurableTrimListener` partial implementation |
-| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge implemented；production fork capture wiring pending |
-| materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier |
+| adapter compaction | codec/strategy/rewrite/policy/planner/coverage/fetch + activated-generation resolver + scheduler/orphan scanner + single-partition pass + bounded owned-partition runtime bridge + projection-free Kafka stream registration/ACTIVE-readiness generation guard implemented；production Object-WAL composition and fork capture wiring pending |
+| materialization | ranged decoder SPI、V2 two-pass engine/publisher/verifier + explicit projection-required/direct-stream authority modes and caller authority final-CAS fence |
 | metadata | binding compaction coverage nested record/codec/transition validators + partition-scoped KCP1 scan continuation |
 | object store | NTC2 writer/reader/goldens from document 02 |
 

@@ -18,6 +18,7 @@ import com.nereusstream.metadata.oxia.StreamMetadataSnapshot;
 import com.nereusstream.metadata.oxia.VersionedGenerationCandidate;
 import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.VersionedMaterializationStreamRegistration;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -38,22 +39,40 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
     public static final int MAX_CANDIDATE_EDGES = 4_096;
     public static final int MAX_PATH_STATES = 4_096;
 
-    private static final Comparator<SourceGeneration> EDGE_ORDER = Comparator
-            .comparingLong((SourceGeneration source) -> source.range().startOffset())
-            .thenComparingLong(source -> source.range().endOffset())
-            .thenComparing(Comparator.comparingLong(SourceGeneration::generation).reversed())
-            .thenComparing(SourceGeneration::indexKey, DefaultCommittedSourceSetResolver::compareUtf8);
+    private static final Comparator<SourceGeneration> EDGE_ORDER =
+            Comparator.comparingLong((SourceGeneration source) -> source.range().startOffset())
+                    .thenComparingLong(source -> source.range().endOffset())
+                    .thenComparing(
+                            Comparator.comparingLong(SourceGeneration::generation).reversed())
+                    .thenComparing(
+                            SourceGeneration::indexKey,
+                            DefaultCommittedSourceSetResolver::compareUtf8);
 
     private final String cluster;
     private final OxiaMetadataStore l0Metadata;
     private final GenerationMetadataStore generations;
     private final int scanPageSize;
+    private final MaterializationStreamAuthorityMode authorityMode;
 
     public DefaultCommittedSourceSetResolver(
             String cluster,
             OxiaMetadataStore l0Metadata,
             GenerationMetadataStore generations,
             int scanPageSize) {
+        this(
+                cluster,
+                l0Metadata,
+                generations,
+                scanPageSize,
+                MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
+    }
+
+    public DefaultCommittedSourceSetResolver(
+            String cluster,
+            OxiaMetadataStore l0Metadata,
+            GenerationMetadataStore generations,
+            int scanPageSize,
+            MaterializationStreamAuthorityMode authorityMode) {
         this.cluster = requireText(cluster, "cluster");
         this.l0Metadata = Objects.requireNonNull(l0Metadata, "l0Metadata");
         this.generations = Objects.requireNonNull(generations, "generations");
@@ -61,6 +80,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
             throw new IllegalArgumentException("scanPageSize must be in [1, 1000]");
         }
         this.scanPageSize = scanPageSize;
+        this.authorityMode = Objects.requireNonNull(authorityMode, "authorityMode");
     }
 
     @Override
@@ -80,20 +100,30 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
                             exactCoverage.endOffset(),
                             Optional.empty(),
                             new ArrayList<>())
-                    .thenCompose(candidates -> loadAuthority(exactStream)
-                            .thenCompose(authority -> {
-                                requireCoverageAuthority(
-                                        exactStream, exactCoverage, authority);
-                                ExactSourceSet sourceSet = selectExactSourceSet(
-                                        exactStream, exactCoverage, candidates, authority);
-                                CommittedSourceSetResolution resolution =
-                                        new CommittedSourceSetResolution(
-                                                exactStream,
-                                                sourceSet,
-                                                authority.snapshot(),
-                                                authority.registration());
-                                return revalidate(resolution).thenApply(ignored -> resolution);
-                            }));
+                    .thenCompose(
+                            candidates ->
+                                    loadAuthority(exactStream)
+                                            .thenCompose(
+                                                    authority -> {
+                                                        requireCoverageAuthority(
+                                                                exactStream,
+                                                                exactCoverage,
+                                                                authority);
+                                                        ExactSourceSet sourceSet =
+                                                                selectExactSourceSet(
+                                                                        exactStream,
+                                                                        exactCoverage,
+                                                                        candidates,
+                                                                        authority);
+                                                        CommittedSourceSetResolution resolution =
+                                                                new CommittedSourceSetResolution(
+                                                                        exactStream,
+                                                                        sourceSet,
+                                                                        authority.snapshot(),
+                                                                        authority.registration());
+                                                        return revalidate(resolution)
+                                                                .thenApply(ignored -> resolution);
+                                                    }));
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -102,38 +132,42 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
     @Override
     public CompletableFuture<Void> revalidate(CommittedSourceSetResolution expected) {
         try {
-            CommittedSourceSetResolution exact =
-                    Objects.requireNonNull(expected, "expected");
+            CommittedSourceSetResolution exact = Objects.requireNonNull(expected, "expected");
             CompletableFuture<Authority> authority = loadAuthority(exact.streamId());
             List<CompletableFuture<Void>> sourceChecks =
                     new ArrayList<>(exact.sourceSet().sources().size());
             for (SourceGeneration source : exact.sourceSet().sources()) {
-                sourceChecks.add(generations
-                        .getCandidate(
-                                cluster,
-                                exact.streamId(),
-                                ReadView.COMMITTED,
-                                source.range().endOffset(),
-                                source.generation())
-                        .thenAccept(candidate -> {
-                            if (candidate.isEmpty()
-                                    || !MaterializationSourceMapper.matchesExactSource(
-                                            candidate.orElseThrow(),
-                                            exact.streamId(),
-                                            source)) {
-                                throw condition(
-                                        "authoritative COMMITTED source changed during resolution");
-                            }
-                        }));
+                sourceChecks.add(
+                        generations
+                                .getCandidate(
+                                        cluster,
+                                        exact.streamId(),
+                                        ReadView.COMMITTED,
+                                        source.range().endOffset(),
+                                        source.generation())
+                                .thenAccept(
+                                        candidate -> {
+                                            if (candidate.isEmpty()
+                                                    || !MaterializationSourceMapper
+                                                            .matchesExactSource(
+                                                                    candidate.orElseThrow(),
+                                                                    exact.streamId(),
+                                                                    source)) {
+                                                throw condition(
+                                                        "authoritative COMMITTED source changed"
+                                                            + " during resolution");
+                                            }
+                                        }));
             }
-            return CompletableFuture.allOf(
-                            sourceChecks.toArray(CompletableFuture[]::new))
-                    .thenCombine(authority, (ignored, current) -> {
-                        requireCoverageAuthority(
-                                exact.streamId(), exact.sourceSet().coverage(), current);
-                        requireStableAuthority(exact, current);
-                        return null;
-                    });
+            return CompletableFuture.allOf(sourceChecks.toArray(CompletableFuture[]::new))
+                    .thenCombine(
+                            authority,
+                            (ignored, current) -> {
+                                requireCoverageAuthority(
+                                        exact.streamId(), exact.sourceSet().coverage(), current);
+                                requireStableAuthority(exact, current);
+                                return null;
+                            });
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
@@ -154,12 +188,14 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
                         maximumOffsetEnd,
                         continuation,
                         scanPageSize)
-                .thenCompose(page -> appendCandidatePage(
-                        streamId,
-                        minimumOffsetEnd,
-                        maximumOffsetEnd,
-                        values,
-                        page));
+                .thenCompose(
+                        page ->
+                                appendCandidatePage(
+                                        streamId,
+                                        minimumOffsetEnd,
+                                        maximumOffsetEnd,
+                                        values,
+                                        page));
     }
 
     private CompletableFuture<List<VersionedGenerationCandidate>> appendCandidatePage(
@@ -175,11 +211,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         }
         if (page.continuation().isPresent()) {
             return scanCandidates(
-                    streamId,
-                    minimumOffsetEnd,
-                    maximumOffsetEnd,
-                    page.continuation(),
-                    values);
+                    streamId, minimumOffsetEnd, maximumOffsetEnd, page.continuation(), values);
         }
         return CompletableFuture.completedFuture(List.copyOf(values));
     }
@@ -189,10 +221,14 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
                 .getStreamSnapshot(cluster, streamId)
                 .thenCombine(
                         generations.getStreamRegistration(cluster, streamId),
-                        (snapshot, registration) -> new Authority(
-                                Objects.requireNonNull(snapshot, "stream snapshot"),
-                                registration.orElseThrow(() -> condition(
-                                        "materialization stream registration is absent"))));
+                        (snapshot, registration) ->
+                                new Authority(
+                                        Objects.requireNonNull(snapshot, "stream snapshot"),
+                                        registration.orElseThrow(
+                                                () ->
+                                                        condition(
+                                                                "materialization stream"
+                                                                    + " registration is absent"))));
     }
 
     private ExactSourceSet selectExactSourceSet(
@@ -201,19 +237,25 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
             List<VersionedGenerationCandidate> candidates,
             Authority authority) {
         requireUniquePositiveGenerations(candidates);
-        List<SourceGeneration> edges = candidates.stream()
-                .map(candidate -> MaterializationSourceMapper.committedSource(
-                        candidate,
-                        streamId,
-                        ReadView.COMMITTED,
-                        authority.snapshot().committedEnd().committedEndOffset(),
-                        authority.snapshot().committedEnd().commitVersion(),
-                        authority.effectiveProjection()))
-                .flatMap(Optional::stream)
-                .filter(source -> source.range().startOffset() >= coverage.startOffset())
-                .filter(source -> source.range().endOffset() <= coverage.endOffset())
-                .sorted(EDGE_ORDER)
-                .toList();
+        List<SourceGeneration> edges =
+                candidates.stream()
+                        .map(
+                                candidate ->
+                                        MaterializationSourceMapper.committedSource(
+                                                candidate,
+                                                streamId,
+                                                ReadView.COMMITTED,
+                                                authority
+                                                        .snapshot()
+                                                        .committedEnd()
+                                                        .committedEndOffset(),
+                                                authority.snapshot().committedEnd().commitVersion(),
+                                                authority.effectiveProjection()))
+                        .flatMap(Optional::stream)
+                        .filter(source -> source.range().startOffset() >= coverage.startOffset())
+                        .filter(source -> source.range().endOffset() <= coverage.endOffset())
+                        .sorted(EDGE_ORDER)
+                        .toList();
         Map<Long, Map<PathState, Path>> pathsByEnd = new HashMap<>();
         int pathStates = 0;
         for (SourceGeneration edge : edges) {
@@ -230,8 +272,9 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
                 }
             }
             for (Path candidate : candidatesAtEdge) {
-                Map<PathState, Path> atEnd = pathsByEnd.computeIfAbsent(
-                        candidate.endOffset(), ignored -> new HashMap<>());
+                Map<PathState, Path> atEnd =
+                        pathsByEnd.computeIfAbsent(
+                                candidate.endOffset(), ignored -> new HashMap<>());
                 PathState state = candidate.state();
                 Path current = atEnd.get(state);
                 if (current == null) {
@@ -248,11 +291,13 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         Map<PathState, Path> complete = pathsByEnd.get(coverage.endOffset());
         if (complete == null || complete.isEmpty()) {
             throw condition(
-                    "no exact gap-free authoritative COMMITTED source path covers the requested range");
+                    "no exact gap-free authoritative COMMITTED source path covers the requested"
+                        + " range");
         }
-        Path selected = complete.values().stream()
-                .min(DefaultCommittedSourceSetResolver::comparePath)
-                .orElseThrow();
+        Path selected =
+                complete.values().stream()
+                        .min(DefaultCommittedSourceSetResolver::comparePath)
+                        .orElseThrow();
         return ExactSourceSet.create(ReadView.COMMITTED, coverage, selected.sources());
     }
 
@@ -263,17 +308,16 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
             if (!(candidate instanceof VersionedGenerationIndex higher)) {
                 continue;
             }
-            String previous = keysByGeneration.putIfAbsent(
-                    higher.value().generation(), higher.key());
+            String previous =
+                    keysByGeneration.putIfAbsent(higher.value().generation(), higher.key());
             if (previous != null && !previous.equals(higher.key())) {
                 throw invariant(
-                        "one COMMITTED source view contains duplicate positive generations",
-                        null);
+                        "one COMMITTED source view contains duplicate positive generations", null);
             }
         }
     }
 
-    private static void requireCoverageAuthority(
+    private void requireCoverageAuthority(
             StreamId streamId, OffsetRange coverage, Authority authority) {
         StreamMetadataSnapshot snapshot = authority.snapshot();
         if (!snapshot.metadata().streamId().equals(streamId.value())
@@ -294,17 +338,37 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         }
         if (!profile.objectMaterializationEnabled()
                 || !authority.registration().value().storageProfile().equals(profile.name())
-                || authority.effectiveProjection().isEmpty()) {
+                || !matchesAuthorityMode(streamId, profile, authority)) {
             throw condition(
                     "materialization registration no longer matches stream profile/projection");
         }
         if (coverage.startOffset() < snapshot.trim().trimOffset()
-                || coverage.endOffset()
-                        > snapshot.committedEnd().committedEndOffset()
+                || coverage.endOffset() > snapshot.committedEnd().committedEndOffset()
                 || snapshot.committedEnd().commitVersion() <= 0) {
             throw condition(
                     "requested COMMITTED source range is outside authoritative retained bounds");
         }
+    }
+
+    private boolean matchesAuthorityMode(
+            StreamId streamId, StorageProfile profile, Authority authority) {
+        if (authorityMode == MaterializationStreamAuthorityMode.PROJECTION_REQUIRED) {
+            return authority.effectiveProjection().isPresent();
+        }
+        return authority.effectiveProjection().isEmpty()
+                && authority
+                        .registration()
+                        .value()
+                        .projectionRef()
+                        .equals(DirectMaterializationStreamAuthority.encodedProjectionRef())
+                && authority
+                        .registration()
+                        .value()
+                        .projectionIdentitySha256()
+                        .equals(
+                                DirectMaterializationStreamAuthority.identitySha256(
+                                                streamId, profile)
+                                        .value());
     }
 
     private static void requireStableAuthority(
@@ -312,10 +376,11 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         StreamMetadataSnapshot previous = expected.streamSnapshot();
         var previousRegistration = expected.registration().value();
         var currentRegistration = current.registration().value();
-        long sourceCommitVersion = expected.sourceSet()
-                .sources()
-                .get(expected.sourceSet().sources().size() - 1)
-                .commitVersion();
+        long sourceCommitVersion =
+                expected.sourceSet()
+                        .sources()
+                        .get(expected.sourceSet().sources().size() - 1)
+                        .commitVersion();
         if (!previous.metadata().profile().equals(current.snapshot().metadata().profile())
                 || previous.metadata().policyVersion()
                         != current.snapshot().metadata().policyVersion()
@@ -345,8 +410,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
             if (generation != 0) {
                 return generation;
             }
-            int edgeEnd = Long.compare(
-                    rightEdge.range().endOffset(), leftEdge.range().endOffset());
+            int edgeEnd = Long.compare(rightEdge.range().endOffset(), leftEdge.range().endOffset());
             if (edgeEnd != 0) {
                 return edgeEnd;
             }
@@ -363,8 +427,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         byte[] rightBytes = right.getBytes(StandardCharsets.UTF_8);
         int length = Math.min(leftBytes.length, rightBytes.length);
         for (int index = 0; index < length; index++) {
-            int compared =
-                    Integer.compare(leftBytes[index] & 0xff, rightBytes[index] & 0xff);
+            int compared = Integer.compare(leftBytes[index] & 0xff, rightBytes[index] & 0xff);
             if (compared != 0) {
                 return compared;
             }
@@ -381,8 +444,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
     }
 
     private static NereusException invariant(String message, Throwable cause) {
-        return new NereusException(
-                ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
+        return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message, cause);
     }
 
     private static String requireText(String value, String field) {
@@ -400,10 +462,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         private Authority(
                 StreamMetadataSnapshot snapshot,
                 VersionedMaterializationStreamRegistration registration) {
-            this(
-                    snapshot,
-                    registration,
-                    decodeProjection(registration.value().projectionRef()));
+            this(snapshot, registration, decodeProjection(registration.value().projectionRef()));
         }
 
         private static Optional<ProjectionRef> decodeProjection(String encoded) {
@@ -411,17 +470,13 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
                 return ProjectionIdentity.decode(encoded);
             } catch (RuntimeException failure) {
                 throw invariant(
-                        "materialization registration contains an unsupported projection",
-                        failure);
+                        "materialization registration contains an unsupported projection", failure);
             }
         }
     }
 
     private record PathState(
-            long cumulativeSizeAtStart,
-            long cumulativeSizeAtEnd,
-            long lastCommitVersion) {
-    }
+            long cumulativeSizeAtStart, long cumulativeSizeAtEnd, long lastCommitVersion) {}
 
     private record Path(
             long endOffset,
@@ -445,8 +500,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         }
 
         private Path append(SourceGeneration source) {
-            ArrayList<SourceGeneration> combined =
-                    new ArrayList<>(sources.size() + 1);
+            ArrayList<SourceGeneration> combined = new ArrayList<>(sources.size() + 1);
             combined.addAll(sources);
             combined.add(source);
             return new Path(
@@ -458,8 +512,7 @@ public final class DefaultCommittedSourceSetResolver implements CommittedSourceS
         }
 
         private PathState state() {
-            return new PathState(
-                    cumulativeSizeAtStart, cumulativeSizeAtEnd, lastCommitVersion);
+            return new PathState(cumulativeSizeAtStart, cumulativeSizeAtEnd, lastCommitVersion);
         }
     }
 }

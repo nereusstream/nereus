@@ -42,7 +42,6 @@ import com.nereusstream.metadata.oxia.records.GenerationIndexRecord;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
-import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectLifecycle;
 import com.nereusstream.metadata.oxia.records.PhysicalObjectRootRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
@@ -50,6 +49,7 @@ import com.nereusstream.metadata.oxia.records.TaskFailureClass;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
 import com.nereusstream.metadata.oxia.records.WorkerClaimRecord;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
@@ -69,16 +69,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class GenerationPublicationTestSupport {
     static final String CLUSTER = "cluster-publication";
     static final StreamId STREAM = new StreamId("stream-publication");
-    static final ProjectionRef PROJECTION = new ProjectionRef(
-            ProjectionType.VIRTUAL_LEDGER, "projection-publication");
+    static final ProjectionRef PROJECTION =
+            new ProjectionRef(ProjectionType.VIRTUAL_LEDGER, "projection-publication");
     static final Checksum PROJECTION_SHA = sha("c");
     static final Checksum REFERENCE_DOMAINS_SHA = sha("f");
     static final String CLAIM_ID = "c".repeat(26);
     static final String PROCESS_ID = "d".repeat(26);
     static final Clock CLOCK = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC);
 
-    private GenerationPublicationTestSupport() {
-    }
+    private GenerationPublicationTestSupport() {}
 
     static Context context() {
         return context(false, false);
@@ -92,215 +91,249 @@ final class GenerationPublicationTestSupport {
         return context(true, true);
     }
 
+    static Context directKafkaTopicContext() {
+        return context(true, true, true);
+    }
+
     private static Context context(boolean topicCompacted, boolean emptyKafkaOutput) {
+        return context(topicCompacted, emptyKafkaOutput, false);
+    }
+
+    private static Context context(
+            boolean topicCompacted, boolean emptyKafkaOutput, boolean directStream) {
         GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
         FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
-        ObjectProtectionManager protections = new DefaultObjectProtectionManager(
-                CLUSTER,
-                physical,
-                Duration.ofMinutes(5),
-                Duration.ofSeconds(1),
-                Duration.ofMinutes(10),
-                CLOCK);
+        ObjectProtectionManager protections =
+                new DefaultObjectProtectionManager(
+                        CLUSTER,
+                        physical,
+                        Duration.ofMinutes(5),
+                        Duration.ofSeconds(1),
+                        Duration.ofMinutes(10),
+                        CLOCK);
 
-        ObjectSliceReadTarget sourceTarget = target(
-                "source-object",
-                "objects/publication/source-object",
-                "source-slice",
-                "11111111");
-        PhysicalObjectIdentity sourceIdentity = PhysicalObjectIdentity.create(
-                sourceTarget.objectKey(),
-                Optional.of(sourceTarget.objectId()),
-                PhysicalObjectKind.COMMITTED_COMPACTED,
-                sourceTarget.objectLength(),
-                new Checksum(ChecksumType.CRC32C, sourceTarget.sliceChecksum().value()),
-                Optional.of(sha("a")),
-                Optional.of("source-etag"));
+        ObjectSliceReadTarget sourceTarget =
+                target(
+                        "source-object",
+                        "objects/publication/source-object",
+                        "source-slice",
+                        "11111111");
+        PhysicalObjectIdentity sourceIdentity =
+                PhysicalObjectIdentity.create(
+                        sourceTarget.objectKey(),
+                        Optional.of(sourceTarget.objectId()),
+                        PhysicalObjectKind.COMMITTED_COMPACTED,
+                        sourceTarget.objectLength(),
+                        new Checksum(ChecksumType.CRC32C, sourceTarget.sliceChecksum().value()),
+                        Optional.of(sha("a")),
+                        Optional.of("source-etag"));
         physical.createRoot(CLUSTER, activeRoot(sourceIdentity, 100)).join();
 
         PublicationId sourcePublication = new PublicationId("s".repeat(26));
-        AllocatedGeneration sourceAllocation = generations.allocateGeneration(
-                CLUSTER, STREAM, ReadView.COMMITTED, sourcePublication).join();
+        AllocatedGeneration sourceAllocation =
+                generations
+                        .allocateGeneration(CLUSTER, STREAM, ReadView.COMMITTED, sourcePublication)
+                        .join();
         Checksum sourcePolicy = sha("b");
-        GenerationIndexRecord sourcePrepared = generation(
-                sourceTarget,
-                sourceAllocation.generation().value(),
-                sourcePublication.value(),
-                "source-task",
-                sourcePolicy,
-                GenerationLifecycle.PREPARED,
-                100,
-                0,
-                100);
-        VersionedGenerationIndex sourceCreated = generations.createPrepared(
-                CLUSTER, sourcePrepared).join();
-        VersionedGenerationIndex sourceCommitted = generations.compareAndSetIndex(
-                CLUSTER,
+        Optional<ProjectionRef> authorityProjection =
+                directStream ? Optional.empty() : Optional.of(PROJECTION);
+        GenerationIndexRecord sourcePrepared =
                 generation(
                         sourceTarget,
                         sourceAllocation.generation().value(),
                         sourcePublication.value(),
                         "source-task",
                         sourcePolicy,
-                        GenerationLifecycle.COMMITTED,
+                        GenerationLifecycle.PREPARED,
                         100,
-                        110,
-                        110),
-                sourceCreated.metadataVersion()).join();
+                        0,
+                        100,
+                        authorityProjection);
+        VersionedGenerationIndex sourceCreated =
+                generations.createPrepared(CLUSTER, sourcePrepared).join();
+        VersionedGenerationIndex sourceCommitted =
+                generations
+                        .compareAndSetIndex(
+                                CLUSTER,
+                                generation(
+                                        sourceTarget,
+                                        sourceAllocation.generation().value(),
+                                        sourcePublication.value(),
+                                        "source-task",
+                                        sourcePolicy,
+                                        GenerationLifecycle.COMMITTED,
+                                        100,
+                                        110,
+                                        110,
+                                        authorityProjection),
+                                sourceCreated.metadataVersion())
+                        .join();
 
-        SourceGeneration source = new SourceGeneration(
-                ReadView.COMMITTED,
-                new OffsetRange(0, 2),
-                sourceCommitted.value().generation(),
-                1,
-                sourceCommitted.key(),
-                sourceCommitted.metadataVersion(),
-                sourceCommitted.durableValueSha256(),
-                sourceTarget,
-                new Checksum(
-                        ChecksumType.SHA256,
-                        ReadTargetCodecRegistry.phase15()
-                                .encode(sourceTarget)
-                                .identityChecksumValue()),
-                Optional.of(sourcePolicy),
-                PayloadFormat.PULSAR_ENTRY_BATCH,
-                Optional.of(PROJECTION),
-                2,
-                2,
-                100,
-                schemas(),
-                0,
-                100);
+        SourceGeneration source =
+                new SourceGeneration(
+                        ReadView.COMMITTED,
+                        new OffsetRange(0, 2),
+                        sourceCommitted.value().generation(),
+                        1,
+                        sourceCommitted.key(),
+                        sourceCommitted.metadataVersion(),
+                        sourceCommitted.durableValueSha256(),
+                        sourceTarget,
+                        new Checksum(
+                                ChecksumType.SHA256,
+                                ReadTargetCodecRegistry.phase15()
+                                        .encode(sourceTarget)
+                                        .identityChecksumValue()),
+                        Optional.of(sourcePolicy),
+                        PayloadFormat.PULSAR_ENTRY_BATCH,
+                        authorityProjection,
+                        2,
+                        2,
+                        100,
+                        schemas(),
+                        0,
+                        100);
         MaterializationPolicy policy;
         if (emptyKafkaOutput) {
-            policy = new MaterializationPolicy(
-                    "policy-kafka-topic-publication",
-                    2,
-                    ReadView.TOPIC_COMPACTED,
-                    TaskKind.TOPIC_KEY_COMPACTION,
-                    MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT,
-                    2,
-                    128,
-                    1_048_576,
-                    1L << 20,
-                    65_536,
-                    "ZSTD",
-                    Optional.of(new TopicCompactionSpec("latest", 1, "KCK2")));
+            policy =
+                    new MaterializationPolicy(
+                            "policy-kafka-topic-publication",
+                            2,
+                            ReadView.TOPIC_COMPACTED,
+                            TaskKind.TOPIC_KEY_COMPACTION,
+                            MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT,
+                            2,
+                            128,
+                            1_048_576,
+                            1L << 20,
+                            65_536,
+                            "ZSTD",
+                            Optional.of(new TopicCompactionSpec("latest", 1, "KCK2")));
         } else if (topicCompacted) {
-            policy = new MaterializationPolicy(
-                    "policy-topic-publication",
-                    1,
-                    ReadView.TOPIC_COMPACTED,
-                    TaskKind.TOPIC_KEY_COMPACTION,
-                    MaterializationPolicy.TOPIC_COMPACTED_FORMAT,
-                    2,
-                    128,
-                    1_048_576,
-                    1L << 20,
-                    65_536,
-                    "ZSTD",
-                    Optional.of(new TopicCompactionSpec("latest", 1, "test-key-v1")));
+            policy =
+                    new MaterializationPolicy(
+                            "policy-topic-publication",
+                            1,
+                            ReadView.TOPIC_COMPACTED,
+                            TaskKind.TOPIC_KEY_COMPACTION,
+                            MaterializationPolicy.TOPIC_COMPACTED_FORMAT,
+                            2,
+                            128,
+                            1_048_576,
+                            1L << 20,
+                            65_536,
+                            "ZSTD",
+                            Optional.of(new TopicCompactionSpec("latest", 1, "test-key-v1")));
         } else {
-            policy = new MaterializationPolicy(
-                    "policy-publication",
-                    1,
-                    ReadView.COMMITTED,
-                    TaskKind.LOSSLESS_REWRITE,
-                    MaterializationPolicy.COMMITTED_FORMAT,
-                    2,
-                    128,
-                    1_048_576,
-                    1L << 20,
-                    65_536,
-                    "ZSTD",
-                    Optional.empty());
+            policy =
+                    new MaterializationPolicy(
+                            "policy-publication",
+                            1,
+                            ReadView.COMMITTED,
+                            TaskKind.LOSSLESS_REWRITE,
+                            MaterializationPolicy.COMMITTED_FORMAT,
+                            2,
+                            128,
+                            1_048_576,
+                            1L << 20,
+                            65_536,
+                            "ZSTD",
+                            Optional.empty());
         }
-        MaterializationTask task = MaterializationTask.create(
-                STREAM, new OffsetRange(0, 2), List.of(source), policy);
+        MaterializationTask task =
+                MaterializationTask.create(STREAM, new OffsetRange(0, 2), List.of(source), policy);
 
-        String outputPhysicalFormat = emptyKafkaOutput
-                ? MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT
-                : topicCompacted
-                        ? MaterializationPolicy.TOPIC_COMPACTED_FORMAT
-                        : MaterializationPolicy.COMMITTED_FORMAT;
-        ObjectSliceReadTarget outputTarget = target(
-                "output-object",
-                "objects/publication/output-object",
-                "output-slice",
-                "22222222",
-                outputPhysicalFormat,
+        String outputPhysicalFormat =
                 emptyKafkaOutput
-                        ? "KAFKA_RECORD_BATCH_V1"
-                        : PayloadFormat.PULSAR_ENTRY_BATCH.name());
-        MaterializationOutput output = new MaterializationOutput(
-                task.taskId(),
-                STREAM,
-                policy.view(),
-                task.coverage(),
-                CLAIM_ID,
-                outputTarget.objectId(),
-                outputTarget.objectKey(),
-                ObjectKeyHash.from(outputTarget.objectKey()),
-                outputTarget.objectLength(),
-                new Checksum(ChecksumType.CRC32C, outputTarget.sliceChecksum().value()),
-                sha("e"),
-                "output-etag",
-                outputTarget.physicalFormat(),
-                outputTarget.logicalFormat(),
-                outputTarget,
-                new Checksum(
-                        ChecksumType.SHA256,
-                        ReadTargetCodecRegistry.phase15()
-                                .encode(outputTarget)
-                                .identityChecksumValue()),
-                outputTarget.entryIndexRef(),
-                2,
-                emptyKafkaOutput ? 0 : topicCompacted ? 1 : 2,
-                emptyKafkaOutput ? 0 : 2,
-                emptyKafkaOutput ? 0 : 100,
-                schemas(),
-                0,
-                100,
-                task.sourceSetSha256(),
-                Optional.of(PROJECTION));
+                        ? MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT
+                        : topicCompacted
+                                ? MaterializationPolicy.TOPIC_COMPACTED_FORMAT
+                                : MaterializationPolicy.COMMITTED_FORMAT;
+        ObjectSliceReadTarget outputTarget =
+                target(
+                        "output-object",
+                        "objects/publication/output-object",
+                        "output-slice",
+                        "22222222",
+                        outputPhysicalFormat,
+                        emptyKafkaOutput
+                                ? "KAFKA_RECORD_BATCH_V1"
+                                : PayloadFormat.PULSAR_ENTRY_BATCH.name());
+        MaterializationOutput output =
+                new MaterializationOutput(
+                        task.taskId(),
+                        STREAM,
+                        policy.view(),
+                        task.coverage(),
+                        CLAIM_ID,
+                        outputTarget.objectId(),
+                        outputTarget.objectKey(),
+                        ObjectKeyHash.from(outputTarget.objectKey()),
+                        outputTarget.objectLength(),
+                        new Checksum(ChecksumType.CRC32C, outputTarget.sliceChecksum().value()),
+                        sha("e"),
+                        "output-etag",
+                        outputTarget.physicalFormat(),
+                        outputTarget.logicalFormat(),
+                        outputTarget,
+                        new Checksum(
+                                ChecksumType.SHA256,
+                                ReadTargetCodecRegistry.phase15()
+                                        .encode(outputTarget)
+                                        .identityChecksumValue()),
+                        outputTarget.entryIndexRef(),
+                        2,
+                        emptyKafkaOutput ? 0 : topicCompacted ? 1 : 2,
+                        emptyKafkaOutput ? 0 : 2,
+                        emptyKafkaOutput ? 0 : 100,
+                        schemas(),
+                        0,
+                        100,
+                        task.sourceSetSha256(),
+                        authorityProjection);
 
         createOutputReadyTask(generations, task, output);
-        generations.createOrVerifyStreamRegistration(
-                CLUSTER,
-                new MaterializationStreamRegistrationRecord(
-                        1,
-                        STREAM.value(),
-                        MaterializationRecordMapper.projectionIdentity(Optional.of(PROJECTION)),
-                        PROJECTION_SHA.value(),
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
-                        100,
-                        1,
-                        100,
-                        0)).join();
+        generations
+                .createOrVerifyStreamRegistration(
+                        CLUSTER,
+                        new MaterializationStreamRegistrationRecord(
+                                1,
+                                STREAM.value(),
+                                directStream
+                                        ? DirectMaterializationStreamAuthority
+                                                .encodedProjectionRef()
+                                        : MaterializationRecordMapper.projectionIdentity(
+                                                Optional.of(PROJECTION)),
+                                directStream
+                                        ? DirectMaterializationStreamAuthority.identitySha256(
+                                                        STREAM,
+                                                        StorageProfile.OBJECT_WAL_SYNC_OBJECT)
+                                                .value()
+                                        : PROJECTION_SHA.value(),
+                                StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                                100,
+                                1,
+                                100,
+                                0))
+                .join();
 
-        StreamMetadataSnapshot snapshot = new StreamMetadataSnapshot(
-                new StreamMetadataRecord(
-                        STREAM.value(),
-                        "persistent://tenant/ns/topic",
-                        "stream-name-hash",
-                        StreamState.ACTIVE.name(),
-                        StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
-                        Map.of(),
-                        1,
-                        1,
-                        5),
-                new CommittedEndOffsetRecord(STREAM.value(), 2, 100, 1, 5),
-                new TrimRecord(STREAM.value(), 0, "", 1, 5));
+        StreamMetadataSnapshot snapshot =
+                new StreamMetadataSnapshot(
+                        new StreamMetadataRecord(
+                                STREAM.value(),
+                                "persistent://tenant/ns/topic",
+                                "stream-name-hash",
+                                StreamState.ACTIVE.name(),
+                                StorageProfile.OBJECT_WAL_SYNC_OBJECT.name(),
+                                Map.of(),
+                                1,
+                                1,
+                                5),
+                        new CommittedEndOffsetRecord(STREAM.value(), 2, 100, 1, 5),
+                        new TrimRecord(STREAM.value(), 0, "", 1, 5));
         OxiaMetadataStore l0Store = l0Store(snapshot);
-        return new Context(
-                generations,
-                physical,
-                protections,
-                scheduler,
-                l0Store,
-                task,
-                output);
+        return new Context(generations, physical, protections, scheduler, l0Store, task, output);
     }
 
     static GenerationProtocolActivationGuard successfulGuard() {
@@ -310,16 +343,17 @@ final class GenerationPublicationTestSupport {
                     GenerationOperation operation,
                     com.nereusstream.core.capability.GenerationActivationSubject subject,
                     boolean activateLiveProjectionIfAbsent) {
-                return CompletableFuture.completedFuture(GenerationActivationProof.create(
-                        operation,
-                        subject,
-                        1,
-                        1,
-                        1,
-                        REFERENCE_DOMAINS_SHA,
-                        true,
-                        false,
-                        CLOCK.millis()));
+                return CompletableFuture.completedFuture(
+                        GenerationActivationProof.create(
+                                operation,
+                                subject,
+                                1,
+                                1,
+                                1,
+                                REFERENCE_DOMAINS_SHA,
+                                true,
+                                false,
+                                CLOCK.millis()));
             }
 
             @Override
@@ -345,7 +379,8 @@ final class GenerationPublicationTestSupport {
             public CompletableFuture<Void> revalidate(GenerationActivationProof proof) {
                 if (fail.compareAndSet(true, false)) {
                     return CompletableFuture.failedFuture(
-                            new F4MetadataConditionFailedException("activation changed before commit"));
+                            new F4MetadataConditionFailedException(
+                                    "activation changed before commit"));
                 }
                 return CompletableFuture.completedFuture(null);
             }
@@ -355,113 +390,129 @@ final class GenerationPublicationTestSupport {
     static GenerationMetadataStore loseFirstCommittedIndexResponse(
             GenerationMetadataStore delegate) {
         AtomicBoolean lose = new AtomicBoolean(true);
-        return proxy(delegate, (method, args, result) -> {
-            if (method.equals("compareAndSetIndex")
-                    && args[1] instanceof GenerationIndexRecord replacement
-                    && replacement.lifecycle() == GenerationLifecycle.COMMITTED
-                    && lose.compareAndSet(true, false)) {
-                @SuppressWarnings("unchecked")
-                CompletableFuture<VersionedGenerationIndex> exact =
-                        (CompletableFuture<VersionedGenerationIndex>) result;
-                return exact.thenCompose(ignored -> CompletableFuture.failedFuture(
-                        new F4MetadataConditionFailedException("lost committed-index response")));
-            }
-            return result;
-        });
+        return proxy(
+                delegate,
+                (method, args, result) -> {
+                    if (method.equals("compareAndSetIndex")
+                            && args[1] instanceof GenerationIndexRecord replacement
+                            && replacement.lifecycle() == GenerationLifecycle.COMMITTED
+                            && lose.compareAndSet(true, false)) {
+                        @SuppressWarnings("unchecked")
+                        CompletableFuture<VersionedGenerationIndex> exact =
+                                (CompletableFuture<VersionedGenerationIndex>) result;
+                        return exact.thenCompose(
+                                ignored ->
+                                        CompletableFuture.failedFuture(
+                                                new F4MetadataConditionFailedException(
+                                                        "lost committed-index response")));
+                    }
+                    return result;
+                });
     }
 
     static GenerationMetadataStore hideSources(GenerationMetadataStore delegate) {
-        return proxy(delegate, (method, args, result) -> method.equals("getCandidate")
-                ? CompletableFuture.completedFuture(Optional.empty())
-                : result);
+        return proxy(
+                delegate,
+                (method, args, result) ->
+                        method.equals("getCandidate")
+                                ? CompletableFuture.completedFuture(Optional.empty())
+                                : result);
     }
 
     static GenerationMetadataStore loseFirstGenerationAttachmentResponse(
             GenerationMetadataStore delegate) {
         AtomicBoolean lose = new AtomicBoolean(true);
-        return proxy(delegate, (method, args, result) -> {
-            if (method.equals("compareAndSetTask")
-                    && args[1] instanceof MaterializationTaskRecord replacement
-                    && replacement.lifecycle() == TaskLifecycle.PUBLISHING
-                    && replacement.allocatedGeneration().isPresent()
-                    && lose.compareAndSet(true, false)) {
-                @SuppressWarnings("unchecked")
-                CompletableFuture<VersionedMaterializationTask> exact =
-                        (CompletableFuture<VersionedMaterializationTask>) result;
-                return exact.thenCompose(ignored -> CompletableFuture.failedFuture(
-                        new F4MetadataConditionFailedException("lost task attachment response")));
-            }
-            return result;
-        });
-    }
-
-    private static GenerationMetadataStore proxy(
-            GenerationMetadataStore delegate,
-            ResultInterceptor interceptor) {
-        return (GenerationMetadataStore) Proxy.newProxyInstance(
-                GenerationMetadataStore.class.getClassLoader(),
-                new Class<?>[] {GenerationMetadataStore.class},
-                (proxy, method, args) -> {
-                    if (method.getDeclaringClass() == Object.class) {
-                        return method.invoke(delegate, args);
+        return proxy(
+                delegate,
+                (method, args, result) -> {
+                    if (method.equals("compareAndSetTask")
+                            && args[1] instanceof MaterializationTaskRecord replacement
+                            && replacement.lifecycle() == TaskLifecycle.PUBLISHING
+                            && replacement.allocatedGeneration().isPresent()
+                            && lose.compareAndSet(true, false)) {
+                        @SuppressWarnings("unchecked")
+                        CompletableFuture<VersionedMaterializationTask> exact =
+                                (CompletableFuture<VersionedMaterializationTask>) result;
+                        return exact.thenCompose(
+                                ignored ->
+                                        CompletableFuture.failedFuture(
+                                                new F4MetadataConditionFailedException(
+                                                        "lost task attachment response")));
                     }
-                    try {
-                        Object result = method.invoke(delegate, args);
-                        return interceptor.intercept(method.getName(), args, result);
-                    } catch (InvocationTargetException failure) {
-                        throw failure.getCause();
-                    }
+                    return result;
                 });
     }
 
+    private static GenerationMetadataStore proxy(
+            GenerationMetadataStore delegate, ResultInterceptor interceptor) {
+        return (GenerationMetadataStore)
+                Proxy.newProxyInstance(
+                        GenerationMetadataStore.class.getClassLoader(),
+                        new Class<?>[] {GenerationMetadataStore.class},
+                        (proxy, method, args) -> {
+                            if (method.getDeclaringClass() == Object.class) {
+                                return method.invoke(delegate, args);
+                            }
+                            try {
+                                Object result = method.invoke(delegate, args);
+                                return interceptor.intercept(method.getName(), args, result);
+                            } catch (InvocationTargetException failure) {
+                                throw failure.getCause();
+                            }
+                        });
+    }
+
     private static void createOutputReadyTask(
-            GenerationMetadataStore store,
-            MaterializationTask task,
-            MaterializationOutput output) {
-        MaterializationTaskRecord planned = new MaterializationTaskRecord(
-                1,
-                task.taskId(),
-                task.taskSequence(),
-                task.streamId().value(),
-                task.view().wireId(),
-                task.taskKind().wireId(),
-                task.coverage().startOffset(),
-                task.coverage().endOffset(),
-                task.sources().stream().map(MaterializationRecordMapper::sourceRecord).toList(),
-                task.sourceSetSha256().value(),
-                task.policy().policyId(),
-                task.policy().policyVersion(),
-                task.policyDigestSha256().value(),
-                MaterializationRecordMapper.policyRecord(task.policy()),
-                TaskLifecycle.PLANNED,
-                0,
-                Optional.empty(),
-                Optional.empty(),
-                OptionalLong.empty(),
-                "",
-                TaskFailureClass.NONE.wireId(),
-                "",
-                0,
-                200,
-                200,
-                0);
+            GenerationMetadataStore store, MaterializationTask task, MaterializationOutput output) {
+        MaterializationTaskRecord planned =
+                new MaterializationTaskRecord(
+                        1,
+                        task.taskId(),
+                        task.taskSequence(),
+                        task.streamId().value(),
+                        task.view().wireId(),
+                        task.taskKind().wireId(),
+                        task.coverage().startOffset(),
+                        task.coverage().endOffset(),
+                        task.sources().stream()
+                                .map(MaterializationRecordMapper::sourceRecord)
+                                .toList(),
+                        task.sourceSetSha256().value(),
+                        task.policy().policyId(),
+                        task.policy().policyVersion(),
+                        task.policyDigestSha256().value(),
+                        MaterializationRecordMapper.policyRecord(task.policy()),
+                        TaskLifecycle.PLANNED,
+                        0,
+                        Optional.empty(),
+                        Optional.empty(),
+                        OptionalLong.empty(),
+                        "",
+                        TaskFailureClass.NONE.wireId(),
+                        "",
+                        0,
+                        200,
+                        200,
+                        0);
         VersionedMaterializationTask created = store.createTask(CLUSTER, planned).join();
-        MaterializationTaskRecord claimed = taskState(
-                planned,
-                TaskLifecycle.CLAIMED,
-                1,
-                Optional.of(new WorkerClaimRecord(CLAIM_ID, PROCESS_ID, 1, 300, 2_000)),
-                Optional.empty(),
-                300);
-        VersionedMaterializationTask claimedValue = store.compareAndSetTask(
-                CLUSTER, claimed, created.metadataVersion()).join();
-        MaterializationTaskRecord ready = taskState(
-                claimed,
-                TaskLifecycle.OUTPUT_READY,
-                1,
-                Optional.empty(),
-                Optional.of(MaterializationRecordMapper.outputRecord(output)),
-                400);
+        MaterializationTaskRecord claimed =
+                taskState(
+                        planned,
+                        TaskLifecycle.CLAIMED,
+                        1,
+                        Optional.of(new WorkerClaimRecord(CLAIM_ID, PROCESS_ID, 1, 300, 2_000)),
+                        Optional.empty(),
+                        300);
+        VersionedMaterializationTask claimedValue =
+                store.compareAndSetTask(CLUSTER, claimed, created.metadataVersion()).join();
+        MaterializationTaskRecord ready =
+                taskState(
+                        claimed,
+                        TaskLifecycle.OUTPUT_READY,
+                        1,
+                        Optional.empty(),
+                        Optional.of(MaterializationRecordMapper.outputRecord(output)),
+                        400);
         store.compareAndSetTask(CLUSTER, ready, claimedValue.metadataVersion()).join();
     }
 
@@ -510,7 +561,8 @@ final class GenerationPublicationTestSupport {
             GenerationLifecycle lifecycle,
             long createdAt,
             long committedAt,
-            long stateChangedAt) {
+            long stateChangedAt,
+            Optional<ProjectionRef> projection) {
         var encoded = ReadTargetCodecRegistry.phase15().encode(target);
         return new GenerationIndexRecord(
                 1,
@@ -537,7 +589,7 @@ final class GenerationPublicationTestSupport {
                 1,
                 1,
                 schemas(),
-                MaterializationRecordMapper.projectionIdentity(Optional.of(PROJECTION)),
+                MaterializationRecordMapper.projectionIdentity(projection),
                 createdAt,
                 committedAt,
                 "",
@@ -546,16 +598,9 @@ final class GenerationPublicationTestSupport {
     }
 
     private static ObjectSliceReadTarget target(
-            String objectId,
-            String objectKey,
-            String sliceId,
-            String checksum) {
+            String objectId, String objectKey, String sliceId, String checksum) {
         return target(
-                objectId,
-                objectKey,
-                sliceId,
-                checksum,
-                MaterializationPolicy.COMMITTED_FORMAT);
+                objectId, objectKey, sliceId, checksum, MaterializationPolicy.COMMITTED_FORMAT);
     }
 
     private static ObjectSliceReadTarget target(
@@ -582,14 +627,15 @@ final class GenerationPublicationTestSupport {
             String logicalFormat) {
         ObjectId id = new ObjectId(objectId);
         ObjectKey key = new ObjectKey(objectKey);
-        EntryIndexRef index = new EntryIndexRef(
-                EntryIndexLocation.OBJECT_FOOTER,
-                Optional.of(id),
-                Optional.of(key),
-                Optional.empty(),
-                96,
-                32,
-                new Checksum(ChecksumType.CRC32C, "33333333"));
+        EntryIndexRef index =
+                new EntryIndexRef(
+                        EntryIndexLocation.OBJECT_FOOTER,
+                        Optional.of(id),
+                        Optional.of(key),
+                        Optional.empty(),
+                        96,
+                        32,
+                        new Checksum(ChecksumType.CRC32C, "33333333"));
         return new ObjectSliceReadTarget(
                 1,
                 id,
@@ -605,8 +651,7 @@ final class GenerationPublicationTestSupport {
     }
 
     private static PhysicalObjectRootRecord activeRoot(
-            PhysicalObjectIdentity identity,
-            long createdAt) {
+            PhysicalObjectIdentity identity, long createdAt) {
         return new PhysicalObjectRootRecord(
                 1,
                 identity.objectKeyHash().value(),
@@ -635,17 +680,22 @@ final class GenerationPublicationTestSupport {
     }
 
     private static OxiaMetadataStore l0Store(StreamMetadataSnapshot snapshot) {
-        return (OxiaMetadataStore) Proxy.newProxyInstance(
-                OxiaMetadataStore.class.getClassLoader(),
-                new Class<?>[] {OxiaMetadataStore.class},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "getStreamSnapshot" -> CompletableFuture.completedFuture(snapshot);
-                    case "close" -> null;
-                    case "toString" -> "PublicationTestL0Store";
-                    case "hashCode" -> System.identityHashCode(proxy);
-                    case "equals" -> proxy == args[0];
-                    default -> throw new UnsupportedOperationException(method.getName());
-                });
+        return (OxiaMetadataStore)
+                Proxy.newProxyInstance(
+                        OxiaMetadataStore.class.getClassLoader(),
+                        new Class<?>[] {OxiaMetadataStore.class},
+                        (proxy, method, args) ->
+                                switch (method.getName()) {
+                                    case "getStreamSnapshot" ->
+                                            CompletableFuture.completedFuture(snapshot);
+                                    case "close" -> null;
+                                    case "toString" -> "PublicationTestL0Store";
+                                    case "hashCode" -> System.identityHashCode(proxy);
+                                    case "equals" -> proxy == args[0];
+                                    default ->
+                                            throw new UnsupportedOperationException(
+                                                    method.getName());
+                                });
     }
 
     private static List<SchemaRef> schemas() {
@@ -717,8 +767,14 @@ final class GenerationPublicationTestSupport {
         }
 
         DefaultGenerationCommitter committer(
+                GenerationMetadataStore store, GenerationProtocolActivationGuard guard) {
+            return committer(store, guard, MaterializationStreamAuthorityMode.PROJECTION_REQUIRED);
+        }
+
+        DefaultGenerationCommitter committer(
                 GenerationMetadataStore store,
-                GenerationProtocolActivationGuard guard) {
+                GenerationProtocolActivationGuard guard,
+                MaterializationStreamAuthorityMode authorityMode) {
             return new DefaultGenerationCommitter(
                     CLUSTER,
                     l0Store,
@@ -726,14 +782,17 @@ final class GenerationPublicationTestSupport {
                     physical,
                     protections,
                     guard,
-                    (ignoredTask, ignoredOutput, timeout) -> CompletableFuture.completedFuture(null),
+                    (ignoredTask, ignoredOutput, timeout) ->
+                            CompletableFuture.completedFuture(null),
                     () -> {
                         int value = publicationSequence.getAndIncrement();
                         if (value > 9) {
-                            throw new IllegalStateException("test publication id sequence exhausted");
+                            throw new IllegalStateException(
+                                    "test publication id sequence exhausted");
                         }
                         return new PublicationId(String.valueOf((char) ('p' + value)).repeat(26));
                     },
+                    authorityMode,
                     Duration.ofSeconds(30),
                     scheduler,
                     CLOCK);
