@@ -6,10 +6,11 @@ dependencies {
     implementation(project(":nereus-metadata-oxia"))
     implementation(project(":nereus-object-store"))
     implementation(project(":nereus-materialization"))
-    implementation(libs.kafka.clients)
+    compileOnly(libs.kafka.clients)
 
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testImplementation(testFixtures(project(":nereus-object-store")))
+    testImplementation(libs.kafka.clients)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -142,6 +143,7 @@ tasks.register<Test>("f9CompactionPropertyTest") {
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCoordinatorTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanOrphanScannerTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlannerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionProductionRuntimeFactoryTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPublicationCoordinatorTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowMapperTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowSpoolTest")
@@ -158,6 +160,7 @@ tasks.register<Test>("f9CompactionPropertyTest") {
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactedFetchPlannerTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactedFetchIntegrationTest")
         includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactedNoResurrectionIntegrationTest")
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaCompactionRuntimeConfigurationTest")
     }
 }
 

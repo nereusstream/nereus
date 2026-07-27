@@ -713,8 +713,9 @@ Current implementation（2026-07-27）：these four protocol-neutral contracts a
 `2940e62ac155a477052b955c1b30a2e7e77862bb7383d240b792ca064f472104`。It requires exactly one complete valid
 magic-v2 batch whose base/next/count equal the `ReadBatch` range，decompresses through Kafka 3.9 client wire code，validates
 every record and emits KCK2 keyed/null/control identities with exact source SHA/index and owned batch bytes as the ephemeral
-rewrite token。The main adapter therefore has an explicit `kafka-clients` implementation dependency；Kafka server classes
-remain absent。
+rewrite token。The adapter compiles against `kafka-clients` with `compileOnly` and adds the locked 3.9 client only to its
+test classpath；a Kafka broker/fork therefore supplies its own matching Kafka runtime and does not receive a transitive 3.9
+client or LZ4 capability。Kafka server classes remain absent。
 
 ### 10.3 Plan ranges
 

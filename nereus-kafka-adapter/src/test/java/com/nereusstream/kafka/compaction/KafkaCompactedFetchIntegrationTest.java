@@ -20,6 +20,7 @@ import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.EntryIndexLocation;
 import com.nereusstream.api.EntryIndexRef;
+import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.ObjectId;
 import com.nereusstream.api.ObjectKey;
 import com.nereusstream.api.ObjectType;
@@ -40,10 +41,12 @@ import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaFetchAssembly;
 import com.nereusstream.kafka.codec.KafkaRecordBatchCodec;
 import com.nereusstream.kafka.partition.KafkaStableSnapshot;
+import com.nereusstream.kafka.partition.KafkaStorageReadRequest;
 import com.nereusstream.kafka.testing.TestStreamStorage;
 import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +59,52 @@ import org.junit.jupiter.api.Test;
 
 class KafkaCompactedFetchIntegrationTest {
   private static final StreamId STREAM = new StreamId("kafka-compacted-plan-stream");
+
+  @Test
+  void committedReadStopsAfterAccumulatedBatchWhenRemainingBudgetCannotFitTheNextBatch() {
+    ArrayList<ReadRequest> requests = new ArrayList<>();
+    TestStreamStorage streams = new TestStreamStorage();
+    byte[] first = batch(0, "first");
+    streams.semanticReader(
+        (streamId, request) -> {
+          requests.add(request);
+          if (request.startOffset() == 0) {
+            return CompletableFuture.completedFuture(
+                result(
+                    request,
+                    List.of(readBatch(new OffsetRange(0, 1), first, 0, 1)),
+                    1));
+          }
+          return CompletableFuture.completedFuture(result(request, List.of(), 1));
+        });
+    KafkaCompactedFetchReader reader =
+        KafkaCompactedFetchReader.committedOnly(
+            KafkaCompactedFetchPlannerTest.identity(), STREAM, streams);
+    KafkaStorageReadRequest request =
+        new KafkaStorageReadRequest(
+            0,
+            2,
+            100,
+            first.length + 1,
+            first.length + 1,
+            true,
+            0,
+            0,
+            Duration.ofSeconds(5));
+
+    KafkaCompactedFetchReader.Result read =
+        reader.read(request, KafkaStableSnapshot.nonTransactional(0, 2, 7)).join();
+
+    assertThat(requests).hasSize(2);
+    assertThat(requests.get(1).startOffset()).isEqualTo(1);
+    assertThat(requests.get(1).firstEntryPolicy())
+        .isEqualTo(FirstEntryPolicy.LEGACY_STRICT_LIMIT);
+    assertThat(read.semanticRead().result().batches())
+        .extracting(ReadBatch::range)
+        .containsExactly(new OffsetRange(0, 1));
+    assertThat(read.semanticRead().result().nextOffset()).isEqualTo(1);
+    assertThat(read.semanticRead().sourceCoverageEndOffset()).isEqualTo(1);
+  }
 
   @Test
   void scenarioKfFet012() {

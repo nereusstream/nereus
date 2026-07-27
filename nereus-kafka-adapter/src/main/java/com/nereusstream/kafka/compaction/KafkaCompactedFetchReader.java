@@ -333,12 +333,13 @@ public final class KafkaCompactedFetchReader {
       }
     } else {
       if (returned.isEmpty()) {
-        if (cursor < segment.range().endOffset()) {
+        if (accumulator.batches.isEmpty() && cursor < segment.range().endOffset()) {
           throw new NereusException(
               ErrorCode.READ_RESOLUTION_FAILED,
               true,
               "committed Kafka Fetch source produced no readable batch");
         }
+        accumulator.stoppedAtReadLimit = true;
         nextCursor = cursor;
       } else if (accumulator.batches.size() == acceptedBefore) {
         if (!accumulator.stoppedAtUpperBound) {
@@ -432,6 +433,7 @@ public final class KafkaCompactedFetchReader {
     private long coverageEnd;
     private boolean firstEntryOverflow;
     private boolean stoppedAtUpperBound;
+    private boolean stoppedAtReadLimit;
 
     private Accumulator(long startOffset) {
       coverageEnd = startOffset;
@@ -456,7 +458,8 @@ public final class KafkaCompactedFetchReader {
       return firstEntryOverflow
           || bytes >= request.maxPartitionBytes()
           || records >= request.maxRecords()
-          || stoppedAtUpperBound;
+          || stoppedAtUpperBound
+          || stoppedAtReadLimit;
     }
 
     private long lastBatchEnd() {

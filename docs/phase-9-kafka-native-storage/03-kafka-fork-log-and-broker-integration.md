@@ -668,7 +668,10 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
   上限。`KafkaRecordTimestampInspector` 是 fork-owned exact-record seam：adapter 只交付 read-only exact Kafka
   bytes 与 minimum offset，由 fork 使用 stock `MemoryRecords` 迭代压缩/非压缩 records。命中必须位于本页且
   timestamp query 不得低于 target；预算耗尽、无进展、并发 trim、inspector 越界或扫描中 authority 丢失均失败，
-  不返回近似 offset。max timestamp 相等时选择最低 logical offset。
+  不返回近似 offset。若一次 outer read 已接收至少一个完整 batch，而剩余 strict byte/record budget 不能容纳
+  下一个不可拆 batch，后续空 source page 只终止当前 outer page，resolver 从已返回 batch 的 end offset 发起
+  下一页；首个 source page 为空仍按 `READ_RESOLUTION_FAILED` fail closed。max timestamp 相等时选择最低
+  logical offset。
 
 adapter 测试 oracle 是 test-only `org.apache.kafka:kafka-clients:3.9.0`，与锁定 AutoMQ `3.9.0-SNAPSHOT` reference
 format 对齐；该依赖不进入 adapter production/runtime classpath。Kafka fork 本身则以显式隔离 repository/version
@@ -1003,7 +1006,9 @@ error，不能返回一个未经证明的 nearby offset。
 `KafkaRecordTimestampInspector` 把每页 read-only exact bytes 交给 fork 的 stock `MemoryRecords` iterator，并校验
 返回的 offset/timestamp 仍在该页证明范围内。扫描期间 stale epoch、resign 或 write-fence 会返回 `FENCED_APPEND`；
 并发 trim 返回 `OFFSET_TRIMMED`；records/bytes/read-count 预算耗尽返回 `METADATA_LIMIT_EXCEEDED`；deadline 到期返回
-`TIMEOUT`；空页无进展返回 `READ_LIMIT_TOO_SMALL`。上述错误都不会降级成近似 offset。
+`TIMEOUT`；首个 source page 空且无进展返回 `READ_RESOLUTION_FAILED`。若当前 outer read 已返回至少一个完整 batch，
+剩余 strict budget 导致的空 source page 结束该页而不丢弃已验证 bytes，下一次 bounded resolver read 从精确
+`nextLogicalOffset` 继续。上述错误都不会降级成近似 offset。
 
 `NereusTimeIndex` verified checkpoint candidate 尚未接入，因此当前 resolver 从冻结 log start 扫描，属于正确但受硬
 预算限制的 fallback。local Kafka fork 的 `NereusRecordTimestampInspector` 已用锁定 4.3 stock
