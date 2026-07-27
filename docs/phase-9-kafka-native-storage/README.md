@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition 以及 idempotent/transaction/control exact append encoding partial slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + product-side exact DeleteRecords + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill/KCRS-to-NTC2 preparation + object upload/Generation publication/coverage-CAS linearization + terminal dual-root retirement deterministic partial slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；exact recovery state/storage publication、同步 UnifiedLog correctness bridge，以及有界 ReplicaManager Produce 和 whole-request multi-partition async Fetch handoff 已实现，但 M4 Kafka fork import/replay、transaction request semantics、internal-topic coordinator ordering、M5 concrete partition retention/DeleteRecords runtime wiring、compaction scheduler/read-side no-resurrection、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition 以及 idempotent/transaction/control exact append encoding partial slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + product-side exact DeleteRecords + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill/KCRS-to-NTC2 preparation + object upload/Generation publication/coverage-CAS linearization + binding-rooted compacted-prefix/committed-tail no-resurrection routing + terminal dual-root retirement deterministic partial slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；exact recovery state/storage publication、同步 UnifiedLog correctness bridge，以及有界 ReplicaManager Produce 和 whole-request multi-partition async Fetch handoff 已实现，但 M4 Kafka fork import/replay、transaction request semantics、internal-topic coordinator ordering、M5 concrete partition retention/DeleteRecords runtime wiring、compaction scheduler/activated-generation-set discovery、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -127,7 +127,7 @@ listener 已组合 binding observed-logStart CAS；canonical seven-section local
 round trip 已通过。Product-side DeleteRecords 现保留 stock-normalized exact logical offset（包括 mid-batch），对
 already-deleted request 无 I/O 返回 durable low watermark，并通过共享 checkpoint/trim barrier 覆盖 policy/HW/config
 race 和 normalized-HW target。Concrete partition-lock capture/local-log updater、periodic scheduling、Kafka-fork
-DeleteRecords invocation/fetch wake-up、compaction/no-resurrection 和 stock differential oracle 仍待实现，因此
+DeleteRecords invocation/fetch wake-up、compaction scheduler/activated-set discovery 和 stock differential oracle 仍待实现，因此
 `phase9M5RetentionCheck` 只是 partial gate。
 Ranged compaction 的首个 codec slice 另新增 materialization-side immutable decode/rewrite records 和 adapter
 `KafkaCompactionPlanner`/`KafkaTopicCompactionCodecV1`：planner 从 mandatory end 起只选 LSO/min-lag 允许的连续 closed
@@ -165,8 +165,11 @@ identity、task/output format agreement 和 zero-survivor generation accounting�
 `KafkaCompactionPublicationCoordinator` 又按 guarded upload/HEAD/full verify/OUTPUT_READY/Generation COMMITTED/
 binding coverage CAS 的顺序闭合 write-side linearization，以 canonical gap-free generation-set digest 支持首次、
 扩展与替换，并覆盖 PUT/CAS response loss、heartbeat race 和 generation-commit 后 basis drift。
-当前形成 `phase9M5CompactionCoreCheck`；plan-only orphan scan、runtime cleaner scheduling/read-side
-no-resurrection 与 stock cleaner oracle 仍待实现。
+`KafkaCompactedFetchPlanner`/`KafkaCompactedFetchReader` 又把每次 Fetch 绑定到最新 ACTIVE root：mandatory prefix
+只发 `TOPIC_COMPACTED` 请求，稀疏/空结果按 coverage 跨洞并在 exact end 切到剩余预算的 COMMITTED tail；强制对象
+失败不做 cross-view retry。生产 opener/runtime 已注入 partition store，旧构造路径保持 committed-only。
+当前形成 `phase9M5CompactionCoreCheck`；plan-only orphan scan、runtime cleaner scheduling、activated-generation-set
+discovery、provider/restart gates 与 stock cleaner oracle 仍待实现。
 为接入 stock transaction state，product partition boundary 已把 durable end 与 derived visibility 拆开：
 stable append 先推进 exact end/commit version 并保留旧 HW/LSO；fork 必须在 stock producer/transaction 更新成功后
 调用 `publishDerivedOffsets(exactEnd, HW, LSO)`，随后才发布 `STABLE_APPEND` 并 dispatch 同 partition 下一次

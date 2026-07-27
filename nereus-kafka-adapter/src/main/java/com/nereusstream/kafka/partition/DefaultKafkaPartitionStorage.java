@@ -21,25 +21,22 @@ import com.nereusstream.api.AppendPrecondition;
 import com.nereusstream.api.AppendResult;
 import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.ErrorCode;
-import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
-import com.nereusstream.api.ReadBatch;
-import com.nereusstream.api.ReadBoundaryMode;
-import com.nereusstream.api.ReadIsolation;
-import com.nereusstream.api.ReadOptions;
-import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.SemanticReadResult;
+import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamStorage;
-import com.nereusstream.api.StorageProfile;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointSourceState;
 import com.nereusstream.kafka.codec.EncodedKafkaAppend;
 import com.nereusstream.kafka.codec.KafkaAppendBatchEncoder;
 import com.nereusstream.kafka.codec.KafkaAppendResultValidator;
 import com.nereusstream.kafka.codec.KafkaFetchAssembler;
 import com.nereusstream.kafka.codec.KafkaFetchAssembly;
+import com.nereusstream.kafka.compaction.KafkaCompactedFetchReader;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -57,7 +54,10 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Serialized stable append and bounded committed-read implementation for one recovered Kafka leader. */
+/**
+ * Serialized stable append and bounded committed-read implementation for one recovered Kafka
+ * leader.
+ */
 public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage {
     private static final String AUTHORITY_TYPE = "kafka-partition-leader-v1";
 
@@ -70,6 +70,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private final KafkaStorageProfilePolicy profilePolicy;
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
+    private final KafkaCompactedFetchReader fetchReader;
     private final ScheduledExecutorService renewalScheduler;
     private final Duration sessionTtl;
     private final long renewalIntervalMillis;
@@ -106,6 +107,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 profilePolicy,
                 appendEncoder,
                 fetchAssembler,
+                Optional.empty(),
                 null,
                 null,
                 0);
@@ -132,6 +134,40 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 profilePolicy,
                 appendEncoder,
                 fetchAssembler,
+                Optional.empty(),
+                Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
+                positive(sessionTtl, "sessionTtl"),
+                positive(renewalInterval, "renewalInterval").toMillis());
+        if (renewalInterval.compareTo(sessionTtl) >= 0) {
+            throw new IllegalArgumentException("renewalInterval must be shorter than sessionTtl");
+        }
+        scheduleRenewal(true);
+    }
+
+    public DefaultKafkaPartitionStorage(
+            KafkaPartitionIdentity identity,
+            StreamStorage streams,
+            StreamId streamId,
+            AcquiredAppendSession acquiredSession,
+            KafkaCheckpointSourceState recoveredSource,
+            KafkaStorageProfilePolicy profilePolicy,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            KafkaPartitionMetadataStore partitionMetadataStore,
+            ScheduledExecutorService renewalScheduler,
+            Duration sessionTtl,
+            Duration renewalInterval) {
+        this(
+                identity,
+                streams,
+                streamId,
+                acquiredSession,
+                recoveredSource,
+                profilePolicy,
+                appendEncoder,
+                fetchAssembler,
+                Optional.of(
+                        Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
                 Objects.requireNonNull(renewalScheduler, "renewalScheduler"),
                 positive(sessionTtl, "sessionTtl"),
                 positive(renewalInterval, "renewalInterval").toMillis());
@@ -150,6 +186,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             KafkaStorageProfilePolicy profilePolicy,
             KafkaAppendBatchEncoder appendEncoder,
             KafkaFetchAssembler fetchAssembler,
+            Optional<KafkaPartitionMetadataStore> partitionMetadataStore,
             ScheduledExecutorService renewalScheduler,
             Duration sessionTtl,
             long renewalIntervalMillis) {
@@ -161,14 +198,27 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         this.profilePolicy = Objects.requireNonNull(profilePolicy, "profilePolicy");
         this.appendEncoder = Objects.requireNonNull(appendEncoder, "appendEncoder");
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
+        this.fetchReader =
+                Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")
+                        .<KafkaCompactedFetchReader>map(
+                                store ->
+                                        new KafkaCompactedFetchReader(
+                                                this.identity, this.streamId, this.streams, store))
+                        .orElseGet(
+                                () ->
+                                        KafkaCompactedFetchReader.committedOnly(
+                                                this.identity, this.streamId, this.streams));
         this.renewalScheduler = renewalScheduler;
         this.sessionTtl = sessionTtl;
         this.renewalIntervalMillis = renewalIntervalMillis;
         this.appendSession = acquiredSession.session();
         validateRecoveredSession(acquiredSession, recoveredSource);
         this.leaderEpoch = Math.toIntExact(recoveredSource.authority().authorityEpoch());
-        this.stableSnapshot = KafkaStableSnapshot.nonTransactional(
-                recoveredSource.trimOffset(), recoveredSource.endOffset(), recoveredSource.commitVersion());
+        this.stableSnapshot =
+                KafkaStableSnapshot.nonTransactional(
+                        recoveredSource.trimOffset(),
+                        recoveredSource.endOffset(),
+                        recoveredSource.commitVersion());
         this.admittedEndOffset = recoveredSource.endOffset();
     }
 
@@ -203,9 +253,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
 
     @Override
     public KafkaStableSnapshot publishDerivedOffsets(
-            long expectedStableEndOffset,
-            long highWatermark,
-            long lastStableOffset) {
+            long expectedStableEndOffset, long highWatermark, long lastStableOffset) {
         KafkaStableSnapshot published;
         boolean startNext = false;
         boolean completeResign = false;
@@ -217,7 +265,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             }
             if (expectedStableEndOffset != stableSnapshot.stableEndOffset()
                     || (derivedOffsetsPendingEnd >= 0
-                    && derivedOffsetsPendingEnd != expectedStableEndOffset)) {
+                            && derivedOffsetsPendingEnd != expectedStableEndOffset)) {
                 throw new IllegalStateException(
                         "Kafka derived offsets do not match the exact pending stable end");
             }
@@ -230,16 +278,17 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             }
             if (derivedOffsetsInitialized
                     && (highWatermark < stableSnapshot.highWatermark()
-                    || lastStableOffset < stableSnapshot.lastStableOffset())) {
+                            || lastStableOffset < stableSnapshot.lastStableOffset())) {
                 throw new IllegalArgumentException(
                         "Kafka derived offsets cannot move backward after initialization");
             }
-            published = new KafkaStableSnapshot(
-                    stableSnapshot.logStartOffset(),
-                    expectedStableEndOffset,
-                    highWatermark,
-                    lastStableOffset,
-                    stableSnapshot.commitVersion());
+            published =
+                    new KafkaStableSnapshot(
+                            stableSnapshot.logStartOffset(),
+                            expectedStableEndOffset,
+                            highWatermark,
+                            lastStableOffset,
+                            stableSnapshot.commitVersion());
             stableSnapshot = published;
             derivedOffsetsInitialized = true;
             derivedOffsetsPendingEnd = -1;
@@ -270,15 +319,19 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         boolean start;
         synchronized (guard) {
             if (state != KafkaPartitionState.LEADER_WRITABLE) {
-                return CompletableFuture.failedFuture(fenced("Kafka partition is not writable: " + state));
+                return CompletableFuture.failedFuture(
+                        fenced("Kafka partition is not writable: " + state));
             }
             if (context.leaderEpoch() != leaderEpoch) {
                 return CompletableFuture.failedFuture(fenced("Kafka append leader epoch is stale"));
             }
             if (context.expectedStartOffset() != admittedEndOffset) {
-                return CompletableFuture.failedFuture(offsetConflict(
-                        "Kafka append expected " + context.expectedStartOffset()
-                                + " but admitted end is " + admittedEndOffset));
+                return CompletableFuture.failedFuture(
+                        offsetConflict(
+                                "Kafka append expected "
+                                        + context.expectedStartOffset()
+                                        + " but admitted end is "
+                                        + admittedEndOffset));
             }
             admittedEndOffset = encoded.range().endOffset();
             appendQueue.addLast(operation);
@@ -305,27 +358,25 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             snapshot = stableSnapshot;
         }
         if (request.startOffset() < snapshot.logStartOffset()) {
-            return CompletableFuture.failedFuture(new NereusException(
-                    ErrorCode.OFFSET_TRIMMED, false, "Kafka fetch offset precedes log start"));
+            return CompletableFuture.failedFuture(
+                    new NereusException(
+                            ErrorCode.OFFSET_TRIMMED,
+                            false,
+                            "Kafka fetch offset precedes log start"));
         }
         long upperBound = Math.min(request.maxOffsetExclusive(), snapshot.stableEndOffset());
         if (request.startOffset() >= upperBound) {
             return CompletableFuture.completedFuture(emptyRead(request, snapshot));
         }
-        ReadRequest nereusRequest = new ReadRequest(
-                request.startOffset(),
-                ReadView.COMMITTED,
-                ReadBoundaryMode.CONTAINING_ENTRY,
-                request.minOneMessage()
-                        ? FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW
-                        : FirstEntryPolicy.LEGACY_STRICT_LIMIT,
-                new ReadOptions(
-                        request.maxRecords(),
-                        request.maxPartitionBytes(),
-                        ReadIsolation.COMMITTED,
-                        request.timeout()));
-        return streams.read(streamId, nereusRequest)
-                .thenApply(result -> assembleRead(request, snapshot, upperBound, result));
+        return fetchReader
+                .read(request, snapshot)
+                .thenApply(
+                        result ->
+                                assembleRead(
+                                        request,
+                                        snapshot,
+                                        result.semanticRead(),
+                                        result.firstEntryOverflow()));
     }
 
     @Override
@@ -360,9 +411,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             snapshot = stableSnapshot;
             renewal = renewalTask;
             renewalTask = null;
-            complete = !appendRunning
-                    && appendQueue.isEmpty()
-                    && derivedOffsetsPendingEnd < 0;
+            complete = !appendRunning && appendQueue.isEmpty() && derivedOffsetsPendingEnd < 0;
             if (complete) state = KafkaPartitionState.CLOSED;
         }
         if (renewal != null) renewal.cancel(false);
@@ -406,20 +455,23 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         }
         if (completeResign) resigned.complete(null);
         if (operation == null) return;
-        AppendOptions options = new AppendOptions(
-                Optional.of(appendSession),
-                profilePolicy.durabilityLevel(),
-                profilePolicy.completionPolicy(),
-                operation.context.timeout(),
-                false,
-                operation.context.tags());
+        AppendOptions options =
+                new AppendOptions(
+                        Optional.of(appendSession),
+                        profilePolicy.durabilityLevel(),
+                        profilePolicy.completionPolicy(),
+                        operation.context.timeout(),
+                        false,
+                        operation.context.tags());
         CompletableFuture<AppendResult> append;
         try {
-            append = streams.append(
-                    streamId,
-                    operation.encoded.appendBatch(),
-                    options,
-                    AppendPrecondition.expectedStartOffset(operation.context.expectedStartOffset()));
+            append =
+                    streams.append(
+                            streamId,
+                            operation.encoded.appendBatch(),
+                            options,
+                            AppendPrecondition.expectedStartOffset(
+                                    operation.context.expectedStartOffset()));
         } catch (Throwable failure) {
             append = CompletableFuture.failedFuture(failure);
         }
@@ -432,21 +484,29 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         KafkaStableAppendResult success = null;
         if (failure == null) {
             try {
-                AppendResult exact = KafkaAppendResultValidator.validate(streamId, operation.encoded, appendResult);
+                AppendResult exact =
+                        KafkaAppendResultValidator.validate(
+                                streamId, operation.encoded, appendResult);
                 synchronized (guard) {
                     if (exact.commitVersion() <= stableSnapshot.commitVersion()
                             || exact.range().startOffset() != stableSnapshot.stableEndOffset()) {
-                        throw new IllegalStateException("Kafka stable append result is stale or non-contiguous");
+                        throw new IllegalStateException(
+                                "Kafka stable append result is stale or non-contiguous");
                     }
-                    stableSnapshot = new KafkaStableSnapshot(
-                            stableSnapshot.logStartOffset(),
-                            exact.committedEndOffset(),
-                            stableSnapshot.highWatermark(),
-                            stableSnapshot.lastStableOffset(),
-                            exact.commitVersion());
+                    stableSnapshot =
+                            new KafkaStableSnapshot(
+                                    stableSnapshot.logStartOffset(),
+                                    exact.committedEndOffset(),
+                                    stableSnapshot.highWatermark(),
+                                    stableSnapshot.lastStableOffset(),
+                                    exact.commitVersion());
                     derivedOffsetsPendingEnd = exact.committedEndOffset();
-                    success = new KafkaStableAppendResult(
-                            exact, operation.encoded, stableSnapshot, operation.context.requiredAcks());
+                    success =
+                            new KafkaStableAppendResult(
+                                    exact,
+                                    operation.encoded,
+                                    stableSnapshot,
+                                    operation.context.requiredAcks());
                 }
             } catch (Throwable invalidResult) {
                 failure = invalidResult;
@@ -491,14 +551,19 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
 
         if (failure == null) {
             operation.result.complete(success);
-            NereusException rejectedFailure = fenced(
-                    "Kafka append was rejected because partition authority renewal failed");
+            NereusException rejectedFailure =
+                    fenced("Kafka append was rejected because partition authority renewal failed");
             rejected.forEach(value -> value.result.completeExceptionally(rejectedFailure));
         } else {
             operation.result.completeExceptionally(failure);
-            NereusException rejectedFailure = rejectBecauseFenced
-                    ? fenced("Kafka append was rejected because partition authority was lost")
-                    : offsetConflict("Kafka append was rejected because an earlier lane append did not complete");
+            NereusException rejectedFailure =
+                    rejectBecauseFenced
+                            ? fenced(
+                                    "Kafka append was rejected because partition authority was"
+                                        + " lost")
+                            : offsetConflict(
+                                    "Kafka append was rejected because an earlier lane append did"
+                                        + " not complete");
             rejected.forEach(value -> value.result.completeExceptionally(rejectedFailure));
         }
         if (completeResign) resigned.complete(null);
@@ -507,63 +572,41 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
     private KafkaStorageReadResult assembleRead(
             KafkaStorageReadRequest request,
             KafkaStableSnapshot snapshot,
-            long upperBound,
-            SemanticReadResult source) {
+            SemanticReadResult source,
+            boolean firstOverflow) {
         if (!source.result().streamId().equals(streamId)
-                || source.result().requestedOffset() != request.startOffset()
-                || source.view() != ReadView.COMMITTED) {
-            throw new IllegalStateException("Nereus read result does not match the Kafka partition request");
+                || source.result().requestedOffset() != request.startOffset()) {
+            throw new IllegalStateException(
+                    "Nereus read result does not match the Kafka partition request");
         }
-        List<ReadBatch> selected = new ArrayList<>();
-        int selectedBytes = 0;
-        for (ReadBatch batch : source.result().batches()) {
-            if (batch.range().endOffset() > upperBound) break;
-            selectedBytes = Math.addExact(selectedBytes, batch.payload().length);
-            selected.add(batch);
-        }
-        long nextOffset = selected.isEmpty()
-                ? request.startOffset()
-                : selected.get(selected.size() - 1).range().endOffset();
-        boolean firstOverflow = !selected.isEmpty()
-                && selected.get(0).payload().length > request.maxPartitionBytes();
-        if (firstOverflow && (!request.minOneMessage() || selected.size() != 1)) {
-            throw new IllegalStateException("Nereus read violated Kafka first-entry overflow semantics");
-        }
-        if (!firstOverflow && selectedBytes > request.maxPartitionBytes()) {
-            throw new IllegalStateException("Nereus read exceeded the Kafka partition byte limit");
-        }
-        ReadResult clipped = new ReadResult(
-                streamId,
-                request.startOffset(),
-                nextOffset,
-                selected,
-                source.result().endOfStream());
-        SemanticReadResult semantic = new SemanticReadResult(ReadView.COMMITTED, clipped, nextOffset);
-        KafkaFetchAssembly assembly = fetchAssembler.assemble(
-                semantic,
-                request.hardMaxResponseBytes(),
-                firstOverflow,
-                request.virtualSegmentBaseOffset(),
-                request.relativeLogicalBytePosition(),
-                List.of());
+        KafkaFetchAssembly assembly =
+                fetchAssembler.assemble(
+                        source,
+                        request.hardMaxResponseBytes(),
+                        firstOverflow,
+                        request.virtualSegmentBaseOffset(),
+                        request.relativeLogicalBytePosition(),
+                        List.of());
         return new KafkaStorageReadResult(assembly, snapshot);
     }
 
     private KafkaStorageReadResult emptyRead(
             KafkaStorageReadRequest request, KafkaStableSnapshot snapshot) {
-        ReadResult empty = new ReadResult(
-                streamId,
-                request.startOffset(),
-                request.startOffset(),
-                List.of(),
-                request.startOffset() >= snapshot.stableEndOffset());
-        KafkaFetchAssembly assembly = fetchAssembler.assemble(
-                new SemanticReadResult(ReadView.COMMITTED, empty, request.startOffset()),
-                request.hardMaxResponseBytes(),
-                false,
-                request.virtualSegmentBaseOffset(),
-                request.relativeLogicalBytePosition(),
-                List.of());
+        ReadResult empty =
+                new ReadResult(
+                        streamId,
+                        request.startOffset(),
+                        request.startOffset(),
+                        List.of(),
+                        request.startOffset() >= snapshot.stableEndOffset());
+        KafkaFetchAssembly assembly =
+                fetchAssembler.assemble(
+                        new SemanticReadResult(ReadView.COMMITTED, empty, request.startOffset()),
+                        request.hardMaxResponseBytes(),
+                        false,
+                        request.virtualSegmentBaseOffset(),
+                        request.relativeLogicalBytePosition(),
+                        List.of());
         return new KafkaStorageReadResult(assembly, snapshot);
     }
 
@@ -573,7 +616,10 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
                 || acquired.authority().isEmpty()
                 || !acquired.authority().orElseThrow().equals(recovered.authority())
                 || !recovered.authority().authorityType().equals(AUTHORITY_TYPE)
-                || !recovered.authority().authorityId().equals(identity.durableId().canonicalIdentity())
+                || !recovered
+                        .authority()
+                        .authorityId()
+                        .equals(identity.durableId().canonicalIdentity())
                 || !appendSession.writerId().equals(recovered.writerId())
                 || appendSession.epoch() != recovered.sessionEpoch()
                 || !appendSession.fencingToken().equals(recovered.fencingToken())
@@ -589,13 +635,14 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         if (renewalScheduler == null) return;
         try {
             synchronized (guard) {
-                if (state != KafkaPartitionState.LEADER_WRITABLE || renewalTask != null || renewalInFlight) {
+                if (state != KafkaPartitionState.LEADER_WRITABLE
+                        || renewalTask != null
+                        || renewalInFlight) {
                     return;
                 }
-                renewalTask = renewalScheduler.schedule(
-                        this::beginRenewal,
-                        renewalIntervalMillis,
-                        TimeUnit.MILLISECONDS);
+                renewalTask =
+                        renewalScheduler.schedule(
+                                this::beginRenewal, renewalIntervalMillis, TimeUnit.MILLISECONDS);
             }
         } catch (RejectedExecutionException failure) {
             if (initial) {
@@ -621,7 +668,8 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         try {
             renewal = streams.renewAppendSession(current, sessionTtl);
             if (renewal == null) {
-                throw new IllegalStateException("StreamStorage returned a null append-session renewal future");
+                throw new IllegalStateException(
+                        "StreamStorage returned a null append-session renewal future");
             }
         } catch (Throwable failure) {
             renewal = CompletableFuture.failedFuture(failure);
@@ -629,10 +677,7 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
         renewal.whenComplete((renewed, failure) -> completeRenewal(current, renewed, failure));
     }
 
-    private void completeRenewal(
-            AppendSession previous,
-            AppendSession renewed,
-            Throwable failure) {
+    private void completeRenewal(AppendSession previous, AppendSession renewed, Throwable failure) {
         boolean failed = failure != null || !validRenewal(previous, renewed);
         synchronized (guard) {
             renewalInFlight = false;
@@ -684,7 +729,8 @@ public final class DefaultKafkaPartitionStorage implements KafkaPartitionStorage
             valid = false;
         }
         if (!valid) {
-            throw new IllegalArgumentException(name + " must be positive and millisecond-representable");
+            throw new IllegalArgumentException(
+                    name + " must be positive and millisecond-representable");
         }
         return value;
     }

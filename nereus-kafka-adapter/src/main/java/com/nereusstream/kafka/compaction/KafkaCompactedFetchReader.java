@@ -1,0 +1,370 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.nereusstream.kafka.compaction;
+
+import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
+import com.nereusstream.api.NereusException;
+import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadBoundaryMode;
+import com.nereusstream.api.ReadIsolation;
+import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
+import com.nereusstream.api.ReadResult;
+import com.nereusstream.api.ReadView;
+import com.nereusstream.api.SemanticReadResult;
+import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StreamStorage;
+import com.nereusstream.kafka.partition.KafkaPartitionIdentity;
+import com.nereusstream.kafka.partition.KafkaStableSnapshot;
+import com.nereusstream.kafka.partition.KafkaStorageReadRequest;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Executes a binding-rooted Fetch plan and composes its sparse compacted prefix with its lossless
+ * tail.
+ *
+ * <p>Every mandatory call is issued explicitly in {@link ReadView#TOPIC_COMPACTED}. Failures from
+ * that view propagate directly; this class has no code path that retries a mandatory offset in
+ * COMMITTED.
+ */
+public final class KafkaCompactedFetchReader {
+  private static final int MAX_VIEW_READS = 512;
+
+  private final KafkaPartitionIdentity identity;
+  private final StreamId streamId;
+  private final StreamStorage streams;
+  private final Optional<KafkaPartitionMetadataStore> bindings;
+  private final KafkaCompactedFetchPlanner planner;
+
+  public KafkaCompactedFetchReader(
+      KafkaPartitionIdentity identity,
+      StreamId streamId,
+      StreamStorage streams,
+      KafkaPartitionMetadataStore bindings) {
+    this(
+        identity,
+        streamId,
+        streams,
+        Optional.of(Objects.requireNonNull(bindings, "bindings")),
+        new KafkaCompactedFetchPlanner());
+  }
+
+  public static KafkaCompactedFetchReader committedOnly(
+      KafkaPartitionIdentity identity, StreamId streamId, StreamStorage streams) {
+    return new KafkaCompactedFetchReader(
+        identity, streamId, streams, Optional.empty(), new KafkaCompactedFetchPlanner());
+  }
+
+  KafkaCompactedFetchReader(
+      KafkaPartitionIdentity identity,
+      StreamId streamId,
+      StreamStorage streams,
+      Optional<KafkaPartitionMetadataStore> bindings,
+      KafkaCompactedFetchPlanner planner) {
+    this.identity = Objects.requireNonNull(identity, "identity");
+    this.streamId = Objects.requireNonNull(streamId, "streamId");
+    this.streams = Objects.requireNonNull(streams, "streams");
+    this.bindings = Objects.requireNonNull(bindings, "bindings");
+    this.planner = Objects.requireNonNull(planner, "planner");
+  }
+
+  public CompletableFuture<Result> read(
+      KafkaStorageReadRequest request, KafkaStableSnapshot stableSnapshot) {
+    Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(stableSnapshot, "stableSnapshot");
+    long startedNanos = System.nanoTime();
+    CompletableFuture<KafkaCompactedFetchPlanner.Plan> planned =
+        bindings
+            .map(
+                store ->
+                    store
+                        .get(identity.durableId())
+                        .thenApply(
+                            optional ->
+                                planner.plan(
+                                    identity,
+                                    streamId,
+                                    stableSnapshot,
+                                    request,
+                                    optional.orElseThrow(
+                                        () ->
+                                            new NereusException(
+                                                ErrorCode.STREAM_NOT_FOUND,
+                                                false,
+                                                "Kafka partition binding disappeared before"
+                                                    + " Fetch")))))
+            .orElseGet(
+                () ->
+                    CompletableFuture.completedFuture(
+                        planner.committedOnly(stableSnapshot, request)));
+    return planned.thenCompose(
+        plan -> {
+          Accumulator accumulator = new Accumulator(request.startOffset());
+          return readSegment(request, plan, 0, request.startOffset(), startedNanos, accumulator, 0)
+              .thenApply(ignored -> finish(request, plan, accumulator));
+        });
+  }
+
+  private CompletableFuture<Void> readSegment(
+      KafkaStorageReadRequest request,
+      KafkaCompactedFetchPlanner.Plan plan,
+      int segmentIndex,
+      long cursor,
+      long startedNanos,
+      Accumulator accumulator,
+      int readCalls) {
+    if (segmentIndex >= plan.segments().size() || accumulator.limitReached(request)) {
+      return CompletableFuture.completedFuture(null);
+    }
+    if (readCalls >= MAX_VIEW_READS) {
+      return failed(
+          ErrorCode.METADATA_LIMIT_EXCEEDED,
+          false,
+          "Kafka Fetch exceeded the bounded semantic-view read count");
+    }
+    KafkaCompactedFetchPlanner.Segment segment = plan.segments().get(segmentIndex);
+    if (cursor >= segment.range().endOffset()) {
+      return readSegment(
+          request, plan, segmentIndex + 1, cursor, startedNanos, accumulator, readCalls);
+    }
+
+    Duration remaining;
+    try {
+      remaining = remaining(request.timeout(), startedNanos);
+    } catch (Throwable failure) {
+      return CompletableFuture.failedFuture(failure);
+    }
+    int remainingRecords =
+        Math.toIntExact(Math.max(1L, request.maxRecords() - accumulator.records));
+    int remainingBytes = Math.max(1, request.maxPartitionBytes() - accumulator.bytes);
+    boolean allowFirstOverflow = accumulator.batches.isEmpty() && request.minOneMessage();
+    ReadRequest sourceRequest =
+        new ReadRequest(
+            cursor,
+            segment.view(),
+            ReadBoundaryMode.CONTAINING_ENTRY,
+            allowFirstOverflow
+                ? FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW
+                : FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+            new ReadOptions(remainingRecords, remainingBytes, ReadIsolation.COMMITTED, remaining));
+    return streams
+        .read(streamId, sourceRequest)
+        .thenCompose(
+            source -> {
+              long nextCursor;
+              try {
+                nextCursor = accept(request, segment, cursor, source, accumulator);
+              } catch (Throwable failure) {
+                return CompletableFuture.failedFuture(failure);
+              }
+              if (accumulator.limitReached(request)) {
+                return CompletableFuture.completedFuture(null);
+              }
+              if (nextCursor >= segment.range().endOffset()) {
+                return readSegment(
+                    request,
+                    plan,
+                    segmentIndex + 1,
+                    nextCursor,
+                    startedNanos,
+                    accumulator,
+                    readCalls + 1);
+              }
+              if (nextCursor <= cursor) {
+                return failed(
+                    ErrorCode.READ_RESOLUTION_FAILED,
+                    true,
+                    "Kafka semantic-view read made no source-coverage progress");
+              }
+              return readSegment(
+                  request,
+                  plan,
+                  segmentIndex,
+                  nextCursor,
+                  startedNanos,
+                  accumulator,
+                  readCalls + 1);
+            });
+  }
+
+  private long accept(
+      KafkaStorageReadRequest request,
+      KafkaCompactedFetchPlanner.Segment segment,
+      long cursor,
+      SemanticReadResult source,
+      Accumulator accumulator) {
+    if (!source.result().streamId().equals(streamId)
+        || source.result().requestedOffset() != cursor
+        || source.view() != segment.view()) {
+      throw invariant("Nereus semantic read result does not match the planned Kafka Fetch segment");
+    }
+    List<ReadBatch> returned = source.result().batches();
+    int acceptedBefore = accumulator.batches.size();
+    for (ReadBatch batch : returned) {
+      if (segment.range().startOffset() > request.startOffset()
+          && batch.range().startOffset() < segment.range().startOffset()) {
+        throw invariant("Kafka batch crosses the mandatory compacted/committed view boundary");
+      }
+      if (batch.range().startOffset() >= segment.range().endOffset()) {
+        break;
+      }
+      if (batch.range().endOffset() > segment.range().endOffset()) {
+        if (segment.view() == ReadView.TOPIC_COMPACTED) {
+          throw invariant("mandatory compacted batch crosses the activated coverage boundary");
+        }
+        accumulator.stoppedAtUpperBound = true;
+        break;
+      }
+      accumulator.add(request, batch);
+      if (accumulator.limitReached(request)) {
+        break;
+      }
+    }
+
+    long nextCursor;
+    if (segment.view() == ReadView.TOPIC_COMPACTED) {
+      nextCursor = Math.min(source.sourceCoverageEndOffset(), segment.range().endOffset());
+      if (nextCursor < cursor
+          || (!accumulator.batches.isEmpty() && accumulator.lastBatchEnd() > nextCursor)) {
+        throw invariant("compacted Fetch source coverage does not cover returned Kafka batches");
+      }
+    } else {
+      if (returned.isEmpty()) {
+        if (cursor < segment.range().endOffset()) {
+          throw new NereusException(
+              ErrorCode.READ_RESOLUTION_FAILED,
+              true,
+              "committed Kafka Fetch source produced no readable batch");
+        }
+        nextCursor = cursor;
+      } else if (accumulator.batches.size() == acceptedBefore) {
+        if (!accumulator.stoppedAtUpperBound) {
+          throw invariant("committed Kafka Fetch source returned no admissible batch");
+        }
+        nextCursor = cursor;
+      } else {
+        nextCursor = accumulator.lastBatchEnd();
+      }
+    }
+    accumulator.coverageEnd = Math.max(accumulator.coverageEnd, nextCursor);
+    if (accumulator.stoppedAtUpperBound) {
+      return segment.range().endOffset();
+    }
+    return nextCursor;
+  }
+
+  private Result finish(
+      KafkaStorageReadRequest request,
+      KafkaCompactedFetchPlanner.Plan plan,
+      Accumulator accumulator) {
+    long nextOffset =
+        accumulator.batches.isEmpty() ? request.startOffset() : accumulator.lastBatchEnd();
+    ReadView resultView =
+        plan.hasMandatoryCompactedPrefix() ? ReadView.TOPIC_COMPACTED : ReadView.COMMITTED;
+    long coverageEnd = resultView == ReadView.COMMITTED ? nextOffset : accumulator.coverageEnd;
+    ReadResult result =
+        new ReadResult(
+            streamId,
+            request.startOffset(),
+            nextOffset,
+            accumulator.batches,
+            coverageEnd >= plan.requestRange().endOffset());
+    SemanticReadResult semantic = new SemanticReadResult(resultView, result, coverageEnd);
+    return new Result(semantic, accumulator.firstEntryOverflow, plan);
+  }
+
+  public record Result(
+      SemanticReadResult semanticRead,
+      boolean firstEntryOverflow,
+      KafkaCompactedFetchPlanner.Plan plan) {
+    public Result {
+      Objects.requireNonNull(semanticRead, "semanticRead");
+      Objects.requireNonNull(plan, "plan");
+      if (firstEntryOverflow && semanticRead.result().batches().size() != 1) {
+        throw new IllegalArgumentException(
+            "Kafka first-entry overflow requires exactly one returned batch");
+      }
+    }
+  }
+
+  private static Duration remaining(Duration timeout, long startedNanos) {
+    long elapsed = Math.max(0, System.nanoTime() - startedNanos);
+    long remaining;
+    try {
+      remaining = Math.subtractExact(timeout.toNanos(), elapsed);
+    } catch (ArithmeticException failure) {
+      remaining = Long.MAX_VALUE;
+    }
+    if (remaining <= 0) {
+      throw new NereusException(ErrorCode.TIMEOUT, true, "Kafka compacted Fetch deadline expired");
+    }
+    return Duration.ofNanos(remaining);
+  }
+
+  private static <T> CompletableFuture<T> failed(
+      ErrorCode code, boolean retriable, String message) {
+    return CompletableFuture.failedFuture(new NereusException(code, retriable, message));
+  }
+
+  private static NereusException invariant(String message) {
+    return new NereusException(ErrorCode.METADATA_INVARIANT_VIOLATION, false, message);
+  }
+
+  private static final class Accumulator {
+    private final List<ReadBatch> batches = new ArrayList<>();
+    private int bytes;
+    private long records;
+    private long coverageEnd;
+    private boolean firstEntryOverflow;
+    private boolean stoppedAtUpperBound;
+
+    private Accumulator(long startOffset) {
+      coverageEnd = startOffset;
+    }
+
+    private void add(KafkaStorageReadRequest request, ReadBatch batch) {
+      Objects.requireNonNull(batch, "batch");
+      int nextBytes = Math.addExact(bytes, batch.payload().length);
+      long nextRecords = Math.addExact(records, batch.range().recordCount());
+      boolean overflow =
+          nextBytes > request.maxPartitionBytes() || nextRecords > request.maxRecords();
+      if (overflow && (!request.minOneMessage() || !batches.isEmpty())) {
+        throw invariant("Nereus semantic read exceeded Kafka Fetch partition limits");
+      }
+      batches.add(batch);
+      bytes = nextBytes;
+      records = nextRecords;
+      firstEntryOverflow = overflow && batches.size() == 1;
+    }
+
+    private boolean limitReached(KafkaStorageReadRequest request) {
+      return firstEntryOverflow
+          || bytes >= request.maxPartitionBytes()
+          || records >= request.maxRecords()
+          || stoppedAtUpperBound;
+    }
+
+    private long lastBatchEnd() {
+      return batches.get(batches.size() - 1).range().endOffset();
+    }
+  }
+}

@@ -15,6 +15,8 @@ import com.nereusstream.kafka.recovery.KafkaCheckpointRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
 import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaRecoveredPartition;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataStore;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
@@ -22,7 +24,10 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 
-/** Product-owned composition of authority acquisition, exact source recovery, and leader storage construction. */
+/**
+ * Product-owned composition of authority acquisition, exact source recovery, and leader storage
+ * construction.
+ */
 public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     private final StreamStorage streams;
     private final String writerId;
@@ -32,6 +37,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     private final KafkaPartitionRecoveryLauncher recoveryLauncher;
     private final KafkaAppendBatchEncoder appendEncoder;
     private final KafkaFetchAssembler fetchAssembler;
+    private final Optional<KafkaPartitionMetadataStore> partitionMetadataStore;
     private final Clock clock;
 
     public DefaultKafkaPartitionOpener(
@@ -44,6 +50,55 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
             KafkaAppendBatchEncoder appendEncoder,
             KafkaFetchAssembler fetchAssembler,
             Clock clock) {
+        this(
+                streams,
+                writerId,
+                sessionTtl,
+                renewalInterval,
+                renewalScheduler,
+                recoveryLauncher,
+                appendEncoder,
+                fetchAssembler,
+                Optional.empty(),
+                clock);
+    }
+
+    public DefaultKafkaPartitionOpener(
+            StreamStorage streams,
+            String writerId,
+            Duration sessionTtl,
+            Duration renewalInterval,
+            ScheduledExecutorService renewalScheduler,
+            KafkaPartitionRecoveryLauncher recoveryLauncher,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            KafkaPartitionMetadataStore partitionMetadataStore,
+            Clock clock) {
+        this(
+                streams,
+                writerId,
+                sessionTtl,
+                renewalInterval,
+                renewalScheduler,
+                recoveryLauncher,
+                appendEncoder,
+                fetchAssembler,
+                Optional.of(
+                        Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore")),
+                clock);
+    }
+
+    private DefaultKafkaPartitionOpener(
+            StreamStorage streams,
+            String writerId,
+            Duration sessionTtl,
+            Duration renewalInterval,
+            ScheduledExecutorService renewalScheduler,
+            KafkaPartitionRecoveryLauncher recoveryLauncher,
+            KafkaAppendBatchEncoder appendEncoder,
+            KafkaFetchAssembler fetchAssembler,
+            Optional<KafkaPartitionMetadataStore> partitionMetadataStore,
+            Clock clock) {
         this.streams = Objects.requireNonNull(streams, "streams");
         this.writerId = requireText(writerId, "writerId");
         this.sessionTtl = positive(sessionTtl, "sessionTtl");
@@ -55,6 +110,8 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
         this.recoveryLauncher = Objects.requireNonNull(recoveryLauncher, "recoveryLauncher");
         this.appendEncoder = Objects.requireNonNull(appendEncoder, "appendEncoder");
         this.fetchAssembler = Objects.requireNonNull(fetchAssembler, "fetchAssembler");
+        this.partitionMetadataStore =
+                Objects.requireNonNull(partitionMetadataStore, "partitionMetadataStore");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -66,11 +123,13 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
             deadline = Math.addExact(clock.millis(), plan.timeout().toMillis());
         } catch (ArithmeticException failure) {
             return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("Kafka partition open deadline overflows", failure));
+                    new IllegalArgumentException(
+                            "Kafka partition open deadline overflows", failure));
         }
-        AppendSessionRequest request = AppendSessionRequest.authoritative(
-                new AppendSessionOptions(writerId, sessionTtl, false),
-                plan.authority().appendAuthority());
+        AppendSessionRequest request =
+                AppendSessionRequest.authoritative(
+                        new AppendSessionOptions(writerId, sessionTtl, false),
+                        plan.authority().appendAuthority());
         try {
             remaining(deadline);
         } catch (Throwable failure) {
@@ -82,42 +141,69 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     }
 
     private CompletableFuture<RecoveredOpen> recover(
-            KafkaPartitionOpenPlan plan,
-            AcquiredAppendSession acquired,
-            long deadline) {
+            KafkaPartitionOpenPlan plan, AcquiredAppendSession acquired, long deadline) {
         requireExactAuthority(plan, acquired);
-        DefaultKafkaCheckpointSourceValidator validator = new DefaultKafkaCheckpointSourceValidator(
-                streams,
-                plan.binding().streamId(),
-                acquired,
-                plan.profilePolicy().storageProfile());
-        return validator.loadCurrent().thenCompose(source -> {
-            Duration remaining = remaining(deadline);
-            KafkaCheckpointRecoveryRequest checkpointRequest = new KafkaCheckpointRecoveryRequest(
-                    plan.authority().identity(),
-                    plan.binding().durableRoot(),
-                    source,
-                    validator,
-                    remaining);
-            return recoveryLauncher.recover(new KafkaPartitionRecoveryRequest(
-                            checkpointRequest, remaining))
-                    .thenApply(recovered -> validateRecovered(plan, acquired, source, recovered, deadline));
-        });
+        DefaultKafkaCheckpointSourceValidator validator =
+                new DefaultKafkaCheckpointSourceValidator(
+                        streams,
+                        plan.binding().streamId(),
+                        acquired,
+                        plan.profilePolicy().storageProfile());
+        return validator
+                .loadCurrent()
+                .thenCompose(
+                        source -> {
+                            Duration remaining = remaining(deadline);
+                            KafkaCheckpointRecoveryRequest checkpointRequest =
+                                    new KafkaCheckpointRecoveryRequest(
+                                            plan.authority().identity(),
+                                            plan.binding().durableRoot(),
+                                            source,
+                                            validator,
+                                            remaining);
+                            return recoveryLauncher
+                                    .recover(
+                                            new KafkaPartitionRecoveryRequest(
+                                                    checkpointRequest, remaining))
+                                    .thenApply(
+                                            recovered ->
+                                                    validateRecovered(
+                                                            plan, acquired, source, recovered,
+                                                            deadline));
+                        });
     }
 
     private KafkaPartitionStorage storage(KafkaPartitionOpenPlan plan, RecoveredOpen recovered) {
-        return new DefaultKafkaPartitionStorage(
-                plan.authority().identity(),
-                streams,
-                plan.binding().streamId(),
-                recovered.acquiredSession(),
-                recovered.recovered().frozenSource(),
-                plan.profilePolicy(),
-                appendEncoder,
-                fetchAssembler,
-                renewalScheduler,
-                sessionTtl,
-                renewalInterval);
+        return partitionMetadataStore
+                .<KafkaPartitionStorage>map(
+                        store ->
+                                new DefaultKafkaPartitionStorage(
+                                        plan.authority().identity(),
+                                        streams,
+                                        plan.binding().streamId(),
+                                        recovered.acquiredSession(),
+                                        recovered.recovered().frozenSource(),
+                                        plan.profilePolicy(),
+                                        appendEncoder,
+                                        fetchAssembler,
+                                        store,
+                                        renewalScheduler,
+                                        sessionTtl,
+                                        renewalInterval))
+                .orElseGet(
+                        () ->
+                                new DefaultKafkaPartitionStorage(
+                                        plan.authority().identity(),
+                                        streams,
+                                        plan.binding().streamId(),
+                                        recovered.acquiredSession(),
+                                        recovered.recovered().frozenSource(),
+                                        plan.profilePolicy(),
+                                        appendEncoder,
+                                        fetchAssembler,
+                                        renewalScheduler,
+                                        sessionTtl,
+                                        renewalInterval));
     }
 
     private RecoveredOpen validateRecovered(
@@ -139,8 +225,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     }
 
     private static void requireExactAuthority(
-            KafkaPartitionOpenPlan plan,
-            AcquiredAppendSession acquired) {
+            KafkaPartitionOpenPlan plan, AcquiredAppendSession acquired) {
         if (!acquired.session().streamId().equals(plan.binding().streamId())
                 || !acquired.authority().equals(Optional.of(plan.authority().appendAuthority()))) {
             throw fenced("Nereus returned a different Kafka append authority/session");
@@ -150,7 +235,8 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     private Duration remaining(long deadline) {
         long millis = deadline - clock.millis();
         if (millis <= 0) {
-            throw new NereusException(ErrorCode.TIMEOUT, true, "Kafka partition open deadline expired");
+            throw new NereusException(
+                    ErrorCode.TIMEOUT, true, "Kafka partition open deadline expired");
         }
         return Duration.ofMillis(millis);
     }
@@ -164,7 +250,8 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     private static Duration positive(Duration value, String name) {
         Objects.requireNonNull(value, name);
         if (value.isZero() || value.isNegative() || value.toMillis() <= 0) {
-            throw new IllegalArgumentException(name + " must be positive and millisecond-representable");
+            throw new IllegalArgumentException(
+                    name + " must be positive and millisecond-representable");
         }
         return value;
     }
@@ -178,8 +265,7 @@ public final class DefaultKafkaPartitionOpener implements KafkaPartitionOpener {
     }
 
     private record RecoveredOpen(
-            AcquiredAppendSession acquiredSession,
-            KafkaRecoveredPartition<?> recovered) {
+            AcquiredAppendSession acquiredSession, KafkaRecoveredPartition<?> recovered) {
         private RecoveredOpen {
             Objects.requireNonNull(acquiredSession, "acquiredSession");
             Objects.requireNonNull(recovered, "recovered");

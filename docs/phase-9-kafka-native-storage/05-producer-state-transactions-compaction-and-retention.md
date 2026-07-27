@@ -1001,8 +1001,9 @@ read target。
 
 `KafkaCompactionPublicationCoordinatorTest` executes a real staged Parquet NTC2 upload/read verifier and the durable task
 claim/output transition，injects both response-loss cuts，accepts a same-owner heartbeat race and proves an unrelated
-coverage activation cannot be overwritten after Generation commit。Runtime cleaner scheduling、plan-orphan scan and the
-read-side no-resurrection resolver remain pending。
+coverage activation cannot be overwritten after Generation commit。Runtime cleaner scheduling、plan-orphan scan、activated
+generation-set discovery and provider-backed restart gates remain pending；the binding-rooted read-view router described in
+section 11.3 is implemented。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two
 Oxia roots are atomic。It writes the immutable KCP1 child first，then asks `MaterializationTaskStore.create` to revalidate
@@ -1177,6 +1178,17 @@ candidate。No single physical candidate crosses view。
 
 Changing cleanup policy `compact -> delete` freezes existing mandatory coverage and uses COMMITTED only for new tail；old
 records do not reappear。Re-enabling compaction resumes/extends or replaces NTC2 coverage。
+
+Current implementation（2026-07-27）：`KafkaCompactedFetchPlanner` validates the exact ACTIVE partition/stream binding and
+freezes the activation epoch、generation-set SHA and policy SHA into an immutable two-segment plan。It treats the binding
+coverage as correctness state independently of the current cleanup policy。`KafkaCompactedFetchReader` reloads that root for
+every Fetch，issues only `TOPIC_COMPACTED` calls below mandatory end，advances sparse/empty results by
+`sourceCoverageEndOffset` and then issues a new `COMMITTED` call at the exact boundary with the remaining record/byte/deadline
+budget。All mandatory failures propagate directly；there is no adapter path that retries the same offset through COMMITTED。
+The production runtime now passes its borrowed partition metadata store into every opened storage instance；the legacy
+constructor remains committed-only for isolated compatibility tests。A runtime whose `StreamStorage` has no F4
+generation-aware reader therefore fails closed after coverage activation rather than exposing WAL/NCP2。Exact activated-set
+discovery/protection wiring and real-provider/restart evidence remain part of the remaining M5 gate。
 
 ## 12. Compaction and lossless materialization coexistence
 

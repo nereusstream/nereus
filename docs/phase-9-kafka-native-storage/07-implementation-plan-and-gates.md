@@ -585,7 +585,7 @@ publication/root reload，with a canonical seven-section local-file object-store
 response-loss-safe binding observed-logStart CAS before calling the exact local updater。This task deliberately does not
 use the `phase9M5Check` completion name：concrete partition capture、
 local-log updater、periodic scheduling、Kafka-fork DeleteRecords invocation、
-compaction/no-resurrection、stock oracle and real-provider/restart gates remain required。
+compaction scheduler、activated-set discovery、stock oracle and real-provider/restart gates remain required。
 
 The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
 the frozen HW，returns the current durable low watermark without I/O for already-deleted requests，and otherwise routes the
@@ -638,8 +638,10 @@ agreement and preserves valid zero-survivor generations while keeping COMMITTED 
 `KafkaCompactionPublicationCoordinator` then performs guarded if-absent upload、HEAD/full NTC2 verification、durable
 OUTPUT_READY、generic Generation commit and canonical generation-set coverage CAS in that order；bounded exact reload
 handles PUT/CAS response loss，while a changed coverage basis leaves the committed generation non-mandatory。Plan-only
-orphan scan、runtime cleaner scheduling/read integration and the cleaner differential oracle remain pending；the write-side
-linearization exists but this gate still does not claim end-to-end client compaction visibility。
+orphan scan、runtime cleaner scheduling、activated-generation-set discovery and the cleaner differential oracle remain
+pending。The product runtime now reloads binding coverage per Fetch and executes a sparse `TOPIC_COMPACTED` prefix followed
+by a `COMMITTED` tail；mandatory-view failure has no cross-view fallback。This closes the deterministic adapter
+no-resurrection boundary but does not yet claim provider/restart or end-to-end client compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

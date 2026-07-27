@@ -18,6 +18,12 @@
 
 `R/P/C` rows cannot be satisfied by fake stores or mocks。A row may require multiple tiers。
 
+Current deterministic M5 read-side evidence（2026-07-27）：`KafkaCompactedFetchPlannerTest` and
+`KafkaCompactedFetchIntegrationTest` cover KF-FET-011/012 at adapter tier，including an entirely empty compacted prefix；
+`KafkaCompactedNoResurrectionIntegrationTest` covers the view-domain portion of KF-FET-013/014 and proves an unavailable
+mandatory source never produces a COMMITTED retry。The manifest rows remain `PLANNED` because their required real-service、
+restart/Kafka-fork and process/chaos tiers are not yet satisfied。
+
 ## 2. Machine-readable manifest target
 
 F9-M1 implementation start 已创建 `docs/phase-9-kafka-native-storage/f9-scenarios.json`，每个 Markdown row 对应
