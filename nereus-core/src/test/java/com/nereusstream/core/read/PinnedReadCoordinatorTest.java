@@ -6,17 +6,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
+import com.nereusstream.api.FirstEntryPolicy;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectType;
 import com.nereusstream.api.OffsetRange;
 import com.nereusstream.api.PayloadFormat;
 import com.nereusstream.api.PublicationId;
 import com.nereusstream.api.ReadBatch;
+import com.nereusstream.api.ReadBoundaryMode;
 import com.nereusstream.api.ReadIsolation;
 import com.nereusstream.api.ReadOptions;
+import com.nereusstream.api.ReadRequest;
 import com.nereusstream.api.ReadResult;
 import com.nereusstream.api.ReadView;
 import com.nereusstream.api.ResolvedRange;
+import com.nereusstream.api.SemanticReadResult;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.core.StreamStorageConfig;
@@ -49,7 +53,8 @@ class PinnedReadCoordinatorTest {
         CompletableFuture<WalReadResult> readerCompletion = new CompletableFuture<>();
         TestReader reader = new TestReader(ReadTargetReaderKey.from(target), readerCompletion);
         ReadCoordinator coordinator = coordinator(
-                (stream, offset, view, deadline, repair, excluded) -> CompletableFuture.completedFuture(
+                (stream, offset, view, deadline, repair, excluded, constraint) ->
+                        CompletableFuture.completedFuture(
                         Optional.of(new PinnedResolvedRange(candidate, lease))),
                 new ReadTargetReaderRegistry(List.of(reader)),
                 GenerationReadFailureHandler.noOp());
@@ -86,7 +91,7 @@ class PinnedReadCoordinatorTest {
                 ReadTargetReaderKey.from(zeroTarget),
                 CompletableFuture.completedFuture(result(zeroTarget, (byte) 9)));
         ReadCoordinator coordinator = coordinator(
-                (stream, offset, view, deadline, repair, excluded) -> {
+                (stream, offset, view, deadline, repair, excluded, constraint) -> {
                     views.add(view);
                     exclusions.add(Set.copyOf(excluded));
                     GenerationReadCandidate selected = excluded.contains(higher) ? zero : higher;
@@ -130,7 +135,7 @@ class PinnedReadCoordinatorTest {
                                 ErrorCode.OBJECT_READ_FAILED, true, "throttled-2")),
                         CompletableFuture.completedFuture(result(target, (byte) 11))));
         ReadCoordinator coordinator = coordinator(
-                (stream, offset, view, deadline, repair, excluded) -> {
+                (stream, offset, view, deadline, repair, excluded, constraint) -> {
                     resolves.incrementAndGet();
                     assertThat(excluded).isEmpty();
                     return CompletableFuture.completedFuture(Optional.of(
@@ -169,7 +174,7 @@ class PinnedReadCoordinatorTest {
                 ReadTargetReaderKey.from(zeroTarget),
                 CompletableFuture.completedFuture(result(zeroTarget, (byte) 12)));
         ReadCoordinator coordinator = coordinator(
-                (stream, offset, view, deadline, repair, excluded) -> {
+                (stream, offset, view, deadline, repair, excluded, constraint) -> {
                     resolves.incrementAndGet();
                     GenerationReadCandidate selected = excluded.contains(higher) ? zero : higher;
                     ObjectSliceReadTarget target = selected == higher ? higherTarget : zeroTarget;
@@ -191,6 +196,52 @@ class PinnedReadCoordinatorTest {
         assertThat(transientFailure.calls).hasValue(2);
         assertThat(healthy.calls).hasValue(1);
         assertThat(handled).hasValue(1);
+        coordinator.close();
+    }
+
+    @Test
+    void exactConstraintSkipsNewerUnactivatedGeneration() {
+        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
+                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        GenerationReadCandidate unactivated = candidate(target, ReadView.TOPIC_COMPACTED, 9);
+        GenerationReadCandidate activated = candidate(target, ReadView.TOPIC_COMPACTED, 7);
+        List<Set<GenerationReadCandidate>> exclusions = new ArrayList<>();
+        ReadCoordinator coordinator = coordinator(
+                (stream, offset, view, deadline, repair, excluded, constraint) -> {
+                    exclusions.add(Set.copyOf(excluded));
+                    GenerationReadCandidate selected =
+                            excluded.contains(unactivated) ? activated : unactivated;
+                    return CompletableFuture.completedFuture(Optional.of(
+                            new PinnedResolvedRange(selected, new TestLease(target))));
+                },
+                new ReadTargetReaderRegistry(List.of(new TestReader(
+                        ReadTargetReaderKey.from(target),
+                        CompletableFuture.completedFuture(result(target, (byte) 13))))),
+                GenerationReadFailureHandler.noOp());
+        GenerationReadConstraint constraint = new GenerationReadConstraint(
+                STREAM,
+                ReadView.TOPIC_COMPACTED,
+                activated.resolvedRange().offsetRange(),
+                List.of(new GenerationReadConstraint.Identity(
+                        activated.resolvedRange().offsetRange(),
+                        activated.resolvedRange().generation(),
+                        activated.publicationId().orElseThrow(),
+                        activated.indexKey(),
+                        activated.indexMetadataVersion(),
+                        activated.indexRecordSha256())));
+        ReadRequest request = new ReadRequest(
+                0,
+                ReadView.TOPIC_COMPACTED,
+                ReadBoundaryMode.EXACT_START,
+                FirstEntryPolicy.LEGACY_STRICT_LIMIT,
+                options());
+
+        SemanticReadResult value = coordinator.read(STREAM, request, constraint).join();
+
+        assertThat(value.result().batches().getFirst().payload()).containsExactly(13);
+        assertThat(exclusions).hasSize(2);
+        assertThat(exclusions.getFirst()).isEmpty();
+        assertThat(exclusions.get(1)).containsExactly(unactivated);
         coordinator.close();
     }
 
@@ -234,6 +285,13 @@ class PinnedReadCoordinatorTest {
     private static GenerationReadCandidate candidate(
             ObjectSliceReadTarget target,
             long generation) {
+        return candidate(target, ReadView.COMMITTED, generation);
+    }
+
+    private static GenerationReadCandidate candidate(
+            ObjectSliceReadTarget target,
+            ReadView view,
+            long generation) {
         ResolvedRange range = new ResolvedRange(
                 new OffsetRange(0, 1),
                 generation,
@@ -246,7 +304,7 @@ class PinnedReadCoordinatorTest {
                 Optional.empty(),
                 1);
         return new GenerationReadCandidate(
-                ReadView.COMMITTED,
+                view,
                 range,
                 "/index/1/" + generation,
                 generation + 1,

@@ -248,6 +248,27 @@ class GenerationReadResolverTest {
     }
 
     @Test
+    void resolvesSparseTopicCompactedGenerationWithZeroSurvivors() {
+        VersionedGenerationIndex sparse = sparseTopicCompacted(7);
+        GenerationStoreState store = new GenerationStoreState(List.of(sparse));
+        TestPinManager pins = new TestPinManager();
+        GenerationReadResolver resolver = resolver(store, pins, readers(true));
+
+        PinnedResolvedRange selected = resolver.resolve(
+                        STREAM, 0, ReadView.TOPIC_COMPACTED, Duration.ofSeconds(5))
+                .join()
+                .orElseThrow();
+
+        assertThat(selected.resolvedRange().offsetRange()).isEqualTo(new OffsetRange(0, 2));
+        assertThat(selected.resolvedRange().recordCount()).isEqualTo(2);
+        assertThat(selected.resolvedRange().entryCount()).isZero();
+        assertThat(selected.resolvedRange().logicalBytes()).isZero();
+        assertThat(selected.resolvedRange().payloadFormat())
+                .isEqualTo(PayloadFormat.KAFKA_RECORD_BATCH);
+        selected.release().join();
+    }
+
+    @Test
     void admitsExactlyFourThousandNinetySixGenerationCandidates() throws Exception {
         AtomicInteger pages = new AtomicInteger();
         F4ScanToken continuation = scanToken();
@@ -575,6 +596,49 @@ class GenerationReadResolverTest {
                 version);
         return new VersionedGenerationIndex(
                 "/" + view.name() + "/index/2/" + generation,
+                record,
+                version,
+                sha(version));
+    }
+
+    private static VersionedGenerationIndex sparseTopicCompacted(long generation) {
+        ObjectSliceReadTarget target = ReadTargetReaderRegistryTest.target(
+                ObjectType.STREAM_COMPACTED_OBJECT, "NEREUS_COMPACTED_PARQUET_V1");
+        var encoded = ReadTargetCodecRegistry.phase15().encode(target);
+        long version = generation + 10;
+        GenerationIndexRecord record = new GenerationIndexRecord(
+                1,
+                STREAM.value(),
+                ReadView.TOPIC_COMPACTED.wireId(),
+                0,
+                2,
+                generation,
+                publication(generation),
+                "task-" + generation,
+                GenerationLifecycle.COMMITTED,
+                "a".repeat(64),
+                "b".repeat(64),
+                encoded,
+                encoded.identityChecksumValue(),
+                "b".repeat(64),
+                PayloadFormat.KAFKA_RECORD_BATCH.name(),
+                2,
+                0,
+                0,
+                0,
+                0,
+                2,
+                1,
+                1,
+                List.of(),
+                CommitSliceRequest.emptyProjectionIdentity(),
+                100,
+                110,
+                "",
+                120,
+                version);
+        return new VersionedGenerationIndex(
+                "/TOPIC_COMPACTED/index/2/" + generation,
                 record,
                 version,
                 sha(version));

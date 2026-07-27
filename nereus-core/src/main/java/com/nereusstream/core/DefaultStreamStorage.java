@@ -54,6 +54,8 @@ import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.lifecycle.StreamLifecycleCoordinator;
 import com.nereusstream.core.profile.Phase15StorageProfileResolver;
 import com.nereusstream.core.profile.StorageProfileResolver;
+import com.nereusstream.core.read.ConstrainedSemanticStreamReader;
+import com.nereusstream.core.read.GenerationReadConstraint;
 import com.nereusstream.core.read.ReadCoordinator;
 import com.nereusstream.core.read.ReadMetricsObserver;
 import com.nereusstream.core.read.ReadResolver;
@@ -77,7 +79,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Phase 1 stream-storage facade. M4 implements the strict Object WAL append path. */
-public final class DefaultStreamStorage implements StreamStorage {
+public final class DefaultStreamStorage implements StreamStorage, ConstrainedSemanticStreamReader {
     private final StreamStorageConfig config;
     private final OxiaMetadataStore metadataStore;
     private final AppendSessionManager appendSessionManager;
@@ -616,6 +618,14 @@ public final class DefaultStreamStorage implements StreamStorage {
             StreamId streamId,
             ReadRequest request) {
         return readCoordinator.read(streamId, request);
+    }
+
+    @Override
+    public CompletableFuture<SemanticReadResult> read(
+            StreamId streamId,
+            ReadRequest request,
+            GenerationReadConstraint constraint) {
+        return readCoordinator.read(streamId, request, constraint);
     }
 
     @Override

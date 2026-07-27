@@ -265,7 +265,21 @@ public final class ReadCoordinator implements StreamViewReader {
     public CompletableFuture<SemanticReadResult> read(
             StreamId streamId,
             ReadRequest request) {
+        return read(streamId, request, null);
+    }
+
+    /** Executes one semantic read while admitting only exact externally activated generations. */
+    public CompletableFuture<SemanticReadResult> read(
+            StreamId streamId,
+            ReadRequest request,
+            GenerationReadConstraint constraint) {
         if (request != null && request.isLegacyEquivalent() && generationResolver == null) {
+            if (constraint != null) {
+                return CompletableFuture.failedFuture(new NereusException(
+                        ErrorCode.UNSUPPORTED_READ_SEMANTICS,
+                        false,
+                        "generation constraints require a generation-aware reader"));
+            }
             return read(streamId, request.startOffset(), request.options())
                     .thenApply(value -> SemanticReadResult.forRequest(
                             request, value, value.nextOffset()));
@@ -293,6 +307,16 @@ public final class ReadCoordinator implements StreamViewReader {
                     "the configured storage does not expose higher-generation semantic views"));
             return result;
         }
+        if (constraint != null
+                && (!constraint.streamId().equals(streamId)
+                        || constraint.view() != request.view()
+                        || !constraint.coverage().contains(request.startOffset()))) {
+            result.completeExceptionally(new NereusException(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "generation constraint does not cover the requested stream/view/offset"));
+            return result;
+        }
         Duration effectiveTimeout = request.options().timeout().compareTo(config.readTimeout()) <= 0
                 ? request.options().timeout()
                 : config.readTimeout();
@@ -311,7 +335,8 @@ public final class ReadCoordinator implements StreamViewReader {
                     request,
                     deadline,
                     new LinkedHashSet<>(),
-                    new HashMap<>());
+                    new HashMap<>(),
+                    constraint);
         }
         completeFrom(result, pipeline);
         return result;
@@ -361,23 +386,46 @@ public final class ReadCoordinator implements StreamViewReader {
             ReadRequest request,
             ReadOperationDeadline deadline,
             Set<GenerationReadCandidate> excludedCandidates,
-            Map<GenerationReadCandidate, Integer> transientRetries) {
+            Map<GenerationReadCandidate, Integer> transientRetries,
+            GenerationReadConstraint constraint) {
         return generationResolver.resolve(
                         streamId,
                         request.startOffset(),
                         request.view(),
                         deadline,
                         true,
-                        excludedCandidates)
+                        excludedCandidates,
+                        constraint)
                 .thenCompose(optional -> optional
-                        .map(pinned -> readSemanticPinned(
-                                streamId,
-                                request,
-                                deadline,
-                                pinned,
-                                excludedCandidates,
-                                transientRetries))
+                        .map(pinned -> {
+                            if (constraint != null && !constraint.admits(pinned.candidate())) {
+                                Set<GenerationReadCandidate> nextExclusions =
+                                        new LinkedHashSet<>(excludedCandidates);
+                                nextExclusions.add(pinned.candidate());
+                                return pinned.release().thenCompose(ignored -> readSemanticGeneration(
+                                        streamId,
+                                        request,
+                                        deadline,
+                                        nextExclusions,
+                                        transientRetries,
+                                        constraint));
+                            }
+                            return readSemanticPinned(
+                                    streamId,
+                                    request,
+                                    deadline,
+                                    pinned,
+                                    excludedCandidates,
+                                    transientRetries,
+                                    constraint);
+                        })
                         .orElseGet(() -> {
+                            if (constraint != null) {
+                                return CompletableFuture.failedFuture(new NereusException(
+                                        ErrorCode.READ_RESOLUTION_FAILED,
+                                        false,
+                                        "no externally activated generation covers the requested offset"));
+                            }
                             ReadResult empty = new ReadResult(
                                     streamId,
                                     request.startOffset(),
@@ -396,7 +444,8 @@ public final class ReadCoordinator implements StreamViewReader {
             ReadOperationDeadline deadline,
             PinnedResolvedRange pinned,
             Set<GenerationReadCandidate> excludedCandidates,
-            Map<GenerationReadCandidate, Integer> transientRetries) {
+            Map<GenerationReadCandidate, Integer> transientRetries,
+            GenerationReadConstraint constraint) {
         CompletableFuture<SemanticPhysicalRead> read = readSemanticRanges(
                 streamId,
                 request,
@@ -426,7 +475,8 @@ public final class ReadCoordinator implements StreamViewReader {
                             request,
                             deadline,
                             excludedCandidates,
-                            nextRetries);
+                            nextRetries,
+                            constraint);
                 }
             }
             Set<GenerationReadCandidate> nextExclusions = new LinkedHashSet<>(excludedCandidates);
@@ -438,7 +488,8 @@ public final class ReadCoordinator implements StreamViewReader {
                             request,
                             deadline,
                             nextExclusions,
-                            transientRetries));
+                            transientRetries,
+                            constraint));
         }).thenCompose(value -> value);
     }
 
@@ -867,6 +918,7 @@ public final class ReadCoordinator implements StreamViewReader {
                 ReadView view,
                 ReadOperationDeadline deadline,
                 boolean allowRepair,
-                Set<GenerationReadCandidate> excludedCandidates);
+                Set<GenerationReadCandidate> excludedCandidates,
+                GenerationReadConstraint constraint);
     }
 }

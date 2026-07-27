@@ -31,7 +31,7 @@ public record ResolvedRange(
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         projectionRef = Objects.requireNonNull(projectionRef, "projectionRef");
         if (offsetRange.isEmpty() || generation < 0 || commitVersion <= 0
-                || recordCount <= 0 || entryCount <= 0 || logicalBytes < 0) {
+                || recordCount <= 0 || entryCount < 0 || logicalBytes < 0) {
             throw new IllegalArgumentException("invalid resolved range fields");
         }
         if (recordCount != offsetRange.recordCount()) {

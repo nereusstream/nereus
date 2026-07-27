@@ -120,7 +120,8 @@ public final class GenerationReadResolver {
                 Objects.requireNonNull(view, "view"),
                 new ReadOperationDeadline(timeout),
                 true,
-                Set.of());
+                Set.of(),
+                null);
     }
 
     CompletableFuture<Optional<PinnedResolvedRange>> resolve(
@@ -129,7 +130,7 @@ public final class GenerationReadResolver {
             ReadView view,
             ReadOperationDeadline deadline,
             boolean allowRepair) {
-        return resolve(streamId, offset, view, deadline, allowRepair, Set.of());
+        return resolve(streamId, offset, view, deadline, allowRepair, Set.of(), null);
     }
 
     CompletableFuture<Optional<PinnedResolvedRange>> resolve(
@@ -139,8 +140,29 @@ public final class GenerationReadResolver {
             ReadOperationDeadline deadline,
             boolean allowRepair,
             Set<GenerationReadCandidate> excludedCandidates) {
+        return resolve(
+                streamId, offset, view, deadline, allowRepair, excludedCandidates, null);
+    }
+
+    CompletableFuture<Optional<PinnedResolvedRange>> resolve(
+            StreamId streamId,
+            long offset,
+            ReadView view,
+            ReadOperationDeadline deadline,
+            boolean allowRepair,
+            Set<GenerationReadCandidate> excludedCandidates,
+            GenerationReadConstraint constraint) {
         Set<GenerationReadCandidate> exclusions = Set.copyOf(
                 Objects.requireNonNull(excludedCandidates, "excludedCandidates"));
+        if (constraint != null
+                && (!constraint.streamId().equals(streamId)
+                        || constraint.view() != view
+                        || !constraint.coverage().contains(offset))) {
+            return NereusException.failedFuture(
+                    ErrorCode.INVALID_ARGUMENT,
+                    false,
+                    "generation constraint does not cover the requested stream/view/offset");
+        }
         if (offset < 0) {
             return NereusException.failedFuture(
                     ErrorCode.INVALID_ARGUMENT, false, "read offset must be non-negative");
@@ -167,7 +189,8 @@ public final class GenerationReadResolver {
                             view,
                             snapshot,
                             wrappers,
-                            profile.objectMaterializationEnabled()))
+                            profile.objectMaterializationEnabled(),
+                            constraint))
                     .thenCompose(candidates -> {
                         List<GenerationReadCandidate> admitted = candidates.stream()
                                 .filter(candidate -> !exclusions.contains(candidate))
@@ -213,7 +236,8 @@ public final class GenerationReadResolver {
                                                 view,
                                                 deadline,
                                                 false,
-                                                exclusions);
+                                                exclusions,
+                                                constraint);
                                     });
                         }
                         return CompletableFuture.failedFuture(new NereusException(
@@ -308,7 +332,8 @@ public final class GenerationReadResolver {
             ReadView view,
             StreamMetadataSnapshot snapshot,
             List<VersionedGenerationCandidate> wrappers,
-            boolean higherGenerationsAllowed) {
+            boolean higherGenerationsAllowed,
+            GenerationReadConstraint constraint) {
         Map<Long, String> positiveGenerationKeys = new HashMap<>();
         List<GenerationReadCandidate> result = new ArrayList<>();
         for (VersionedGenerationCandidate wrapper : wrappers) {
@@ -318,27 +343,32 @@ public final class GenerationReadResolver {
                             "a primary-WAL-only profile contains a higher generation",
                             null));
                 }
+                if (higher.value().lifecycle() != GenerationLifecycle.COMMITTED) {
+                    continue;
+                }
+                if (constraint != null && !constraint.admits(higher)) {
+                    continue;
+                }
                 String previous = positiveGenerationKeys.putIfAbsent(
                         higher.value().generation(), higher.key());
                 if (previous != null && !previous.equals(higher.key())) {
                     return CompletableFuture.failedFuture(invariant(
                             "one stream/view contains duplicate positive generation numbers", null));
                 }
-                if (higher.value().lifecycle() != GenerationLifecycle.COMMITTED) {
-                    continue;
-                }
-                OffsetIndexEntry entry = indexValidator.requireCommitted(
+                ResolvedRange resolved = indexValidator.requireSemantic(
                         higher,
                         streamId,
                         view,
                         snapshot.committedEnd().committedEndOffset(),
                         snapshot.committedEnd().commitVersion());
-                if (covers(entry, offset)) {
-                    result.add(toCandidate(
+                if (resolved.offsetRange().contains(offset)) {
+                    result.add(new GenerationReadCandidate(
                             view,
-                            entry,
+                            resolved,
                             higher.key(),
+                            higher.metadataVersion(),
                             higher.durableValueSha256(),
+                            false,
                             Optional.of(new PublicationId(higher.value().publicationId()))));
                 }
             } else if (wrapper instanceof VersionedGenerationZeroIndex zero) {
