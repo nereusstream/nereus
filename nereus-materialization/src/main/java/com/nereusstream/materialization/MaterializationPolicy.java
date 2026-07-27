@@ -26,6 +26,8 @@ public record MaterializationPolicy(
     public static final int MAX_ROW_GROUP_RECORDS = 65_536;
     public static final String COMMITTED_FORMAT = "NEREUS_COMPACTED_PARQUET_V1";
     public static final String TOPIC_COMPACTED_FORMAT = "NEREUS_TOPIC_COMPACTED_PARQUET_V1";
+    public static final String KAFKA_TOPIC_COMPACTED_FORMAT =
+            "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2";
 
     public MaterializationPolicy {
         policyId = requireText(policyId, "policyId");
@@ -56,7 +58,8 @@ public record MaterializationPolicy(
                 throw new IllegalArgumentException("lossless policy must target the committed compacted format");
             }
         } else if (view != ReadView.TOPIC_COMPACTED
-                || !targetPhysicalFormat.equals(TOPIC_COMPACTED_FORMAT)
+                || (!targetPhysicalFormat.equals(TOPIC_COMPACTED_FORMAT)
+                        && !targetPhysicalFormat.equals(KAFKA_TOPIC_COMPACTED_FORMAT))
                 || topicCompaction.isEmpty()) {
             throw new IllegalArgumentException("topic-compaction policy is incomplete or view-inconsistent");
         }

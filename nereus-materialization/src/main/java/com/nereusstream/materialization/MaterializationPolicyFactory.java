@@ -8,6 +8,8 @@ import java.util.Optional;
 public final class MaterializationPolicyFactory {
     public static final String LOSSLESS_COMMITTED_POLICY_ID = "nereus-committed-default";
     public static final String TOPIC_COMPACTED_POLICY_ID = "nereus-topic-compacted-default";
+    public static final String KAFKA_TOPIC_COMPACTED_POLICY_ID =
+            "nereus-kafka-topic-compacted-v2";
 
     private MaterializationPolicyFactory() {
     }
@@ -65,6 +67,39 @@ public final class MaterializationPolicyFactory {
                 ReadView.TOPIC_COMPACTED,
                 TaskKind.TOPIC_KEY_COMPACTION,
                 MaterializationPolicy.TOPIC_COMPACTED_FORMAT,
+                minMergeSourceRanges,
+                maxSourceRanges,
+                maxRangeRecords,
+                targetObjectBytes,
+                targetRowGroupRecords,
+                compression,
+                Optional.of(exact));
+    }
+
+    public static MaterializationPolicy kafkaTopicCompacted(
+            TopicCompactionSpec topicCompaction,
+            int minMergeSourceRanges,
+            int maxSourceRanges,
+            long maxRangeRecords,
+            long targetObjectBytes,
+            int targetRowGroupRecords,
+            String compression) {
+        TopicCompactionSpec exact = java.util.Objects.requireNonNull(
+                topicCompaction, "topicCompaction");
+        long policyVersion = MaterializationCanonical.kafkaTopicOperatorPolicyVersion(
+                exact,
+                minMergeSourceRanges,
+                maxSourceRanges,
+                maxRangeRecords,
+                targetObjectBytes,
+                targetRowGroupRecords,
+                compression);
+        return new MaterializationPolicy(
+                KAFKA_TOPIC_COMPACTED_POLICY_ID,
+                policyVersion,
+                ReadView.TOPIC_COMPACTED,
+                TaskKind.TOPIC_KEY_COMPACTION,
+                MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT,
                 minMergeSourceRanges,
                 maxSourceRanges,
                 maxRangeRecords,

@@ -55,4 +55,26 @@ class MaterializationPolicyFactoryTest {
                         2, 16, 1_000, 1_000_000, 512, "SNAPPY"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void freezesKafkaTopicCompactionAsADistinctNtc2PolicyIdentity() {
+        TopicCompactionSpec spec = new TopicCompactionSpec("kafka-log-cleaner-v1", 1, "KCK2");
+
+        MaterializationPolicy ntc1 = MaterializationPolicyFactory.topicCompacted(
+                spec, 2, 128, 1_048_576, 256L * 1024 * 1024, 65_536, "ZSTD");
+        MaterializationPolicy ntc2 = MaterializationPolicyFactory.kafkaTopicCompacted(
+                spec, 2, 128, 1_048_576, 256L * 1024 * 1024, 65_536, "ZSTD");
+
+        assertThat(ntc2.policyId()).isEqualTo("nereus-kafka-topic-compacted-v2");
+        assertThat(ntc2.targetPhysicalFormat())
+                .isEqualTo(MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT);
+        assertThat(ntc2.view()).isEqualTo(ReadView.TOPIC_COMPACTED);
+        assertThat(ntc2.taskKind()).isEqualTo(TaskKind.TOPIC_KEY_COMPACTION);
+        assertThat(ntc2.topicCompaction()).contains(spec);
+        assertThat(ntc2.policyVersion()).isNotEqualTo(ntc1.policyVersion());
+        assertThat(ntc2.digestSha256()).isNotEqualTo(ntc1.digestSha256());
+        assertThat(MaterializationPolicyFactory.kafkaTopicCompacted(
+                        spec, 2, 128, 1_048_576, 256L * 1024 * 1024, 65_536, "ZSTD"))
+                .isEqualTo(ntc2);
+    }
 }

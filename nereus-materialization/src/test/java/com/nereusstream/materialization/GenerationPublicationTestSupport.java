@@ -81,14 +81,18 @@ final class GenerationPublicationTestSupport {
     }
 
     static Context context() {
-        return context(false);
+        return context(false, false);
     }
 
     static Context topicContext() {
-        return context(true);
+        return context(true, false);
     }
 
-    private static Context context(boolean topicCompacted) {
+    static Context emptyKafkaTopicContext() {
+        return context(true, true);
+    }
+
+    private static Context context(boolean topicCompacted, boolean emptyKafkaOutput) {
         GenerationMetadataStore generations = GenerationMetadataStoreTestFactory.inMemory(CLOCK);
         FakePhysicalObjectMetadataStore physical = new FakePhysicalObjectMetadataStore();
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
@@ -168,44 +172,64 @@ final class GenerationPublicationTestSupport {
                 schemas(),
                 0,
                 100);
-        MaterializationPolicy policy = topicCompacted
-                ? new MaterializationPolicy(
-                        "policy-topic-publication",
-                        1,
-                        ReadView.TOPIC_COMPACTED,
-                        TaskKind.TOPIC_KEY_COMPACTION,
-                        MaterializationPolicy.TOPIC_COMPACTED_FORMAT,
-                        2,
-                        128,
-                        1_048_576,
-                        1L << 20,
-                        65_536,
-                        "ZSTD",
-                        Optional.of(new TopicCompactionSpec("latest", 1, "test-key-v1")))
-                : new MaterializationPolicy(
-                        "policy-publication",
-                        1,
-                        ReadView.COMMITTED,
-                        TaskKind.LOSSLESS_REWRITE,
-                        MaterializationPolicy.COMMITTED_FORMAT,
-                        2,
-                        128,
-                        1_048_576,
-                        1L << 20,
-                        65_536,
-                        "ZSTD",
-                        Optional.empty());
+        MaterializationPolicy policy;
+        if (emptyKafkaOutput) {
+            policy = new MaterializationPolicy(
+                    "policy-kafka-topic-publication",
+                    2,
+                    ReadView.TOPIC_COMPACTED,
+                    TaskKind.TOPIC_KEY_COMPACTION,
+                    MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT,
+                    2,
+                    128,
+                    1_048_576,
+                    1L << 20,
+                    65_536,
+                    "ZSTD",
+                    Optional.of(new TopicCompactionSpec("latest", 1, "KCK2")));
+        } else if (topicCompacted) {
+            policy = new MaterializationPolicy(
+                    "policy-topic-publication",
+                    1,
+                    ReadView.TOPIC_COMPACTED,
+                    TaskKind.TOPIC_KEY_COMPACTION,
+                    MaterializationPolicy.TOPIC_COMPACTED_FORMAT,
+                    2,
+                    128,
+                    1_048_576,
+                    1L << 20,
+                    65_536,
+                    "ZSTD",
+                    Optional.of(new TopicCompactionSpec("latest", 1, "test-key-v1")));
+        } else {
+            policy = new MaterializationPolicy(
+                    "policy-publication",
+                    1,
+                    ReadView.COMMITTED,
+                    TaskKind.LOSSLESS_REWRITE,
+                    MaterializationPolicy.COMMITTED_FORMAT,
+                    2,
+                    128,
+                    1_048_576,
+                    1L << 20,
+                    65_536,
+                    "ZSTD",
+                    Optional.empty());
+        }
         MaterializationTask task = MaterializationTask.create(
                 STREAM, new OffsetRange(0, 2), List.of(source), policy);
 
+        String outputPhysicalFormat = emptyKafkaOutput
+                ? MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT
+                : topicCompacted
+                        ? MaterializationPolicy.TOPIC_COMPACTED_FORMAT
+                        : MaterializationPolicy.COMMITTED_FORMAT;
         ObjectSliceReadTarget outputTarget = target(
                 "output-object",
                 "objects/publication/output-object",
                 "output-slice",
                 "22222222",
-                topicCompacted
-                        ? MaterializationPolicy.TOPIC_COMPACTED_FORMAT
-                        : MaterializationPolicy.COMMITTED_FORMAT);
+                outputPhysicalFormat);
         MaterializationOutput output = new MaterializationOutput(
                 task.taskId(),
                 STREAM,
@@ -229,9 +253,9 @@ final class GenerationPublicationTestSupport {
                                 .identityChecksumValue()),
                 outputTarget.entryIndexRef(),
                 2,
-                topicCompacted ? 1 : 2,
-                2,
-                100,
+                emptyKafkaOutput ? 0 : topicCompacted ? 1 : 2,
+                emptyKafkaOutput ? 0 : 2,
+                emptyKafkaOutput ? 0 : 100,
                 schemas(),
                 0,
                 100,

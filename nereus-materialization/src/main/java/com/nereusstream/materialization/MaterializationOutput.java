@@ -97,15 +97,22 @@ public record MaterializationOutput(
         }
         if (sourceRecordCount <= 0 || sourceRecordCount != coverage.recordCount()
                 || outputRecordCount < 0 || outputRecordCount > sourceRecordCount
-                || entryCount <= 0 || logicalBytes < 0
+                || entryCount < 0 || logicalBytes < 0
                 || cumulativeSizeAtStart < 0
                 || cumulativeSizeAtEnd < cumulativeSizeAtStart) {
             throw new IllegalArgumentException("output accounting is invalid");
         }
         if (view == ReadView.COMMITTED
-                && (outputRecordCount != sourceRecordCount
+                && (entryCount == 0
+                        || outputRecordCount != sourceRecordCount
                         || Math.subtractExact(cumulativeSizeAtEnd, cumulativeSizeAtStart) != logicalBytes)) {
             throw new IllegalArgumentException("committed output must be dense and byte-accounting exact");
+        }
+        if (view == ReadView.TOPIC_COMPACTED
+                && ((entryCount == 0) != (outputRecordCount == 0)
+                        || (entryCount == 0 && logicalBytes != 0))) {
+            throw new IllegalArgumentException(
+                    "topic-compacted output row/record/byte accounting is inconsistent");
         }
         schemaRefs = MetadataCanonicalizer.canonicalSchemaRefs(schemaRefs);
         requireChecksum(sourceSetSha256, ChecksumType.SHA256, "sourceSetSha256");

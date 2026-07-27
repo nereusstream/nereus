@@ -118,6 +118,9 @@ public final class KafkaCompactionSourceResolver {
     if (policy.view() != ReadView.TOPIC_COMPACTED
         || policy.taskKind() != TaskKind.TOPIC_KEY_COMPACTION
         || policy.taskKind().sourceView() != ReadView.COMMITTED
+        || !policy
+            .targetPhysicalFormat()
+            .equals(MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT)
         || policy.topicCompaction().filter(expected::equals).isEmpty()) {
       throw new IllegalArgumentException(
           "materialization policy is not the current Kafka compaction policy");

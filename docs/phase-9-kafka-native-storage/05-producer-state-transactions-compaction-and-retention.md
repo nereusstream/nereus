@@ -978,6 +978,16 @@ reference executor，uploads the staged file to `LocalFileObjectStore` and passe
 proves empty-survivor NTC2 is strictly readable and cancellation during pass one releases an already-created KCSR run。
 `KafkaCompactionRowSpoolTest` covers one-row demand、the empty terminal tuple、same-length corruption detected only at
 verified EOF、pre-subscribe close and invalid replay-executor cleanup。
+
+The generic F4 publication boundary now has an explicit Kafka NTC2 policy identity
+`nereus-kafka-topic-compacted-v2` / `NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2`。The policy snapshot codec accepts NTC1
+and NTC2 as distinct closed `TOPIC_COMPACTED` formats，and the Kafka resolver rejects an NTC1 task before exact-source
+execution。`MaterializationOutput`、its durable task output and `GenerationIndexRecord` allow `entryCount == 0` only for
+the sparse view with `outputRecordCount == 0 && logicalBytes == 0`；`COMMITTED` remains dense/non-empty。Generation
+publication additionally requires the output physical format to equal the frozen task policy，so an NTC2 object cannot be
+published under an NTC1 policy digest。`GenerationIndexPublicationTest` proves a fully superseded NTC2 output reaches a
+zero-row `COMMITTED` generation without weakening COMMITTED-view accounting。
+
 Production worker upload/generation publication and coverage activation remain pending。
 
 `KafkaCompactionPlanCoordinator` now makes KCP1/task publication and worker recovery executable without pretending the two

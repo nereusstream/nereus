@@ -106,6 +106,31 @@ final class MaterializationCanonical {
         return version == 0 ? 1 : version;
     }
 
+    static long kafkaTopicOperatorPolicyVersion(
+            TopicCompactionSpec topicCompaction,
+            int minMergeSourceRanges,
+            int maxSourceRanges,
+            long maxRangeRecords,
+            long targetObjectBytes,
+            int targetRowGroupRecords,
+            String compression) {
+        CanonicalWriter writer = new CanonicalWriter();
+        writer.text("nereus-kafka-topic-compacted-operator-policy-v2");
+        writer.text(MaterializationPolicy.KAFKA_TOPIC_COMPACTED_FORMAT);
+        writer.text(topicCompaction.strategyId());
+        writer.longValue(topicCompaction.strategyVersion());
+        writer.text(topicCompaction.keyCodecId());
+        writer.intValue(minMergeSourceRanges);
+        writer.intValue(maxSourceRanges);
+        writer.longValue(maxRangeRecords);
+        writer.longValue(targetObjectBytes);
+        writer.intValue(targetRowGroupRecords);
+        writer.text(compression);
+        byte[] digest = sha256Bytes(writer.bytes());
+        long version = ByteBuffer.wrap(digest, 0, Long.BYTES).getLong() & Long.MAX_VALUE;
+        return version == 0 ? 1 : version;
+    }
+
     static Checksum sourceSetDigest(List<SourceGeneration> sources) {
         List<SourceGeneration> canonical = canonicalSources(sources);
         CanonicalWriter writer = new CanonicalWriter();

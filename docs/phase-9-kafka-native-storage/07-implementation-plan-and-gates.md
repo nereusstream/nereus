@@ -633,7 +633,9 @@ terminal accounting is known。Product tests compare the staged content SHA with
 upload plus strict NTC2 verification and prove cancellation releases an existing KCSR run/KCRS permits。
 `KafkaCompactionTerminalRetirer` additionally requires exact terminal task/plan roots and a stable no-admission authority
 guard，then conditionally deletes task first and KCP1 second with bounded exact-reload convergence for both response-loss
-cuts。Plan-only orphan scan、production object upload/generation publication、coverage activation and the cleaner
+cuts。The F4 policy/output/index boundary now carries a distinct NTC2 policy identity、requires task/output physical-format
+agreement and preserves valid zero-survivor generations while keeping COMMITTED generations non-empty。Plan-only orphan
+scan、production object upload/generation publication、coverage activation and the cleaner
 differential oracle remain pending；this gate does not claim compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。

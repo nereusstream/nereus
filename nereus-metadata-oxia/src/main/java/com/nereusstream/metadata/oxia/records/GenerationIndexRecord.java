@@ -59,7 +59,7 @@ public record GenerationIndexRecord(
         }
         payloadFormat = F4RecordValidation.requireText(payloadFormat, "payloadFormat");
         F4RecordValidation.requireNonNegative(outputRecordCount, "outputRecordCount");
-        F4RecordValidation.requirePositive(entryCount, "entryCount");
+        F4RecordValidation.requireNonNegative(entryCount, "entryCount");
         F4RecordValidation.requireNonNegative(logicalBytes, "logicalBytes");
         F4RecordValidation.requireNonNegative(cumulativeSizeAtStart, "cumulativeSizeAtStart");
         if (cumulativeSizeAtEnd < cumulativeSizeAtStart) {
@@ -80,12 +80,15 @@ public record GenerationIndexRecord(
         }
         F4RecordValidation.requireMetadataVersion(metadataVersion);
         if (readViewId == 1) {
-            if (outputRecordCount != sourceRecordCount
+            if (entryCount == 0
+                    || outputRecordCount != sourceRecordCount
                     || Math.subtractExact(cumulativeSizeAtEnd, cumulativeSizeAtStart) != logicalBytes) {
                 throw new IllegalArgumentException("COMMITTED generation must be dense and byte-accounting exact");
             }
-        } else if (outputRecordCount > sourceRecordCount) {
-            throw new IllegalArgumentException("TOPIC_COMPACTED output cannot exceed source count");
+        } else if (outputRecordCount > sourceRecordCount
+                || (entryCount == 0) != (outputRecordCount == 0)
+                || (entryCount == 0 && logicalBytes != 0)) {
+            throw new IllegalArgumentException("TOPIC_COMPACTED output accounting is inconsistent");
         }
         boolean visible = lifecycle == GenerationLifecycle.COMMITTED
                 || lifecycle == GenerationLifecycle.QUARANTINED

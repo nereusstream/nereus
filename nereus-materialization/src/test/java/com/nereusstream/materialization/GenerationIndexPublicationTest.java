@@ -102,4 +102,31 @@ class GenerationIndexPublicationTest {
                     .isNotEqualTo(context.task().taskId());
         }
     }
+
+    @Test
+    void publishesAnEmptyKafkaTopicCompactionGeneration() {
+        try (GenerationPublicationTestSupport.Context context =
+                GenerationPublicationTestSupport.emptyKafkaTopicContext()) {
+            DefaultGenerationCommitter committer = context.committer(
+                    context.generations(), GenerationPublicationTestSupport.successfulGuard());
+
+            GenerationCommitResult result = committer.publish(
+                    context.task(), context.output()).join();
+
+            var index = context.generations().getIndex(
+                            CLUSTER,
+                            new GenerationIndexIdentity(
+                                    STREAM,
+                                    ReadView.TOPIC_COMPACTED,
+                                    result.coverage().endOffset(),
+                                    result.generation().value()))
+                    .join()
+                    .orElseThrow();
+            assertThat(index.value().lifecycle()).isEqualTo(GenerationLifecycle.COMMITTED);
+            assertThat(index.value().entryCount()).isZero();
+            assertThat(index.value().outputRecordCount()).isZero();
+            assertThat(index.value().logicalBytes()).isZero();
+            assertThat(index.value().readViewId()).isEqualTo(ReadView.TOPIC_COMPACTED.wireId());
+        }
+    }
 }

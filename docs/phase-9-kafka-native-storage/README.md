@@ -160,7 +160,8 @@ restart recomputation、same-length corruption 和 cancel cleanup。
 `KafkaCompactionStreamingExecutor` 又以两个独立 exact streams 完成 decision/output passes，将 survivor 写入
 whole-file-SHA-verified KCRS V1，再由 `KafkaCompactionParquetPublisher` demand-stream 为 staged NTC2；产物 SHA 已与
 reference executor 对齐并通过 strict reader。`KafkaCompactionTerminalRetirer` 以 exact terminal task root first、
-KCP1 second 的顺序收敛双根删除和 response loss。
+KCP1 second 的顺序收敛双根删除和 response loss。通用 F4 policy/output/index 现已增加独立 Kafka NTC2 policy
+identity、task/output format agreement 和 zero-survivor generation accounting，且不放宽 COMMITTED dense invariant。
 当前形成 `phase9M5CompactionCoreCheck`；plan-only orphan scan、object upload/generation publication、coverage CAS 与
 stock cleaner oracle 仍待实现。
 为接入 stock transaction state，product partition boundary 已把 durable end 与 derived visibility 拆开：

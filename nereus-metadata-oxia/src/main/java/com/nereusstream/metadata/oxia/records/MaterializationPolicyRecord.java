@@ -65,7 +65,9 @@ public record MaterializationPolicyRecord(
                 throw new IllegalArgumentException("lossless policy snapshot is view/format inconsistent");
             }
         } else if (readViewId != 2
-                || !targetPhysicalFormat.equals("NEREUS_TOPIC_COMPACTED_PARQUET_V1")
+                || (!targetPhysicalFormat.equals("NEREUS_TOPIC_COMPACTED_PARQUET_V1")
+                        && !targetPhysicalFormat.equals(
+                                "NEREUS_TOPIC_COMPACTED_KAFKA_PARQUET_V2"))
                 || topicStrategyId.isEmpty()
                 || topicStrategyVersion <= 0
                 || topicKeyCodecId.isEmpty()) {

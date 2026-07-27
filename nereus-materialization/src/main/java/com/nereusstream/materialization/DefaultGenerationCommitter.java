@@ -1182,6 +1182,7 @@ public final class DefaultGenerationCommitter implements GenerationCommitter {
                 || !output.streamId().equals(task.streamId())
                 || output.view() != task.view()
                 || !output.coverage().equals(task.coverage())
+                || !output.physicalFormat().equals(task.policy().targetPhysicalFormat())
                 || !output.sourceSetSha256().equals(task.sourceSetSha256())) {
             throw new IllegalArgumentException("materialization task/output identity does not agree");
         }

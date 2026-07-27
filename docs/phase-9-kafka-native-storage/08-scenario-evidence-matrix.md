@@ -319,7 +319,9 @@ both recovered KCP1 passes，including demand-exhausted completion and substitut
 recomputations、newer decision-tail suppression、same-length sealed-run corruption detection and cancellation permit/file
 cleanup；`KafkaCompactionRowSpoolTest` freezes KCRS single-demand/EOF-accounting/corruption/cleanup behavior；
 `KafkaCompactionStreamingExecutorTest` compares reference and streamed NTC2 SHA，runs non-empty/empty local upload plus
-strict verification and proves decision-pass cancellation releases KCSR；`KafkaCompactionTerminalRetirerTest` covers task-first/plan-second
+strict verification and proves decision-pass cancellation releases KCSR；`GenerationIndexPublicationTest` also proves the
+empty survivor can be durably published as a zero-row TOPIC_COMPACTED generation while COMMITTED remains non-empty；
+`KafkaCompactionTerminalRetirerTest` covers task-first/plan-second
 ordering、both response-loss cuts and exact-root fail-closed behavior。`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty
 tombstone bytes。Plan-only orphan scan、production upload/generation publication、coverage activation and stock
 `LogCleaner` comparison remain absent，so all rows remain `PLANNED`。

@@ -144,7 +144,7 @@ class KafkaCompactionPlanCodecV1Test {
     ExactSourceSet outputSources = sourceSet(List.of(output));
     ExactSourceSet decisionSources = sourceSet(List.of(output, tail));
     MaterializationPolicy materializationPolicy =
-        MaterializationPolicyFactory.topicCompacted(
+        MaterializationPolicyFactory.kafkaTopicCompacted(
             new TopicCompactionSpec(
                 KafkaCompactionStrategyV1.STRATEGY_ID,
                 KafkaCompactionStrategyV1.STRATEGY_VERSION,
