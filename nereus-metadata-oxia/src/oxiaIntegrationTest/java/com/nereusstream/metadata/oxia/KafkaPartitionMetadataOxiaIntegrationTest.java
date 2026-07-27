@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionOperationType;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionPendingOperationRecord;
@@ -12,6 +13,8 @@ import com.nereusstream.metadata.oxia.records.KafkaPartitionRegistryRecord;
 import io.oxia.testcontainers.OxiaContainer;
 import java.time.Clock;
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -37,6 +40,7 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
         KafkaPartitionId id = new KafkaPartitionId(kafkaCluster, topicId(1), 3);
         OxiaClientConfiguration configuration = configuration();
         VersionedKafkaPartitionBinding active;
+        VersionedKafkaCompactionPlan compactionPlan;
 
         try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
                 OxiaJavaKafkaPartitionMetadataStore store =
@@ -60,6 +64,10 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
                     active.value().lifecycleId(), active.value().bindingEpoch(), 1_200, 0)).join();
             assertThat(store.scanRegistry(keys.registryShard(id), Optional.empty(), 1).join().values())
                     .singleElement().satisfies(value -> assertThat(value.value().identity()).isEqualTo(id));
+            KafkaCompactionPlanRecord requestedPlan = compactionPlan(id);
+            compactionPlan = store.putCompactionPlanIfAbsent(requestedPlan).join();
+            assertThat(store.putCompactionPlanIfAbsent(requestedPlan).join())
+                    .isEqualTo(compactionPlan);
         }
 
         try (SharedOxiaClientRuntime runtime = SharedOxiaClientRuntime.connect(configuration, Clock.systemUTC());
@@ -70,6 +78,13 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
             KafkaPartitionKeyspace keys = new KafkaPartitionKeyspace(nereusCluster, kafkaCluster);
             assertThat(store.scanRegistry(keys.registryShard(id), Optional.empty(), 10).join().values())
                     .hasSize(1);
+            assertThat(store.getCompactionPlan(
+                            id, compactionPlan.value().materializationTaskId()).join())
+                    .contains(compactionPlan);
+            store.deleteCompactionPlan(compactionPlan).join();
+            assertThat(store.getCompactionPlan(
+                            id, compactionPlan.value().materializationTaskId()).join())
+                    .isEmpty();
         }
     }
 
@@ -81,6 +96,22 @@ class KafkaPartitionMetadataOxiaIntegrationTest {
                 new KafkaPartitionPendingOperationRecord(
                         KafkaPartitionOperationType.CREATE.wireId(), attempt, "broker-run", 1,
                         2_000, metadataOffset, 1_000, ""));
+    }
+
+    private static KafkaCompactionPlanRecord compactionPlan(KafkaPartitionId id) {
+        byte[] bytes = "canonical-kcp1-image".getBytes(StandardCharsets.UTF_8);
+        return new KafkaCompactionPlanRecord(
+                1, id.kafkaClusterId(), id.topicId(), id.partitionId(),
+                "stream-id", "kcp1-" + "a".repeat(52), "mat1-" + "b".repeat(52),
+                0, 10, 12, sha256(bytes), bytes, 1_300, 0);
+    }
+
+    private static byte[] sha256(byte[] value) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(value);
+        } catch (Exception failure) {
+            throw new AssertionError(failure);
+        }
     }
 
     private static String topicId(int value) {

@@ -95,3 +95,14 @@ tasks.register<Test>("bkM6MixedSourceScaleTest") {
         includeTestsMatching("com.nereusstream.materialization.BookKeeperMixedSourceTaskScaleTest")
     }
 }
+
+tasks.register<Test>("f9ExactSourceSetTest") {
+    group = "verification"
+    description = "Run the F9 durable exact source-set codec and corruption contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.materialization.ExactSourceSetCodecV1Test")
+    }
+}

@@ -23,7 +23,7 @@ import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.SimpleRecord;
 
-final class KafkaRecordBatchTestSupport {
+public final class KafkaRecordBatchTestSupport {
     private KafkaRecordBatchTestSupport() {}
 
     static byte[] batch(long baseOffset, CompressionType compressionType, long timestamp, String... values) {
@@ -37,7 +37,7 @@ final class KafkaRecordBatchTestSupport {
                 records));
     }
 
-    static byte[] bytes(MemoryRecords records) {
+    public static byte[] bytes(MemoryRecords records) {
         ByteBuffer buffer = records.buffer().duplicate();
         byte[] bytes = new byte[buffer.remaining()];
         buffer.get(bytes);
@@ -62,7 +62,7 @@ final class KafkaRecordBatchTestSupport {
         ByteBuffer.wrap(encodedBatch).putInt(17, (int) crc32c.getValue());
     }
 
-    static ReadBatch readBatch(OffsetRange range, byte[] payload, String suffix) {
+    public static ReadBatch readBatch(OffsetRange range, byte[] payload, String suffix) {
         Checksum checksum = new Checksum(ChecksumType.CRC32C, "00000000");
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.OBJECT_FOOTER,

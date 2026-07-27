@@ -207,8 +207,8 @@ hash。Markdown/JSON ID sets must match。
 | KF-FET-006 | READ_UNCOMMITTED upper bound HW and READ_COMMITTED upper bound LSO | `KafkaNativeIsolationIntegrationTest` | R,K | M4 |
 | KF-FET-007 | aborted transaction list/filter matches Kafka baseline | `KafkaNativeIsolationIntegrationTest` | R,K | M4 |
 | KF-FET-008 | request below durable logStart is out-of-range；mid-batch trim hides prefix | `KafkaNativeDeleteRecordsIntegrationTest` | R,K | M5 |
-| KF-FET-009 | ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline | `KafkaNativeListOffsetsIntegrationTest` | R,K | M3/M4 |
-| KF-FET-010 | leader-epoch end-offset lookup survives checkpoint/restart/takeover | `KafkaNativeLeaderEpochIntegrationTest` | R,P,K | M4 |
+| KF-FET-009 | ListOffsets earliest/latest/max timestamp/timestamp lookup match baseline | product `KafkaDerivedIndexStateCodecV1Test`（section 5/6 canonical bytes partial）；`KafkaNativeListOffsetsIntegrationTest`（index lookup/restart pending） | R,K | M3/M4 |
+| KF-FET-010 | leader-epoch end-offset lookup survives checkpoint/restart/takeover | product `KafkaLeaderEpochStateCodecV1Test`（canonical bytes partial）；`KafkaNativeLeaderEpochIntegrationTest`（restart/takeover pending） | R,P,K | M4 |
 | KF-FET-011 | compacted sparse holes advance by source coverage without loop/phantom row | `KafkaCompactedFetchIntegrationTest` | D,R | M5 |
 | KF-FET-012 | mandatory compacted prefix switches exactly once to committed tail at coverage end | `KafkaCompactedFetchIntegrationTest` | D,R,K | M5 |
 | KF-FET-013 | missing/corrupt newest NTC2 uses verified same-view fallback only | `KafkaCompactedNoResurrectionIntegrationTest` | R,P,C | M5 |
@@ -246,35 +246,74 @@ full replay；no request-path or recovery claim is inferred from codec-only evid
 
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
 | --- | --- | --- | --- | --- |
-| KF-RET-001 | time retention over virtual closed segments matches stock predicate | `KafkaRetentionOracleTest` | D,M,K | M5 |
-| KF-RET-002 | size retention uses exact Kafka logical bytes and matches stock predicate | `KafkaRetentionOracleTest` | D,M,K | M5 |
-| KF-RET-003 | combined policies choose monotonic next-segment boundary，never active segment | `KafkaRetentionOracleTest` | D,M | M5 |
-| KF-RET-004 | insufficient checkpoint blocks trim；new checkpoint then permits exact candidate | `KafkaRetentionBarrierIntegrationTest` | R,C | M5 |
-| KF-RET-005 | trim response loss reloads durable head and completes idempotently | `KafkaRetentionBarrierIntegrationTest` | R,P,C | M5 |
-| KF-RET-006 | DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly | `KafkaNativeDeleteRecordsIntegrationTest` | R,K | M5 |
+| KF-RET-001 | time retention over virtual closed segments matches stock predicate | product `KafkaRetentionPlannerTest`（deterministic strict predicate partial）；fork `KafkaRetentionOracleTest`（stock differential pending） | D,M,K | M5 |
+| KF-RET-002 | size retention uses exact Kafka logical bytes and matches stock predicate | product `KafkaRetentionPlannerTest`（deterministic logical-byte prefix partial）；fork `KafkaRetentionOracleTest`（stock differential pending） | D,M,K | M5 |
+| KF-RET-003 | combined policies choose monotonic next-segment boundary，never active segment | product `KafkaRetentionPlannerTest`（deterministic partial）；fork `KafkaRetentionOracleTest`（pending） | D,M | M5 |
+| KF-RET-004 | insufficient checkpoint blocks trim；new checkpoint then permits exact candidate | product `KafkaTrimBarrierTest`（port-level partial）；`KafkaRetentionBarrierIntegrationTest`（real publication pending） | R,C | M5 |
+| KF-RET-005 | trim response loss reloads durable head and completes idempotently | product `KafkaTrimBarrierTest`（port-level partial）；`KafkaRetentionBarrierIntegrationTest`（real provider pending） | R,P,C | M5 |
+| KF-RET-006 | DeleteRecords at batch start/middle/end/HW maps durable logStart/low watermark correctly | product `KafkaDeleteRecordsCoordinatorTest`（exact logical target/barrier partial）；fork `KafkaNativeDeleteRecordsIntegrationTest`（pending） | R,K | M5 |
 | KF-RET-007 | retention/config/new-append races revalidate and never over-trim | `KafkaRetentionRacePropertyTest` | M,R,C | M5 |
 | KF-RET-008 | compact+delete preserves compacted visibility until logical trim passes range | `KafkaCompactionRetentionIntegrationTest` | R,K | M5 |
 | KF-RET-009 | logical trim success is independent of delayed protected physical GC | `KafkaRetentionPhysicalGcIntegrationTest` | R,C | M5 |
 | KF-RET-010 | all storage profiles obey same checkpoint barrier and trim semantics | `KafkaRetentionProfileMatrixTest` | R | M5/M7 |
 
+Implementation note（2026-07-27）：product `KafkaDerivedIndexStateCodecV1Test` provides canonical-format partial evidence
+for the time-index and exact logical-byte facts consumed by KF-RET-001/002：frozen section 5/6 bytes、cross-section
+segment/bounds validation、corrupt input rejection and 200 deterministic randomized round trips。
+`KafkaVirtualSegmentStateCodecV1Test` and `KafkaCanonicalCheckpointStateCodecV1Test` add section 4/full-composition facts：
+dense segment/config-history bytes、virtual/logical segment equivalence and per-segment index bounds。
+`KafkaRetentionPlannerTest` now consumes section-4 state and covers strict time equality、exact size excess、combined prefix、
+HW cap、active protection and config mismatch；`KafkaTrimBarrierTest` covers insufficient/unrooted checkpoint blocking、
+config revalidation、normal trim、applied response loss and unapplied failure；
+`KafkaRetentionCheckpointGateTest` covers newest sufficient selection、closed corruption fallback、stable-end publication
+and transient-failure pause；`KafkaRetentionCoordinatorTest` covers no-op、trigger coalescing/cancellation isolation and the
+full deterministic planner→barrier path；`KafkaRetentionDurableTrimListenerTest` covers binding-before-local ordering、
+binding CAS response loss、changed leader fencing and local-update failure after durable metadata。The existing checkpoint
+publication/recovery integration gate now also verifies one exact rooted reference without implicit fallback，which is the
+I/O boundary consumed by `KafkaRetentionCheckpointServices`，and performs a canonical seven-section publish→root
+reload→exact verify round trip against the local-file object store。`KafkaDeleteRecordsCoordinatorTest` adds product-side
+partial KF-RET-006 evidence for exact mid-segment and normalized-HW targets，already-deleted idempotence，policy/range
+rejection and a KRaft config race before mutation；Kafka `Partition`/`UnifiedLog`/Fetch wake-up integration is still pending。
+Rows remain `PLANNED` until the stock differential
+oracle、real retention provider trim、concrete partition capture/local-log update and restart/takeover gates pass。
+
 ## 10. Kafka compaction
 
 | ID | Scenario / assertion | Planned test owner | Tier | Gate |
 | --- | --- | --- | --- | --- |
-| KF-CMP-001 | latest keyed value survives；older values removed at same offsets as oracle | `KafkaCompactionOraclePropertyTest` | M,K | M5 |
-| KF-CMP-002 | empty key is keyed；null key is uniquely retained；encodings cannot collide | `KafkaCompactionKeyEncodingTest` | D,M | M5 |
-| KF-CMP-003 | tombstone retention/drop boundary matches Kafka delete-retention oracle | `KafkaCompactionOraclePropertyTest` | M,K | M5 |
-| KF-CMP-004 | newer key in decision-horizon tail removes eligible older output record | `KafkaCompactionHorizonTest` | D,M | M5 |
+| KF-CMP-001 | latest keyed value survives；older values removed at same offsets as oracle | product `KafkaCompactionStrategyV1Test` + `KafkaCompactionTwoPassExecutorTest`（engine partial）；`KafkaCompactionOraclePropertyTest`（oracle pending） | M,K | M5 |
+| KF-CMP-002 | empty key is keyed；null key is uniquely retained；encodings cannot collide | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionStrategyV1Test`（decode/decision partial）；`KafkaCompactionKeyEncodingTest`（engine pending） | D,M | M5 |
+| KF-CMP-003 | tombstone retention/drop boundary matches Kafka delete-retention oracle | product `KafkaCompactionStrategyV1Test` + `KafkaCompactionPassOneCollectorTest`（first/later horizon partial）；`KafkaCompactionOraclePropertyTest`（oracle pending） | M,K | M5 |
+| KF-CMP-004 | newer key in decision-horizon tail removes eligible older output record | product `KafkaCompactionPlannerTest` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest`（in-memory partial）；`KafkaCompactionHorizonTest`（durable source pending） | D,M | M5 |
 | KF-CMP-005 | append after frozen horizon can leave extra old record but never drops newest incorrectly | `KafkaCompactionHorizonTest` | D,M,C | M5 |
 | KF-CMP-006 | spill/no-spill/restart produce deterministic same NTC2 SHA/rows | `KafkaCompactionSpillPropertyTest` | M,R,C | M5 |
-| KF-CMP-007 | all compression formats、headers、timestamps rewrite to equivalent valid records | `KafkaCompactionRewriteTest` | D,M,K | M5 |
-| KF-CMP-008 | idempotent/transactional/control/open/aborted traces match stock cleaner views | `KafkaCompactionTransactionOracleTest` | M,K | M5 |
-| KF-CMP-009 | decode ratio/key/task limits abort without publication or lost source refs | `KafkaCompactionResourceLimitTest` | D,M,R | M5 |
+| KF-CMP-007 | all compression formats、headers、timestamps rewrite to equivalent valid records | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionRowMapperTest`（GZIP/header/timestamp/NTC2 partial）；`KafkaCompactionRewriteTest`（full matrix pending） | D,M,K | M5 |
+| KF-CMP-008 | idempotent/transactional/control/open/aborted traces match stock cleaner views | product `KafkaTopicCompactionCodecV1Test` + `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionStrategyV1Test`（rewrite/decision partial）；`KafkaCompactionTransactionOracleTest`（stock trace pending） | M,K | M5 |
+| KF-CMP-009 | decode ratio/key/task limits abort without publication or lost source refs | product `KafkaCompactionPassOneCollectorTest` + `KafkaCompactionTwoPassExecutorTest`（bounded in-memory partial）；`KafkaCompactionResourceLimitTest`（spill/restart pending） | D,M,R | M5 |
 | KF-CMP-010 | generation commit before coverage CAS is not client-visible mandatory compaction | `KafkaCompactionActivationCutTest` | R,C | M5 |
 | KF-CMP-011 | coverage CAS response loss reloads exact activation and never double-advances epoch | `KafkaCompactionActivationCutTest` | R,P,C | M5 |
 | KF-CMP-012 | compact→delete preserves old mandatory coverage；delete→compact activates only after verified output | `KafkaCompactionPolicyTransitionTest` | R,K,C | M5 |
 | KF-CMP-013 | same-range NTC2 replacement protects readers and retires old generation after proof | `KafkaCompactionReplacementIntegrationTest` | R,C | M5 |
 | KF-CMP-014 | user and both internal compacted topics pass differential/restart/takeover suite | `KafkaNativeCompactionEndToEndTest` | P,K,C | M5/M7 |
+
+Implementation note（2026-07-27）：product `KafkaCompactionPlannerTest` adds range-only partial KF-CMP-004 facts：closed
+segment/LSO bounds、strict min-lag boundary、mandatory-end resume and active/config/coverage protection；it does not yet
+resolve/freeze exact sources or decide a key winner。`KafkaTopicCompactionCodecV1Test` is codec-only partial evidence for
+KF-CMP-002/007/008。It proves exact one-batch range/count validation、KCK2 empty-key/null-key/control separation、owned
+source SHA/base/index facts、GZIP key/value/header rewrite、transactional producer sequence preservation、abort-marker
+round trip and range/source-SHA/message-format drift rejection。`KafkaCompactionStrategyV1Test` adds deterministic partial
+KF-CMP-001/002/003/004/008 evidence for latest/older keyed decisions、unique null-key retention、aborted/open transaction
+handling and full-scan-proven tombstone/control-marker equality boundaries。
+`KafkaCompactionPassOneCollectorTest` now adds dense full/output fact SHA、aborted-winner
+exclusion、open-tail/crossing and first-pass horizon evidence；`KafkaCompactionTwoPassExecutorTest` replays real Kafka
+batches twice，verifies canonical exact source sets/targets、rejects byte-equivalent target re-resolution、emits sparse NTC2
+rows and proves the task/result coverage plus NTC2 writer-metadata binding，while
+`ExactSourceSetCodecV1Test`/`KafkaCompactionPlanCodecV1Test` freeze byte-stable EXS1/KCP1 target/task/transaction facts and
+`KafkaCompactionPlanMetadataStoreContractTest` plus the real-Oxia metadata scenario cover the immutable KCP1 attachment；
+`KafkaCompactionPlanCoordinatorTest` proves plan-first publication、pre-task exact KCP1 reread、missing-plan rejection and
+task-ID restart recovery；`Ncp2Ntc2GoldenAndCorruptionTest` freezes non-empty tombstone bytes。Authoritative COMMITTED source
+resolution、orphan/terminal recovery、sorted spill/restart、Parquet publication/coverage activation and stock `LogCleaner`
+comparison remain absent，so all rows remain `PLANNED`。
 
 ## 11. Configuration, activation, controller and operations
 

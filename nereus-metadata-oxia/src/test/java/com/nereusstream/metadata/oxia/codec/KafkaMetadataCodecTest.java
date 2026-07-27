@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.nereusstream.metadata.oxia.KafkaPartitionKeyspaceTest;
 import com.nereusstream.metadata.oxia.records.KafkaCheckpointReferenceRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaCompactionCoverageRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
@@ -60,6 +61,30 @@ public class KafkaMetadataCodecTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void boundedKafkaCompactionPlanAttachmentRoundTripsAndRejectsShaDrift() {
+        byte[] planBytes = "canonical-kcp1".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        KafkaCompactionPlanRecord plan = new KafkaCompactionPlanRecord(
+                1, "kraft", KafkaPartitionKeyspaceTest.topicId(5), 2,
+                "stream-5", "kcp1-" + "a".repeat(52), "mat1-" + "b".repeat(52),
+                10, 20, 30, sha256Bytes(planBytes), planBytes, 1_000, 0);
+
+        byte[] first = KafkaMetadataCodecs.encodeEnvelope(
+                plan, KafkaCompactionPlanRecord.class);
+        byte[] second = KafkaMetadataCodecs.encodeEnvelope(
+                plan, KafkaCompactionPlanRecord.class);
+
+        assertThat(second).isEqualTo(first);
+        assertThat(KafkaMetadataCodecs.decodeEnvelope(
+                first, KafkaCompactionPlanRecord.class)).isEqualTo(plan);
+        assertThatThrownBy(() -> new KafkaCompactionPlanRecord(
+                1, "kraft", KafkaPartitionKeyspaceTest.topicId(5), 2,
+                "stream-5", plan.planId(), plan.materializationTaskId(),
+                10, 20, 30, bytes(9), planBytes, 1_000, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SHA");
+    }
+
     public static KafkaPartitionBindingRecord fullBinding() {
         return new KafkaPartitionBindingRecord(
                 1, "kraft", KafkaPartitionKeyspaceTest.topicId(1), 3, "orders", 1,
@@ -98,6 +123,14 @@ public class KafkaMetadataCodecTest {
     private static String sha256(byte[] value) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
+        } catch (Exception failure) {
+            throw new AssertionError(failure);
+        }
+    }
+
+    private static byte[] sha256Bytes(byte[] value) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(value);
         } catch (Exception failure) {
             throw new AssertionError(failure);
         }

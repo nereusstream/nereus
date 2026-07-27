@@ -54,6 +54,7 @@ Request handler
 | `kafka.log.nereus.NereusLogSegment` | extends `LogSegment` | virtual roll/size/index facade；no durable file |
 | `kafka.log.nereus.NereusLogRecords` | records facade | exact MemoryRecords encode/read and owned buffers |
 | `kafka.log.nereus.NereusProducerStateManager` | extends `ProducerStateManager` | in-memory stock semantics + checkpoint bridge |
+| `org.apache.kafka.storage.internals.log.ProducerStateEntry.fromSnapshot` | stock inert factory seam | exact five-batch queue import without overwriting marker-updated lastTimestamp |
 | `kafka.log.nereus.NereusTimeIndex` | Kafka `TimeIndex` facade | derived timestamp lookup/checkpoint state |
 | `kafka.log.nereus.NereusTransactionIndex` | Kafka `TransactionIndex` facade | derived aborted-txn lookup/checkpoint state |
 | `kafka.log.nereus.NereusLeaderEpochCache` | epoch cache facade/adapter | derived epoch ranges；no local checkpoint truth |
@@ -337,6 +338,15 @@ deadline-race、146/146 scenarios、real provider recovery、stock KRaft restart
 
 `makeLeader` 不能在 Kafka partition lock 内等待一个需要同一 lock 的 recovery callback。open 流程在 lifecycle
 executor 完成 replay，final publication 才以短 critical section 安装 log/state。
+
+`deleteRecordsOnLeader` 的 Nereus branch 保留 stock read-lock 内的 leader、policy、negative-offset 和
+`HIGH_WATERMARK (-1)` conversion。它在锁内捕获 exact `KafkaTrimBarrier.Snapshot` 和 normalized target，
+随后在锁外等待 `KafkaDeleteRecordsCoordinator.deleteTo`；只有该 future 返回 durable low watermark 后，才以同一
+partition incarnation/leader epoch 的短 critical section 发布 `UnifiedLog.logStartOffset`、推进 producer/epoch
+derived state 并唤醒 delayed Fetch/DeleteRecords。Product coordinator 对 target `<= durable logStart` 返回无 I/O
+幂等成功；对 advancing target 使用共享 NKC1 checkpoint-before-trim barrier，且不把 mid-batch offset 向 segment
+边界取整。任一 leadership/config/root race 在 Nereus mutation 前失败。当前 product API/测试已实现，fork branch
+仍待接入。
 
 当前 required-acks seam 仅扩展 stock `storage` package interface 和一个 `Partition` match branch；
 `testAuthoritativeAppendPreservesRequiredAcks` 同时证明 `-1` 原样路由、非法值在 adapter I/O 前拒绝，以及普通
@@ -643,7 +653,8 @@ start 落入 batch 中间时返回完整 batch；Kafka client iterator 按 reque
 - `KafkaByteBudget` / `KafkaProduceBufferSnapshot` / `KafkaBoundedAppendExecutor`：在 queue admission 前取得全局
   byte lease 并复制 caller remaining bytes，向 task 只暴露 owned read-only view；byte/queue saturation 均在 append
   I/O 前返回 `KNOWN_NOT_COMMITTED`，所有 terminal/race path release once；client future cancel 不会取消已经入队的
-  append task，executor close 则拒绝新 admission 并 drain 已接受任务；
+  append task，executor close 则拒绝新 admission 并 drain 已接受任务；byte lease 先 release 再完成 client-visible
+  future，因此 terminal observer 不会看到已完成 operation 仍占用 owned-buffer budget；
 - `KafkaAppendFailureClassifier`：生成 protocol-neutral `KafkaAppendFailureDisposition`；只有显式
   `KNOWN_NOT_COMMITTED` 能保持 writable，authority/offset conflict、缺失 outcome、`MAY_HAVE_COMMITTED` 和
   `KNOWN_COMMITTED` 一律进入 `WRITE_FENCE_RECOVERY_REQUIRED`，checksum/format/invariant failure 进入

@@ -2,6 +2,7 @@
 package com.nereusstream.metadata.oxia.codec;
 
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionRegistryRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
@@ -12,6 +13,7 @@ import java.util.List;
 public final class KafkaMetadataCodecs {
     private static final MapMetadataCodecRegistry REGISTRY = new MapMetadataCodecRegistry(List.of(
             registered(KafkaPartitionBindingRecord.class, new KafkaPartitionBindingRecordCodecV1()),
+            registered(KafkaCompactionPlanRecord.class, new KafkaCompactionPlanRecordCodecV1()),
             registered(KafkaPartitionRegistryRecord.class, new KafkaPartitionRegistryRecordCodecV1()),
             registered(
                     KafkaStorageProtocolActivationRecord.class,

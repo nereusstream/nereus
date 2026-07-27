@@ -93,6 +93,34 @@ public final class KafkaCheckpointRecoveryCoordinator {
         });
     }
 
+    /** Verifies one exact rooted checkpoint without newest-first fallback. */
+    public CompletableFuture<KafkaRecoveredCheckpoint> recoverReference(
+            KafkaCheckpointRecoveryRequest request,
+            KafkaCheckpointReferenceRecord reference) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(reference, "reference");
+        validateRequest(request);
+        Optional<KafkaCheckpointReferenceRecord> rooted = request.binding().value().checkpointReferences().stream()
+                .filter(candidate -> candidate.objectId().equals(reference.objectId()))
+                .findFirst();
+        if (rooted.isEmpty()) {
+            return CompletableFuture.failedFuture(invariant(
+                    "requested Kafka checkpoint is not rooted by the captured binding"));
+        }
+        if (!rooted.orElseThrow().equals(reference)) {
+            return CompletableFuture.failedFuture(invariant(
+                    "requested Kafka checkpoint conflicts with its captured root"));
+        }
+        long deadline;
+        try {
+            deadline = Math.addExact(clock.millis(), request.timeout().toMillis());
+        } catch (ArithmeticException failure) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException(
+                    "Kafka checkpoint recovery deadline overflows", failure));
+        }
+        return recoverOne(request, reference, deadline);
+    }
+
     private CompletableFuture<Optional<KafkaRecoveredCheckpoint>> tryReference(
             KafkaCheckpointRecoveryRequest request,
             List<KafkaCheckpointReferenceRecord> references,

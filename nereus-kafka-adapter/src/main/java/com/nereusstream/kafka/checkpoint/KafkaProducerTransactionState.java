@@ -197,11 +197,6 @@ public record KafkaProducerTransactionState(
                         "empty Kafka producer epoch cannot retain batches or a transaction");
             }
             batches.forEach(batch -> Objects.requireNonNull(batch, "batch"));
-            if (!batches.isEmpty()
-                    && lastTimestamp != batches.get(batches.size() - 1).timestamp()) {
-                throw new IllegalArgumentException(
-                        "Kafka producer timestamp must match its newest retained batch");
-            }
         }
     }
 

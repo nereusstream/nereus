@@ -116,7 +116,7 @@ class Ncp2Ntc2GoldenAndCorruptionTest {
                     ntc2Row(23, KafkaCompactionDispositionV2.RETAIN_UNKEYED,
                             KafkaCompactionKeyEncodingV2.nullKey(23), "b", 22, 1),
                     ntc2Row(27, KafkaCompactionDispositionV2.RETAIN_TOMBSTONE,
-                            KafkaCompactionKeyEncodingV2.keyed(ByteBuffer.wrap(new byte[] {1})), "", 25, 2),
+                            KafkaCompactionKeyEncodingV2.keyed(ByteBuffer.wrap(new byte[] {1})), "t", 25, 2),
                     ntc2Row(29, KafkaCompactionDispositionV2.RETAIN_CONTROL,
                             KafkaCompactionKeyEncodingV2.control(29), "c", 29, 0));
             ParquetKafkaTopicCompactedWriter writer =
@@ -134,7 +134,7 @@ class Ncp2Ntc2GoldenAndCorruptionTest {
                                 request)
                         .join();
                 assertThat(written.contentSha256().value())
-                        .isEqualTo("367da6663bb4e8d6e83e942277b3a250b86ec13f4f4a5863235aed32157bd2e8");
+                        .isEqualTo("8bbc227701a386f84906e35d3465f8930d4f1123a1d25784e1dbddc13bf31bb8");
                 KafkaTopicCompactedObjectReadResult read = reader.read(new KafkaTopicCompactedObjectReadRequest(
                                 request.streamId(), request.sourceCoverage(), 21, target,
                                 ReadBoundaryMode.EXACT_START, FirstEntryPolicy.ALLOW_FIRST_ENTRY_OVERFLOW,
@@ -147,9 +147,24 @@ class Ncp2Ntc2GoldenAndCorruptionTest {
                                 KafkaCompactionDispositionV2.RETAIN_UNKEYED,
                                 KafkaCompactionDispositionV2.RETAIN_TOMBSTONE,
                                 KafkaCompactionDispositionV2.RETAIN_CONTROL);
+                assertThat(read.rows().get(1).exactPayload())
+                        .isEqualTo(ByteBuffer.wrap(new byte[] {'t'}));
                 assertThat(read.sourceCoverageEndOffset()).isEqualTo(30);
             }
         }
+    }
+
+    @Test
+    void ntc2RejectsAnEmptyPayloadForEveryFetchableSurvivor() {
+        assertThatThrownBy(() -> ntc2Row(
+                        27,
+                        KafkaCompactionDispositionV2.RETAIN_TOMBSTONE,
+                        KafkaCompactionKeyEncodingV2.keyed(ByteBuffer.wrap(new byte[] {1})),
+                        "",
+                        25,
+                        2))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fetchable Kafka batch");
     }
 
     @Test
@@ -272,7 +287,7 @@ class Ncp2Ntc2GoldenAndCorruptionTest {
     private static KafkaTopicCompactedObjectWriteRequest ntc2Request() {
         return new KafkaTopicCompactedObjectWriteRequest(
                 "test-cluster", new StreamId("s-ntc2"), new OffsetRange(20, 30), "b".repeat(26),
-                sha256('3'), sha256('4'), 4, 4, 3, 203, 2, "UNCOMPRESSED", "nereus-test-build",
+                sha256('3'), sha256('4'), 4, 4, 4, 203, 2, "UNCOMPRESSED", "nereus-test-build",
                 new KafkaTopicCompactedFormatSpecV2(
                         "kafka-latest-key", 1, CompactedObjectFormatV2.KAFKA_KEY_CODEC,
                         CompactedObjectFormatV2.KAFKA_REWRITE_CODEC, sha256('5'), 4, 4));

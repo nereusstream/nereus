@@ -3022,9 +3022,24 @@ tasks.register("phase9M3ProviderCheck") {
 
 tasks.register("phase9M4ProducerStateCheck") {
     group = "verification"
-    description = "Run the partial F9-M4 canonical producer and transaction checkpoint gate."
+    description = "Run the partial F9-M4 canonical state checkpoint gate."
     dependsOn("phase9M3ProviderCheck")
     dependsOn(":nereus-kafka-adapter:f9ProducerStatePropertyTest")
+}
+
+tasks.register("phase9M5RetentionCheck") {
+    group = "verification"
+    description = "Run the partial F9-M5 retention, DeleteRecords, and checkpoint-before-trim gate."
+    dependsOn("phase9M4ProducerStateCheck")
+    dependsOn(":nereus-kafka-adapter:f9RetentionTest")
+}
+
+tasks.register("phase9M5CompactionCoreCheck") {
+    group = "verification"
+    description = "Run the partial F9-M5 Kafka compaction planner, bounded two-pass core, and NTC2 gate."
+    dependsOn("phase9M5RetentionCheck")
+    dependsOn(":nereus-materialization:f9ExactSourceSetTest")
+    dependsOn(":nereus-kafka-adapter:f9CompactionPropertyTest")
 }
 
 tasks.register("phase9M6ActivationMetadataCheck") {

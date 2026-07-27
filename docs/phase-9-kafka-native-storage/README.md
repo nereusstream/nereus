@@ -1,6 +1,6 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
-> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 producer/open-transaction/aborted-transaction canonical state、strict V1 codec 以及 idempotent/transaction/control exact append encoding partial slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；exact recovery state/storage publication、同步 UnifiedLog correctness bridge，以及有界 ReplicaManager Produce 和 whole-request multi-partition async Fetch handoff 已实现，但 M4 Kafka fork import/replay、transaction request semantics、internal-topic coordinator ordering、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
+> 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition 以及 idempotent/transaction/control exact append encoding partial slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + product-side exact DeleteRecords + ranged Kafka compaction decode/rewrite deterministic partial slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle partial slices implemented；M2 direct real-service gates pass；fresh inherited final gate blocked by local Pulsar source-lock drift；exact recovery state/storage publication、同步 UnifiedLog correctness bridge，以及有界 ReplicaManager Produce 和 whole-request multi-partition async Fetch handoff 已实现，但 M4 Kafka fork import/replay、transaction request semantics、internal-topic coordinator ordering、M5 concrete partition retention/DeleteRecords wiring/compaction engine+activation、CLI/KafkaRaftServer production selection 与真实 KRaft gate 仍未实现
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
@@ -93,6 +93,62 @@ decode/re-encode byte exact。当前只允许 normal checkpoint barrier；comple
 严格校验后的 idempotent、transactional 与 control magic-v2 batch，并继续逐 batch 保存 exact bytes 与 logical
 offset span；该改变不绕过 fork 的 stock producer/transaction validation。当前锁定 fork 尚未提交
 `ProducerStateManager` import/replay 和事务 request path，因此不能据此声明 M4 完成。
+Section 3 现由 Kafka-artifact-neutral `KafkaLeaderEpochState` 与 `KafkaLeaderEpochStateCodecV1` 实现：
+leader epoch/start offset 双严格递增，只有首条可低于 logStart 作为 carried-forward range，所有 start 均不超过
+stable end，末条可等于 stable end 表达当前空 epoch；required/version/flags、unsigned count、truncation、
+duplicate、ordering、bounds 与 EOF 均 fail closed。冻结 payload SHA-256 和 200 轮固定种子状态覆盖
+decode/re-encode byte exact。Section 5/6 现由 `KafkaDerivedIndexState` 与
+`KafkaDerivedIndexStateCodecV1` 一起实现，使 time index 只能引用同一 checkpoint 中存在的 logical-byte
+segment，并对 segment base、entry offset、timestamp、cumulative logical bytes 与 outer logStart/stableEnd
+做跨 section 校验；当前空 segment 只能位于 stable end 且 logical bytes 必须为 0。两个 required payload
+均为 strict big-endian V1，frozen combined digest、损坏输入和另 200 轮固定种子状态覆盖 byte-exact round
+trip。Section 4 现由 `KafkaVirtualSegmentState`/`KafkaVirtualSegmentStateCodecV1` 实现 virtual segment 与
+bounded config history：offset/byte ranges 必须 dense，最后且仅最后一段 ACTIVE，roll sequence/time/config digest
+严格可验证，active roll jitter、index-full reason 和所有 effective roll/retention/compaction config 均使用 closed
+wire fields。`KafkaCanonicalCheckpointStateCodecV1` 最终按 type 1–7 编码全部 required sections，并交叉校验
+checkpointOffset=stableEnd、virtual/logical segment 一一对应、logical bytes 相等，以及 time/logical sample 不跨
+virtual segment。Section 4 与 full composition 分别有 frozen digest、corruption/invariant tests；codec-only slice
+已完整。`KafkaCanonicalCheckpointPublicationFactory` 已把 partition-lock-frozen canonical image、exact source
+head/session 和 ACTIVE binding 组装为 header + seven-section write/publication request，并在 object I/O 前拒绝
+in-flight append、state-map/end、leader authority 和 bounds mismatch；production runtime 的 staging/writer
+ownership、periodic trigger 和 Kafka fork import/replay 仍未接入。
+M5 的首个 product slice 已新增 `KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、
+`KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaTrimBarrier` 和
+`KafkaRetentionDurableTrimListener`。Planner 直接消费 section-4 virtual
+segment/config image，按 stock Kafka strict `retention.ms` 与 logical segment-size excess 计算连续 closed-segment
+前缀，取 time/size 更远边界并受 HW 限制，active segment 永不被选择。Barrier 只接受同一 frozen snapshot 的 exact
+plan，要求 checkpoint offset/object SHA/root 足以覆盖目标，重载并复核 ACTIVE binding、leader/broker authority、
+config digest 和重新计算的候选，然后才调用 Nereus trim；成功或异常响应都重载 stable head，只有 durable trim 已达到
+目标才通知本地 logStart/binding 更新。当前 deterministic tests 覆盖 strict predicate、size/time union、active/HW
+边界、checkpoint failure/unrooted reference、closed corruption fallback/transient pause、config race、正常 trim、
+response-loss 收敛、并发 trigger coalescing/cancellation isolation，以及 binding-before-local CAS/response loss/leader
+fencing。Checkpoint services 已组合 pinned exact-reference recovery、canonical publication 和 root reload；durable
+listener 已组合 binding observed-logStart CAS；canonical seven-section local-file object-store publish/root-reload/verify
+round trip 已通过。Product-side DeleteRecords 现保留 stock-normalized exact logical offset（包括 mid-batch），对
+already-deleted request 无 I/O 返回 durable low watermark，并通过共享 checkpoint/trim barrier 覆盖 policy/HW/config
+race 和 normalized-HW target。Concrete partition-lock capture/local-log updater、periodic scheduling、Kafka-fork
+DeleteRecords invocation/fetch wake-up、compaction/no-resurrection 和 stock differential oracle 仍待实现，因此
+`phase9M5RetentionCheck` 只是 partial gate。
+Ranged compaction 的首个 codec slice 另新增 materialization-side immutable decode/rewrite records 和 adapter
+`KafkaCompactionPlanner`/`KafkaTopicCompactionCodecV1`：planner 从 mandatory end 起只选 LSO/min-lag 允许的连续 closed
+virtual segments，并冻结到 stable-end decision horizon；codec 严格解码一个 exact magic-v2 ranged batch，为每条
+logical record 生成 KCK2 key/null/control 身份与 source SHA/base/index，并把选中的普通、transactional 或
+commit/abort record 重写为原 offset 上的单记录 valid batch；compression、timestamp、headers、producer/sequence 与
+control meaning 经 decode round trip 验证。`KafkaCompactionStrategyV1` 又以 pass-1 collector facts 确定
+latest/superseded key、unique null-key、committed/aborted/open transaction，以及 full-scan-proven tombstone/control
+delete horizon（含 first-pass assignment 和 later `now == horizon`）。Bounded
+`KafkaCompactionPassOneCollector`/`KafkaCompactionTwoPassExecutor` 已扫描 full horizon、reprove output prefix，并将
+survivors 重写/映射为 ordered、non-empty、fetchable NTC2 rows；`ExactSourceSetVerifier` 同时拒绝 target/source-set
+drift。`KafkaCompactionWriteRequestFactory` 再把 verified range/source-set SHA/accounting 与固定
+strategy/key/rewrite/message-format identity 绑定为 strict NTC2 writer request，并拒绝 task/result coverage mismatch。
+`ExactSourceSetCodecV1`/`KafkaCompactionPlanCodecV1` 又将 exact target、output task、decision horizon、LSO/HW、
+config/coverage、transaction marker facts 与兼容性元组冻结为 byte-stable EXS1/KCP1 restart image。
+`KafkaCompactionPlanRecordMapper`/`KafkaCompactionPlanMetadataStore` 已把 bounded KCP1 bytes/SHA 作为 partition child
+做 immutable create、restart read 与 exact-version delete。
+`KafkaCompactionPlanCoordinator` 再以 plan-first 顺序处理非原子的 KCP1/task roots：task admission 前会再次验证
+authority 并按 materialization task ID 精确回读 KCP1，restart 也从该 ID 恢复并校验完整 task。
+当前形成 `phase9M5CompactionCoreCheck`；authoritative source resolution、orphan/terminal recovery、
+sorted spill/streaming Parquet publication、coverage CAS 与 stock cleaner oracle 仍待实现。
 为接入 stock transaction state，product partition boundary 已把 durable end 与 derived visibility 拆开：
 stable append 先推进 exact end/commit version 并保留旧 HW/LSO；fork 必须在 stock producer/transaction 更新成功后
 调用 `publishDerivedOffsets(exactEnd, HW, LSO)`，随后才发布 `STABLE_APPEND` 并 dispatch 同 partition 下一次

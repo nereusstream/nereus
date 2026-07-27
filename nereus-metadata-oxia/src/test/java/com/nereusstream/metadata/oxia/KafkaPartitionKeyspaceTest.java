@@ -20,6 +20,9 @@ public class KafkaPartitionKeyspaceTest {
         assertThat(keys.parseRegistryKey(keys.registryShard(id), keys.registryKey(id))).isEqualTo(id);
         assertThat(keys.parseCapabilityKey(
                 keys.capabilityKey(broker.brokerId(), broker.brokerEpoch()))).isEqualTo(broker);
+        String taskId = "mat1-" + "a".repeat(52);
+        assertThat(keys.parseCompactionPlanKey(id, keys.compactionPlanKey(id, taskId)))
+                .isEqualTo(taskId);
         assertThat(keys.bindingRootKey(id)).contains("/0000000003/root");
         assertThat(keys.identitySha256(id)).hasSize(64);
         assertThat(keys.activationPartitionKey().value()).isEqualTo(
@@ -42,6 +45,11 @@ public class KafkaPartitionKeyspaceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> keys.parseCapabilityKey(keys.capabilityKey(1, 2)
                 .replace("0000000001", "1")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.parseCompactionPlanKey(
+                id, keys.compactionPlanKey(id, "mat1-" + "a".repeat(52)) + "/extra"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> keys.compactionPlanKey(id, "not-a-task-id"))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new KafkaPartitionId("kraft-a", "AAAAAAAAAAAAAAAAAAAAAA", 0))
                 .isInstanceOf(IllegalArgumentException.class);

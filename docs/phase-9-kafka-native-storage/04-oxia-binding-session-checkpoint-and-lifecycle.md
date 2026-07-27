@@ -1,6 +1,6 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
-> 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 section 1/2/7 canonical payload codec partial slice implemented
+> 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs and full composition partial slice implemented
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -31,6 +31,7 @@ topic ID 冲突，fail closed；不得按 topic name“修正”为另一个 str
 /nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/readiness
 
 /nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/partitions/{topicId}/{partition}/root
+/nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/partitions/{topicId}/{partition}/compaction-plans/{materializationTaskId}
 /nereus/clusters/{nereusCluster}/kafka/{kafkaClusterId}/registry/{shard}/{topicId}/{partition}
 ```
 
@@ -41,7 +42,8 @@ binding/registry = sha256(kafkaClusterId || 0x00 || topicId || 0x00 || partition
 activation       = sha256(kafkaClusterId || 0x00 || "activation")
 ```
 
-binding 与其 registry hint 使用相同 Oxia partition key where provider permits，但实现不能依赖 multi-key
+binding 与其 immutable compaction-plan children 使用同一 deterministic partition key；registry hint 使用其 shard
+partition key。实现仍不能依赖 multi-key
 transaction。stream head 使用既有 `streamPartitionKey(streamId)`，通常与 binding 不同 shard。
 V1 activation、capability 与 readiness 三类 control-plane key 均使用 `activation` partition key；这是 deterministic
 routing，不是 multi-key transaction 承诺。`KafkaPartitionKeyspace` 已实现 capability key strict round-trip parser，拒绝
@@ -62,10 +64,13 @@ records/KafkaCheckpointReferenceRecord.java
 records/KafkaCompactionCoverageRecord.java
 records/KafkaPartitionPendingOperationRecord.java
 records/KafkaPartitionRegistryRecord.java
+records/KafkaCompactionPlanRecord.java
 codec/KafkaPartitionBindingRecordCodecV1.java
 codec/KafkaPartitionRegistryRecordCodecV1.java
+codec/KafkaCompactionPlanRecordCodecV1.java
 KafkaPartitionMetadataTransitions.java
 KafkaPartitionMetadataStore.java
+KafkaCompactionPlanMetadataStore.java
 OxiaJavaKafkaPartitionMetadataStore.java
 ```
 
@@ -185,6 +190,70 @@ lastErrorCode:string      advisory, bounded, empty allowed
 
 Lease 只协调 worker，不授予 Kafka append authority。过期 worker 的 late CAS 因 root version/bindingEpoch 不匹配而
 失败。DELETE/CREATE operations are idempotent by deterministic attempt ID。
+
+### 3.7 Immutable compaction-plan attachment
+
+KCP1 is larger and more Kafka-specific than the partition root，so it is an immutable child rather than a mutable nested
+binding field。`KafkaCompactionPlanRecord` field order：
+
+```text
+formatVersion:int=1
+kafkaClusterId/topicId/partitionId
+streamId:string
+planId:string                         exact kcp1-<sha256-base32lower>
+materializationTaskId:string
+outputStartOffset/outputEndOffset:long
+decisionEndOffset:long
+planSha256:32-byte binary
+planBytes:bytes                       1..60 KiB canonical KCP1
+createdAtMillis:long
+metadataVersion:long                  zero on write, hydrated on read
+```
+
+Record construction verifies `sha256(planBytes)` and canonical identity/range/size bounds。The adapter
+`KafkaCompactionPlanRecordMapper` then decodes KCP1 and cross-checks stream、plan/task IDs and both ranges；the metadata module
+does not interpret Kafka transaction facts or depend back on the adapter。
+
+The child key uses `materializationTaskId`，not `planId`，so a generic worker can resolve KCP1 directly from its durable task
+without a prefix scan。The first plan for one output task becomes authoritative；a later decision-horizon replan must create a
+new output task/source identity rather than mutate that child。
+
+`putCompactionPlanIfAbsent` converges only when the existing exact record bytes are identical；same task ID with different
+plan bytes is an invariant failure。Read verifies key/value partition + task identity。Terminal cleanup uses exact Oxia version；
+a stale delete cannot remove a replacement。The real-Oxia F9 metadata gate includes create/idempotent restart read/exact
+delete for this child。
+
+`KafkaCompactionPlanCoordinator` owns the non-atomic KCP1/task-root convergence boundary。The two roots may hash to
+different Oxia partitions，so the implementation uses plan-first ordering rather than claiming a cross-partition
+transaction：
+
+```text
+converge(partition, outputTask, frozenFacts, authorityGuard):
+  plan      = KafkaCompactionPlan.create(outputTask, frozenFacts)
+  requested = KafkaCompactionPlanRecordMapper.toRecord(partition, plan, clock.millis())
+  authorityGuard.revalidate()
+  durablePlan = plans.putCompactionPlanIfAbsent(requested)
+  durableTask = tasks.create(outputTask, guard = () -> {
+      authorityGuard.revalidate()
+      current = plans.getCompactionPlan(partition, outputTask.taskId()).orElse(fail)
+      require current == durablePlan
+      require current.value.withMetadataVersion(0) == requested
+      require mapper.fromRecord(current.value) == plan
+  })
+  require durableTask == outputTask
+```
+
+`MaterializationTaskStore.create` invokes that inner guard after revalidating every exact source generation and immediately
+before the task mutation。Therefore a visible compaction task has passed a final authority check and an exact KCP1 reread；
+a crash after KCP1 create but before task create leaves only a harmless immutable orphan。A retry converges on identical
+KCP1/task bytes。A missing or changed plan before task admission is a non-retryable metadata invariant violation。
+
+Worker restart starts from the already loaded durable `MaterializationTask` and calls
+`recover(partition, outputTask)`。The coordinator performs a direct child lookup by `outputTask.taskId()`，decodes the
+SHA-verified KCP1 and runs `plan.requireMaterializationTask(outputTask)` before returning any frozen transaction/source
+facts。A task without its KCP1 attachment fails closed with retryable `METADATA_CONDITION_FAILED`；execution never rebuilds
+the decision horizon from the current log。Terminal task/plan retirement ordering and orphan-plan scanning remain part of
+the production worker/recovery slice。
 
 ## 4. Deterministic identity
 
@@ -544,12 +613,26 @@ has tighter bound。Decoder checks lengths before allocation、no overflow、kno
 每 section 的 canonical fields 见文档 05。Unknown optional section 仅当 header forward-compatible flag允许时可跳过；
 unknown required section flag fail closed。
 
-Current implementation note（2026-07-24）：`nereus-kafka-adapter` 已实现 required section 1/2/7 的
-Kafka-artifact-neutral model 和 strict V1 codec。Decoder 在 allocation 前验证 unsigned count/remaining bytes，
+Current implementation note（2026-07-27）：`nereus-kafka-adapter` 已实现全部 required section 1–7 的
+Kafka-artifact-neutral models 和 strict V1 codecs。Decoder 在 allocation 前验证 unsigned count/remaining bytes，
 并校验 exact outer required/version/flags、payload version、排序、cross-section equivalence、checkpoint offset 和
-EOF；encode→decode→encode 由 frozen digest 与 200 轮固定种子随机状态覆盖。该切片只接受 normal checkpoint
+EOF；section 3 另外交叉校验 logStart/stableEnd，限制最多一条首位 pre-logStart carried-forward range，并允许
+stableEnd 上的当前空 epoch；section 5/6 共用同一个 logStart/stableEnd-bounded canonical image，time segment
+必须引用 logical-byte segment，entry/sample offset 严格递增，timestamp 非递减，cumulative logical bytes
+严格递增且小于 segment logical bytes，stableEnd 上的 segment 必须为空；section 4 冻结 dense virtual
+segment ranges、lifecycle、roll jitter/reason、cumulative bytes 和 bounded effective config history。
+`KafkaCanonicalCheckpointStateCodecV1` 按 type 1–7 产生 deterministic section order，decode 对 section order
+不敏感，并交叉校验 `checkpointOffset=stableEnd`、virtual/logical segment set、logical bytes、time/sample
+segment bounds 和 max timestamp。encode→decode→encode 由 frozen digests 与每类 200 轮固定种子随机状态覆盖。
+该切片只接受 normal checkpoint
 barrier；section 7 的 completed-but-not-finalized entry 在定义并实现显式 section flag 前必须 fail closed。
-Section 3–6、full NKC1 publication composition，以及 Kafka fork import/replay 仍是后续切片。
+Full canonical composition 与 publication-request factory 已实现；publication coordinator 的 runtime-owned
+object round trip 以及 Kafka fork import/replay 仍是后续切片。Product
+`KafkaCanonicalCheckpointPublicationFactory` 已完成前半段：
+它只接受同一 capture 中 `checkpointOffset=stableEnd=source.end`、`logStart=source.trim`、无 in-flight append、
+state-map end exact、ACTIVE binding 和 exact leader authority 的 canonical image，然后产生 header、type 1–7
+sections 与 immutable write request。Runtime-owned private staging/writer、trigger/coalescing 和真实 object
+round trip 仍待接线。
 
 ## 10. Checkpoint publication
 

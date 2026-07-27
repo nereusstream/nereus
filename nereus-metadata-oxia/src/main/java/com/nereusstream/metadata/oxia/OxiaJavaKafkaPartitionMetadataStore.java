@@ -7,6 +7,7 @@ import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.metadata.oxia.codec.KafkaMetadataCodecs;
 import com.nereusstream.metadata.oxia.codec.MetadataCodecException;
+import com.nereusstream.metadata.oxia.records.KafkaCompactionPlanRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionBindingRecord;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaPartitionRegistryRecord;
@@ -22,7 +23,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Production native-Kafka binding store over a borrowed shared Oxia runtime. */
-public final class OxiaJavaKafkaPartitionMetadataStore implements KafkaPartitionMetadataStore {
+public final class OxiaJavaKafkaPartitionMetadataStore
+        implements KafkaPartitionMetadataStore, KafkaCompactionPlanMetadataStore {
     private static final int MAX_HINT_CAS_RETRIES = 64;
 
     private final KafkaPartitionKeyspace keys;
@@ -52,6 +54,69 @@ public final class OxiaJavaKafkaPartitionMetadataStore implements KafkaPartition
         String key = keys.bindingRootKey(id);
         return client.get(key, keys.bindingPartitionKey(id))
                 .thenApply(optional -> optional.map(value -> binding(value, id)));
+    }
+
+    @Override
+    public CompletableFuture<Optional<VersionedKafkaCompactionPlan>> getCompactionPlan(
+            KafkaPartitionId id, String materializationTaskId) {
+        ensureOpen();
+        String key = keys.compactionPlanKey(id, materializationTaskId);
+        return client.get(key, keys.bindingPartitionKey(id))
+                .thenApply(optional -> optional.map(
+                        value -> compactionPlan(value, id, materializationTaskId)));
+    }
+
+    @Override
+    public CompletableFuture<VersionedKafkaCompactionPlan> putCompactionPlanIfAbsent(
+            KafkaCompactionPlanRecord value) {
+        ensureOpen();
+        KafkaCompactionPlanRecord exact = requireWritableCompactionPlan(value);
+        KafkaPartitionId id = exact.identity();
+        String key = keys.compactionPlanKey(id, exact.materializationTaskId());
+        byte[] bytes = KafkaMetadataCodecs.encodeEnvelope(exact, KafkaCompactionPlanRecord.class);
+        return client.putIfAbsent(key, bytes, keys.bindingPartitionKey(id))
+                .thenApply(result -> versionedCompactionPlan(key, exact, result.version(), bytes))
+                .exceptionallyCompose(failure -> {
+                    if (!F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return failed(metadataFailure(
+                                "failed to create Kafka compaction plan", failure));
+                    }
+                    return getCompactionPlan(id, exact.materializationTaskId()).thenApply(optional -> {
+                        VersionedKafkaCompactionPlan existing = optional.orElseThrow(() ->
+                                new KafkaMetadataConditionFailedException(
+                                        "Kafka compaction plan create lost condition but key is absent"));
+                        if (!existing.value().withMetadataVersion(0).equals(exact)) {
+                            throw invariant(
+                                    "existing Kafka compaction plan conflicts with canonical bytes",
+                                    null);
+                        }
+                        return existing;
+                    });
+                });
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteCompactionPlan(VersionedKafkaCompactionPlan expected) {
+        ensureOpen();
+        VersionedKafkaCompactionPlan exact = Objects.requireNonNull(expected, "expected");
+        KafkaPartitionId id = exact.value().identity();
+        String key = keys.compactionPlanKey(id, exact.value().materializationTaskId());
+        if (!key.equals(exact.key())
+                || exact.metadataVersion() != exact.value().metadataVersion()) {
+            throw new IllegalArgumentException(
+                    "Kafka compaction plan delete key/version identity mismatch");
+        }
+        return client.deleteIfVersion(
+                        key, exact.metadataVersion(), keys.bindingPartitionKey(id))
+                .exceptionallyCompose(failure -> {
+                    if (F4MetadataStoreSupport.isConditionFailure(failure)) {
+                        return failed(new KafkaMetadataConditionFailedException(
+                                "Kafka compaction plan delete lost its exact version condition",
+                                F4MetadataStoreSupport.unwrap(failure)));
+                    }
+                    return failed(metadataFailure(
+                            "failed to delete Kafka compaction plan", failure));
+                });
     }
 
     @Override
@@ -208,6 +273,27 @@ public final class OxiaJavaKafkaPartitionMetadataStore implements KafkaPartition
         }
     }
 
+    private VersionedKafkaCompactionPlan compactionPlan(
+            PartitionedOxiaClient.VersionedValue stored,
+            KafkaPartitionId expected,
+            String expectedTaskId) {
+        try {
+            KafkaCompactionPlanRecord value = KafkaMetadataCodecs.decodeEnvelope(
+                            stored.value(), KafkaCompactionPlanRecord.class)
+                    .withMetadataVersion(stored.version());
+            if (!value.identity().equals(expected)
+                    || !value.materializationTaskId().equals(expectedTaskId)
+                    || !stored.key().equals(keys.compactionPlanKey(expected, expectedTaskId))
+                    || !keys.parseCompactionPlanKey(expected, stored.key()).equals(expectedTaskId)) {
+                throw invariant("Kafka compaction plan key/value identity mismatch", null);
+            }
+            return new VersionedKafkaCompactionPlan(
+                    stored.key(), value, stored.version(), sha256(stored.value()));
+        } catch (MetadataCodecException | IllegalArgumentException failure) {
+            throw invariant("invalid authoritative Kafka compaction plan metadata", failure);
+        }
+    }
+
     private static KafkaPartitionBindingRecord requireWritableBinding(KafkaPartitionBindingRecord value) {
         KafkaPartitionBindingRecord exact = Objects.requireNonNull(value, "value");
         if (exact.metadataVersion() != 0) {
@@ -220,6 +306,16 @@ public final class OxiaJavaKafkaPartitionMetadataStore implements KafkaPartition
         KafkaPartitionRegistryRecord exact = Objects.requireNonNull(value, "value");
         if (exact.metadataVersion() != 0) {
             throw new IllegalArgumentException("encoded Kafka registry metadataVersion must be zero");
+        }
+        return exact;
+    }
+
+    private static KafkaCompactionPlanRecord requireWritableCompactionPlan(
+            KafkaCompactionPlanRecord value) {
+        KafkaCompactionPlanRecord exact = Objects.requireNonNull(value, "value");
+        if (exact.metadataVersion() != 0) {
+            throw new IllegalArgumentException(
+                    "encoded Kafka compaction plan metadataVersion must be zero");
         }
         return exact;
     }
@@ -238,6 +334,15 @@ public final class OxiaJavaKafkaPartitionMetadataStore implements KafkaPartition
     private VersionedKafkaPartitionBinding versionedBinding(
             String key, KafkaPartitionBindingRecord value, long version, byte[] bytes) {
         return new VersionedKafkaPartitionBinding(
+                key, value.withMetadataVersion(version), version, sha256(bytes));
+    }
+
+    private VersionedKafkaCompactionPlan versionedCompactionPlan(
+            String key,
+            KafkaCompactionPlanRecord value,
+            long version,
+            byte[] bytes) {
+        return new VersionedKafkaCompactionPlan(
                 key, value.withMetadataVersion(version), version, sha256(bytes));
     }
 

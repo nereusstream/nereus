@@ -4,14 +4,18 @@ package com.nereusstream.kafka.checkpoint;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.nereusstream.api.AcquiredAppendSession;
 import com.nereusstream.api.AppendAuthority;
+import com.nereusstream.api.AppendSession;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
 import com.nereusstream.api.ErrorCode;
 import com.nereusstream.api.NereusException;
 import com.nereusstream.api.ObjectKeyHash;
+import com.nereusstream.api.StableStreamHeadSnapshot;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
+import com.nereusstream.api.StreamState;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.kafka.metadata.KafkaBindingRequest;
@@ -26,8 +30,12 @@ import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryRequest;
 import com.nereusstream.kafka.recovery.KafkaRecoveryBatchPage;
 import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
 import com.nereusstream.kafka.recovery.KafkaReplayBatch;
+import com.nereusstream.kafka.retention.KafkaRetentionCheckpointServices;
+import com.nereusstream.kafka.retention.KafkaRetentionPlanner;
+import com.nereusstream.kafka.retention.KafkaTrimBarrier;
 import com.nereusstream.kafka.testing.TestStreamStorage;
 import com.nereusstream.metadata.oxia.FakePhysicalObjectMetadataStore;
+import com.nereusstream.metadata.oxia.KafkaPartitionMetadataTransitions;
 import com.nereusstream.metadata.oxia.VersionedKafkaPartitionBinding;
 import com.nereusstream.metadata.oxia.records.ObjectProtectionType;
 import com.nereusstream.metadata.oxia.testing.FakeKafkaPartitionMetadataStore;
@@ -88,6 +96,178 @@ class KafkaCheckpointPublicationRecoveryIntegrationTest {
             assertThat(recovered.checkpoint().orElseThrow().header()).isEqualTo(object.header());
             assertThat(recovered.checkpoint().orElseThrow().sections()).isEqualTo(object.sections());
             assertThat(fixture.readerLeaseCount(object)).isZero();
+        }
+    }
+
+    @Test
+    void verifiesOneExactRootWithoutNewestFirstFallback() throws Exception {
+        try (Fixture fixture = fixture()) {
+            KafkaCheckpointSourceState oldSource = source(fixture.identity, 0, 42, 12, 'a');
+            KafkaCheckpointObject oldObject = fixture.publish(fixture.activeBinding(), oldSource);
+            KafkaCheckpointSourceState currentSource = source(fixture.identity, 0, 50, 13, 'c');
+            fixture.publish(fixture.currentBinding(), currentSource);
+            VersionedKafkaPartitionBinding current = fixture.currentBinding();
+            var oldReference = current.value().checkpointReferences().stream()
+                    .filter(reference -> reference.objectId().equals(oldObject.objectId().value()))
+                    .findFirst()
+                    .orElseThrow();
+            fixture.validator.current.set(currentSource);
+            KafkaCheckpointRecoveryRequest request = new KafkaCheckpointRecoveryRequest(
+                    fixture.identity, current, currentSource, fixture.validator, Duration.ofSeconds(5));
+
+            var recovered = fixture.recovery(CLOCK).recoverReference(request, oldReference).join();
+
+            assertThat(recovered.reference()).isEqualTo(oldReference);
+            assertThat(recovered.header()).isEqualTo(oldObject.header());
+            assertThat(fixture.unusable).isEmpty();
+            assertThat(fixture.readerLeaseCount(oldObject)).isZero();
+        }
+    }
+
+    @Test
+    void retentionCheckpointServicesPublishReloadAndVerifyTheCanonicalRoot() throws Exception {
+        try (Fixture fixture = fixture()) {
+            VersionedKafkaPartitionBinding active = fixture.activeBinding();
+            var observedRecord = KafkaPartitionMetadataTransitions.observe(
+                    active.value(),
+                    fixture.identity.observedTopicName(),
+                    active.value().lastAppliedMetadataOffset(),
+                    1,
+                    7,
+                    1,
+                    0,
+                    1,
+                    CLOCK.millis());
+            VersionedKafkaPartitionBinding observed =
+                    fixture.bindings.compareAndSet(active, observedRecord).join();
+            AppendAuthority authority = new AppendAuthority(
+                    "kafka-partition-leader-v1",
+                    fixture.identity.durableId().canonicalIdentity(),
+                    7,
+                    "broker-1",
+                    1);
+            StreamId streamId = new StreamId(observed.value().streamId());
+            KafkaCheckpointSourceState source = new KafkaCheckpointSourceState(
+                    authority,
+                    "writer-1",
+                    1,
+                    "fencing-token-1",
+                    1,
+                    0,
+                    1,
+                    1,
+                    "commit-1",
+                    sha256('a'),
+                    false,
+                    1);
+            fixture.validator.current.set(source);
+            StableStreamHeadSnapshot head = new StableStreamHeadSnapshot(
+                    streamId,
+                    StreamState.ACTIVE,
+                    StorageProfile.valueOf(observed.value().storageProfile()),
+                    0,
+                    1,
+                    10,
+                    1,
+                    "commit-1",
+                    Optional.of(new AcquiredAppendSession(
+                            new AppendSession(
+                                    streamId,
+                                    source.writerId(),
+                                    source.sessionEpoch(),
+                                    source.fencingToken(),
+                                    source.leaseVersion(),
+                                    60_000),
+                            Optional.of(authority))),
+                    source.headSha256(),
+                    1);
+            var config = KafkaVirtualSegmentState.LogConfigHistoryEntry.create(
+                    observed.value().lastAppliedMetadataOffset(),
+                    0,
+                    1_024,
+                    60_000,
+                    0,
+                    1_024,
+                    64,
+                    -1,
+                    -1,
+                    0,
+                    86_400_000,
+                    0,
+                    Long.MAX_VALUE,
+                    0.5,
+                    KafkaVirtualSegmentState.LogConfigHistoryEntry.CLEANUP_DELETE_FLAG);
+            KafkaVirtualSegmentState virtual = new KafkaVirtualSegmentState(
+                    0,
+                    1,
+                    List.of(new KafkaVirtualSegmentState.VirtualSegment(
+                            0,
+                            1,
+                            0,
+                            1_000,
+                            0,
+                            0,
+                            1_000,
+                            0,
+                            10,
+                            0,
+                            10,
+                            config.configDigest(),
+                            KafkaVirtualSegmentState.RollReason.INITIAL,
+                            KafkaVirtualSegmentState.SegmentState.ACTIVE)),
+                    List.of(config));
+            KafkaRetentionPlanner.Snapshot retention = new KafkaRetentionPlanner.Snapshot(
+                    virtual,
+                    KafkaRetentionPlanner.Policy.from(config),
+                    0,
+                    1,
+                    CLOCK.millis());
+            KafkaTrimBarrier.Snapshot trimSnapshot =
+                    new KafkaTrimBarrier.Snapshot(fixture.identity, observed, head, retention);
+            KafkaCanonicalCheckpointState canonical = new KafkaCanonicalCheckpointState(
+                    1,
+                    0,
+                    1,
+                    new KafkaProducerTransactionState(1, List.of(), List.of(), List.of()),
+                    new KafkaLeaderEpochState(
+                            0,
+                            1,
+                            List.of(new KafkaLeaderEpochState.LeaderEpochRange(7, 0))),
+                    virtual,
+                    new KafkaDerivedIndexState(
+                            0,
+                            1,
+                            List.of(),
+                            List.of(new KafkaDerivedIndexState.SegmentLogicalByteIndex(
+                                    0, 10, List.of()))));
+            KafkaCheckpointPublicationCoordinator publisher = new KafkaCheckpointPublicationCoordinator(
+                    fixture.bindings, fixture.writer, fixture.verifier, fixture.protections, CLOCK);
+            KafkaRetentionCheckpointServices services = new KafkaRetentionCheckpointServices(
+                    fixture.recovery(CLOCK),
+                    new KafkaCanonicalCheckpointPublicationFactory(
+                            NEREUS_CLUSTER,
+                            sha256('b'),
+                            Duration.ofSeconds(5),
+                            Duration.ofMinutes(5),
+                            "test-build"),
+                    publisher,
+                    fixture.bindings,
+                    snapshot -> CompletableFuture.completedFuture(
+                            new KafkaRetentionCheckpointServices.Capture(
+                                    source, canonical, 7, fixture.validator)),
+                    Duration.ofSeconds(5));
+
+            KafkaTrimBarrier.VerifiedCheckpoint published = services.publish(trimSnapshot).join();
+            VersionedKafkaPartitionBinding rooted = fixture.currentBinding();
+            KafkaTrimBarrier.Snapshot rootedSnapshot =
+                    new KafkaTrimBarrier.Snapshot(fixture.identity, rooted, head, retention);
+            KafkaTrimBarrier.VerifiedCheckpoint verified =
+                    services.verify(rootedSnapshot, published.reference()).join();
+
+            assertThat(rooted.value().checkpointReferences()).containsExactly(published.reference());
+            assertThat(verified.reference()).isEqualTo(published.reference());
+            assertThat(verified.verifiedObjectSha256())
+                    .containsExactly(published.verifiedObjectSha256());
         }
     }
 

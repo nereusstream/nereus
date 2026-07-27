@@ -100,6 +100,27 @@ class KafkaProducerTransactionStateCodecV1Test {
     }
 
     @Test
+    void preservesMarkerTimestampBeyondTheRetainedDataBatchWindow() {
+        ProducerState markerUpdated = new ProducerState(
+                7,
+                (short) 3,
+                5,
+                3_000,
+                OptionalLong.empty(),
+                List.of(new BatchMetadata(1, 12, 1, 2_000)));
+        KafkaProducerTransactionState state =
+                new KafkaProducerTransactionState(
+                        13,
+                        List.of(markerUpdated),
+                        List.of(),
+                        List.of());
+
+        assertThat(codec.decodeSections(
+                codec.encodeSections(state, 13), 13))
+                .isEqualTo(state);
+    }
+
+    @Test
     void rejectsUnsortedOrInconsistentProducerAndTransactionFacts() {
         ProducerState first = producer(2, 0, 0, OptionalLong.empty());
         ProducerState second = producer(1, 1, 1, OptionalLong.empty());

@@ -386,7 +386,7 @@ message nereus_committed_generation_v2 {
 - row range 是 `[stream_offset_start, addExact(start, record_count))`；
 - `record_count > 0`，ordinal 从 0 连续增加；
 - row ranges dense，第一 row start == metadata coverage start，最后 end == coverage end；
-- payload 长度 `0..64 MiB`，Kafka adapter 另要求至少 Kafka batch header 长度；
+- NCP2 payload 长度 `0..64 MiB`；NTC2 survivor payload 必须非空且由 Kafka codec 验证为完整 batch；
 - CRC32C 对 exact payload；
 - `event_time_millis` 是 Nereus append fact；Kafka timestamp 仍以 payload 为权威；
 - 不保存可从 exact payload 验证出的 producer/compression 字段副本，避免双 truth。
@@ -467,6 +467,9 @@ message nereus_topic_compacted_kafka_v2 {
 Output row 只代表 survivor；被 compact 掉的 offset 不写 row，由 file metadata 的 source coverage 证明 hole。
 首版 normal data survivor rewrite 为一个合法 single-record Kafka batch，所以 `record_count=1`。control batch 或
 未来不可拆 semantic unit 可以大于 1，但必须经过 codec 显式 disposition/validator，不能由 generic writer 猜测。
+四种 disposition（包括 `RETAIN_TOMBSTONE`）的 `payload` 都是可直接返回给 Fetch 的非空 Kafka batch；tombstone
+由 batch 内 record 的 null value 表示，不能把 NTC1 的“空 tombstone payload”约定带入 NTC2。Current NTC2
+constructor、Parquet golden round trip and CRC/accounting test freeze this rule。
 
 `source_batch_sha256` 固定 32 bytes；它用于 audit/determinism，不作为 source existence reference。所有 current
 source references 仍由 F4 durable protections/generation records 管理。

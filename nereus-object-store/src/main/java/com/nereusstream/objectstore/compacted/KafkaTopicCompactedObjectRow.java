@@ -32,6 +32,9 @@ public record KafkaTopicCompactedObjectRow(
         Objects.requireNonNull(disposition, "disposition");
         compactionKey = immutable(compactionKey, "compactionKey");
         exactPayload = immutable(exactPayload, "exactPayload");
+        if (!exactPayload.hasRemaining()) {
+            throw new IllegalArgumentException("NTC2 survivor payload must contain a fetchable Kafka batch");
+        }
         if (exactPayload.remaining() > CompactedObjectFormatV2.MAX_PAYLOAD_BYTES) {
             throw new IllegalArgumentException("NTC2 row payload exceeds 64 MiB");
         }
@@ -44,9 +47,6 @@ public record KafkaTopicCompactedObjectRow(
             throw new IllegalArgumentException("eventTimeMillis must be non-negative");
         }
         KafkaCompactionKeyEncodingV2.validateForRow(compactionKey, streamOffsetStart, disposition);
-        if (disposition == KafkaCompactionDispositionV2.RETAIN_TOMBSTONE && exactPayload.hasRemaining()) {
-            throw new IllegalArgumentException("NTC2 tombstone payload must be empty");
-        }
         if ((disposition == KafkaCompactionDispositionV2.RETAIN_VALUE
                         || disposition == KafkaCompactionDispositionV2.RETAIN_TOMBSTONE
                         || disposition == KafkaCompactionDispositionV2.RETAIN_UNKEYED)

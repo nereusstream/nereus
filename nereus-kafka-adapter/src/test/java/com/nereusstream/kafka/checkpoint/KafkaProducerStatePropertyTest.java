@@ -89,6 +89,9 @@ class KafkaProducerStatePropertyTest {
                         lastSequence, lastOffset, offsetDelta, lastTimestamp));
                 nextOffset = lastOffset + 1 + random.nextInt(3);
             }
+            if (random.nextBoolean()) {
+                lastTimestamp += 1 + random.nextInt(100);
+            }
             OptionalLong currentTransactionFirstOffset =
                     random.nextBoolean()
                             ? OptionalLong.of(10_000L + iteration * 100L + producerIndex)

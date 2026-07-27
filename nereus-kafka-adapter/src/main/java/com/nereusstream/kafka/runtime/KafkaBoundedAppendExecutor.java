@@ -256,12 +256,19 @@ public final class KafkaBoundedAppendExecutor implements AutoCloseable {
         }
 
         private void execute() {
+            T value = null;
+            Throwable failure = null;
             try {
-                result.complete(task.execute(snapshot.buffer()));
-            } catch (Throwable failure) {
-                result.completeExceptionally(failure);
+                value = task.execute(snapshot.buffer());
+            } catch (Throwable taskFailure) {
+                failure = taskFailure;
             } finally {
                 snapshot.close();
+            }
+            if (failure == null) {
+                result.complete(value);
+            } else {
+                result.completeExceptionally(failure);
             }
         }
     }

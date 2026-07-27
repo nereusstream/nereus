@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 producer/open/aborted canonical state and strict V1 codec partial slice implemented；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition partial slice implemented；M2 ordinary/direct real-service gates pass；inherited final gate blocked by local Pulsar source drift
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -499,7 +499,7 @@ coordinator/transaction/compaction remain M4/M5。
 
 ### Slices
 
-1. canonical NKC1 producer/open-txn/aborted/epoch/segment/time/byte sections（section 1/2/7 product model + strict codec implemented；section 3–6 pending）；
+1. canonical NKC1 producer/open-txn/aborted/epoch/segment/time/byte sections（all section 1–7 product models + strict codecs + full composition implemented）；
 2. `NereusProducerStateManager`/txn/time/epoch facades；
 3. stable post-commit failure fence/replay；
 4. idempotent producer retries/epochs/sequences；
@@ -522,13 +522,24 @@ phase9M4FinalCheck --rerun-tasks
 
 Final includes Kafka upstream producer/group/transaction focused suites plus real two-broker takeover。
 
-Current partial gate（2026-07-24）：`:nereus-kafka-adapter:f9ProducerStatePropertyTest` and
+Current partial gate（2026-07-27）：`:nereus-kafka-adapter:f9ProducerStatePropertyTest` and
 `phase9M4ProducerStateCheck` cover section 1/2/7 structural invariants、frozen canonical bytes、sequence wrap and 200
 deterministic randomized round trips。`KafkaAppendBatchEncoderTest` additionally proves byte-exact acceptance of
 idempotent、transactional and abort-control magic-v2 batches without moving producer semantics into the adapter。
+The same gate now covers section 3 bounds、carried-forward/current-empty-epoch semantics、frozen bytes、corruption cases
+and another 200 deterministic randomized round trips；section 5/6 cross-section segment equivalence、checkpoint bounds、
+monotonic time/offset/logical-byte samples、current-empty-segment semantics、frozen combined bytes、corruption cases and
+another 200 deterministic randomized round trips；section 4 dense virtual ranges、lifecycle、roll/config history、
+canonical config digest、frozen bytes、corruption cases and another 200 deterministic randomized round trips。The full
+composition test freezes type 1–7 output order/bytes，accepts only outer-verified optional sections，and rejects
+checkpoint/stable-end、virtual/logical-byte sets、logical bytes、time/sample segment bounds and max-timestamp mismatches。
+`KafkaCanonicalCheckpointPublicationFactoryTest` further proves the exact ACTIVE binding/source/leader capture produces
+the matching header and all seven sections，while append-in-flight、state-map/end and leader-epoch mismatches fail before
+object I/O。
 The task deliberately does not use the `phase9M4Check` completion name；stock
 `ProducerStateManager` import/replay、idempotent/transaction request paths、LSO/aborted filtering and internal-topic
-coordinator ordering are still required before M4 completion。
+coordinator ordering、publication snapshot/object round trip and restart/takeover index recovery are still required before
+M4 completion。
 
 ## 9. F9-M5 — Retention and compaction
 
@@ -558,6 +569,56 @@ Kafka fork: nereusF9InternalTopicCompactionTest
 phase9M5Check
 phase9M5FinalCheck --rerun-tasks
 ```
+
+Current partial gate（2026-07-27）：`:nereus-kafka-adapter:f9RetentionTest` and
+`phase9M5RetentionCheck` cover the Kafka-artifact-neutral `KafkaRetentionPlanner`、`KafkaRetentionCheckpointGate/Services`、
+`KafkaRetentionCoordinator`、`KafkaDeleteRecordsCoordinator`、`KafkaTrimBarrier` and
+`KafkaRetentionDurableTrimListener`。The planner freezes
+the current section-4 config offset/digest，implements stock strict time and logical-segment-size prefix predicates，unions
+them at the farthest HW-bounded closed-segment boundary and never selects the active segment。The barrier requires an
+object-SHA-verified rooted NKC1 reference sufficient through the candidate，revalidates ACTIVE binding/leader/authority/config
+and a recomputed candidate，then confirms durable trim from the stable stream head before notifying local state；an applied
+trim with a lost response converges idempotently。The checkpoint gate selects newest sufficient roots、uses a closed
+fallback allowlist and requires new publication at stable end；the coordinator coalesces concurrent triggers without
+letting one caller cancel shared work。The services adapter composes exact-reference pinned recovery and canonical
+publication/root reload，with a canonical seven-section local-file object-store round trip；the durable listener performs
+response-loss-safe binding observed-logStart CAS before calling the exact local updater。This task deliberately does not
+use the `phase9M5Check` completion name：concrete partition capture、
+local-log updater、periodic scheduling、Kafka-fork DeleteRecords invocation、
+compaction/no-resurrection、stock oracle and real-provider/restart gates remain required。
+
+The product-side DeleteRecords slice now accepts only Kafka-normalized non-negative offsets，rechecks delete policy and
+the frozen HW，returns the current durable low watermark without I/O for already-deleted requests，and otherwise routes the
+exact (including mid-batch) logical offset through the same rooted-checkpoint/revalidation/durable-response-loss barrier。
+Its revalidation freezes KRaft config/leader authority but deliberately does not round or recompute a retention segment
+candidate。The fork still owns stock policy/leader/range validation、`-1 -> HW` conversion、partition-lock capture、
+`UnifiedLog` publication and Fetch wake-up，so slice 3 is only product-partial。
+
+`:nereus-kafka-adapter:f9CompactionPropertyTest` and `phase9M5CompactionCoreCheck` now add the first slice-4 partial
+gate。`nereus-materialization` owns immutable ranged decode/rewrite records rather than reusing the F4 one-entry/one-record
+contract；`KafkaCompactionPlanner` selects only the consecutive closed virtual-segment prefix at/below LSO and outside the
+strict stock minimum-lag boundary，resuming at mandatory coverage end while freezing policy/coverage facts。The adapter
+`KafkaTopicCompactionCodecV1` strictly decodes one exact magic-v2 batch，emits every KCK2-tagged logical record with source
+SHA/base/index，and rewrites a selected value、transactional record or commit/abort marker to one round-trip-verified batch
+at its original absolute offset。The codec freezes its message-format digest and preserves compression unless the plan
+explicitly allows an uncompressed fallback。`KafkaCompactionStrategyV1` consumes full-horizon collector facts and decides
+latest/superseded keyed data、unique null-key retention、committed/aborted/open transactions and full-scan-proven
+tombstone/control-marker delete horizons，including first-pass horizon assignment and the later exact `now == horizon`
+boundary。`KafkaCompactionPassOneCollector`/`KafkaCompactionTwoPassExecutor` now provide a bounded dense two-pass reference：
+aborted/open data cannot become key winners，full/output fact SHA must reproduce，and retained records are rewritten and
+mapped to ordered non-empty NTC2 rows under explicit budgets。`ExactSourceSetVerifier` also freezes/validates the exact
+COMMITTED target identity and rejects output sources that are not the decision-set prefix。
+`KafkaCompactionWriteRequestFactory` now binds the verified result range/source-set SHA/accounting and fixed
+strategy/key/rewrite/message-format identities into the existing strict NTC2 writer request，rejecting a task/result coverage
+mismatch before writer admission。`ExactSourceSetCodecV1` and `KafkaCompactionPlanCodecV1Test` additionally freeze a
+byte-stable EXS1/KCP1 restart image and reject corrupt target/task/transaction/compatibility facts。
+`KafkaCompactionPlanRecordMapper` plus the separate `KafkaCompactionPlanMetadataStore` bind the KCP1 bytes/SHA/ranges to an
+immutable partition child；in-memory and real-Oxia contracts cover idempotent create、restart read and exact-version delete。
+`KafkaCompactionPlanCoordinator` now closes the non-atomic KCP1/task workflow：authority is checked before plan create and
+again inside `MaterializationTaskStore` immediately before task mutation，after an exact task-addressed KCP1 reread；restart
+recovers KCP1 by materialization task ID and cross-validates the full task。Authoritative COMMITTED source resolution、orphan
+scan/terminal dual-root retirement、sorted spill、streaming Parquet upload/full verification、coverage activation and the
+cleaner differential oracle remain pending；this gate does not claim compaction visibility。
 
 No-resurrection is a release blocker，including policy compact→delete、missing newest NTC2 and restart cuts。
 

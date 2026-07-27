@@ -64,13 +64,35 @@ public final class KafkaPartitionKeyspace {
     }
 
     public String bindingRootKey(KafkaPartitionId id) {
-        KafkaPartitionId exact = requireIdentity(id);
-        return prefix + "/partitions/" + KeyComponentCodec.encodeComponent(exact.topicId())
-                + "/" + partitionDigits(exact.partitionId()) + "/root";
+        return partitionPrefix(id) + "/root";
     }
 
     public PartitionKey bindingPartitionKey(KafkaPartitionId id) {
         return new PartitionKey("kafka-binding-v1-" + identitySha256(requireIdentity(id)));
+    }
+
+    public String compactionPlanPrefix(KafkaPartitionId id) {
+        return partitionPrefix(id) + "/compaction-plans";
+    }
+
+    public String compactionPlanKey(KafkaPartitionId id, String materializationTaskId) {
+        return compactionPlanPrefix(id) + "/"
+                + KeyComponentCodec.encodeComponent(materializationTaskId(materializationTaskId));
+    }
+
+    public String parseCompactionPlanKey(KafkaPartitionId expected, String key) {
+        KafkaPartitionId exact = requireIdentity(expected);
+        String family = compactionPlanPrefix(exact) + "/";
+        String supplied = scoped(key, family, "compaction plan");
+        String suffix = supplied.substring(family.length());
+        if (suffix.isEmpty() || suffix.indexOf('/') >= 0) {
+            throw new IllegalArgumentException("compaction plan key has an unknown depth");
+        }
+        String taskId = KeyComponentCodec.decodeComponent(suffix);
+        if (!compactionPlanKey(exact, taskId).equals(supplied)) {
+            throw new IllegalArgumentException("compaction plan key is not canonical");
+        }
+        return taskId;
     }
 
     public int registryShard(KafkaPartitionId id) {
@@ -149,6 +171,12 @@ public final class KafkaPartitionKeyspace {
         return exact;
     }
 
+    private String partitionPrefix(KafkaPartitionId id) {
+        KafkaPartitionId exact = requireIdentity(id);
+        return prefix + "/partitions/" + KeyComponentCodec.encodeComponent(exact.topicId())
+                + "/" + partitionDigits(exact.partitionId());
+    }
+
     private byte[] identityDigest(KafkaPartitionId id) {
         MessageDigest digest = sha256();
         digest.update(id.kafkaClusterId().getBytes(StandardCharsets.UTF_8));
@@ -208,5 +236,21 @@ public final class KafkaPartitionKeyspace {
         Objects.requireNonNull(value, name);
         if (value.isBlank()) throw new IllegalArgumentException(name + " cannot be blank");
         return value;
+    }
+
+    private static String materializationTaskId(String value) {
+        String exact = text(value, "materializationTaskId");
+        if (!exact.startsWith("mat1-") || exact.length() != 57) {
+            throw new IllegalArgumentException("materializationTaskId is not canonical");
+        }
+        for (int index = 5; index < exact.length(); index++) {
+            char character = exact.charAt(index);
+            if (!((character >= 'a' && character <= 'z')
+                    || (character >= '2' && character <= '7'))) {
+                throw new IllegalArgumentException(
+                        "materializationTaskId is not canonical base32lower");
+            }
+        }
+        return exact;
     }
 }

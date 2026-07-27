@@ -6,10 +6,10 @@ dependencies {
     implementation(project(":nereus-metadata-oxia"))
     implementation(project(":nereus-object-store"))
     implementation(project(":nereus-materialization"))
+    implementation(libs.kafka.clients)
 
     testImplementation(testFixtures(project(":nereus-metadata-oxia")))
     testImplementation(testFixtures(project(":nereus-object-store")))
-    testImplementation(libs.kafka.clients)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -95,13 +95,53 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
 
 tasks.register<Test>("f9ProducerStatePropertyTest") {
     group = "verification"
-    description = "Run the partial F9-M4 canonical producer and transaction checkpoint contracts."
+    description = "Run the partial F9-M4 complete seven-section canonical checkpoint contracts."
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
     filter {
         includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaProducerTransactionStateCodecV1Test")
         includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaProducerStatePropertyTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaLeaderEpochStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaDerivedIndexStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaVirtualSegmentStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointStateCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointPublicationFactoryTest")
+    }
+}
+
+tasks.register<Test>("f9RetentionTest") {
+    group = "verification"
+    description = "Run the partial F9-M5 retention, DeleteRecords, and checkpoint-before-trim contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionPlannerTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaTrimBarrierTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionCheckpointGateTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionCoordinatorTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaRetentionDurableTrimListenerTest")
+        includeTestsMatching("com.nereusstream.kafka.retention.KafkaDeleteRecordsCoordinatorTest")
+        includeTestsMatching("com.nereusstream.kafka.checkpoint.KafkaCheckpointPublicationRecoveryIntegrationTest")
+    }
+}
+
+tasks.register<Test>("f9CompactionPropertyTest") {
+    group = "verification"
+    description = "Run the partial F9-M5 Kafka compaction planner, strategy, and codec contracts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPassOneCollectorTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlanCoordinatorTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionPlannerTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionRowMapperTest")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionStrategyV1Test")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaTopicCompactionCodecV1Test")
+        includeTestsMatching("com.nereusstream.kafka.compaction.KafkaCompactionTwoPassExecutorTest")
     }
 }
 
