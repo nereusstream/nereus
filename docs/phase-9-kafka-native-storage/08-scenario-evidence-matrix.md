@@ -24,13 +24,16 @@ Current deterministic M5 read-side evidence（2026-07-27）：`KafkaCompactedFet
 mandatory source never produces a COMMITTED retry。The manifest rows remain `PLANNED` because their required real-service、
 restart/Kafka-fork and process/chaos tiers are not yet satisfied。
 
-Current deterministic M4 fork evidence（local `ec7f0db991`）：`NereusProducerStateManagerTest`、
+Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
 KF-TXN-002/003/005/006/007 and KF-FET-006/007：five-batch/sequence-wrap checkpoint equality、full seven-section hydration
 plus committed tail、open/abort LSO、stock transaction verification、HW publication、READ_COMMITTED bounds and
-actual-page aborted filtering。The stock `ProducerStateManagerTest` also locks marker-updated timestamp restore。Rows stay
-`PLANNED` because required real-service、process/restart、takeover and aggregate tiers have not run，and the fork commit is
-not yet remotely published。
+actual-page aborted filtering。The stock `ProducerStateManagerTest` also locks marker-updated timestamp restore。
+`ReplicaManagerTest` now covers the deterministic/Kafka-fork part of KF-TXN-010 by deferring the stock transactional append
+and TV2 marker through the configured storage executor。`BrokerMetadataPublisherTest` and
+`NereusTopicDeltaLifecycleTest` cover the deterministic ordering part of KF-TXN-011/012：both elections wait for ready，
+and transaction-state ready waits for exact recovered storage installation。Rows stay `PLANNED` because required
+real-service、process/restart、takeover and aggregate tiers have not run，and the fork commits are not remotely published。
 
 ## 2. Machine-readable manifest target
 
@@ -243,9 +246,9 @@ hash。Markdown/JSON ID sets must match。
 | KF-TXN-007 | abort marker builds exact aborted index and read-committed filtering | fork `NereusProducerStateManagerTest`/`NereusUnifiedLogFactoryTest`（D/K partial）；`KafkaTransactionRecoveryIntegrationTest`（R pending） | R,K | M4 |
 | KF-TXN-008 | crash after transactional data/marker commit before derived update replays correctly | `KafkaTransactionProcessCutIntegrationTest` | P,C | M4 |
 | KF-TXN-009 | transaction spanning virtual segments/checkpoint/takeover remains atomic to consumers | `KafkaTransactionProcessCutIntegrationTest` | P,K | M4 |
-| KF-TXN-010 | transaction verification guard survives async executor handoff without request-thread local use | fork `NereusTransactionVerificationTest` | D,R,K | M4 |
-| KF-TXN-011 | `__consumer_offsets` opens/replays before group coordinator election | `KafkaInternalTopicOrderingIntegrationTest` | P,C | M4 |
-| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | `KafkaInternalTopicOrderingIntegrationTest` | P,C | M4 |
+| KF-TXN-010 | transaction verification guard survives async executor handoff without request-thread local use | fork `ReplicaManagerTest.testStorageAppendExecutorPreservesTransactionGuardAndMarkerVersion`（D/K partial；R pending） | D,R,K | M4 |
+| KF-TXN-011 | `__consumer_offsets` opens/replays before group coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady`（D partial）；`KafkaInternalTopicOrderingIntegrationTest`（P/C pending） | P,C | M4 |
+| KF-TXN-012 | `__transaction_state` opens/replays before transaction coordinator election | fork `BrokerMetadataPublisherTest.testAsyncTopicLifecycleDefersInternalCoordinatorElectionsUntilLeaderReady` + `NereusTopicDeltaLifecycleTest.testLeaderCallbackWaitsForExactRecoveredStorageInstallation`（D partial）；`KafkaInternalTopicOrderingIntegrationTest`（P/C pending） | P,C | M4 |
 | KF-TXN-013 | group commit/rebalance/restart/takeover works with native internal topic | `KafkaGroupCoordinatorIntegrationTest` | P,K | M4 |
 | KF-TXN-014 | ongoing transaction coordinator failover resolves from internal topic | `KafkaTransactionCoordinatorIntegrationTest` | P,K | M4 |
 | KF-TXN-015 | group offset lag does not protect user-topic retention；client observes normal reset/out-of-range | `KafkaGroupRetentionIndependenceTest` | R,P,K | M5 |

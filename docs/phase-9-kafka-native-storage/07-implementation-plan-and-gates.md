@@ -453,11 +453,12 @@ coordinator/transaction/compaction remain M4/M5。
   `KafkaConfigTest` pass with server/core checkstyle and SpotBugs。This is deterministic partial evidence for KF-SRC-007、
   KF-SRC-008 and KF-OPS-001/002；runtime creation、activation/cluster ID、controller create-topic enforcement、secret
   redaction and real-process cuts remain open；
-- the M3 head rejects idempotent/transaction/control input until M4 owns producer/transaction state；isolated M4 commit
-  `ec7f0db991` now owns stock import/replay and transactional shell semantics but is not part of the clean M3 aggregate lock；
+- the M3 head rejects idempotent/transaction/control input until M4 owns producer/transaction state；isolated M4 commits
+  `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
+  preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the isolated local branch
-  `nereus/future9-native-kafka-storage@ec7f0db991` contains the nineteen reviewed M3 commits plus one M4
-  producer/transaction commit，but push to `nereusstream/kafka` is rejected with GitHub 403，so KF-SRC-004 remains
+  `nereus/future9-native-kafka-storage@032974067c` contains the nineteen reviewed M3 commits plus two M4
+  producer/transaction and ordering-test commits，but push to `nereusstream/kafka` is rejected with GitHub 403，so KF-SRC-004 remains
   incomplete。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection and the real KRaft final gate remain open；
@@ -542,11 +543,14 @@ Isolated Kafka fork commit `ec7f0db991` adds stock `ProducerStateEntry.fromBatch
 replay and exact manager publication into `NereusUnifiedLog`。The shell test exercises stock verification guard、
 transactional CLIENT append、COORDINATOR abort marker、durable-end-to-HW advancement、open-transaction LSO、
 READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/shell plus stock restore regression total
-10 passing focused tests，with Checkstyle and SpotBugs。The commit remains local because push to the organization fork was
-rejected with GitHub 403。
-The task deliberately does not use the `phase9M4Check` completion name；transaction request/executor handoff、
-internal-topic coordinator ordering、publication snapshot/object round trip、fresh process restart/takeover index recovery、
-upstream focused suites and real two-broker evidence are still required before M4 completion。
+10 passing focused tests，with Checkstyle and SpotBugs。Follow-up `032974067c` adds three regressions：the actual
+ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
+transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
+storage installation。All 13 focused tests pass together。Both commits remain local because push to the organization fork
+is rejected with GitHub 403。
+The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
+process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
+and real two-broker evidence are still required before M4 completion。
 
 ## 9. F9-M5 — Retention and compaction
 

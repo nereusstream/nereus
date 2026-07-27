@@ -1,6 +1,6 @@
 # 05 — Producer State, Transactions, Compaction and Retention
 
-> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication and READ_COMMITTED/aborted-index deterministic shell slice implemented locally；request executor/internal-topic/process gates remain in progress；F9-M5 designed target
+> 状态：F9-M4 all seven NKC1 canonical sections + strict V1 codecs/full composition + exact idempotent/transaction/control append encoding implemented；Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transactional executor handoff and internal-topic ready-ordering deterministic slices implemented locally；real checkpoint/process/coordinator gates remain in progress；F9-M5 designed target
 > Recovery source：lossless `COMMITTED` bytes only
 > Client compacted view：mandatory `TOPIC_COMPACTED` coverage + committed tail；never resurrect compacted records
 
@@ -251,6 +251,12 @@ coordinator keys through Kafka semantics。
 Transaction coordinator recovery reads `__transaction_state` through the mandatory compacted view。If NTC2 coverage for an
 activated internal-topic range is unavailable，coordinator election fails；it may not fall back to full COMMITTED bytes and
 resurrect compacted state。
+
+Local fork commit `032974067c` adds deterministic ordering evidence at the stock seams：both group and transaction
+coordinator elections remain absent until `AsyncTopicDeltaLifecycle` reports the exact leader ready，and the
+`__transaction_state` ready callback itself waits for installation of the exact recovered storage instance。This closes
+the request/lifecycle unit-test gap only；real internal-topic replay、coordinator restart/failover and mandatory NTC2
+unavailability remain process gates。
 
 ## 6. Leader epoch section
 

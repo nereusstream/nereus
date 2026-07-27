@@ -1,6 +1,6 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
-> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index deterministic shell slice implemented locally；KafkaRaftServer production selection、internal-topic ordering and real KRaft process gate remain open
+> 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result/recovery-state bridges、stock Partition/ReplicaManager request seam、manager-to-Partition lookup/state lifecycle、optional async metadata-publisher seam、M6 typed config validation、stock-compatible BrokerServer lifecycle injection、adapter-backed typed runtime bridge、authoritative UnifiedLog factory/shell selection、synchronous correctness bridge，以及 bounded ReplicaManager Produce / whole-request multi-partition async Fetch handoff implemented；M4 stock producer/transaction NKC1 import/replay、HW/LSO publication、READ_COMMITTED/aborted-index、transactional request handoff 与 internal-topic ready ordering deterministic slices implemented locally；KafkaRaftServer production selection、真实 internal-topic coordinator recovery and real KRaft process gate remain open
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -298,6 +298,10 @@ M4 产品 encoder 已接受通过严格 magic-v2/CRC/producer-fact 校验的 ide
 是否可写仍由 fork 的 stock `UnifiedLog` producer/transaction validation 决定，adapter 不复制该状态机。
 隔离 fork commit `ec7f0db991` 已允许 `CLIENT` transactional data 与 `COORDINATOR` marker 通过同一 stable
 append bridge，verification guard、epoch/sequence/marker 校验仍由 stock path 执行；follower append 永远拒绝。
+隔离 follow-up `032974067c` 在真实 `ReplicaManager.appendRecordsOnStorageExecutor` closure 上先建立 stock
+verification guard，再延迟执行 CLIENT transactional append，随后经同一 executor 发送 TV2 COORDINATOR abort
+marker；两步都成功且生成 ongoing/aborted stock state，锁定 `verificationGuards` 与 `transactionVersion` 不会在
+request-to-worker handoff 中丢失。
 
 Fetch 已按 stock isolation 选择 LOG_END/HW/LSO 上界。READ_COMMITTED 的 aborted transaction list 来自
 checkpoint/replay 恢复的 in-memory `NereusTransactionIndex`，并按本次实际返回页的 next logical offset 裁剪，
@@ -389,6 +393,10 @@ internal-topic coordinator election 必须晚于对应 storage fully recovered�
 `Some(NereusTopicDeltaLifecycle)`，但尚无 shipped concrete Nereus factory，也尚未把异步 open failure 转成最终的
 per-partition offline policy；因此
 本节是已测试的 invocation seam，不是可启用 broker runtime 或 KF-OPS-017 完成声明。
+`032974067c` 的 publisher regression 同时放入 group 与 transaction 两个 internal topic，证明 ready callback
+之前两个 coordinator 都不 election，callback 之后才分别以 exact leader epoch election；另一个 lifecycle
+regression 用 `__transaction_state` 锁定 callback 必须等待 exact recovered storage 安装。该证据仍是同进程
+deterministic seam，不替代真实 coordinator replay/restart/failover gate。
 
 ### 3.6 `core/.../kafka/server/ReplicaManager.scala`
 
@@ -713,6 +721,8 @@ product-backed whole-request wave executor、ReplicaManager async Fetch completi
 Fetch 错误降级为 backpressure 的竞态，但不扩大 `threads + queueCapacity` logical admission。第二十个隔离本地
 commit `ec7f0db991` 增加 stock producer-entry exact restore seam、in-memory producer/transaction state、
 full NKC1 hydration + committed-tail replay、stable-end-to-HW/LSO publication 和 READ_COMMITTED aborted filtering。
+第二十一个隔离本地 commit `032974067c` 增加 stock ReplicaManager transactional guard/TV2 marker-version executor
+handoff，以及 group/transaction internal-topic recovered-storage-before-election 回归。
 Controller scheduling、CLI/KafkaRaftServer production selection 和 real KRaft process gate 尚未实现。当前 branch
 尚未推送，因而仍未满足 production fork source-lock entry；bounded Produce/Fetch/M4 transaction 单元与组合证据也不构成真实
 KRaft runtime claim。
