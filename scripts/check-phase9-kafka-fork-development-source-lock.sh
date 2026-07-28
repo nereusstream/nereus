@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "41" ]] \
-    || fail "expected forty-one reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "42" ]] \
+    || fail "expected forty-two reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -203,7 +203,7 @@ aadcc658a9e74de9798b06d674ecb784947c8762 core/src/main/java/kafka/log/nereus/Ner
 7ea7807874c39b2ce383f9472fca019633602b1d core/src/main/java/kafka/log/nereus/NereusUnifiedLog.java
 df74856a75146e0e35aaf5431b1ecb35531ec054 core/src/main/java/kafka/server/builders/LogManagerBuilder.java
 0984006b925982dea46544d6459a5b5510e2a634 core/src/main/java/kafka/server/builders/ReplicaManagerBuilder.java
-5a2db8b4237f3bf968824437155bde8f3840410c core/src/main/java/kafka/server/nereus/NereusControllerStorageRuntime.java
+78ee9a18e54b9e4b8510efc4c438c0eee96eb751 core/src/main/java/kafka/server/nereus/NereusControllerStorageRuntime.java
 6521c6972def23a62c1fa1e8cc81a284f3b5c502 core/src/main/java/kafka/server/nereus/NereusKafkaControllerActivation.java
 3c61509e24531a47edeef62800a1ba0eb625240d core/src/main/java/kafka/server/nereus/NereusKafkaControllerActivationCreator.java
 44fe428c0b70ac64e4b8d1a5709ccde3c70d6f69 core/src/main/java/kafka/server/nereus/NereusKafkaControllerRuntimeConfiguration.java
@@ -786,6 +786,8 @@ grep -F -q 'terminalFailure = true;' "$controller_adapter_runtime" \
     || fail "controller runtime lost per-epoch terminal failure suppression"
 grep -F -q 'cancelScheduled();' "$controller_adapter_runtime" \
     || fail "controller runtime lost leadership-loss/shutdown cancellation"
+grep -F -q 'Nereus Kafka storage activation reconciled by controller {} at epoch {}' "$controller_adapter_runtime" \
+    || fail "controller runtime lost per-epoch successful reconciliation observability"
 
 replication_control="$kafka_checkout/metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java"
 grep -F -q 'changeNereusPartitionReassignment(' "$replication_control" \
@@ -902,4 +904,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; forty-one commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; forty-two commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"

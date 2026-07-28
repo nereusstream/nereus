@@ -29,8 +29,12 @@ the storage worker is blocked in `NereusUnifiedLog.appendStable`，and `SIGSTOP`
 `append session changed before guarded object upload`，the WAL key set and latest offset remain unchanged，and broker 2
 commits the next batch at the exact old stable end。The dedicated
 `f9InFlightTakeoverProcessIntegrationTest` is part of `phase9M6KafkaProcessCheck`。
-These are still partial F9 results；BookKeeper-profile takeover、multi-controller/coordinator migration、response-loss
-restart and the stock retention oracle remain open。
+The same aggregate now also covers all three BookKeeper profiles through post-handoff recovery plus their shared
+Bookie-acked/metadata-`WRITING` stale-completion cut，and a three-voter/three-combined-node process gate kills the current
+KRaft controller、requires a different higher-epoch controller to reconcile Nereus ACTIVE authority，then proves native
+Produce/Fetch/ListOffsets and object persistence continue。These are still partial F9 results；activation PREPARED and
+response-loss controller cuts、coordinator/checkpoint migration、release-process response-loss restart and the stock
+retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
 bitmap，streams a whole-file-verified KCRS survivor spool into staged NTC2，and completes guarded upload、Generation
@@ -129,8 +133,9 @@ BookKeeper configuration snapshot、exact password-file identity、client lifecy
 `OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The BookKeeper process gate uses a real two-bookie
 cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exact formatted KRaft broker in a fresh JVM，
 recovers offset 0 and appends offset 1 with earliest=0/latest=2；
-multi-controller and multi-broker live takeover、checkpoint/virtual-segment cuts、
-BookKeeper-backed async/sync materialization profiles and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
+The current process suite additionally covers Object/BookKeeper live takeover and ACTIVE-state three-voter controller
+failover。Checkpoint/virtual-segment cuts、PREPARED/response-loss activation cuts and wider chaos evidence remain future
+work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

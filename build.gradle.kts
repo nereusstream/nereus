@@ -66,6 +66,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
         || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
+        || task == "f9MultiControllerFailoverProcessIntegrationTest"
         || task == "f9InFlightTakeoverProcessIntegrationTest"
         || task == "f9BookKeeperProfileTakeoverProcessIntegrationTest"
         || task == "f9BookKeeperInFlightTakeoverProcessIntegrationTest"
@@ -139,6 +140,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9BookKeeperLedgerDeletionProviderIntegrationTest",
         "f9M6KafkaProcessIntegrationTest",
         "f9MultiBrokerTakeoverProcessIntegrationTest",
+        "f9MultiControllerFailoverProcessIntegrationTest",
         "f9InFlightTakeoverProcessIntegrationTest",
         "f9BookKeeperProfileTakeoverProcessIntegrationTest",
         "f9BookKeeperInFlightTakeoverProcessIntegrationTest",
@@ -2874,7 +2876,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e",
+        "df238bb387706f60bc020e43c8dc6878fbf41051",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -3093,9 +3095,10 @@ tasks.register("phase9M6KafkaFeatureCheck") {
 tasks.register("phase9M6KafkaProcessCheck") {
     group = "verification"
     description =
-        "Run real Oxia + LocalStack + BookKeeper cold-restart, live takeover, and in-flight fencing acceptance."
+        "Run real Oxia + LocalStack + BookKeeper cold-restart, broker/controller takeover, and in-flight fencing acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9InFlightTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperInFlightTakeoverProcessIntegrationTest")

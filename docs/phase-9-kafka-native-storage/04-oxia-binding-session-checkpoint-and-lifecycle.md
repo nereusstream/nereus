@@ -1,7 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
-> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；multi-controller、checkpoint/virtual-segment 与 coordinator migration 仍 open
+> 2026-07-29 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；三 release JVM in-flight gate 证明旧 Object-WAL append 已阻塞在 provider future 时，higher epoch takeover 会在 guarded upload 前重新校验并 fence；真实两 Bookie/两 Kafka release-process gate 闭合 BookKeeper 三 profile 的 post-handoff recovery/continuation；test-only agent gate further proves Bookie-acked/metadata-`WRITING` stale append recovery and fencing；three-voter/three-combined-node gate further proves ACTIVE activation remains immutable across controller kill and readiness epoch does not regress；PREPARED/response-loss controller cuts、checkpoint/virtual-segment 与 coordinator migration 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -568,8 +568,8 @@ The focused deterministic regression is
 `DefaultKafkaPartitionStorageTest.knownNotCommittedAuthorityOrHeadFailureStillFencesTheOldLeader`。The real gate is wired into
 `phase9M3ProviderCheck` as `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest`。This closes an R-tier
 two-runtime Object-provider live-preemption slice for KF-META-007/KF-META-012；it is not yet a two Kafka-process/KRaft
-failover、BookKeeper-profile takeover or multi-controller proof。The separate sections 7.3–7.5 process gates now supply
-the Object-WAL post-handoff/old in-flight cuts and the BookKeeper three-profile post-handoff matrix。
+failover、BookKeeper-profile takeover or multi-controller proof。The separate sections 7.3–7.7 process gates now supply
+the Object-WAL post-handoff/old in-flight cuts、the BookKeeper three-profile P/C boundaries and ACTIVE controller failover。
 
 ### 7.3 Release-process handoff and binding-preservation boundary（2026-07-28）
 
@@ -719,7 +719,40 @@ captured boundary。Section 7.5 separately proves each profile's post-handoff co
 actionable tasks in 1m30s and belongs to both `phase9M6KafkaProcessCheck` and
 `phase9M6KafkaBookKeeperProcessCheck`。
 
-### 7.7 Recovery component ownership
+### 7.7 ACTIVE controller failover metadata boundary（2026-07-29）
+
+`f9MultiControllerFailoverProcessIntegrationTest` runs three combined `broker,controller` release processes with one static
+voter set。The data partition is deliberately assigned to a combined node other than the current controller leader，so
+killing the controller does not also remove the RF1 data owner。Before and after the kill，the harness opens its own
+`SharedOxiaClientRuntime` and `KafkaStorageActivationMetadataStore` rather than trusting only Kafka logs。
+
+The accepted metadata state before the fault is：
+
+```text
+activation.lifecycle == ACTIVE
+activation.kafkaClusterId == formatted Kafka cluster ID
+readiness.kafkaClusterId == formatted Kafka cluster ID
+sorted(readiness.brokers.brokerId) == [1, 2, 3]
+readiness.readinessEpoch >= activation.activationEpoch
+readiness.expiresAtMillis > now
+readiness.capabilitySha256 == activation.requiredCapabilitySha256
+```
+
+After the active controller process is forcibly terminated，`describeMetadataQuorum` must expose a different leader ID and
+strictly larger leader epoch while still returning voters `[1,2,3]` and a non-negative high watermark。The replacement
+controller must complete its own activation reconciliation for that exact epoch。The second Oxia read then requires
+`replacement.activation().equals(initial.activation())` and
+`replacement.readiness().readinessEpoch() >= initial.readiness().readinessEpoch()`。This freezes the one-way-state rule：
+controller replacement may refresh/reconcile readiness but may not recreate、downgrade or rewrite the ACTIVE activation
+authority。
+
+This cut does not persist controller epoch inside
+`KafkaStorageProtocolActivationRecord`。The fork's process-local reconciliation marker proves the selected leader ran the
+coordinator；the existing Oxia CAS records remain the durable safety authority。Therefore the gate supplies ACTIVE steady-state
+P/C evidence only。A complete KF-OPS-005 gate still needs leadership changes while PREPARED、between durable proof and ACTIVE
+CAS，and after provider application but before the controller observes the response。
+
+### 7.8 Recovery component ownership
 
 The executable recovery boundary is now split by resource ownership：
 

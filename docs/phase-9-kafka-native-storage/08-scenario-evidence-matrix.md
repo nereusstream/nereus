@@ -30,7 +30,7 @@ Current provider-profile evidence（2026-07-28）：the product adapter installs
 ledger-ID namespace、ACTIVE publication and exact broker readiness。`f9BookKeeperWalOnlyProviderIntegrationTest` starts real
 two-bookie BookKeeper、opens a Kafka leader with `BOOKKEEPER_WAL_ONLY`、strictly appends a magic-v2 batch、publishes the exact
 BookKeeper generation-zero target and Fetches it through the shared generation resolver。The client is borrowed and the
-provider graph closes before it。Fork `bb7e8937c5` supplies the 100-key typed configuration、exact BookKeeper secret
+provider graph closes before it。Fork `df238bb387` supplies the 100-key typed configuration、exact BookKeeper secret
 identity/client ownership、five-profile mapping、six-key fail-closed ledger-GC policy and three-key materialization
 retirement policy with focused static/unit evidence。
 `f9BookKeeperWalOnlyProcessIntegrationTest` now supplies independent-process evidence for this one profile：a real release
@@ -64,7 +64,8 @@ Current release-process takeover evidence（product/fork 2026-07-28）：
 fork `fe308359b6` makes a Nereus level-1 singleton reassignment one atomic KRaft
 `PartitionChangeRecord` with target replicas/ISR/leader and no adding/removing or transitional RF2；fork `bb7e8937c5`
 classifies a local replica removal by consulting the new image and calls `resign` when the exact topic ID/partition still
-exists，reserving durable `delete` for an absent/recreated identity。
+exists，reserving durable `delete` for an absent/recreated identity；fork `df238bb387` adds one success marker per local
+controller epoch after Nereus activation reconciliation completes。
 `f9MultiBrokerTakeoverProcessIntegrationTest` starts node 1 combined controller/broker and node 2 broker-only from the real
 release distribution against shared KRaft/Oxia/LocalStack authority。It commits offset 0 on `[1]`，Admin-reassigns to `[2]`，
 requires `leader=2, replicas=[2], ISR=[2]`、empty ongoing reassignment and both processes alive，then recovers offset 0 and
@@ -110,6 +111,19 @@ cut is before `WRITING -> DURABLE` and profile-specific NCP2 behavior，it combi
 BookKeeper service/profile P/C evidence for KF-META-007/KF-META-012/KF-APP-014。The rows remain `PLANNED` under the manifest's
 milestone/final-aggregate status policy；the remaining reason is no longer a missing BookKeeper in-flight cut。
 
+Current multi-controller evidence（product/fork 2026-07-29）：
+`f9MultiControllerFailoverProcessIntegrationTest` starts three combined broker/controller release JVMs with voter IDs
+`[1,2,3]`、one shared Oxia/S3 authority and isolated process directories。Before the fault it requires exact broker/voter
+sets，captures the current controller ID and epoch，waits for that controller's exact-epoch Nereus reconciliation marker and
+reads ACTIVE/readiness directly from Oxia。The RF1 user partition is assigned to a different combined node，then offset 0 is
+produced/fetched。After the active controller is forcibly killed，the surviving two voters must elect a different controller
+at a strictly higher epoch and emit a second exact-epoch reconciliation marker；voter IDs stay `[1,2,3]`，the activation
+record remains equal，and readiness epoch cannot regress。The surviving bootstrap produces/fetches offset 1，returns
+earliest/latest `0/2` and retains a positive S3 object count。Fresh direct execution passes 64/64 actionable tasks in 36s and
+is included in `phase9M6KafkaProcessCheck`。This supplies the ACTIVE steady-state P/C subset of KF-OPS-005；the row remains
+`PLANNED` because PREPARED、first-ACTIVE and provider-applied/response-loss controller cuts plus the final aggregate remain
+absent。
+
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
 KF-TXN-002/003/005/006/007 and KF-FET-006/007：five-batch/sequence-wrap checkpoint equality、full seven-section hydration
@@ -125,7 +139,7 @@ The extended gate also leaves one transaction open at a stable data batch，forc
 resolves it with an ABORT marker before accepting the next transaction；read-committed and the group skip the aborted data。
 Rows stay `PLANNED` because their required BookKeeper/profile service matrix、multi-broker takeover、
 checkpoint/virtual-segment and mandatory NTC2 failure cuts plus aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@bb7e8937c5`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@df238bb387`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -133,7 +147,7 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@bb7e8937c5`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@df238bb387`。
 
 Current BookKeeper deletion evidence（product 2026-07-28）：
 `KafkaBookKeeperStreamCoverageProofProducerTest` proves complete 64-shard Kafka binding inventory plus complete 64-shard F4
@@ -171,7 +185,7 @@ fresh broker process、takeover or aggregate tiers。
 Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
 one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
 canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus
-Checkstyle、SpotBugs and the executable 41-commit/121-file source lock。Rows remain `PLANNED` until real-provider
+Checkstyle、SpotBugs and the executable 42-commit/121-file source lock。Rows remain `PLANNED` until real-provider
 fresh-process/restart/takeover and full LogCleaner differential evidence exist。
 
 Current M6 launcher/isolation/process evidence（fork `faaffc8a75` + `3bd92c7244` + `9773c8f817` + `d23dc5c787` +
@@ -188,7 +202,7 @@ selection。Fork `d23dc5c787` additionally proves explicit-only `nereus.storage.
 enabled broker/controller advertisement、dedicated-controller validation、explicit enabled formatting、finalized-feature
 activation wait and controller-side RF/minISR/ISR/reassignment/directory rejection。Fork `ecde6964c5` creates and validates
 the authoritative cache root's KRaft V1 identity before directory registration。Focused launcher/runtime/feature suites、
-complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 41-commit/121-file source lock pass。
+complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 42-commit/121-file source lock pass。
 `phase9M6KafkaProcessCheck` additionally builds the real release tarball and passes one combined broker/controller process
 against four-shard Oxia and pinned LocalStack S3：explicit feature format、registration/activation、Admin create、acks=all
 Produce、byte-exact Fetch、one committed transaction、one real group rebalance/offset commit、earliest=0/latest=3
@@ -204,12 +218,16 @@ also runs the two-bookie `BOOKKEEPER_WAL_ONLY` cold-restart gate and the real Ox
 `OBJECT_WAL_ASYNC_OBJECT` first-JVM/fresh-JVM offset 0/1 gate；both end at earliest=0/latest=2。It now also runs the
 two-release-process Object-WAL singleton reassignment gate：the old broker remains alive，the new broker recovers offset 0，
 and the cluster commits offset 1 after exact `[1] -> [2]` KRaft handoff with no transitional reassignment。
+The aggregate now also runs the three-voter ACTIVE controller-failover gate：it observes initial/replacement exact controller
+epochs and Nereus reconciliation markers、forces the active controller process down、requires immutable ACTIVE and
+nondecreasing readiness from Oxia，then continues native IO to final earliest/latest `0/2`。
 KF-OPS-006/007 are `PASSED_CURRENT_SOURCE` deterministic evidence；the process gates add real cold-restart/takeover partial evidence to
 KF-META-009、KF-APP-005/006、KF-FET-001/006/007/009、KF-TXN-007/011/012/013/014 and
 KF-OPS-003/009/013/017，but those rows remain `PLANNED` where live preemption、timestamp/leader-epoch、
-remaining provider-profile matrix、checkpoint/virtual-segment、mandatory NTC2、multi-controller/chaos or aggregate requirements are
+remaining provider-profile matrix、checkpoint/virtual-segment、mandatory NTC2、activation-cut/chaos or aggregate requirements are
 still absent。
-In-flight activation epoch fencing and multi-controller takeover also remain open。
+ACTIVE steady-state controller takeover is now present；in-flight PREPARED/first-ACTIVE/provider-response-loss activation
+epoch cuts remain open。
 
 ## 2. Machine-readable manifest target
 
@@ -291,8 +309,9 @@ any non-empty shard is projected into the activation snapshot，and an already-p
 activation-backed Object-WAL integration test proves this wrapper remains on the public production path。Kafka controller
 seam/context binding and deterministic activation scheduling are now implemented at fork `d23dc5c787`；the feature/control tests
 cover controller-current retry、leadership loss、in-flight coalescing、per-epoch process-local fault suppression、explicit feature
-format/advertisement and single-copy controller mutation。Real multi-controller process/takeover、priority budgets and the
-broader native-storage process cuts 仍未实现；all three BookKeeper provider constructions and their first
+format/advertisement and single-copy controller mutation。The current three-voter process gate now covers ACTIVE-state
+controller kill/reconciliation；PREPARED/response-loss cuts、priority budgets and broader native-storage process cuts
+仍未实现；all three BookKeeper provider constructions and their first
 single-node/fresh-JVM native process slices now pass，
 除 KF-OPS-006/007 外 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
@@ -567,7 +586,7 @@ composition/restart evidence only；the real-provider fresh-process restart tier
 | KF-OPS-002 | KRaft-only、remote-log/cleaner/conflicting mode/message-limit violations reject before IO | fork `NereusKafkaConfigValidatorTest` | D,K | M6 |
 | KF-OPS-003 | empty cluster first activation PREPARED→ACTIVE succeeds with exact brokers/digests | `KafkaActivationIntegrationTest` | R,P,C | M6 |
 | KF-OPS-004 | any topic/internal topic/local authoritative log/binding makes first activation fail non-destructively | `KafkaActivationIntegrationTest` | R,P | M6 |
-| KF-OPS-005 | controller failover at every activation cut preserves one-way state | `KafkaActivationControllerFailoverTest` | P,C,K | M6 |
+| KF-OPS-005 | controller failover at every activation cut preserves one-way state | `KafkaActivationControllerFailoverTest`；product `f9MultiControllerFailoverProcessIntegrationTest` adds ACTIVE steady-state P/C evidence | P,C,K | M6 |
 | KF-OPS-006 | controller enforces RF=1/minISR=1 for create/create-partitions/manual assignment | fork `ReplicationControlManagerTest.testNereusStorageFeatureGatesTopicCreationAndPartitionGrowth` | D,K | M6 |
 | KF-OPS-007 | ISR/reassignment/directory APIs cannot create follower/local-placement semantics | fork `ReplicationControlManagerTest.testNereusStorageFeatureGatesIsrReassignmentAndDirectories` + `testNereusStorageFeatureAtomicallyHandsOffSingletonReplica`；product `f9MultiBrokerTakeoverProcessIntegrationTest` adds P evidence | D,K | M6 |
 | KF-OPS-008 | missing/mismatched/expired broker capability excludes leader ownership | `KafkaCapabilityReadinessIntegrationTest` | R,P,C | M6 |

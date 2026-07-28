@@ -1,11 +1,11 @@
 # Phase 9 — Native Kafka Shared-Storage Code-Level Target
 
 > 状态：In progress；F9-M1/M2 implementation complete；F9-M3 Nereus raw RecordBatch + serialized partition IO + bounded append/async Fetch + binding-first leader manager + storage-profile policy + exact bounded ListOffsets scan + activation-backed Object-WAL provider/checkpoint/read-pin/paged-replay runtime + provider-neutral `BOOKKEEPER_WAL_ONLY` adapter composition + local Kafka-fork stock-RecordBatch recovery-state/metadata-lifecycle/deferred-provider/log-factory slices implemented；F9-M4 NKC1 全七 section canonical state/strict V1 codecs/full composition、idempotent/transaction/control exact append encoding，以及 Kafka-fork stock producer/transaction import/replay、checkpoint hydration、HW/LSO publication、READ_COMMITTED/aborted-index、transaction guard/marker-version async executor handoff 和 recovered-storage-before-coordinator-election deterministic slices implemented；F9-M5 stock-compatible retention planner + checkpoint-before-trim/response-loss barrier + stock DeleteRecords fork invocation + checkpoint-restorable virtual segment/config/index state + periodic owned-partition retention runtime + ranged Kafka compaction decode/rewrite/exact-source/sorted-spill/KCRS-to-NTC2 preparation + object upload/Generation publication/coverage-CAS linearization + exact activated-generation discovery/generation-constrained runtime reads + binding-rooted compacted-prefix/committed-tail no-resurrection routing + recoverable single-partition pass + terminal dual-root retirement + bounded orphan scan/non-overlapping scheduler-owner + projection-free direct-stream registration/Generation authority fence + activated Object-WAL production composition + fork-owned compaction registration/partition-lock authority/stock transaction-marker pre-scan deterministic slices implemented；F9-M6 config schema/typed snapshot/pure startup validation + adapter process lifecycle/resource-ownership + activation metadata/coordinator + broker publisher/verifier/runtime startup fence + generic BrokerServer lifecycle + stock-source isolation + explicit native-storage launcher + controller-leader-only activation scheduling + durable feature/format + dedicated-controller admission + controller single-copy enforcement slices implemented；checkpoint recovery/retention 的 exact-reference durable quarantine/redacted first-failure audit 已接入 Object-WAL/BookKeeper-WAL-only product runtime，并通过 deterministic 与 real-Oxia reconnect gate；real Oxia + two-bookie adapter gate and real release-distribution/fresh-JVM process gates now prove all three BookKeeper profiles can open a leader、Produce、Fetch、ListOffsets and recover cold；the same installed Object provider exposes both `OBJECT_WAL_SYNC_OBJECT` and `OBJECT_WAL_ASYNC_OBJECT`，and an independent real release/fresh-JVM gate proves async Object-WAL Produce/Fetch/ListOffsets/cold recovery；Kafka NCP2 direct-stream materialization owns one process-shared lifecycle、ranged writer/strict verifier、direct planner/scanner/required-generation/commit authority and async append lag admission；real Oxia/ObjectStore/two-bookie provider gates prove byte-exact NCP2 publication/read for Object async and BookKeeper async/sync，including the sync append completion barrier；Kafka fork now owns 100-key ConfigDef、complete typed BookKeeper binding、password-file identity、BookKeeper client construction/close ordering、six-key ledger-GC rollout policy、three-key materialization-retirement policy and exact five-profile default/capability mapping；the provider graph now conditionally composes materialization → Kafka stream-coverage deletion activation → BookKeeper retention，while safe defaults create none of the deletion owners；deterministic 64+64-shard fail-closed proof、real Oxia + two-bookie adapter-level physical deletion/applied-delete response-loss and release-distribution normal-stop/fresh-JVM NCP2 fallback after physical deletion all pass；real release-distribution combined-node KRaft + four-shard Oxia + pinned LocalStack S3 gate now passes explicit format、registration/activation、Admin create、Produce/Fetch/ListOffsets、object persistence、SIGTERM、fresh-JVM higher-broker-epoch ACTIVE-readiness refresh、user/`__consumer_offsets`/`__transaction_state` concurrent remote recovery、consumer-group committed-offset resume and committed-transaction continuation；real-Oxia two-runtime Object-WAL gate now proves higher-leader-epoch live preemption、exact committed replay、old-writer recovery fencing and new-writer continuation before TTL；Object-WAL P/C takeover 与 BookKeeper 三 profile post-handoff P matrix 已通过；M4 checkpoint publication、ongoing/aborted transaction coordinator failover 与 mandatory-internal-topic NTC2 failure cuts，M5 release-process response-loss restart/BookKeeper already-in-flight cuts、完整 stock `LogCleaner` differential oracle以及真实多 Controller failover 仍未实现
-> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：真实 two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；三 release JVM + Toxiproxy + `jcmd` + `SIGSTOP/SIGCONT` gate 又闭合了 Object-WAL already-dispatched old append 的 P/C 切点，并证明 stale append 在 guarded upload 前被新 session fence、WAL key 集与 durable LEO 不变；stock ZooKeeper + two-bookie + two Kafka release-process gate 闭合 `BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_SYNC_OBJECT` 的 post-handoff recovery/continuation 与 profile object invariants；test-only Byte Buddy agent gate further holds one real Bookie-acked write before `WRITING -> DURABLE`，proves exact physical-entry presence、new-leader `ABANDONED`/`SEALED` recovery、stale completion fencing and final LEO `2`；remaining open items are transaction/internal-topic coordinator migration、checkpoint/virtual-segment cuts、multi-controller and broader kill/response-loss chaos
+> 2026-07-29 状态增量（覆盖上一行末尾的旧 open-item 描述）：真实 two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与 new leader continuation 已通过；三 release JVM + Toxiproxy + `jcmd` + `SIGSTOP/SIGCONT` gate 又闭合了 Object-WAL already-dispatched old append 的 P/C 切点，并证明 stale append 在 guarded upload 前被新 session fence、WAL key 集与 durable LEO 不变；stock ZooKeeper + two-bookie + two Kafka release-process gate 闭合 `BOOKKEEPER_WAL_ONLY`、`BOOKKEEPER_WAL_ASYNC_OBJECT`、`BOOKKEEPER_WAL_SYNC_OBJECT` 的 post-handoff recovery/continuation 与 profile object invariants；test-only Byte Buddy agent gate further holds one real Bookie-acked write before `WRITING -> DURABLE`，proves exact physical-entry presence、new-leader `ABANDONED`/`SEALED` recovery、stale completion fencing and final LEO `2`；three combined broker/controller release JVMs with three static voters now prove ACTIVE-state controller kill/failover、per-epoch Nereus activation reconciliation and native IO continuity；remaining open items are transaction/internal-topic coordinator migration、checkpoint/virtual-segment cuts、PREPARED/applied-response-loss controller cuts and broader kill/response-loss chaos
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e`（41 commits / 121 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；前 39 commits 保持既有 M3–M6/config/profile/runtime slices，第 40 个 commit 增加 Nereus RF1 shared-storage singleton 原子重分配，第 41 个 commit 区分本地副本移除与全局 binding 删除）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
+> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@df238bb387706f60bc020e43c8dc6878fbf41051`（42 commits / 121 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；前 39 commits 保持既有 M3–M6/config/profile/runtime slices，第 40 个 commit 增加 Nereus RF1 shared-storage singleton 原子重分配，第 41 个 commit 区分本地副本移除与全局 binding 删除，第 42 个 commit 增加每个 controller epoch 成功完成 activation reconciliation 的可执行日志证据）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -83,7 +83,8 @@ metadata read/write failure 直接 fail closed。fork `d23dc5c787` 已注册 opt
 controller create/config/ISR/reassignment/directory mutation 同时执行 single-copy policy。BookKeeper WAL-only creator
 及其首个真实 process profile 已实现；Object async creator 与首个真实 process profile 也已实现；Nereus provider
 现已组合 BookKeeper async/sync creator 并通过完整五档 real-service provider matrix；checkpoint time-index candidate、
-完整五档 fresh-process profile matrix、真实多 Controller failover仍未实现。`NereusUnifiedLog` 已有首条同步
+完整五档 fresh-process profile matrix、PREPARED/response-loss controller failover cuts 仍未实现；ACTIVE 稳态
+三 voter controller kill/reconciliation gate 已通过。`NereusUnifiedLog` 已有首条同步
 correctness bridge：stock validation/offset assignment 后把 exact bytes 交给 adapter stable append，成功后才推进 shell
 LEO；Fetch 把 bounded adapter assembly 转回 `MemoryRecords`，synthetic segment size 保持 `0`。fork-owned
 `NereusRecordTimestampInspector` 已在隔离本地 branch 使用
@@ -264,8 +265,9 @@ head 还完成 durable feature 注册、enabled-only advertisement/format、dedi
 single-copy controller policy。`ecde6964c5` 又在 authoritative cache root 生成并校验 KRaft V1
 `meta.properties`/non-reserved directory ID。Product ACTIVE path 现会在 broker set/epoch 变化时先加载新 capability，
 再以 CAS 提升 readiness epoch；不会重新执行只适用于首次 activation 的 empty-cluster proof。真实 combined-node
-provider-backed process gate 已覆盖同节点 fresh-JVM 冷重启；当前仍未闭合的是多 Controller failover、live
-takeover、in-flight append/checkpoint kill cuts 和 chaos/profile 扩展。
+provider-backed process gate 已覆盖同节点 fresh-JVM 冷重启；独立 process gates 也已覆盖 Object/BookKeeper live
+takeover、in-flight append cuts 和 ACTIVE-state controller kill。当前仍未闭合的是 PREPARED/response-loss
+activation、checkpoint kill cuts 和 chaos/profile 扩展。
 fork `617451957c` 已把该 generic seam 接到 adapter contract：显式 typed creators 交付 runtime 与 ListOffsets limits，
 同一 product manager 只绑定一个 exact `ReplicaManager`，构造 `NereusListOffsetsLifecycle`/`NereusTopicDeltaLifecycle`，
 并在 runtime drain 时同步撤销 lookup admission；disabled build 排除全部 adapter-backed sources。
@@ -388,7 +390,7 @@ known-not-committed 可安全重试”和“即使 known-not-committed 也必须
 Fresh `phase9M3ProviderCheck --rerun-tasks` 已以 64/64 actionable tasks 通过，组合了 146/146 scenario manifest、
 29-source Nereus lock、Kafka baseline lock、M1/M2/M3 deterministic predecessors、Object/BookKeeper provider gates 与
 新增 live takeover gate。
-`f9MultiBrokerTakeoverProcessIntegrationTest` 现在进一步使用 fork `bb7e8937c5` 的真实 release tarball 启动两个
+`f9MultiBrokerTakeoverProcessIntegrationTest` 现在进一步使用 fork `df238bb387` 的真实 release tarball 启动两个
 独立 Kafka JVM：node 1 是 combined controller/broker，node 2 是 broker-only；两者共享同一个 KRaft cluster ID、
 controller quorum、四分片 Oxia authority、LocalStack S3 Object-WAL root 和 Nereus cluster identity，同时使用各自
 独立的 metadata/log/cache 目录。测试先把 RF1 partition 显式分配给 broker 1，Produce/Fetch offset 0；再让 broker 2
@@ -438,6 +440,37 @@ authority 失败，旧 JVM 保持存活，durable earliest/latest 仍为 `0/2`�
 `BookKeeperPrimaryWalAppender`、早于 `DURABLE` 和任何 materialization 分支；结合上面的 three-profile P matrix，
 它补齐三 profile 的共同 C 边界。`KF-APP-014` manifest status 仍按全局里程碑策略保留 `PLANNED`，不把这一个
 新增 gate 等同于 F9 final aggregate。
+
+ACTIVE 稳态 controller failover 由
+`:nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest --rerun-tasks` 覆盖。该 gate 从同一真实
+release tarball 启动 node 1/2/3 三个 `broker,controller` combined JVM；每个节点拥有独立 broker listener、
+controller listener、KRaft metadata、Kafka log shell 和 Nereus cache 目录，但共享同一个 Kafka cluster ID、
+静态 voter set `1,2,3`、四分片 Oxia、LocalStack S3 Object-WAL authority 和 Nereus cluster identity。测试先等待：
+
+1. Admin broker set 精确等于 `[1,2,3]`；
+2. `describeMetadataQuorum` 的 voter set 精确等于 `[1,2,3]`，leader ID 有效、leader epoch/high watermark 非负；
+3. 当前 leader 日志出现
+   `Nereus Kafka storage activation reconciled by controller <leaderId> at epoch <leaderEpoch>`；
+4. 独立 Oxia inspector 读到 immutable activation lifecycle `ACTIVE`，readiness broker IDs 精确为 `[1,2,3]`、
+   readiness epoch 不低于 activation epoch、未过期且 capability digest 相等。
+
+为了把 controller failure 与 data replica loss 分离，RF1 user partition 被显式放到“不是当前 controller
+leader”的 combined node。测试提交/读取 offset 0 后对当前 controller JVM 执行 `destroyForcibly()`，要求进程非零
+退出且不得出现正常 `shut down completed`。两个 survivor 必须选出不同 controller ID、更高 controller epoch，
+同时 voter set 仍保持 `[1,2,3]`；新的 leader 也必须为自己的 exact epoch 输出上面的 reconciliation-success 日志。
+第二次 Oxia 直读要求 activation record byte-for-byte 不变、readiness epoch 单调不减。随后 survivor bootstrap
+必须提交 offset 1、byte-exact 读取 offset 0/1、报告 earliest/latest `0/2`，且 S3 bucket 至少存在一个对象。
+
+`NereusControllerStorageRuntime` 为此新增 process-local `reconciledControllerEpoch`：一次 activation attempt 成功时，
+只有该本地 controller epoch 的第一次成功会记录 INFO；同 epoch 的 metadata coalescing/retry success 不重复打点，
+新的 controller epoch 会重新记录。这个字段不是 durable fencing token，也不改变 PREPARED/ACTIVE CAS 合同；它只让
+进程 gate 能区分“Raft 已选主”和“Nereus activation coordinator 已在新 leader 上完成 reconcile”。断言完成后，
+剩余 combined nodes 由 harness 强制终止，因为在三 voter 中先杀一名 leader 后再逐个 graceful shutdown 会在失去
+quorum 时卡住 controlled shutdown；正常 SIGTERM 路径继续由 cold-restart gates 独立覆盖。
+
+该 fresh direct gate 已以 64/64 actionable tasks、36s 通过，并进入 `phase9M6KafkaProcessCheck`。它为
+`KF-OPS-005` 提供 ACTIVE 稳态 kill/failover 的 P/C 部分证据；PREPARED、首次 ACTIVE publication、
+provider-applied/response-loss 等 activation cut matrix 仍未覆盖，因此 scenario status 保持 `PLANNED`。
 
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。

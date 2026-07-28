@@ -16,7 +16,9 @@ import com.nereusstream.metadata.oxia.BookKeeperKeyspace;
 import com.nereusstream.metadata.oxia.BookKeeperMetadataStoreConfig;
 import com.nereusstream.metadata.oxia.BookKeeperScanToken;
 import com.nereusstream.metadata.oxia.BookKeeperVersionedValue;
+import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
 import com.nereusstream.metadata.oxia.KafkaPartitionId;
+import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaBookKeeperMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
@@ -25,6 +27,9 @@ import com.nereusstream.metadata.oxia.records.AppendReservationLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperAppendReservationRecord;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerLifecycle;
 import com.nereusstream.metadata.oxia.records.BookKeeperLedgerRootRecord;
+import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
+import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
+import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
 import eu.rekawek.toxiproxy.model.ToxicDirection;
 import io.oxia.testcontainers.OxiaContainer;
 import java.io.IOException;
@@ -54,6 +59,7 @@ import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.NewPartitionReassignment;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.QuorumInfo;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -649,6 +655,325 @@ class NereusKafkaNativeProcessIntegrationTest {
                         brokerTwoFormatLog,
                         brokerOneServerLog,
                         brokerTwoServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void threeCombinedNodesKeepNativeIoThroughControllerLeaderKill()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome =
+                extractReleaseDistribution(
+                        kafkaCheckout,
+                        root.resolve("kafka-multi-controller-distribution"));
+        Path formatScript =
+                executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript =
+                executable(
+                        kafkaHome.resolve(
+                                "bin/nereus-kafka-server-start.sh"));
+        Path[] configs = new Path[3];
+        Path[] formatLogs = new Path[3];
+        Path[] serverLogs = new Path[3];
+        int[] brokerPorts = new int[3];
+        int[] controllerPorts = new int[3];
+        List<Integer> allocatedPorts = new ArrayList<>();
+        for (int index = 0; index < 3; index++) {
+            int nodeId = index + 1;
+            configs[index] =
+                    root.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + ".properties");
+            formatLogs[index] =
+                    root.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + "-format.log");
+            serverLogs[index] =
+                    root.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + "-server.log");
+            brokerPorts[index] =
+                    differentFreePort(
+                            allocatedPorts.stream()
+                                    .mapToInt(Integer::intValue)
+                                    .toArray());
+            allocatedPorts.add(brokerPorts[index]);
+            controllerPorts[index] =
+                    differentFreePort(
+                            allocatedPorts.stream()
+                                    .mapToInt(Integer::intValue)
+                                    .toArray());
+            allocatedPorts.add(controllerPorts[index]);
+        }
+        String controllerQuorumVoters =
+                "1@127.0.0.1:"
+                        + controllerPorts[0]
+                        + ",2@127.0.0.1:"
+                        + controllerPorts[1]
+                        + ",3@127.0.0.1:"
+                        + controllerPorts[2];
+        List<String> bootstraps =
+                List.of(
+                        "127.0.0.1:" + brokerPorts[0],
+                        "127.0.0.1:" + brokerPorts[1],
+                        "127.0.0.1:" + brokerPorts[2]);
+        String clusterBootstrap = String.join(",", bootstraps);
+        String bucket =
+                "nereus-kafka-ctrl-"
+                        + UUID.randomUUID();
+        String topic =
+                "controller-failover-" + UUID.randomUUID();
+        String nereusCluster =
+                "f9-controller-failover-" + UUID.randomUUID();
+        String kafkaClusterId =
+                org.apache.kafka.common.Uuid.randomUuid().toString();
+        createBucket(bucket);
+        for (int index = 0; index < 3; index++) {
+            int nodeId = index + 1;
+            writeConfiguration(
+                    configs[index],
+                    brokerPorts[index],
+                    controllerPorts[index],
+                    bucket,
+                    root.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + "-log"),
+                    root.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + "-metadata"),
+                    root.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + "-cache"),
+                    "OBJECT_WAL_SYNC_OBJECT",
+                    null,
+                    nodeId,
+                    true,
+                    controllerQuorumVoters,
+                    nereusCluster,
+                    LOCALSTACK
+                            .getEndpointOverride(
+                                    LocalStackContainer.Service.S3)
+                            .toString());
+            formatStorage(
+                    formatScript,
+                    kafkaHome,
+                    configs[index],
+                    formatLogs[index],
+                    kafkaClusterId);
+        }
+
+        Process[] nodes = new Process[3];
+        Throwable failure = null;
+        try {
+            for (int index = 0; index < 3; index++) {
+                nodes[index] =
+                        start(
+                                List.of(
+                                        startScript.toString(),
+                                        configs[index].toString()),
+                                kafkaHome,
+                                serverLogs[index]);
+            }
+            for (int index = 0; index < 3; index++) {
+                awaitBroker(
+                        bootstraps.get(index),
+                        nodes[index],
+                        serverLogs[index]);
+            }
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2, 3),
+                    List.of(nodes),
+                    serverLogs);
+            ControllerQuorumEvidence initialQuorum =
+                    awaitControllerQuorum(
+                            clusterBootstrap,
+                            List.of(1, 2, 3),
+                            -1,
+                            -1,
+                            List.of(nodes),
+                            serverLogs);
+            awaitControllerActivationReconciliation(
+                    nodes[initialQuorum.leaderId() - 1],
+                    serverLogs[initialQuorum.leaderId() - 1],
+                    initialQuorum);
+            KafkaActivationEvidence initialActivation =
+                    awaitActiveActivation(
+                            nereusCluster,
+                            kafkaClusterId,
+                            List.of(1, 2, 3),
+                            serverLogs,
+                            Duration.ofSeconds(30));
+
+            int dataNodeId =
+                    initialQuorum.leaderId() % 3 + 1;
+            TopicPartition partition =
+                    new TopicPartition(topic, 0);
+            try (Admin admin =
+                    Admin.create(
+                            adminProperties(clusterBootstrap))) {
+                admin.createTopics(
+                                List.of(
+                                        new NewTopic(
+                                                topic,
+                                                Map.of(
+                                                        0,
+                                                        List.of(
+                                                                dataNodeId)))))
+                        .all()
+                        .get(
+                                CLIENT_TIMEOUT.toSeconds(),
+                                TimeUnit.SECONDS);
+            }
+            byte[] firstValue =
+                    "controller-failover-before"
+                            .getBytes(StandardCharsets.UTF_8);
+            RecordMetadata first =
+                    produce(
+                            clusterBootstrap,
+                            topic,
+                            "controller-before"
+                                    .getBytes(StandardCharsets.UTF_8),
+                            firstValue);
+            assertThat(first.offset()).isZero();
+            assertThat(
+                            fetch(
+                                            clusterBootstrap,
+                                            partition,
+                                            0,
+                                            serverLogs[
+                                                    dataNodeId - 1])
+                                    .value())
+                    .isEqualTo(firstValue);
+
+            Process oldController =
+                    nodes[initialQuorum.leaderId() - 1];
+            killBroker(
+                    oldController,
+                    serverLogs[initialQuorum.leaderId() - 1]);
+            List<Process> survivors = new ArrayList<>();
+            List<Path> survivorLogs = new ArrayList<>();
+            List<String> survivorBootstraps =
+                    new ArrayList<>();
+            for (int index = 0; index < 3; index++) {
+                if (index == initialQuorum.leaderId() - 1) {
+                    continue;
+                }
+                survivors.add(nodes[index]);
+                survivorLogs.add(serverLogs[index]);
+                survivorBootstraps.add(bootstraps.get(index));
+            }
+            String survivingBootstrap =
+                    String.join(",", survivorBootstraps);
+            ControllerQuorumEvidence replacementQuorum =
+                    awaitControllerQuorum(
+                            survivingBootstrap,
+                            List.of(1, 2, 3),
+                            initialQuorum.leaderId(),
+                            initialQuorum.leaderEpoch(),
+                            survivors,
+                            survivorLogs.toArray(Path[]::new));
+            awaitControllerActivationReconciliation(
+                    nodes[replacementQuorum.leaderId() - 1],
+                    serverLogs[
+                            replacementQuorum.leaderId() - 1],
+                    replacementQuorum);
+            KafkaActivationEvidence replacementActivation =
+                    awaitActiveActivation(
+                            nereusCluster,
+                            kafkaClusterId,
+                            List.of(1, 2, 3),
+                            survivorLogs.toArray(Path[]::new),
+                            Duration.ofSeconds(30));
+            assertThat(replacementActivation.activation())
+                    .as(
+                            "controller failover must not rewrite the one-way ACTIVE authority")
+                    .isEqualTo(
+                            initialActivation.activation());
+            assertThat(
+                            replacementActivation
+                                    .readiness()
+                                    .readinessEpoch())
+                    .isGreaterThanOrEqualTo(
+                            initialActivation
+                                    .readiness()
+                                    .readinessEpoch());
+
+            byte[] secondValue =
+                    "controller-failover-after"
+                            .getBytes(StandardCharsets.UTF_8);
+            RecordMetadata second =
+                    produce(
+                            survivingBootstrap,
+                            topic,
+                            "controller-after"
+                                    .getBytes(StandardCharsets.UTF_8),
+                            secondValue);
+            assertThat(second.offset()).isEqualTo(1L);
+            assertThat(
+                            fetch(
+                                            survivingBootstrap,
+                                            partition,
+                                            0,
+                                            serverLogs[
+                                                    dataNodeId - 1])
+                                    .value())
+                    .isEqualTo(firstValue);
+            assertThat(
+                            fetch(
+                                            survivingBootstrap,
+                                            partition,
+                                            1,
+                                            serverLogs[
+                                                    dataNodeId - 1])
+                                    .value())
+                    .isEqualTo(secondValue);
+            try (Admin admin =
+                    Admin.create(
+                            adminProperties(
+                                    survivingBootstrap))) {
+                assertOffsets(admin, partition, 0, 2);
+            }
+            assertThat(objectCount(bucket)).isPositive();
+        } catch (Throwable operationFailure) {
+            failure = operationFailure;
+        }
+        for (int index = nodes.length - 1;
+                index >= 0;
+                index--) {
+            Process node = nodes[index];
+            if (node == null || !node.isAlive()) {
+                continue;
+            }
+            try {
+                killBroker(
+                        node,
+                        serverLogs[index]);
+            } catch (Throwable shutdownFailure) {
+                failure =
+                        mergeFailure(
+                                failure,
+                                shutdownFailure);
+            }
+        }
+        if (failure != null) {
+            try {
+                preserveMultiControllerFailureEvidence(
+                        configs,
+                        formatLogs,
+                        serverLogs);
             } catch (AssertionError evidenceFailure) {
                 failure.addSuppressed(evidenceFailure);
             }
@@ -2245,6 +2570,41 @@ class NereusKafkaNativeProcessIntegrationTest {
             String nereusCluster,
             String objectEndpoint
     ) throws IOException {
+        return writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                logDirectory,
+                metadataDirectory,
+                cacheDirectory,
+                storageProfile,
+                bookKeeper,
+                nodeId,
+                controllerRole,
+                controllerNodeId
+                        + "@127.0.0.1:"
+                        + controllerPort,
+                nereusCluster,
+                objectEndpoint);
+    }
+
+    private String writeConfiguration(
+            Path config,
+            int brokerPort,
+            int controllerPort,
+            String bucket,
+            Path logDirectory,
+            Path metadataDirectory,
+            Path cacheDirectory,
+            String storageProfile,
+            BookKeeperProcessConfiguration bookKeeper,
+            int nodeId,
+            boolean controllerRole,
+            String controllerQuorumVoters,
+            String nereusCluster,
+            String objectEndpoint
+    ) throws IOException {
         boolean bookKeeperProfile = storageProfile.startsWith("BOOKKEEPER_WAL_");
         if (bookKeeperProfile != (bookKeeper != null)) {
             throw new IllegalArgumentException(
@@ -2253,8 +2613,10 @@ class NereusKafkaNativeProcessIntegrationTest {
         if (nodeId <= 0) {
             throw new IllegalArgumentException("nodeId must be positive");
         }
-        if (controllerNodeId <= 0) {
-            throw new IllegalArgumentException("controllerNodeId must be positive");
+        if (controllerQuorumVoters == null
+                || controllerQuorumVoters.isBlank()) {
+            throw new IllegalArgumentException(
+                    "controllerQuorumVoters must be non-blank");
         }
         if (nereusCluster == null || nereusCluster.isBlank()) {
             throw new IllegalArgumentException("nereusCluster must be non-blank");
@@ -2272,7 +2634,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("node.id", Integer.toString(nodeId));
         properties.setProperty(
                 "controller.quorum.voters",
-                controllerNodeId + "@127.0.0.1:" + controllerPort);
+                controllerQuorumVoters);
         properties.setProperty(
                 "listeners",
                 controllerRole
@@ -3681,6 +4043,15 @@ class NereusKafkaNativeProcessIntegrationTest {
         if (broker.isAlive()) {
             broker.destroy();
         }
+        awaitNormalBrokerShutdown(
+                broker,
+                serverLog);
+    }
+
+    private static void awaitNormalBrokerShutdown(
+            Process broker,
+            Path serverLog
+    ) throws Exception {
         int exit = await(broker, PROCESS_TIMEOUT, "Nereus Kafka shutdown", serverLog);
         String output = readLog(serverLog);
         if (exit != 0 && exit != 143) {
@@ -3882,6 +4253,200 @@ class NereusKafkaNativeProcessIntegrationTest {
         throw new AssertionError(
                 "Kafka cluster did not expose brokers " + expected
                         + " before the deadline:\n"
+                        + joinedLogs(serverLogs),
+                lastFailure);
+    }
+
+    private static ControllerQuorumEvidence
+            awaitControllerQuorum(
+                    String bootstrapServers,
+                    List<Integer> expectedVoterIds,
+                    int disallowedLeaderId,
+                    long minimumExclusiveEpoch,
+                    List<Process> liveProcesses,
+                    Path... serverLogs
+            ) throws Exception {
+        List<Integer> expected =
+                expectedVoterIds.stream().sorted().toList();
+        long deadline =
+                System.nanoTime()
+                        + PROCESS_TIMEOUT.toNanos();
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(
+                    liveProcesses,
+                    serverLogs);
+            try (Admin admin =
+                    Admin.create(
+                            adminProperties(
+                                    bootstrapServers))) {
+                QuorumInfo quorum =
+                        admin.describeMetadataQuorum()
+                                .quorumInfo()
+                                .get(
+                                        2,
+                                        TimeUnit.SECONDS);
+                List<Integer> voters =
+                        quorum.voters()
+                                .stream()
+                                .map(
+                                        QuorumInfo.ReplicaState
+                                                ::replicaId)
+                                .sorted()
+                                .toList();
+                if (voters.equals(expected)
+                        && quorum.leaderId() >= 0
+                        && quorum.leaderId()
+                                != disallowedLeaderId
+                        && quorum.leaderEpoch()
+                                > minimumExclusiveEpoch
+                        && quorum.highWatermark() >= 0) {
+                    return new ControllerQuorumEvidence(
+                            quorum.leaderId(),
+                            quorum.leaderEpoch(),
+                            quorum.highWatermark());
+                }
+                lastFailure =
+                        new AssertionError(
+                                "expected controller voters "
+                                        + expected
+                                        + ", leader other than "
+                                        + disallowedLeaderId
+                                        + " and epoch > "
+                                        + minimumExclusiveEpoch
+                                        + " but observed "
+                                        + quorum);
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            }
+            Thread.sleep(250);
+        }
+        throw new AssertionError(
+                "KRaft controller quorum did not reach the expected state:\n"
+                        + joinedLogs(serverLogs),
+                lastFailure);
+    }
+
+    private static void
+            awaitControllerActivationReconciliation(
+                    Process controller,
+                    Path serverLog,
+                    ControllerQuorumEvidence quorum
+            ) throws Exception {
+        String expected =
+                "Nereus Kafka storage activation reconciled by controller "
+                        + quorum.leaderId()
+                        + " at epoch "
+                        + quorum.leaderEpoch();
+        long deadline =
+                System.nanoTime()
+                        + Duration.ofSeconds(30).toNanos();
+        while (System.nanoTime() < deadline) {
+            if (!controller.isAlive()) {
+                throw new AssertionError(
+                        "controller exited before Nereus activation reconciliation:\n"
+                                + readLog(serverLog));
+            }
+            if (readLog(serverLog).contains(expected)) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError(
+                "controller did not reconcile Nereus activation for the elected epoch; expected '"
+                        + expected
+                        + "':\n"
+                        + readLog(serverLog));
+    }
+
+    private static KafkaActivationEvidence
+            awaitActiveActivation(
+                    String nereusCluster,
+                    String kafkaClusterId,
+                    List<Integer> expectedBrokerIds,
+                    Path[] serverLogs,
+                    Duration timeout
+            ) {
+        List<Integer> expected =
+                expectedBrokerIds.stream().sorted().toList();
+        OxiaClientConfiguration oxia =
+                oxiaConfiguration();
+        Clock clock = Clock.systemUTC();
+        long deadline =
+                System.nanoTime() + timeout.toNanos();
+        Throwable lastFailure = null;
+        try (SharedOxiaClientRuntime shared =
+                        SharedOxiaClientRuntime.connect(
+                                oxia,
+                                clock);
+                KafkaStorageActivationMetadataStore store =
+                        KafkaStorageActivationMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        shared,
+                                        nereusCluster,
+                                        kafkaClusterId)) {
+            while (System.nanoTime() < deadline) {
+                try {
+                    var activation =
+                            store.getActivation().join();
+                    var readiness =
+                            store.getReadiness().join();
+                    if (activation.isPresent()
+                            && readiness.isPresent()) {
+                        KafkaStorageProtocolActivationRecord active =
+                                activation.orElseThrow().value();
+                        KafkaStorageReadinessRecord ready =
+                                readiness.orElseThrow().value();
+                        List<Integer> brokers =
+                                ready.brokers()
+                                        .stream()
+                                        .map(
+                                                KafkaBrokerIdentity
+                                                        ::brokerId)
+                                        .sorted()
+                                        .toList();
+                        if (active.lifecycle()
+                                        == KafkaStorageActivationLifecycle
+                                                .ACTIVE
+                                && active.kafkaClusterId()
+                                        .equals(
+                                                kafkaClusterId)
+                                && ready.kafkaClusterId()
+                                        .equals(
+                                                kafkaClusterId)
+                                && brokers.equals(expected)
+                                && ready.readinessEpoch()
+                                        >= active.activationEpoch()
+                                && ready.expiresAtMillis()
+                                        > clock.millis()
+                                && java.util.Arrays.equals(
+                                        active
+                                                .requiredCapabilitySha256(),
+                                        ready
+                                                .capabilitySha256())) {
+                            return new KafkaActivationEvidence(
+                                    active,
+                                    ready);
+                        }
+                        lastFailure =
+                                new AssertionError(
+                                        "activation/readiness has not converged: activation="
+                                                + active
+                                                + ", readiness="
+                                                + ready);
+                    }
+                } catch (Throwable failure) {
+                    lastFailure = failure;
+                }
+                pauseForProviderState(
+                        "multi-controller activation");
+            }
+        }
+        throw new AssertionError(
+                "Nereus ACTIVE/readiness did not converge for brokers "
+                        + expected
+                        + ":\n"
                         + joinedLogs(serverLogs),
                 lastFailure);
     }
@@ -4222,6 +4787,55 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static void
+            preserveMultiControllerFailureEvidence(
+                    Path[] configs,
+                    Path[] formatLogs,
+                    Path[] serverLogs
+            ) {
+        String configured =
+                System.getProperty(
+                        "nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target =
+                Path.of(configured)
+                        .toAbsolutePath()
+                        .normalize();
+        try {
+            Files.createDirectories(target);
+            for (int index = 0;
+                    index < configs.length;
+                    index++) {
+                int nodeId = index + 1;
+                copyIfPresent(
+                        configs[index],
+                        target.resolve(
+                                "multi-controller-node-"
+                                        + nodeId
+                                        + ".properties"));
+                copyIfPresent(
+                        formatLogs[index],
+                        target.resolve(
+                                "multi-controller-node-"
+                                        + nodeId
+                                        + "-format.log"));
+                copyIfPresent(
+                        serverLogs[index],
+                        target.resolve(
+                                "multi-controller-node-"
+                                        + nodeId
+                                        + "-server.log"));
+            }
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve multi-controller Kafka process evidence under "
+                            + target,
+                    failure);
+        }
+    }
+
     private static void preserveInFlightTakeoverFailureEvidence(
             Path controllerConfig,
             Path brokerOneConfig,
@@ -4425,6 +5039,23 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("multi-broker-two-format.log"));
         Files.deleteIfExists(target.resolve("multi-broker-one-server.log"));
         Files.deleteIfExists(target.resolve("multi-broker-two-server.log"));
+        for (int nodeId = 1; nodeId <= 3; nodeId++) {
+            Files.deleteIfExists(
+                    target.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + ".properties"));
+            Files.deleteIfExists(
+                    target.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + "-format.log"));
+            Files.deleteIfExists(
+                    target.resolve(
+                            "multi-controller-node-"
+                                    + nodeId
+                                    + "-server.log"));
+        }
         Files.deleteIfExists(target.resolve("inflight-controller.properties"));
         Files.deleteIfExists(target.resolve("inflight-broker-one.properties"));
         Files.deleteIfExists(target.resolve("inflight-broker-two.properties"));
@@ -4718,6 +5349,17 @@ class NereusKafkaNativeProcessIntegrationTest {
             String reservationId,
             long ledgerId,
             long entryId) {
+    }
+
+    private record ControllerQuorumEvidence(
+            int leaderId,
+            long leaderEpoch,
+            long highWatermark) {
+    }
+
+    private record KafkaActivationEvidence(
+            KafkaStorageProtocolActivationRecord activation,
+            KafkaStorageReadinessRecord readiness) {
     }
 
     private record PendingProduce(

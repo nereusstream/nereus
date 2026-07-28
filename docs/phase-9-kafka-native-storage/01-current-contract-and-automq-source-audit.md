@@ -435,13 +435,14 @@ retirement policy/configuration-digest mapping commit 是
 fixture completion commit 是 `ebf1d7616309a26ca95cffa3a2434bf9d5a20868`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。第四十个 controller singleton shared-storage reassignment commit
 是 `fe308359b6edaec26819a3c207f7308f1cc15918`；第四十一个 local-replica-removal lifecycle fix 是
-`bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e`，并且是当前已发布 head。
+`bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e`；第四十二个 controller-epoch activation reconciliation
+observability commit 是 `df238bb387706f60bc020e43c8dc6878fbf41051`，并且是当前已发布 head。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-one-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-two-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
-BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding、stock-only
+BrokerServer runtime create/ready/drain/close signature、controller activation success log、typed adapter factory/ReplicaManager binding、stock-only
 maintenance interfaces、共享 `Kafka.run` dual-factory 传递、artifact-only launcher 与 executable script，以及 package-wide
 no-reflection/no-service-loader/no-stock-product-import 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
 broker-capability、activation-backed Object/BookKeeper creator、typed BookKeeper binding/client ownership、borrowed scheduler、single-image KRaft snapshot、
@@ -624,7 +625,7 @@ Fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks and co
 and two-bookie BookKeeper provider gates、M1/M2/M3 deterministic predecessors、146/146 scenario synchronization and the
 updated 29-source Nereus lock。
 
-The published fork head `bb7e8937c5` and product process harness now close the narrower two-release-process/KRaft
+The published fork head `df238bb387` and product process harness now close the narrower two-release-process/KRaft
 reassignment boundary。The controller must not reuse stock reassignment's temporary `[old,new]` RF2 state under Nereus
 feature level 1，because the same feature contract rejects follower ISR and non-singleton assignments。
 `ReplicationControlManager.changeNereusPartitionReassignment` therefore accepts only a stable RF1 current partition and one
@@ -665,7 +666,21 @@ committing offset 1。Resuming broker 1 releases the delayed future but its stal
 and WAL-only publishes no Object bytes。Fresh execution passes 66/66 actionable tasks in 1m30s。Because this cut precedes
 `DURABLE` and the profile-specific materialization branch，the same production boundary is shared by WAL-only、async and
 sync；the prior three-profile P matrix supplies the profile-specific half。Transaction/internal-topic coordinator migration、
-multi-controller and broader chaos proof remain open。
+checkpoint/virtual-segment and broader chaos proof remain open。
+
+The same published head and
+`f9MultiControllerFailoverProcessIntegrationTest` now close the ACTIVE steady-state controller-kill subset of the
+multi-controller gap。Three real combined broker/controller processes use one three-voter KRaft quorum and shared
+Oxia/S3/Nereus authority but isolated per-process directories。The harness observes exact voter set、initial leader/epoch and
+the initial leader's per-epoch
+`Nereus Kafka storage activation reconciled by controller <id> at epoch <epoch>` log，then reads ACTIVE activation/readiness
+directly from Oxia。It places the RF1 data partition on a node other than the controller leader，commits offset 0 and forcibly
+kills the controller process。The survivors must elect a different leader at a higher epoch without changing the voter set；
+that leader must emit the same success marker for its new exact epoch，while the durable activation record remains immutable
+and readiness epoch does not regress。Native Produce/Fetch/ListOffsets then continue through offset 1 with final `0/2` and a
+positive S3 object count。The fresh direct task passes 64/64 actionable tasks in 36s and is aggregated by
+`phase9M6KafkaProcessCheck`。This is P/C evidence for ACTIVE-state failover，not yet the PREPARED/first-ACTIVE/
+provider-response-loss cut matrix required to close KF-OPS-005。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
 source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed
@@ -686,5 +701,5 @@ the implemented slice，not KF-FINAL-001/002 release evidence。
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e`。Executable source-lock expectation 已更新到该 reviewed、
+`df238bb387706f60bc020e43c8dc6878fbf41051`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。
