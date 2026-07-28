@@ -290,7 +290,7 @@ tasks.register<Test>("f9MultiControllerFailoverProcessIntegrationTest") {
 tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
     group = "verification"
     description =
-        "Kill the active controller before/after PREPARED and ACTIVE Oxia publication and prove failover recovery."
+        "Kill the active controller before/after readiness, PREPARED, and ACTIVE Oxia publication and prove recovery."
     dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
     dependsOn(f9ActivationFaultAgentJar)
     shouldRunAfter(tasks.named("f9MultiControllerFailoverProcessIntegrationTest"))
@@ -316,7 +316,7 @@ tasks.register<Test>("f9ActivationCutFailoverProcessIntegrationTest") {
     filter {
         includeTestsMatching(
             "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
-                "threeControllersRecoverEveryActivationPublicationCut",
+                "threeControllersRecoverEveryActivationStorePublicationCut",
         )
     }
 }

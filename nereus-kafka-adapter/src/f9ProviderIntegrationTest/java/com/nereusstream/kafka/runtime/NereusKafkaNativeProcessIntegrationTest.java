@@ -984,7 +984,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.MINUTES)
-    void threeControllersRecoverEveryActivationPublicationCut()
+    void threeControllersRecoverEveryActivationStorePublicationCut()
             throws Exception {
         clearFailureEvidence();
         Path kafkaCheckout = requiredKafkaCheckout();
@@ -1320,6 +1320,31 @@ class NereusKafkaNativeProcessIntegrationTest {
                             Duration.ofSeconds(30));
             if (cut.durableState()
                     == ActivationDurableState
+                            .READINESS) {
+                KafkaStorageReadinessRecord readiness =
+                        cutEvidence
+                                .readiness()
+                                .orElseThrow();
+                assertThat(
+                                recovered
+                                        .activation()
+                                        .preparedAtMetadataOffset())
+                        .as(
+                                "PREPARED must bind to the durable readiness metadata offset")
+                        .isEqualTo(
+                                readiness
+                                        .kraftMetadataOffset());
+                assertThat(
+                                recovered
+                                        .activation()
+                                        .activationEpoch())
+                        .as(
+                                "PREPARED must bind to the durable readiness epoch")
+                        .isEqualTo(
+                                readiness
+                                        .readinessEpoch());
+            } else if (cut.durableState()
+                    == ActivationDurableState
                             .PREPARED) {
                 assertPreparedFactsPreserved(
                         cutEvidence
@@ -1341,17 +1366,20 @@ class NereusKafkaNativeProcessIntegrationTest {
                                 cutEvidence
                                         .activation())
                         .as(
-                                "a before-provider PREPARED cut must not create activation")
+                                "a pre-activation cut must not create activation")
                         .isEmpty();
             }
-            assertThat(
-                            recovered
-                                    .readiness()
-                                    .readinessEpoch())
-                    .isGreaterThanOrEqualTo(
-                            cutEvidence
-                                    .readiness()
-                                    .readinessEpoch());
+            cutEvidence
+                    .readiness()
+                    .ifPresent(
+                            original ->
+                                    assertThat(
+                                                    recovered
+                                                            .readiness()
+                                                            .readinessEpoch())
+                                            .isGreaterThanOrEqualTo(
+                                                    original
+                                                            .readinessEpoch()));
 
             awaitClusterBrokers(
                     brokerBootstrap,
@@ -4974,15 +5002,17 @@ class NereusKafkaNativeProcessIntegrationTest {
                     Duration timeout
             ) {
         if (cut.durableState()
-                == ActivationDurableState.ABSENT) {
-            return new KafkaActivationCutEvidence(
-                    Optional.empty(),
-                    awaitAbsentActivationReadiness(
-                            nereusCluster,
-                            kafkaClusterId,
-                            expectedBrokerIds,
-                            serverLogs,
-                            timeout));
+                == ActivationDurableState.EMPTY
+                || cut.durableState()
+                        == ActivationDurableState.READINESS) {
+            return awaitPreActivationControlPlaneState(
+                    nereusCluster,
+                    kafkaClusterId,
+                    expectedBrokerIds,
+                    cut.durableState()
+                            == ActivationDurableState.READINESS,
+                    serverLogs,
+                    timeout);
         }
         KafkaActivationEvidence evidence =
                 awaitActivationLifecycle(
@@ -4996,14 +5026,16 @@ class NereusKafkaNativeProcessIntegrationTest {
         return new KafkaActivationCutEvidence(
                 Optional.of(
                         evidence.activation()),
-                evidence.readiness());
+                Optional.of(
+                        evidence.readiness()));
     }
 
-    private static KafkaStorageReadinessRecord
-            awaitAbsentActivationReadiness(
+    private static KafkaActivationCutEvidence
+            awaitPreActivationControlPlaneState(
                     String nereusCluster,
                     String kafkaClusterId,
                     List<Integer> expectedBrokerIds,
+                    boolean readinessExpected,
                     Path[] serverLogs,
                     Duration timeout
             ) {
@@ -5038,7 +5070,13 @@ class NereusKafkaNativeProcessIntegrationTest {
                             store.getReadiness()
                                     .join();
                     if (activation.isEmpty()
-                            && readiness.isPresent()) {
+                            && readiness.isPresent()
+                                    == readinessExpected) {
+                        if (!readinessExpected) {
+                            return new KafkaActivationCutEvidence(
+                                    Optional.empty(),
+                                    Optional.empty());
+                        }
                         KafkaStorageReadinessRecord ready =
                                 readiness.orElseThrow()
                                         .value();
@@ -5057,7 +5095,10 @@ class NereusKafkaNativeProcessIntegrationTest {
                                         expected)
                                 && ready.expiresAtMillis()
                                         > clock.millis()) {
-                            return ready;
+                            return new KafkaActivationCutEvidence(
+                                    Optional.empty(),
+                                    Optional.of(
+                                            ready));
                         }
                         lastFailure =
                                 new AssertionError(
@@ -5066,7 +5107,9 @@ class NereusKafkaNativeProcessIntegrationTest {
                     } else {
                         lastFailure =
                                 new AssertionError(
-                                        "expected absent activation and present readiness but observed activation="
+                                        "expected absent activation and readiness present="
+                                                + readinessExpected
+                                                + " but observed activation="
                                                 + activation
                                                 + ", readiness="
                                                 + readiness);
@@ -5075,12 +5118,14 @@ class NereusKafkaNativeProcessIntegrationTest {
                     lastFailure = failure;
                 }
                 pauseForProviderState(
-                        "absent activation");
+                        "pre-activation control plane");
             }
         }
         throw new AssertionError(
-                "Nereus absent-activation/readiness did not converge for brokers "
+                "Nereus pre-activation state did not converge for brokers "
                         + expected
+                        + " with readiness present="
+                        + readinessExpected
                         + ":\n"
                         + joinedLogs(
                                 serverLogs),
@@ -6328,13 +6373,27 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     private enum ActivationPublicationCut {
+        READINESS_BEFORE_PROVIDER(
+                "ready-before",
+                "createReadiness",
+                ActivationFaultPhase
+                        .BEFORE_PROVIDER,
+                ActivationDurableState
+                        .EMPTY),
+        READINESS_APPLIED(
+                "ready-applied",
+                "createReadiness",
+                ActivationFaultPhase
+                        .AFTER_PROVIDER,
+                ActivationDurableState
+                        .READINESS),
         PREPARED_BEFORE_PROVIDER(
                 "prep-before",
                 "createActivation",
                 ActivationFaultPhase
                         .BEFORE_PROVIDER,
                 ActivationDurableState
-                        .ABSENT),
+                        .READINESS),
         PREPARED_APPLIED(
                 "prep-applied",
                 "createActivation",
@@ -6409,7 +6468,8 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     private enum ActivationDurableState {
-        ABSENT(null),
+        EMPTY(null),
+        READINESS(null),
         PREPARED(
                 KafkaStorageActivationLifecycle
                         .PREPARED),
@@ -6428,7 +6488,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         private KafkaStorageActivationLifecycle lifecycle() {
             if (lifecycle == null) {
                 throw new IllegalStateException(
-                        "ABSENT activation has no lifecycle");
+                        name()
+                                + " activation state has no lifecycle");
             }
             return lifecycle;
         }
@@ -6522,7 +6583,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     private record KafkaActivationCutEvidence(
             Optional<KafkaStorageProtocolActivationRecord> activation,
-            KafkaStorageReadinessRecord readiness) {
+            Optional<KafkaStorageReadinessRecord> readiness) {
     }
 
     private record ActivationAgentMarkers(

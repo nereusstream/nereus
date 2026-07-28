@@ -36,7 +36,7 @@ protocol/table state = projection
 | F6 Lakehouse | later phase | Designed | F4 compacted generation and GC references |
 | F7 Routing/Elasticity | later phase | Designed | F1 session/fencing + F2/F5 lookup projections |
 | F8 Advanced Pulsar | later phase | Designed | F2/F3/F4/F7 foundations |
-| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | In progress；M1/M2 and substantial M3–M6 code complete；real Object-WAL P/C takeover、BookKeeper three-profile P/C takeover、ACTIVE-state three-voter controller failover and before-provider/after-provider PREPARED/ACTIVE store-publication cuts pass | close remaining coordinator、checkpoint/virtual-segment、initial-proof/readiness、actual transport-error、chaos and final aggregate gates |
+| F9 Native Kafka Shared Storage | Phase 9 F9-M0-M7 | In progress；M1/M2 and substantial M3–M6 code complete；real Object-WAL P/C takeover、BookKeeper three-profile P/C takeover、ACTIVE-state three-voter controller failover and the complete before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication matrix pass | close remaining coordinator、checkpoint/virtual-segment、initial empty-cluster snapshot/proof and capability aggregation、actual transport-error、chaos and final aggregate gates |
 
 Phase 1 implements only `OBJECT_WAL_SYNC_OBJECT` execution。Phase 1.5 changes the L0 abstraction/recovery/lifecycle
 foundation but intentionally keeps that executable-profile boundary。Future 2 consumes the same strict Object-WAL
@@ -353,11 +353,10 @@ Object-WAL append fenced before upload，WAL-only/async/sync BookKeeper post-han
 profile Object invariants，and a Bookie-acked/metadata-`WRITING` BookKeeper append abandoned/sealed by the new leader before
 the stale JVM can publish。A three-voter release cluster now also proves ACTIVE-state controller kill、higher-epoch
 reconciliation and native IO continuation。A separate three-controller/one-broker release gate deterministically withholds
-the real Oxia completion after PREPARED create and after the ACTIVE CAS，kills the exact active controller and proves a
-higher-epoch controller preserves the durable tuple/readiness before native IO begins；the same gate now covers the
-before-provider side of both store operations and activation-absent recovery from existing readiness。M4
-coordinator/checkpoint/virtual-segment cuts、M5 provider retention/compaction completion、initial-proof/readiness、
-actual transport-error and broader chaos/aggregate evidence remain open，so F9 remains in
+the real Oxia completion before or after readiness create、PREPARED create and the ACTIVE CAS，kills the exact active
+controller and proves a higher-epoch controller preserves empty/readiness-only/PREPARED/ACTIVE durable state before native
+IO begins。M4 coordinator/checkpoint/virtual-segment cuts、M5 provider retention/compaction completion、initial empty-cluster
+snapshot/proof and capability aggregation、actual transport-error and broader chaos/aggregate evidence remain open，so F9 remains in
 progress rather than production-ready.
 
 F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates

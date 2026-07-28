@@ -681,24 +681,25 @@ and readiness epoch does not regress。Native Produce/Fetch/ListOffsets then con
 positive S3 object count。The fresh direct task passes 64/64 actionable tasks in 36s and is aggregated by
 `phase9M6KafkaProcessCheck`。This is the ACTIVE steady-state P/C subset of KF-OPS-005。
 
-`f9ActivationCutFailoverProcessIntegrationTest` adds the complete two-operation store-publication boundary matrix with
+`f9ActivationCutFailoverProcessIntegrationTest` adds the complete three-operation store-publication boundary matrix with
 three dedicated controller release JVMs and one dedicated broker JVM。A test-only Byte Buddy agent is installed on every
 controller but the harness arms only the direct-Admin-observed current leader。For each of the real Oxia
-`createActivation` and `compareAndSetActivation` methods，the before-provider phase skips the provider、writes `blocked` and
+`createReadiness`、`createActivation` and `compareAndSetActivation` methods，the before-provider phase skips the provider、writes `blocked` and
 returns an incomplete future；the after-provider phase requires the underlying future to succeed、writes `applied` and keeps
 the coordinator-visible future incomplete。The harness directly freezes activation absent/PREPARED/ACTIVE plus readiness，
 asserts the leader has not logged reconciliation success and forcibly kills that exact process。A different higher-epoch
-controller must reconcile：absent activation reuses the existing readiness epoch/metadata offset，PREPARED preserves every
-immutable preparation fact while advancing to ACTIVE，and an already-applied ACTIVE record remains exactly equal。All four
-cuts preserve/non-regress readiness for the stable broker set `[4]`，then admit node 4 and pass native
-Produce/Fetch/ListOffsets at `0/1` with a positive Object count。Fresh `--rerun-tasks` execution passes 75/75 actionable
-tasks in 2m02s and the task is aggregated by `phase9M6KafkaProcessCheck`。
+controller must reconcile：an empty control plane recreates readiness after revalidation，readiness-only state reuses the
+existing readiness epoch/metadata offset，PREPARED preserves every immutable preparation fact while advancing to ACTIVE，
+and an already-applied ACTIVE record remains exactly equal。All six cuts preserve or safely create readiness for the stable
+broker set `[4]`，then admit node 4 and pass native Produce/Fetch/ListOffsets at `0/1` with a positive Object count。Fresh
+`--rerun-tasks` execution passes 66/66 actionable tasks in 2m42s and the task is aggregated by
+`phase9M6KafkaProcessCheck`。
 
 The first before-PREPARED execution found that replacement recovery reused valid readiness at offset `r` but built PREPARED
 with a newer snapshot offset `s`，which immediately violated the exact PREPARED/readiness tuple。Production
 `createPrepared` now stores `readiness.kraftMetadataOffset()` and
 `resumesAbsentActivationFromExistingReadinessAfterControllerFailure` provides a narrow deterministic regression。The
-store-publication matrix is closed；initial-proof/readiness publication、an actual transport error and the M7 aggregate
+store-publication matrix is closed；initial empty-cluster snapshot/capability aggregation、an actual transport error and the M7 aggregate
 remain before KF-OPS-005 can leave `PLANNED`。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first

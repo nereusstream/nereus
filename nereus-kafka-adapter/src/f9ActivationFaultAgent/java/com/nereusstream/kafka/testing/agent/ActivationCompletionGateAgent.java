@@ -22,9 +22,9 @@ import net.bytebuddy.matcher.ElementMatcher;
 /**
  * Test-only Java agent that blocks one activation-store publication boundary from the controller.
  *
- * <p>Before-provider mode skips the real PREPARED create or ACTIVE CAS. After-provider mode lets the real Oxia-backed
- * store apply successfully. Both modes substitute a future that never completes, creating deterministic process-loss
- * boundaries on either side of the durable store call.
+ * <p>Before-provider mode skips the real readiness create, PREPARED create, or ACTIVE CAS. After-provider mode lets the
+ * real Oxia-backed store apply successfully. Both modes substitute a future that never completes, creating deterministic
+ * process-loss boundaries on either side of the durable store call.
  */
 public final class ActivationCompletionGateAgent {
     private static final String PROPERTY_PREFIX =
@@ -63,7 +63,8 @@ public final class ActivationCompletionGateAgent {
 
         ElementMatcher.Junction<MethodDescription> methodMatcher =
                 switch (operation) {
-                    case "createActivation" ->
+                    case "createReadiness",
+                            "createActivation" ->
                             named(operation).and(takesArguments(1));
                     case "compareAndSetActivation" ->
                             named(operation).and(takesArguments(2));
