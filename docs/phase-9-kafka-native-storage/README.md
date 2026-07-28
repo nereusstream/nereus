@@ -117,8 +117,9 @@ READ_COMMITTED 元数据按实际返回页上界裁剪。后续隔离 commit `03
 在异步 handoff 后仍原样进入 `UnifiedLog`，并同时锁定 `__consumer_offsets`/`__transaction_state` election 只有在
 exact recovered storage ready callback 后才发生。codec/replay/factory/shell/stock request/lifecycle 的 13 个聚合
 焦点测试已通过；这些 commit 现均包含在远端 F9 branch。真实单节点进程门现已覆盖 committed transaction 与
-consumer-group offset 的 fresh-JVM 内部主题恢复；真实 checkpoint publication、live takeover、ongoing/abort
-transaction failover、mandatory NTC2 unavailable 和多节点 coordinator failover 仍未完成，因此不能声明 M4 完成。
+consumer-group offset 的 fresh-JVM 内部主题恢复，并覆盖 stable open transaction 后强制进程退出、fresh-JVM
+ABORT resolution 与 read-committed filtering；真实 checkpoint publication、multi-broker live takeover、
+BookKeeper/profile matrix、mandatory NTC2 unavailable 和多节点 coordinator failover 仍未完成，因此不能声明 M4 完成。
 Section 3 现由 Kafka-artifact-neutral `KafkaLeaderEpochState` 与 `KafkaLeaderEpochStateCodecV1` 实现：
 leader epoch/start offset 双严格递增，只有首条可低于 logStart 作为 carried-forward range，所有 start 均不超过
 stable end，末条可等于 stable end 表达当前空 epoch；required/version/flags、unsigned count、truncation、
@@ -262,7 +263,7 @@ single-copy controller policy。`ecde6964c5` 又在 authoritative cache root 生
 `meta.properties`/non-reserved directory ID。Product ACTIVE path 现会在 broker set/epoch 变化时先加载新 capability，
 再以 CAS 提升 readiness epoch；不会重新执行只适用于首次 activation 的 empty-cluster proof。真实 combined-node
 provider-backed process gate 已覆盖同节点 fresh-JVM 冷重启；当前仍未闭合的是多 Controller failover、live
-takeover、kill cuts 和 chaos/profile 扩展。
+takeover、in-flight append/checkpoint kill cuts 和 chaos/profile 扩展。
 fork `617451957c` 已把该 generic seam 接到 adapter contract：显式 typed creators 交付 runtime 与 ListOffsets limits，
 同一 product manager 只绑定一个 exact `ReplicaManager`，构造 `NereusListOffsetsLifecycle`/`NereusTopicDeltaLifecycle`，
 并在 runtime drain 时同步撤销 lookup admission；disabled build 排除全部 adapter-backed sources。
@@ -299,11 +300,14 @@ Produce、consumer Fetch、earliest/latest ListOffsets、S3 object assertion 和
 group offset 2；随后同一 config/KRaft directories 启动 fresh JVM，要求 higher broker epoch readiness CAS refresh，
 并发恢复用户分区、`__consumer_offsets` 和 `__transaction_state`，加载原 group committed offset 2，以同一
 transactional ID 提交 data offset 3/marker offset 4，再由同一 group 从可见 offset 3 恢复并提交 offset 4，最终验证
-earliest=0/latest=5 和第二次正常 shutdown。恢复页读取遇到 retriable `NereusException`（包括共享读取预算暂满）
+earliest=0/latest=5 和第二次正常 shutdown。第三 JVM 随后稳定提交 open-transaction data offset 5 后被强制终止；
+第四 JVM 以同一 transactional ID 恢复并先生成 ABORT marker 6，再提交 data/COMMIT marker 7/8，
+`read_committed` 从 offset 5 只返回 7，原 group 提交 offset 8，最终 latest=9。恢复页读取遇到 retriable
+`NereusException`（包括共享读取预算暂满）
 时，在同一冻结 head 与 wall deadline 内以 10 ms 起、250 ms 封顶的指数退避重试；成功页到达前不 replay、不
 publish，也不触发 coordinator-ready。M6 process/feature task-name detection 强制根
 构建使用并重发 `0.1.0-f9-dev`，避免 release tarball 复用旧 development artifact。BookKeeper/async provider、
-真实 controller failover、live takeover、ongoing/aborted transaction failover、kill cuts 和 chaos/profile 扩展仍未组装。
+真实 controller/multi-broker live takeover、checkpoint/virtual-segment transaction cuts 和 chaos/profile 扩展仍未组装。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。
 

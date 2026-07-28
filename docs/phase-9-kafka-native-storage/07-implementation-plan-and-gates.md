@@ -473,7 +473,8 @@ coordinator/transaction/compaction remain M4/M5。
   `bin/nereus-kafka-server-start.sh`；stock `ControllerServer` now owns a product-neutral metadata-publisher/runtime seam，
   and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
   release-distribution provider-backed KRaft baseline and same-node fresh-JVM user/group/transaction-state cold restart pass；
-  multi-controller/live takeover、ongoing/aborted transaction failover and kill-cut final gates remain open；
+  stable open-transaction forced-exit/abort recovery also passes，while multi-controller/live takeover、BookKeeper/profile、
+  checkpoint/virtual-segment and broader kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
@@ -780,12 +781,16 @@ shutdown completion；then a fresh JVM reuses the exact KRaft identity/directori
 the ACTIVE controller path to CAS-refresh readiness and concurrently recovers the user partition、`__consumer_offsets` and
 `__transaction_state`。The second process must load group offset 2，reuse the same transactional ID for data/marker offsets
 3/4，resume the group at visible offset 3、commit offset 4，verify earliest=0/latest=5 and complete a second normal shutdown。
+It then starts a third JVM，stably appends an open-transaction data batch at offset 5 and forcibly terminates the broker。
+A fourth JVM must recover the internal-topic transaction state；reinitializing that same transactional ID must first resolve
+the interrupted transaction with ABORT marker 6，then commit data/marker offsets 7/8。A read-committed consumer and the
+existing group both start at visible offset 7，the group commits 8，and latest is 9。
 The recovery coordinator retries retriable page-read failures at the exact cursor with 10–250 ms exponential backoff under
 the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
 recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
 `0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets and
-ongoing/aborted transaction failover/kill-during-inflight cuts remain open。
+multi-broker takeover、checkpoint/virtual-segment cuts and provider-profile gates remain open。
 
 ### Tasks
 

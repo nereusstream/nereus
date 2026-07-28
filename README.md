@@ -102,9 +102,12 @@ broker epoch，CAS-refreshes ACTIVE readiness and concurrently recovers the user
 that group offset、reinitializes the same transactional ID、commits the next transaction、resumes the group at the exact
 visible offset and verifies earliest=0/latest=5 before a second normal shutdown。The recovery coordinator now retries
 transient page-read backpressure with bounded 10–250 ms exponential delay under the unchanged recovery deadline；it never
-publishes a partial state，while ordinary Fetch continues to reject resource exhaustion immediately。This is single-node
-graceful cold-restart evidence only：multi-controller failover、live takeover、ongoing/aborted transaction failover、kill cuts
-and wider profile/chaos evidence remain future work，so this is not yet a production-rollout claim.
+publishes a partial state，while ordinary Fetch continues to reject resource exhaustion immediately。A third JVM then
+stably appends open-transaction data at offset 5 and is forcibly killed；a fourth JVM reuses that transactional ID，recovers
+the coordinator state、writes ABORT marker 6、commits data/marker 7/8，proves `read_committed` skips the aborted record and
+advances the group to offset 8 with latest=9。This is still single-node/Object-WAL evidence：multi-controller and
+multi-broker live takeover、checkpoint/virtual-segment cuts、BookKeeper/async profiles and wider chaos evidence remain future
+work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

@@ -284,8 +284,10 @@ activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 
 identity 启动第二个 JVM。第一 JVM 除普通 offset 0 外，还提交 transactional data/COMMIT marker、执行真实 group
 subscribe/rebalance 并提交 offset；第二 JVM 验证 higher broker epoch readiness refresh、用户分区与两个 coordinator
 internal topics 的并发 remote recovery、原 group committed offset reload、同一 transactional ID 的下一次 commit、
-group 从下一可见 offset 恢复，以及最终 earliest=0/latest=5。该同节点优雅冷重启 slice 不包含 live takeover、
-ongoing/abort transaction failover 或 kill cut，仍不足以宣称 production rollout ready。
+group 从下一可见 offset 恢复，以及最终 earliest=0/latest=5。随后第三 JVM 在 open-transaction data offset 5
+stable 后被强制终止；第四 JVM 恢复同一 transactional ID，生成 ABORT marker 6、提交 data/marker 7/8，并证明
+read-committed/group 都跳过 aborted data、latest=9。该切片仍不包含 multi-broker live takeover、
+checkpoint/virtual-segment transaction cut 或 provider-profile matrix，仍不足以宣称 production rollout ready。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 

@@ -347,8 +347,9 @@ implemented；the published Kafka fork has exact-record/async ListOffsets bridge
 explicit native-storage CLI/log selection and deferred activation-backed Object-WAL context composition。The product process
 gate now proves a real combined-node KRaft/Oxia/S3 start plus same-node fresh-JVM recovery of user data、
 `__consumer_offsets` and `__transaction_state`，including committed group offset resume and same-transactional-ID continuation。
-M4 live takeover/ongoing-or-aborted transaction failover、M5 provider retention/compaction completion、multi-controller and
-kill/chaos aggregate evidence remain open，so F9 remains in progress rather than production-ready.
+It also proves forced-process-loss recovery of stable open-transaction data into an ABORT marker before the next committed
+transaction。M4 multi-broker/checkpoint/virtual-segment cuts、M5 provider retention/compaction completion、multi-controller
+and broader chaos/aggregate evidence remain open，so F9 remains in progress rather than production-ready.
 
 F9 is deliberately separate from F5. F5 projects the Kafka protocol through KoP on the Pulsar facade；F9 integrates
 a KRaft Kafka broker fork directly with Nereus as the partition log. The two tracks share logical storage primitives

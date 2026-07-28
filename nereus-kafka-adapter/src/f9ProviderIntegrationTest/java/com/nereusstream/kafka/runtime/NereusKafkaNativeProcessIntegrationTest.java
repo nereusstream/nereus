@@ -20,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
@@ -57,8 +58,8 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
  *
  * <p>This is intentionally not a Kafka test-kit fixture: formatting, feature activation, broker registration,
  * controller policy enforcement, provider creation, Produce, Fetch, ListOffsets, group/transaction coordination and
- * shutdown all cross the same launcher and scripts that an operator uses. A fresh second JVM must reacquire readiness
- * at a higher broker epoch, recover the first process's remote bytes and internal-topic state, then append again.
+ * shutdown all cross the same launcher and scripts that an operator uses. Fresh JVMs must reacquire readiness at higher
+ * broker epochs, recover remote user/internal-topic state, and resolve an open transaction left by a forced process exit.
  */
 @Testcontainers
 class NereusKafkaNativeProcessIntegrationTest {
@@ -83,7 +84,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.MINUTES)
-    void productProcessRecoversProduceFetchAndListOffsetsAcrossColdRestart()
+    void productProcessRecoversUserGroupAndTransactionStateAcrossGracefulAndForcedRestarts()
             throws Exception {
         clearFailureEvidence();
         Path kafkaCheckout = requiredKafkaCheckout();
@@ -96,10 +97,14 @@ class NereusKafkaNativeProcessIntegrationTest {
         Path formatLog = root.resolve("format.log");
         Path firstServerLog = root.resolve("server-first.log");
         Path restartServerLog = root.resolve("server-restart.log");
+        Path interruptedServerLog = root.resolve("server-interrupted-transaction.log");
+        Path recoveryServerLog = root.resolve("server-transaction-recovery.log");
         String bucket = "nereus-kafka-" + UUID.randomUUID();
         String topic = "process-gate-" + UUID.randomUUID();
         String groupId = "process-group-" + UUID.randomUUID();
         String transactionalId = "process-transaction-" + UUID.randomUUID();
+        String interruptedTransactionalId =
+                "process-interrupted-transaction-" + UUID.randomUUID();
         int brokerPort = freePort();
         int controllerPort = differentFreePort(brokerPort);
         String bootstrapServers = "127.0.0.1:" + brokerPort;
@@ -133,7 +138,13 @@ class NereusKafkaNativeProcessIntegrationTest {
                     .isZero();
         } catch (Exception | AssertionError failure) {
             try {
-                preserveFailureEvidence(config, formatLog, firstServerLog, restartServerLog);
+                preserveFailureEvidence(
+                        config,
+                        formatLog,
+                        firstServerLog,
+                        restartServerLog,
+                        interruptedServerLog,
+                        recoveryServerLog);
             } catch (AssertionError evidenceFailure) {
                 failure.addSuppressed(evidenceFailure);
             }
@@ -289,6 +300,113 @@ class NereusKafkaNativeProcessIntegrationTest {
                     }
                 });
 
+        byte[] interruptedKey = "key-tx-interrupted".getBytes(StandardCharsets.UTF_8);
+        byte[] interruptedValue =
+                "nereus-native-process-transaction-interrupted".getBytes(StandardCharsets.UTF_8);
+        AtomicReference<OpenTransaction> interrupted = new AtomicReference<>();
+        try {
+            runBroker(
+                    startScript,
+                    kafkaHome,
+                    config,
+                    formatLog,
+                    interruptedServerLog,
+                    bootstrapServers,
+                    StopMode.FORCE,
+                    () -> {
+                        OpenTransaction open = beginTransaction(
+                                bootstrapServers,
+                                interruptedTransactionalId,
+                                topic,
+                                interruptedKey,
+                                interruptedValue);
+                        interrupted.set(open);
+                        assertThat(open.metadata().offset())
+                                .as("the open transaction starts after two committed markers")
+                                .isEqualTo(5L);
+
+                        ConsumerRecord<byte[], byte[]> uncommitted =
+                                fetch(bootstrapServers, partition, 5L, interruptedServerLog);
+                        assertThat(uncommitted.offset()).isEqualTo(5L);
+                        assertThat(uncommitted.key()).isEqualTo(interruptedKey);
+                        assertThat(uncommitted.value()).isEqualTo(interruptedValue);
+                    });
+        } finally {
+            OpenTransaction open = interrupted.get();
+            if (open != null) {
+                open.close();
+            }
+        }
+
+        byte[] recoveredTransactionKey =
+                "key-tx-after-interruption".getBytes(StandardCharsets.UTF_8);
+        byte[] recoveredTransactionValue =
+                "nereus-native-process-transaction-after-interruption"
+                        .getBytes(StandardCharsets.UTF_8);
+        runBroker(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                recoveryServerLog,
+                bootstrapServers,
+                () -> {
+                    try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                        assertThat(committedGroupOffset(
+                                bootstrapServers, groupId, partition))
+                                .as("the forced process exit cannot roll back the prior group commit")
+                                .isEqualTo(4L);
+
+                        RecordMetadata committed = transactionalProduce(
+                                bootstrapServers,
+                                interruptedTransactionalId,
+                                topic,
+                                recoveredTransactionKey,
+                                recoveredTransactionValue);
+                        assertThat(committed.offset())
+                                .as("producer epoch recovery must abort the interrupted transaction first")
+                                .isEqualTo(7L);
+
+                        ConsumerRecord<byte[], byte[]> visible =
+                                fetchReadCommitted(
+                                        bootstrapServers,
+                                        partition,
+                                        5L,
+                                        recoveryServerLog);
+                        assertThat(visible.offset())
+                                .as("read committed must skip interrupted data and its abort marker")
+                                .isEqualTo(7L);
+                        assertThat(visible.key()).isEqualTo(recoveredTransactionKey);
+                        assertThat(visible.value()).isEqualTo(recoveredTransactionValue);
+
+                        ConsumerRecord<byte[], byte[]> grouped = consumeGroupThroughOffset(
+                                bootstrapServers,
+                                groupId,
+                                topic,
+                                partition,
+                                7L,
+                                7L,
+                                recoveryServerLog);
+                        assertThat(grouped.offset()).isEqualTo(7L);
+                        assertThat(committedGroupOffset(
+                                bootstrapServers, groupId, partition))
+                                .isEqualTo(8L);
+
+                        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
+                                admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
+                                        .all()
+                                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest =
+                                admin.listOffsets(Map.of(partition, OffsetSpec.latest()))
+                                        .all()
+                                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                        assertThat(earliest.get(partition).offset()).isZero();
+                        assertThat(latest.get(partition).offset())
+                                .as("abort and commit markers are both retained in the logical log")
+                                .isEqualTo(9L);
+                    }
+                });
+
         assertThat(objectCount(bucket))
                 .as("user and internal-topic commits must persist S3-compatible objects")
                 .isPositive();
@@ -414,6 +532,31 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static OpenTransaction beginTransaction(
+            String bootstrapServers,
+            String transactionalId,
+            String topic,
+            byte[] key,
+            byte[] value
+    ) throws Exception {
+        Properties properties = producerProperties(bootstrapServers);
+        properties.setProperty(ProducerConfig.TRANSACTIONAL_ID_CONFIG, transactionalId);
+        properties.setProperty(ProducerConfig.TRANSACTION_TIMEOUT_CONFIG, "30000");
+        KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties);
+        try {
+            producer.initTransactions();
+            producer.beginTransaction();
+            RecordMetadata metadata =
+                    producer.send(new ProducerRecord<>(topic, 0, key, value))
+                            .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            producer.flush();
+            return new OpenTransaction(producer, metadata);
+        } catch (Exception | AssertionError failure) {
+            producer.close(Duration.ZERO);
+            throw failure;
+        }
+    }
+
     private static Properties producerProperties(String bootstrapServers) {
         Properties properties = new Properties();
         properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -510,6 +653,35 @@ class NereusKafkaNativeProcessIntegrationTest {
             long offset,
             Path serverLog
     ) throws Exception {
+        return fetch(
+                bootstrapServers,
+                partition,
+                offset,
+                "read_uncommitted",
+                serverLog);
+    }
+
+    private static ConsumerRecord<byte[], byte[]> fetchReadCommitted(
+            String bootstrapServers,
+            TopicPartition partition,
+            long offset,
+            Path serverLog
+    ) throws Exception {
+        return fetch(
+                bootstrapServers,
+                partition,
+                offset,
+                "read_committed",
+                serverLog);
+    }
+
+    private static ConsumerRecord<byte[], byte[]> fetch(
+            String bootstrapServers,
+            TopicPartition partition,
+            long offset,
+            String isolationLevel,
+            Path serverLog
+    ) throws Exception {
         Properties properties = new Properties();
         properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         properties.setProperty(
@@ -520,6 +692,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 ByteArrayDeserializer.class.getName());
         properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.setProperty(ConsumerConfig.ISOLATION_LEVEL_CONFIG, isolationLevel);
         properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "f9-process-" + UUID.randomUUID());
         try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
             consumer.assign(List.of(partition));
@@ -545,6 +718,27 @@ class NereusKafkaNativeProcessIntegrationTest {
             String bootstrapServers,
             BrokerAssertions assertions
     ) throws Exception {
+        runBroker(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                serverLog,
+                bootstrapServers,
+                StopMode.NORMAL,
+                assertions);
+    }
+
+    private static void runBroker(
+            Path startScript,
+            Path kafkaHome,
+            Path config,
+            Path formatLog,
+            Path serverLog,
+            String bootstrapServers,
+            StopMode stopMode,
+            BrokerAssertions assertions
+    ) throws Exception {
         Process broker = start(
                 List.of(startScript.toString(), config.toString()),
                 kafkaHome,
@@ -557,7 +751,7 @@ class NereusKafkaNativeProcessIntegrationTest {
             failure = operationFailure;
         }
         try {
-            stopBroker(broker, serverLog);
+            stopMode.stop(broker, serverLog);
         } catch (Exception | AssertionError shutdownFailure) {
             if (failure == null) {
                 failure = shutdownFailure;
@@ -588,6 +782,20 @@ class NereusKafkaNativeProcessIntegrationTest {
         assertThat(output)
                 .as("Kafka process must reach its normal shutdown completion path")
                 .contains("shut down completed");
+    }
+
+    private static void killBroker(Process broker, Path serverLog) throws Exception {
+        if (broker.isAlive()) {
+            broker.destroyForcibly();
+        }
+        int exit = await(broker, PROCESS_TIMEOUT, "forced Nereus Kafka stop", serverLog);
+        String output = readLog(serverLog);
+        assertThat(exit)
+                .withFailMessage(() -> "forced process exit was unexpectedly clean:\n" + output)
+                .isNotZero();
+        assertThat(output)
+                .as("forced process stop must not reach the normal shutdown completion path")
+                .doesNotContain("shut down completed");
     }
 
     private static void rethrow(Throwable failure) throws Exception {
@@ -780,6 +988,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("format.log"));
         Files.deleteIfExists(target.resolve("server-first.log"));
         Files.deleteIfExists(target.resolve("server-restart.log"));
+        Files.deleteIfExists(target.resolve("server-interrupted-transaction.log"));
+        Files.deleteIfExists(target.resolve("server-transaction-recovery.log"));
     }
 
     private static void copyIfPresent(Path source, Path target) throws IOException {
@@ -855,5 +1065,32 @@ class NereusKafkaNativeProcessIntegrationTest {
     @FunctionalInterface
     private interface BrokerAssertions {
         void verify() throws Exception;
+    }
+
+    private enum StopMode {
+        NORMAL {
+            @Override
+            void stop(Process broker, Path serverLog) throws Exception {
+                stopBroker(broker, serverLog);
+            }
+        },
+        FORCE {
+            @Override
+            void stop(Process broker, Path serverLog) throws Exception {
+                killBroker(broker, serverLog);
+            }
+        };
+
+        abstract void stop(Process broker, Path serverLog) throws Exception;
+    }
+
+    private record OpenTransaction(
+            KafkaProducer<byte[], byte[]> producer,
+            RecordMetadata metadata
+    ) implements AutoCloseable {
+        @Override
+        public void close() {
+            producer.close(Duration.ZERO);
+        }
     }
 }

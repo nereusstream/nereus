@@ -260,7 +260,10 @@ the request/lifecycle unit-test gap。The product `NereusKafkaNativeProcessInteg
 graceful restart slice：the first JVM commits transactional data plus its COMMIT marker、joins/rebalances a real consumer
 group and commits offset 2；the second JVM concurrently recovers both internal topics，loads that committed offset，
 reinitializes the same transactional ID、commits the next transaction and resumes the group at the next visible data offset。
-This is partial evidence only；ongoing/aborted transaction failover、multi-broker coordinator takeover and mandatory NTC2
+The same gate then leaves transaction data stable without an end marker、forcibly kills the broker and proves a fresh JVM
+reinitializing that transactional ID writes the missing ABORT before its next committed transaction；read-committed and the
+real group both skip the aborted data。This is partial KF-TXN-007/014 evidence only；the exact rows still require their locked
+BookKeeper/provider matrix，and multi-broker coordinator takeover、checkpoint/virtual-segment cuts and mandatory NTC2
 unavailability remain process gates。
 
 ## 6. Leader epoch section
