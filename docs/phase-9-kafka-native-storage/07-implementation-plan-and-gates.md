@@ -405,7 +405,8 @@ coordinator/transaction/compaction remain M4/M5。
   `BrokerMetadataPublisher` routing。`NereusTopicDeltaLifecycleTest`、`ReplicaManagerTest` and
   `BrokerMetadataPublisherTest` prove stock-state-first preparation、old/new image identity selection、delete-before-recreate、
   callback-after-success、coordinator-election-after-recovery and `firstPublishFuture` non-readiness semantics。Time-index
-  checkpoint candidate、provider-backed BrokerServer activation and real native-storage KRaft baseline remain open；
+  checkpoint candidate remains open；provider-backed BrokerServer activation and the real combined-node native-storage
+  KRaft baseline now pass through `phase9M6KafkaProcessCheck`；
 - `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the first concrete provider graph to exactly
   `OBJECT_WAL_SYNC_OBJECT`、matched cluster/writer/session/scan limits and disabled legacy auto-session；
   `NereusKafkaObjectWalRuntimeFactoryTest` proves activation scope is rejected before provider IO，and a checked
@@ -460,21 +461,22 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@5ebf31cde8` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@ecde6964c5` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
-  controller activation scheduling commit、one durable feature/control commit and one aggregate Spotless alignment commit。The
+  controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
+  cache-directory KRaft identity commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
   `bin/nereus-kafka-server-start.sh`；stock `ControllerServer` now owns a product-neutral metadata-publisher/runtime seam，
-  and the artifact runtime deterministically schedules first activation only while locally current。The real
-  multi-controller/provider-backed KRaft final gate remains open；
+  and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
+  release-distribution provider-backed KRaft baseline passes；multi-controller/restart/takeover final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/thirty-commit count/organization remote/one-hundred-eighteen log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/thirty-one-commit count/organization remote/one-hundred-eighteen log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -556,7 +558,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@5ebf31cde8` branch。
+`nereus/future9-native-kafka-storage@ecde6964c5` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -759,12 +761,18 @@ current-controller-only execution、one in-flight/coalesced callbacks、retriabl
 one durable fault per controller epoch and owned close。The same `d23dc5c787` head registers explicit-only
 `nereus.storage.version`、advertises it only from enabled broker/controller processes、supports dedicated controllers、
 requires explicit enabled formatting、waits for finalized level 1 before activation and enforces single-copy controller
-mutations。`phase9M6KafkaFeatureCheck --rerun-tasks` locks that head and runs the isolated server-common、server、metadata and
+mutations。Fork `ecde6964c5` additionally prepares the exact authoritative cache root with a validated KRaft V1
+`meta.properties` and non-reserved directory ID before `LogManager` loads directory identities。
+`phase9M6KafkaFeatureCheck --rerun-tasks` locks that head and runs the isolated server-common、server、metadata and
 artifact-enabled core feature suites。`phase9M6CheckpointQuarantineCheck --rerun-tasks` additionally
 composes 146/146 manifest validation、immutable store/codec contracts、recovery/retention ordering、production Object-WAL
-resource ownership and real-Oxia close/reconnect lookup。These remain focused partial evidence：
-durable in-flight epoch fencing、multi-controller takeover、priority budgets and real native-storage
-shutdown/process cuts remain open。
+resource ownership and real-Oxia close/reconnect lookup。`phase9M6KafkaProcessCheck --rerun-tasks` publishes the exact
+`0.1.0-f9-dev` artifacts、builds `:core:releaseTarGz` from the source-locked fork and runs the actual
+`bin/nereus-kafka-server-start.sh` combined-node process against four-shard Oxia and pinned LocalStack S3。It requires
+explicit `nereus.storage.version=1` format、broker/controller registration and activation、Admin single-copy topic creation、
+acks=all Produce offset 0、byte-exact consumer Fetch、earliest=0/latest=1 ListOffsets、at least one S3 object and normal
+SIGTERM shutdown completion。Durable in-flight epoch fencing、multi-controller takeover、restart/takeover、priority budgets
+and kill-during-inflight cuts remain open。
 
 ### Tasks
 
@@ -776,6 +784,7 @@ shutdown/process cuts remain open。
 phase9M6ActivationMetadataCheck
 phase9M6KafkaFeatureCheck
 phase9M6CheckpointQuarantineCheck
+phase9M6KafkaProcessCheck
 Kafka fork: nereusF9ControllerTest
 Kafka fork: nereusF9BrokerLifecycleTest
 Kafka fork: nereusF9MetadataPublisherTest

@@ -31,8 +31,11 @@ configurations[f9ProviderIntegrationTest.runtimeOnlyConfigurationName].extendsFr
 dependencies {
     add(f9ProviderIntegrationTest.implementationConfigurationName, project())
     add(f9ProviderIntegrationTest.implementationConfigurationName, testFixtures(project(":nereus-object-store")))
+    add(f9ProviderIntegrationTest.implementationConfigurationName, platform(libs.aws.sdk.v2.bom))
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.aws.sdk.v2.s3)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.oxia.testcontainers)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.junit.jupiter)
+    add(f9ProviderIntegrationTest.implementationConfigurationName, libs.testcontainers.localstack)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.junit.jupiter)
     add(f9ProviderIntegrationTest.implementationConfigurationName, libs.assertj)
     add(f9ProviderIntegrationTest.runtimeOnlyConfigurationName, libs.junit.platform.launcher)
@@ -92,6 +95,30 @@ tasks.register<Test>("f9M3ProviderIntegrationTest") {
     classpath = f9ProviderIntegrationTest.runtimeClasspath
     shouldRunAfter(tasks.test, tasks.named("f9M3CodecTest"))
     useJUnitPlatform()
+}
+
+tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the F9 provider-backed Nereus Kafka process Produce/Fetch/ListOffsets/shutdown gate."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching("com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest")
+    }
 }
 
 tasks.register<Test>("f9ProducerStatePropertyTest") {

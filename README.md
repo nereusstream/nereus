@@ -88,14 +88,16 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@5ebf31cde8`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@ecde6964c5`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
 `nereus.storage.version >= 1`。The same fork head advertises this opt-in feature only from enabled broker/controller processes、
-allows dedicated enabled controllers and enforces single-copy controller mutations。A real provider-backed KRaft process gate、
-multi-controller failover evidence and
-end-to-end native Produce/Fetch/ListOffsets evidence remain future work，so this is not yet a production-rollout claim.
+allows dedicated enabled controllers and enforces single-copy controller mutations。A real release-distribution combined-node
+KRaft process gate now passes against four-shard Oxia and pinned LocalStack S3，including explicit feature formatting、
+broker/controller registration、activation、Admin topic creation、acks=all Produce、consumer Fetch、earliest/latest
+ListOffsets、object persistence and SIGTERM shutdown。Multi-controller failover、restart/takeover and wider profile/chaos
+evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

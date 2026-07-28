@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "30" ]] \
-    || fail "expected thirty reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "31" ]] \
+    || fail "expected thirty-one reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -215,11 +215,11 @@ b903540487b6553d4a1944b5f36e9567fc9262ba core/src/main/java/kafka/server/nereus/
 1970537a48ac13fd77c6bc32fd2bf1e99fb31670 core/src/main/java/kafka/server/nereus/NereusKafkaStorageClusterSnapshotProvider.java
 ae2387ee9d6b318eaf37f62840d8ca3ac44f4e9b core/src/main/scala/kafka/Kafka.scala
 d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Partition.scala
-0e5117ef3fabc87e5bad14ff92e66a73e9136215 core/src/main/scala/kafka/log/LogManager.scala
-80bbb0cac25ac68a37af9e2d18975ed0ecf02c3f core/src/main/scala/kafka/log/UnifiedLogFactory.scala
+69b47dc0c8441ec0e22408b6a7a4ea42e56a9d2b core/src/main/scala/kafka/log/LogManager.scala
+27cf63cf77c51cd5d1cdc9599629e8e6b644e93e core/src/main/scala/kafka/log/UnifiedLogFactory.scala
 5d48cd669ee816cd3215f93a4db0c9fc8b4e9a2f core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
 21441c7e0e06556ff072f38b5c58e90514176748 core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
-f487465399bcde389cc5209e88bc5b946184217d core/src/main/scala/kafka/log/nereus/NereusUnifiedLogFactory.scala
+418831074feeec2d16d75b7400e2108c3ec1f378 core/src/main/scala/kafka/log/nereus/NereusUnifiedLogFactory.scala
 9a956b643165d6e0a04a506f7fc8378299e834e8 core/src/main/scala/kafka/server/BrokerServer.scala
 e22088276dc750fe4ab5698f58959bb68dbd5cdd core/src/main/scala/kafka/server/ConfigHandler.scala
 cfaf49737e0f7608560eedee4a496d9aae331b27 core/src/main/scala/kafka/server/ControllerServer.scala
@@ -262,12 +262,12 @@ e4b1bc88c777fa45cd56165fb0a37334c90b4237 core/src/test/java/kafka/server/nereus/
 e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 c28a29d488b51c0630cb1197b95b30bc6bf43a68 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 ba0bcb6a45f1715683ac23611873dcb83ce5a474 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
-75c5a668abdabf875079dfaca88fbe94d5fc84c3 core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
+7c58b46e3d2746d61b5c673257ef75b57a6ce1f2 core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
 14358b2d91ae9a25ea683946509cd3fd1657b6ca core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
 dda8c0b06459e6df5fd05b0537a540f21a143a51 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
 6bfc0f2d51334dbe9213a98b21ab7124416a666b core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 98e32cef17bc011b1f6f13f6865fd56d87cfdc27 core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
-7e992aacc46a0dccfa2ca0941e5c3946c034ad7b core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageAppendExecutorTest.scala
+97aec0dfd4972d124a6456b5dc09777563c0b0c1 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageAppendExecutorTest.scala
 3c9281f1c48872b3645de485aaa98bcc2ac431ae core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageFetchExecutorTest.scala
 49c96ae84cb30876cfd79afd39e93ad52aa92618 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
 d2a9265f60ae82e93bb152832c4dd36f69c46126 core/src/test/scala/unit/kafka/server/nereus/NereusKafkaOwnedPartitionSourceBridgeTest.scala
@@ -836,4 +836,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty commits, one hundred eighteen log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-one commits, one hundred eighteen log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control blobs and markers match"

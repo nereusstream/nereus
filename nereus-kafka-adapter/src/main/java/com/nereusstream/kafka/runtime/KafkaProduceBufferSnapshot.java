@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Owned immutable Produce bytes safe to retain after the Kafka request thread returns. */
+/** Owned Produce bytes safe to retain after the Kafka request thread returns. */
 public final class KafkaProduceBufferSnapshot implements AutoCloseable {
     private final byte[] bytes;
     private final KafkaByteBudget.Lease lease;
@@ -47,6 +47,11 @@ public final class KafkaProduceBufferSnapshot implements AutoCloseable {
     public ByteBuffer buffer() {
         if (closed.get()) throw new IllegalStateException("Kafka Produce buffer snapshot is closed");
         return ByteBuffer.wrap(bytes).asReadOnlyBuffer();
+    }
+
+    ByteBuffer mutableExecutionBuffer() {
+        if (closed.get()) throw new IllegalStateException("Kafka Produce buffer snapshot is closed");
+        return ByteBuffer.wrap(bytes);
     }
 
     @Override

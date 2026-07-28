@@ -2,6 +2,7 @@
 package com.nereusstream.kafka.runtime;
 
 import com.nereusstream.api.StreamStorage;
+import com.nereusstream.api.keys.DeterministicIds;
 import com.nereusstream.core.DefaultStreamStorage;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
@@ -228,7 +229,7 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             protections);
             ObjectReadPinManager readPins = new DefaultObjectReadPinManager(
                     exactConfiguration.runtime().nereusCluster(),
-                    exactConfiguration.streamStorage().processRunId(),
+                    durableProcessRunId(exactConfiguration.streamStorage().processRunId()),
                     physicalMetadataStore,
                     exactConfiguration.pendingProtectionDuration(),
                     exactConfiguration.maximumClockSkew(),
@@ -439,6 +440,14 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 materializations,
                 backgroundServices,
                 maintenanceFactory);
+    }
+
+    static String durableProcessRunId(String runtimeProcessId) {
+        String exact = Objects.requireNonNull(runtimeProcessId, "runtimeProcessId");
+        if (exact.isBlank()) {
+            throw new IllegalArgumentException("runtimeProcessId cannot be blank");
+        }
+        return DeterministicIds.stableHashComponent(exact);
     }
 
     private static void validateActivationContext(

@@ -30,6 +30,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class NereusKafkaObjectWalRuntimeFactoryTest {
     @Test
+    void canonicalizesKafkaUuidProcessIdentityForDurableReadLeases() {
+        String kafkaRuntimeInstanceId = "92efbd60-15c3-4fbd-bf80-86186a79740b";
+
+        String durableProcessRunId =
+                NereusKafkaObjectWalRuntimeFactory.durableProcessRunId(
+                        kafkaRuntimeInstanceId);
+
+        assertThat(durableProcessRunId)
+                .hasSize(52)
+                .matches("[a-z2-7]+")
+                .isEqualTo(NereusKafkaObjectWalRuntimeFactory.durableProcessRunId(
+                        kafkaRuntimeInstanceId));
+        assertThat(durableProcessRunId).isNotEqualTo(kafkaRuntimeInstanceId);
+    }
+
+    @Test
     void closesAlreadyRegisteredProviderWhenBootstrapFails() {
         FailingObjectStoreProvider provider = new FailingObjectStoreProvider();
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();

@@ -144,7 +144,7 @@ calling the scalar-mutating add path，so a later marker-updated `lastTimestamp`
 into a fresh manager and immediately re-exported for exact canonical equality；ordinary local snapshot IO remains disabled。
 Deterministic tests cover sequence wrap、five-batch retention、marker timestamp preservation、checkpoint encode/decode and
 replay equality。该 commit 现已作为 published F9 branch 的第二十个 commit 包含在
-`nereusstream/kafka:nereus/future9-native-kafka-storage@5ebf31cde8`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@ecde6964c5`。
 
 ## 4. Transaction state and indexes
 
@@ -1141,8 +1141,9 @@ all individual hard-limit violations before provider work。`NereusKafkaObjectWa
 process `KafkaPartitionStorageManager` exists。This prevents a compaction scheduler from observing another manager instance。
 `DefaultNereusKafkaRuntime.start` starts the resulting service after activation but before READY；drain closes it and waits
 accepted work before shutting the manager，and only then may provider/staging resources close。
-The Kafka runtime instance ID is hashed through the shared canonical SHA-256/base32 helper before it becomes the durable
-materialization worker `processRunId`，so the fork's UUID-shaped process identity never reaches the base32-only claim record。
+The Kafka runtime instance ID is hashed through the shared canonical SHA-256/base32 helper before it becomes any durable
+`processRunId`，including materialization worker claims and physical-object reader leases，so the fork's UUID-shaped process
+identity never reaches base32-only metadata records；all subsystems in one runtime derive the same canonical identity。
 
 `KafkaCompactionBatchSource.ReaderFactory` is intentionally keyed by the recovered KCP1 `streamId`。One process-global
 composition therefore cannot accidentally capture a stream from broker startup；each pass constructs

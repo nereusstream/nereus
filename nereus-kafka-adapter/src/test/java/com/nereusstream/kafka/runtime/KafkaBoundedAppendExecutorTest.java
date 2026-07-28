@@ -40,6 +40,25 @@ class KafkaBoundedAppendExecutorTest {
     }
 
     @Test
+    void admittedTaskOwnsAWritableBudgetedSnapshotForKafkaOffsetAssignment() {
+        KafkaByteBudget budget = new KafkaByteBudget(16);
+        KafkaBoundedAppendExecutor executor =
+                new KafkaBoundedAppendExecutor(1, 1, budget, "f9-writable-append");
+        ByteBuffer request = bytes(1);
+
+        CompletableFuture<Integer> result = executor.submit(request, owned -> {
+            assertThat(owned.isReadOnly()).isFalse();
+            owned.putInt(owned.position(), 2);
+            return owned.getInt();
+        });
+
+        assertThat(result.join()).isEqualTo(2);
+        assertThat(request.getInt()).isEqualTo(1);
+        assertThat(executor.ownedBufferBytes()).isZero();
+        executor.close();
+    }
+
+    @Test
     void queueRejectionOccursBeforeTaskAndCancellationDoesNotCancelAdmittedWork() throws Exception {
         KafkaByteBudget budget = new KafkaByteBudget(64);
         KafkaBoundedAppendExecutor executor = new KafkaBoundedAppendExecutor(1, 1, budget, "f9-append");

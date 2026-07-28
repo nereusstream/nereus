@@ -2826,7 +2826,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "5ebf31cde8a5ef58597f9a2e0f05d9c37e5ceb41",
+        "ecde6964c5b3a52163ef2776e63d3b0b7093c358",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -2851,6 +2851,21 @@ tasks.register("publishPhase9DevelopmentArtifacts") {
 
 val phase9DevelopmentRepository = layout.buildDirectory.dir("development-repository")
 val kafkaForkGradleWrapper = file(kafkaForkCheckoutPath.get()).resolve("gradlew").absolutePath
+
+tasks.register<Exec>("phase9M6KafkaProcessRuntime") {
+    group = "verification"
+    description = "Build the exact Nereus-enabled Kafka release distribution used by the provider-backed F9 gate."
+    dependsOn("phase9KafkaForkDevelopmentSourceLockCheck")
+    dependsOn("publishPhase9DevelopmentArtifacts")
+    usesService(kafkaCheckoutGate)
+    workingDir = file(kafkaForkCheckoutPath.get())
+    commandLine(
+        kafkaForkGradleWrapper,
+        ":core:releaseTarGz",
+        "-PnereusDevelopmentRepository=${phase9DevelopmentRepository.get().asFile.absolutePath}",
+        "-PnereusDevelopmentVersion=$phase9DevelopmentVersion",
+    )
+}
 
 tasks.register<Exec>("phase9M3KafkaForkStockCheck") {
     group = "verification"
@@ -3023,6 +3038,12 @@ tasks.register("phase9M6KafkaFeatureCheck") {
     dependsOn("phase9M6KafkaFeatureServerCheck")
     dependsOn("phase9M6KafkaFeatureMetadataCheck")
     dependsOn("phase9M6KafkaFeatureCoreCheck")
+}
+
+tasks.register("phase9M6KafkaProcessCheck") {
+    group = "verification"
+    description = "Run real Oxia + LocalStack + Nereus Kafka process Produce/Fetch/ListOffsets/shutdown acceptance."
+    dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
 }
 
 tasks.register("phase9M3KafkaForkCheck") {

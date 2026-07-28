@@ -1,0 +1,588 @@
+/* Licensed under the Apache License, Version 2.0 */
+package com.nereusstream.kafka.runtime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.oxia.testcontainers.OxiaContainer;
+import java.io.IOException;
+import java.io.Writer;
+import java.net.ServerSocket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.containers.localstack.LocalStackContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+
+/**
+ * Starts the product launcher in a separate OS process over real Oxia and an S3-compatible provider.
+ *
+ * <p>This is intentionally not a Kafka test-kit fixture: formatting, feature activation, broker registration,
+ * controller policy enforcement, provider creation, Produce, Fetch, ListOffsets and shutdown all cross the same
+ * launcher and scripts that an operator uses.
+ */
+@Testcontainers
+class NereusKafkaNativeProcessIntegrationTest {
+    private static final DockerImageName OXIA_IMAGE =
+            DockerImageName.parse("oxia/oxia:0.16.3");
+    private static final DockerImageName LOCALSTACK_IMAGE =
+            DockerImageName.parse("localstack/localstack:4.14.0");
+    private static final Duration PROCESS_TIMEOUT = Duration.ofSeconds(90);
+    private static final Duration CLIENT_TIMEOUT = Duration.ofSeconds(60);
+
+    @Container
+    private static final OxiaContainer OXIA =
+            new OxiaContainer(OXIA_IMAGE).withShards(4);
+
+    @Container
+    private static final LocalStackContainer LOCALSTACK =
+            new LocalStackContainer(LOCALSTACK_IMAGE)
+                    .withServices(LocalStackContainer.Service.S3);
+
+    @TempDir
+    Path root;
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void productProcessRoundTripsProduceFetchAndListOffsetsThenShutsDownCleanly()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path config = root.resolve("server.properties");
+        Path formatLog = root.resolve("format.log");
+        Path serverLog = root.resolve("server.log");
+        String bucket = "nereus-kafka-" + UUID.randomUUID();
+        String topic = "process-gate-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+
+        createBucket(bucket);
+        writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                root.resolve("kafka-log"),
+                root.resolve("metadata-log"),
+                root.resolve("nereus-cache"));
+
+        Process format = start(
+                List.of(
+                        formatScript.toString(),
+                        "format",
+                        "--cluster-id",
+                        org.apache.kafka.common.Uuid.randomUuid().toString(),
+                        "--config",
+                        config.toString(),
+                        "--feature",
+                        "nereus.storage.version=1"),
+                kafkaHome,
+                formatLog);
+        try {
+            int formatExit = await(format, PROCESS_TIMEOUT, "Kafka storage format", formatLog);
+            assertThat(formatExit)
+                    .withFailMessage(() -> "storage format failed:\n" + readLog(formatLog))
+                    .isZero();
+        } catch (Exception | AssertionError failure) {
+            try {
+                preserveFailureEvidence(config, formatLog, serverLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            throw failure;
+        }
+
+        Process broker = start(
+                List.of(startScript.toString(), config.toString()),
+                kafkaHome,
+                serverLog);
+        Throwable primaryFailure = null;
+        try {
+            awaitBroker(bootstrapServers, broker, serverLog);
+            TopicPartition partition = new TopicPartition(topic, 0);
+            byte[] key = "key-0".getBytes(StandardCharsets.UTF_8);
+            byte[] value = "nereus-native-process".getBytes(StandardCharsets.UTF_8);
+
+            try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
+                        .all()
+                        .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+
+                RecordMetadata produced = produce(bootstrapServers, topic, key, value);
+                assertThat(produced.partition()).isZero();
+                assertThat(produced.offset()).isZero();
+
+                ConsumerRecord<byte[], byte[]> fetched =
+                        fetch(bootstrapServers, partition, serverLog);
+                assertThat(fetched.offset()).isZero();
+                assertThat(fetched.key()).isEqualTo(key);
+                assertThat(fetched.value()).isEqualTo(value);
+
+                Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliest =
+                        admin.listOffsets(Map.of(partition, OffsetSpec.earliest()))
+                                .all()
+                                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latest =
+                        admin.listOffsets(Map.of(partition, OffsetSpec.latest()))
+                                .all()
+                                .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                assertThat(earliest.get(partition).offset()).isZero();
+                assertThat(latest.get(partition).offset()).isEqualTo(1L);
+            }
+
+            assertThat(objectCount(bucket))
+                    .as("stable Produce must persist at least one S3-compatible object")
+                    .isPositive();
+        } catch (Exception | AssertionError failure) {
+            primaryFailure = failure;
+            try {
+                preserveFailureEvidence(config, formatLog, serverLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            throw failure;
+        } finally {
+            try {
+                if (broker.isAlive()) {
+                    broker.destroy();
+                }
+                int exit = await(broker, PROCESS_TIMEOUT, "Nereus Kafka shutdown", serverLog);
+                String output = readLog(serverLog);
+                if (exit != 0 && exit != 143) {
+                    throw new AssertionError(
+                            "unexpected process exit " + exit + ":\n" + output);
+                }
+                if (primaryFailure == null) {
+                    assertThat(output)
+                            .as("Kafka process must reach its normal shutdown completion path")
+                            .contains("shut down completed");
+                }
+            } catch (Exception | AssertionError shutdownFailure) {
+                if (primaryFailure != null) {
+                    primaryFailure.addSuppressed(shutdownFailure);
+                } else {
+                    throw shutdownFailure;
+                }
+            }
+        }
+    }
+
+    private void writeConfiguration(
+            Path config,
+            int brokerPort,
+            int controllerPort,
+            String bucket,
+            Path logDirectory,
+            Path metadataDirectory,
+            Path cacheDirectory
+    ) throws IOException {
+        Files.createDirectories(logDirectory);
+        Files.createDirectories(metadataDirectory);
+        Files.createDirectories(cacheDirectory);
+        Properties properties = new Properties();
+        properties.setProperty("process.roles", "broker,controller");
+        properties.setProperty("node.id", "1");
+        properties.setProperty("controller.quorum.voters", "1@127.0.0.1:" + controllerPort);
+        properties.setProperty(
+                "listeners",
+                "PLAINTEXT://127.0.0.1:" + brokerPort
+                        + ",CONTROLLER://127.0.0.1:" + controllerPort);
+        properties.setProperty(
+                "advertised.listeners",
+                "PLAINTEXT://127.0.0.1:" + brokerPort);
+        properties.setProperty("controller.listener.names", "CONTROLLER");
+        properties.setProperty(
+                "listener.security.protocol.map",
+                "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT");
+        properties.setProperty("inter.broker.listener.name", "PLAINTEXT");
+        properties.setProperty("log.dirs", logDirectory.toString());
+        properties.setProperty("metadata.log.dir", metadataDirectory.toString());
+        properties.setProperty("num.partitions", "1");
+        properties.setProperty("default.replication.factor", "1");
+        properties.setProperty("min.insync.replicas", "1");
+        properties.setProperty("offsets.topic.replication.factor", "1");
+        properties.setProperty("transaction.state.log.replication.factor", "1");
+        properties.setProperty("transaction.state.log.min.isr", "1");
+        properties.setProperty("share.coordinator.state.topic.replication.factor", "1");
+        properties.setProperty("share.coordinator.state.topic.min.isr", "1");
+        properties.setProperty("auto.create.topics.enable", "false");
+        properties.setProperty("remote.log.storage.system.enable", "false");
+        properties.setProperty("log.cleaner.enable", "false");
+
+        properties.setProperty("nereus.kafka.storage.enabled", "true");
+        properties.setProperty("nereus.kafka.storage.cluster", "f9-process-" + UUID.randomUUID());
+        properties.setProperty("nereus.kafka.storage.profile", "OBJECT_WAL_SYNC_OBJECT");
+        properties.setProperty(
+                "nereus.kafka.storage.oxia.service.address",
+                OXIA.getServiceAddress());
+        properties.setProperty("nereus.kafka.storage.oxia.namespace", "default");
+        properties.setProperty("nereus.kafka.storage.object.provider", "s3");
+        properties.setProperty("nereus.kafka.storage.object.bucket", bucket);
+        properties.setProperty(
+                "nereus.kafka.storage.object.endpoint",
+                LOCALSTACK.getEndpointOverride(LocalStackContainer.Service.S3).toString());
+        properties.setProperty(
+                "nereus.kafka.storage.object.region",
+                LOCALSTACK.getRegion());
+        properties.setProperty("nereus.kafka.storage.object.path.style.access", "true");
+        properties.setProperty("nereus.kafka.storage.cache.dir", cacheDirectory.toString());
+        properties.setProperty("nereus.kafka.storage.compaction.enabled", "true");
+        properties.setProperty("nereus.kafka.storage.append.executor.threads", "2");
+        properties.setProperty("nereus.kafka.storage.fetch.executor.threads", "2");
+        properties.setProperty("nereus.kafka.storage.lifecycle.executor.threads", "2");
+        properties.setProperty("nereus.kafka.storage.recovery.executor.threads", "2");
+        properties.setProperty("nereus.kafka.storage.readiness.timeout.ms", "90000");
+        properties.setProperty("nereus.kafka.storage.capability.heartbeat.ms", "1000");
+        properties.setProperty("nereus.kafka.storage.capability.expiry.ms", "30000");
+        properties.setProperty("nereus.kafka.storage.shutdown.drain.timeout.ms", "30000");
+        properties.setProperty("nereus.kafka.storage.shutdown.checkpoint.timeout.ms", "30000");
+        try (Writer writer = Files.newBufferedWriter(config, StandardCharsets.UTF_8)) {
+            properties.store(writer, "F9 native Kafka provider-backed process gate");
+        }
+    }
+
+    private static RecordMetadata produce(
+            String bootstrapServers,
+            String topic,
+            byte[] key,
+            byte[] value
+    ) throws InterruptedException, ExecutionException, TimeoutException {
+        Properties properties = new Properties();
+        properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        properties.setProperty(
+                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                ByteArraySerializer.class.getName());
+        properties.setProperty(
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                ByteArraySerializer.class.getName());
+        properties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+        properties.setProperty(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, "60000");
+        properties.setProperty(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "30000");
+        try (KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(properties)) {
+            return producer.send(new ProducerRecord<>(topic, 0, key, value))
+                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        }
+    }
+
+    private static ConsumerRecord<byte[], byte[]> fetch(
+            String bootstrapServers,
+            TopicPartition partition,
+            Path serverLog
+    ) throws Exception {
+        Properties properties = new Properties();
+        properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        properties.setProperty(
+                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                ByteArrayDeserializer.class.getName());
+        properties.setProperty(
+                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                ByteArrayDeserializer.class.getName());
+        properties.setProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+        properties.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.setProperty(ConsumerConfig.GROUP_ID_CONFIG, "f9-process-" + UUID.randomUUID());
+        try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(properties)) {
+            consumer.assign(List.of(partition));
+            consumer.seek(partition, 0L);
+            long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
+            while (System.nanoTime() < deadline) {
+                ConsumerRecords<byte[], byte[]> records =
+                        consumer.poll(Duration.ofMillis(500));
+                if (!records.isEmpty()) {
+                    return records.iterator().next();
+                }
+            }
+        }
+        throw new AssertionError("Fetch timed out:\n" + readLog(serverLog));
+    }
+
+    private static void awaitBroker(
+            String bootstrapServers,
+            Process broker,
+            Path serverLog
+    ) throws Exception {
+        long deadline = System.nanoTime() + PROCESS_TIMEOUT.toNanos();
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            if (!broker.isAlive()) {
+                throw new AssertionError(
+                        "Nereus Kafka exited before readiness:\n" + readLog(serverLog));
+            }
+            try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                admin.describeCluster()
+                        .nodes()
+                        .get(2, TimeUnit.SECONDS);
+                return;
+            } catch (Throwable failure) {
+                lastFailure = failure;
+                Thread.sleep(250);
+            }
+        }
+        throw new AssertionError(
+                "Nereus Kafka did not become ready:\n" + readLog(serverLog),
+                lastFailure);
+    }
+
+    private static Properties adminProperties(String bootstrapServers) {
+        Properties properties = new Properties();
+        properties.setProperty(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
+                bootstrapServers);
+        properties.setProperty(
+                AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG,
+                "5000");
+        properties.setProperty(
+                AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG,
+                "5000");
+        return properties;
+    }
+
+    private static Process start(
+            List<String> command,
+            Path workingDirectory,
+            Path output
+    ) throws IOException {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(workingDirectory.toFile());
+        builder.redirectErrorStream(true);
+        builder.redirectOutput(output.toFile());
+        Map<String, String> environment = builder.environment();
+        environment.put("AWS_ACCESS_KEY_ID", LOCALSTACK.getAccessKey());
+        environment.put("AWS_SECRET_ACCESS_KEY", LOCALSTACK.getSecretKey());
+        environment.put("AWS_REGION", LOCALSTACK.getRegion());
+        environment.put("AWS_DEFAULT_REGION", LOCALSTACK.getRegion());
+        environment.put("AWS_EC2_METADATA_DISABLED", "true");
+        environment.put("KAFKA_HEAP_OPTS", "-Xms256m -Xmx512m");
+        environment.put("EXTRA_ARGS", "");
+        return builder.start();
+    }
+
+    private static int await(
+            Process process,
+            Duration timeout,
+            String operation,
+            Path log
+    ) throws Exception {
+        if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            process.destroyForcibly();
+            process.waitFor(10, TimeUnit.SECONDS);
+            throw new AssertionError(operation + " timed out:\n" + readLog(log));
+        }
+        return process.exitValue();
+    }
+
+    private static Path requiredKafkaCheckout() {
+        String configured = System.getProperty("nereus.kafka.fork.checkout");
+        assertThat(configured)
+                .as("nereus.kafka.fork.checkout")
+                .isNotBlank();
+        Path checkout = Path.of(configured).toAbsolutePath().normalize();
+        assertThat(checkout.resolve(".git"))
+                .as("configured Kafka fork checkout")
+                .exists();
+        return checkout;
+    }
+
+    private static Path extractReleaseDistribution(
+            Path checkout,
+            Path target
+    ) throws Exception {
+        Path distributionDirectory = checkout.resolve("core/build/distributions");
+        Path archive;
+        try (var archives = Files.list(distributionDirectory)) {
+            archive = archives
+                    .filter(path -> path.getFileName().toString().startsWith("kafka_"))
+                    .filter(path -> path.getFileName().toString().endsWith(".tgz"))
+                    .filter(path -> !path.getFileName().toString().contains("site-docs"))
+                    .max(java.util.Comparator.comparingLong(
+                            NereusKafkaNativeProcessIntegrationTest::lastModified))
+                    .orElseThrow(() -> new AssertionError(
+                            "missing Kafka release distribution under " + distributionDirectory));
+        }
+        Files.createDirectories(target);
+        Process extraction = new ProcessBuilder(
+                        "tar",
+                        "-xzf",
+                        archive.toString(),
+                        "-C",
+                        target.toString())
+                .redirectErrorStream(true)
+                .redirectOutput(target.resolve("extract.log").toFile())
+                .start();
+        int exit = await(
+                extraction,
+                Duration.ofSeconds(30),
+                "Kafka release extraction",
+                target.resolve("extract.log"));
+        assertThat(exit)
+                .withFailMessage(() -> "Kafka release extraction failed:\n"
+                        + readLog(target.resolve("extract.log")))
+                .isZero();
+        try (var children = Files.list(target)) {
+            return children
+                    .filter(Files::isDirectory)
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError(
+                            "Kafka release archive has no top-level directory: " + archive));
+        }
+    }
+
+    private static long lastModified(Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toMillis();
+        } catch (IOException failure) {
+            throw new IllegalStateException(
+                    "cannot inspect distribution archive " + path,
+                    failure);
+        }
+    }
+
+    private static Path executable(Path path) {
+        assertThat(path).exists().isExecutable();
+        return path;
+    }
+
+    private static void preserveFailureEvidence(
+            Path config,
+            Path formatLog,
+            Path serverLog
+    ) {
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            copyIfPresent(config, target.resolve("server.properties"));
+            copyIfPresent(formatLog, target.resolve("format.log"));
+            copyIfPresent(serverLog, target.resolve("server.log"));
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve Kafka process evidence under " + target,
+                    failure);
+        }
+    }
+
+    private static void clearFailureEvidence() throws IOException {
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        Files.deleteIfExists(target.resolve("server.properties"));
+        Files.deleteIfExists(target.resolve("format.log"));
+        Files.deleteIfExists(target.resolve("server.log"));
+    }
+
+    private static void copyIfPresent(Path source, Path target) throws IOException {
+        if (Files.exists(source)) {
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static int freePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            socket.setReuseAddress(false);
+            return socket.getLocalPort();
+        }
+    }
+
+    private static int differentFreePort(int first) throws IOException {
+        int candidate;
+        do {
+            candidate = freePort();
+        } while (candidate == first);
+        return candidate;
+    }
+
+    private static void createBucket(String bucket) {
+        try (S3AsyncClient admin = s3Client()) {
+            admin.createBucket(CreateBucketRequest.builder().bucket(bucket).build()).join();
+        }
+    }
+
+    private static int objectCount(String bucket) {
+        try (S3AsyncClient admin = s3Client()) {
+            return admin.listObjectsV2(
+                            ListObjectsV2Request.builder().bucket(bucket).build())
+                    .join()
+                    .keyCount();
+        }
+    }
+
+    private static S3AsyncClient s3Client() {
+        return S3AsyncClient.builder()
+                .endpointOverride(
+                        LOCALSTACK.getEndpointOverride(LocalStackContainer.Service.S3))
+                .region(Region.of(LOCALSTACK.getRegion()))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(
+                                LOCALSTACK.getAccessKey(),
+                                LOCALSTACK.getSecretKey())))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
+    }
+
+    private static String readLog(Path log) {
+        try {
+            if (!Files.exists(log)) {
+                return "<missing " + log + ">";
+            }
+            String content = Files.readString(log, StandardCharsets.UTF_8);
+            int maximum = 128_000;
+            if (content.length() <= maximum) {
+                return content;
+            }
+            int half = maximum / 2;
+            return content.substring(0, half)
+                    + "\n<... middle of log omitted ...>\n"
+                    + content.substring(content.length() - half);
+        } catch (IOException failure) {
+            return "<failed to read " + log + ": " + failure + ">";
+        }
+    }
+}
