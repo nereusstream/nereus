@@ -47,6 +47,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.NewPartitionReassignment;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -443,6 +444,211 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 4, unit = TimeUnit.MINUTES)
+    void twoReleaseProcessesAtomicallyReassignLiveSharedStorageLeader()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome = extractReleaseDistribution(
+                kafkaCheckout,
+                root.resolve("kafka-multi-broker-distribution"));
+        Path formatScript = executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript = executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path brokerOneConfig = root.resolve("multi-broker-one.properties");
+        Path brokerTwoConfig = root.resolve("multi-broker-two.properties");
+        Path brokerOneFormatLog = root.resolve("multi-broker-one-format.log");
+        Path brokerTwoFormatLog = root.resolve("multi-broker-two-format.log");
+        Path brokerOneServerLog = root.resolve("multi-broker-one-server.log");
+        Path brokerTwoServerLog = root.resolve("multi-broker-two-server.log");
+        String bucket = "nereus-kafka-takeover-" + UUID.randomUUID();
+        String topic = "process-takeover-" + UUID.randomUUID();
+        String nereusCluster = "f9-process-takeover-" + UUID.randomUUID();
+        String kafkaClusterId =
+                org.apache.kafka.common.Uuid.randomUuid().toString();
+        int brokerOnePort = freePort();
+        int controllerPort = differentFreePort(brokerOnePort);
+        int brokerTwoPort = differentFreePort(brokerOnePort, controllerPort);
+        String brokerOneBootstrap = "127.0.0.1:" + brokerOnePort;
+        String brokerTwoBootstrap = "127.0.0.1:" + brokerTwoPort;
+        String clusterBootstrap =
+                brokerOneBootstrap + "," + brokerTwoBootstrap;
+
+        createBucket(bucket);
+        writeConfiguration(
+                brokerOneConfig,
+                brokerOnePort,
+                controllerPort,
+                bucket,
+                root.resolve("multi-broker-one-log"),
+                root.resolve("multi-broker-one-metadata"),
+                root.resolve("multi-broker-one-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                1,
+                true,
+                nereusCluster);
+        writeConfiguration(
+                brokerTwoConfig,
+                brokerTwoPort,
+                controllerPort,
+                bucket,
+                root.resolve("multi-broker-two-log"),
+                root.resolve("multi-broker-two-metadata"),
+                root.resolve("multi-broker-two-cache"),
+                "OBJECT_WAL_SYNC_OBJECT",
+                null,
+                2,
+                false,
+                nereusCluster);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerOneConfig,
+                brokerOneFormatLog,
+                kafkaClusterId);
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                brokerTwoConfig,
+                brokerTwoFormatLog,
+                kafkaClusterId);
+
+        TopicPartition partition = new TopicPartition(topic, 0);
+        byte[] firstKey =
+                "takeover-key-0".getBytes(StandardCharsets.UTF_8);
+        byte[] firstValue =
+                "nereus-process-takeover-first".getBytes(StandardCharsets.UTF_8);
+        byte[] secondKey =
+                "takeover-key-1".getBytes(StandardCharsets.UTF_8);
+        byte[] secondValue =
+                "nereus-process-takeover-second".getBytes(StandardCharsets.UTF_8);
+        Process brokerOne = start(
+                List.of(startScript.toString(), brokerOneConfig.toString()),
+                kafkaHome,
+                brokerOneServerLog);
+        Process brokerTwo = null;
+        Throwable failure = null;
+        try {
+            awaitBroker(brokerOneBootstrap, brokerOne, brokerOneServerLog);
+            try (Admin admin =
+                    Admin.create(adminProperties(brokerOneBootstrap))) {
+                admin.createTopics(List.of(
+                                new NewTopic(
+                                        topic,
+                                        Map.of(0, List.of(1)))))
+                        .all()
+                        .get(
+                                CLIENT_TIMEOUT.toSeconds(),
+                                TimeUnit.SECONDS);
+            }
+            RecordMetadata first = produce(
+                    brokerOneBootstrap,
+                    topic,
+                    firstKey,
+                    firstValue);
+            assertThat(first.offset()).isZero();
+            assertThat(fetch(
+                            brokerOneBootstrap,
+                            partition,
+                            0,
+                            brokerOneServerLog)
+                    .value())
+                    .isEqualTo(firstValue);
+
+            brokerTwo = start(
+                    List.of(startScript.toString(), brokerTwoConfig.toString()),
+                    kafkaHome,
+                    brokerTwoServerLog);
+            awaitBroker(brokerTwoBootstrap, brokerTwo, brokerTwoServerLog);
+            awaitClusterBrokers(
+                    clusterBootstrap,
+                    List.of(1, 2),
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneServerLog,
+                    brokerTwoServerLog);
+
+            try (Admin admin =
+                    Admin.create(adminProperties(clusterBootstrap))) {
+                admin.alterPartitionReassignments(Map.of(
+                                partition,
+                                Optional.of(new NewPartitionReassignment(
+                                        List.of(2)))))
+                        .all()
+                        .get(
+                                CLIENT_TIMEOUT.toSeconds(),
+                                TimeUnit.SECONDS);
+                awaitPartitionLeader(
+                        admin,
+                        partition,
+                        2,
+                        brokerOne,
+                        brokerTwo,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+                assertThat(admin.listPartitionReassignments(Set.of(partition))
+                                .reassignments()
+                                .get(
+                                        CLIENT_TIMEOUT.toSeconds(),
+                                        TimeUnit.SECONDS))
+                        .as("Nereus RF1 handoff must not leave a stock catch-up reassignment")
+                        .isEmpty();
+            }
+
+            assertThat(brokerOne.isAlive())
+                    .as("the old Kafka process remains live during higher-leader-epoch takeover")
+                    .isTrue();
+            RecordMetadata second = produce(
+                    clusterBootstrap,
+                    topic,
+                    secondKey,
+                    secondValue);
+            assertThat(second.offset()).isEqualTo(1L);
+            ConsumerRecord<byte[], byte[]> recovered = fetch(
+                    clusterBootstrap,
+                    partition,
+                    0,
+                    brokerTwoServerLog);
+            assertThat(recovered.key()).isEqualTo(firstKey);
+            assertThat(recovered.value()).isEqualTo(firstValue);
+            ConsumerRecord<byte[], byte[]> appended = fetch(
+                    clusterBootstrap,
+                    partition,
+                    1,
+                    brokerTwoServerLog);
+            assertThat(appended.key()).isEqualTo(secondKey);
+            assertThat(appended.value()).isEqualTo(secondValue);
+        } catch (Exception | AssertionError operationFailure) {
+            failure = operationFailure;
+        }
+        if (brokerTwo != null) {
+            try {
+                stopBroker(brokerTwo, brokerTwoServerLog);
+            } catch (Exception | AssertionError shutdownFailure) {
+                failure = mergeFailure(failure, shutdownFailure);
+            }
+        }
+        try {
+            stopBroker(brokerOne, brokerOneServerLog);
+        } catch (Exception | AssertionError shutdownFailure) {
+            failure = mergeFailure(failure, shutdownFailure);
+        }
+        if (failure != null) {
+            try {
+                preserveMultiBrokerFailureEvidence(
+                        brokerOneConfig,
+                        brokerTwoConfig,
+                        brokerOneFormatLog,
+                        brokerTwoFormatLog,
+                        brokerOneServerLog,
+                        brokerTwoServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            rethrow(failure);
+        }
+    }
+
+    @Test
     @Timeout(value = 3, unit = TimeUnit.MINUTES)
     void objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart()
             throws Exception {
@@ -698,22 +904,61 @@ class NereusKafkaNativeProcessIntegrationTest {
             String storageProfile,
             BookKeeperProcessConfiguration bookKeeper
     ) throws IOException {
+        return writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                logDirectory,
+                metadataDirectory,
+                cacheDirectory,
+                storageProfile,
+                bookKeeper,
+                1,
+                true,
+                "f9-process-" + UUID.randomUUID());
+    }
+
+    private String writeConfiguration(
+            Path config,
+            int brokerPort,
+            int controllerPort,
+            String bucket,
+            Path logDirectory,
+            Path metadataDirectory,
+            Path cacheDirectory,
+            String storageProfile,
+            BookKeeperProcessConfiguration bookKeeper,
+            int nodeId,
+            boolean controllerRole,
+            String nereusCluster
+    ) throws IOException {
         boolean bookKeeperProfile = storageProfile.startsWith("BOOKKEEPER_WAL_");
         if (bookKeeperProfile != (bookKeeper != null)) {
             throw new IllegalArgumentException(
                     "BookKeeper process configuration must exactly match the selected storage profile");
         }
+        if (nodeId <= 0) {
+            throw new IllegalArgumentException("nodeId must be positive");
+        }
+        if (nereusCluster == null || nereusCluster.isBlank()) {
+            throw new IllegalArgumentException("nereusCluster must be non-blank");
+        }
         Files.createDirectories(logDirectory);
         Files.createDirectories(metadataDirectory);
         Files.createDirectories(cacheDirectory);
         Properties properties = new Properties();
-        properties.setProperty("process.roles", "broker,controller");
-        properties.setProperty("node.id", "1");
+        properties.setProperty(
+                "process.roles",
+                controllerRole ? "broker,controller" : "broker");
+        properties.setProperty("node.id", Integer.toString(nodeId));
         properties.setProperty("controller.quorum.voters", "1@127.0.0.1:" + controllerPort);
         properties.setProperty(
                 "listeners",
-                "PLAINTEXT://127.0.0.1:" + brokerPort
-                        + ",CONTROLLER://127.0.0.1:" + controllerPort);
+                controllerRole
+                        ? "PLAINTEXT://127.0.0.1:" + brokerPort
+                                + ",CONTROLLER://127.0.0.1:" + controllerPort
+                        : "PLAINTEXT://127.0.0.1:" + brokerPort);
         properties.setProperty(
                 "advertised.listeners",
                 "PLAINTEXT://127.0.0.1:" + brokerPort);
@@ -740,7 +985,6 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("log.cleaner.enable", "false");
 
         properties.setProperty("nereus.kafka.storage.enabled", "true");
-        String nereusCluster = "f9-process-" + UUID.randomUUID();
         properties.setProperty("nereus.kafka.storage.cluster", nereusCluster);
         properties.setProperty(
                 "nereus.kafka.storage.profile",
@@ -895,12 +1139,27 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path config,
             Path formatLog
     ) throws Exception {
+        formatStorage(
+                formatScript,
+                kafkaHome,
+                config,
+                formatLog,
+                org.apache.kafka.common.Uuid.randomUuid().toString());
+    }
+
+    private static void formatStorage(
+            Path formatScript,
+            Path kafkaHome,
+            Path config,
+            Path formatLog,
+            String kafkaClusterId
+    ) throws Exception {
         Process format = start(
                 List.of(
                         formatScript.toString(),
                         "format",
                         "--cluster-id",
-                        org.apache.kafka.common.Uuid.randomUuid().toString(),
+                        kafkaClusterId,
                         "--config",
                         config.toString(),
                         "--feature",
@@ -1874,6 +2133,17 @@ class NereusKafkaNativeProcessIntegrationTest {
         throw new AssertionError("unexpected Kafka process failure", failure);
     }
 
+    private static Throwable mergeFailure(
+            Throwable current,
+            Throwable additional
+    ) {
+        if (current == null) {
+            return additional;
+        }
+        current.addSuppressed(additional);
+        return current;
+    }
+
     private static void awaitBroker(
             String bootstrapServers,
             Process broker,
@@ -1899,6 +2169,130 @@ class NereusKafkaNativeProcessIntegrationTest {
         throw new AssertionError(
                 "Nereus Kafka did not become ready:\n" + readLog(serverLog),
                 lastFailure);
+    }
+
+    private static void awaitClusterBrokers(
+            String bootstrapServers,
+            List<Integer> expectedBrokerIds,
+            List<Process> brokers,
+            Path... serverLogs
+    ) throws Exception {
+        List<Integer> expected = expectedBrokerIds.stream().sorted().toList();
+        long deadline = System.nanoTime() + PROCESS_TIMEOUT.toNanos();
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(brokers, serverLogs);
+            try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
+                List<Integer> observed = admin.describeCluster()
+                        .nodes()
+                        .get(2, TimeUnit.SECONDS)
+                        .stream()
+                        .map(node -> node.id())
+                        .sorted()
+                        .toList();
+                if (observed.equals(expected)) {
+                    return;
+                }
+                lastFailure = new AssertionError(
+                        "expected Kafka brokers " + expected
+                                + " but observed " + observed);
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            }
+            Thread.sleep(250);
+        }
+        throw new AssertionError(
+                "Kafka cluster did not expose brokers " + expected
+                        + " before the deadline:\n"
+                        + joinedLogs(serverLogs),
+                lastFailure);
+    }
+
+    private static void awaitPartitionLeader(
+            Admin admin,
+            TopicPartition partition,
+            int expectedLeaderId,
+            Process brokerOne,
+            Process brokerTwo,
+            Path brokerOneLog,
+            Path brokerTwoLog
+    ) throws Exception {
+        long deadline = System.nanoTime() + CLIENT_TIMEOUT.toNanos();
+        Throwable lastFailure = null;
+        while (System.nanoTime() < deadline) {
+            assertProcessesAlive(
+                    List.of(brokerOne, brokerTwo),
+                    brokerOneLog,
+                    brokerTwoLog);
+            try {
+                var description = admin.describeTopics(
+                                List.of(partition.topic()))
+                        .allTopicNames()
+                        .get(2, TimeUnit.SECONDS)
+                        .get(partition.topic());
+                var partitionInfo = description.partitions()
+                        .stream()
+                        .filter(info ->
+                                info.partition() == partition.partition())
+                        .findFirst()
+                        .orElseThrow();
+                List<Integer> replicas = partitionInfo.replicas()
+                        .stream()
+                        .map(node -> node.id())
+                        .toList();
+                List<Integer> isr = partitionInfo.isr()
+                        .stream()
+                        .map(node -> node.id())
+                        .toList();
+                if (partitionInfo.leader() != null
+                        && partitionInfo.leader().id() == expectedLeaderId
+                        && replicas.equals(List.of(expectedLeaderId))
+                        && isr.equals(List.of(expectedLeaderId))) {
+                    return;
+                }
+                lastFailure = new AssertionError(
+                        "expected leader/replicas/ISR ["
+                                + expectedLeaderId
+                                + "] but observed leader "
+                                + (partitionInfo.leader() == null
+                                        ? "<none>"
+                                        : partitionInfo.leader().id())
+                                + ", replicas " + replicas
+                                + ", ISR " + isr);
+            } catch (Throwable failure) {
+                lastFailure = failure;
+            }
+            Thread.sleep(250);
+        }
+        throw new AssertionError(
+                "partition did not complete the Nereus shared-storage handoff:\n"
+                        + joinedLogs(brokerOneLog, brokerTwoLog),
+                lastFailure);
+    }
+
+    private static void assertProcessesAlive(
+            List<Process> processes,
+            Path... serverLogs
+    ) {
+        for (int index = 0; index < processes.size(); index++) {
+            if (!processes.get(index).isAlive()) {
+                throw new AssertionError(
+                        "Kafka process " + index
+                                + " exited during live takeover:\n"
+                                + joinedLogs(serverLogs));
+            }
+        }
+    }
+
+    private static String joinedLogs(Path... serverLogs) {
+        StringBuilder joined = new StringBuilder();
+        for (Path serverLog : serverLogs) {
+            joined.append("\n===== ")
+                    .append(serverLog.getFileName())
+                    .append(" =====\n")
+                    .append(readLog(serverLog));
+        }
+        return joined.toString();
     }
 
     private static Properties adminProperties(String bootstrapServers) {
@@ -2044,6 +2438,47 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
     }
 
+    private static void preserveMultiBrokerFailureEvidence(
+            Path brokerOneConfig,
+            Path brokerTwoConfig,
+            Path brokerOneFormatLog,
+            Path brokerTwoFormatLog,
+            Path brokerOneServerLog,
+            Path brokerTwoServerLog
+    ) {
+        String configured = System.getProperty("nereus.kafka.process.evidence.dir");
+        if (configured == null || configured.isBlank()) {
+            return;
+        }
+        Path target = Path.of(configured).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(target);
+            copyIfPresent(
+                    brokerOneConfig,
+                    target.resolve("multi-broker-one.properties"));
+            copyIfPresent(
+                    brokerTwoConfig,
+                    target.resolve("multi-broker-two.properties"));
+            copyIfPresent(
+                    brokerOneFormatLog,
+                    target.resolve("multi-broker-one-format.log"));
+            copyIfPresent(
+                    brokerTwoFormatLog,
+                    target.resolve("multi-broker-two-format.log"));
+            copyIfPresent(
+                    brokerOneServerLog,
+                    target.resolve("multi-broker-one-server.log"));
+            copyIfPresent(
+                    brokerTwoServerLog,
+                    target.resolve("multi-broker-two-server.log"));
+        } catch (IOException failure) {
+            throw new AssertionError(
+                    "failed to preserve multi-broker Kafka process evidence under "
+                            + target,
+                    failure);
+        }
+    }
+
     private static void clearFailureEvidence() throws IOException {
         String configured = System.getProperty("nereus.kafka.process.evidence.dir");
         if (configured == null || configured.isBlank()) {
@@ -2060,6 +2495,12 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("bookkeeper-server-restart.log"));
         Files.deleteIfExists(target.resolve("object-async-server-first.log"));
         Files.deleteIfExists(target.resolve("object-async-server-restart.log"));
+        Files.deleteIfExists(target.resolve("multi-broker-one.properties"));
+        Files.deleteIfExists(target.resolve("multi-broker-two.properties"));
+        Files.deleteIfExists(target.resolve("multi-broker-one-format.log"));
+        Files.deleteIfExists(target.resolve("multi-broker-two-format.log"));
+        Files.deleteIfExists(target.resolve("multi-broker-one-server.log"));
+        Files.deleteIfExists(target.resolve("multi-broker-two-server.log"));
     }
 
     private static void copyIfPresent(Path source, Path target) throws IOException {

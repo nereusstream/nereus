@@ -1,6 +1,7 @@
 # 04 — Oxia Binding, Leader Session, Checkpoint and Lifecycle
 
 > 状态：F9-M2 implementation complete；ordinary and direct real-service gates pass；aggregate final blocked only by inherited Pulsar source-lock drift；F9-M4 all seven canonical payload codecs/full composition and Object-WAL exact-reference durable checkpoint quarantine partial slices implemented
+> 2026-07-28 状态增量：real-Oxia provider preemption 之外，真实 two-release-process/KRaft singleton reassignment 已证明旧 broker 只 resign、不会 delete shared binding；already-dispatched old append、BookKeeper/profile、multi-controller 与 coordinator migration 仍 open
 > Durable rule：KRaft owns protocol leadership，stream head owns data commit，one Oxia partition root owns mapping/lifecycle
 > 禁止：跨 shard atomicity 假设、topic-name identity、checkpoint-as-log、TTL-only leader fencing
 
@@ -568,6 +569,45 @@ The focused deterministic regression is
 `phase9M3ProviderCheck` as `:nereus-kafka-adapter:f9MultiBrokerTakeoverProviderIntegrationTest`。This closes an R-tier
 two-runtime Object-provider live-preemption slice for KF-META-007/KF-META-012；it is not yet a two Kafka-process/KRaft
 failover、old in-flight append publication cut、BookKeeper-profile takeover or multi-controller proof。
+
+### 7.3 Release-process handoff and binding-preservation boundary（2026-07-28）
+
+`f9MultiBrokerTakeoverProcessIntegrationTest` now closes the next boundary with real release binaries：one combined
+controller/broker node and one broker-only node share one KRaft cluster ID、controller quorum、Nereus cluster、
+four-shard Oxia authority and LocalStack Object root while retaining separate metadata/log/cache directories。The test
+commits `[0,1)` on assignment `[1]`，starts broker 2，Admin-reassigns the partition to singleton `[2]`，requires exact
+`leader=2, replicas=[2], ISR=[2]` and an empty reassignment listing while broker 1 remains alive，then requires broker 2 to
+recover `[0,1)` and commit/read `[1,2)`。
+
+The durable lifecycle rule exposed by this gate is：
+
+```text
+previous exact identity = oldImage(topicName, topicId, partition)
+new exact identity      = newImage(topicName, topicId, partition)
+
+new exact identity exists:
+    local replica removed from this broker
+    -> resign(previous identity, new leader epoch)
+    -> keep binding/root/head/checkpoint/materialization state
+
+new exact identity absent or topicId changed:
+    durable partition deletion or same-name recreation
+    -> delete(previous identity, metadata offset)
+    -> serialize later open of the new identity after delete
+```
+
+`TopicsDelta.localChanges(brokerId).deletes()` cannot distinguish these cases by itself。Calling durable delete for the first
+case makes the departing broker a cluster-wide deletion owner and races the new leader's recovery；the initial process run
+reproduced exactly this failure as `Kafka partition binding is deleted or deleting`。
+`NereusTopicDeltaLifecycleTest.testLocalReplicaRemovalResignsWithoutDeletingSharedBinding` locks the corrected decision，
+while the existing previous-topic-ID and same-name-recreation tests lock the true-delete branches。
+
+The matching controller rule is one atomic KRaft record that changes replicas、ISR and leader to the active target
+singleton，with empty adding/removing lists；no transitional RF2 or follower ISR may become visible。This lets the new broker
+acquire a higher stream-head authority only after KRaft ownership changes，while the old broker's metadata callback merely
+resigns its local runtime。Fresh process execution passed 73/73 actionable tasks。It is still not the
+KF-APP-014 already-dispatched append cut：the old broker stays alive，but the test submits the next append only after the
+handoff is observed。
 
 The executable recovery boundary is now split by resource ownership：
 

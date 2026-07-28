@@ -181,6 +181,35 @@ tasks.register<Test>("f9M6KafkaProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9MultiBrokerTakeoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Run two release Kafka processes through a live RF1 shared-storage leader reassignment."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-multi-broker-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "twoReleaseProcessesAtomicallyReassignLiveSharedStorageLeader",
+        )
+    }
+}
+
 tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
     group = "verification"
     description = "Run the native Kafka BookKeeper-WAL-only Produce/Fetch cold-restart process gate."

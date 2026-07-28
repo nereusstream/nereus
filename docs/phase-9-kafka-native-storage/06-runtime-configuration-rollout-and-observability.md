@@ -1,6 +1,7 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
 > 状态：Implementation in progress；100-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real two-bookie ledger deletion、provider-level applied-delete response-loss、fresh-JVM NCP2 fallback after physical deletion and real-Oxia two-runtime Object-WAL live takeover pass；release-process response-loss restart、two Kafka-process/profile takeover、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
+> 2026-07-28 状态增量：two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；profile takeover、already-dispatched append、multi-controller、coordinator migration 和 chaos 仍为 rollout blocker
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -550,8 +551,30 @@ head token。A subsequent old-token append is durably rejected and locally chang
 `WRITE_FENCED_RECOVERY_REQUIRED` even when the failure outcome is known-not-committed；B continues at the recovered offset。
 The Gradle task owns a dedicated Docker slot and is included by `phase9M3ProviderCheck`。It remains an in-process
 two-runtime R-tier test，not a release-distribution/KRaft reassignment or multi-controller gate。
-Multi-controller/two Kafka-process live takeover、checkpoint/virtual-segment cuts、BookKeeper-profile takeover 和完整 rollout
-evidence 尚未闭合，所以整个路径
+
+`f9MultiBrokerTakeoverProcessIntegrationTest` now adds the release/KRaft boundary。The Gradle task depends on
+`phase9M6KafkaProcessRuntime`，uses its exact release distribution，owns a distinct Docker evidence directory and is serialized
+with every other Docker F9 integration task。It formats node 1 and node 2 with one generated Kafka cluster ID and the durable
+feature level 1。Node 1 runs `controller,broker` and owns the sole controller voter；node 2 runs broker-only。Both use one
+Nereus cluster/provider scope、real four-shard Oxia and LocalStack S3，but distinct KRaft metadata、log shell and cache
+directories。Startup/test order is fixed：
+
+1. start node 1 and wait for Admin broker set `[1]`；
+2. create one RF1 partition with exact assignment `[1]`，Produce and Fetch offset 0；
+3. start node 2 and wait for broker set `[1,2]`；
+4. issue `alterPartitionReassignments` with `NewPartitionReassignment(List.of(2))`；
+5. wait for `leader=2, replicas=[2], ISR=[2]`，assert `listPartitionReassignments` empty and both JVMs alive；
+6. Produce offset 1 through the cluster bootstrap and Fetch offsets 0/1 byte-exact；
+7. stop node 2，then node 1，and preserve configs/stdout/stderr on failure。
+
+The fork controller produces one atomic singleton handoff record；the old broker's topic-delta lifecycle recognizes that the
+same topic ID/partition remains in the new image and calls `resign` instead of durable binding `delete`。Fresh
+`:nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest --rerun-tasks` passes 73/73 actionable tasks in 1m04s，
+and `phase9M6KafkaProcessCheck` now depends on it。This is P-tier Object-WAL evidence with one controller，not
+multi-controller failover or a five-profile matrix。
+
+Multi-controller、checkpoint/virtual-segment cuts、BookKeeper-profile takeover、transaction/internal-topic coordinator
+migration、already-dispatched old append and complete rollout evidence 尚未闭合，所以整个路径
 仍不能用于 production rollout readiness。
 
 The selected shell is not a durability shortcut：`NereusUnifiedLogFactory` uses only

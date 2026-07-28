@@ -433,9 +433,11 @@ retirement policy/configuration-digest mapping commit 是
 `33f988a83ef026773772df0e6ad45160520f3646`，第三十八个 logging-runtime isolation commit 是
 `a1b1e3482de875b15dc42ecda0ce500a65eb37b5`，第三十九个 enabled-format default-BookKeeper-profile
 fixture completion commit 是 `ebf1d7616309a26ca95cffa3a2434bf9d5a20868`。该 head 已通过 SSH 发布到
-`origin/nereus/future9-native-kafka-storage`。
+`origin/nereus/future9-native-kafka-storage`。第四十个 controller singleton shared-storage reassignment commit
+是 `fe308359b6edaec26819a3c207f7308f1cc15918`；第四十一个 local-replica-removal lifecycle fix 是
+`bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e`，并且是当前已发布 head。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-nine-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/forty-one-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
@@ -621,6 +623,31 @@ Fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks and co
 and two-bookie BookKeeper provider gates、M1/M2/M3 deterministic predecessors、146/146 scenario synchronization and the
 updated 29-source Nereus lock。
 
+The published fork head `bb7e8937c5` and product process harness now close the narrower two-release-process/KRaft
+reassignment boundary。The controller must not reuse stock reassignment's temporary `[old,new]` RF2 state under Nereus
+feature level 1，because the same feature contract rejects follower ISR and non-singleton assignments。
+`ReplicationControlManager.changeNereusPartitionReassignment` therefore accepts only a stable RF1 current partition and one
+registered/active target broker，then emits one `PartitionChangeRecord` whose replicas、ISR and preferred leader are the
+target singleton and whose adding/removing replicas are empty。Level 0/absent remains on the stock reassignment path。
+
+The first real process attempt reached this atomic KRaft handoff but failed new-leader recovery with
+`Kafka partition binding is deleted or deleting`。The source trace showed that
+`TopicsDelta.localChanges(brokerId).deletes()` means both local assignment removal and durable topic/partition deletion。
+`NereusTopicDeltaLifecycle` now reads the new metadata image before choosing the operation：if the same topic name、topic ID
+and partition still exist，the old broker calls `resign(previousIdentity, newLeaderEpoch, ...)` and preserves the shared
+binding；if the identity is absent or the same name has a new topic ID，it calls durable
+`delete(previousIdentity, metadataOffset, ...)`。This retains delete-before-open ordering for same-name recreation while
+preventing a departing replica from destroying cluster-wide data authority。
+
+`f9MultiBrokerTakeoverProcessIntegrationTest` formats two independent release nodes with one Kafka cluster ID；node 1 is
+combined controller/broker and node 2 is broker-only，with one shared controller quorum、Nereus cluster、four-shard Oxia
+authority and LocalStack Object root but isolated metadata/log/cache directories。It creates a partition assigned to `[1]`，
+commits/reads offset 0，starts node 2，Admin-reassigns to `[2]`，requires exact
+`leader=2, replicas=[2], ISR=[2]` and no ongoing reassignment while node 1 remains alive，then commits offset 1 and reads
+both batches from the cluster。Fresh execution passed 73/73 actionable tasks in 1m04s and the task is part of
+`phase9M6KafkaProcessCheck`。This is P-tier Object-WAL post-handoff evidence，not an already-dispatched old-append cut、
+BookKeeper-profile takeover、transaction/internal-topic coordinator migration、multi-controller or chaos proof。
+
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
 source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed
 NCP2 higher-generation prefix plus the still-readable BookKeeper generation-zero tail；comparing raw
@@ -640,5 +667,5 @@ the implemented slice，not KF-FINAL-001/002 release evidence。
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`ebf1d7616309a26ca95cffa3a2434bf9d5a20868`。Executable source-lock expectation 已更新到该 reviewed、
+`bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

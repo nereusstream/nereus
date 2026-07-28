@@ -65,6 +65,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task.startsWith("phase9M6Kafka")
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9MultiBrokerTakeoverProviderIntegrationTest"
+        || task == "f9MultiBrokerTakeoverProcessIntegrationTest"
         || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
         || task == "f9BookKeeperWalAsyncObjectProcessIntegrationTest"
         || task == "f9BookKeeperWalSyncObjectProcessIntegrationTest"
@@ -134,6 +135,7 @@ val dockerBackedSubprojectTasks = mapOf(
         "f9BookKeeperWalOnlyProviderIntegrationTest",
         "f9BookKeeperLedgerDeletionProviderIntegrationTest",
         "f9M6KafkaProcessIntegrationTest",
+        "f9MultiBrokerTakeoverProcessIntegrationTest",
         "f9BookKeeperWalOnlyProcessIntegrationTest",
         "f9BookKeeperWalAsyncObjectProcessIntegrationTest",
         "f9BookKeeperWalSyncObjectProcessIntegrationTest",
@@ -2866,7 +2868,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "ebf1d7616309a26ca95cffa3a2434bf9d5a20868",
+        "bb7e8937c5ec361b7e8bb6b79ea3833fe4e4a20e",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -3084,8 +3086,10 @@ tasks.register("phase9M6KafkaFeatureCheck") {
 
 tasks.register("phase9M6KafkaProcessCheck") {
     group = "verification"
-    description = "Run real Oxia + LocalStack + BookKeeper + Nereus Kafka cold-restart process acceptance."
+    description =
+        "Run real Oxia + LocalStack + BookKeeper cold-restart and two-process Nereus Kafka takeover acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalAsyncObjectProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalSyncObjectProcessIntegrationTest")

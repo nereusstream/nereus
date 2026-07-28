@@ -1,6 +1,7 @@
 # 07 — Implementation Plan and Gates
 
 > 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback and real-Oxia two-runtime Object-WAL live leader takeover are implemented；release-process response-loss restart、two Kafka-process/multi-controller takeover、remaining M4 internal-topic cuts and inherited final gates remain open
+> 2026-07-28 状态增量：two-release-process Object-WAL/KRaft singleton takeover 已实现并进入 M6 process aggregate；仍 open 的 takeover 边界是 already-dispatched old append、BookKeeper profiles、coordinator/internal topics、multi-controller 与 chaos
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -379,8 +380,15 @@ coordinator/transaction/compaction remain M4/M5。
   immediately preempts broker A before TTL，recovers A's exact committed batch，forces A's next append into
   `WRITE_FENCED_RECOVERY_REQUIRED` and continues at the recovered end。`DefaultKafkaPartitionStorageTest` separately locks
   the implementation rule that `FENCED_APPEND`/expired-session/head-offset conflicts fence even when the failed append is
-  provably known-not-committed。This is R-tier provider evidence；two Kafka processes、old in-flight append publication and
-  BookKeeper/profile takeover cuts remain open；
+  provably known-not-committed。This is R-tier provider evidence；
+- `f9MultiBrokerTakeoverProcessIntegrationTest` now supplies P-tier release/KRaft evidence：node 1 combined controller/broker
+  commits offset 0 on exact assignment `[1]`；node 2 broker-only joins the same cluster；Admin singleton reassignment
+  atomically reaches `leader=2, replicas=[2], ISR=[2]` with no ongoing reassignment while node 1 remains alive；node 2
+  recovers offset 0 and commits/reads offset 1。The controller test
+  `testNereusStorageFeatureAtomicallyHandsOffSingletonReplica` requires a single change record with no transitional RF2，
+  and `testLocalReplicaRemovalResignsWithoutDeletingSharedBinding` requires the departing broker to resign rather than
+  delete the shared binding。Fresh task execution passes 73/73 actionable tasks in 1m04s。Old already-in-flight append、
+  BookKeeper/profile、coordinator/internal-topic、multi-controller and chaos cuts remain open；
 - fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks on this source。The aggregate reruns the
   146/146 scenario manifest、29-blob Nereus source lock、Apache Kafka baseline lock、M1/M2/M3 codec predecessors and all
   three provider gates：Object sync/async round trip、two-bookie BookKeeper WAL-only/profile composition and the new live
@@ -544,7 +552,7 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@ebf1d76163` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@bb7e8937c5` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
@@ -552,7 +560,8 @@ coordinator/transaction/compaction remain M4/M5。
   profile-mapping commit、one BookKeeper Object-profile/cache-root NCP2 mapping commit、one BookKeeper ledger-GC
   configuration/digest-mapping commit、one materialization-retirement configuration/digest-mapping commit and one
   stock config-fixture alignment commit、one logging-runtime isolation commit and one enabled-format
-  default-BookKeeper-profile fixture completion commit。The
+  default-BookKeeper-profile fixture completion commit、one atomic shared-storage reassignment commit and one
+  local-replica-removal binding-preservation commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -560,14 +569,14 @@ coordinator/transaction/compaction remain M4/M5。
   and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
   release-distribution provider-backed KRaft baseline and same-node fresh-JVM user/group/transaction-state cold restart pass；
   stable open-transaction forced-exit/abort recovery and the separate two-bookie `BOOKKEEPER_WAL_ONLY`
-  release-distribution cold restart also pass；the in-process two-runtime Object-WAL live takeover also passes，while
-  multi-controller/two Kafka-process live takeover、BookKeeper-profile takeover、
-  checkpoint/virtual-segment and broader kill-cut final gates remain open；
+  release-distribution cold restart also pass；the in-process two-runtime Object-WAL live takeover and the two-release-process
+  KRaft singleton reassignment both pass，while multi-controller、already-in-flight old append、BookKeeper-profile takeover、
+  checkpoint/virtual-segment/coordinator migration and broader kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/thirty-three-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/forty-one-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -649,7 +658,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@ebf1d76163` branch。
+`nereus/future9-native-kafka-storage@bb7e8937c5` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -893,9 +902,9 @@ The recovery coordinator retries retriable page-read failures at the exact curso
 the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
 recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
-`0.1.0-f9-dev` artifact。The provider-level Object-WAL old-token fence is covered；durable already-in-flight append cuts、
-multi-controller/two Kafka-process live takeover、priority budgets、BookKeeper-profile takeover and
-checkpoint/virtual-segment cuts remain open。
+`0.1.0-f9-dev` artifact。The provider-level Object-WAL old-token fence and release-process post-handoff recovery/continuation
+are covered；durable already-in-flight append cuts、multi-controller、priority budgets、BookKeeper-profile takeover、
+coordinator migration and checkpoint/virtual-segment cuts remain open。
 
 ### Tasks
 
@@ -907,6 +916,7 @@ checkpoint/virtual-segment cuts remain open。
 phase9M6ActivationMetadataCheck
 phase9M6KafkaFeatureCheck
 phase9M6CheckpointQuarantineCheck
+:nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest
 phase9M6KafkaProcessCheck
 phase9M6KafkaBookKeeperProcessCheck
 Kafka fork: nereusF9ControllerTest

@@ -1,6 +1,7 @@
 # 03 — Kafka Fork, Log and Broker Integration
 
 > 状态：Implementation in progress；Nereus-side M3 codec/ListOffsets/checkpoint-pinned paged recovery、Kafka-fork record/async-result bridges、M4 producer/transaction state、M5 retention/compaction slices and M6 runtime/config/lifecycle seams are implemented；stock-source isolation、显式 `NereusKafka` launcher、controller-leader-only activation、durable feature/format、cache-root KRaft identity、ACTIVE broker-epoch readiness refresh、complete BookKeeper typed runtime/client ownership、five-profile mapping 与 product-side durable checkpoint quarantine 已实现；real release-distribution combined-node Oxia/S3 user/internal-topic/transaction recovery、Object async cold restart、BookKeeper WAL-only/async/sync cold-restart and real-Oxia two-runtime Object-WAL live takeover gates 均通过；multi-controller failover、two Kafka-process live takeover and extended kill/chaos process gates remain open
+> 2026-07-28 状态增量：fork `bb7e8937c5` 与 product `f9MultiBrokerTakeoverProcessIntegrationTest` 已通过 two-release-process Object-WAL/KRaft singleton live reassignment；尚未覆盖 already-dispatched old append、BookKeeper-profile takeover、transaction/internal-topic coordinator migration、multi-controller 和 kill/response-loss chaos
 > 参考：AutoMQ Kafka fork `1c648d84819d5c3fef2af585f02149c397584870`
 > 初始原则：保留 stock Kafka validation/coordinator/protocol，替换 durable partition-log owner
 
@@ -293,8 +294,9 @@ earliest=0/latest=1、正常停机、fresh-JVM offset 0 恢复、offset 1 继续
 并冻结 earliest=0/latest=2。BookKeeper async gate 写入四个 batch、等待真实 LocalStack NCP2 object、正常停机后
 fresh-JVM 恢复并继续追加；sync gate 写入一个 batch，并以 append 返回前 required NCP2 COMMITTED/readable
 作为同步语义证据，再完成 fresh-JVM 恢复。独立 provider gate 已覆盖 real Oxia 上的 two-runtime Object-WAL
-live takeover；尚未实现的是真实 controller failover、two Kafka-process KRaft takeover 和更广 kill-cut process
-tests。显式
+live takeover。后续 fork `fe308359b6` / `bb7e8937c5` 与 product release-process gate 又闭合了一个真实
+two-process KRaft singleton takeover；尚未实现的是真实 controller failover、already-dispatched old append、
+BookKeeper-profile takeover 和更广 kill-cut process tests。显式
 launcher/KafkaRaftServer broker/controller factory selection 已实现；`phase9M6KafkaProcessCheck` 现使用真实 release
 distribution、四分片 Oxia 和 pinned LocalStack S3 覆盖显式 feature format、broker/controller registration、
 activation、Admin create、Produce/Fetch/ListOffsets、S3 object existence 和 SIGTERM shutdown，并以同一 KRaft
@@ -303,9 +305,10 @@ subscribe/rebalance 并提交 offset；第二 JVM 验证 higher broker epoch rea
 internal topics 的并发 remote recovery、原 group committed offset reload、同一 transactional ID 的下一次 commit、
 group 从下一可见 offset 恢复，以及最终 earliest=0/latest=5。随后第三 JVM 在 open-transaction data offset 5
 stable 后被强制终止；第四 JVM 恢复同一 transactional ID，生成 ABORT marker 6、提交 data/marker 7/8，并证明
-read-committed/group 都跳过 aborted data、latest=9。该切片仍不包含 two Kafka-process live takeover、
-checkpoint/virtual-segment transaction cut 或 provider-profile matrix；现有 provider-level two-runtime takeover
-不能替代这些 Kafka-process cuts，仍不足以宣称 production rollout ready。
+read-committed/group 都跳过 aborted data、latest=9。新增
+`f9MultiBrokerTakeoverProcessIntegrationTest` 则补上 two Kafka-process Object-WAL live reassignment，但不包含
+checkpoint/virtual-segment transaction cut、provider-profile matrix、coordinator migration、multi-controller 或
+old in-flight append cut，仍不足以宣称 production rollout ready。
 
 ### 3.3 `core/.../kafka/log/LogManager.scala`
 
@@ -1120,8 +1123,49 @@ LSO 继续由 stock ProducerStateManager/first unstable offset 算法计算，re
 和 fresh recovery。Kafka fork metadata callback、BrokerServer config/runtime factory、manager ownership、ordered
 shutdown wiring、显式 native-storage CLI selection 与 controller-leader-only first-activation scheduling 已实现；
 combined-node native-storage KRaft process baseline 已通过；real-Oxia two-runtime Object-WAL gate 已覆盖 durable
-live preemption/replay/old-token fencing。真实 controller failover、two Kafka-process KRaft reassignment、old
-in-flight append cut 与 BookKeeper-profile takeover 尚未实现。
+live preemption/replay/old-token fencing；two-release-process singleton reassignment 也已通过。真实 controller
+failover、old in-flight append cut 与 BookKeeper-profile takeover 尚未实现。
+
+### 7.2 Shared-storage singleton reassignment and local lifecycle（2026-07-28）
+
+Nereus feature level 1 的 assignment contract 是“一个 KRaft leader + 一个 shared durable log owner”，不是 stock
+replicated local log。`ReplicationControlManager.alterPartitionReassignment` 在该 feature 下必须调用
+`changeNereusPartitionReassignment`，不得构造 stock `ReassignmentReplicas` 的
+`replicas=[old,new], adding=[new], removing=[old]` 中间状态。新方法按以下顺序执行：
+
+1. 要求当前 partition 为 stable RF1：`replicas.size == 1`，且不存在 adding/removing replica；
+2. 要求 request target 恰好一个 broker，并由 `clusterControl.isActive` 验证已注册、未 fenced；
+3. 如果 target 等于当前 singleton，返回 no-op；
+4. 否则建立一个 `PartitionChangeBuilder`，同时设置 target singleton replicas、ISR、preferred election，并清空
+   adding/removing replicas；
+5. 生成一条 `PartitionChangeRecord`，由同一个 metadata transaction 原子发布新 replicas/ISR/leader。
+
+这里使用 active-broker predicate，而不是 stock `LeaderAcceptor` 的旧 replica directory 校验：shared-storage
+新 owner 在 handoff 前没有旧 local partition directory identity。Feature level 0/absent 继续执行 stock path。
+`ReplicationControlManagerTest.testNereusStorageFeatureAtomicallyHandsOffSingletonReplica` 锁定 record 形状，
+原有 `testNereusStorageFeatureGatesIsrReassignmentAndDirectories` 继续锁定非 singleton ISR/reassignment 和
+directory API 的 fail-closed 行为。
+
+broker metadata lifecycle 还有一个不能从方法名推断的边界：
+`TopicsDelta.localChanges(brokerId).deletes()` 只表示“从本 broker 的 local image 删除”，不必然表示 durable
+topic/partition 删除。`NereusTopicDeltaLifecycle.apply` 必须用 previous image 取得 exact
+`(topicName, topicId, partition)`，再查询 new image：
+
+- new image 仍含同名、同 topic ID、同 partition：这是 reassignment 后的 local replica removal，调用
+  `partitionLifecycle.resign(previousIdentity, newLeaderEpoch, ...)`，回调 `Some(newLeaderEpoch)`，不得删除 binding；
+- new image 不含该 identity：这是 durable delete，调用
+  `partitionLifecycle.delete(previousIdentity, metadataOffset, ...)`，回调 `None`；
+- 同名但 topic ID 已变化：仍按 old identity durable delete，随后同一 partition lane 串行 open 新 identity，保持
+  delete-before-recreate。
+
+真实进程回归使用 node 1 combined controller/broker、node 2 broker-only。两 JVM 共享 Kafka cluster ID、
+controller voter、Nereus cluster/Oxia/Object root，并隔离 KRaft metadata、Kafka log shell 和 Nereus cache。
+测试在 `[1]` 上提交 offset 0，启动 broker 2 后通过 Admin 重分配到 `[2]`，等待 exact
+`leader=2, replicas=[2], ISR=[2]`，要求 `listPartitionReassignments` 为空且 broker 1 仍存活，再提交 offset 1 并
+读取 offset 0/1。`f9MultiBrokerTakeoverProcessIntegrationTest --rerun-tasks` fresh 通过 73/73 actionable tasks，
+并由 `phase9M6KafkaProcessCheck` 聚合。它证明 post-handoff recovery/continuation，不证明 handoff 时已经进入
+provider 的旧 append 只能由 current term publication，也不证明 coordinator/internal-topic、BookKeeper 或
+multi-controller takeover。
 
 ## 8. Fetch execution
 

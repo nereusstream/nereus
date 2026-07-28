@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "39" ]] \
-    || fail "expected thirty-nine reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "41" ]] \
+    || fail "expected forty-one reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -222,7 +222,7 @@ d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Parti
 69b47dc0c8441ec0e22408b6a7a4ea42e56a9d2b core/src/main/scala/kafka/log/LogManager.scala
 27cf63cf77c51cd5d1cdc9599629e8e6b644e93e core/src/main/scala/kafka/log/UnifiedLogFactory.scala
 5d48cd669ee816cd3215f93a4db0c9fc8b4e9a2f core/src/main/scala/kafka/log/nereus/NereusListOffsetsLifecycle.scala
-21441c7e0e06556ff072f38b5c58e90514176748 core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
+bd7378a3248bc8cbd3f01f213827399d113b1f80 core/src/main/scala/kafka/log/nereus/NereusTopicDeltaLifecycle.scala
 418831074feeec2d16d75b7400e2108c3ec1f378 core/src/main/scala/kafka/log/nereus/NereusUnifiedLogFactory.scala
 9a956b643165d6e0a04a506f7fc8378299e834e8 core/src/main/scala/kafka/server/BrokerServer.scala
 e22088276dc750fe4ab5698f58959bb68dbd5cdd core/src/main/scala/kafka/server/ConfigHandler.scala
@@ -266,7 +266,7 @@ ec32f2b8e23e9548a7a8b4e8bdb717a7949dc788 core/src/test/java/kafka/server/nereus/
 d0fafe524cb8dd67db61678cfa81659af71631f0 core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
 e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 c28a29d488b51c0630cb1197b95b30bc6bf43a68 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
-ba0bcb6a45f1715683ac23611873dcb83ce5a474 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
+f054f280586cd74cbda2bececc1b71b7c55ec4ec core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
 46303a1661fa6c8d4b876a1853b4b169c2dff71b core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
 1917d93569260dabf490f2b4111723d58ab9160c core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
 1c3c2d507d48e2ea776e8a9f49ebc73be7cea5b2 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
@@ -282,12 +282,12 @@ e09fa0c9643d3982af69a6679438f1baf8230606 core/src/test/scala/unit/kafka/server/n
 cd06ee5e4709b7d70c19cdd82c241db5d44377bb metadata/src/main/java/org/apache/kafka/controller/ConfigurationControlManager.java
 e7bc734e74e6e35346f6cb5a621b34ca6e20b1ac metadata/src/main/java/org/apache/kafka/controller/FeatureControlManager.java
 6cd7b89e51a474c98844431503a2c31808f0f3b5 metadata/src/main/java/org/apache/kafka/controller/QuorumFeatures.java
-4ba7b1b76a03e1750730e1df12630058d06eed12 metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java
+497ae9f9aa266cb00ba822edf77d45799b83d1fa metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java
 153a1668c2e3db8b850e0d739ec49374efc375d2 metadata/src/main/java/org/apache/kafka/image/FeaturesImage.java
 20b59845539d419251efc3e5174b8d602f0a4450 metadata/src/test/java/org/apache/kafka/controller/ConfigurationControlManagerTest.java
 d096d6b28cf4efaddb4fac5b4ffdf5e122df08e0 metadata/src/test/java/org/apache/kafka/controller/FeatureControlManagerTest.java
 0932a4f8edc114d5525f770d186e8747668e67be metadata/src/test/java/org/apache/kafka/controller/QuorumFeaturesTest.java
-da062ff1ddde7348d830eb850128d86d8621040f metadata/src/test/java/org/apache/kafka/controller/ReplicationControlManagerTest.java
+e465517026fa582eed55707322ef54f2f4df5737 metadata/src/test/java/org/apache/kafka/controller/ReplicationControlManagerTest.java
 e4cfd9a94228abfd06c80d84982431d4029eac1b server-common/src/main/java/org/apache/kafka/server/common/Feature.java
 6d430f14bf450811f3e72cfc1215ecd4a7b9abd7 server-common/src/main/java/org/apache/kafka/server/common/NereusStorageVersion.java
 1fbf9180a68bca9a5d45e38f9862841ea486f739 server-common/src/main/java/org/apache/kafka/server/util/KafkaScheduler.java
@@ -537,8 +537,12 @@ grep -F -q 'delta.localChanges(brokerId)' "$topic_delta_lifecycle" \
     || fail "Nereus topic-delta lifecycle lost exact broker-local reconciliation"
 grep -F -q 'new KafkaPartitionLeaderOpenRequest(' "$topic_delta_lifecycle" \
     || fail "Nereus topic-delta lifecycle lost exact leader-open request construction"
-grep -F -q 'partitionLifecycle.delete(identity, metadataOffset, operationTimeout)' "$topic_delta_lifecycle" \
+grep -F -q 'partitionLifecycle.delete(previousIdentity, metadataOffset, operationTimeout)' "$topic_delta_lifecycle" \
     || fail "Nereus topic-delta lifecycle lost metadata-ordered delete"
+grep -F -q 'retainedLeaderEpoch(newImage, topicPartition, previousIdentity)' "$topic_delta_lifecycle" \
+    || fail "Nereus topic-delta lifecycle no longer distinguishes replica removal from durable deletion"
+grep -F -q 'partitionLifecycle.resign(previousIdentity, observedLeaderEpoch, operationTimeout)' "$topic_delta_lifecycle" \
+    || fail "Nereus topic-delta lifecycle lost shared-binding-preserving replica removal"
 
 async_lifecycle="$kafka_checkout/core/src/main/scala/kafka/server/metadata/AsyncTopicDeltaLifecycle.scala"
 grep -F -q 'trait AsyncTopicDeltaLifecycle' "$async_lifecycle" \
@@ -783,6 +787,15 @@ grep -F -q 'terminalFailure = true;' "$controller_adapter_runtime" \
 grep -F -q 'cancelScheduled();' "$controller_adapter_runtime" \
     || fail "controller runtime lost leadership-loss/shutdown cancellation"
 
+replication_control="$kafka_checkout/metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java"
+grep -F -q 'changeNereusPartitionReassignment(' "$replication_control" \
+    || fail "controller lost the Nereus shared-storage reassignment path"
+grep -F -q 'builder.setTargetIsr(target.replicas());' "$replication_control" \
+    || fail "Nereus shared-storage reassignment lost its atomic singleton ISR handoff"
+replication_control_test="$kafka_checkout/metadata/src/test/java/org/apache/kafka/controller/ReplicationControlManagerTest.java"
+grep -F -q 'testNereusStorageFeatureAtomicallyHandsOffSingletonReplica' "$replication_control_test" \
+    || fail "controller lost the atomic singleton reassignment regression"
+
 product_runtime_creator="$kafka_checkout/core/src/main/java/kafka/server/nereus/NereusKafkaProductRuntimeCreator.java"
 grep -F -q 'NereusKafkaObjectWalRuntimeFactory.createActivated(' "$product_runtime_creator" \
     || fail "product runtime creator lost activation-backed Object-WAL construction"
@@ -889,4 +902,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-nine commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; forty-one commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"
