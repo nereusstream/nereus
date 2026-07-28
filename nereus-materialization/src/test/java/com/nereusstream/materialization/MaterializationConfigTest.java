@@ -130,6 +130,20 @@ class MaterializationConfigTest {
                 .isEqualTo(fixture.policy);
     }
 
+    @Test
+    void exposesKafkaNcp2Defaults() throws Exception {
+        MaterializationConfig config =
+                MaterializationConfig.kafkaDefaults(
+                        privateDirectory("kafka-defaults"));
+
+        assertThat(config.committedPolicy().policyId())
+                .isEqualTo(
+                        MaterializationPolicyFactory
+                                .KAFKA_LOSSLESS_COMMITTED_POLICY_ID);
+        assertThat(config.committedPolicy().targetPhysicalFormat())
+                .isEqualTo(MaterializationPolicy.KAFKA_COMMITTED_FORMAT);
+    }
+
     private Path privateDirectory(String name) throws Exception {
         Path path = Files.createDirectory(temporaryDirectory.resolve(name));
         Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));

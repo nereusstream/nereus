@@ -53,11 +53,11 @@ class KafkaGenerationProtocolActivationGuardTest {
                             DirectMaterializationStreamAuthority.identitySha256(STREAM, profile));
 
             var proof =
-                    guard.requireReady(GenerationOperation.TOPIC_COMPACTED_PUBLISH, subject, false)
+                    guard.requireReady(GenerationOperation.GENERATION_PUBLISH, subject, false)
                             .join();
 
             assertThat(proof.subject()).isEqualTo(subject);
-            assertThat(proof.operation()).isEqualTo(GenerationOperation.TOPIC_COMPACTED_PUBLISH);
+            assertThat(proof.operation()).isEqualTo(GenerationOperation.GENERATION_PUBLISH);
             assertThat(proof.publicationEnabled()).isTrue();
             assertThat(proof.deletionEnabled()).isFalse();
             guard.revalidate(proof).join();

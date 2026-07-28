@@ -153,6 +153,24 @@ public record MaterializationConfig(
                 256L << 20,
                 MaterializationPolicy.MAX_ROW_GROUP_RECORDS,
                 "ZSTD");
+        return defaults(stagingDirectory, policy);
+    }
+
+    /** Default bounded materialization limits with the closed Kafka NCP2 committed policy. */
+    public static MaterializationConfig kafkaDefaults(Path stagingDirectory) {
+        MaterializationPolicy policy = MaterializationPolicyFactory.kafkaLosslessCommitted(
+                4,
+                64,
+                MaterializationPolicy.MAX_RANGE_RECORDS,
+                256L << 20,
+                MaterializationPolicy.MAX_ROW_GROUP_RECORDS,
+                "ZSTD");
+        return defaults(stagingDirectory, policy);
+    }
+
+    private static MaterializationConfig defaults(
+            Path stagingDirectory,
+            MaterializationPolicy policy) {
         return new MaterializationConfig(
                 policy,
                 256,

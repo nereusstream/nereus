@@ -64,12 +64,14 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
     }
 
     @Test
-    void acceptsExactObjectAndBookKeeperWalOnlyComposition() {
+    void acceptsExactObjectAndAllBookKeeperCompositions() {
         new NereusKafkaObjectWalRuntimeConfiguration(
                 runtime(Set.of(
                         StorageProfile.OBJECT_WAL_SYNC_OBJECT,
                         StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                        StorageProfile.BOOKKEEPER_WAL_ONLY)),
+                        StorageProfile.BOOKKEEPER_WAL_ONLY,
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT)),
                 streams(false),
                 oxia(),
                 objects(),

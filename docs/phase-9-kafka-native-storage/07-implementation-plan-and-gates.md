@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and BookKeeper-WAL-only real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization core is implemented and focused-gated；production runtime/profile wiring、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and BookKeeper-WAL-only real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition and real five-profile provider evidence are implemented；Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -408,19 +408,21 @@ coordinator/transaction/compaction remain M4/M5。
   checkpoint candidate remains open；provider-backed BrokerServer activation and the real combined-node native-storage
   KRaft baseline now pass through `phase9M6KafkaProcessCheck`，including single-node graceful restart of committed
   `__consumer_offsets` and `__transaction_state` truth；
-- `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the first concrete provider graph to exactly
-  `OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT` without BookKeeper，or exactly those two Object profiles plus
-  `BOOKKEEPER_WAL_ONLY` when the provider-neutral BookKeeper configuration/context is present；
+- `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the concrete provider graph to exactly
+  `OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT` without BookKeeper，or exactly those two Object profiles plus all three
+  BookKeeper profiles when the provider-neutral BookKeeper configuration/context is present；
   both graphs retain matched cluster/writer/session/scan limits and disabled legacy auto-session；
   `NereusKafkaObjectWalRuntimeFactoryTest` proves activation scope is rejected before provider IO，and a checked
   provider-construction failure is propagated with every resource registered before that cut closed；
   `f9M3ProviderIntegrationTest` passes against real Oxia plus the filesystem ObjectStore provider and covers deterministic
-  ACTIVE/readiness seeding、runtime capability resume/verification、binding、authority acquire/recovery、leader open、one byte-exact
-  stable Produce、committed Fetch and owned provider shutdown。
+  ACTIVE/readiness seeding、runtime capability resume/verification、binding、authority acquire/recovery、leader open、stable
+  Produce、committed Fetch、async NCP2 publication/byte-exact normal read and owned provider shutdown。
   `f9BookKeeperWalOnlyProviderIntegrationTest` separately provisions the exact F1-BK ledger-ID namespace/publication
   activation，borrows a real two-bookie client，then proves Kafka leader open、strict append、physical-reference publication
   and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
-  runtime/stores/readers are closed through the product ledger。Fork `80445853a3` adds the complete stock-owned typed
+  runtime/stores/readers are closed through the product ledger。The same gate now opens `BOOKKEEPER_WAL_ASYNC_OBJECT` and
+  `BOOKKEEPER_WAL_SYNC_OBJECT`，verifies NCP2 COMMITTED publication、byte-exact normal reads and the sync append
+  required-generation completion barrier。Fork `80445853a3` adds the complete stock-owned typed
   BookKeeper binding、exact file/version secret reference、pre-I/O cross-field validation、BookKeeper client construction and
   product-before-client close wrapper；six server config tests、eight mapper/ownership tests、Checkstyle、SpotBugs and
   Spotless pass。`f9BookKeeperWalOnlyProcessIntegrationTest` now adds real release-distribution P-tier evidence：stock
@@ -428,7 +430,7 @@ coordinator/transaction/compaction remain M4/M5。
   shutdown、fresh-JVM recovery and continued append all pass。The same Object provider is also opened under
   `OBJECT_WAL_ASYNC_OBJECT` in the real Oxia integration，and `f9ObjectWalAsyncObjectProcessIntegrationTest` proves
   first-JVM append/read plus fresh-JVM recovery/continued append over real Oxia and LocalStack；multi-broker takeover and
-  the two BookKeeper materialization profiles remain open；
+  the two BookKeeper materialization fresh-process gates remain open；
 - the 2026-07-28 Kafka NCP2 materialization core checkpoint adds the distinct
   `nereus-kafka-committed-v2` / `NEREUS_COMPACTED_PARQUET_V2` committed policy，without reinterpreting NCP1 durable
   records。`DefaultMaterializationWorker` now has an NCP2-only ranged writer path that preserves every Kafka
@@ -438,8 +440,12 @@ coordinator/transaction/compaction remain M4/M5。
   generation committer now accept an explicit `DIRECT_STREAM` authority mode while all compatibility constructors remain
   `PROJECTION_REQUIRED`，so Pulsar NCP1/NTC1 behavior is unchanged。The Kafka activation guard admits
   `GENERATION_PUBLISH` with the same ACTIVE/readiness proof and revalidation boundary used by direct-stream compaction。
-  Focused materialization、metadata and Kafka activation tests pass；production service lifecycle、append lag admission and
-  the three Object-producing profile mappings are the next checkpoint；
+  `KafkaObjectMaterializationRuntime` now owns one process-shared direct NCP2 service、staging directory and bounded worker
+  executor while borrowing the provider metadata/ObjectStore/scheduler/read graph。The activated runtime closes it through the
+  normal product resource ledger。`KafkaAsyncAppendAdmissionGuard` requires an ACTIVE `GENERATION_PUBLISH` proof，applies the
+  materialization lag gate and revalidates immediately before both Object/BookKeeper async appends；sync profiles retain their
+  required-generation barrier。The profile resolver now maps all five profiles when BookKeeper is installed。Focused tests and
+  the real Object/BookKeeper provider gates pass；fork mapping and BookKeeper async/sync fresh-process gates are next；
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
@@ -763,7 +769,8 @@ authority/recovery opener、one partition manager、one codec pair and one proce
 entered into the exact close ledger；the Object-WAL creator now additionally owns checkpoint read pins and concrete
 checkpoint/COMMITTED replay composition。Its optional BookKeeper slice borrows the client、requires exact F1-BK ACTIVE
 publication/readiness、installs the BookKeeper appender/reader/physical-reference/profile resolver in the same graph and skips
-Object materialization registration for `BOOKKEEPER_WAL_ONLY`。Kafka scheduler/clock and the fork recovery-state factory
+Object materialization registration for `BOOKKEEPER_WAL_ONLY`，but installs direct NCP2 registration/materialization for
+both BookKeeper object-producing profiles。Kafka scheduler/clock and the fork recovery-state factory
 remain borrowed。The BookKeeper client is borrowed by the product graph but owned by the fork's outer
 `NereusKafkaOwnedProviderRuntime`，which closes the product graph before the client and remains idempotent under repeated close。
 The local Kafka fork also
@@ -831,7 +838,7 @@ the original deadline；the deterministic regression requires two reads but exac
 recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
 `0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets and
-multi-broker takeover、checkpoint/virtual-segment cuts and the two BookKeeper materialization profile gates remain open。
+multi-broker takeover、checkpoint/virtual-segment cuts and the two BookKeeper materialization fresh-process gates remain open。
 
 ### Tasks
 

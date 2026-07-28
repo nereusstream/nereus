@@ -4,6 +4,8 @@ package com.nereusstream.kafka.runtime;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.Checksum;
 import com.nereusstream.api.ChecksumType;
+import com.nereusstream.api.ReadView;
+import com.nereusstream.api.StreamId;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadiness;
 import com.nereusstream.bookkeeper.BookKeeperBrokerReadinessProvider;
 import com.nereusstream.bookkeeper.BookKeeperDigestType;
@@ -15,6 +17,7 @@ import com.nereusstream.bookkeeper.BookKeeperWalConfiguration;
 import com.nereusstream.bookkeeper.OxiaBookKeeperLedgerIdNamespaceReservationStore;
 import com.nereusstream.bookkeeper.OxiaBookKeeperProtocolActivationStore;
 import com.nereusstream.core.StreamStorageConfig;
+import com.nereusstream.materialization.MaterializationConfig;
 import com.nereusstream.kafka.activation.KafkaBrokerCapabilitySpecification;
 import com.nereusstream.kafka.activation.KafkaStorageCapabilityDigests;
 import com.nereusstream.kafka.activation.KafkaStorageClusterSnapshot;
@@ -29,7 +32,10 @@ import com.nereusstream.kafka.recovery.KafkaRecoveryState;
 import com.nereusstream.kafka.recovery.KafkaRecoveryStateCodec;
 import com.nereusstream.kafka.recovery.KafkaReplayBatch;
 import com.nereusstream.metadata.oxia.OxiaClientConfiguration;
+import com.nereusstream.metadata.oxia.OxiaJavaGenerationMetadataStore;
+import com.nereusstream.metadata.oxia.OxiaJavaKafkaPartitionMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaBrokerIdentity;
+import com.nereusstream.metadata.oxia.VersionedGenerationIndex;
 import com.nereusstream.metadata.oxia.KafkaStorageActivationMetadataStore;
 import com.nereusstream.metadata.oxia.SharedOxiaClientRuntime;
 import com.nereusstream.metadata.oxia.records.KafkaBrokerCapabilityRecord;
@@ -37,6 +43,7 @@ import com.nereusstream.metadata.oxia.records.KafkaPayloadMapping;
 import com.nereusstream.metadata.oxia.records.KafkaStorageActivationLifecycle;
 import com.nereusstream.metadata.oxia.records.KafkaStorageProtocolActivationRecord;
 import com.nereusstream.metadata.oxia.records.KafkaStorageReadinessRecord;
+import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.objectstore.ObjectPutRetryPolicy;
 import com.nereusstream.objectstore.ObjectStore;
 import com.nereusstream.objectstore.ObjectStoreConfiguration;
@@ -45,6 +52,7 @@ import com.nereusstream.objectstore.ObjectStoreSecretResolver;
 import com.nereusstream.objectstore.testing.LocalFileObjectStore;
 import io.oxia.testcontainers.OxiaContainer;
 import java.net.URI;
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -124,7 +132,11 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                             Duration.ofMinutes(10),
                             Duration.ofSeconds(5),
                             Duration.ofHours(24),
-                            2);
+                            2,
+                            MaterializationConfig.kafkaDefaults(
+                                    root.resolve(
+                                                    "object-materialization")
+                                            .toAbsolutePath()));
             KafkaBrokerIdentity broker = new KafkaBrokerIdentity(1, 9);
             KafkaBrokerCapabilitySpecification capability = new KafkaBrokerCapabilitySpecification(
                     kafkaCluster,
@@ -217,14 +229,16 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                     .nextLogicalOffset())
                     .isEqualTo(1);
 
+            KafkaPartitionIdentity asyncIdentity =
+                    new KafkaPartitionIdentity(
+                            kafkaCluster,
+                            "AAAAAAAAAAAAAAAAAAAAAw",
+                            0,
+                            "orders-async");
             KafkaPartitionStorage asyncStorage =
                     runtime.partitionStorageManager().openLeader(
                             new KafkaPartitionLeaderOpenRequest(
-                                    new KafkaPartitionIdentity(
-                                            kafkaCluster,
-                                            "AAAAAAAAAAAAAAAAAAAAAw",
-                                            0,
-                                            "orders-async"),
+                                    asyncIdentity,
                                     1,
                                     1,
                                     9,
@@ -232,35 +246,66 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                                     1,
                                     Duration.ofSeconds(10)))
                             .join();
-            ByteBuffer asyncRecords =
-                    MemoryRecords.withRecords(
-                                    0,
-                                    Compression.of(CompressionType.NONE).build(),
-                                    new SimpleRecord(
-                                            2_000,
-                                            "async-value".getBytes()))
-                            .buffer()
-                            .duplicate();
-            KafkaStableAppendResult asyncAppend =
-                    asyncStorage
-                            .append(
-                                    asyncRecords,
-                                    new KafkaAppendContext(
-                                            0,
-                                            1,
-                                            (short) -1,
-                                            Duration.ofSeconds(10),
-                                            Map.of()))
-                            .join();
-            assertThat(asyncAppend.stableSnapshot().stableEndOffset())
-                    .isEqualTo(1);
-            asyncStorage.publishDerivedOffsets(1, 1, 1);
+            ByteArrayOutputStream expectedAsyncBytes =
+                    new ByteArrayOutputStream();
+            for (int offset = 0; offset < 4; offset++) {
+                ByteBuffer asyncRecords =
+                        MemoryRecords.withRecords(
+                                        offset,
+                                        Compression.of(
+                                                        CompressionType
+                                                                .NONE)
+                                                .build(),
+                                        new SimpleRecord(
+                                                2_000 + offset,
+                                                ("async-value-" + offset)
+                                                        .getBytes()))
+                                .buffer()
+                                .duplicate();
+                byte[] expected = new byte[asyncRecords.remaining()];
+                asyncRecords.duplicate().get(expected);
+                expectedAsyncBytes.writeBytes(expected);
+                KafkaStableAppendResult asyncAppend =
+                        asyncStorage
+                                .append(
+                                        asyncRecords,
+                                        new KafkaAppendContext(
+                                                offset,
+                                                1,
+                                                (short) -1,
+                                                Duration.ofSeconds(10),
+                                                Map.of()))
+                                .join();
+                assertThat(
+                                asyncAppend
+                                        .stableSnapshot()
+                                        .stableEndOffset())
+                        .isEqualTo(offset + 1L);
+                asyncStorage.publishDerivedOffsets(
+                        offset + 1L,
+                        offset + 1L,
+                        offset + 1L);
+            }
+            VersionedGenerationIndex ncp2 =
+                    awaitCommittedGeneration(
+                            oxia,
+                            nereusCluster,
+                            kafkaCluster,
+                            asyncIdentity,
+                            clock,
+                            4);
+            assertThat(ncp2.value().lifecycle())
+                    .isEqualTo(GenerationLifecycle.COMMITTED);
+            assertThat(ncp2.value().payloadFormat())
+                    .isEqualTo("KAFKA_RECORD_BATCH");
+            assertThat(ncp2.value().offsetStart()).isZero();
+            assertThat(ncp2.value().offsetEnd()).isEqualTo(4);
             assertThat(
                             asyncStorage
                                     .read(
                                             new KafkaStorageReadRequest(
                                                     0,
-                                                    1,
+                                                    4,
                                                     10,
                                                     1024 * 1024,
                                                     1024 * 1024,
@@ -270,8 +315,8 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                                                     Duration.ofSeconds(10)))
                                     .join()
                                     .fetchAssembly()
-                                    .nextLogicalOffset())
-                    .isEqualTo(1);
+                                    .encodedRecords())
+                    .containsExactly(expectedAsyncBytes.toByteArray());
         } finally {
             if (runtime != null) {
                 runtime.close();
@@ -320,7 +365,9 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
             Set<StorageProfile> profiles = Set.of(
                     StorageProfile.OBJECT_WAL_SYNC_OBJECT,
                     StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
-                    StorageProfile.BOOKKEEPER_WAL_ONLY);
+                    StorageProfile.BOOKKEEPER_WAL_ONLY,
+                    StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                    StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT);
             NereusKafkaRuntimeConfiguration runtimeConfiguration =
                     new NereusKafkaRuntimeConfiguration(
                             nereusCluster,
@@ -344,6 +391,10 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                             Duration.ofSeconds(5),
                             Duration.ofHours(24),
                             2,
+                            MaterializationConfig.kafkaDefaults(
+                                    root.resolve(
+                                                    "bookkeeper-materialization")
+                                            .toAbsolutePath()),
                             Optional.of(
                                     new NereusKafkaBookKeeperWalRuntimeConfiguration(
                                             deployment,
@@ -465,6 +516,114 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                             .fetchAssembly()
                             .nextLogicalOffset())
                     .isEqualTo(1);
+
+            KafkaPartitionIdentity asyncIdentity =
+                    new KafkaPartitionIdentity(
+                            kafkaCluster,
+                            "AAAAAAAAAAAAAAAAAAAABA",
+                            0,
+                            "bookkeeper-orders-async");
+            KafkaPartitionStorage asyncStorage =
+                    runtime.partitionStorageManager().openLeader(
+                            new KafkaPartitionLeaderOpenRequest(
+                                    asyncIdentity,
+                                    1,
+                                    1,
+                                    11,
+                                    StorageProfile
+                                            .BOOKKEEPER_WAL_ASYNC_OBJECT,
+                                    1,
+                                    Duration.ofSeconds(10)))
+                            .join();
+            byte[] expectedAsyncBytes =
+                    appendKafkaBatches(
+                            asyncStorage,
+                            4,
+                            3_000,
+                            "bookkeeper-async-value-");
+            VersionedGenerationIndex asyncNcp2 =
+                    awaitCommittedGeneration(
+                            oxia,
+                            nereusCluster,
+                            kafkaCluster,
+                            asyncIdentity,
+                            clock,
+                            4);
+            assertThat(asyncNcp2.value().lifecycle())
+                    .isEqualTo(GenerationLifecycle.COMMITTED);
+            assertThat(asyncNcp2.value().payloadFormat())
+                    .isEqualTo("KAFKA_RECORD_BATCH");
+            assertThat(
+                            asyncStorage
+                                    .read(
+                                            new KafkaStorageReadRequest(
+                                                    0,
+                                                    4,
+                                                    10,
+                                                    1024 * 1024,
+                                                    1024 * 1024,
+                                                    true,
+                                                    0,
+                                                    0,
+                                                    Duration.ofSeconds(10)))
+                                    .join()
+                                    .fetchAssembly()
+                                    .encodedRecords())
+                    .containsExactly(expectedAsyncBytes);
+
+            KafkaPartitionIdentity syncIdentity =
+                    new KafkaPartitionIdentity(
+                            kafkaCluster,
+                            "AAAAAAAAAAAAAAAAAAAABQ",
+                            0,
+                            "bookkeeper-orders-sync");
+            KafkaPartitionStorage syncStorage =
+                    runtime.partitionStorageManager().openLeader(
+                            new KafkaPartitionLeaderOpenRequest(
+                                    syncIdentity,
+                                    1,
+                                    1,
+                                    11,
+                                    StorageProfile
+                                            .BOOKKEEPER_WAL_SYNC_OBJECT,
+                                    1,
+                                    Duration.ofSeconds(10)))
+                            .join();
+            byte[] expectedSyncBytes =
+                    appendKafkaBatches(
+                            syncStorage,
+                            1,
+                            4_000,
+                            "bookkeeper-sync-value-");
+            VersionedGenerationIndex syncNcp2 =
+                    awaitCommittedGeneration(
+                            oxia,
+                            nereusCluster,
+                            kafkaCluster,
+                            syncIdentity,
+                            clock,
+                            1);
+            assertThat(syncNcp2.value().lifecycle())
+                    .isEqualTo(GenerationLifecycle.COMMITTED);
+            assertThat(syncNcp2.value().payloadFormat())
+                    .isEqualTo("KAFKA_RECORD_BATCH");
+            assertThat(
+                            syncStorage
+                                    .read(
+                                            new KafkaStorageReadRequest(
+                                                    0,
+                                                    1,
+                                                    10,
+                                                    1024 * 1024,
+                                                    1024 * 1024,
+                                                    true,
+                                                    0,
+                                                    0,
+                                                    Duration.ofSeconds(10)))
+                                    .join()
+                                    .fetchAssembly()
+                                    .encodedRecords())
+                    .containsExactly(expectedSyncBytes);
             } finally {
                 if (runtime != null) {
                     runtime.close();
@@ -476,6 +635,53 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
             scheduler.shutdownNow();
         }
         assertThat(provider.closed()).isTrue();
+    }
+
+    private static byte[] appendKafkaBatches(
+            KafkaPartitionStorage storage,
+            int batchCount,
+            long timestampBase,
+            String valuePrefix) {
+        ByteArrayOutputStream expectedBytes = new ByteArrayOutputStream();
+        for (int offset = 0; offset < batchCount; offset++) {
+            ByteBuffer records =
+                    MemoryRecords.withRecords(
+                                    offset,
+                                    Compression.of(
+                                                    CompressionType
+                                                            .NONE)
+                                            .build(),
+                                    new SimpleRecord(
+                                            timestampBase + offset,
+                                            (valuePrefix + offset)
+                                                    .getBytes()))
+                            .buffer()
+                            .duplicate();
+            byte[] batchBytes = new byte[records.remaining()];
+            records.duplicate().get(batchBytes);
+            expectedBytes.writeBytes(batchBytes);
+            KafkaStableAppendResult appendResult =
+                    storage
+                            .append(
+                                    records,
+                                    new KafkaAppendContext(
+                                            offset,
+                                            1,
+                                            (short) -1,
+                                            Duration.ofSeconds(10),
+                                            Map.of()))
+                            .join();
+            assertThat(
+                            appendResult
+                                    .stableSnapshot()
+                                    .stableEndOffset())
+                    .isEqualTo(offset + 1L);
+            storage.publishDerivedOffsets(
+                    offset + 1L,
+                    offset + 1L,
+                    offset + 1L);
+        }
+        return expectedBytes.toByteArray();
     }
 
     private static void seedActiveAuthority(
@@ -530,6 +736,73 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                     now,
                     0)).join();
         }
+    }
+
+    private static VersionedGenerationIndex awaitCommittedGeneration(
+            OxiaClientConfiguration oxia,
+            String nereusCluster,
+            String kafkaCluster,
+            KafkaPartitionIdentity identity,
+            Clock clock,
+            long expectedEndOffset) {
+        long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+        try (SharedOxiaClientRuntime inspector =
+                        SharedOxiaClientRuntime.connect(oxia, clock);
+                OxiaJavaKafkaPartitionMetadataStore partitions =
+                        OxiaJavaKafkaPartitionMetadataStore
+                                .usingSharedRuntime(
+                                        oxia,
+                                        inspector,
+                                        nereusCluster,
+                                        kafkaCluster);
+                OxiaJavaGenerationMetadataStore generations =
+                        OxiaJavaGenerationMetadataStore
+                                .usingSharedRuntime(
+                                        oxia, inspector, clock)) {
+            StreamId streamId =
+                    new StreamId(
+                            partitions
+                                    .get(identity.durableId())
+                                    .join()
+                                    .orElseThrow()
+                                    .value()
+                                    .streamId());
+            while (System.nanoTime() < deadline) {
+                for (var candidate :
+                        generations
+                                .scanIndex(
+                                        nereusCluster,
+                                        streamId,
+                                        ReadView.COMMITTED,
+                                        1,
+                                        expectedEndOffset,
+                                        Optional.empty(),
+                                        100)
+                                .join()
+                                .values()) {
+                    if (candidate
+                                    instanceof VersionedGenerationIndex
+                                            index
+                            && index.value().lifecycle()
+                                    == GenerationLifecycle.COMMITTED
+                            && index.value().offsetStart() == 0
+                            && index.value().offsetEnd()
+                                    == expectedEndOffset) {
+                        return index;
+                    }
+                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException failure) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(
+                            "interrupted while awaiting Kafka NCP2 generation",
+                            failure);
+                }
+            }
+        }
+        throw new AssertionError(
+                "Kafka NCP2 generation did not commit before the integration deadline");
     }
 
     private static byte[] bytes(int seed) {

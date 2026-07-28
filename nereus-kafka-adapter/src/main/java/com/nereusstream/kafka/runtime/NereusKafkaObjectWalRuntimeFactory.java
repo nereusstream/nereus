@@ -13,6 +13,9 @@ import com.nereusstream.core.append.AppendAdmissionGuard;
 import com.nereusstream.core.append.AppendCoordinator;
 import com.nereusstream.core.append.DefaultGenerationZeroPhysicalReferencePublisher;
 import com.nereusstream.core.append.GenerationZeroPhysicalReferencePublisher;
+import com.nereusstream.core.append.RequiredObjectGenerationCompletion;
+import com.nereusstream.core.backpressure.MaterializationLagGate;
+import com.nereusstream.core.backpressure.MaterializationLagThresholds;
 import com.nereusstream.core.physical.DefaultObjectReadPinManager;
 import com.nereusstream.core.physical.DefaultObjectProtectionManager;
 import com.nereusstream.core.physical.ObjectReadPinManager;
@@ -33,6 +36,8 @@ import com.nereusstream.core.wal.object.ObjectWalReaderAdapter;
 import com.nereusstream.kafka.activation.KafkaStorageActivationRuntime;
 import com.nereusstream.kafka.activation.KafkaStorageActivationVerifier;
 import com.nereusstream.kafka.activation.KafkaStorageBindingAwareClusterSnapshotProvider;
+import com.nereusstream.kafka.activation.KafkaAsyncAppendAdmissionGuard;
+import com.nereusstream.kafka.activation.KafkaGenerationProtocolActivationGuard;
 import com.nereusstream.kafka.checkpoint.DurableKafkaCheckpointFailureQuarantine;
 import com.nereusstream.kafka.checkpoint.KafkaCanonicalCheckpointPublicationFactory;
 import com.nereusstream.kafka.checkpoint.KafkaCheckpointFailureQuarantine;
@@ -47,6 +52,7 @@ import com.nereusstream.kafka.recovery.KafkaPartitionRecoveryLauncher;
 import com.nereusstream.kafka.retention.DefaultKafkaPartitionMaintenance;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceFactory;
 import com.nereusstream.kafka.retention.KafkaPartitionMaintenanceRuntime;
+import com.nereusstream.materialization.MaterializationSourceProvider;
 import com.nereusstream.metadata.oxia.GenerationIndexValidator;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
 import com.nereusstream.metadata.oxia.KafkaCheckpointFailureMetadataStore;
@@ -342,6 +348,109 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             generationMetadataStore,
                             physicalMetadataStore,
                             exactContext.clock()));
+            AppendAdmissionGuard appendAdmissionGuard =
+                    AppendAdmissionGuard.noOp();
+            RequiredObjectGenerationCompletion
+                    requiredObjectGeneration = null;
+            if (activationContext != null) {
+                KafkaStorageActivationVerifier
+                        exactActivationVerifier =
+                                Objects.requireNonNull(
+                                        activationVerifier,
+                                        "Kafka materialization requires an activation verifier");
+                KafkaGenerationProtocolActivationGuard
+                        generationActivation =
+                                new KafkaGenerationProtocolActivationGuard(
+                                        exactConfiguration
+                                                .runtime()
+                                                .nereusCluster(),
+                                        generationMetadataStore,
+                                        exactActivationVerifier,
+                                        exactContext.clock());
+                List<MaterializationSourceProvider>
+                        additionalMaterializationSources =
+                                bookKeeperRuntime == null
+                                        ? List.of()
+                                        : List.of(
+                                                bookKeeperRuntime
+                                                        .materializationSourceProvider());
+                ExecutorService materializationWorkers =
+                        Executors.newFixedThreadPool(
+                                exactConfiguration
+                                        .materialization()
+                                        .maxConcurrentWorkers(),
+                                daemonFactory(
+                                        "nereus-kafka-materialization"));
+                KafkaObjectMaterializationRuntime
+                        exactMaterialization =
+                                new KafkaObjectMaterializationRuntime(
+                                        exactConfiguration
+                                                .runtime()
+                                                .nereusCluster(),
+                                        durableProcessRunId(
+                                                exactConfiguration
+                                                        .streamStorage()
+                                                        .processRunId()),
+                                        exactConfiguration
+                                                .streamStorage()
+                                                .maxCommitChainScan(),
+                                        exactConfiguration
+                                                .materialization(),
+                                        l0MetadataStore,
+                                        generationMetadataStore,
+                                        physicalMetadataStore,
+                                        objectStore,
+                                        identities,
+                                        protections,
+                                        readPins,
+                                        readComponents,
+                                        generationActivation,
+                                        additionalMaterializationSources,
+                                        exactContext
+                                                .renewalScheduler(),
+                                        materializationWorkers,
+                                        callbackExecutor,
+                                        exactContext.clock());
+                providerResources.add(
+                        registerOwned(
+                                constructedResources,
+                                "kafka-object-materialization-runtime",
+                                exactMaterialization));
+                backgroundServiceFactories.add(
+                        ignored -> exactMaterialization);
+                MaterializationLagThresholds thresholds =
+                        new MaterializationLagThresholds(
+                                exactConfiguration
+                                        .materialization()
+                                        .lagThrottleRecords(),
+                                exactConfiguration
+                                        .materialization()
+                                        .lagRejectRecords(),
+                                exactConfiguration
+                                        .materialization()
+                                        .lagThrottleBytes(),
+                                exactConfiguration
+                                        .materialization()
+                                        .lagRejectBytes(),
+                                exactConfiguration
+                                        .materialization()
+                                        .lagRejectAge(),
+                                exactConfiguration
+                                        .materialization()
+                                        .lagThrottleDelay());
+                appendAdmissionGuard =
+                        new KafkaAsyncAppendAdmissionGuard(
+                                generationActivation,
+                                new MaterializationLagGate(
+                                        exactMaterialization
+                                                .lagSnapshotReader(),
+                                        thresholds,
+                                        exactContext
+                                                .renewalScheduler()));
+                requiredObjectGeneration =
+                        exactMaterialization
+                                .requiredObjectGenerationCompletion();
+            }
             PrimaryWalRegistry objectWalRegistry =
                     AppendCoordinator.productionObjectWalRegistry(
                             exactConfiguration.streamStorage(),
@@ -371,6 +480,12 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                 profileResolvers.put(
                         StorageProfile.BOOKKEEPER_WAL_ONLY,
                         bookKeeperRuntime.walRuntime().profileResolver());
+                profileResolvers.put(
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,
+                        bookKeeperRuntime.walRuntime().profileResolver());
+                profileResolvers.put(
+                        StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT,
+                        bookKeeperRuntime.walRuntime().profileResolver());
             }
             streamStorage = new DefaultStreamStorage(
                     exactConfiguration.streamStorage(),
@@ -381,7 +496,8 @@ public final class NereusKafkaObjectWalRuntimeFactory {
                             exactConfiguration.runtime().nereusCluster(),
                             l0MetadataStore),
                     new StorageProfileResolverRegistry(profileResolvers),
-                    AppendAdmissionGuard.noOp(),
+                    appendAdmissionGuard,
+                    requiredObjectGeneration,
                     readComponents,
                     exactContext.clock(),
                     callbackExecutor,
