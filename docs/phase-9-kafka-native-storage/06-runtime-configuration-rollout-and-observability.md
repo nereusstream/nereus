@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；58-key Kafka ConfigDef、immutable typed snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL provider/checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；BookKeeper/async providers、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
+> 状态：Implementation in progress；91-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL/BookKeeper-WAL-only provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；BookKeeper process profile、async/sync materialization、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -37,7 +37,7 @@ binding-operation owner/epoch/TTL and the exact non-empty executable-profile set
 store、borrowed renewal scheduler、a prepared recovery launcher、clock、startup action and provider resources with exact
 ownership。The factory constructs one keyspace/lifecycle/opener/manager/runtime graph and one shared RecordBatch codec；it has
 no Kafka server type、reflection、service loader、global registry or duplicate provider lifecycle。Broker/controller identity、
-KRaft metadata view、Kafka `Time`/metrics and the mapping from the fork's 58-key snapshot remain inputs to the not-yet-built
+KRaft metadata view、Kafka `Time`/metrics and the mapping from the fork's 91-key snapshot are explicit inputs to the
 provider/activation creator。The manager checks that set before binding lifecycle I/O，so a partial provider deployment cannot
 persist an unusable binding。Independent runtimes can run in one JVM。
 
@@ -139,9 +139,10 @@ shutdown。
 
 ## 2. Configuration namespace
 
-All 58 keys below are registered in Kafka `ConfigDef` by local fork `d312e8e58d`。Primitive types、defaults、independent
-hard ranges、profile dependencies and broker-local cross-field rules are executable；dynamic mutation、provider connectivity、
-activation/controller enforcement and runtime resource creation remain target behavior。
+All 91 keys below are registered in Kafka `ConfigDef` by the local fork。The original 58-key inert surface is extended by
+33 BookKeeper binding/resource/readiness keys in fork `50b46aab2d`。Primitive types、defaults、independent hard ranges、
+profile dependencies and broker-local cross-field rules are executable；dynamic mutation and provider connectivity remain
+startup/runtime behavior。
 
 ### 2.1 Core and providers
 
@@ -162,6 +163,56 @@ activation/controller enforcement and runtime resource creation remain target be
 
 Credentials are supplied through existing provider credential mechanisms/environment/secret files，not echoed into Kafka
 effective-config logs。Config mapper redacts any key matching access/secret/token/password/private-key patterns。
+
+#### 2.1.1 Complete BookKeeper binding
+
+`NereusKafkaStorageConfig.from(AbstractConfig)` constructs
+`Optional<NereusKafkaBookKeeperConfig>` only when storage is enabled and the selected profile uses BookKeeper。Object-only
+profiles reject a populated BookKeeper snapshot；a BookKeeper profile rejects any incomplete identity。The metadata URI is
+part of `Core`，while the remaining 33 fields form the immutable stock-owned record：
+
+| Key | Default | Code-level validation/consumer |
+| --- | --- | --- |
+| `nereus.kafka.storage.bookkeeper.metadata.service.uri` | none | required URI；`ClientConfiguration.setMetadataServiceUri` |
+| `nereus.kafka.storage.bookkeeper.deployment.id` | none | non-blank F1-BK deployment identity |
+| `nereus.kafka.storage.bookkeeper.cluster.alias` | none | non-blank durable physical-target alias |
+| `nereus.kafka.storage.bookkeeper.provider.scope.sha256` | none | exactly 64 lowercase hex chars |
+| `nereus.kafka.storage.bookkeeper.ledger.id.prefix.bits` | `12` | `8..24` |
+| `nereus.kafka.storage.bookkeeper.ledger.id.prefix.value` | none | canonical positive prefix；highest configured prefix bit set |
+| `nereus.kafka.storage.bookkeeper.ledger.id.reservation.id` | none | non-blank immutable operator reservation ID |
+| `nereus.kafka.storage.bookkeeper.ensemble.size` | `2` | positive；`ensemble >= write >= ack` |
+| `nereus.kafka.storage.bookkeeper.write.quorum.size` | `2` | positive；not above ensemble |
+| `nereus.kafka.storage.bookkeeper.ack.quorum.size` | `2` | positive；not above write quorum |
+| `nereus.kafka.storage.bookkeeper.digest.type` | `CRC32C` | exact `CRC32`、`CRC32C` or `MAC` |
+| `nereus.kafka.storage.bookkeeper.password.file` | none | absolute normalized reference；raw password is never stored in snapshot/digest |
+| `nereus.kafka.storage.bookkeeper.password.version` | none | non-blank immutable secret identity version |
+| `nereus.kafka.storage.bookkeeper.max.entries.per.ledger` | `100000` | positive |
+| `nereus.kafka.storage.bookkeeper.max.bytes.per.ledger` | `256 MiB` | `1 MiB..1 TiB` |
+| `nereus.kafka.storage.bookkeeper.max.append.ranges.per.ledger` | `1000` | `1..65536`；multiplied by slots must be `<=65536` |
+| `nereus.kafka.storage.bookkeeper.protection.slots.per.range` | `8` | `4..64` |
+| `nereus.kafka.storage.bookkeeper.max.reader.leases.per.ledger` | `64` | must cover `persistentBrokerCount + 1` restart overlap |
+| `nereus.kafka.storage.bookkeeper.max.uncertain.allocations` | `32` | `1..65536` fixed durable slot bound |
+| `nereus.kafka.storage.bookkeeper.max.ledger.age.ms` | `3600000` | at least `1000` |
+| `nereus.kafka.storage.bookkeeper.max.writes.inflight` | `8` | not above append `threads + queueCapacity` |
+| `nereus.kafka.storage.bookkeeper.max.reads.inflight` | `8` | not above Fetch executor threads |
+| `nereus.kafka.storage.bookkeeper.max.read.bytes.inflight` | `64 MiB` | `1..32 GiB` and not above Fetch inflight bytes |
+| `nereus.kafka.storage.bookkeeper.operation.timeout.ms` | `30000` | `1s..300s` and fits append、Fetch and shutdown-drain deadlines |
+| `nereus.kafka.storage.bookkeeper.allocation.timeout.ms` | `20000` | `1s..300s` and fits append deadline |
+| `nereus.kafka.storage.bookkeeper.seal.timeout.ms` | `30000` | `1s..300s` and fits shutdown-drain deadline |
+| `nereus.kafka.storage.bookkeeper.delete.timeout.ms` | `30000` | `1s..300s` and fits shutdown-drain deadline |
+| `nereus.kafka.storage.bookkeeper.reader.lease.ttl.ms` | `120000` | at least `1000` and strictly above renewal interval |
+| `nereus.kafka.storage.bookkeeper.reader.lease.renew.ms` | `30000` | at least `1000` and strictly below TTL |
+| `nereus.kafka.storage.bookkeeper.retention.scan.interval.ms` | `60000` | at least `1000` |
+| `nereus.kafka.storage.bookkeeper.retention.page.size` | `256` | `1..1024` |
+| `nereus.kafka.storage.bookkeeper.readiness.epoch` | `1` | positive exact pre-provisioned readiness epoch |
+| `nereus.kafka.storage.bookkeeper.readiness.sha256` | none | exactly 64 lowercase hex chars |
+| `nereus.kafka.storage.bookkeeper.persistent.broker.count` | `1` | positive and included in restart-overlap lease validation |
+
+The password provider accepts only a `BookKeeperSecretRef` whose file URI and `identityVersion` exactly match this snapshot，
+reads at most 64 KiB on demand，and never adds secret bytes to compatibility/provider/code digests。Because NKC1 checkpoints
+and compaction generations remain ObjectStore-backed，every currently executable enabled profile—including
+`BOOKKEEPER_WAL_ONLY`—still requires the typed Object provider/bucket。This does not make BookKeeper generation zero an
+Object WAL；it preserves the Kafka checkpoint/materialization plane shared by both executable profiles。
 
 Allowed initial profiles after their existing activation proofs：
 
@@ -342,8 +393,14 @@ password providers。Presence must match before provider I/O。When present，th
 views，requires an exact ACTIVE publication before admission，and registers the BookKeeper appender、reader、generation-zero
 physical-reference publisher and profile resolver in the same storage graph。`BOOKKEEPER_WAL_ONLY` deliberately skips Object
 materialization registration。The adapter closes its owned BookKeeper runtime before the embedding owner closes the borrowed
-client。The Kafka-fork call path above still constructs only the Object configuration/provider；BookKeeper configuration mapping
-and client ownership are the next process-level seam，not implied by the adapter gate。
+client。Fork `50b46aab2d` now maps the complete typed snapshot to
+`BookKeeperWalConfiguration`/`NereusKafkaBookKeeperWalRuntimeConfiguration`，constructs the BookKeeper client only after
+pre-I/O validation，passes it as borrowed context to the product runtime，and wraps the result in
+`NereusKafkaOwnedProviderRuntime`。Close order is product graph first and client second；both closes are attempted，suppressed
+failure is preserved，and repeated close is idempotent。A construction failure closes the already-created client before it
+escapes。The executable set/default becomes exactly
+`{OBJECT_WAL_SYNC_OBJECT, BOOKKEEPER_WAL_ONLY}`/`BOOKKEEPER_WAL_ONLY`，and the configuration/provider/code digests include
+the binding checksum plus readiness identity without including password bytes。
 
 The broker-epoch wait deadline is the typed rollout readiness timeout。The exact epoch is captured once and passed unchanged into
 the capability；the mapper derives only the separate checked operation epoch。`KafkaScheduler.scheduledExecutorService()` exposes

@@ -420,8 +420,11 @@ coordinator/transaction/compaction remain M4/M5。
   `f9BookKeeperWalOnlyProviderIntegrationTest` separately provisions the exact F1-BK ledger-ID namespace/publication
   activation，borrows a real two-bookie client，then proves Kafka leader open、strict append、physical-reference publication
   and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
-  runtime/stores/readers are closed through the product ledger。This is adapter evidence；Kafka-fork BookKeeper config/client
-  ownership and process-level profile evidence remain open；
+  runtime/stores/readers are closed through the product ledger。Fork `50b46aab2d` adds the complete stock-owned typed
+  BookKeeper binding、exact file/version secret reference、pre-I/O cross-field validation、BookKeeper client construction and
+  product-before-client close wrapper；six server config tests、eight mapper/ownership tests、Checkstyle、SpotBugs and
+  Spotless pass。This remains deterministic/focused adapter evidence；the native Kafka process-level BookKeeper profile gate
+  remains open；
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
@@ -468,24 +471,24 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@ecde6964c5` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@50b46aab2d` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
-  cache-directory KRaft identity commit。The
+  cache-directory KRaft identity commit plus one typed BookKeeper runtime/client-ownership commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
   `bin/nereus-kafka-server-start.sh`；stock `ControllerServer` now owns a product-neutral metadata-publisher/runtime seam，
   and the artifact runtime deterministically schedules first activation only while locally current。The real single-node
   release-distribution provider-backed KRaft baseline and same-node fresh-JVM user/group/transaction-state cold restart pass；
-  stable open-transaction forced-exit/abort recovery also passes，while multi-controller/live takeover、BookKeeper/profile、
+  stable open-transaction forced-exit/abort recovery also passes，while multi-controller/live takeover、BookKeeper process profile、
   checkpoint/virtual-segment and broader kill-cut final gates remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/thirty-one-commit count/organization remote/one-hundred-eighteen log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/thirty-two-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -567,7 +570,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@ecde6964c5` branch。
+`nereus/future9-native-kafka-storage@50b46aab2d` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -743,8 +746,10 @@ authority/recovery opener、one partition manager、one codec pair and one proce
 entered into the exact close ledger；the Object-WAL creator now additionally owns checkpoint read pins and concrete
 checkpoint/COMMITTED replay composition。Its optional BookKeeper slice borrows the client、requires exact F1-BK ACTIVE
 publication/readiness、installs the BookKeeper appender/reader/physical-reference/profile resolver in the same graph and skips
-Object materialization registration for `BOOKKEEPER_WAL_ONLY`。Kafka scheduler/clock、BookKeeper client and the fork
-recovery-state factory remain borrowed。The local Kafka fork also
+Object materialization registration for `BOOKKEEPER_WAL_ONLY`。Kafka scheduler/clock and the fork recovery-state factory
+remain borrowed。The BookKeeper client is borrowed by the product graph but owned by the fork's outer
+`NereusKafkaOwnedProviderRuntime`，which closes the product graph before the client and remains idempotent under repeated close。
+The local Kafka fork also
 has an explicitly injected generic `BrokerStorageRuntimeFactory` with
 stock restart coverage and exact BrokerServer start/ready/metadata/drain/close ordering。`NereusBrokerStorageRuntimeFactory`
 and `NereusBrokerStorageRuntime` now add typed runtime/scan-limit creators、failure rollback、one exact ReplicaManager binding、

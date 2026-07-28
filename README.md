@@ -91,7 +91,7 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@ecde6964c5`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@50b46aab2d`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
@@ -109,8 +109,10 @@ publishes a partial state，while ordinary Fetch continues to reject resource ex
 stably appends open-transaction data at offset 5 and is forcibly killed；a fourth JVM reuses that transactional ID，recovers
 the coordinator state、writes ABORT marker 6、commits data/marker 7/8，proves `read_committed` skips the aborted record and
 advances the group to offset 8 with latest=9。The native Kafka process evidence is still single-node/Object-WAL。The product
-adapter's focused real-service gate now covers `BOOKKEEPER_WAL_ONLY`，but the Kafka fork does not yet map BookKeeper
-configuration or own a BookKeeper client；multi-controller and multi-broker live takeover、checkpoint/virtual-segment cuts、
+adapter's focused real-service gate covers `BOOKKEEPER_WAL_ONLY`，and the Kafka fork now owns the complete typed
+BookKeeper configuration snapshot、exact password-file identity、client lifecycle and
+`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The process distribution has not yet run that profile；
+multi-controller and multi-broker live takeover、checkpoint/virtual-segment cuts、
 async/sync materialization profiles and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase

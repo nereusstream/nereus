@@ -418,17 +418,18 @@ source-isolation fix 是 `faaffc8a75`，第二十七个 native-storage launcher 
 `9773c8f817a8f9f81d8beadf072d8d0e1345be99`，第二十九个 durable storage feature/control commit 是
 `d23dc5c7877eac89366e3552b56cae4a87bdad4a`，第三十个 aggregate Spotless import alignment 是
 `5ebf31cde8a5ef58597f9a2e0f05d9c37e5ceb41`，第三十一个 cache-directory KRaft identity commit 是
-`ecde6964c5b3a52163ef2776e63d3b0b7093c358`。该 head 已通过 SSH 发布到
+`ecde6964c5b3a52163ef2776e63d3b0b7093c358`，第三十二个 typed BookKeeper runtime/client-ownership commit 是
+`50b46aab2dad56850fc5d76ec11cf929b14c1bd9`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-one-commit
-count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百一十八文件 exact change set/blob、
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-two-commit
+count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
 BrokerServer runtime create/ready/drain/close signature、typed adapter factory/ReplicaManager binding、stock-only
 maintenance interfaces、共享 `Kafka.run` dual-factory 传递、artifact-only launcher 与 executable script，以及 package-wide
 no-reflection/no-service-loader/no-stock-product-import 规则；新增 runtime composition 还锁定 executable-profile、explicit-provider、
-broker-capability、activation-backed Object-WAL creator、borrowed scheduler、single-image KRaft snapshot、
+broker-capability、activation-backed Object/BookKeeper creator、typed BookKeeper binding/client ownership、borrowed scheduler、single-image KRaft snapshot、
 post-registration broker epoch、per-operation admission recheck、one-time recovery-state-factory binding、stock
 `RecordBatch` CRC/fresh-state/frozen-source validation、exact `Partition` publication，以及 stock-local
 `UnifiedLogFactory.Local` fallback、Nereus no-local-scan/no-local-maintenance factory、recovered-state/storage publication
@@ -574,5 +575,5 @@ matrix evidence。
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`ecde6964c5b3a52163ef2776e63d3b0b7093c358`。Executable source-lock expectation 已更新到该 reviewed、
+`50b46aab2dad56850fc5d76ec11cf929b14c1bd9`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

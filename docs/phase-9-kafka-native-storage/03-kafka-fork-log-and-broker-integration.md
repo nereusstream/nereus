@@ -896,7 +896,11 @@ stock-owned controller runtime/publisher seam、artifact-only activation schedul
 format、dedicated-controller validation、activation feature wait 和 single-copy controller policy；第三十个
 `5ebf31cde8` 修正 aggregate `core:spotlessCheck` 捕获的 controller runtime test import order；第三十一个
 `ecde6964c5` 为 Nereus authoritative cache root 创建/校验 KRaft V1 `meta.properties` 与 non-reserved directory ID，
-使 broker registration 能携带有效 directory identity。真实 combined-node KRaft/Oxia/S3 process baseline 已通过；
+使 broker registration 能携带有效 directory identity；第三十二个 `50b46aab2d` 新增 stock-owned
+`NereusKafkaBookKeeperConfig`、91-key `ConfigDef`、BookKeeper cross-field validation、WAL/runtime/capability mapping、
+password-file exact identity、fork-owned client construction，以及 product-first/client-second idempotent close wrapper。
+该 commit 只允许 `OBJECT_WAL_SYNC_OBJECT` 或 `BOOKKEEPER_WAL_ONLY` 进入 production creator；其余 profile 继续在
+provider I/O 前 fail closed。真实 combined-node KRaft/Oxia/S3 process baseline 已通过；
 同节点 fresh-JVM cold restart 也已通过；多 Controller failover、live takeover、kill-cut matrix 与完整 stock
 cleaner differential matrix 尚未实现。
 

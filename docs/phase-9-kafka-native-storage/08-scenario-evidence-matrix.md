@@ -29,8 +29,9 @@ Current provider-profile evidence（2026-07-28）：the product adapter can inst
 ledger-ID namespace、ACTIVE publication and exact broker readiness。`f9BookKeeperWalOnlyProviderIntegrationTest` starts real
 two-bookie BookKeeper、opens a Kafka leader with `BOOKKEEPER_WAL_ONLY`、strictly appends a magic-v2 batch、publishes the exact
 BookKeeper generation-zero target and Fetches it through the shared generation resolver。The client is borrowed and the
-provider graph closes before it。All profile-matrix rows remain `PLANNED` because the Kafka fork still lacks BookKeeper
-configuration/client ownership、process startup/restart/takeover and async/sync Object materialization evidence。
+provider graph closes before it。Fork `50b46aab2d` now supplies complete typed BookKeeper configuration、exact secret
+identity、client ownership and executable-profile mapping with focused static/unit evidence。All profile-matrix rows remain
+`PLANNED` because BookKeeper process startup/restart/takeover and async/sync Object materialization evidence have not run。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -47,7 +48,7 @@ The extended gate also leaves one transaction open at a stable data batch，forc
 resolves it with an ABORT marker before accepting the next transaction；read-committed and the group skip the aborted data。
 Rows stay `PLANNED` because their required BookKeeper/profile service matrix、multi-broker takeover、
 checkpoint/virtual-segment and mandatory NTC2 failure cuts plus aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@ecde6964c5`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@50b46aab2d`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -55,7 +56,7 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@ecde6964c5`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@50b46aab2d`。
 
 Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
 cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure
@@ -69,7 +70,7 @@ fresh broker process、takeover or aggregate tiers。
 Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
 one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
 canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus
-Checkstyle、SpotBugs and the executable 31-commit/118-file source lock。Rows remain `PLANNED` until real-provider
+Checkstyle、SpotBugs and the executable 32-commit/121-file source lock。Rows remain `PLANNED` until real-provider
 fresh-process/restart/takeover and full LogCleaner differential evidence exist。
 
 Current M6 launcher/isolation/process evidence（fork `faaffc8a75` + `3bd92c7244` + `9773c8f817` + `d23dc5c787` +
@@ -86,7 +87,7 @@ selection。Fork `d23dc5c787` additionally proves explicit-only `nereus.storage.
 enabled broker/controller advertisement、dedicated-controller validation、explicit enabled formatting、finalized-feature
 activation wait and controller-side RF/minISR/ISR/reassignment/directory rejection。Fork `ecde6964c5` creates and validates
 the authoritative cache root's KRaft V1 identity before directory registration。Focused launcher/runtime/feature suites、
-complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 31-commit/118-file source lock pass。
+complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 32-commit/121-file source lock pass。
 `phase9M6KafkaProcessCheck` additionally builds the real release tarball and passes one combined broker/controller process
 against four-shard Oxia and pinned LocalStack S3：explicit feature format、registration/activation、Admin create、acks=all
 Produce、byte-exact Fetch、one committed transaction、one real group rebalance/offset commit、earliest=0/latest=3
