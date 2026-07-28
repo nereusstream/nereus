@@ -692,7 +692,7 @@ controller must reconcile：an empty control plane recreates readiness after rev
 existing readiness epoch/metadata offset，PREPARED preserves every immutable preparation fact while advancing to ACTIVE，
 and an already-applied ACTIVE record remains exactly equal。All six cuts preserve or safely create readiness for the stable
 broker set `[4]`，then admit node 4 and pass native Produce/Fetch/ListOffsets at `0/1` with a positive Object count。Fresh
-`--rerun-tasks` execution passes 66/66 actionable tasks in 2m42s and the task is aggregated by
+`--rerun-tasks` regression passes 75/75 actionable tasks in 2m40s and the task is aggregated by
 `phase9M6KafkaProcessCheck`。
 
 The first before-PREPARED execution found that replacement recovery reused valid readiness at offset `r` but built PREPARED
@@ -700,6 +700,16 @@ with a newer snapshot offset `s`，which immediately violated the exact PREPARED
 `createPrepared` now stores `readiness.kraftMetadataOffset()` and
 `resumesAbsentActivationFromExistingReadinessAfterControllerFailure` provides a narrow deterministic regression。The
 store-publication matrix is closed。
+
+`f9ActivationProofCutFailoverProcessIntegrationTest` closes the adjacent four initial-proof cuts on the same
+three-dedicated-controller/one-broker release topology。The agent targets
+`KafkaStorageFirstActivationCoordinator.currentSnapshot()` and `loadCapabilities(...)`，before invocation or after the
+first successful returned-stage completion。The successful snapshot boundary includes the fork-owned KRaft/local-log fact
+and all 64 binding registry scans；the successful capability boundary includes broker `[4]` identity、epoch、expiry、
+five-profile compatibility and provider-scope digest aggregation。Exceptional attempts are forwarded without consuming the
+after-provider one-shot capture。Each cut observes readiness/activation absent，kills the exact armed leader and requires a
+different higher-epoch controller to repeat the proof、publish ACTIVE/readiness `[4]` and pass native IO/Object persistence。
+Fresh execution passes 66/66 actionable tasks in 1m49s and is aggregated by `phase9M6KafkaProcessCheck`。
 
 `f9ActivationTransportRecoveryProcessIntegrationTest` now closes the adjacent actual Oxia transport-reset boundary。It routes
 one dedicated controller and one dedicated broker through Toxiproxy，establishes the controller's exact KRaft epoch，then
@@ -710,8 +720,8 @@ gate exposed that `OxiaJavaKafkaStorageActivationMetadataStore` returned arbitra
 causing the fork controller runtime to mark the epoch terminal。The store now preserves typed Nereus/condition/invariant
 failures but normalizes unknown read/write provider failures to retriable `METADATA_UNAVAILABLE`，including synchronous
 provider throws converted to failed futures。The narrow store regression and its complete contract pass；the process gate
-passes 73/73 actionable tasks in 1m10s。Initial empty-cluster snapshot/capability-aggregation process loss and the M7
-aggregate remain before KF-OPS-005 can leave `PLANNED`。
+passes 73/73 actionable tasks in 1m10s。The initial snapshot/capability-aggregation cuts now pass separately；the M7
+aggregate remains before KF-OPS-005 can leave `PLANNED`。
 
 The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
 source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed

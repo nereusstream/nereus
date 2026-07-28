@@ -1,7 +1,7 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；100-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real two-bookie ledger deletion、provider-level applied-delete response-loss、fresh-JVM NCP2 fallback、Object/BookKeeper takeover、three-voter ACTIVE controller kill/failover and six-way readiness/PREPARED/ACTIVE store-publication cuts pass；release-process response-loss restart、remaining activation process cuts、coordinator/checkpoint migration、broader kill-chaos and full observability remain target；F9-M6
-> 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；three-release-process Object-WAL already-dispatched append gate 锁定 provider-future stack、process freeze、pre-upload session fencing、no-orphan WAL 和 exact LEO continuation；BookKeeper three-profile P matrix and common provider-applied C cut pass；three combined nodes with three static controller voters now pass ACTIVE-state controller kill/re-election/reconciliation and native IO continuation；three dedicated controllers plus broker `[4]` now also pass before-provider and after-provider failover for readiness create、PREPARED create and ACTIVE CAS；one dedicated controller/broker gate further passes actual Oxia connection reset and same-controller-epoch retry；initial empty-cluster proof/capability-aggregation process cuts、coordinator migration 和更广 chaos 仍为 rollout blocker
+> 状态：Implementation in progress；100-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh、Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit、Kafka 64+64-shard stream-coverage deletion activation 与 fail-closed BookKeeper ledger-retention service composition are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real two-bookie ledger deletion、provider-level applied-delete response-loss、fresh-JVM NCP2 fallback、Object/BookKeeper takeover、three-voter ACTIVE controller kill/failover、six-way readiness/PREPARED/ACTIVE store-publication cuts and four-way initial proof cuts pass；release-process response-loss restart、coordinator/checkpoint migration、broader kill-chaos and full observability remain target；F9-M6
+> 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton reassignment、旧 owner resignation、committed recovery 与新 leader continuation 已通过；three-release-process Object-WAL already-dispatched append gate 锁定 provider-future stack、process freeze、pre-upload session fencing、no-orphan WAL 和 exact LEO continuation；BookKeeper three-profile P matrix and common provider-applied C cut pass；three combined nodes with three static controller voters now pass ACTIVE-state controller kill/re-election/reconciliation and native IO continuation；three dedicated controllers plus broker `[4]` now also pass before-provider and after-provider failover for readiness create、PREPARED create and ACTIVE CAS，以及 initial snapshot proof/capability aggregation；one dedicated controller/broker gate further passes actual Oxia connection reset and same-controller-epoch retry；coordinator migration 和更广 chaos 仍为 rollout blocker
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -110,7 +110,7 @@ image finalizes level 1。It also enforces RF/minISR/ISR/reassignment/directory 
 provider-backed native-storage baseline and same-node fresh-JVM cold restart now pass；ACTIVE re-entry CAS-refreshes readiness
 for the higher broker epoch without rerunning empty-cluster activation。Object/BookKeeper old-process fencing and
 ACTIVE-state three-voter controller takeover plus the six readiness/PREPARED/ACTIVE store-publication boundary cuts now pass；
-initial empty-cluster proof/capability-aggregation process cuts and broader chaos cuts remain open。
+the four initial snapshot-proof/capability-aggregation boundary cuts also pass；broader chaos cuts remain open。
 
 ### 1.2 Resource ownership
 
@@ -661,13 +661,26 @@ The surviving quorum must elect a different higher-epoch leader and emit the exa
 Empty-control-plane recovery repeats the proof and creates readiness；readiness-only recovery binds PREPARED to the existing
 readiness epoch/metadata offset；PREPARED recovery preserves the original prepared facts into ACTIVE；the already-applied
 ACTIVE response-loss case preserves the complete activation record unchanged。Only then may node 4 become ready and pass
-native RF1 Produce/Fetch/ListOffsets `0/1` with real Object persistence。The fresh `--rerun-tasks` execution passes 66/66
-actionable tasks in 2m42s，owns `build/f9-kafka-activation-cut-evidence` and is part of
+native RF1 Produce/Fetch/ListOffsets `0/1` with real Object persistence。The latest fresh `--rerun-tasks` regression passes
+75/75 actionable tasks in 2m40s，owns `build/f9-kafka-activation-cut-evidence` and is part of
 `phase9M6KafkaProcessCheck`。The agent and marker files are
 test-only observability and never become durable authority or release dependencies。
 
 The before-PREPARED cut also locks the production rule that PREPARED takes its metadata offset from durable readiness，
 not a replacement controller's newer snapshot。
+
+`f9ActivationProofCutFailoverProcessIntegrationTest` reuses the same role-separated topology and exact-leader arm/kill
+protocol，but targets the two coordinator proof boundaries rather than a store mutation。Its four isolated clusters gate
+`currentSnapshot` and `loadCapabilities` before invocation or after their returned stage succeeds。A successful snapshot
+completion includes the fork-owned KRaft broker/topic/local-log fact plus all 64 binding-registry shard reads；a successful
+capability completion includes the current broker `[4]` tuple and its identity、expiry、five-profile compatibility and
+provider-scope digest validation。All four cuts require direct Oxia readiness/activation absence before the kill。
+
+The after-provider agent wraps every armed attempt but consumes its one-shot capture only on the first successful provider
+completion；startup-time exceptional completions propagate unchanged and remain retryable。The replacement must be a
+different controller at a higher KRaft epoch，repeat the complete proof/aggregation，publish ACTIVE/readiness `[4]` and pass
+native Produce/Fetch/ListOffsets `0/1` with Object persistence。The fresh task passes 66/66 actionable tasks in 1m49s，
+owns `build/f9-kafka-activation-proof-cut-evidence` and is aggregated by `phase9M6KafkaProcessCheck`。
 
 `f9ActivationTransportRecoveryProcessIntegrationTest` independently routes one dedicated controller and one broker through a
 Toxiproxy endpoint backed by the real four-shard Oxia container。After node 1 becomes the exact single-voter controller，the
@@ -683,8 +696,7 @@ response-loss still reloads and accepts an exact winner。The deterministic cont
 exception escape and now passes together with monotonic create/CAS and applied-response-loss cases。The fresh real process
 task passes 73/73 actionable tasks in 1m10s and belongs to `phase9M6KafkaProcessCheck`。
 
-Initial empty-cluster proof/capability-aggregation process cuts、
-checkpoint/virtual-segment cuts、
+Checkpoint/virtual-segment cuts、
 transaction/internal-topic coordinator migration and complete rollout evidence 尚未闭合，所以整个路径
 仍不能用于 production rollout readiness。
 
@@ -1102,8 +1114,8 @@ queue rejection as backpressure。Never switch to network-thread blocking as eme
 - disabled stock Kafka boot and compatibility suite；
 - empty-cluster activation success and every partial cut；non-empty rejection；
 - controller failover during readiness/PREPARED/ACTIVE；ACTIVE steady-state kill plus before-provider/after-provider
-  readiness-create/PREPARED-create/ACTIVE-CAS cuts and actual Oxia transport reset/same-epoch retry are implemented；initial
-  proof/capability-aggregation process cuts remain required；
+  readiness-create/PREPARED-create/ACTIVE-CAS、initial snapshot-proof/capability-aggregation cuts and actual Oxia transport
+  reset/same-epoch retry are implemented；
 - rolling restart/new broker epoch/capability mismatch/unsupported rollback；
 - profile/provider scope mismatch and mixed executable profiles；
 - startup/shutdown at every resource cut，owned/borrowed close assertions；

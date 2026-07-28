@@ -1015,6 +1015,38 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 8, unit = TimeUnit.MINUTES)
+    void threeControllersRecoverEveryInitialActivationProofCut()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome =
+                extractReleaseDistribution(
+                        kafkaCheckout,
+                        root.resolve(
+                                "kafka-activation-proof-cut-distribution"));
+        Path formatScript =
+                executable(
+                        kafkaHome.resolve(
+                                "bin/kafka-storage.sh"));
+        Path startScript =
+                executable(
+                        kafkaHome.resolve(
+                                "bin/nereus-kafka-server-start.sh"));
+        Path activationAgent =
+                requiredActivationFaultAgent();
+        for (ActivationProofCut cut :
+                ActivationProofCut.values()) {
+            runActivationControllerCut(
+                    kafkaHome,
+                    formatScript,
+                    startScript,
+                    activationAgent,
+                    cut);
+        }
+    }
+
+    @Test
     @Timeout(value = 6, unit = TimeUnit.MINUTES)
     void controllerRetriesActualOxiaTransportFailureDuringFirstActivation()
             throws Exception {
@@ -1366,6 +1398,21 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path activationAgent,
             ActivationPublicationCut cut
     ) throws Exception {
+        runActivationControllerCut(
+                kafkaHome,
+                formatScript,
+                startScript,
+                activationAgent,
+                cut);
+    }
+
+    private void runActivationControllerCut(
+            Path kafkaHome,
+            Path formatScript,
+            Path startScript,
+            Path activationAgent,
+            ActivationControllerCut cut
+    ) throws Exception {
         int processCount = 4;
         int controllerCount = 3;
         String prefix =
@@ -1430,7 +1477,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         String brokerBootstrap =
                 "127.0.0.1:" + brokerPorts[3];
         String bucket =
-                "nereus-act-"
+                "n-act-"
                         + cut.slug()
                         + "-"
                         + UUID.randomUUID();
@@ -5165,7 +5212,7 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     private static void awaitActivationCutMarker(
-            ActivationPublicationCut cut,
+            ActivationControllerCut cut,
             ActivationAgentMarkers[] markers,
             int gatedControllerIndex,
             Process[] nodes,
@@ -5460,7 +5507,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                     String nereusCluster,
                     String kafkaClusterId,
                     List<Integer> expectedBrokerIds,
-                    ActivationPublicationCut cut,
+                    ActivationControllerCut cut,
                     Path[] serverLogs,
                     Duration timeout
             ) {
@@ -5955,7 +6002,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     private static String activationFaultAgentOptions(
             Path agent,
-            ActivationPublicationCut cut,
+            ActivationControllerCut cut,
             ActivationAgentMarkers markers
     ) {
         Map<String, String> arguments =
@@ -6221,7 +6268,7 @@ class NereusKafkaNativeProcessIntegrationTest {
 
     private static void
             preserveActivationCutFailureEvidence(
-                    ActivationPublicationCut cut,
+                    ActivationControllerCut cut,
                     Path[] configs,
                     Path[] formatLogs,
                     Path[] serverLogs,
@@ -6525,49 +6572,11 @@ class NereusKafkaNativeProcessIntegrationTest {
         }
         for (ActivationPublicationCut cut :
                 ActivationPublicationCut.values()) {
-            for (int nodeId = 1;
-                    nodeId <= 4;
-                    nodeId++) {
-                String prefix =
-                        "activation-cut-"
-                                + cut.slug()
-                                + "-node-"
-                                + nodeId;
-                Files.deleteIfExists(
-                        target.resolve(
-                                prefix
-                                        + ".properties"));
-                Files.deleteIfExists(
-                        target.resolve(
-                                prefix
-                                        + "-format.log"));
-                Files.deleteIfExists(
-                        target.resolve(
-                                prefix
-                                        + "-server.log"));
-            }
-            for (int nodeId = 1;
-                    nodeId <= 3;
-                    nodeId++) {
-                String prefix =
-                        "activation-cut-"
-                                + cut.slug()
-                                + "-controller-"
-                                + nodeId
-                                + "-agent-";
-                for (String marker :
-                        List.of(
-                                "arm",
-                                "captured",
-                                "blocked",
-                                "applied",
-                                "installed")) {
-                    Files.deleteIfExists(
-                            target.resolve(
-                                    prefix
-                                            + marker));
-                }
-            }
+            clearActivationCutEvidence(target, cut);
+        }
+        for (ActivationProofCut cut :
+                ActivationProofCut.values()) {
+            clearActivationCutEvidence(target, cut);
         }
         Files.deleteIfExists(target.resolve("inflight-controller.properties"));
         Files.deleteIfExists(target.resolve("inflight-broker-one.properties"));
@@ -6612,6 +6621,55 @@ class NereusKafkaNativeProcessIntegrationTest {
                     target.resolve(profile + "-one-server.log"));
             Files.deleteIfExists(
                     target.resolve(profile + "-two-server.log"));
+        }
+    }
+
+    private static void clearActivationCutEvidence(
+            Path target,
+            ActivationControllerCut cut
+    ) throws IOException {
+        for (int nodeId = 1;
+                nodeId <= 4;
+                nodeId++) {
+            String prefix =
+                    "activation-cut-"
+                            + cut.slug()
+                            + "-node-"
+                            + nodeId;
+            Files.deleteIfExists(
+                    target.resolve(
+                            prefix
+                                    + ".properties"));
+            Files.deleteIfExists(
+                    target.resolve(
+                            prefix
+                                    + "-format.log"));
+            Files.deleteIfExists(
+                    target.resolve(
+                            prefix
+                                    + "-server.log"));
+        }
+        for (int nodeId = 1;
+                nodeId <= 3;
+                nodeId++) {
+            String prefix =
+                    "activation-cut-"
+                            + cut.slug()
+                            + "-controller-"
+                            + nodeId
+                            + "-agent-";
+            for (String marker :
+                    List.of(
+                            "arm",
+                            "captured",
+                            "blocked",
+                            "applied",
+                            "installed")) {
+                Files.deleteIfExists(
+                        target.resolve(
+                                prefix
+                                        + marker));
+            }
         }
     }
 
@@ -6835,7 +6893,18 @@ class NereusKafkaNativeProcessIntegrationTest {
         abstract void stop(Process broker, Path serverLog) throws Exception;
     }
 
-    private enum ActivationPublicationCut {
+    private interface ActivationControllerCut {
+        String slug();
+
+        String operation();
+
+        ActivationFaultPhase phase();
+
+        ActivationDurableState durableState();
+    }
+
+    private enum ActivationPublicationCut
+            implements ActivationControllerCut {
         READINESS_BEFORE_PROVIDER(
                 "ready-before",
                 "createReadiness",
@@ -6896,20 +6965,74 @@ class NereusKafkaNativeProcessIntegrationTest {
             this.durableState = durableState;
         }
 
-        private String slug() {
+        public String slug() {
             return slug;
         }
 
-        private String operation() {
+        public String operation() {
             return operation;
         }
 
-        private ActivationFaultPhase phase() {
+        public ActivationFaultPhase phase() {
             return phase;
         }
 
-        private ActivationDurableState durableState() {
+        public ActivationDurableState durableState() {
             return durableState;
+        }
+    }
+
+    private enum ActivationProofCut
+            implements ActivationControllerCut {
+        SNAPSHOT_BEFORE_PROVIDER(
+                "snapshot-before",
+                "currentSnapshot",
+                ActivationFaultPhase
+                        .BEFORE_PROVIDER),
+        SNAPSHOT_APPLIED(
+                "snapshot-applied",
+                "currentSnapshot",
+                ActivationFaultPhase
+                        .AFTER_PROVIDER),
+        CAPABILITIES_BEFORE_PROVIDER(
+                "capabilities-before",
+                "loadCapabilities",
+                ActivationFaultPhase
+                        .BEFORE_PROVIDER),
+        CAPABILITIES_APPLIED(
+                "capabilities-applied",
+                "loadCapabilities",
+                ActivationFaultPhase
+                        .AFTER_PROVIDER);
+
+        private final String slug;
+        private final String operation;
+        private final ActivationFaultPhase phase;
+
+        ActivationProofCut(
+                String slug,
+                String operation,
+                ActivationFaultPhase phase
+        ) {
+            this.slug = slug;
+            this.operation = operation;
+            this.phase = phase;
+        }
+
+        public String slug() {
+            return slug;
+        }
+
+        public String operation() {
+            return operation;
+        }
+
+        public ActivationFaultPhase phase() {
+            return phase;
+        }
+
+        public ActivationDurableState durableState() {
+            return ActivationDurableState.EMPTY;
         }
     }
 

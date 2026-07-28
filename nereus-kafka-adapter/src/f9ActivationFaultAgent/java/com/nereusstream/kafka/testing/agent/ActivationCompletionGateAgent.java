@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import net.bytebuddy.agent.builder.AgentBuilder;
 import net.bytebuddy.asm.Advice;
@@ -20,17 +21,19 @@ import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.matcher.ElementMatcher;
 
 /**
- * Test-only Java agent that blocks one activation-store publication boundary from the controller.
+ * Test-only Java agent that blocks one first-activation boundary from the controller.
  *
- * <p>Before-provider mode skips the real readiness create, PREPARED create, or ACTIVE CAS. After-provider mode lets the
- * real Oxia-backed store apply successfully. Both modes substitute a future that never completes, creating deterministic
- * process-loss boundaries on either side of the durable store call.
+ * <p>Before-provider mode skips the real proof/aggregation or Oxia publication call. After-provider mode lets the
+ * operation finish successfully but withholds its completion from the controller. Both modes substitute a future that
+ * never completes, creating deterministic process-loss boundaries on either side of the selected operation.
  */
 public final class ActivationCompletionGateAgent {
     private static final String PROPERTY_PREFIX =
             "nereus.f9.activation.completion.gate.";
-    private static final String TARGET_TYPE =
+    private static final String ACTIVATION_STORE_TYPE =
             "com.nereusstream.metadata.oxia.OxiaJavaKafkaStorageActivationMetadataStore";
+    private static final String ACTIVATION_COORDINATOR_TYPE =
+            "com.nereusstream.kafka.activation.KafkaStorageFirstActivationCoordinator";
 
     private ActivationCompletionGateAgent() {
     }
@@ -68,15 +71,27 @@ public final class ActivationCompletionGateAgent {
                             named(operation).and(takesArguments(1));
                     case "compareAndSetActivation" ->
                             named(operation).and(takesArguments(2));
+                    case "currentSnapshot",
+                            "loadCapabilities" ->
+                            named(operation).and(takesArguments(
+                                    operation.equals("currentSnapshot") ? 0 : 1));
                     default ->
                             throw new IllegalArgumentException(
                                     "unsupported activation completion gate operation: "
                                             + operation);
                 };
+        boolean proofOperation =
+                operation.equals("currentSnapshot")
+                        || operation.equals("loadCapabilities");
+        boolean completionStageOperation =
+                operation.equals("loadCapabilities");
         new AgentBuilder.Default()
                 .disableClassFormatChanges()
                 .ignore(nameStartsWith("net.bytebuddy."))
-                .type(named(TARGET_TYPE))
+                .type(named(
+                        proofOperation
+                                ? ACTIVATION_COORDINATOR_TYPE
+                                : ACTIVATION_STORE_TYPE))
                 .transform(
                         (builder,
                                 type,
@@ -85,7 +100,9 @@ public final class ActivationCompletionGateAgent {
                                 protectionDomain) ->
                                 builder.visit(
                                         Advice.to(
-                                                        ActivationCompletionAdvice.class)
+                                                        completionStageOperation
+                                                                ? ActivationStageCompletionAdvice.class
+                                                                : ActivationCompletionAdvice.class)
                                                 .on(methodMatcher)))
                 .installOn(instrumentation);
         writeMarker(
@@ -181,8 +198,7 @@ public final class ActivationCompletionGateAgent {
             }
             if (!property("phase")
                     .equals("after-provider")
-                    || !Files.exists(path("arm"))
-                    || !capture()) {
+                    || !Files.exists(path("arm"))) {
                 return;
             }
             CompletableFuture<?> provider = returned;
@@ -227,6 +243,41 @@ public final class ActivationCompletionGateAgent {
         }
     }
 
+    public static final class ActivationStageCompletionAdvice {
+        private ActivationStageCompletionAdvice() {
+        }
+
+        @Advice.OnMethodEnter(
+                skipOn = Advice.OnNonDefaultValue.class)
+        public static boolean gateBeforeProvider() {
+            return ActivationCompletionAdvice.gateBeforeProvider();
+        }
+
+        @Advice.OnMethodExit
+        public static void gate(
+                @Advice.Enter boolean skipped,
+                @Advice.Return(readOnly = false)
+                        CompletionStage<?> returned
+        ) {
+            if (skipped) {
+                returned = new CompletableFuture<>();
+                return;
+            }
+            if (!ActivationCompletionAdvice.property("phase")
+                    .equals("after-provider")
+                    || !Files.exists(
+                            ActivationCompletionAdvice.path("arm"))) {
+                return;
+            }
+            CompletionStage<?> provider = returned;
+            CompletableFuture<Object> delayed =
+                    new CompletableFuture<>();
+            returned = delayed;
+            provider.whenComplete(
+                    new ProviderCompletion(delayed));
+        }
+    }
+
     public static final class ProviderCompletion
             implements BiConsumer<Object, Throwable> {
         private final CompletableFuture<Object> delayed;
@@ -244,6 +295,10 @@ public final class ActivationCompletionGateAgent {
         ) {
             if (failure != null) {
                 delayed.completeExceptionally(failure);
+                return;
+            }
+            if (!ActivationCompletionAdvice.capture()) {
+                delayed.complete(value);
                 return;
             }
             try {

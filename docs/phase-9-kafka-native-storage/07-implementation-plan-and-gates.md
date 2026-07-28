@@ -1,7 +1,7 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover and the complete six-way readiness/PREPARED/ACTIVE store-publication cuts are implemented；release-process response-loss restart、remaining activation process cuts、remaining M4 internal-topic cuts and inherited final gates remain open
-> 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover 已实现并进入 M6 process aggregate；`f9InFlightTakeoverProcessIntegrationTest` 已闭合 Object-WAL already-dispatched old append 的 P/C 边界；`f9BookKeeperProfileTakeoverProcessIntegrationTest` 已闭合 WAL-only/async/sync 的 post-handoff P-tier matrix；`f9BookKeeperInFlightTakeoverProcessIntegrationTest` 已闭合三 profile 共享的 Bookie-acked/metadata-`WRITING` C boundary；`f9MultiControllerFailoverProcessIntegrationTest` 已闭合 ACTIVE 稳态 controller kill/election/reconciliation and native IO continuity；`f9ActivationCutFailoverProcessIntegrationTest` 已闭合 readiness create、PREPARED create 与 ACTIVE CAS 的 before-provider/after-provider controller cuts，并修复 readiness 已存在但 activation 尚不存在时的 higher-offset replacement recovery；`f9ActivationTransportRecoveryProcessIntegrationTest` 已闭合 actual Oxia transport reset、typed retriable failure normalization 与 same-controller-epoch recovery；仍 open 的 takeover 边界是 coordinator/internal topics、checkpoint/virtual segments、initial empty-cluster snapshot/proof and capability-aggregation process cuts 与更广 chaos
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、provider-level applied-delete response-loss、release-process physical-deletion/fresh-JVM NCP2 fallback、Object/BookKeeper process takeover cuts、real-Oxia two-runtime Object-WAL live leader takeover、ACTIVE-state three-voter controller failover、the complete six-way readiness/PREPARED/ACTIVE store-publication cuts and four-way initial proof cuts are implemented；release-process response-loss restart、remaining M4 internal-topic cuts and inherited final gates remain open
+> 2026-07-29 状态增量：two-release-process Object-WAL/KRaft singleton takeover 已实现并进入 M6 process aggregate；`f9InFlightTakeoverProcessIntegrationTest` 已闭合 Object-WAL already-dispatched old append 的 P/C 边界；`f9BookKeeperProfileTakeoverProcessIntegrationTest` 已闭合 WAL-only/async/sync 的 post-handoff P-tier matrix；`f9BookKeeperInFlightTakeoverProcessIntegrationTest` 已闭合三 profile 共享的 Bookie-acked/metadata-`WRITING` C boundary；`f9MultiControllerFailoverProcessIntegrationTest` 已闭合 ACTIVE 稳态 controller kill/election/reconciliation and native IO continuity；`f9ActivationCutFailoverProcessIntegrationTest` 已闭合 readiness create、PREPARED create 与 ACTIVE CAS 的 before-provider/after-provider controller cuts，并修复 readiness 已存在但 activation 尚不存在时的 higher-offset replacement recovery；`f9ActivationProofCutFailoverProcessIntegrationTest` 已闭合 initial snapshot proof 与 capability aggregation 的 before-provider/after-provider cuts；`f9ActivationTransportRecoveryProcessIntegrationTest` 已闭合 actual Oxia transport reset、typed retriable failure normalization 与 same-controller-epoch recovery；仍 open 的 takeover 边界是 coordinator/internal topics、checkpoint/virtual segments 与更广 chaos
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -422,9 +422,18 @@ coordinator/transaction/compaction remain M4/M5。
   lets the real create/CAS apply before withholding completion。Direct Oxia inspection requires empty/readiness-only/
   PREPARED/ACTIVE durable state as appropriate。After that exact controller is killed before its reconciliation-success log，
   a different higher-epoch controller must preserve or advance that state，then offset-0 Produce/Fetch/ListOffsets `0/1` and
-  real Object persistence must pass。Fresh `--rerun-tasks` execution passes 66/66 actionable tasks in 2m42s and is included in
+  real Object persistence must pass。The latest fresh `--rerun-tasks` regression passes 75/75 actionable tasks in 2m40s and is included in
   `phase9M6KafkaProcessCheck`。The first before-PREPARED run exposed and fixed PREPARED using a replacement snapshot offset
   instead of the durable readiness offset；
+- `f9ActivationProofCutFailoverProcessIntegrationTest` adds four initial-proof P/C cuts on the same role-separated
+  topology。The test-only agent blocks `KafkaStorageFirstActivationCoordinator.currentSnapshot` or `loadCapabilities`
+  before invocation，or withholds the first successfully completed result。Snapshot success means the fork-owned
+  KRaft/local-log fact and all 64 binding registry shard reads completed；capability success means broker `[4]` passed
+  identity、epoch、expiry、five-profile compatibility and provider-scope digest aggregation。Direct Oxia must still show
+  readiness/activation absent before the exact current leader is killed。A different higher-epoch controller must repeat
+  the proof，publish ACTIVE/readiness `[4]` and pass native Produce/Fetch/ListOffsets `0/1` plus Object persistence。
+  Exceptional startup attempts do not consume the after-provider one-shot capture。Fresh execution passes 66/66
+  actionable tasks in 1m49s and the task is included in `phase9M6KafkaProcessCheck`；
 - `f9ActivationTransportRecoveryProcessIntegrationTest` adds actual Oxia transport failure/recovery P/C evidence with one
   dedicated controller and one broker。After controller node 1 reaches its exact single-voter KRaft epoch，Toxiproxy resets
   downstream Oxia connections while broker node 2 starts。Both JVMs must survive a four-second cut with direct Oxia
@@ -433,8 +442,7 @@ coordinator/transaction/compaction remain M4/M5。
   `OxiaJavaKafkaStorageActivationMetadataStore` and being marked terminal by the fork runtime；the store now preserves typed
   conditions/invariants but maps unknown provider failures to retriable `METADATA_UNAVAILABLE` failed futures。The
   deterministic store contract passes and the fresh process task passes 73/73 actionable tasks in 1m10s；
-- coordinator/internal-topic、checkpoint/virtual-segment、initial empty-cluster snapshot/proof and capability-aggregation
-  process cuts and broader chaos cuts remain open；
+- coordinator/internal-topic、checkpoint/virtual-segment and broader chaos cuts remain open；
 - fresh `phase9M3ProviderCheck --rerun-tasks` passes 64/64 actionable tasks on this source。The aggregate reruns the
   146/146 scenario manifest、29-blob Nereus source lock、Apache Kafka baseline lock、M1/M2/M3 codec predecessors and all
   three provider gates：Object sync/async round trip、two-bookie BookKeeper WAL-only/profile composition and the new live
@@ -626,9 +634,9 @@ coordinator/transaction/compaction remain M4/M5。
   release-distribution cold restart also pass；the in-process two-runtime Object-WAL live takeover and the two-release-process
   KRaft singleton reassignment、the three-release-process already-in-flight Object-WAL append cut and the BookKeeper
   three-profile two-process post-handoff matrix plus the common Bookie-acked/pre-publication C cut pass；the three-voter
-  ACTIVE controller kill/reconciliation gate、the complete six-way readiness/PREPARED/ACTIVE store-publication-cut gate and
-  actual Oxia transport reset/same-epoch retry also pass，while initial empty-cluster snapshot/proof and
-  capability-aggregation process cuts、checkpoint/virtual-segment/coordinator migration and broader kill-cut final gates
+  ACTIVE controller kill/reconciliation gate、the complete six-way readiness/PREPARED/ACTIVE store-publication-cut gate、
+  the four-way initial snapshot-proof/capability-aggregation gate and actual Oxia transport reset/same-epoch retry also pass，
+  while checkpoint/virtual-segment/coordinator migration and broader kill-cut final gates
   remain open；
 - `phase9KafkaBaselineSourceLockCheck` pins the clean local Apache Kafka
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
@@ -964,8 +972,8 @@ process-test task names as F9 development gates，so the published coordinate ca
 recovery/continuation、already-dispatched append cut and BookKeeper three-profile post-handoff matrix are covered；
 the common BookKeeper provider-applied C cut、ACTIVE-state multi-controller kill/reconciliation、the complete
 before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication matrix and actual Oxia
-transport reset/same-epoch retry are also covered；initial empty-cluster snapshot/proof and capability-aggregation process
-cuts、priority budgets、coordinator migration and checkpoint/virtual-segment cuts remain open。
+transport reset/same-epoch retry are also covered；the initial snapshot-proof/capability-aggregation four-cut matrix is
+covered as well；priority budgets、coordinator migration and checkpoint/virtual-segment cuts remain open。
 
 ### Tasks
 
@@ -980,6 +988,7 @@ phase9M6CheckpointQuarantineCheck
 :nereus-kafka-adapter:f9MultiBrokerTakeoverProcessIntegrationTest
 :nereus-kafka-adapter:f9MultiControllerFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationCutFailoverProcessIntegrationTest
+:nereus-kafka-adapter:f9ActivationProofCutFailoverProcessIntegrationTest
 :nereus-kafka-adapter:f9ActivationTransportRecoveryProcessIntegrationTest
 :nereus-kafka-adapter:f9InFlightTakeoverProcessIntegrationTest
 :nereus-kafka-adapter:f9BookKeeperProfileTakeoverProcessIntegrationTest
@@ -994,9 +1003,9 @@ phase9M6Check
 phase9M6FinalCheck --rerun-tasks
 ```
 
-Final extends the current ACTIVE steady-state、complete three-operation store-publication-cut proofs and actual Oxia
-transport-reset recovery with initial empty-cluster snapshot/proof and capability-aggregation process cuts、rolling
-restart、capability mismatch、all selected profiles and clean shutdown/kill cuts。
+Final extends the current ACTIVE steady-state、complete three-operation store-publication cuts、initial snapshot-proof/
+capability-aggregation cuts and actual Oxia transport-reset recovery with rolling restart、capability mismatch、all selected
+profiles and clean shutdown/kill cuts。
 
 ## 11. F9-M7 — Scale, chaos and compatibility aggregate
 

@@ -350,6 +350,44 @@ tasks.register<Test>("f9ActivationTransportRecoveryProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9ActivationProofCutFailoverProcessIntegrationTest") {
+    group = "verification"
+    description =
+        "Kill the active controller before/after initial snapshot proof and capability aggregation and prove recovery."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    dependsOn(f9ActivationFaultAgentJar)
+    shouldRunAfter(tasks.named("f9ActivationCutFailoverProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.activation.fault.agent",
+        layout.buildDirectory.file("libs/nereus-f9-activation-fault-agent.jar").get().asFile.absolutePath,
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-activation-proof-cut-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "threeControllersRecoverEveryInitialActivationProofCut",
+        )
+    }
+}
+
+tasks.named("f9ActivationTransportRecoveryProcessIntegrationTest") {
+    shouldRunAfter(tasks.named("f9ActivationProofCutFailoverProcessIntegrationTest"))
+}
+
 tasks.register<Test>("f9InFlightTakeoverProcessIntegrationTest") {
     group = "verification"
     description =

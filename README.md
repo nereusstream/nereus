@@ -39,8 +39,9 @@ coordinator observes completion。The replacement controller preserves the readi
 ACTIVE authority，publishes non-regressing readiness for broker `[4]`，and the broker subsequently completes native
 Produce/Fetch/ListOffsets with Object persistence。The same gate also covers the before-provider side of all three store
 operations，including activation-absent recovery from an existing readiness tuple。A real Oxia connection-reset gate now
-also proves same-controller-epoch retry after transport recovery。These are still partial F9 results；initial empty-cluster
-snapshot/proof and capability-aggregation process cuts、coordinator/checkpoint migration、
+also proves same-controller-epoch retry after transport recovery。A third controller gate now kills the exact leader on
+both sides of the complete empty-cluster `currentSnapshot` proof and `loadCapabilities` aggregation，then proves
+higher-epoch ACTIVE recovery and native IO。These are still partial F9 results；coordinator/checkpoint migration、
 release-process response-loss restart and the stock retention oracle remain open。
 The partial F9-M5 compaction path now freezes KCP1 exact COMMITTED source sets，opens
 independent backpressured decision/output replays，reduces checksum-verified KCK2 sorted spill runs to a bounded winner
@@ -141,9 +142,9 @@ BookKeeper configuration snapshot、exact password-file identity、client lifecy
 cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exact formatted KRaft broker in a fresh JVM，
 recovers offset 0 and appends offset 1 with earliest=0/latest=2；
 The current process suite additionally covers Object/BookKeeper live takeover、ACTIVE-state three-voter controller
-failover and the complete before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication
-matrix plus actual first-activation Oxia transport reset/retry。Checkpoint/virtual-segment cuts、initial empty-cluster
-snapshot/proof and capability-aggregation process cuts and wider chaos evidence remain future work，so this is not yet a
+failover、the complete before-provider/after-provider readiness-create/PREPARED-create/ACTIVE-CAS store-publication
+matrix、the four-way initial snapshot-proof/capability-aggregation matrix and actual first-activation Oxia transport
+reset/retry。Checkpoint/virtual-segment cuts、coordinator migration and wider chaos evidence remain future work，so this is not yet a
 production-rollout claim.
 
 ## Current Phase
