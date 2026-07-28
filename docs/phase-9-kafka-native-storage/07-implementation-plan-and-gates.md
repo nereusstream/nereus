@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and BookKeeper-WAL-only real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition and real five-profile provider evidence are implemented；Kafka-fork five-profile mapping、BookKeeper async/sync fresh-process gates、multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and all three BookKeeper real release/fresh-JVM gates pass；Kafka NCP2 direct-stream materialization runtime/profile composition、real five-profile provider evidence、Kafka-fork five-profile mapping and BookKeeper async/sync fresh-process gates are implemented；multi-broker/controller、remaining M4 internal-topic cuts and inherited final gates remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -422,15 +422,19 @@ coordinator/transaction/compaction remain M4/M5。
   and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
   runtime/stores/readers are closed through the product ledger。The same gate now opens `BOOKKEEPER_WAL_ASYNC_OBJECT` and
   `BOOKKEEPER_WAL_SYNC_OBJECT`，verifies NCP2 COMMITTED publication、byte-exact normal reads and the sync append
-  required-generation completion barrier。Fork `80445853a3` adds the complete stock-owned typed
+  required-generation completion barrier。Fork `116052aa53` adds the complete stock-owned typed
   BookKeeper binding、exact file/version secret reference、pre-I/O cross-field validation、BookKeeper client construction and
   product-before-client close wrapper；six server config tests、eight mapper/ownership tests、Checkstyle、SpotBugs and
   Spotless pass。`f9BookKeeperWalOnlyProcessIntegrationTest` now adds real release-distribution P-tier evidence：stock
   ZooKeeper long-hierarchical metadata、two bookies、combined-node Kafka Admin create/Produce/Fetch/ListOffsets、normal
   shutdown、fresh-JVM recovery and continued append all pass。The same Object provider is also opened under
   `OBJECT_WAL_ASYNC_OBJECT` in the real Oxia integration，and `f9ObjectWalAsyncObjectProcessIntegrationTest` proves
-  first-JVM append/read plus fresh-JVM recovery/continued append over real Oxia and LocalStack；multi-broker takeover and
-  the two BookKeeper materialization fresh-process gates remain open；
+  first-JVM append/read plus fresh-JVM recovery/continued append over real Oxia and LocalStack。
+  `f9BookKeeperWalAsyncObjectProcessIntegrationTest` appends four batches、waits for an NCP2 object in real
+  LocalStack、normally stops and recovers/appends in a fresh JVM；`f9BookKeeperWalSyncObjectProcessIntegrationTest`
+  proves a one-batch append does not complete before its required NCP2 object is COMMITTED/readable，then performs the same
+  cold recovery。The WAL-only/async/sync tasks are composed by `phase9M6KafkaBookKeeperProcessCheck`；multi-broker takeover
+  remains open；
 - the 2026-07-28 Kafka NCP2 materialization core checkpoint adds the distinct
   `nereus-kafka-committed-v2` / `NEREUS_COMPACTED_PARQUET_V2` committed policy，without reinterpreting NCP1 durable
   records。`DefaultMaterializationWorker` now has an NCP2-only ranged writer path that preserves every Kafka
@@ -444,8 +448,9 @@ coordinator/transaction/compaction remain M4/M5。
   executor while borrowing the provider metadata/ObjectStore/scheduler/read graph。The activated runtime closes it through the
   normal product resource ledger。`KafkaAsyncAppendAdmissionGuard` requires an ACTIVE `GENERATION_PUBLISH` proof，applies the
   materialization lag gate and revalidates immediately before both Object/BookKeeper async appends；sync profiles retain their
-  required-generation barrier。The profile resolver now maps all five profiles when BookKeeper is installed。Focused tests and
-  the real Object/BookKeeper provider gates pass；fork mapping and BookKeeper async/sync fresh-process gates are next；
+  required-generation barrier。The profile resolver and fork mapper now map all five profiles when BookKeeper is installed，
+  retain the exact selected default and place NCP2 staging below the authoritative cache root。Focused tests、the real
+  Object/BookKeeper provider gates and both BookKeeper materialization fresh-process gates pass；
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
@@ -492,12 +497,12 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@80445853a3` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@116052aa53` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
-  cache-directory KRaft identity commit、one typed BookKeeper runtime/client-ownership commit and one async Object-WAL
-  profile-mapping commit。The
+  cache-directory KRaft identity commit、one typed BookKeeper runtime/client-ownership commit、one async Object-WAL
+  profile-mapping commit and one BookKeeper Object-profile/cache-root NCP2 mapping commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -593,7 +598,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@80445853a3` branch。
+`nereus/future9-native-kafka-storage@116052aa53` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -837,8 +842,8 @@ The recovery coordinator retries retriable page-read failures at the exact curso
 the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
 recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
-`0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets and
-multi-broker takeover、checkpoint/virtual-segment cuts and the two BookKeeper materialization fresh-process gates remain open。
+`0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets、
+multi-broker takeover and checkpoint/virtual-segment cuts remain open。
 
 ### Tasks
 

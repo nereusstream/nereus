@@ -1,6 +1,6 @@
 # 06 — Runtime, Configuration, Rollout and Observability
 
-> 状态：Implementation in progress；91-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed Object-WAL/BookKeeper-WAL-only provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie `BOOKKEEPER_WAL_ONLY` release-distribution initial process + fresh-JVM cold-restart gate also passes；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；BookKeeper async/sync materialization、real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
+> 状态：Implementation in progress；91-key Kafka ConfigDef、immutable typed Object/BookKeeper snapshot、enabled-only pure startup validation、adapter runtime/admission + activation-backed five-profile provider composition、checkpoint-pinned recovery/compaction lifecycle、activation/capability/readiness durable records and Oxia CAS store、broker publisher/verifier、controller-side first-activation coordinator、generic BrokerServer seam、typed mapping/deferred Kafka context/provider composition、runtime-owned authoritative log-shell factory、synchronous UnifiedLog correctness bridge，以及 bounded Produce / whole-request async Fetch request-path handoff implemented；periodic owned-partition retention configuration/context/fork capture、Kafka compaction config/owned-partition capture、stock-source isolation、explicit native-storage launcher、controller-leader-only activation scheduling、durable `nereus.storage.version` registration/advertisement/format、dedicated-controller admission、single-copy controller enforcement、cache-root KRaft directory identity、ACTIVE broker-epoch readiness refresh 与 Object-WAL exact-reference durable checkpoint quarantine/redacted first-failure audit are implemented locally；real release-distribution combined-node KRaft/Oxia/S3 initial process + same-node fresh-JVM user/group/transaction-state cold-restart gate passes；real two-bookie BookKeeper WAL-only/async/sync release-distribution initial process + fresh-JVM cold-restart gates pass；an independent `OBJECT_WAL_ASYNC_OBJECT` initial/fresh-JVM cold-restart gate passes over the same real Object provider；real multi-controller failover/live-takeover/kill-chaos and full observability remain target；F9-M6
 > Activation：cluster-wide、KRaft-only、new/empty cluster、one-way protocol activation
 > Safe default：`nereus.kafka.storage.enabled=false`
 
@@ -140,7 +140,7 @@ shutdown。
 ## 2. Configuration namespace
 
 All 91 keys below are registered in Kafka `ConfigDef` by the local fork。The original 58-key inert surface is extended by
-33 BookKeeper binding/resource/readiness keys in fork `80445853a3`。Primitive types、defaults、independent hard ranges、
+33 BookKeeper binding/resource/readiness keys in fork `116052aa53`。Primitive types、defaults、independent hard ranges、
 profile dependencies and broker-local cross-field rules are executable；dynamic mutation and provider connectivity remain
 startup/runtime behavior。
 
@@ -395,18 +395,19 @@ At the product boundary，`NereusKafkaObjectWalRuntimeConfiguration` may now car
 `NereusKafkaBookKeeperWalRuntimeConfiguration` and the context may carry the matching borrowed BookKeeper client/readiness/
 password providers。Presence must match before provider I/O。The Object graph always installs exactly
 `OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT`；when BookKeeper is present it additionally installs
-`BOOKKEEPER_WAL_ONLY`，uses the shared Oxia client for the F1-BK namespace/activation/ledger metadata
+all three BookKeeper profiles，uses the shared Oxia client for the F1-BK namespace/activation/ledger metadata
 views，requires an exact ACTIVE publication before admission，and registers the BookKeeper appender、reader、generation-zero
 physical-reference publisher and profile resolver in the same storage graph。`BOOKKEEPER_WAL_ONLY` deliberately skips Object
-materialization registration。The adapter closes its owned BookKeeper runtime before the embedding owner closes the borrowed
-client。Fork `80445853a3` now maps the complete typed snapshot to
+materialization；async/sync profiles register the shared NCP2 runtime，with async lag admission or sync required-generation
+completion respectively。The adapter closes its owned BookKeeper runtime before the embedding owner closes the borrowed
+client。Fork `116052aa53` maps the complete typed snapshot to
 `BookKeeperWalConfiguration`/`NereusKafkaBookKeeperWalRuntimeConfiguration`，constructs the BookKeeper client only after
 pre-I/O validation，passes it as borrowed context to the product runtime，and wraps the result in
 `NereusKafkaOwnedProviderRuntime`。Close order is product graph first and client second；both closes are attempted，suppressed
 failure is preserved，and repeated close is idempotent。A construction failure closes the already-created client before it
-escapes。The BookKeeper executable set/default becomes exactly
-`{OBJECT_WAL_SYNC_OBJECT, OBJECT_WAL_ASYNC_OBJECT, BOOKKEEPER_WAL_ONLY}`/`BOOKKEEPER_WAL_ONLY`；without BookKeeper the
-set is the two Object profiles and the mapper retains the selected sync/async profile as default。The configuration/provider/code digests include
+escapes。With BookKeeper installed，the executable set is all five profiles and the mapper retains the exact configured
+profile as default；without BookKeeper the set is the two Object profiles and the mapper retains the selected sync/async
+profile as default。The configuration/provider/code digests include
 the binding checksum plus readiness identity without including password bytes。
 
 `f9BookKeeperWalOnlyProcessIntegrationTest` closes the native process boundary for this first BookKeeper profile。The fixture

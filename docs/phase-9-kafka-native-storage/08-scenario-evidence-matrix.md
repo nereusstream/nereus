@@ -30,16 +30,18 @@ Current provider-profile evidence（2026-07-28）：the product adapter installs
 ledger-ID namespace、ACTIVE publication and exact broker readiness。`f9BookKeeperWalOnlyProviderIntegrationTest` starts real
 two-bookie BookKeeper、opens a Kafka leader with `BOOKKEEPER_WAL_ONLY`、strictly appends a magic-v2 batch、publishes the exact
 BookKeeper generation-zero target and Fetches it through the shared generation resolver。The client is borrowed and the
-provider graph closes before it。Fork `80445853a3` now supplies complete typed BookKeeper configuration、exact secret
-identity、client ownership and executable-profile mapping with focused static/unit evidence。
+provider graph closes before it。Fork `116052aa53` supplies complete typed BookKeeper configuration、exact secret
+identity、client ownership and five-profile mapping with focused static/unit evidence。
 `f9BookKeeperWalOnlyProcessIntegrationTest` now supplies independent-process evidence for this one profile：a real release
 distribution runs against stock ZooKeeper long-hierarchical metadata and two bookies，creates a topic，produces/fetches offset
 0，checks earliest=0/latest=1，shuts down normally，then a fresh Kafka JVM recovers offset 0、appends/fetches offset 1 and
 checks earliest=0/latest=2 before another normal shutdown。`f9M3ProviderIntegrationTest` also opens the real Object graph
 under `OBJECT_WAL_ASYNC_OBJECT`；`f9ObjectWalAsyncObjectProcessIntegrationTest` adds release-distribution evidence with
 offset 0 in the first JVM and recovered offset 0 plus offset 1 in a fresh JVM，ending at earliest=0/latest=2 over real
-Oxia/LocalStack。All profile-matrix rows remain `PLANNED` because multi-broker takeover、BookKeeper async/sync
-materialization profiles and aggregate tiers have not run。
+Oxia/LocalStack。The BookKeeper async process gate appends four batches、waits for the real NCP2 S3 object、normally
+stops and recovers/appends in a fresh JVM；the sync gate appends one batch only after required NCP2
+COMMITTED/readable completion and then performs the same cold recovery。All profile-matrix rows remain `PLANNED` because
+single-node evidence does not satisfy their multi-broker takeover、failure-cut and aggregate tiers。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -56,7 +58,7 @@ The extended gate also leaves one transaction open at a stable data batch，forc
 resolves it with an ABORT marker before accepting the next transaction；read-committed and the group skip the aborted data。
 Rows stay `PLANNED` because their required BookKeeper/profile service matrix、multi-broker takeover、
 checkpoint/virtual-segment and mandatory NTC2 failure cuts plus aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@80445853a3`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@116052aa53`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -64,7 +66,7 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@80445853a3`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@116052aa53`。
 
 Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
 cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure
@@ -196,9 +198,9 @@ any non-empty shard is projected into the activation snapshot，and an already-p
 activation-backed Object-WAL integration test proves this wrapper remains on the public production path。Kafka controller
 seam/context binding and deterministic activation scheduling are now implemented at fork `d23dc5c787`；the feature/control tests
 cover controller-current retry、leadership loss、in-flight coalescing、per-epoch process-local fault suppression、explicit feature
-format/advertisement and single-copy controller mutation。Real multi-controller process/takeover、
-BookKeeper async/sync-object provider construction、priority budgets and the broader native-storage process cuts 仍未实现；
-`BOOKKEEPER_WAL_ONLY` construction and its first single-node/fresh-JVM native process slice now pass，
+format/advertisement and single-copy controller mutation。Real multi-controller process/takeover、priority budgets and the
+broader native-storage process cuts 仍未实现；all three BookKeeper provider constructions and their first
+single-node/fresh-JVM native process slices now pass，
 除 KF-OPS-006/007 外 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及
 BrokerServer stock start/drain/close compatibility；`NereusBrokerStorageRuntimeTest` additionally verifies disabled creator

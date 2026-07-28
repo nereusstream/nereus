@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "33" ]] \
-    || fail "expected thirty-three reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "34" ]] \
+    || fail "expected thirty-four reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -215,7 +215,7 @@ c49b0fdc4f8c70f13c60696ef6af646cf8d0c323 core/src/main/java/kafka/server/nereus/
 22d198549a1854c1f2e16b6213f84931be75f89e core/src/main/java/kafka/server/nereus/NereusKafkaProductRuntimeCreator.java
 bf0b8ed32d850cda69ba3e05b5ba64fe288bf452 core/src/main/java/kafka/server/nereus/NereusKafkaRecoveryStateFactory.java
 b903540487b6553d4a1944b5f36e9567fc9262ba core/src/main/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridge.java
-a6e944f623f34c1cc4b4a6588a639ab546fe9fd5 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
+d468272019ab5ee17ed32599dc36922d4d5934c6 core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java
 1970537a48ac13fd77c6bc32fd2bf1e99fb31670 core/src/main/java/kafka/server/nereus/NereusKafkaStorageClusterSnapshotProvider.java
 ae2387ee9d6b318eaf37f62840d8ca3ac44f4e9b core/src/main/scala/kafka/Kafka.scala
 d477c7485376ae62f82abcb8393c9582be8794df core/src/main/scala/kafka/cluster/Partition.scala
@@ -263,7 +263,7 @@ d7f0b8cca7dec9cfa4de9a542c8eb1b3c3c9cfe5 core/src/test/java/kafka/server/nereus/
 019ec4a4007cde8e4bb1143fe101f06d5fc6e352 core/src/test/java/kafka/server/nereus/NereusKafkaOwnedProviderRuntimeTest.java
 ec32f2b8e23e9548a7a8b4e8bdb717a7949dc788 core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryBridgeTest.java
 0dad9ef15898372476787e354ce96ac2415a8a3c core/src/test/java/kafka/server/nereus/NereusKafkaRecoveryStateFactoryTest.java
-8460915bba1046dcd9607ba25ece5627f3bf8f20 core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
+482c51940f9e1b8818e761bf4a39e46273b26c3f core/src/test/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapperTest.java
 e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 c28a29d488b51c0630cb1197b95b30bc6bf43a68 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 ba0bcb6a45f1715683ac23611873dcb83ce5a474 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
@@ -274,7 +274,7 @@ dda8c0b06459e6df5fd05b0537a540f21a143a51 core/src/test/scala/unit/kafka/server/N
 98e32cef17bc011b1f6f13f6865fd56d87cfdc27 core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
 97aec0dfd4972d124a6456b5dc09777563c0b0c1 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageAppendExecutorTest.scala
 3c9281f1c48872b3645de485aaa98bcc2ac431ae core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageFetchExecutorTest.scala
-49c96ae84cb30876cfd79afd39e93ad52aa92618 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
+585f6c87db02f35ef00f829d87876698f4613d52 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
 d2a9265f60ae82e93bb152832c4dd36f69c46126 core/src/test/scala/unit/kafka/server/nereus/NereusKafkaOwnedPartitionSourceBridgeTest.scala
 e09fa0c9643d3982af69a6679438f1baf8230606 core/src/test/scala/unit/kafka/server/nereus/NereusKafkaTest.scala
 733c4d4815cbec6a7335f9a337053e980e87883d core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
@@ -687,10 +687,18 @@ for stock_source in \
 done
 
 runtime_mapper="$kafka_checkout/core/src/main/java/kafka/server/nereus/NereusKafkaRuntimeConfigurationMapper.java"
-grep -F -q 'only Object-WAL profiles and BOOKKEEPER_WAL_ONLY have production provider runtimes' "$runtime_mapper" \
-    || fail "runtime mapper lost its executable-profile fail-closed boundary"
 grep -F -q 'case OBJECT_WAL_ASYNC_OBJECT -> StorageProfile.OBJECT_WAL_ASYNC_OBJECT' "$runtime_mapper" \
     || fail "runtime mapper lost explicit async Object-WAL default-profile selection"
+grep -F -q 'case BOOKKEEPER_WAL_ASYNC_OBJECT ->' "$runtime_mapper" \
+    || fail "runtime mapper lost explicit BookKeeper async-object default-profile selection"
+grep -F -q 'case BOOKKEEPER_WAL_SYNC_OBJECT ->' "$runtime_mapper" \
+    || fail "runtime mapper lost explicit BookKeeper sync-object default-profile selection"
+grep -F -q 'StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT,' "$runtime_mapper" \
+    || fail "runtime mapper lost BookKeeper async-object capability publication"
+grep -F -q 'StorageProfile.BOOKKEEPER_WAL_SYNC_OBJECT)' "$runtime_mapper" \
+    || fail "runtime mapper lost BookKeeper sync-object capability publication"
+grep -F -q 'MaterializationConfig.kafkaDefaults(' "$runtime_mapper" \
+    || fail "runtime mapper lost cache-rooted Kafka NCP2 staging configuration"
 grep -F -q 'only the explicit s3 provider token is supported' "$runtime_mapper" \
     || fail "runtime mapper gained an implicit provider-loading fallback"
 grep -F -q 'new KafkaBrokerCapabilitySpecification(' "$runtime_mapper" \
@@ -844,4 +852,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-three commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-four commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control blobs and markers match"

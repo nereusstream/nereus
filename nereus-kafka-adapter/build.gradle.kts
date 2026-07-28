@@ -177,6 +177,64 @@ tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9BookKeeperWalAsyncObjectProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the native Kafka BookKeeper async-object NCP2 cold-restart process gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    mustRunAfter(tasks.named("f9BookKeeperWalOnlyProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-async-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "bookKeeperWalAsyncObjectProcessMaterializesAndRecoversAcrossFreshJvmRestart",
+        )
+    }
+}
+
+tasks.register<Test>("f9BookKeeperWalSyncObjectProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the native Kafka BookKeeper sync-object NCP2 cold-restart process gate."
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED")
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    mustRunAfter(tasks.named("f9BookKeeperWalAsyncObjectProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-bookkeeper-sync-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "bookKeeperWalSyncObjectProcessMaterializesBeforeAppendAndRecoversAcrossFreshJvmRestart",
+        )
+    }
+}
+
 tasks.register<Test>("f9ObjectWalAsyncObjectProcessIntegrationTest") {
     group = "verification"
     description = "Run the native Kafka async Object-WAL Produce/Fetch cold-restart process gate."
