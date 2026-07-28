@@ -428,6 +428,71 @@ class NereusKafkaNativeProcessIntegrationTest {
     }
 
     @Test
+    @Timeout(value = 3, unit = TimeUnit.MINUTES)
+    void objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart()
+            throws Exception {
+        clearFailureEvidence();
+        Path kafkaCheckout = requiredKafkaCheckout();
+        Path kafkaHome =
+                extractReleaseDistribution(
+                        kafkaCheckout,
+                        root.resolve("kafka-object-async-distribution"));
+        Path formatScript =
+                executable(kafkaHome.resolve("bin/kafka-storage.sh"));
+        Path startScript =
+                executable(kafkaHome.resolve("bin/nereus-kafka-server-start.sh"));
+        Path config = root.resolve("object-async-server.properties");
+        Path formatLog = root.resolve("object-async-format.log");
+        Path firstServerLog = root.resolve("object-async-server-first.log");
+        Path restartServerLog =
+                root.resolve("object-async-server-restart.log");
+        String bucket = "nereus-kafka-object-async-" + UUID.randomUUID();
+        String topic = "object-async-process-gate-" + UUID.randomUUID();
+        int brokerPort = freePort();
+        int controllerPort = differentFreePort(brokerPort);
+        String bootstrapServers = "127.0.0.1:" + brokerPort;
+
+        createBucket(bucket);
+        writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                root.resolve("object-async-kafka-log"),
+                root.resolve("object-async-metadata-log"),
+                root.resolve("object-async-nereus-cache"),
+                "OBJECT_WAL_ASYNC_OBJECT",
+                null);
+        try {
+            runSimpleProfileColdRestart(
+                    formatScript,
+                    startScript,
+                    kafkaHome,
+                    config,
+                    formatLog,
+                    firstServerLog,
+                    restartServerLog,
+                    bootstrapServers,
+                    topic,
+                    "object-async");
+            assertThat(objectCount(bucket))
+                    .as("the async profile must retain its durable Object WAL across restart")
+                    .isPositive();
+        } catch (Exception | AssertionError failure) {
+            try {
+                preserveFailureEvidence(
+                        config,
+                        formatLog,
+                        firstServerLog,
+                        restartServerLog);
+            } catch (AssertionError evidenceFailure) {
+                failure.addSuppressed(evidenceFailure);
+            }
+            throw failure;
+        }
+    }
+
+    @Test
     @Timeout(value = 4, unit = TimeUnit.MINUTES)
     void bookKeeperWalOnlyProcessRecoversAcrossFreshJvmRestart()
             throws Exception {
@@ -485,82 +550,17 @@ class NereusKafkaNativeProcessIntegrationTest {
                     root.resolve("bookkeeper-metadata-log"),
                     root.resolve("bookkeeper-nereus-cache"),
                     bookKeeper);
-            formatStorage(formatScript, kafkaHome, config, formatLog);
-
-            TopicPartition partition = new TopicPartition(topic, 0);
-            byte[] firstKey = "bookkeeper-key-0".getBytes(StandardCharsets.UTF_8);
-            byte[] firstValue =
-                    "nereus-bookkeeper-process-first".getBytes(StandardCharsets.UTF_8);
-            runBroker(
+            runSimpleProfileColdRestart(
+                    formatScript,
                     startScript,
                     kafkaHome,
                     config,
                     formatLog,
                     firstServerLog,
-                    bootstrapServers,
-                    () -> {
-                        try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
-                            admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
-                                    .all()
-                                    .get(CLIENT_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-                            RecordMetadata produced =
-                                    produce(
-                                            bootstrapServers,
-                                            topic,
-                                            firstKey,
-                                            firstValue);
-                            assertThat(produced.partition()).isZero();
-                            assertThat(produced.offset()).isZero();
-                            ConsumerRecord<byte[], byte[]> fetched =
-                                    fetch(
-                                            bootstrapServers,
-                                            partition,
-                                            0,
-                                            firstServerLog);
-                            assertThat(fetched.key()).isEqualTo(firstKey);
-                            assertThat(fetched.value()).isEqualTo(firstValue);
-                            assertOffsets(admin, partition, 0, 1);
-                        }
-                    });
-
-            byte[] secondKey = "bookkeeper-key-1".getBytes(StandardCharsets.UTF_8);
-            byte[] secondValue =
-                    "nereus-bookkeeper-process-second".getBytes(StandardCharsets.UTF_8);
-            runBroker(
-                    startScript,
-                    kafkaHome,
-                    config,
-                    formatLog,
                     restartServerLog,
                     bootstrapServers,
-                    () -> {
-                        ConsumerRecord<byte[], byte[]> recovered =
-                                fetch(
-                                        bootstrapServers,
-                                        partition,
-                                        0,
-                                        restartServerLog);
-                        assertThat(recovered.key()).isEqualTo(firstKey);
-                        assertThat(recovered.value()).isEqualTo(firstValue);
-                        RecordMetadata appended =
-                                produce(
-                                        bootstrapServers,
-                                        topic,
-                                        secondKey,
-                                        secondValue);
-                        assertThat(appended.offset()).isEqualTo(1);
-                        ConsumerRecord<byte[], byte[]> fetched =
-                                fetch(
-                                        bootstrapServers,
-                                        partition,
-                                        1,
-                                        restartServerLog);
-                        assertThat(fetched.key()).isEqualTo(secondKey);
-                        assertThat(fetched.value()).isEqualTo(secondValue);
-                        try (Admin admin = Admin.create(adminProperties(bootstrapServers))) {
-                            assertOffsets(admin, partition, 0, 2);
-                        }
-                    });
+                    topic,
+                    "bookkeeper");
         } catch (Exception | AssertionError failure) {
             try {
                 preserveFailureEvidence(
@@ -592,6 +592,7 @@ class NereusKafkaNativeProcessIntegrationTest {
                 logDirectory,
                 metadataDirectory,
                 cacheDirectory,
+                "OBJECT_WAL_SYNC_OBJECT",
                 null);
     }
 
@@ -605,6 +606,34 @@ class NereusKafkaNativeProcessIntegrationTest {
             Path cacheDirectory,
             BookKeeperProcessConfiguration bookKeeper
     ) throws IOException {
+        writeConfiguration(
+                config,
+                brokerPort,
+                controllerPort,
+                bucket,
+                logDirectory,
+                metadataDirectory,
+                cacheDirectory,
+                "BOOKKEEPER_WAL_ONLY",
+                bookKeeper);
+    }
+
+    private void writeConfiguration(
+            Path config,
+            int brokerPort,
+            int controllerPort,
+            String bucket,
+            Path logDirectory,
+            Path metadataDirectory,
+            Path cacheDirectory,
+            String storageProfile,
+            BookKeeperProcessConfiguration bookKeeper
+    ) throws IOException {
+        boolean bookKeeperProfile = storageProfile.startsWith("BOOKKEEPER_WAL_");
+        if (bookKeeperProfile != (bookKeeper != null)) {
+            throw new IllegalArgumentException(
+                    "BookKeeper process configuration must exactly match the selected storage profile");
+        }
         Files.createDirectories(logDirectory);
         Files.createDirectories(metadataDirectory);
         Files.createDirectories(cacheDirectory);
@@ -645,9 +674,7 @@ class NereusKafkaNativeProcessIntegrationTest {
         properties.setProperty("nereus.kafka.storage.cluster", "f9-process-" + UUID.randomUUID());
         properties.setProperty(
                 "nereus.kafka.storage.profile",
-                bookKeeper == null
-                        ? "OBJECT_WAL_SYNC_OBJECT"
-                        : "BOOKKEEPER_WAL_ONLY");
+                storageProfile);
         properties.setProperty(
                 "nereus.kafka.storage.oxia.service.address",
                 OXIA.getServiceAddress());
@@ -750,6 +777,108 @@ class NereusKafkaNativeProcessIntegrationTest {
         assertThat(formatExit)
                 .withFailMessage(() -> "storage format failed:\n" + readLog(formatLog))
                 .isZero();
+    }
+
+    private static void runSimpleProfileColdRestart(
+            Path formatScript,
+            Path startScript,
+            Path kafkaHome,
+            Path config,
+            Path formatLog,
+            Path firstServerLog,
+            Path restartServerLog,
+            String bootstrapServers,
+            String topic,
+            String payloadPrefix
+    ) throws Exception {
+        formatStorage(formatScript, kafkaHome, config, formatLog);
+        TopicPartition partition = new TopicPartition(topic, 0);
+        byte[] firstKey =
+                (payloadPrefix + "-key-0").getBytes(StandardCharsets.UTF_8);
+        byte[] firstValue =
+                ("nereus-" + payloadPrefix + "-process-first")
+                        .getBytes(StandardCharsets.UTF_8);
+        runBroker(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                firstServerLog,
+                bootstrapServers,
+                () -> {
+                    try (Admin admin =
+                            Admin.create(adminProperties(bootstrapServers))) {
+                        admin.createTopics(
+                                        List.of(
+                                                new NewTopic(
+                                                        topic,
+                                                        1,
+                                                        (short) 1)))
+                                .all()
+                                .get(
+                                        CLIENT_TIMEOUT.toSeconds(),
+                                        TimeUnit.SECONDS);
+                        RecordMetadata produced =
+                                produce(
+                                        bootstrapServers,
+                                        topic,
+                                        firstKey,
+                                        firstValue);
+                        assertThat(produced.partition()).isZero();
+                        assertThat(produced.offset()).isZero();
+                        ConsumerRecord<byte[], byte[]> fetched =
+                                fetch(
+                                        bootstrapServers,
+                                        partition,
+                                        0,
+                                        firstServerLog);
+                        assertThat(fetched.key()).isEqualTo(firstKey);
+                        assertThat(fetched.value()).isEqualTo(firstValue);
+                        assertOffsets(admin, partition, 0, 1);
+                    }
+                });
+
+        byte[] secondKey =
+                (payloadPrefix + "-key-1").getBytes(StandardCharsets.UTF_8);
+        byte[] secondValue =
+                ("nereus-" + payloadPrefix + "-process-second")
+                        .getBytes(StandardCharsets.UTF_8);
+        runBroker(
+                startScript,
+                kafkaHome,
+                config,
+                formatLog,
+                restartServerLog,
+                bootstrapServers,
+                () -> {
+                    ConsumerRecord<byte[], byte[]> recovered =
+                            fetch(
+                                    bootstrapServers,
+                                    partition,
+                                    0,
+                                    restartServerLog);
+                    assertThat(recovered.key()).isEqualTo(firstKey);
+                    assertThat(recovered.value()).isEqualTo(firstValue);
+                    RecordMetadata appended =
+                            produce(
+                                    bootstrapServers,
+                                    topic,
+                                    secondKey,
+                                    secondValue);
+                    assertThat(appended.offset()).isEqualTo(1);
+                    ConsumerRecord<byte[], byte[]> fetched =
+                            fetch(
+                                    bootstrapServers,
+                                    partition,
+                                    1,
+                                    restartServerLog);
+                    assertThat(fetched.key()).isEqualTo(secondKey);
+                    assertThat(fetched.value()).isEqualTo(secondValue);
+                    try (Admin admin =
+                            Admin.create(adminProperties(bootstrapServers))) {
+                        assertOffsets(admin, partition, 0, 2);
+                    }
+                });
     }
 
     private static void assertOffsets(
@@ -1405,6 +1534,8 @@ class NereusKafkaNativeProcessIntegrationTest {
         Files.deleteIfExists(target.resolve("server-transaction-recovery.log"));
         Files.deleteIfExists(target.resolve("bookkeeper-server-first.log"));
         Files.deleteIfExists(target.resolve("bookkeeper-server-restart.log"));
+        Files.deleteIfExists(target.resolve("object-async-server-first.log"));
+        Files.deleteIfExists(target.resolve("object-async-server-restart.log"));
     }
 
     private static void copyIfPresent(Path source, Path target) throws IOException {

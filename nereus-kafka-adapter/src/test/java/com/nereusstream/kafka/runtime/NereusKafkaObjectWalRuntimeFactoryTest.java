@@ -110,7 +110,9 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
                 "4.3.0",
                 "nereus-test",
                 "21",
-                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT),
+                Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT),
                 StorageProfile.OBJECT_WAL_SYNC_OBJECT,
                 bytes(1),
                 bytes(2),
@@ -151,7 +153,9 @@ class NereusKafkaObjectWalRuntimeFactoryTest {
                 Duration.ofSeconds(30),
                 100_000,
                 256 * 1024 * 1024,
-                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
+                Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT));
         return new NereusKafkaObjectWalRuntimeConfiguration(
                 runtime,
                 streams(),

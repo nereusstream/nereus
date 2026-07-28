@@ -1,6 +1,6 @@
 # 07 — Implementation Plan and Gates
 
-> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented；M2 ordinary/direct real-service gates pass；M4 process/internal-topic gates and inherited final gate remain open
+> 状态：F9-M1/M2/M3 implementation slices complete；F9-M4 all seven canonical states/strict V1 codecs/full composition plus local Kafka-fork producer/transaction import/replay and isolation shell slices implemented，including single-node real user/group/transaction restart and interrupted-transaction recovery；M5 deterministic retention/compaction slices implemented；M6 Object sync、Object async and BookKeeper-WAL-only real release/fresh-JVM gates pass；multi-broker/controller、BookKeeper materialization、remaining M4 internal-topic cuts and inherited final gates remain open
 > Sequence：F9-M0 → M1 → M2 → M3 → {M4,M5} → M6 → M7
 > Rule：one milestone commit series + ordinary gate + fresh final gate + mandatory review stop
 
@@ -409,8 +409,8 @@ coordinator/transaction/compaction remain M4/M5。
   KRaft baseline now pass through `phase9M6KafkaProcessCheck`，including single-node graceful restart of committed
   `__consumer_offsets` and `__transaction_state` truth；
 - `NereusKafkaObjectWalRuntimeConfigurationTest` freezes the first concrete provider graph to exactly
-  `OBJECT_WAL_SYNC_OBJECT` without BookKeeper，or exactly
-  `OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` when the provider-neutral BookKeeper configuration/context is present；
+  `OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT` without BookKeeper，or exactly those two Object profiles plus
+  `BOOKKEEPER_WAL_ONLY` when the provider-neutral BookKeeper configuration/context is present；
   both graphs retain matched cluster/writer/session/scan limits and disabled legacy auto-session；
   `NereusKafkaObjectWalRuntimeFactoryTest` proves activation scope is rejected before provider IO，and a checked
   provider-construction failure is propagated with every resource registered before that cut closed；
@@ -420,13 +420,15 @@ coordinator/transaction/compaction remain M4/M5。
   `f9BookKeeperWalOnlyProviderIntegrationTest` separately provisions the exact F1-BK ledger-ID namespace/publication
   activation，borrows a real two-bookie client，then proves Kafka leader open、strict append、physical-reference publication
   and cold generation-zero Fetch against the shared Oxia graph。The BookKeeper client remains borrowed and the provider-neutral
-  runtime/stores/readers are closed through the product ledger。Fork `50b46aab2d` adds the complete stock-owned typed
+  runtime/stores/readers are closed through the product ledger。Fork `80445853a3` adds the complete stock-owned typed
   BookKeeper binding、exact file/version secret reference、pre-I/O cross-field validation、BookKeeper client construction and
   product-before-client close wrapper；six server config tests、eight mapper/ownership tests、Checkstyle、SpotBugs and
   Spotless pass。`f9BookKeeperWalOnlyProcessIntegrationTest` now adds real release-distribution P-tier evidence：stock
   ZooKeeper long-hierarchical metadata、two bookies、combined-node Kafka Admin create/Produce/Fetch/ListOffsets、normal
-  shutdown、fresh-JVM recovery and continued append all pass；multi-broker takeover and the other three provider profiles
-  remain open；
+  shutdown、fresh-JVM recovery and continued append all pass。The same Object provider is also opened under
+  `OBJECT_WAL_ASYNC_OBJECT` in the real Oxia integration，and `f9ObjectWalAsyncObjectProcessIntegrationTest` proves
+  first-JVM append/read plus fresh-JVM recovery/continued append over real Oxia and LocalStack；multi-broker takeover and
+  the two BookKeeper materialization profiles remain open；
 - `NereusKafkaObjectWalRuntimeFactory` now owns durable checkpoint read pins、reader/verifier/recovery coordinator、
   configured `recoveryChunkRecords/recoveryChunkBytes` paging and `DefaultKafkaPartitionRecoveryLauncher`。
   `DefaultKafkaRecoveryBatchSourceTest` proves exact bounded COMMITTED/EXACT_START pages and fail-closed empty/non-Kafka
@@ -473,11 +475,12 @@ coordinator/transaction/compaction remain M4/M5。
   `ec7f0db991` and `032974067c` now own stock import/replay、transactional shell semantics、request executor parameter
   preservation and internal-topic ready ordering，but are not part of the clean M3 aggregate lock；
 - the organization fork exists and the published branch
-  `nereus/future9-native-kafka-storage@50b46aab2d` contains the nineteen reviewed M3 commits、two M4
+  `nereus/future9-native-kafka-storage@80445853a3` contains the nineteen reviewed M3 commits、two M4
   producer/transaction and ordering-test commits、three M5 DeleteRecords/retention/virtual-log commits、one
   compaction-authority commit、one stock-source isolation fix、one explicit native-storage launcher commit、one
   controller activation scheduling commit、one durable feature/control commit、one aggregate Spotless alignment commit and one
-  cache-directory KRaft identity commit plus one typed BookKeeper runtime/client-ownership commit。The
+  cache-directory KRaft identity commit、one typed BookKeeper runtime/client-ownership commit and one async Object-WAL
+  profile-mapping commit。The
   SSH-published remote head matches the clean working clone。Produce hands off exact owned bytes
   to a bounded per-partition FIFO executor；Fetch hands off the complete stock `readFromLog` request to a bounded event/deadline
   wave executor。CLI/KafkaRaftServer production runtime selection is executable through
@@ -491,7 +494,7 @@ coordinator/transaction/compaction remain M4/M5。
   `427b409cf440f745ad6195673d3342f6bd3974d4` / `4.3.0-SNAPSHOT` probe and 10 relevant source blobs；
   `phase9M3CodecCheck` aggregates that probe、M2 deterministic predecessors and adapter codec tests，but deliberately
   does not use the `phase9M3Check` completion name。`phase9KafkaForkDevelopmentSourceLockCheck` additionally locks the
-  fork branch/local+remote head/base ancestry/thirty-two-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
+  fork branch/local+remote head/base ancestry/thirty-three-commit count/organization remote/one-hundred-twenty-one log-IO/bridge/recovery/
   metadata-lifecycle/configuration/runtime-composition/retention/compaction
   plus stock-isolation/launcher/controller-runtime/feature-control blobs and markers；`phase9M3KafkaForkCheck` publishes exact
   `0.1.0-f9-dev` artifacts，verifies stock-without-artifacts compilation and runs all three fork bridge test classes plus
@@ -573,7 +576,7 @@ READ_COMMITTED bounds and actual-page aborted filtering；codec/manager/factory/
 ReplicaManager storage-executor closure preserves stock transaction verification guard and TV2 marker version；group and
 transaction elections wait for the ready callback；and the transaction-state ready callback waits for exact recovered
 storage installation。All 13 focused tests pass together。Both commits are now included in the SSH-published
-`nereus/future9-native-kafka-storage@50b46aab2d` branch。
+`nereus/future9-native-kafka-storage@80445853a3` branch。
 The task deliberately does not use the `phase9M4Check` completion name；publication snapshot/object round trip、fresh
 process restart/takeover index recovery、real internal-topic coordinator replay/restart/failover、upstream focused suites
 and real two-broker evidence are still required before M4 completion。
@@ -808,12 +811,16 @@ feature and starts the real release launcher with `BOOKKEEPER_WAL_ONLY`。The fi
 fetch offset 0、verify earliest=0/latest=1 and shut down normally；a fresh JVM must recover that batch、append/fetch offset 1、
 verify earliest=0/latest=2 and shut down normally。The Java 21 `java.io` module opening is confined to the in-process
 BookKeeper fixture and is not added to the Kafka runtime command。
+The aggregate additionally runs `f9ObjectWalAsyncObjectProcessIntegrationTest`。It selects the exact
+`OBJECT_WAL_ASYNC_OBJECT` default over the installed Object provider，writes/fetches offset 0 in the first real JVM，
+normally shuts down，then requires a fresh JVM to recover offset 0、append/fetch offset 1 and verify
+earliest=0/latest=2 over the same Oxia/S3 state。
 The recovery coordinator retries retriable page-read failures at the exact cursor with 10–250 ms exponential backoff under
 the original deadline；the deterministic regression requires two reads but exactly one publication。The root build now
 recognizes M6 feature/process and direct
 process-test task names as F9 development gates，so the published coordinate cannot silently remain an older
 `0.1.0-f9-dev` artifact。Durable in-flight epoch fencing、multi-controller/live takeover、priority budgets and
-multi-broker takeover、checkpoint/virtual-segment cuts and provider-profile gates remain open。
+multi-broker takeover、checkpoint/virtual-segment cuts and the two BookKeeper materialization profile gates remain open。
 
 ### Tasks
 

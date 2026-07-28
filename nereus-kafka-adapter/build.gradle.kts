@@ -177,6 +177,34 @@ tasks.register<Test>("f9BookKeeperWalOnlyProcessIntegrationTest") {
     }
 }
 
+tasks.register<Test>("f9ObjectWalAsyncObjectProcessIntegrationTest") {
+    group = "verification"
+    description = "Run the native Kafka async Object-WAL Produce/Fetch cold-restart process gate."
+    dependsOn(rootProject.tasks.named("phase9M6KafkaProcessRuntime"))
+    shouldRunAfter(tasks.named("f9M6KafkaProcessIntegrationTest"))
+    testClassesDirs = f9ProviderIntegrationTest.output.classesDirs
+    classpath = f9ProviderIntegrationTest.runtimeClasspath
+    systemProperty(
+        "nereus.kafka.fork.checkout",
+        providers.gradleProperty("kafkaForkCheckout")
+            .orElse(providers.environmentVariable("NEREUS_KAFKA_FORK_CHECKOUT"))
+            .orElse(rootProject.layout.projectDirectory.dir("../../nereusstream/kafka").asFile.absolutePath)
+            .get(),
+    )
+    systemProperty(
+        "nereus.kafka.process.evidence.dir",
+        layout.buildDirectory.dir("f9-kafka-object-async-process-evidence").get().asFile.absolutePath,
+    )
+    maxParallelForks = 1
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.nereusstream.kafka.runtime.NereusKafkaNativeProcessIntegrationTest." +
+                "objectWalAsyncObjectProcessRecoversAcrossFreshJvmRestart",
+        )
+    }
+}
+
 tasks.register<Test>("f9ProducerStatePropertyTest") {
     group = "verification"
     description = "Run the partial F9-M4 complete seven-section canonical checkpoint contracts."

@@ -105,7 +105,9 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                     Duration.ofSeconds(30),
                     100_000,
                     256 * 1024 * 1024,
-                    Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
+                    Set.of(
+                            StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                            StorageProfile.OBJECT_WAL_ASYNC_OBJECT));
             OxiaClientConfiguration oxia = new OxiaClientConfiguration(
                     OXIA.getServiceAddress(),
                     "default",
@@ -131,7 +133,9 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                     "4.3.0",
                     "f9-provider-test",
                     System.getProperty("java.version"),
-                    Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT),
+                    Set.of(
+                            StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                            StorageProfile.OBJECT_WAL_ASYNC_OBJECT),
                     StorageProfile.OBJECT_WAL_SYNC_OBJECT,
                     bytes(1),
                     bytes(2),
@@ -212,6 +216,62 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                     .fetchAssembly()
                     .nextLogicalOffset())
                     .isEqualTo(1);
+
+            KafkaPartitionStorage asyncStorage =
+                    runtime.partitionStorageManager().openLeader(
+                            new KafkaPartitionLeaderOpenRequest(
+                                    new KafkaPartitionIdentity(
+                                            kafkaCluster,
+                                            "AAAAAAAAAAAAAAAAAAAAAw",
+                                            0,
+                                            "orders-async"),
+                                    1,
+                                    1,
+                                    9,
+                                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+                                    1,
+                                    Duration.ofSeconds(10)))
+                            .join();
+            ByteBuffer asyncRecords =
+                    MemoryRecords.withRecords(
+                                    0,
+                                    Compression.of(CompressionType.NONE).build(),
+                                    new SimpleRecord(
+                                            2_000,
+                                            "async-value".getBytes()))
+                            .buffer()
+                            .duplicate();
+            KafkaStableAppendResult asyncAppend =
+                    asyncStorage
+                            .append(
+                                    asyncRecords,
+                                    new KafkaAppendContext(
+                                            0,
+                                            1,
+                                            (short) -1,
+                                            Duration.ofSeconds(10),
+                                            Map.of()))
+                            .join();
+            assertThat(asyncAppend.stableSnapshot().stableEndOffset())
+                    .isEqualTo(1);
+            asyncStorage.publishDerivedOffsets(1, 1, 1);
+            assertThat(
+                            asyncStorage
+                                    .read(
+                                            new KafkaStorageReadRequest(
+                                                    0,
+                                                    1,
+                                                    10,
+                                                    1024 * 1024,
+                                                    1024 * 1024,
+                                                    true,
+                                                    0,
+                                                    0,
+                                                    Duration.ofSeconds(10)))
+                                    .join()
+                                    .fetchAssembly()
+                                    .nextLogicalOffset())
+                    .isEqualTo(1);
         } finally {
             if (runtime != null) {
                 runtime.close();
@@ -259,6 +319,7 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
             try {
             Set<StorageProfile> profiles = Set.of(
                     StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
                     StorageProfile.BOOKKEEPER_WAL_ONLY);
             NereusKafkaRuntimeConfiguration runtimeConfiguration =
                     new NereusKafkaRuntimeConfiguration(

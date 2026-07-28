@@ -419,10 +419,11 @@ source-isolation fix 是 `faaffc8a75`，第二十七个 native-storage launcher 
 `d23dc5c7877eac89366e3552b56cae4a87bdad4a`，第三十个 aggregate Spotless import alignment 是
 `5ebf31cde8a5ef58597f9a2e0f05d9c37e5ceb41`，第三十一个 cache-directory KRaft identity commit 是
 `ecde6964c5b3a52163ef2776e63d3b0b7093c358`，第三十二个 typed BookKeeper runtime/client-ownership commit 是
-`50b46aab2dad56850fc5d76ec11cf929b14c1bd9`。该 head 已通过 SSH 发布到
+`50b46aab2dad56850fc5d76ec11cf929b14c1bd9`，第三十三个 async Object-WAL profile mapping commit 是
+`80445853a3ee718089933615776d910f0414470f`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-two-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-three-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
@@ -585,8 +586,14 @@ normally。This proves the typed mapping/client ownership reaches a real process
 BookKeeper metadata driver into the Kafka distribution；it remains one-profile/single-node evidence rather than the complete
 five-profile or live-takeover matrix。
 
+The same published head now has an independent `OBJECT_WAL_ASYNC_OBJECT` release-distribution gate。The Nereus factory
+registers one real Object provider resolver under both Object sync and async profiles；the Kafka mapper freezes the selected
+async profile as default without constructing another provider graph。The first real JVM writes/fetches offset 0 and verifies
+earliest=0/latest=1；after normal shutdown a fresh JVM recovers offset 0、writes/fetches offset 1 and verifies
+earliest=0/latest=2 over the same formatted KRaft directories、Oxia and LocalStack S3。
+
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`50b46aab2dad56850fc5d76ec11cf929b14c1bd9`。Executable source-lock expectation 已更新到该 reviewed、
+`80445853a3ee718089933615776d910f0414470f`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

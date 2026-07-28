@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-/** Complete provider configuration for the first strict synchronous Object-WAL Kafka runtime. */
+/** Complete provider configuration for the Object-WAL and optional BookKeeper-WAL Kafka runtime. */
 public record NereusKafkaObjectWalRuntimeConfiguration(
         NereusKafkaRuntimeConfiguration runtime,
         StreamStorageConfig streamStorage,
@@ -21,11 +21,14 @@ public record NereusKafkaObjectWalRuntimeConfiguration(
         Duration orphanGrace,
         int callbackThreads,
         Optional<NereusKafkaBookKeeperWalRuntimeConfiguration> bookKeeper) {
-    private static final Set<StorageProfile> OBJECT_ONLY_PROFILES =
-            Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT);
-    private static final Set<StorageProfile> BOOKKEEPER_WAL_ONLY_PROFILES =
+    private static final Set<StorageProfile> OBJECT_WAL_PROFILES =
             Set.of(
                     StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT);
+    private static final Set<StorageProfile> OBJECT_AND_BOOKKEEPER_WAL_ONLY_PROFILES =
+            Set.of(
+                    StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
                     StorageProfile.BOOKKEEPER_WAL_ONLY);
 
     public NereusKafkaObjectWalRuntimeConfiguration(
@@ -64,8 +67,8 @@ public record NereusKafkaObjectWalRuntimeConfiguration(
         }
         Set<StorageProfile> expectedProfiles =
                 bookKeeper.isPresent()
-                        ? BOOKKEEPER_WAL_ONLY_PROFILES
-                        : OBJECT_ONLY_PROFILES;
+                        ? OBJECT_AND_BOOKKEEPER_WAL_ONLY_PROFILES
+                        : OBJECT_WAL_PROFILES;
         if (!runtime.executableProfiles().equals(expectedProfiles)) {
             throw new IllegalArgumentException(
                     "runtime executable profiles do not match its installed primary-WAL providers");

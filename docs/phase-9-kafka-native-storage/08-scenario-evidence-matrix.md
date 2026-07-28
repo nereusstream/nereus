@@ -24,18 +24,22 @@ Current deterministic M5 read-side evidence（2026-07-27）：`KafkaCompactedFet
 mandatory source never produces a COMMITTED retry。The manifest rows remain `PLANNED` because their required real-service、
 restart/Kafka-fork and process/chaos tiers are not yet satisfied。
 
-Current provider-profile evidence（2026-07-28）：the product adapter can install exactly
-`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` over one shared Oxia runtime after validating an operator-provisioned F1-BK
+Current provider-profile evidence（2026-07-28）：the product adapter installs exactly
+`OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT` over one shared Oxia runtime and can additionally install
+`BOOKKEEPER_WAL_ONLY` after validating an operator-provisioned F1-BK
 ledger-ID namespace、ACTIVE publication and exact broker readiness。`f9BookKeeperWalOnlyProviderIntegrationTest` starts real
 two-bookie BookKeeper、opens a Kafka leader with `BOOKKEEPER_WAL_ONLY`、strictly appends a magic-v2 batch、publishes the exact
 BookKeeper generation-zero target and Fetches it through the shared generation resolver。The client is borrowed and the
-provider graph closes before it。Fork `50b46aab2d` now supplies complete typed BookKeeper configuration、exact secret
+provider graph closes before it。Fork `80445853a3` now supplies complete typed BookKeeper configuration、exact secret
 identity、client ownership and executable-profile mapping with focused static/unit evidence。
 `f9BookKeeperWalOnlyProcessIntegrationTest` now supplies independent-process evidence for this one profile：a real release
 distribution runs against stock ZooKeeper long-hierarchical metadata and two bookies，creates a topic，produces/fetches offset
 0，checks earliest=0/latest=1，shuts down normally，then a fresh Kafka JVM recovers offset 0、appends/fetches offset 1 and
-checks earliest=0/latest=2 before another normal shutdown。All profile-matrix rows remain `PLANNED` because multi-broker
-BookKeeper takeover、async/sync Object materialization profiles and aggregate tiers have not run。
+checks earliest=0/latest=2 before another normal shutdown。`f9M3ProviderIntegrationTest` also opens the real Object graph
+under `OBJECT_WAL_ASYNC_OBJECT`；`f9ObjectWalAsyncObjectProcessIntegrationTest` adds release-distribution evidence with
+offset 0 in the first JVM and recovered offset 0 plus offset 1 in a fresh JVM，ending at earliest=0/latest=2 over real
+Oxia/LocalStack。All profile-matrix rows remain `PLANNED` because multi-broker takeover、BookKeeper async/sync
+materialization profiles and aggregate tiers have not run。
 
 Current deterministic M4 fork evidence（local `ec7f0db991` + `032974067c`）：`NereusProducerStateManagerTest`、
 `NereusKafkaRecoveryStateCodecTest` and `NereusUnifiedLogFactoryTest` cover the deterministic portions of
@@ -52,7 +56,7 @@ The extended gate also leaves one transaction open at a stable data batch，forc
 resolves it with an ABORT marker before accepting the next transaction；read-committed and the group skip the aborted data。
 Rows stay `PLANNED` because their required BookKeeper/profile service matrix、multi-broker takeover、
 checkpoint/virtual-segment and mandatory NTC2 failure cuts plus aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@50b46aab2d`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@80445853a3`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -60,7 +64,7 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@50b46aab2d`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@80445853a3`。
 
 Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
 cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure
@@ -74,7 +78,7 @@ fresh broker process、takeover or aggregate tiers。
 Current deterministic compaction fork evidence（product `e18bf36`；fork `58342d9dca`）：typed bounded runtime config、
 one-time product composition、leader-only owned-partition registration、internal/user work classification、partition-lock
 canonical/HW/LSO capture and stock `CleanedTransactionMetadata` marker pre-scan pass focused adapter/fork tests plus
-Checkstyle、SpotBugs and the executable 32-commit/121-file source lock。Rows remain `PLANNED` until real-provider
+Checkstyle、SpotBugs and the executable 33-commit/121-file source lock。Rows remain `PLANNED` until real-provider
 fresh-process/restart/takeover and full LogCleaner differential evidence exist。
 
 Current M6 launcher/isolation/process evidence（fork `faaffc8a75` + `3bd92c7244` + `9773c8f817` + `d23dc5c787` +
@@ -91,7 +95,7 @@ selection。Fork `d23dc5c787` additionally proves explicit-only `nereus.storage.
 enabled broker/controller advertisement、dedicated-controller validation、explicit enabled formatting、finalized-feature
 activation wait and controller-side RF/minISR/ISR/reassignment/directory rejection。Fork `ecde6964c5` creates and validates
 the authoritative cache root's KRaft V1 identity before directory registration。Focused launcher/runtime/feature suites、
-complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 32-commit/121-file source lock pass。
+complete stock `KafkaConfigTest` compilation、Checkstyle、SpotBugs and the executable 33-commit/121-file source lock pass。
 `phase9M6KafkaProcessCheck` additionally builds the real release tarball and passes one combined broker/controller process
 against four-shard Oxia and pinned LocalStack S3：explicit feature format、registration/activation、Admin create、acks=all
 Produce、byte-exact Fetch、one committed transaction、one real group rebalance/offset commit、earliest=0/latest=3
@@ -102,7 +106,9 @@ verifies earliest=0/latest=5 before another normal shutdown。A deterministic re
 backpressure to same-cursor 10–250 ms deadline-bounded retry with one complete state publication。The gate then forcibly
 kills a third JVM after open-transaction data offset 5 is stable；a fourth JVM writes ABORT marker 6 before committed
 data/marker 7/8，and read-committed/group visibility advances directly to 7 with latest=9。A regression also locks
-that M6 task selection republishes the current `0.1.0-f9-dev` artifact rather than reusing stale bytes。KF-OPS-006/007 are
+that M6 task selection republishes the current `0.1.0-f9-dev` artifact rather than reusing stale bytes。The same aggregate
+also runs the two-bookie `BOOKKEEPER_WAL_ONLY` cold-restart gate and the real Oxia/LocalStack
+`OBJECT_WAL_ASYNC_OBJECT` first-JVM/fresh-JVM offset 0/1 gate；both end at earliest=0/latest=2。KF-OPS-006/007 are
 `PASSED_CURRENT_SOURCE` deterministic evidence；the process gate adds real cold-restart partial evidence to
 KF-META-009、KF-APP-005/006、KF-FET-001/006/007/009、KF-TXN-007/011/012/013/014 and
 KF-OPS-003/009/013/017，but those rows remain `PLANNED` where live preemption、timestamp/leader-epoch、
@@ -191,7 +197,7 @@ activation-backed Object-WAL integration test proves this wrapper remains on the
 seam/context binding and deterministic activation scheduling are now implemented at fork `d23dc5c787`；the feature/control tests
 cover controller-current retry、leadership loss、in-flight coalescing、per-epoch process-local fault suppression、explicit feature
 format/advertisement and single-copy controller mutation。Real multi-controller process/takeover、
-async/sync-object provider construction、priority budgets and the broader native-storage process cuts 仍未实现；
+BookKeeper async/sync-object provider construction、priority budgets and the broader native-storage process cuts 仍未实现；
 `BOOKKEEPER_WAL_ONLY` construction and its first single-node/fresh-JVM native process slice now pass，
 除 KF-OPS-006/007 外 rows 保持 `PLANNED`；fork `BrokerStorageRuntimeFactoryTest` 和 stock single-node
 KRaft restart 另验证 disabled no-op、enabled-without-factory fail-closed、explicit borrowed context 以及

@@ -7,12 +7,15 @@ Fetch-operation、binding-first leader manager、exact stable-head/commit-reacha
 checkpoint-pinned paged COMMITTED replay and
 storage-profile policy、authority-session periodic renewal/fail-closed fencing and exact bounded ListOffsets scan slices
 are in progress；the adapter now also has the process admission/runtime lifecycle and an explicit owned/borrowed resource
-ledger with reverse-order close。The product runtime can now optionally install the provider-neutral BookKeeper runtime
-beside Object WAL and admits exactly `OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` only after the exact F1-BK namespace、
+ledger with reverse-order close。The product runtime now installs the same real Object provider for both
+`OBJECT_WAL_SYNC_OBJECT` and `OBJECT_WAL_ASYNC_OBJECT`，and can optionally install the provider-neutral BookKeeper runtime
+beside them；the BookKeeper graph admits exactly those two Object-WAL profiles plus `BOOKKEEPER_WAL_ONLY` only after the exact F1-BK namespace、
 publication activation and broker readiness are present；a real Oxia + two-bookie gate proves strict BookKeeper append and
 cold generation-zero Fetch。A second real release-distribution process gate now proves `BOOKKEEPER_WAL_ONLY` through
 Admin create、Produce、Fetch、ListOffsets、normal shutdown and fresh-JVM cold recovery over stock
-`zk+longhierarchical` BookKeeper metadata while Nereus authority remains in Oxia。The local Kafka fork now also maintains
+`zk+longhierarchical` BookKeeper metadata while Nereus authority remains in Oxia。A third release-distribution process gate
+selects `OBJECT_WAL_ASYNC_OBJECT` as the exact default over the installed Object provider，then proves offset 0 on the first
+JVM and recovery plus offset 1 on a fresh JVM with earliest=0/latest=2 over real Oxia and LocalStack S3。The local Kafka fork now also maintains
 checkpoint-restorable virtual segments、exact
 KRaft config history、logical/time indexes and real offset metadata，routes stock DeleteRecords through the shared
 checkpoint-before-trim barrier，and supplies bounded owned-partition capture to the product's periodic retention runtime。
@@ -94,7 +97,7 @@ record iterator、fresh M3 recovery codec/state factory、async `OffsetResultHol
 interfaces、an explicit native-storage launcher and a stock-owned controller metadata-publisher/runtime seam。Its code-level
 target and locked AutoMQ reference audit live in
 [`docs/phase-9-kafka-native-storage/`](docs/phase-9-kafka-native-storage/README.md). The SSH-published fork head is
-`nereus/future9-native-kafka-storage@50b46aab2d`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
+`nereus/future9-native-kafka-storage@80445853a3`；`bin/nereus-kafka-server-start.sh` selects fresh production broker and
 controller factories through the shared stock `Kafka.run`/`KafkaRaftServer` lifecycle。The controller runtime now coalesces
 metadata/leadership callbacks、runs first activation only while locally current、retries only retriable product failures and
 cancels scheduled retry on leadership loss；activation scheduling additionally waits for finalized
@@ -112,14 +115,14 @@ publishes a partial state，while ordinary Fetch continues to reject resource ex
 stably appends open-transaction data at offset 5 and is forcibly killed；a fourth JVM reuses that transactional ID，recovers
 the coordinator state、writes ABORT marker 6、commits data/marker 7/8，proves `read_committed` skips the aborted record and
 advances the group to offset 8 with latest=9。The native Kafka process evidence is still single-node, but now covers both
-Object-WAL and `BOOKKEEPER_WAL_ONLY`。The product
+synchronous and asynchronous Object-WAL plus `BOOKKEEPER_WAL_ONLY`。The product
 adapter's focused real-service gate covers `BOOKKEEPER_WAL_ONLY`，and the Kafka fork now owns the complete typed
 BookKeeper configuration snapshot、exact password-file identity、client lifecycle and
-`OBJECT_WAL_SYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The BookKeeper process gate uses a real two-bookie
+`OBJECT_WAL_SYNC_OBJECT + OBJECT_WAL_ASYNC_OBJECT + BOOKKEEPER_WAL_ONLY` capability mapping。The BookKeeper process gate uses a real two-bookie
 cluster with stock ZooKeeper long-hierarchical metadata，then restarts the exact formatted KRaft broker in a fresh JVM，
 recovers offset 0 and appends offset 1 with earliest=0/latest=2；
 multi-controller and multi-broker live takeover、checkpoint/virtual-segment cuts、
-async/sync materialization profiles and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
+BookKeeper-backed async/sync materialization profiles and wider chaos evidence remain future work，so this is not yet a production-rollout claim.
 
 ## Current Phase
 

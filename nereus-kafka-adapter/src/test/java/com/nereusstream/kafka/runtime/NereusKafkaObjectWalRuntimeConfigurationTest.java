@@ -21,7 +21,9 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
     @Test
     void acceptsOnlyExactFailClosedObjectWalComposition() {
         NereusKafkaRuntimeConfiguration runtime = runtime(
-                Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT));
+                Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT));
         new NereusKafkaObjectWalRuntimeConfiguration(
                 runtime,
                 streams(false),
@@ -44,7 +46,9 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("automatic append-session");
         assertThatThrownBy(() -> new NereusKafkaObjectWalRuntimeConfiguration(
-                runtime(Set.of(StorageProfile.OBJECT_WAL_SYNC_OBJECT)),
+                runtime(Set.of(
+                        StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT)),
                 streams(false),
                 oxia(),
                 objects(),
@@ -64,6 +68,7 @@ class NereusKafkaObjectWalRuntimeConfigurationTest {
         new NereusKafkaObjectWalRuntimeConfiguration(
                 runtime(Set.of(
                         StorageProfile.OBJECT_WAL_SYNC_OBJECT,
+                        StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
                         StorageProfile.BOOKKEEPER_WAL_ONLY)),
                 streams(false),
                 oxia(),

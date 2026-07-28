@@ -362,6 +362,9 @@ public final class NereusKafkaObjectWalRuntimeFactory {
             profileResolvers.put(
                     StorageProfile.OBJECT_WAL_SYNC_OBJECT,
                     objectProfiles);
+            profileResolvers.put(
+                    StorageProfile.OBJECT_WAL_ASYNC_OBJECT,
+                    objectProfiles);
             if (bookKeeperRuntime != null) {
                 primaryWalRegistries.add(
                         bookKeeperRuntime.walRuntime().primaryWalRegistry());

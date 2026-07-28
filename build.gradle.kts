@@ -65,6 +65,7 @@ val kafkaDevelopmentGateRequested = gradle.startParameter.taskNames.any { reques
         || task.startsWith("phase9M6Kafka")
         || task == "f9M6KafkaProcessIntegrationTest"
         || task == "f9BookKeeperWalOnlyProcessIntegrationTest"
+        || task == "f9ObjectWalAsyncObjectProcessIntegrationTest"
         || task == "publishPhase9DevelopmentArtifacts"
 }
 check(!(pulsarDevelopmentGateRequested && kafkaDevelopmentGateRequested)) {
@@ -2851,7 +2852,7 @@ tasks.register<Exec>("phase9KafkaForkDevelopmentSourceLockCheck") {
         "bash",
         "scripts/check-phase9-kafka-fork-development-source-lock.sh",
         kafkaForkCheckoutPath.get(),
-        "50b46aab2dad56850fc5d76ec11cf929b14c1bd9",
+        "80445853a3ee718089933615776d910f0414470f",
         "427b409cf440f745ad6195673d3342f6bd3974d4",
         "c300006a7705c240642db6950b5a95fec982bfc5",
         "4.3.0-SNAPSHOT",
@@ -3072,12 +3073,19 @@ tasks.register("phase9M6KafkaProcessCheck") {
     description = "Run real Oxia + LocalStack + BookKeeper + Nereus Kafka cold-restart process acceptance."
     dependsOn(":nereus-kafka-adapter:f9M6KafkaProcessIntegrationTest")
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
+    dependsOn(":nereus-kafka-adapter:f9ObjectWalAsyncObjectProcessIntegrationTest")
 }
 
 tasks.register("phase9M6KafkaBookKeeperProcessCheck") {
     group = "verification"
     description = "Run the focused real BookKeeper-WAL-only native Kafka cold-restart process gate."
     dependsOn(":nereus-kafka-adapter:f9BookKeeperWalOnlyProcessIntegrationTest")
+}
+
+tasks.register("phase9M6KafkaObjectAsyncProcessCheck") {
+    group = "verification"
+    description = "Run the focused async Object-WAL native Kafka cold-restart process gate."
+    dependsOn(":nereus-kafka-adapter:f9ObjectWalAsyncObjectProcessIntegrationTest")
 }
 
 tasks.register("phase9M3KafkaForkCheck") {
