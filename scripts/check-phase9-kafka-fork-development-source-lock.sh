@@ -27,8 +27,8 @@ actual_head="$(git -C "$kafka_checkout" rev-parse HEAD)"
 git -C "$kafka_checkout" merge-base --is-ancestor "$expected_base" "$actual_head" \
     || fail "locked Apache base is not an ancestor of fork HEAD"
 actual_commit_count="$(git -C "$kafka_checkout" rev-list --count "$expected_base"..HEAD)"
-[[ "$actual_commit_count" == "36" ]] \
-    || fail "expected thirty-six reviewed fork commits, got $actual_commit_count"
+[[ "$actual_commit_count" == "39" ]] \
+    || fail "expected thirty-nine reviewed fork commits, got $actual_commit_count"
 
 actual_version="$(git -C "$kafka_checkout" show HEAD:gradle.properties \
     | sed -n 's/^version=//p' | head -n 1)"
@@ -187,7 +187,7 @@ while read -r expected path; do
         || fail "fork source drifted: $path expected $expected, got $actual"
 done <<'LOCKS'
 f5e0be83cf17defd199e750f07aab49bf8c3be58 bin/nereus-kafka-server-start.sh
-21a1505f08769e941f9fae79f1b59a2f5915fcfd build.gradle
+ddc38222187b684512cf07bceea780b699584264 build.gradle
 50994f28e3ad01be109669ee57c89e172331f9af checkstyle/import-control-core.xml
 6f430993a3a5d1cbb3904a0395de75a470c3e43d core/src/main/java/kafka/log/nereus/NereusCanonicalLogState.java
 60dbfb45a00f3c007c624ea31c1aca32ea49a8b2 core/src/main/java/kafka/log/nereus/NereusKafkaExceptionMapper.java
@@ -267,9 +267,9 @@ d0fafe524cb8dd67db61678cfa81659af71631f0 core/src/test/java/kafka/server/nereus/
 e06ff96da5853e2ab0afc1cbc3e4153b981f7b7d core/src/test/scala/unit/kafka/cluster/PartitionTest.scala
 c28a29d488b51c0630cb1197b95b30bc6bf43a68 core/src/test/scala/unit/kafka/log/nereus/NereusListOffsetsLifecycleTest.scala
 ba0bcb6a45f1715683ac23611873dcb83ce5a474 core/src/test/scala/unit/kafka/log/nereus/NereusTopicDeltaLifecycleTest.scala
-7c58b46e3d2746d61b5c673257ef75b57a6ce1f2 core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
-14358b2d91ae9a25ea683946509cd3fd1657b6ca core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
-dda8c0b06459e6df5fd05b0537a540f21a143a51 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
+46303a1661fa6c8d4b876a1853b4b169c2dff71b core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala
+1917d93569260dabf490f2b4111723d58ab9160c core/src/test/scala/unit/kafka/server/KafkaConfigTest.scala
+1c3c2d507d48e2ea776e8a9f49ebc73be7cea5b2 core/src/test/scala/unit/kafka/server/NereusKafkaConfigValidatorTest.scala
 6bfc0f2d51334dbe9213a98b21ab7124416a666b core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala
 98e32cef17bc011b1f6f13f6865fd56d87cfdc27 core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala
 97aec0dfd4972d124a6456b5dc09777563c0b0c1 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageAppendExecutorTest.scala
@@ -277,8 +277,8 @@ dda8c0b06459e6df5fd05b0537a540f21a143a51 core/src/test/scala/unit/kafka/server/N
 585f6c87db02f35ef00f829d87876698f4613d52 core/src/test/scala/unit/kafka/server/nereus/NereusBrokerStorageRuntimeTest.scala
 d2a9265f60ae82e93bb152832c4dd36f69c46126 core/src/test/scala/unit/kafka/server/nereus/NereusKafkaOwnedPartitionSourceBridgeTest.scala
 e09fa0c9643d3982af69a6679438f1baf8230606 core/src/test/scala/unit/kafka/server/nereus/NereusKafkaTest.scala
-733c4d4815cbec6a7335f9a337053e980e87883d core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
-30e87b42350e3f88161dcd14ffee41cb0eb3da81 core/src/test/scala/unit/kafka/tools/StorageToolTest.scala
+93cf326d30fbf7286e0674395e59ea33917bde83 core/src/test/scala/unit/kafka/server/storage/BrokerStorageRuntimeFactoryTest.scala
+05174dd0c74daf786b86e84c612156fdfa2254dc core/src/test/scala/unit/kafka/tools/StorageToolTest.scala
 cd06ee5e4709b7d70c19cdd82c241db5d44377bb metadata/src/main/java/org/apache/kafka/controller/ConfigurationControlManager.java
 e7bc734e74e6e35346f6cb5a621b34ca6e20b1ac metadata/src/main/java/org/apache/kafka/controller/FeatureControlManager.java
 6cd7b89e51a474c98844431503a2c31808f0f3b5 metadata/src/main/java/org/apache/kafka/controller/QuorumFeatures.java
@@ -337,6 +337,23 @@ marker_end="$(grep -h -F -c 'Nereus inject end:' \
     | awk '{ total += $1 } END { print total + 0 }')"
 [[ "$marker_start" -gt 0 && "$marker_start" == "$marker_end" ]] \
     || fail "Nereus inject markers are absent or unbalanced: $marker_start/$marker_end"
+
+kafka_build="$kafka_checkout/build.gradle"
+grep -F -q "exclude group: 'org.apache.logging.log4j', module: 'log4j-slf4j-impl'" "$kafka_build" \
+    || fail "Nereus-enabled Kafka runtime lost the legacy SLF4J binding exclusion"
+grep -F -q "exclude group: 'ch.qos.logback', module: 'logback-classic'" "$kafka_build" \
+    || fail "Nereus-enabled Kafka runtime lost the competing Logback provider exclusion"
+grep -F -q 'implementation "org.slf4j:slf4j-api:2.0.17"' "$kafka_build" \
+    || fail "Nereus-enabled Kafka runtime lost its exact SLF4J 2 API"
+grep -F -q 'log4j-slf4j2-impl:${versions.log4j2}' "$kafka_build" \
+    || fail "Nereus-enabled Kafka runtime lost its exact Log4j SLF4J2 provider"
+grep -F -q 'details.name == "slf4j-api-${versions.slf4j}.jar"' "$kafka_build" \
+    || fail "Nereus release tar lost the legacy SLF4J API filter"
+
+unified_log_factory_test="$kafka_checkout/core/src/test/scala/unit/kafka/log/nereus/NereusUnifiedLogFactoryTest.scala"
+grep -F -q 'properties.put(NereusKafkaConfigs.PROFILE_CONFIG, "OBJECT_WAL_SYNC_OBJECT")' \
+        "$unified_log_factory_test" \
+    || fail "Nereus UnifiedLog factory fixture lost its explicit Object profile"
 
 unified_log_factory="$kafka_checkout/core/src/main/scala/kafka/log/UnifiedLogFactory.scala"
 grep -F -q 'val Local: UnifiedLogFactory = context => UnifiedLog.create(' "$unified_log_factory" \
@@ -856,6 +873,14 @@ kafka_scheduler="$kafka_checkout/server-common/src/main/java/org/apache/kafka/se
 grep -F -q 'public synchronized ScheduledExecutorService scheduledExecutorService()' "$kafka_scheduler" \
     || fail "Kafka scheduler lost its explicit borrowed ScheduledExecutorService boundary"
 
+storage_tool_test="$kafka_checkout/core/src/test/scala/unit/kafka/tools/StorageToolTest.scala"
+grep -F -q 'NereusKafkaConfigs.BOOKKEEPER_DEPLOYMENT_ID_CONFIG' "$storage_tool_test" \
+    || fail "StorageTool enabled-format fixture lost the default BookKeeper deployment identity"
+grep -F -q 'NereusKafkaConfigs.BOOKKEEPER_PASSWORD_FILE_CONFIG' "$storage_tool_test" \
+    || fail "StorageTool enabled-format fixture lost the default BookKeeper secret identity"
+grep -F -q 'NereusKafkaConfigs.BOOKKEEPER_READINESS_SHA256_CONFIG' "$storage_tool_test" \
+    || fail "StorageTool enabled-format fixture lost the default BookKeeper readiness identity"
+
 if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
         "$kafka_checkout/core/src/main/java/kafka/log/nereus" \
         "$kafka_checkout/core/src/main/java/kafka/server/nereus" \
@@ -864,4 +889,4 @@ if grep -E -R -q 'Class\.forName|MethodHandles|setAccessible' \
     fail "Kafka bridge package uses a forbidden reflection bypass"
 fi
 
-echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-six commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control blobs and markers match"
+echo "F9 Kafka fork development source lock: published $actual_remote_head from Apache $expected_base; cached organization trunk $actual_remote_trunk; thirty-nine commits, one hundred twenty-one log-IO/bridge/recovery/metadata-lifecycle/configuration/runtime-composition/retention/compaction/controller/launcher/feature-control/logging-runtime/format-fixture blobs and markers match"

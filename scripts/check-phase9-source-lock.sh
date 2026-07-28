@@ -35,11 +35,11 @@ a642b6488cf6f12c488e68949b8ec09a32d28451 nereus-api/src/main/java/com/nereusstre
 799caf45554ffaab72927bf18e869cce9ba02d2a nereus-api/src/main/java/com/nereusstream/api/AppendPrecondition.java
 e43bd0bb99f1762cc4893e20da18450c9e94b76f nereus-api/src/main/java/com/nereusstream/api/ReadRequest.java
 3b2605616150ffb9efada7287df90fa557b92a34 nereus-api/src/main/java/com/nereusstream/api/SemanticReadResult.java
-14155bedbf37add50388a67a33379a665390a5e6 nereus-core/src/main/java/com/nereusstream/core/DefaultStreamStorage.java
+3f90771dbbb02f56873771953bb12adda6f7f21a nereus-core/src/main/java/com/nereusstream/core/DefaultStreamStorage.java
 bc4553fa84e8cba2ef0c70b3812aef7876dc014e nereus-core/src/main/java/com/nereusstream/core/append/AppendSessionManager.java
 68c0457cddf7db051da12f676c8c0dc599458be7 nereus-core/src/main/java/com/nereusstream/core/append/AppendCoordinator.java
 336d08fa1078248b31925f5a6391932f177999ec nereus-core/src/main/java/com/nereusstream/core/append/AppendResultValidator.java
-293b5bacd47c2908e226cadec32a6f67b01bdfb5 nereus-core/src/main/java/com/nereusstream/core/read/ReadCoordinator.java
+399f51ecb61db8acb97dea6df5f145ba2a9c4b29 nereus-core/src/main/java/com/nereusstream/core/read/ReadCoordinator.java
 11294d4965e76c94cf34a5d66d455c7ace25dad4 nereus-core/src/main/java/com/nereusstream/core/read/ParquetV2CompactedTargetReader.java
 e92e604b377ea8a481d5bece22600073c6fc0235 nereus-core/src/main/java/com/nereusstream/core/capability/PhysicalFormatCapabilityRegistry.java
 6ee7fb5ffcc0b1ff6c9d669ab16b69403b45e9f4 nereus-object-store/src/main/java/com/nereusstream/objectstore/wal/DefaultWalObjectReader.java
@@ -51,6 +51,7 @@ a6e9a0ffe576c88bebd67765864509df5d6680d5 nereus-object-store/src/main/java/com/n
 92871c04d0e767f5252038b142aeab32f1fac18d nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperPrimaryWalReader.java
 dd6233c9a084b4473ba9bc9b1c77fbbf85511c75 nereus-bookkeeper/src/main/java/com/nereusstream/bookkeeper/BookKeeperRangedEntryCodecV1.java
 f4e35b83ffeb0fb630a9b45893f2f9630608dc3e nereus-materialization/src/main/java/com/nereusstream/materialization/RangedLosslessMaterializationRowPublisher.java
+d1715b79b3080483e6ffe8389922840e89eda42d nereus-materialization/src/main/java/com/nereusstream/materialization/DefaultMaterializationPlanner.java
 LOCKS
 
-echo "F9 source lock: AutoMQ and 24 Nereus ranged/head/session-foundation sources match"
+echo "F9 source lock: AutoMQ and 25 Nereus ranged/head/session/planner-foundation sources match"

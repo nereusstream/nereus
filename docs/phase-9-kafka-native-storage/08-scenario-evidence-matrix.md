@@ -30,7 +30,7 @@ Current provider-profile evidence（2026-07-28）：the product adapter installs
 ledger-ID namespace、ACTIVE publication and exact broker readiness。`f9BookKeeperWalOnlyProviderIntegrationTest` starts real
 two-bookie BookKeeper、opens a Kafka leader with `BOOKKEEPER_WAL_ONLY`、strictly appends a magic-v2 batch、publishes the exact
 BookKeeper generation-zero target and Fetches it through the shared generation resolver。The client is borrowed and the
-provider graph closes before it。Fork `5169b57986` supplies the 100-key typed configuration、exact BookKeeper secret
+provider graph closes before it。Fork `ebf1d76163` supplies the 100-key typed configuration、exact BookKeeper secret
 identity/client ownership、five-profile mapping、six-key fail-closed ledger-GC policy and three-key materialization
 retirement policy with focused static/unit evidence。
 `f9BookKeeperWalOnlyProcessIntegrationTest` now supplies independent-process evidence for this one profile：a real release
@@ -59,7 +59,7 @@ The extended gate also leaves one transaction open at a stable data batch，forc
 resolves it with an ABORT marker before accepting the next transaction；read-committed and the group skip the aborted data。
 Rows stay `PLANNED` because their required BookKeeper/profile service matrix、multi-broker takeover、
 checkpoint/virtual-segment and mandatory NTC2 failure cuts plus aggregate tiers have not run。The fork commits are published in
-`nereusstream/kafka:nereus/future9-native-kafka-storage@5169b57986`。
+`nereusstream/kafka:nereus/future9-native-kafka-storage@ebf1d76163`。
 
 Current deterministic M5 retention fork evidence（local `4c060aec89` + `feabf6c686` + `378e9f8967`；product
 `3eb6b63` + `57dcf35`）：stock DeleteRecords normalization/capture invokes the shared checkpoint-before-trim path；
@@ -67,7 +67,7 @@ the fork exposes bounded owned writable partitions and the same `NereusUnifiedLo
 non-overlapping maintenance；and canonical virtual segment/config/time/logical state is rebuilt from checkpoint plus
 committed tail。Focused retention、Partition、UnifiedLog、dynamic-config、Checkstyle and SpotBugs evidence passes。Rows
 remain `PLANNED` because real provider/process/restart/chaos and stock differential tiers are still missing。The Kafka
-fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@5169b57986`。
+fork commits are published at `nereusstream/kafka:nereus/future9-native-kafka-storage@ebf1d76163`。
 
 Current BookKeeper deletion evidence（product 2026-07-28）：
 `KafkaBookKeeperStreamCoverageProofProducerTest` proves complete 64-shard Kafka binding inventory plus complete 64-shard F4
@@ -85,6 +85,11 @@ release-distribution P-tier evidence：one-entry rollover、metadata `DELETED`�
 first-JVM shutdown and fresh-JVM offset-0 NCP2 recovery followed by continued append/fetch/ListOffsets。This is
 deterministic plus adapter/provider/process partial evidence for KF-RET-009 and KF-OPS-012/018 only。Those rows remain
 `PLANNED` because delete-response-loss/multi-broker takeover cuts and aggregate evidence have not run。
+The same date's fresh current-slice aggregate also proves repeated materialization can replace a physically deleted
+BookKeeper prefix with a committed NCP2 higher generation and combine it with a readable BookKeeper tail。The deterministic
+planner reproducer and real provider deletion gate pass inside a 109/109 outer-task run；nested Kafka stock/artifact-enabled
+builds pass 92/92 and 95/95 actionable tasks。This does not change any row to `PASSED_CURRENT_SOURCE`：the manifest's
+required delete-response-loss、multi-broker takeover and final aggregate tiers are still absent。
 
 Current checkpoint-failure quarantine evidence（product 2026-07-28）：closed V1 record/envelope and canonical key tests
 cover exact partition-incarnation/object identity、immutable first-winner、reference-digest collision、raw-failure

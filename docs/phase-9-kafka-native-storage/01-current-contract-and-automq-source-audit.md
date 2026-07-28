@@ -191,6 +191,7 @@ API/core/primary-reader/NCP2/NTC2/materialization rows 是当前已实现事实�
 | `nereus-api/.../BookKeeperEntryMapping.java` | `5236dde94dddb663c0229a0b2f23045686c386a9` | legacy enum stays first；ranged mapping appended without reinterpreting old targets |
 | `nereus-materialization/.../LosslessMaterializationRowPublisher.java` | `ec71fad507a57178ee848426028a3d7c1adf125e` | NCP1 explicitly requires one record per offset |
 | `nereus-materialization/.../RangedLosslessMaterializationRowPublisher.java` | `f4e35b83ffeb0fb630a9b45893f2f9630608dc3e` | one exact Kafka source batch maps to one dense NCP2 row |
+| `nereus-materialization/.../DefaultMaterializationPlanner.java` | `d1715b79b3080483e6ffe8389922840e89eda42d` | normalizes only the exact Kafka V1 Object mapping into the Kafka-batch compatibility domain, so a higher NCP2 prefix supersedes a retired BookKeeper gen0 prefix while a readable BK tail remains selectable |
 | `nereus-materialization/.../DefaultTopicCompactionEngine.java` | `c4849680050a2be4b0059161509564b36daa350d` | NTC1 collector assumes one logical row per batch |
 | `nereus-metadata-oxia/.../OxiaJavaClientMetadataStore.java` | `3c7d29d7a2b7f4f87e240c65503f46f05c03e464` | live other-writer session rejected until expiry |
 
@@ -424,10 +425,13 @@ source-isolation fix 是 `faaffc8a75`，第二十七个 native-storage launcher 
 commit 是 `116052aa53867e4f41bdb4b61f4dc171923a0659`，第三十五个 BookKeeper ledger-GC typed
 configuration/digest mapping commit 是 `b443750be4ea34eb7dd5b827104b7eec7db65292`，第三十六个 materialization
 retirement policy/configuration-digest mapping commit 是
-`5169b57986f9b940d6f2c96ab3e1f777d4aa9cfa`。该 head 已通过 SSH 发布到
+`5169b57986f9b940d6f2c96ab3e1f777d4aa9cfa`，第三十七个 stock config-fixture alignment commit 是
+`33f988a83ef026773772df0e6ad45160520f3646`，第三十八个 logging-runtime isolation commit 是
+`a1b1e3482de875b15dc42ecda0ce500a65eb37b5`，第三十九个 enabled-format default-BookKeeper-profile
+fixture completion commit 是 `ebf1d7616309a26ca95cffa3a2434bf9d5a20868`。该 head 已通过 SSH 发布到
 `origin/nereus/future9-native-kafka-storage`。
 
-`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-six-commit
+`phase9KafkaForkDevelopmentSourceLockCheck` 锁定 branch/local+published head/base ancestry/thirty-nine-commit
 count/version、组织 fork fetch/push identity、cached organization trunk ancestry、一百二十一文件 exact change set/blob、
 成对 inject marker、adapter/async bridge/
 exception-mapper/ListOffsets lifecycle/topic-delta lifecycle/metadata-publisher/config snapshot/validator method signature 和
@@ -437,6 +441,8 @@ no-reflection/no-service-loader/no-stock-product-import 规则；新增 runtime 
 broker-capability、activation-backed Object/BookKeeper creator、typed BookKeeper binding/client ownership、borrowed scheduler、single-image KRaft snapshot、
 post-registration broker epoch、per-operation admission recheck、one-time recovery-state-factory binding、stock
 `RecordBatch` CRC/fresh-state/frozen-source validation、exact `Partition` publication，以及 stock-local
+logging-runtime marker：启用 development artifacts 时只允许 SLF4J 2.x provider，排除 1.x binding、Logback
+provider 和 BookKeeper 传递 provider，并从 release tar 过滤 Kafka 原 1.7 API；
 `UnifiedLogFactory.Local` fallback、Nereus no-local-scan/no-local-maintenance factory、recovered-state/storage publication
 和 `RequiredAcksAwareAppend` exact routing、stable append-before-LEO、post-stable fencing、bounded adapter read 与
 `MemoryRecords` Fetch assembly signatures，以及 request-wide Produce validation、stock optional append executor、
@@ -598,8 +604,24 @@ async profile as default without constructing another provider graph。The first
 earliest=0/latest=1；after normal shutdown a fresh JVM recovers offset 0、writes/fetches offset 1 and verifies
 earliest=0/latest=2 over the same formatted KRaft directories、Oxia and LocalStack S3。
 
+The 2026-07-28 fresh partial aggregate exposed a second-generation BookKeeper materialization planner defect after the first
+source ledger had already completed terminal retirement and physical deletion。The next wider task must select the committed
+NCP2 higher-generation prefix plus the still-readable BookKeeper generation-zero tail；comparing raw
+`KAFKA_RECORD_BATCH` directly with the versioned NCP2 logical format `KAFKA_RECORD_BATCH_V1` instead selected the deleted
+BookKeeper prefix and failed closed as an unreadable source。`DefaultMaterializationPlanner` now normalizes only that exact
+byte-equivalent Kafka mapping to the payload compatibility name while retaining strict equality for every other mapping。
+`MaterializationPlannerTest.prefersKafkaNcp2ReplacementBeforeAReadableBookKeeperTail` fixes the source identities、
+generations and coverage boundary；the real-Oxia/two-bookie physical deletion gate then completes both tasks and proves the
+old ledger remains deleted while NCP2 remains byte-readable。Against fork `ebf1d76163` and the exact product working source，
+the combined
+`phase9M3KafkaForkCheck phase9M5CompactionCoreCheck phase9M6ActivationMetadataCheck phase9M6KafkaFeatureCheck
+phase9M6CheckpointQuarantineCheck --rerun-tasks`
+run passes 109/109 outer tasks；nested Kafka builds pass 92/92 stock and 95/95 artifact-enabled actionable tasks，with
+86/86、42/42、74/74 and 20/20 focused feature/control/static invocations also successful。This is a fresh aggregate for
+the implemented slice，not KF-FINAL-001/002 release evidence。
+
 该段执行时 HTTPS credential 对组织 fork 的 API permission 是 `read`，因此当时只能称为 development source
 lock。2026-07-28 已通过本机 SSH identity 发布完整 branch；当前远端
 `nereus/future9-native-kafka-storage` 与工作 clone HEAD 均为
-`5169b57986f9b940d6f2c96ab3e1f777d4aa9cfa`。Executable source-lock expectation 已更新到该 reviewed、
+`ebf1d7616309a26ca95cffa3a2434bf9d5a20868`。Executable source-lock expectation 已更新到该 reviewed、
 published head；KF-SRC-004 仍须随完整 final gate 一起执行后才能标记 complete。

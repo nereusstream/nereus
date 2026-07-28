@@ -17,6 +17,7 @@ import com.nereusstream.api.SchemaRef;
 import com.nereusstream.api.StorageProfile;
 import com.nereusstream.api.StreamId;
 import com.nereusstream.api.StreamState;
+import com.nereusstream.api.target.BookKeeperEntryRangeReadTarget;
 import com.nereusstream.api.target.ObjectSliceReadTarget;
 import com.nereusstream.api.target.ReadTarget;
 import com.nereusstream.metadata.oxia.GenerationMetadataStore;
@@ -40,6 +41,7 @@ import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationStreamRegistrationRecord;
 import com.nereusstream.metadata.oxia.records.StreamMetadataRecord;
 import com.nereusstream.metadata.oxia.records.TrimRecord;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV2;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -230,6 +232,27 @@ final class MaterializationPlannerTestSupport {
                 List.of());
     }
 
+    static VersionedGenerationZeroIndex kafkaBookKeeperZero(
+            String key,
+            long start,
+            long end,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion,
+            BookKeeperEntryRangeReadTarget target) {
+        return zero(
+                key,
+                start,
+                end,
+                cumulativeStart,
+                logicalBytes,
+                commitVersion,
+                target,
+                PayloadFormat.KAFKA_RECORD_BATCH,
+                1,
+                List.of());
+    }
+
     static VersionedGenerationZeroIndex zero(
             String key,
             long start,
@@ -334,6 +357,57 @@ final class MaterializationPlannerTestSupport {
                 110,
                 metadataVersion);
         return new VersionedGenerationIndex(key, record, metadataVersion, sha(hexCharacter(key)));
+    }
+
+    static VersionedGenerationIndex kafkaHigher(
+            String key,
+            long start,
+            long end,
+            long generation,
+            long cumulativeStart,
+            long logicalBytes,
+            long commitVersion,
+            Checksum policyDigest) {
+        long metadataVersion = 100 + generation;
+        ObjectSliceReadTarget target = target(
+                "kafka-g" + generation + "-" + start + "-" + end,
+                ObjectType.STREAM_COMPACTED_OBJECT,
+                MaterializationPolicy.KAFKA_COMMITTED_FORMAT,
+                CompactedObjectFormatV2.KAFKA_LOGICAL_FORMAT);
+        var encodedTarget = ReadTargetCodecRegistry.phase15().encode(target);
+        GenerationIndexRecord record = new GenerationIndexRecord(
+                1,
+                STREAM.value(),
+                ReadView.COMMITTED.wireId(),
+                start,
+                end,
+                generation,
+                "k".repeat(26),
+                "kafka-source-task-" + generation + "-" + start + "-" + end,
+                GenerationLifecycle.COMMITTED,
+                sha('b').value(),
+                policyDigest.value(),
+                encodedTarget,
+                encodedTarget.identityChecksumValue(),
+                policyDigest.value(),
+                PayloadFormat.KAFKA_RECORD_BATCH.name(),
+                Math.toIntExact(end - start),
+                Math.toIntExact(end - start),
+                1,
+                logicalBytes,
+                cumulativeStart,
+                cumulativeStart + logicalBytes,
+                commitVersion,
+                commitVersion,
+                List.of(),
+                MaterializationRecordMapper.projectionIdentity(Optional.empty()),
+                100,
+                110,
+                "",
+                110,
+                metadataVersion);
+        return new VersionedGenerationIndex(
+                key, record, metadataVersion, sha(hexCharacter(key)));
     }
 
     static VersionedGenerationIndex publishedTopic(MaterializationTask task, int outputRecordCount) {
@@ -522,6 +596,18 @@ final class MaterializationPlannerTestSupport {
             String id,
             ObjectType objectType,
             String physicalFormat) {
+        return target(
+                id,
+                objectType,
+                physicalFormat,
+                PayloadFormat.PULSAR_ENTRY_BATCH.name());
+    }
+
+    private static ObjectSliceReadTarget target(
+            String id,
+            ObjectType objectType,
+            String physicalFormat,
+            String logicalFormat) {
         byte[] indexBytes = new byte[] {1, 2, 3};
         EntryIndexRef index = new EntryIndexRef(
                 EntryIndexLocation.INLINE,
@@ -537,7 +623,7 @@ final class MaterializationPlannerTestSupport {
                 new ObjectKey("objects/planner/" + id),
                 objectType,
                 physicalFormat,
-                PayloadFormat.PULSAR_ENTRY_BATCH.name(),
+                logicalFormat,
                 "slice-" + id,
                 0,
                 100,

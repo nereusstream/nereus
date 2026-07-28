@@ -4,7 +4,7 @@
 > Future：F9 Native Kafka Shared Storage
 > 目标日期基线：2026-07-23
 > AutoMQ 参考锁：`1c648d84819d5c3fef2af585f02149c397584870`（`3.9.0-SNAPSHOT`）
-> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@5169b57986f9b940d6f2c96ab3e1f777d4aa9cfa`（36 commits / 121 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；M3 19 + M4 2 + M5 4 + M6/stock-isolation/controller 3 + durable feature/control 1 + aggregate Spotless alignment 1 + cache-directory KRaft identity 1 + BookKeeper typed runtime/client ownership 1 + async Object-WAL profile mapping 1 + BookKeeper Object-profile/cache-root NCP2 mapping 1 + BookKeeper ledger-GC configuration 1 + materialization-retirement policy 1）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
+> Kafka fork development head：`nereusstream/kafka:nereus/future9-native-kafka-storage@ebf1d7616309a26ca95cffa3a2434bf9d5a20868`（39 commits / 121 files from Apache `427b409cf440f745ad6195673d3342f6bd3974d4`；M3 19 + M4 2 + M5 4 + M6/stock-isolation/controller 3 + durable feature/control 1 + aggregate Spotless alignment 1 + cache-directory KRaft identity 1 + BookKeeper typed runtime/client ownership 1 + async Object-WAL profile mapping 1 + BookKeeper Object-profile/cache-root NCP2 mapping 1 + BookKeeper ledger-GC configuration 1 + materialization-retirement policy 1 + stock config-fixture alignment 1 + logging-runtime isolation 1 + enabled-format default-profile fixture 1）；working clone `/Users/liusinan/apps/ideaproject/nereusstream/kafka`；SSH push is configured and the remote head is verified
 > F9 implementation base：`main@112c459`；M3 adapter slice base：`main@6fe5a7e`
 
 本目录是原生 Kafka 与 Nereus 集成的代码级 target contract。这里的 class、method、record、key、状态机和
@@ -293,7 +293,7 @@ worker 内的 `NereusUnifiedLog` stock state-machine boundary，不再占用 req
 whole-request Fetch read wave 迁到 runtime-owned bounded worker；逻辑 operation permit 覆盖等待期，独立 callback
 executor 负责最终响应，request handler 与 purgatory thread 都不再执行 Nereus storage wait。Controller
 first-activation 的 deterministic scheduling 与 durable feature gate 已由 `d23dc5c787` 组装；Object-WAL checkpoint
-durable quarantine 已在 product runtime 组装。Fork `5169b57986` 将配置面扩展为 100 keys，并为
+durable quarantine 已在 product runtime 组装。Fork `ebf1d76163` 当前 head 将配置面扩展为 100 keys，并为
 `BOOKKEEPER_WAL_ONLY` 构造完整 `NereusKafkaBookKeeperConfig`、BookKeeper WAL 映射、exact readiness/password
 reference 与 fork-owned BookKeeper client；product graph 仍只借用 client，outer wrapper 按 product-first/client-second
 顺序关闭。Mapper 将 Object sync/async 显式映射到同一已安装 Object provider 集合，并在 BookKeeper
@@ -301,6 +301,10 @@ runtime 存在时暴露完整五档 capability set、保留 exact configured pro
 固定到 authoritative cache root 下的 `materialization-staging`。新增六个 BookKeeper ledger-GC key 被映射为
 `BookKeeperLedgerGcConfiguration`；三个 materialization retirement lifecycle key 被映射为
 `MaterializationConfig`，两组字段均参与 compatibility digest。默认 `enabled=false/dryRun=true` 不创建 scanner。
+该 head 还把 Nereus-enabled Kafka 的 logging runtime 收敛为唯一
+`slf4j-api:2.0.17 + log4j-slf4j2-impl:2.25.3`：`core` configuration 排除 Kafka 原 1.x binding、
+OAuth test fixture 的 Logback provider 和 BookKeeper 传递 provider；`releaseTarGz` 在启用 development artifacts
+时过滤 Kafka 原 `slf4j-api:1.7.36`。真实 tar 内容检查不得出现第二个 SLF4J API/provider。
 只有 enabled、non-dry-run 且已组装 Kafka materialization runtime 时，provider-neutral
 `BookKeeperPrimaryWalRuntime.createRetentionService` 才创建 scanner/service。Kafka adapter 同时构造
 `KafkaBookKeeperStreamCoverageProofProducer` 与一次性
@@ -359,6 +363,18 @@ NCP2 publication 和正常 Kafka read。`f9BookKeeperWalAsyncObjectProcessIntegr
 继续追加；`f9BookKeeperWalSyncObjectProcessIntegrationTest` 以单 batch 验证 append 只有在 required NCP2
 COMMITTED/readable 后才完成，再执行同样的 fresh-JVM 恢复。三类 BookKeeper process tasks 已纳入
 `phase9M6KafkaBookKeeperProcessCheck`。
+2026-07-28 的 fresh partial aggregate 还覆盖了一个此前只在连续物化时暴露的 source-selection 缺口：
+generation 0 的 BookKeeper 前缀完成 NCP2 物化并被物理删除后，下一次扩大 source range 必须优先复用
+higher-generation NCP2 前缀，再拼接仍可读的 BookKeeper tail；不能因 raw Kafka batch 使用
+`KAFKA_RECORD_BATCH`、NCP2 logical format 使用 `KAFKA_RECORD_BATCH_V1` 而错误地回退到已删除 ledger。
+`DefaultMaterializationPlanner` 现在只对这一个 byte-equivalent Kafka 映射做兼容归一化，其他 payload/logical
+format 组合仍严格拒绝；确定性 planner 回归和 real Oxia + two-bookie physical-deletion provider gate 均通过。
+根聚合命令
+`phase9M3KafkaForkCheck phase9M5CompactionCoreCheck phase9M6ActivationMetadataCheck phase9M6KafkaFeatureCheck
+phase9M6CheckpointQuarantineCheck --rerun-tasks`
+在 fork `ebf1d76163` 与当前 product source 上以 109/109 outer tasks 成功结束；嵌套 Kafka stock/artifact-enabled
+构建分别通过 92/92 与 95/95 actionable tasks，feature/control focused builds 也通过 86/86、42/42、74/74
+与 20/20 actionable tasks。该结果是当前已实现 slice 的 fresh aggregate，不是 F9 final-release aggregate。
 真实 controller/multi-broker live takeover、checkpoint/virtual-segment transaction cuts 和 chaos/profile 扩展仍未组装。
 若以后
 实现与本文不同，必须先更新合同、版本和兼容性分析，不能让代码静默改变 durable bytes 或 correctness owner。

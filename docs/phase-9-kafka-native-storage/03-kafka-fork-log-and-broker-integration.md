@@ -282,7 +282,7 @@ BookKeeper 模式复用 provider-neutral `BookKeeperPrimaryWalRuntime`、Oxia na
 physical-reference publisher、profile resolver 和 exact reader registry；只有 F1-BK namespace 与 ACTIVE publication
 已由 operator provision、broker readiness exact 匹配时才允许启动。`f9BookKeeperWalOnlyProviderIntegrationTest`
 用真实四分片 Oxia + 两个 bookie 证明 leader open、strict append 和 cold generation-zero Fetch。Fork
-`5169b57986` 已实现完整 100-key typed storage 配置映射、BookKeeper password file/version identity、pre-I/O cross-field
+`ebf1d76163` 已实现完整 100-key typed storage 配置映射、BookKeeper password file/version identity、pre-I/O cross-field
 validation、fork-owned client 和 product-first/client-second close wrapper。`f9BookKeeperWalOnlyProcessIntegrationTest`
 进一步从真实 release tarball 启动 combined-node Kafka，使用 stock
 `zk+longhierarchical://127.0.0.1:<port>/ledgers` 管理 BookKeeper 自身元数据，同时把 Nereus
@@ -915,7 +915,26 @@ BookKeeper-primary + Object-materialization graph，暴露完整五档 capabilit
 authoritative cache root；第三十五个 `b443750be4` 增加六个 ledger-GC rollout key、typed snapshot/cross-field
 validation、compatibility-digest binding 以及 `BookKeeperLedgerGcConfiguration` 映射。第三十六个
 `5169b57986` 增加三个 materialization retirement lifecycle key、`RetentionCompaction` typed snapshot/
-cross-field validation、`MaterializationConfig` 映射与 compatibility-digest binding。默认 disabled/dry-run
+cross-field validation、`MaterializationConfig` 映射与 compatibility-digest binding；第三十七个
+`33f988a83e` 让 stock `KafkaConfigTest` 明确识别 profile-conditional optional fields，并让 enabled validator/
+runtime-factory fixtures 显式选择 Object profile，避免默认 BookKeeper profile 在目标断言前因缺失 identity 失败。
+第三十八个 `a1b1e3482d` 修复 development-artifact 运行时依赖边界：BookKeeper 4.18 将 SLF4J API 提升到
+2.x，因此 `core` 在 Nereus mode 排除 `log4j-slf4j-impl`、`logback-classic` 和 storage dependency
+传递的 provider，显式安装 `slf4j-api:2.0.17` 与 `log4j-slf4j2-impl:2.25.3`；provider 自身的 API
+传递依赖被排除，`releaseTarGz.eachFile` 同时移除 Kafka 原 `slf4j-api:1.7.36`。发行包必须恰好包含
+上述一个 API 和一个 provider。`NereusUnifiedLogFactoryTest.enabledProperties` 同时显式选择
+`OBJECT_WAL_SYNC_OBJECT`，使 log-factory 测试不再隐式依赖默认 BookKeeper profile。
+第三十九个 `ebf1d76163` 补齐 `StorageToolTest.nereusControllerProperties` 的默认
+`BOOKKEEPER_WAL_ASYNC_OBJECT` 身份：deployment、cluster alias、provider-scope SHA-256、ledger-prefix value、
+reservation、password file/version 与 readiness SHA-256。`StorageTool` 仍在读取配置并格式化
+`nereus.storage.version=1` 前构造完整 typed snapshot；测试不再靠缺字段绕过该 fail-closed 校验。
+在相同 fork head 和当前 product source 上，2026-07-28 fresh partial aggregate 同时运行
+`phase9M3KafkaForkCheck`、M5 compaction core、M6 activation metadata、Kafka feature 与 checkpoint quarantine：
+outer 109/109 tasks 全部重新执行成功；nested stock/artifact-enabled Kafka 构建分别通过 92/92 与 95/95
+actionable tasks，后续 feature/control focused builds 通过 86/86、42/42、74/74 与 20/20。该证据确认新的
+enabled-format fixture、source lock 和当前 product planner/physical-deletion slice 能在同一次 clean task
+selection 中组合；它不替代尚未实现的 multi-broker、multi-controller 和 M7 final aggregate。
+默认 disabled/dry-run
 不会启动 scanner；enabled/non-dry-run 只有在 materialization runtime 已激活时才允许创建 retention service。
 Product adapter 现已把 provider-neutral deletion coordinator 下沉到 `nereus-bookkeeper`，并新增 Kafka-owned
 `KafkaBookKeeperStreamCoverageProofProducer`。它完整扫描 64 个 binding shards 与 64 个 F4 registration

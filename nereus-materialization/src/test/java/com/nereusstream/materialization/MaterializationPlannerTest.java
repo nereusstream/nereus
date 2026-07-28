@@ -61,6 +61,85 @@ class MaterializationPlannerTest {
     }
 
     @Test
+    void prefersKafkaNcp2ReplacementBeforeAReadableBookKeeperTail() {
+        MaterializationPolicy policy =
+                MaterializationPolicyFactory.kafkaLosslessCommitted(
+                        2, 16, 1_000, 1_000_000, 128, "ZSTD");
+        BookKeeperEntryRangeReadTarget retiredHead =
+                new BookKeeperEntryRangeReadTarget(
+                        1,
+                        "primary",
+                        91,
+                        0,
+                        1,
+                        BookKeeperEntryMapping
+                                .ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                        new Checksum(ChecksumType.SHA256, "7".repeat(64)));
+        BookKeeperEntryRangeReadTarget readableTail =
+                new BookKeeperEntryRangeReadTarget(
+                        1,
+                        "primary",
+                        92,
+                        0,
+                        1,
+                        BookKeeperEntryMapping
+                                .ONE_NEREUS_ENTRY_PER_BOOKKEEPER_ENTRY,
+                        new Checksum(ChecksumType.SHA256, "8".repeat(64)));
+        List<VersionedGenerationCandidate> sources =
+                List.of(
+                        MaterializationPlannerTestSupport
+                                .kafkaBookKeeperZero(
+                                        "/index/bk-retired-head",
+                                        0,
+                                        1,
+                                        0,
+                                        89,
+                                        1,
+                                        retiredHead),
+                        MaterializationPlannerTestSupport.kafkaHigher(
+                                "/index/ncp2-head",
+                                0,
+                                1,
+                                1,
+                                0,
+                                89,
+                                1,
+                                policy.digestSha256()),
+                        MaterializationPlannerTestSupport
+                                .kafkaBookKeeperZero(
+                                        "/index/bk-readable-tail",
+                                        1,
+                                        2,
+                                        89,
+                                        89,
+                                        2,
+                                        readableTail));
+        DefaultMaterializationPlanner planner =
+                MaterializationPlannerTestSupport.directPlanner(
+                        sources,
+                        List.of(),
+                        0,
+                        2,
+                        StorageProfile.BOOKKEEPER_WAL_ASYNC_OBJECT);
+
+        MaterializationTask task =
+                planner.plan(STREAM, new OffsetRange(0, 2), policy, 1)
+                        .join()
+                        .get(0);
+
+        assertThat(task.coverage()).isEqualTo(new OffsetRange(0, 2));
+        assertThat(task.sources())
+                .extracting(SourceGeneration::generation)
+                .containsExactly(1L, 0L);
+        assertThat(task.sources().get(0).readTarget())
+                .isInstanceOf(
+                        com.nereusstream.api.target
+                                .ObjectSliceReadTarget.class);
+        assertThat(task.sources().get(1).readTarget())
+                .isEqualTo(readableTail);
+    }
+
+    @Test
     void plansWholeGapFreeGenerationZeroEdgesAndDoesNotClipAStraddlingTrim() {
         List<VersionedGenerationCandidate> sources = List.of(
                 MaterializationPlannerTestSupport.zero("/index/z-2", 0, 2, 0, 100, 2),

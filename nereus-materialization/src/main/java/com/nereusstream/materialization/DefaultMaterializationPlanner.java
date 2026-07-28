@@ -30,6 +30,7 @@ import com.nereusstream.metadata.oxia.VersionedMaterializationTask;
 import com.nereusstream.metadata.oxia.records.GenerationLifecycle;
 import com.nereusstream.metadata.oxia.records.MaterializationTaskRecord;
 import com.nereusstream.metadata.oxia.records.TaskLifecycle;
+import com.nereusstream.objectstore.compacted.CompactedObjectFormatV2;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -499,6 +500,18 @@ public final class DefaultMaterializationPlanner implements MaterializationPlann
 
     private static String logicalFormat(ReadTarget target, PayloadFormat payloadFormat) {
         if (target instanceof ObjectSliceReadTarget object) {
+            // NCP2 makes the Kafka batch-to-row mapping version explicit on Object targets.
+            // BookKeeper generation-zero targets carry the same lossless mapping through their
+            // KAFKA_RECORD_BATCH payload identity because they have no logical-format field.
+            // Normalize only that exact V1 mapping so a newer NCP2 prefix can safely replace a
+            // retired BookKeeper prefix while the planner appends a still-readable BK tail.
+            if (payloadFormat == PayloadFormat.KAFKA_RECORD_BATCH
+                    && object.logicalFormat()
+                            .equals(
+                                    CompactedObjectFormatV2
+                                            .KAFKA_LOGICAL_FORMAT)) {
+                return payloadFormat.name();
+            }
             return object.logicalFormat();
         }
         if (target instanceof BookKeeperEntryRangeReadTarget) {

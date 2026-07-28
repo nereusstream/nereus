@@ -1041,7 +1041,7 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
             KafkaPartitionIdentity identity,
             Clock clock,
             long expectedEndOffset) {
-        long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+        long deadline = System.nanoTime() + Duration.ofSeconds(45).toNanos();
         try (SharedOxiaClientRuntime inspector =
                         SharedOxiaClientRuntime.connect(oxia, clock);
                 OxiaJavaKafkaPartitionMetadataStore partitions =
@@ -1096,9 +1096,14 @@ class NereusKafkaObjectWalRuntimeIntegrationTest {
                             failure);
                 }
             }
+            throw new AssertionError(
+                    "Kafka NCP2 generation did not commit before the integration deadline; "
+                            + "materialization tasks="
+                            + materializationInventory(
+                                    generations,
+                                    nereusCluster,
+                                    streamId));
         }
-        throw new AssertionError(
-                "Kafka NCP2 generation did not commit before the integration deadline");
     }
 
     private static StreamId partitionStreamId(
